@@ -69,10 +69,28 @@ async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
     follow_with(
         state,
         machine,
-        || next_page(state, machine, runner.clone()),
+        || {
+            alarm_page(
+                state,
+                machine,
+                runner.clone(),
+                crate::dashboard_api::alarms::follow::now_ms,
+            )
+        },
         tokio::time::sleep,
     )
     .await
+}
+
+pub(crate) async fn alarm_page(
+    state: &Arc<AppState>,
+    machine: &str,
+    runner: RunnerRecord,
+    now: impl FnOnce() -> Result<u64, ServerError> + Send,
+) -> Result<lys_runner::tracking_store::FeedPage, ServerError> {
+    let page = next_page(state, machine, runner.clone()).await?;
+    crate::dashboard_api::alarms::follow::tick_with_clock(state, machine, runner, now).await?;
+    Ok(page)
 }
 
 async fn next_page(

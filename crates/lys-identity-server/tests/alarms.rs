@@ -90,6 +90,7 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
         None, None, None, |config| { config.certificates_dir = None; }, |config| {
         let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
         let agent = seeded.people[0].agents[0].id;
+        let sibling = seeded.people[0].agents[1].id.to_string();
         let other = seeded.people[1].agents[0].id.to_string();
         let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
         let mut runtime = RuntimeStore::open(config.runtime_dir.as_deref().ok_or("no runtime dir")?, key)?;
@@ -108,7 +109,8 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
         FileLeafStore::create(&path, "lys/identity/alarms")?;
         let (mut log, _) = FrontierLog::open(FileLeafStore::open(&path)?)?;
         log.append(&serde_json::to_vec(&json!({"revision": 1, "alarms": [
-            alarm("alarm-own", &agent.to_string(), 100, None), alarm("alarm-other", &other, 101, None)]}))?)?;
+            alarm("alarm-own", &agent.to_string(), 100, None), alarm("alarm-other", &other, 101, None),
+            alarm("alarm-sibling", &sibling, 102, None)]}))?)?;
         Ok((agent.to_string(), pass))
     }).await?;
     let cookie = service
@@ -141,7 +143,9 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
         .send()
         .await?;
     assert_eq!(response.status(), 200);
+    assert!(!response.headers().contains_key("www-authenticate"));
     let answer: Value = response.json().await?;
+    assert_eq!(answer["result"]["isError"], false, "{answer}");
     let result = &answer["result"]["structuredContent"];
     assert_eq!(result["status"], 200, "{answer}");
     let alarms = result["body"]["alarms"]
@@ -150,6 +154,16 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
     assert_eq!(alarms.len(), 1);
     assert_eq!(alarms[0]["id"], "alarm-own");
     assert_eq!(alarms[0]["agent"], agent);
+    assert_eq!(result["body"]["revision"], 1);
+    let (status, own) = service.get("/alarms", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{own}");
+    assert_eq!(
+        own["alarms"]
+            .as_array()
+            .ok_or("missing person's alarms")?
+            .len(),
+        2
+    );
     Ok(())
 }
 

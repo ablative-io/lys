@@ -57,7 +57,12 @@ pub async fn tick_for_machine(state: &Arc<AppState>, machine: &str) -> Result<()
     tick(state, machine, runner).await
 }
 
-/// Evaluate after usage has been kept, before the next follow request waits.
+pub(crate) fn now_ms() -> Result<u64, ServerError> {
+    u64::try_from(jiff::Timestamp::now().as_millisecond())
+        .map_err(|error| server(unavailable(error)))
+}
+
+/// Evaluate a read usage page before the next follow request waits.
 ///
 /// # Errors
 /// Propagates runner, launch, configuration and alarm-store failures.
@@ -65,6 +70,15 @@ pub async fn tick(
     state: &Arc<AppState>,
     machine: &str,
     runner: RunnerRecord,
+) -> Result<(), ServerError> {
+    tick_with_clock(state, machine, runner, now_ms).await
+}
+
+pub(crate) async fn tick_with_clock(
+    state: &Arc<AppState>,
+    machine: &str,
+    runner: RunnerRecord,
+    now: impl FnOnce() -> Result<u64, ServerError> + Send,
 ) -> Result<(), ServerError> {
     let tracked = crate::runtime_api::with_runtime(state, |store| {
         Ok(store
@@ -134,8 +148,7 @@ pub async fn tick(
             proxy,
         });
     }
-    let at_ms = u64::try_from(jiff::Timestamp::now().as_millisecond())
-        .map_err(|error| server(unavailable(error)))?;
+    let at_ms = now()?;
     let changed = super::super::alarms_api::with_store(state, |store, threshold| {
         store.observe(&observations, at_ms, threshold)
     })
@@ -144,4 +157,14 @@ pub async fn tick(
         state.changes.signal()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[macro_use]
+#[path = "../../tests/alarms_follow.rs"]
+mod test_definitions;
+
+#[cfg(test)]
+mod tests {
+    alarms_follow!();
 }
