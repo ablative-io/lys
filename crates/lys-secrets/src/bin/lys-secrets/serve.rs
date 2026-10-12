@@ -80,7 +80,13 @@ pub fn serve(mut broker: Broker<Grants>, layout: Layout, listen: &str) -> Result
                 context: format!("listening on {listen}"),
                 source,
             })?;
-        println!("lys-secrets proxy listening on {listen}");
+        println!(
+            "lys-secrets proxy listening on {listen}, ready in {} ms",
+            crate::STARTED
+                .get_or_init(std::time::Instant::now)
+                .elapsed()
+                .as_millis()
+        );
         let app = crate::router::routes(shared);
         axum::serve(listener, app)
             .await

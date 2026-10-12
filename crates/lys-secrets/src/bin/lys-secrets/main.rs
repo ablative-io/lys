@@ -479,7 +479,11 @@ fn parse() -> Cli {
     Cli::from_arg_matches(&matches).unwrap_or_else(|error| error.exit())
 }
 
+/// When this process began, for the proxy's ready line.
+pub(crate) static STARTED: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
 fn main() -> ExitCode {
+    STARTED.get_or_init(std::time::Instant::now);
     match run(parse().command) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
