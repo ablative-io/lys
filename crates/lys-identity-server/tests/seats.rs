@@ -166,7 +166,7 @@ async fn a_second_machine_naming_this_installs_runner_is_refused_naming_the_firs
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_seat_whose_profile_does_not_require_controls_is_not_started() -> TestResult {
+async fn a_seat_whose_profile_does_not_require_controls_starts_as_a_pty() -> TestResult {
     let table = Table::set().await?;
     let machine = table
         .machine(
@@ -185,12 +185,17 @@ async fn a_seat_whose_profile_does_not_require_controls_is_not_started() -> Test
             &json!({ "operation": operation()? }),
         )
         .await?;
-    refused(&answer, 409, "seat_not_managed");
+    assert_eq!(answer.0, 200, "{}", answer.1);
+    let session = answer.1["session"].as_str().ok_or("no seat session")?;
+    let runner = table.serving.as_ref().ok_or("no runner")?.sessions();
+    let liveness = runner.liveness(Some(session))?;
+    assert!(liveness[0].alive);
+    assert!(!liveness[0].managed);
     let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
     assert_eq!(
         live["sessions"].as_array().map(Vec::len),
-        Some(0),
-        "a refused start starts nothing: {live}"
+        Some(1),
+        "the started seat has one live session: {live}"
     );
     let answer = table
         .service

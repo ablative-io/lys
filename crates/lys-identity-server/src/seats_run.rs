@@ -1,18 +1,6 @@
-//! A seat's start, stop and restart (AGENTS-002 R1, R3, R5), each a
-//! deliberate act admitted as `seats_acts.rs` says; its messages and
-//! attach are `seats_send.rs`'s.
-//!
-//! A start goes through the server's own start path, the one the start
-//! command takes, from the seat's exact profile version, and only when that
-//! version's session requires controls, so the runner starts it managed. A
-//! seat whose agent has no responsible person is not started, nor one whose
-//! latest import is in progress or stopped (`import_incomplete`, refused
-//! before anything is stopped or started), nor one the monitor still lists
-//! online. A stop is refused while the harness reports a turn
-//! in progress unless force is named; between turns a managed session is
-//! asked to end through the harness's own end request, and the runner then
-//! ends its process. A restart is a stop and then a start, under a new
-//! session.
+//! Seats start from their exact reviewed profile through the shared launcher.
+//! Their transport is selected by that profile. A busy stop requires force;
+//! an idle terminal receives an exit operation before its bounded exit wait.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -143,7 +131,6 @@ pub(crate) async fn restart(
     } else {
         None
     };
-    let held = seat(&state, &name)?;
     let begun = Box::pin(begin(
         &state,
         &headers,
@@ -189,7 +176,7 @@ async fn begin(
         .into());
     }
     state.seat_imports.require_selectable(&name)?;
-    if let (true, Some(session)) = (held.running, &held.session)
+    if let Some(session) = &held.session
         && session != operation
         && live_session(state, &held.added.machine, session)
             .await?
@@ -208,14 +195,7 @@ async fn begin(
             .cloned()
             .ok_or(ServerError::ProfileVersionUnknown { version: number })
     })?;
-    if !crate::launch_template::requires_controls(&version) {
-        return Err(SeatError::NotManaged {
-            agent: held.added.agent.clone(),
-            version: number,
-        }
-        .into());
-    }
-    let mut notes = vec![crate::seats_monitor::check(&name).await?];
+    let mut notes = vec![crate::seats_monitor::check(&name)?];
     let chosen = Chosen {
         profile: Some(version),
         directory: held.added.working_folder.clone(),
@@ -238,12 +218,17 @@ async fn begin(
             reason: "the kept start names no session".to_owned(),
         })?;
     let harness_session = match live_session(state, &held.added.machine, &session).await {
-        Ok(Some(live)) if live.harness_session.is_some() => live.harness_session,
-        Ok(Some(_)) => {
+        Ok(Some(live)) => {
             notes.push(format!(
-                "the runner has not yet seen the harness name its own session for {session}"
+                "the runner reports transport={} for session {session}",
+                if live.managed { "managed" } else { "pty" }
             ));
-            None
+            if live.harness_session.is_none() {
+                notes.push(format!(
+                    "the runner has not yet seen the harness name its own session for {session}"
+                ));
+            }
+            live.harness_session
         }
         Ok(None) => {
             notes.push(format!("the runner holds no session {session} to read"));
@@ -306,41 +291,49 @@ async fn end(
     };
     let session = running.ok_or_else(|| SeatError::NotRunning { name: name.clone() })?;
     let driven = driven(state, &session)?;
-    let live = live_session(state, &driven.machine, &session).await?;
     let mut notes = Vec::new();
     let mut ended = false;
-    match &live {
-        Some(live) if live.alive && !live.ended => {
-            if live.turn_active && !force {
-                return Err(SeatError::TurnInProgress { name, session }.into());
-            }
-            if live.managed && !live.turn_active {
-                let stop = Act::Operate {
-                    operation: Operation {
-                        operation: operation.to_owned(),
-                        session: session.clone(),
-                        request: OperationRequest::Stop,
-                    },
-                };
-                let (answer, _) = act(state, (&driven, caller, "seat_stop"), None, stop).await?;
-                if let Answer::Operation { outcome } = &answer
-                    && outcome.ended.is_some()
-                {
-                    ended = true;
-                    notes.push("the harness's own end request ended the session".to_owned());
-                } else {
-                    notes.push(format!(
-                        "the harness was asked to end the session ({})",
-                        kind(&answer)
-                    ));
+    if force {
+        notes.push("force was named: going straight to Act::End".to_owned());
+    } else {
+        let live = live_session(state, &driven.machine, &session).await?;
+        match &live {
+            Some(live) if live.alive && !live.ended => {
+                if live.turn_active && !force {
+                    return Err(SeatError::TurnInProgress { name, session }.into());
                 }
-            } else if live.turn_active {
-                notes.push("force was named: the session was ended mid-turn".to_owned());
+                if live.managed {
+                    let stop = Act::Operate {
+                        operation: Operation {
+                            operation: operation.to_owned(),
+                            session: session.clone(),
+                            request: OperationRequest::Stop,
+                        },
+                    };
+                    let (answer, _) =
+                        act(state, (&driven, caller, "seat_stop"), None, stop).await?;
+                    if let Answer::Operation { outcome } = &answer
+                        && outcome.ended.is_some()
+                    {
+                        ended = true;
+                        notes.push("the harness's own end request ended the session".to_owned());
+                    } else {
+                        notes.push(format!(
+                            "the harness was asked to end the session ({})",
+                            kind(&answer)
+                        ));
+                    }
+                } else {
+                    let (exited, receipt) =
+                        crate::seats_monitor::stop_pty(state, &driven, caller, operation).await?;
+                    ended = exited;
+                    notes.extend(receipt);
+                }
             }
-        }
-        Some(_) | None => {
-            ended = true;
-            notes.push("the runner already holds the session ended".to_owned());
+            Some(_) | None => {
+                ended = true;
+                notes.push("the runner already holds the session ended".to_owned());
+            }
         }
     }
     if !ended {
@@ -358,6 +351,12 @@ async fn end(
             }
             Err(other) => return Err(other),
         }
+    }
+    if !ended {
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "the seat stop answered without the process exit".to_owned(),
+        });
     }
     with_seats(state, |store| {
         store.keep(Line::Stopped(Stopped {

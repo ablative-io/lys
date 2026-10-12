@@ -40,16 +40,6 @@ pub enum SeatError {
         /// The operation id.
         operation: String,
     },
-    /// The seat's profile does not require controls, so it would not start managed.
-    #[error(
-        "seat_not_managed: profile version {version} of agent `{agent}` does not require controls, so the seat would not start managed: record a version whose session requires controls"
-    )]
-    NotManaged {
-        /// The agent.
-        agent: String,
-        /// The profile version.
-        version: u32,
-    },
     /// The seat's agent has no responsible person, so nobody answers for its runs.
     #[error("seat_no_responsible: seat `{name}` runs agent `{agent}`, for whom no person answers")]
     NoResponsible {
@@ -86,6 +76,7 @@ pub enum SeatError {
     #[error(
         "seat_online_in_monitor: the monitor at {monitor} lists seat `{name}` online: stop it there and turn its delivery off before starting it from Lys"
     )]
+    #[cfg(test)]
     OnlineInMonitor {
         /// The seat.
         name: String,
@@ -134,11 +125,11 @@ impl SeatError {
             Self::NameTaken { .. } => "seat_name_taken",
             Self::NameInvalid { .. } => "seat_name_invalid",
             Self::OperationReused { .. } => "seat_operation_reused",
-            Self::NotManaged { .. } => "seat_not_managed",
             Self::NoResponsible { .. } => "seat_no_responsible",
             Self::Running { .. } => "seat_running",
             Self::NotRunning { .. } => "seat_not_running",
             Self::TurnInProgress { .. } => "seat_turn_in_progress",
+            #[cfg(test)]
             Self::OnlineInMonitor { .. } => "seat_online_in_monitor",
             Self::RunnerLysTaken { .. } => "runner_lys_taken",
             Self::AttachRefused { .. } => "seat_attach_refused",
@@ -157,13 +148,13 @@ impl SeatError {
             Self::AttachRefused { .. } => StatusCode::FORBIDDEN,
             Self::NameTaken { .. }
             | Self::OperationReused { .. }
-            | Self::NotManaged { .. }
             | Self::NoResponsible { .. }
             | Self::Running { .. }
             | Self::NotRunning { .. }
             | Self::TurnInProgress { .. }
-            | Self::OnlineInMonitor { .. }
             | Self::RunnerLysTaken { .. } => StatusCode::CONFLICT,
+            #[cfg(test)]
+            Self::OnlineInMonitor { .. } => StatusCode::CONFLICT,
         }
     }
 }
@@ -191,13 +182,6 @@ mod tests {
                     operation: "op".to_owned(),
                 },
                 "seat_operation_reused",
-            ),
-            (
-                SeatError::NotManaged {
-                    agent: "agent".to_owned(),
-                    version: 1,
-                },
-                "seat_not_managed",
             ),
             (
                 SeatError::NoResponsible {

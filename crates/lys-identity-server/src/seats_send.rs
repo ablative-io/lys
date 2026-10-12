@@ -1,11 +1,11 @@
 //! A message to a seat and an attach to it (AGENTS-002 R4, R6).
 //!
 //! A message reaches the seat's running session as a user turn, through
-//! the runner's input, never as keys: text that is empty, or carries a
+//! the runner's operations table at a boundary: text that is empty, or carries a
 //! control character other than a line break or a tab, is refused by name,
 //! and a seat with no running session is refused `seat_not_running`. A
-//! message is kept under its operation id once delivered, so the same
-//! message sent again answers as delivered and is not delivered twice. A
+//! message is kept under its operation id once accepted, so the same
+//! message sent again answers its current outcome and is not delivered twice. A
 //! line typed in `lys attach --type` is a message kept as `attach_type`.
 //!
 //! An attach reads the seat's live session as lines, for its responsible
@@ -21,7 +21,9 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::HeaderMap;
 use lys_identity::OperationId;
+use lys_runner::operations::{Operation, OperationOutcome, OperationRequest, OperationState};
 use lys_runner::{Act, Answer};
+use serde::Serialize;
 
 use crate::error::ServerError;
 use crate::error_seat::SeatError;
@@ -34,13 +36,22 @@ use crate::seats_state::{Line, Sent};
 use crate::seats_views::{SeatAttachBody, SeatAttached, SeatSendBody, SeatSent};
 use crate::session::now;
 
+/// The accepted message and the runner's current operation receipt.
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct SeatMessage {
+    #[serde(flatten)]
+    sent: SeatSent,
+    #[schema(value_type = Object)]
+    operation: OperationOutcome,
+}
+
 pub(crate) async fn send(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
     Path(name): Path<String>,
     given: Result<Json<SeatSendBody>, JsonRejection>,
-) -> Result<Json<SeatSent>, ServerError> {
+) -> Result<Json<SeatMessage>, ServerError> {
     let given = body(given)?;
     Box::pin(deliver(
         &state,
@@ -59,7 +70,7 @@ pub(crate) async fn typed(
     OriginalUri(uri): OriginalUri,
     Path(name): Path<String>,
     given: Result<Json<SeatSendBody>, JsonRejection>,
-) -> Result<Json<SeatSent>, ServerError> {
+) -> Result<Json<SeatMessage>, ServerError> {
     let given = body(given)?;
     Box::pin(deliver(
         &state,
@@ -157,7 +168,7 @@ async fn deliver(
     (url, name): (&str, &str),
     given: SeatSendBody,
     how: &str,
-) -> Result<Json<SeatSent>, ServerError> {
+) -> Result<Json<SeatMessage>, ServerError> {
     OperationId::from_str(&given.operation)?;
     let held = seat(state, name)?;
     let (admission, _) = admitted(state, headers, &held, SEND, url)?;
@@ -175,43 +186,49 @@ async fn deliver(
         })
     };
     let kept = with_seats(state, |store| Ok(store.recorded(&given.operation).cloned()))?;
-    if let Some(kept) = kept {
-        return match kept {
-            Line::Sent(sent) if kept_same(&sent, &asked(&sent.session)) => Ok(Json(SeatSent {
-                seat: shown(state, &held).await?,
-                session: sent.session,
-                delivered: true,
-                admission,
-            })),
-            other => Err(SeatError::OperationReused {
+    let recorded = kept.is_some();
+    let session = match kept {
+        Some(Line::Sent(sent)) if kept_same(&sent, &asked(&sent.session)) => sent.session,
+        Some(other) => {
+            return Err(SeatError::OperationReused {
                 operation: other.operation().to_owned(),
             }
-            .into()),
-        };
-    }
-    let running = if held.running {
-        held.session.clone()
-    } else {
-        None
+            .into());
+        }
+        None => held
+            .session
+            .clone()
+            .filter(|_| held.running)
+            .ok_or_else(|| SeatError::NotRunning {
+                name: name.to_owned(),
+            })?,
     };
-    let session = running.ok_or_else(|| SeatError::NotRunning {
-        name: name.to_owned(),
-    })?;
     let driven = driven(state, &session)?;
-    let input = Act::Input {
+    let operation = Operation {
+        operation: given.operation.clone(),
         session: session.clone(),
-        text: given.text.clone(),
-        enter: true,
+        request: OperationRequest::Notice {
+            text: given.text.clone(),
+        },
     };
-    match act(
+    let request = if recorded {
+        Act::Outcome {
+            operation: given.operation.clone(),
+        }
+    } else {
+        Act::Operate {
+            operation: operation.clone(),
+        }
+    };
+    let answer = match act(
         state,
         (&driven, &admission.caller, how),
         Some(digest.clone()),
-        input,
+        request,
     )
     .await
     {
-        Ok(_) => {}
+        Ok((answer, _)) => answer,
         Err(ServerError::Runner { refusal, .. })
             if matches!(refusal.as_str(), "session_ended" | "session_unknown") =>
         {
@@ -221,15 +238,47 @@ async fn deliver(
             .into());
         }
         Err(other) => return Err(other),
-    }
+    };
+    let outcome = outcome(answer, &operation)?;
     let line = asked(&session);
     with_seats(state, |store| store.keep(line))?;
-    Ok(Json(SeatSent {
-        seat: shown(state, &held).await?,
-        session,
-        delivered: true,
-        admission,
+    Ok(Json(SeatMessage {
+        sent: SeatSent {
+            seat: shown(state, &held).await?,
+            session,
+            delivered: matches!(
+                outcome.state,
+                OperationState::Delivered | OperationState::Confirmed
+            ),
+            admission,
+        },
+        operation: outcome,
     }))
+}
+
+/// A receipt must name the exact operation the runner was asked for.
+pub(crate) fn outcome(answer: Answer, asked: &Operation) -> Result<OperationOutcome, ServerError> {
+    let Answer::Operation { outcome } = answer else {
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: format!("a seat operation was answered {}", kind(&answer)),
+        });
+    };
+    let text = match &asked.request {
+        OperationRequest::Notice { text } => Some(lys_runner::operations::TextDigest::of(text)),
+        _ => None,
+    };
+    if outcome.operation != asked.operation
+        || outcome.session != asked.session
+        || outcome.request != asked.request.name()
+        || outcome.text != text
+    {
+        return Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: "the receipt does not name the seat operation that was asked".to_owned(),
+        });
+    }
+    Ok(outcome)
 }
 
 fn kept_same(kept: &Sent, asked: &Line) -> bool {

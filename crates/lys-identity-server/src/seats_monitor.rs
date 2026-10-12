@@ -1,98 +1,142 @@
-//! Before a seat starts from Lys, the monitor's registry is asked whether it
-//! still lists the seat's name online (AGENTS-002 R5), so no seat is watched
-//! twice while it moves.
-//!
-//! The monitor is reached at the base `LYS_MONITOR_URL` names, by its seats
-//! listing `GET {base}/api/seats`, which answers
-//! `{"seats": [{"name", "online"}, ..]}` with `online` true, false, or null
-//! while the monitor cannot read its terminal program. The collector's
-//! secret, when `LYS_MONITOR_SECRET` names one, rides in the header
-//! `LYS_MONITOR_SECRET_HEADER` names; a secret named with no header name, or
-//! a header name that is not one, refuses the start `ConfigInvalid`, and no
-//! header name is ever assumed. With no base named the check is skipped, and
-//! the answer says so. A name the monitor lists online refuses the start
-//! `seat_online_in_monitor`. The monitor unreachable, refusing, answering
-//! what does not read, or not knowing whether the seat is online, does not
-//! block the start: each is said in the answer's notes, in words.
+//! Seat liveness belongs to the runner. Retired monitor settings are refused.
+//! Terminal stop waits follow the runner's output and process exit signals.
 
-use std::env::VarError;
+use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg(test)]
 use reqwest::header::HeaderName;
+#[cfg(test)]
 use serde_json::Value;
 
 use crate::error::ServerError;
+#[cfg(test)]
 use crate::error_seat::SeatError;
+use crate::routes::AppState;
+use crate::runner_acts::Digested;
+use crate::runner_sessions::{Driven, kind, record_end};
+use crate::seats_acts::act;
+use lys_runner::operations::{Operation, OperationRequest, OperationState};
+use lys_runner::{Act, Answer};
 
-/// The variable naming the monitor's base address.
-pub const MONITOR_URL: &str = "LYS_MONITOR_URL";
-/// The variable naming the monitor collector's secret.
-pub const MONITOR_SECRET: &str = "LYS_MONITOR_SECRET";
-/// The variable naming the header the collector's secret rides in.
-pub const MONITOR_SECRET_HEADER: &str = "LYS_MONITOR_SECRET_HEADER";
+/// The bounded grace period after accepting the terminal's exit operation.
+pub(crate) const STOP_WAIT: Duration = Duration::from_secs(30);
 
-/// How long the monitor is given to answer before it is said unreachable.
+#[cfg(test)]
 const ASKED_FOR: Duration = Duration::from_secs(5);
 
-/// Ask the monitor, at the base the environment names, whether `name` is
-/// online; answer the note the start carries, or refuse when it is online
-/// or when its secret is named without the header it rides in.
-pub(crate) async fn check(name: &str) -> Result<String, ServerError> {
-    let base = match std::env::var(MONITOR_URL) {
-        Ok(base) => base,
-        Err(VarError::NotPresent) => {
-            return Ok(format!(
-                "the monitor was not asked whether seat {name} is online: {MONITOR_URL} names no monitor"
-            ));
-        }
-        Err(VarError::NotUnicode(given)) => {
-            return Ok(format!(
-                "the monitor was not asked whether seat {name} is online: {MONITOR_URL} is not text ({})",
-                given.to_string_lossy()
-            ));
-        }
-    };
-    let secret = match std::env::var(MONITOR_SECRET) {
-        Ok(secret) => Some(secret),
-        Err(VarError::NotPresent) => None,
-        Err(VarError::NotUnicode(_)) => {
-            return Ok(format!(
-                "the monitor was not asked whether seat {name} is online: {MONITOR_SECRET} is not text"
-            ));
-        }
-    };
-    let Some(secret) = secret else {
-        return check_at(&base, None, name).await;
-    };
-    let header = secret_header()?;
-    check_at(&base, Some((&header, secret.as_str())), name).await
-}
-
-/// The header the environment names for the collector's secret, refused
-/// `ConfigInvalid` when it names none or names no header.
-fn secret_header() -> Result<HeaderName, ServerError> {
-    let given = match std::env::var(MONITOR_SECRET_HEADER) {
-        Ok(given) => given,
-        Err(VarError::NotPresent) => {
+/// Refuse retired setting names without reading or reporting their values.
+pub(crate) fn check(name: &str) -> Result<String, ServerError> {
+    for key in [
+        "LYS_MONITOR_URL",
+        "LYS_MONITOR_SECRET",
+        "LYS_MONITOR_SECRET_HEADER",
+    ] {
+        if std::env::var_os(key).is_some() {
             return Err(ServerError::ConfigInvalid {
                 reason: format!(
-                    "{MONITOR_SECRET} names a secret but {MONITOR_SECRET_HEADER} names no header for it to ride in"
+                    "{key} is retired: delete the line setting {key}; seat {name}'s liveness comes from the runner"
                 ),
             });
         }
-        Err(VarError::NotUnicode(_)) => {
-            return Err(ServerError::ConfigInvalid {
-                reason: format!("{MONITOR_SECRET_HEADER} is not text"),
+    }
+    Ok(format!("seat {name}'s liveness is read from its runner"))
+}
+
+/// Deliver an exit operation and retain the grace budget and its result.
+pub(crate) async fn stop_pty(
+    state: &Arc<AppState>,
+    driven: &Driven,
+    caller: &str,
+    operation: &str,
+) -> Result<(bool, Vec<String>), ServerError> {
+    let exit = Operation {
+        operation: operation.to_owned(),
+        session: driven.session.clone(),
+        request: OperationRequest::Notice {
+            text: "/exit".to_owned(),
+        },
+    };
+    let (answer, _) = act(
+        state,
+        (driven, caller, "seat_stop"),
+        Some(Digested::of("/exit")),
+        Act::Operate {
+            operation: exit.clone(),
+        },
+    )
+    .await?;
+    let outcome = crate::seats_send::outcome(answer, &exit)?;
+    let mut notes = vec![format!(
+        "PTY exit operation {operation}: {:?}; stop_wait={}s",
+        outcome.state,
+        STOP_WAIT.as_secs()
+    )];
+    if outcome.state == OperationState::Refused {
+        return Err(ServerError::Runner {
+            refusal: "operation_refused".to_owned(),
+            words: outcome.words,
+        });
+    }
+    let ended = wait_for_exit(state, driven).await?;
+    notes.push(if ended {
+        "the runner observed the process exit after /exit".to_owned()
+    } else {
+        format!(
+            "stop_wait={}s expired; ending the process with Act::End",
+            STOP_WAIT.as_secs()
+        )
+    });
+    Ok((ended, notes))
+}
+
+/// Wait for the runner's exit evidence, bounded by the terminal stop budget.
+async fn wait_for_exit(state: &Arc<AppState>, driven: &Driven) -> Result<bool, ServerError> {
+    match tokio::time::timeout(STOP_WAIT, exited(state, driven)).await {
+        Ok(answer) => answer,
+        Err(_) => Ok(false),
+    }
+}
+
+async fn exited(state: &Arc<AppState>, driven: &Driven) -> Result<bool, ServerError> {
+    let mut cursor = None;
+    loop {
+        let answer = crate::runner_client::ask(
+            state,
+            &driven.machine,
+            driven.runner.clone(),
+            Act::Read {
+                session: driven.session.clone(),
+                cursor,
+                lines: None,
+                bytes: cursor.is_none().then_some(0),
+                follow: cursor.is_some(),
+            },
+        )
+        .await?;
+        let Answer::Output { output } = answer else {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: format!("a seat exit read was answered {}", kind(&answer)),
+            });
+        };
+        if output.session != driven.session {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: "the exit read names another session".to_owned(),
             });
         }
-    };
-    HeaderName::from_bytes(given.as_bytes()).map_err(|error| ServerError::ConfigInvalid {
-        reason: format!("{MONITOR_SECRET_HEADER} `{given}` is not a header name: {error}"),
-    })
+        if let Some(ended) = &output.ended {
+            record_end(state, driven, ended)?;
+            return Ok(true);
+        }
+        cursor = Some(output.cursor);
+    }
 }
 
 /// Ask the monitor at `base` whether `name` is online, with the collector's
 /// secret in its header when one is given.
+#[cfg(test)]
 pub(crate) async fn check_at(
     base: &str,
     secret: Option<(&HeaderName, &str)>,
@@ -149,6 +193,7 @@ pub(crate) async fn check_at(
 
 /// Whether the monitor's seats listing `body` names `name` online: none when
 /// it does not list the name or does not know.
+#[cfg(test)]
 pub(crate) fn online_in(body: &Value, name: &str) -> Result<Option<bool>, String> {
     let seats = body
         .get("seats")
