@@ -266,21 +266,32 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
     match proved_ready(ready, &child, &planned) {
         Ok((runner, announced, build)) => {
             // The owner outlives this runner; reap it if it exits first,
-            // without waiting here.
+            // without waiting here. The child is handed over only once the
+            // reaper runs, so a reaper that cannot start leaves this start
+            // holding it, to end and wait for: dropped unwaited, the killed
+            // owner would stay a zombie the kernel still answers for.
             let pid = announced.pid;
+            let (hand, handed) = std::sync::mpsc::channel::<std::process::Child>();
             let reaper = std::thread::Builder::new()
                 .name(format!("lys-owner-reaper-{pid}"))
                 .spawn(move || {
+                    let Ok(mut child) = handed.recv() else {
+                        return;
+                    };
                     if let Err(error) = child.wait() {
                         crate::error::said(&format!("seat_owner_reaper_failed: {error}"));
                     }
                 });
             if let Err(error) = reaper {
-                // The child moved into the closure that never ran: end the
-                // owner by its proved identity instead.
-                return Err(end_owner(
-                    &announced,
+                return Err(abandon(
+                    &mut child,
                     &start_failed(format!("the reaper could not start: {error}")),
+                ));
+            }
+            if let Err(std::sync::mpsc::SendError(mut unhanded)) = hand.send(child) {
+                return Err(abandon(
+                    &mut unhanded,
+                    &start_failed("the reaper ended before it took the owner"),
                 ));
             }
             let mut endpoint = OwnerEndpoint::new(dir, planned, runner, announced);
