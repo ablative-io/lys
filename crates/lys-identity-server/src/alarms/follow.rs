@@ -88,21 +88,50 @@ pub(crate) async fn tick_with_clock(
             .cloned()
             .collect::<Vec<_>>())
     })?;
-    let live =
-        match crate::runner_client::ask(state, machine, runner, Act::Liveness { session: None })
-            .await?
-        {
-            Answer::Liveness { sessions } => sessions,
-            other => {
-                return Err(ServerError::Runner {
-                    refusal: "runner_answer_unexpected".to_owned(),
-                    words: format!("alarm liveness read answered {other:?}"),
-                });
-            }
-        };
+    let live = match crate::runner_client::ask(
+        state,
+        machine,
+        runner.clone(),
+        Act::Liveness { session: None },
+    )
+    .await?
+    {
+        Answer::Liveness { sessions } => sessions,
+        other => {
+            return Err(ServerError::Runner {
+                refusal: "runner_answer_unexpected".to_owned(),
+                words: format!("alarm liveness read answered {other:?}"),
+            });
+        }
+    };
     let mut observations = Vec::new();
     let mut thresholds = std::collections::BTreeMap::new();
-    for session in tracked {
+    for mut session in tracked {
+        if !session.stopped() && !live.iter().any(|seen| seen.session == session.session) {
+            let answered = crate::runner_client::ask(
+                state,
+                machine,
+                runner.clone(),
+                Act::Status {
+                    session: Some(session.session.clone()),
+                },
+            )
+            .await;
+            if matches!(&answered, Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown")
+            {
+                session = crate::runtime_api::with_runtime(state, |store| {
+                    store
+                        .session(&session.session)
+                        .cloned()
+                        .ok_or(ServerError::RuntimeSessionUnknown)
+                })?;
+            } else if let Err(error) = answered {
+                (state.say)(&format!(
+                    "refusals: session {} on machine {machine} could not be reconciled: {error}",
+                    session.session
+                ));
+            }
+        }
         match session_observation(state, machine, &session, &live) {
             Ok((observation, threshold)) => {
                 thresholds.insert(session.session.clone(), threshold);
@@ -214,4 +243,134 @@ mod kept_test_definitions;
 mod tests {
     alarms_follow!();
     kept_feed!();
+}
+
+#[cfg(test)]
+mod seatfix_tests {
+    use crate::budgets_feed::entry_tests::fixture;
+    use crate::runner_client::RunnerRecord;
+    use lys_runner::{Act, Answer};
+    use std::error::Error;
+    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[tokio::test]
+    async fn seatfix_unknown_phantoms_end_once_and_are_never_polled_again()
+    -> Result<(), Box<dyn Error>> {
+        let table = fixture().await?;
+        let phantoms = [
+            "op-1c4c41a08dbce7c50875ea0601768dd7",
+            "op-d62657b3b6d63900190ea2dcb26174e9",
+            "op-c85491ce760726ce9ceb531bb3e54140",
+            "op-a1dc3d3bd3cf0faf6f08a5bcfa3471f2",
+        ];
+        for session in phantoms {
+            table.track(session, "machine")?;
+        }
+        let root = table.state.estate_plan_file.parent().ok_or("no root")?;
+        let key = lys_core::Ed25519Identity::load(&root.join("key"))?.public_key_bytes();
+        let dir = tempfile::tempdir()?;
+        let socket = dir.path().join("missing.sock");
+        let listener = tokio::net::UnixListener::bind(&socket)?;
+        let record = RunnerRecord::Socket {
+            path: socket.to_string_lossy().into_owned(),
+        };
+        crate::network_api::with_network(&table.state, |store| {
+            store.name_runner("machine", Some(record.clone()))
+        })?;
+        let (stop, mut stopped) = tokio::sync::oneshot::channel();
+        let worker = tokio::spawn(async move {
+            let mut statuses = 0;
+            loop {
+                let (stream, _) = tokio::select! { accepted = listener.accept() => accepted?, result = &mut stopped => { result.map_err(std::io::Error::other)?; return Ok::<_, std::io::Error>(statuses); } };
+                let greeting =
+                    lys_runner::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
+                let mut stream = BufReader::new(stream);
+                stream
+                    .get_mut()
+                    .write_all(format!("{}\n", greeting.line()).as_bytes())
+                    .await?;
+                let mut line = String::new();
+                stream.read_line(&mut line).await?;
+                let act = lys_runner::protocol::verify_request(&line, &key, &greeting)
+                    .map_err(std::io::Error::other)?;
+                let answer = match act {
+                    Act::Liveness { session: None } => Answer::Liveness {
+                        sessions: Vec::new(),
+                    },
+                    Act::Owned => Answer::Owned {
+                        owners: Vec::new(),
+                        unreachable: Vec::new(),
+                    },
+                    Act::Status { session: Some(_) } => {
+                        statuses += 1;
+                        Answer::refusal(&lys_runner::RunnerError::refused(
+                            "session_unknown",
+                            "no session is held",
+                        ))
+                    }
+                    other => return Err(std::io::Error::other(format!("unexpected {other:?}"))),
+                };
+                stream
+                    .get_mut()
+                    .write_all(format!("{}\n", lys_runner::protocol::reply_line(answer)).as_bytes())
+                    .await?;
+            }
+        });
+        let result = async {
+            super::tick_with_clock(&table.state, "machine", record.clone(), || Ok(3000)).await?;
+            crate::runtime_api::with_runtime(&table.state, |store| {
+                for session in phantoms {
+                    let tracked = store
+                        .session(session)
+                        .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?;
+                    assert!(tracked.stopped(), "{session} remains live");
+                    assert_eq!(tracked.reports.len(), 3);
+                    assert_eq!(
+                        tracked
+                            .latest()
+                            .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?
+                            .confirmation,
+                        "runner never held it"
+                    );
+                }
+                Ok(())
+            })?;
+            super::tick_with_clock(&table.state, "machine", record.clone(), || Ok(4000)).await?;
+            for session in phantoms {
+                let refused = crate::runner_client::ask(
+                    &table.state,
+                    "machine",
+                    record.clone(),
+                    Act::Status {
+                        session: Some(session.to_owned()),
+                    },
+                )
+                .await
+                .err()
+                .ok_or("settled phantom was asked again")?;
+                assert_eq!(refused.name(), "session_unknown");
+            }
+            crate::runtime_api::with_runtime(&table.state, |store| {
+                for session in phantoms {
+                    assert_eq!(
+                        store
+                            .session(session)
+                            .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?
+                            .reports
+                            .len(),
+                        3
+                    );
+                }
+                Ok(())
+            })?;
+            Ok::<_, Box<dyn Error>>(())
+        }
+        .await;
+        stop.send(()).map_err(|()| "worker ended")?;
+        let statuses = worker.await??;
+        table.finish().await?;
+        result?;
+        assert_eq!(statuses, 4);
+        Ok(())
+    }
 }

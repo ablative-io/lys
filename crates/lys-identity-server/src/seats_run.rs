@@ -177,6 +177,24 @@ async fn begin(
         .into());
     }
     state.seat_imports.require_selectable(&name)?;
+    let runner = crate::runner_sessions::machine_runner(state, &held.added.machine)?
+        .ok_or(ServerError::MachineWithoutRunner)?;
+    match crate::runner_client::ask(
+        state,
+        &held.added.machine,
+        runner,
+        Act::Status { session: None },
+    )
+    .await?
+    {
+        Answer::Status { .. } => {}
+        other => {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: format!("seat start readiness answered {}", kind(&other)),
+            });
+        }
+    }
     if let Some(session) = &held.session
         && session != operation
         && live_session(state, &held.added.machine, session)
@@ -386,6 +404,56 @@ async fn end(
 #[cfg(test)]
 mod tests {
     use super::part;
+
+    #[tokio::test]
+    async fn seatfix_unreachable_start_is_refused_before_tracking()
+    -> Result<(), Box<dyn std::error::Error>> {
+        use crate::budgets_feed::entry_tests::fixture;
+        use serde_json::json;
+        let table = fixture().await?;
+        crate::network_api::with_network(&table.state, |store| {
+            store.name_runner(
+                "machine",
+                Some(crate::runner_client::RunnerRecord::Socket {
+                    path: table
+                        .state
+                        .estate_plan_file
+                        .with_file_name("missing.sock")
+                        .to_string_lossy()
+                        .into_owned(),
+                }),
+            )
+        })?;
+        let held = serde_json::from_value(json!({
+            "added":{"operation":"op-a", "name":"seatfix", "agent":table.agent, "harness":"claude", "profile_version":1,
+                "machine":"machine", "working_folder":null, "account":null, "by":"person", "at":1},
+            "session":null,"harness_session":null,"running":false,"revision":1
+        }))?;
+        let standing = crate::seats_acts::Standing {
+            asker: lys_identity::IdentityId::Agent(table.agent.parse()?),
+            administrator: false,
+            responsible: Some("person".to_owned()),
+            is_responsible: true,
+            pass: false,
+        };
+        let refused = super::begin(
+            &table.state,
+            &axum::http::HeaderMap::new(),
+            (&held, &standing),
+            "person",
+            "op-seatfix",
+            None,
+        )
+        .await
+        .err()
+        .ok_or("start accepted")?;
+        assert_eq!(refused.name(), "runner_unreachable", "{refused}");
+        crate::runtime_api::with_runtime(&table.state, |store| {
+            assert!(store.sessions().is_empty());
+            Ok(())
+        })?;
+        table.finish().await
+    }
 
     #[test]
     fn a_restart_names_its_parts_the_same_each_time() {
