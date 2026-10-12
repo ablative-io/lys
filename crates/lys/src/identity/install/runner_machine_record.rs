@@ -11,6 +11,9 @@ use super::{Layout, provide};
 use crate::identity::error::{ErrorKind, IdentityError, IdentityResult};
 use crate::identity::private_files;
 
+#[path = "runner_machine_record/own_machine.rs"]
+mod own_machine;
+
 /// The installed key and the join receipt belonging to that key, when one exists.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Recorded {
@@ -32,6 +35,7 @@ struct Joins {
 
 #[derive(Deserialize)]
 struct Join {
+    operation: String,
     machine: String,
     standing: Standing,
 }
@@ -65,7 +69,7 @@ fn identity(text: &str, prefix: &str) -> bool {
 /// Read the key's join receipt without rotating or inventing a computer identity.
 ///
 /// # Errors
-/// Names invalid keys, unreadable joins and a key recorded against several computers.
+/// Names invalid keys, unreadable joins and conflicting joins without this install's computer.
 pub fn recorded(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Recorded> {
     let key = lys_runner::protocol::hex(&provide(layout, say)?.public_key_bytes());
     let path = layout.data_dir().join("network.joins.json");
@@ -84,6 +88,7 @@ pub fn recorded(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Re
     if joins.format != "lys-runner-joins/v1" {
         return Err(failed(&path, "runner_machine_joins_format_unknown"));
     }
+    let mut matching = Vec::new();
     for join in joins.codes {
         let Standing::Used {
             key,
@@ -102,17 +107,27 @@ pub fn recorded(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Re
         {
             return Err(failed(&path, "runner_machine_join_identity_invalid"));
         }
-        if recorded
-            .computer
-            .as_ref()
-            .is_some_and(|held| held != &join.machine)
-        {
-            return Err(failed(
-                &path,
-                "runner_machine_join_conflict: this key names several computers",
+        matching.push((join.operation, join.machine, joined));
+    }
+    let conflicting = matching
+        .first()
+        .is_some_and(|(_, first, _)| matching.iter().any(|(_, machine, _)| machine != first));
+    let own = if conflicting {
+        let own = own_machine::read(layout)?;
+        Some(own.filter(|own| matching.iter().any(|(_, machine, _)| machine == own))
+            .ok_or_else(|| failed(&path,
+                "runner_machine_join_conflict: this key names several computers, none is this install's own machine"))?)
+    } else {
+        None
+    };
+    for (operation, machine, joined) in matching {
+        if own.as_ref().is_some_and(|own| own != &machine) {
+            say(&format!(
+                "runner machine record: other join {operation} names computer {machine}; recording this install's own machine"
             ));
+            continue;
         }
-        recorded.computer = Some(join.machine);
+        recorded.computer = Some(machine);
         recorded.identity = joined;
     }
     Ok(recorded)
@@ -197,4 +212,72 @@ fn atomic(path: &Path, bytes: &[u8]) -> IdentityResult<()> {
         return Err(failed(path, &error));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod seatfix_tests {
+    use super::*;
+    #[test]
+    fn seatfix_conflicting_joins_choose_own_machine_in_either_order()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let dir = tempfile::tempdir()?;
+        let layout = Layout::at(dir.path().to_owned());
+        let key = provide(&layout, &mut |_| {})?;
+        fs::create_dir_all(layout.data_dir())?;
+        let public = lys_runner::protocol::hex(&key.public_key_bytes());
+        let own = "op-11111111111111111111111111111111";
+        let other = "op-22222222222222222222222222222222";
+        let network = layout.data_dir().join("network.json");
+        fs::write(
+            layout.service_config(),
+            serde_json::to_vec(
+                &serde_json::json!({"network_file":network,"runner_socket":layout.runner_socket()}),
+            )?,
+        )?;
+        let runner_id = "44444444444444444444444444444444";
+        fs::create_dir_all(layout.data_dir().join("runner"))?;
+        fs::write(layout.data_dir().join("runner/runner.id"), runner_id)?;
+        let own_computer = serde_json::json!({"id":own,"retired":null});
+        let other_computer = serde_json::json!({"id":other,"retired":{"at":1}});
+        let journal = format!("LYS-NETWORK-1\n{}\n{}\n{}\n",
+            serde_json::json!({"machines":[own_computer, {"id":other,"retired":null}],"runners":{other:{"kind":"lys"}}}),
+            serde_json::json!({"change":"retired","machine":other,"retirement":{"at":1}}),
+            serde_json::json!({"change":"runner","machine":own,"runner":{"kind":"lys"}})
+        ).into_bytes();
+        for network_bytes in [
+            serde_json::to_vec(
+                &serde_json::json!({"machines":[own_computer,other_computer],"runners":{own:{"kind":"lys"},other:{"kind":"lys"}}}),
+            )?,
+            serde_json::to_vec(
+                &serde_json::json!({"machines":[own_computer],"runners":{own:{"kind":"dialled","runner":runner_id}}}),
+            )?,
+            serde_json::to_vec(
+                &serde_json::json!({"machines":[own_computer],"runners":{own:{"kind":"socket","path":layout.runner_socket()}}}),
+            )?,
+            journal,
+        ] {
+            fs::write(&network, network_bytes)?;
+            for machines in [[own, other], [other, own]] {
+                let codes = machines.map(|machine| serde_json::json!({"operation":machine,"machine":machine,"standing":{"state":"used","key":public,"identity":"machine-33333333333333333333333333333333"}}));
+                let bytes = serde_json::to_vec(
+                    &serde_json::json!({"format":"lys-runner-joins/v1","codes":codes}),
+                )?;
+                fs::write(layout.data_dir().join("network.joins.json"), &bytes)?;
+                let mut said = Vec::new();
+                let record = recorded(&layout, &mut |line| said.push(line.to_owned()))?;
+                assert_eq!(record.computer.as_deref(), Some(own));
+                assert!(said.iter().any(|line| line.contains(other)));
+                assert_eq!(
+                    fs::read(layout.data_dir().join("network.joins.json"))?,
+                    bytes
+                );
+            }
+        }
+        fs::write(&network, b"{\"machines\":[],\"runners\":{}}")?;
+        let error = recorded(&layout, &mut |_| {})
+            .err()
+            .ok_or("unidentified install accepted conflicting joins")?;
+        assert!(error.to_string().contains("runner_machine_join_conflict"));
+        Ok(())
+    }
 }
