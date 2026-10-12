@@ -25,11 +25,8 @@ use axum::response::{IntoResponse, Response};
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_core::Ed25519Identity;
-use lys_identity::{
-    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, Profile, Provenance,
-    Transition,
-};
-use lys_identity_server::dev_seed::{Seeded, SeededAgent, SeededPerson};
+use lys_identity::OperationId;
+use lys_identity_server::dev_seed::{Seeded, seed_configured};
 use lys_identity_server::secrets_api::SecretsSettings;
 use lys_runner::console_stop;
 use lys_runner::{Options, Runner, Serving};
@@ -40,14 +37,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 const BEA: &str = "bea-subject";
 
 /// Every handle the stand-in broker was asked to end, by id.
-type Drops = Arc<Mutex<BrokerProbe>>;
-
-#[derive(Default)]
-struct BrokerProbe {
-    drops: Vec<String>,
-    callers: Vec<(String, String)>,
-    refuse_drop: bool,
-}
+type Drops = Arc<Mutex<Vec<String>>>;
 
 /// The broker path and the person each call acts for.
 type BrokerCalls = Arc<Mutex<Vec<(String, String)>>>;
@@ -95,13 +85,6 @@ async fn broker(
         .into_response();
     }
     if path == "/_lys/drop" {
-        if refuse_drop {
-            return (
-                axum::http::StatusCode::FORBIDDEN,
-                "BrokerOwnerRefused: custody denied",
-            )
-                .into_response();
-        }
         let Ok(bytes) = to_bytes(request.into_body(), usize::MAX).await else {
             return axum::Json(json!({ "refusal": "unreadable" })).into_response();
         };
@@ -110,7 +93,6 @@ async fn broker(
         drops
             .lock()
             .expect("fixture lock poisoned")
-            .drops
             .push(handle.clone());
         return axum::Json(json!({ "handle": handle, "outcome": "ended" })).into_response();
     }
@@ -126,72 +108,6 @@ fn login(subject: &str) -> Login {
 
 fn operation() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
-}
-
-/// Stop cases need only one active agent per person, with every seed event
-/// still written through the directory's typed API.
-fn seed_stop(config: &lys_identity_server::Config) -> Result<Seeded, Box<dyn Error>> {
-    let mut directory = lys_identity_server::routes::open_directory(config)?;
-    let actor = Actor::new(
-        config.administrator_binding()?,
-        Provenance::new(AuthMethod::Oidc, lys_identity_server::session::now()),
-    );
-    let mut people = Vec::new();
-    for (subject, name, agent_name) in [
-        (ADMINISTRATOR, "Ada (test person)", "Scribe"),
-        (BEA, "Bea (test person)", "Reviewer"),
-    ] {
-        let at = lys_identity_server::session::now();
-        let (id, _) = directory.register_person(
-            actor.clone(),
-            OperationId::generate()?,
-            Profile::new(name)?,
-            at,
-        )?;
-        directory.bind_login(
-            actor.clone(),
-            OperationId::generate()?,
-            id,
-            LoginBinding::new(&config.issuer, subject)?,
-            at,
-        )?;
-        directory.transition(
-            actor.clone(),
-            OperationId::generate()?,
-            IdentityId::Person(id),
-            Transition::Activate,
-            "",
-            at,
-        )?;
-        let (agent, _) = directory.register_agent(
-            actor.clone(),
-            OperationId::generate()?,
-            id,
-            Profile::new(agent_name)?,
-            at,
-        )?;
-        directory.transition(
-            actor.clone(),
-            OperationId::generate()?,
-            IdentityId::Agent(agent),
-            Transition::Activate,
-            "",
-            at,
-        )?;
-        people.push(SeededPerson {
-            id,
-            display_name: name.to_owned(),
-            subject: subject.to_owned(),
-            agents: vec![SeededAgent {
-                id: agent,
-                display_name: agent_name.to_owned(),
-                state: LifecycleState::Active,
-            }],
-        });
-    }
-    let (tree_size, _) = directory.log()?.head()?;
-    assert_eq!(tree_size, 10);
-    Ok(Seeded { people, tree_size })
 }
 
 fn refused(answer: &(u16, Value), status: u16, name: &str) {
@@ -289,12 +205,7 @@ impl Table {
         let socket = dir.path().join("runner.sock");
         let state = dir.path().join("runner-state");
         let adjusted = socket.clone();
-        let screens = dir.path().join("screens");
-        if surface {
-            std::fs::create_dir(&screens)?;
-            std::fs::write(screens.join("index.html"), "<html></html>")?;
-        }
-        let (mut service, (seeded, serving)) = Service::start_adjusted(
+        let (service, (seeded, serving)) = Service::start_adjusted(
             GRANT_MODEL,
             None,
             Some(settings),
@@ -533,12 +444,7 @@ impl Table {
     }
 
     fn dropped(&self) -> Vec<String> {
-        let mut drops = self
-            .drops
-            .lock()
-            .expect("fixture lock poisoned")
-            .drops
-            .clone();
+        let mut drops = self.drops.lock().expect("fixture lock poisoned").clone();
         drops.sort();
         drops
     }
