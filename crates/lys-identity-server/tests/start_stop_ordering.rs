@@ -106,6 +106,21 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
     release.write_all(b"x")?;
     let (stop_status, stop_record) = stopped.await??;
     assert_eq!(stop_status, 200, "{stop_record}");
+    assert_eq!(
+        stop_record["sessions_confirmed"].as_array().map(Vec::len),
+        Some(1),
+        "{stop_record}"
+    );
+    assert_eq!(
+        stop_record["sessions_confirmed"][0]["session"], session,
+        "{stop_record}"
+    );
+    assert!(
+        stop_record["sessions_confirmed"][0]["confirmation"]
+            .as_str()
+            .is_some_and(|confirmation| confirmation.contains("exit status 0")),
+        "{stop_record}"
+    );
     assert_ne!(
         second.0, 200,
         "a second writer overlapped the ending process: {}",

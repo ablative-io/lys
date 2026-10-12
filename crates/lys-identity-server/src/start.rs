@@ -70,6 +70,9 @@ mod directory;
 #[path = "start_records.rs"]
 mod records;
 
+#[path = "start/held.rs"]
+mod held;
+
 use directory::Directory;
 
 /// Who is asking, as the records a start keeps name them.
@@ -151,6 +154,7 @@ pub struct StartService {
     launcher: Option<Box<dyn Launcher>>,
     pass_state: Option<Arc<Mutex<crate::agent_pass_store::Passes>>>,
     kept: Option<Arc<AppState>>,
+    starting: tokio::sync::Mutex<()>,
 }
 
 impl StartService {
@@ -170,6 +174,7 @@ impl StartService {
             launcher: None,
             pass_state: None,
             kept: None,
+            starting: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -332,6 +337,13 @@ async fn start(
     UrlPath(agent): UrlPath<String>,
     body: Bytes,
 ) -> Response {
+    let starting = service.starting.lock().await;
+    let response = start_locked(Arc::clone(&service), headers, agent, body).await;
+    drop(starting);
+    response
+}
+
+async fn start_locked(service: Shared, headers: HeaderMap, agent: String, body: Bytes) -> Response {
     let Some(members) = members(&agent, &body) else {
         return named(
             StatusCode::BAD_REQUEST,
@@ -343,6 +355,22 @@ async fn start(
         .iter()
         .find(|member| member.0 == "profile_version")
         .map(|member| member.1.clone());
+    let machine = members
+        .iter()
+        .find(|member| member.0 == "machine")
+        .map(|member| member.1.clone());
+    if let Some(response) = held::refuse(
+        &service,
+        &headers,
+        &agent,
+        profile_version.as_deref(),
+        machine.as_deref(),
+        None,
+    )
+    .await
+    {
+        return response;
+    }
     let checked = before_checks(&service, &headers, &agent, profile_version.as_deref()).await;
     let broker = match checked {
         Ok(broker) => broker,
@@ -416,13 +444,33 @@ async fn start_again(
     headers: HeaderMap,
     UrlPath(source): UrlPath<String>,
 ) -> Response {
-    let agent = match service.launches() {
-        Ok(launches) => launches.record(&source).map(|kept| kept.agent.clone()),
+    let starting = service.starting.lock().await;
+    let response = start_again_locked(Arc::clone(&service), headers, source).await;
+    drop(starting);
+    response
+}
+
+async fn start_again_locked(service: Shared, headers: HeaderMap, source: String) -> Response {
+    let record = match service.launches() {
+        Ok(launches) => launches.record(&source).cloned(),
         Err(error) => return json(status(&error), error.to_json()),
     };
+    if let Some(record) = &record
+        && let Some(response) = held::refuse(
+            &service,
+            &headers,
+            &record.agent,
+            Some(&record.profile_version),
+            Some(&record.machine),
+            Some(&record.arguments),
+        )
+        .await
+    {
+        return response;
+    }
     // A record that is not kept is refused by the library, by name.
-    let broker = match agent {
-        Some(agent) => match before_checks(&service, &headers, &agent, None).await {
+    let broker = match record {
+        Some(record) => match before_checks(&service, &headers, &record.agent, None).await {
             Ok(broker) => broker,
             Err(refused) => return refused.into_response(),
         },

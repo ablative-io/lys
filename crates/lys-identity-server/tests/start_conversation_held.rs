@@ -80,5 +80,22 @@ async fn start_held_conversation_names_the_live_session_and_records_refusal() ->
         receipts.to_string().contains("conversation_held"),
         "{receipts}"
     );
+    let index = second["start_record"]["index"]
+        .as_u64()
+        .ok_or("refused start has no receipt")?;
+    let (status, record) = table
+        .service
+        .get(&format!("/runner-receipts/{index}"), Some(&table.ada))
+        .await?;
+    assert_eq!(status, 200, "{record}");
+    assert_eq!(record, second["start_record"], "{record}");
+    assert_eq!(record["act"]["act"], "start");
+    assert!(
+        record["act"]["outcome"]
+            .as_str()
+            .is_some_and(|outcome| outcome.starts_with("conversation_held:")
+                && outcome.contains(first_session)),
+        "{record}"
+    );
     table.close()
 }
