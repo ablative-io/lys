@@ -7,6 +7,13 @@
 //! replacement leaves the AI's runs running, while a person's withdrawal
 //! ends them.
 //!
+//! A start stands only on a certificate whose key Lys keeps. A seat
+//! onboarded outside Lys holds a certificate over its own key, which its
+//! tools sign with; Lys cannot delegate a run from a key it does not hold,
+//! so that certificate is never stood on, and never withdrawn as replaced:
+//! withdrawing it would cut the seat's own tools off (12 Oct 2026, the first
+//! seat moved onto Lys was refused `CertificatesUnavailable` for it).
+//!
 //! A withdrawal takes back the AI's credential, as a key believed exposed is
 //! taken back: its runs end, and its next start is issued a new certificate
 //! over a new key. Keeping an AI from acting at all is its suspension: no
@@ -20,7 +27,7 @@ use lys_identity::{AgentId, IdentityId, OperationId};
 
 use crate::agent_sight::SeenAgent;
 use crate::certificates_issue::{VALID_FOR, issued, with_store};
-use crate::certificates_store::Withdrawn;
+use crate::certificates_store::{CertificateStore, Withdrawn};
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
@@ -41,13 +48,23 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 /// The serials of `agent`'s certificates still standing, each with when it
 /// was issued.
 fn standing_of(state: &AppState, agent: &str) -> Result<Vec<(String, u64)>, ServerError> {
-    with_store(state, |store| {
-        Ok(store
-            .certificates()
-            .filter(|entered| entered.issued.agent == agent && entered.withdrawn.is_none())
-            .map(|entered| (entered.issued.serial.clone(), entered.issued.issued_at))
-            .collect())
-    })
+    with_store(state, |store| Ok(held_standing(store, agent)))
+}
+
+/// The serials of `agent`'s certificates still standing whose key Lys keeps,
+/// each with when it was issued; a certificate over a key the seat holds is
+/// not among them.
+fn held_standing(store: &CertificateStore, agent: &str) -> Vec<(String, u64)> {
+    store
+        .certificates()
+        .filter(|entered| entered.issued.agent == agent && entered.withdrawn.is_none())
+        .filter(|entered| {
+            store
+                .agent_key(agent, &entered.issued.serial)
+                .is_some_and(|path| path.is_file())
+        })
+        .map(|entered| (entered.issued.serial.clone(), entered.issued.issued_at))
+        .collect()
 }
 
 /// The newest of `standing` that stands past [`RENEW_WITHIN`] from `at`.
@@ -94,11 +111,7 @@ pub(crate) fn standing(state: &AppState, agent: AgentId) -> Result<String, Serve
         // A start beside this one may have issued while the claims were
         // gathered; its certificate is the one stood on, and this one is
         // not entered.
-        let now_standing: Vec<(String, u64)> = store
-            .certificates()
-            .filter(|entered| entered.issued.agent == name && entered.withdrawn.is_none())
-            .map(|entered| (entered.issued.serial.clone(), entered.issued.issued_at))
-            .collect();
+        let now_standing = held_standing(store, &name);
         if let Some(serial) = lasting(&now_standing, at) {
             // The key made for the certificate not entered names nothing;
             // it is not kept.
@@ -125,7 +138,58 @@ pub(crate) fn standing(state: &AppState, agent: AgentId) -> Result<String, Serve
 
 #[cfg(test)]
 mod tests {
-    use super::{RENEW_WITHIN, VALID_FOR, lasting};
+    use std::sync::Arc;
+
+    use lys_core::Ed25519Identity;
+
+    use super::{RENEW_WITHIN, VALID_FOR, held_standing, lasting};
+    use crate::certificates_store::{CertificateStore, Issued, Withdrawn};
+
+    const AGENT: &str = "agent-0123456789abcdef0123456789abcdef";
+
+    fn issued(serial: &str, issued_at: u64) -> Issued {
+        Issued {
+            serial: serial.to_owned(),
+            agent: AGENT.to_owned(),
+            person: "person-0123456789abcdef0123456789abcdef".to_owned(),
+            claims: serde_json::json!({}),
+            der: "AA==".to_owned(),
+            issued_at,
+        }
+    }
+
+    /// A seat onboarded outside Lys holds a certificate over its own key: Lys
+    /// keeps no key for it, so a start never stands on it and a replacement
+    /// never withdraws it; only the certificate whose key Lys keeps counts.
+    #[test]
+    fn a_certificate_over_a_key_lys_does_not_keep_is_never_stood_on()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let seal = Arc::new(Ed25519Identity::load_or_generate(
+            &root.path().join("seal.key"),
+        )?);
+        let mut store = CertificateStore::open(&root.path().join("certificates"), seal)?;
+        store.issue(issued("op-11111111111111111111111111111111", 100))?;
+        assert!(held_standing(&store, AGENT).is_empty());
+
+        let held = "op-22222222222222222222222222222222";
+        store.issue(issued(held, 50))?;
+        let key = store
+            .agent_key(AGENT, held)
+            .ok_or("the store keeps agent keys")?;
+        std::fs::create_dir_all(key.parent().ok_or("a key has a folder")?)?;
+        Ed25519Identity::load_or_generate(&key)?;
+        assert_eq!(held_standing(&store, AGENT), vec![(held.to_owned(), 50)]);
+
+        store.withdraw(Withdrawn {
+            serial: held.to_owned(),
+            by: "person".to_owned(),
+            reason: "exposed".to_owned(),
+            withdrawn_at: 60,
+        })?;
+        assert!(held_standing(&store, AGENT).is_empty());
+        Ok(())
+    }
 
     #[test]
     fn a_certificate_near_its_end_is_not_stood_on_and_the_newest_lasting_one_is() {
