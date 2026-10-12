@@ -19,6 +19,8 @@ export interface Choices {
   secrets: string[] | null;
   /** The plugins installed on this computer (GET /harnesses/plugins); absent when the service does not answer it. */
   plugins?: InstalledPlugins | null;
+  /** Why GET /harnesses/plugins gave no answer, when it gave none; never read as "all installed". */
+  pluginsMissing?: string;
 }
 export interface InstalledPlugins { folder: string | null; installed: string[]; unread?: string }
 
@@ -42,6 +44,6 @@ export async function readChoices(servedNetwork?: NetworkView): Promise<Choices>
     machines: (network.value?.machines ?? []).filter((machine) => machine.state === 'in_use'),
     skills: skills.value ? skills.value.skills.map((skill) => skill.name) : null,
     secrets: secrets.value ? secrets.value.secrets.map((secret) => secret.name) : null,
-    plugins: plugins.value,
+    plugins: plugins.value, pluginsMissing: plugins.missing,
   };
 }

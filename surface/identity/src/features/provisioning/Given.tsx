@@ -60,10 +60,14 @@ export function ToolsNamed({ value, change }: { value: string[]; change: (next: 
 }
 
 /** The Claude Code plugins the settings turn on, each as name@marketplace. Shown only when there are any; this screen adds none. */
-export function PluginsNamed({ value, change, installed }: { value: string[]; change: (next: string[]) => void; installed?: InstalledPlugins | null }) {
+export function PluginsNamed({ value, change, installed, unanswered, runsOn }: { value: string[]; change: (next: string[]) => void; installed?: InstalledPlugins | null; unanswered?: string; runsOn?: string }) {
   if (value.length === 0) return null;
-  // The same check a start makes (plugin_not_installed), read on this computer.
+  // The same check a start makes (plugin_not_installed), read in the Claude config folder of the computer Lys's
+  // service runs on. A start checks the folder its own run uses (the run's CLAUDE_CONFIG_DIR, else ~/.claude),
+  // on the computer it starts on, so this is said as what was read here, never as the start's verdict.
   const missing = installed && !installed.unread ? value.filter((name) => !installed.installed.includes(name)) : [];
+  const where = installed?.folder ?? 'this computer’s Claude config folder';
+  const elsewhere = runsOn ? ' This agent is set to run on ' + runsOn + '; if that is another computer, its runner checks its own folder before the start.' : '';
   return <section className="given-plugins wide" aria-label="Plugins named in these settings">
     <table className="usage-table">
       <thead><tr><th>Plugins named in these settings</th><th>Change</th></tr></thead>
@@ -71,8 +75,9 @@ export function PluginsNamed({ value, change, installed }: { value: string[]; ch
         <td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td></tr>)}</tbody>
     </table>
     <p className="dim">Each is turned on in the settings Lys writes for this agent’s runs. A plugin must already be installed for the program to load it.</p>
-    {missing.length ? <p className="why-not">Not installed in {installed?.folder ?? 'this computer’s Claude config folder'}: {missing.join(', ')}. A start on this computer is refused (plugin_not_installed) until each is installed there.</p> : null}
-    {installed?.unread ? <p className="why-not">This computer’s installed plugins could not be read: {installed.unread}</p> : null}
+    {missing.length ? <p className="why-not">Not installed in {where}: {missing.join(', ')}. A start that uses that folder is refused (plugin_not_installed) until each is installed there; a run whose settings set CLAUDE_CONFIG_DIR is checked in that folder instead.{elsewhere}</p> : null}
+    {installed?.unread ? <p className="why-not">This computer’s installed plugins could not be read: {installed.unread}{elsewhere}</p> : null}
+    {!installed ? <p className="why-not">Whether these plugins are installed could not be checked{unanswered ? ': ' + unanswered : ''}. A start still checks, and refuses one that is not installed (plugin_not_installed).</p> : null}
   </section>;
 }
 
