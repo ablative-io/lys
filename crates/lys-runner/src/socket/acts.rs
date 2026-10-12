@@ -142,7 +142,11 @@ pub(super) fn perform(
             unreachable: sessions.unreachable_owners()?,
         }),
         Act::Plugins { config_dir } => {
-            let folder = crate::launch_config::claude_config_dir(config_dir.as_deref())?;
+            let launch: std::collections::BTreeMap<String, String> = config_dir
+                .iter()
+                .map(|dir| ("CLAUDE_CONFIG_DIR".to_owned(), dir.clone()))
+                .collect();
+            let folder = crate::launch_config::claude_config_dir(&launch)?;
             if !folder.is_absolute() {
                 return Err(RunnerError::refused(
                     "plugins_unreadable",

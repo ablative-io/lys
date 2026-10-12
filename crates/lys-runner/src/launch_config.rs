@@ -252,24 +252,34 @@ fn publish(state: &Path, session: &str, config: &Config) -> Result<PathBuf, Runn
     Ok(target)
 }
 
-/// The Claude Code config folder a run uses: its `CLAUDE_CONFIG_DIR`, else
-/// the login's own `~/.claude`, where the sign-in the run keeps lives. The one
-/// rule both the start's plugin check and the `plugins` act read by.
+/// The Claude Code config folder a run uses, read from the environment the
+/// child ends with: the launch's own value, else the one it inherits from the
+/// runner. Its `CLAUDE_CONFIG_DIR`, else that environment's `HOME` joined with
+/// `.claude`, where the sign-in the run keeps lives. The one rule both the
+/// start's plugin check and the `plugins` act read by.
 ///
 /// # Errors
-/// `plugin_not_installed` when neither names a folder.
-pub fn claude_config_dir(given: Option<&str>) -> Result<PathBuf, RunnerError> {
-    match given {
-        Some(dir) => Ok(PathBuf::from(dir)),
-        None => std::env::var_os("HOME")
-            .map(|home| PathBuf::from(home).join(".claude"))
-            .ok_or_else(|| {
-                RunnerError::refused(
-                    "plugin_not_installed",
-                    "the run's Claude config directory cannot be named: no CLAUDE_CONFIG_DIR and no HOME",
-                )
-            }),
+/// `plugins_unreadable` when neither names a folder: what is installed cannot
+/// be read, which is not the same as a plugin not being installed.
+pub fn claude_config_dir(launch: &BTreeMap<String, String>) -> Result<PathBuf, RunnerError> {
+    let inherited = |name: &str| {
+        launch
+            .get(name)
+            .map(std::ffi::OsString::from)
+            .or_else(|| std::env::var_os(name))
+            .filter(|value| !value.is_empty())
+    };
+    if let Some(dir) = inherited("CLAUDE_CONFIG_DIR") {
+        return Ok(PathBuf::from(dir));
     }
+    inherited("HOME")
+        .map(|home| PathBuf::from(home).join(".claude"))
+        .ok_or_else(|| {
+            RunnerError::refused(
+                "plugins_unreadable",
+                "the run's Claude config directory cannot be named: its environment has no CLAUDE_CONFIG_DIR and no HOME",
+            )
+        })
 }
 
 /// The plugins installed in `config_dir`, by name@marketplace, in order.
@@ -307,9 +317,15 @@ fn plugins_installed(
     if named.is_empty() {
         return Ok(());
     }
-    let config_dir = claude_config_dir(environment.get("CLAUDE_CONFIG_DIR").map(String::as_str))?;
-    lys_home::harness::claude_code::installed_plugins::require(&config_dir, &named)
-        .map_err(|error| RunnerError::refused("plugin_not_installed", error.to_string()))
+    let config_dir = claude_config_dir(environment)?;
+    lys_home::harness::claude_code::installed_plugins::require(&config_dir, &named).map_err(
+        |error| match error {
+            lys_home::error::HomeError::PluginNotInstalled { .. } => {
+                RunnerError::refused("plugin_not_installed", error.to_string())
+            }
+            other => RunnerError::refused("plugins_unreadable", other.to_string()),
+        },
+    )
 }
 
 /// Validate every input, publish all files, then bind process locations.
