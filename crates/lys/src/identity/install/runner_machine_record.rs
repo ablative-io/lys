@@ -47,7 +47,7 @@ enum Standing {
     },
 }
 
-fn failed(path: &Path, reason: impl ToString) -> IdentityError {
+fn failed(path: &Path, reason: &(impl ToString + ?Sized)) -> IdentityError {
     IdentityError::new(
         ErrorKind::PrivateFileIo,
         "record",
@@ -78,9 +78,9 @@ pub fn recorded(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Re
     let bytes = match fs::read(&path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(recorded),
-        Err(error) => return Err(failed(&path, error)),
+        Err(error) => return Err(failed(&path, &error)),
     };
-    let joins: Joins = serde_json::from_slice(&bytes).map_err(|error| failed(&path, error))?;
+    let joins: Joins = serde_json::from_slice(&bytes).map_err(|error| failed(&path, &error))?;
     if joins.format != "lys-runner-joins/v1" {
         return Err(failed(&path, "runner_machine_joins_format_unknown"));
     }
@@ -131,11 +131,11 @@ pub fn write_build_record(
     let old = match fs::read(&path) {
         Ok(bytes) => Some(bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(error) => return Err(failed(&path, error)),
+        Err(error) => return Err(failed(&path, &error)),
     };
     if let Some(old) = old {
         let value: serde_json::Value =
-            serde_json::from_slice(&old).map_err(|error| failed(&path, error))?;
+            serde_json::from_slice(&old).map_err(|error| failed(&path, &error))?;
         if value.get("runner_machine").is_none() {
             let backup = layout
                 .install_dir()
@@ -148,7 +148,7 @@ pub fn write_build_record(
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     private_files::write(&backup, &old)?;
                 }
-                Err(error) => return Err(failed(&backup, error)),
+                Err(error) => return Err(failed(&backup, &error)),
             }
             atomic(&path, bytes)?;
             say(&format!(
@@ -175,7 +175,7 @@ fn atomic(path: &Path, bytes: &[u8]) -> IdentityResult<()> {
         .create_new(true)
         .mode(0o600)
         .open(&temporary)
-        .map_err(|error| failed(&temporary, error))?;
+        .map_err(|error| failed(&temporary, &error))?;
     let result = (|| {
         file.write_all(bytes)?;
         file.sync_all()?;
@@ -190,11 +190,11 @@ fn atomic(path: &Path, bytes: &[u8]) -> IdentityResult<()> {
             Err(cleanup) => {
                 return Err(failed(
                     path,
-                    format!("{error}; removing the temporary record: {cleanup}"),
+                    &format!("{error}; removing the temporary record: {cleanup}"),
                 ));
             }
         }
-        return Err(failed(path, error));
+        return Err(failed(path, &error));
     }
     Ok(())
 }

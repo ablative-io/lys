@@ -145,7 +145,7 @@ pub enum RunnerCommand {
         #[arg(long)]
         socket: PathBuf,
 
-        /// Override hook_event_name for a settings entry that names its event.
+        /// Override `hook_event_name` for a settings entry that names its event.
         #[arg(long)]
         event: Option<String>,
     },

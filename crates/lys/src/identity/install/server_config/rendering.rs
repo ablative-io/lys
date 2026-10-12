@@ -6,6 +6,7 @@ use super::{
     SESSION_SECONDS, Value, issuer, json, redirect_url,
 };
 
+/// Render the service configuration while retaining the carried installation settings.
 pub fn render(
     layout: &Layout,
     config: &DeploymentConfig,

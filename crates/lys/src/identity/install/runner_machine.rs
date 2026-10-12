@@ -13,7 +13,11 @@ use crate::identity::private_files;
 mod record;
 pub use record::{Recorded, recorded, write_build_record};
 
-fn failure(operation: &'static str, path: &Path, reason: impl ToString) -> IdentityError {
+fn failure(
+    operation: &'static str,
+    path: &Path,
+    reason: &(impl ToString + ?Sized),
+) -> IdentityError {
     IdentityError::new(
         ErrorKind::PrivateFileIo,
         operation,
@@ -35,7 +39,7 @@ fn present(path: &Path) -> IdentityResult<bool> {
             "runner machine key must be a regular private file",
         )),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(failure("check", path, error)),
+        Err(error) => Err(failure("check", path, &error)),
     }
 }
 
@@ -52,10 +56,10 @@ pub fn provide(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Ed2
     let held = present(&path)?;
     if present(&legacy)? {
         let older =
-            Ed25519Identity::load(&legacy).map_err(|error| failure("load", &legacy, error))?;
+            Ed25519Identity::load(&legacy).map_err(|error| failure("load", &legacy, &error))?;
         if held {
             let current =
-                Ed25519Identity::load(&path).map_err(|error| failure("load", &path, error))?;
+                Ed25519Identity::load(&path).map_err(|error| failure("load", &path, &error))?;
             if current.public_key_bytes() != older.public_key_bytes() {
                 return Err(failure(
                     "migrate",
@@ -64,14 +68,14 @@ pub fn provide(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Ed2
                 ));
             }
             fs::remove_file(&legacy)
-                .map_err(|error| failure("remove migrated key", &legacy, error))?;
+                .map_err(|error| failure("remove migrated key", &legacy, &error))?;
         } else {
-            fs::rename(&legacy, &path).map_err(|error| failure("move", &path, error))?;
+            fs::rename(&legacy, &path).map_err(|error| failure("move", &path, &error))?;
         }
         for parent in [layout.root.join("keys"), layout.data_dir()] {
             fs::File::open(&parent)
                 .and_then(|directory| directory.sync_all())
-                .map_err(|error| failure("sync migrated key directory", &parent, error))?;
+                .map_err(|error| failure("sync migrated key directory", &parent, &error))?;
         }
         say(&format!("runner machine key moved to {}", path.display()));
         return Ok(older);
@@ -81,7 +85,7 @@ pub fn provide(layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<Ed2
     } else {
         Ed25519Identity::load_or_generate(&path)
     }
-    .map_err(|error| failure("provide", &path, error))?;
+    .map_err(|error| failure("provide", &path, &error))?;
     if !held {
         say(&format!("runner machine key created at {}", path.display()));
     }

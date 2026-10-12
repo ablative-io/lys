@@ -68,9 +68,8 @@ fn join_machine_key_refuses_conflicting_legacy_keys() -> Outcome {
         .data_dir()
         .join(crate::commands::runner_join::MACHINE_KEY);
     let legacy = Ed25519Identity::load_or_generate(&old)?;
-    let error = match super::provide(&layout, &mut |line| said.push(line.to_owned())) {
-        Ok(_) => return Err("a different legacy identity was discarded".into()),
-        Err(error) => error,
+    let Err(error) = super::provide(&layout, &mut |line| said.push(line.to_owned())) else {
+        return Err("a different legacy identity was discarded".into());
     };
     assert!(error.to_string().contains("runner_machine_key_conflict"));
     assert_eq!(

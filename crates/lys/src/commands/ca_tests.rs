@@ -1,6 +1,9 @@
 #![cfg(test)]
 
+use std::time::Duration;
+
 use super::*;
+use crate::commands::ca_log::LogEntry;
 
 #[test]
 fn capability_claims_oid_extends_the_lys_arc_by_one() {

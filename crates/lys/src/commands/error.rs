@@ -293,7 +293,6 @@ pub enum CliError {
         cause: Box<CliError>,
     },
 
-    /// A timestamp argument could not be parsed as RFC 3339.
     /// A `--validity` spec could not be read as a duration, or no validity
     /// window was supplied at all. Carries the spec verbatim so the operator
     /// can see what was actually parsed.
@@ -305,6 +304,7 @@ pub enum CliError {
         reason: String,
     },
 
+    /// A timestamp argument could not be parsed as RFC 3339.
     #[error("invalid timestamp {value:?}: expected RFC 3339, e.g. 2026-07-10T12:00:00Z ({source})")]
     InvalidTimestamp {
         /// The rejected argument value.
