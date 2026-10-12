@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, click, mount, settle, text, unmountAll } from './harness';
-import { ADA, ME, OWN, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, ME, OWN, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 import { refreshLive } from '../src/live';
@@ -295,8 +295,13 @@ describe('Another computer, connected with a code that works once', () => {
     expect(text()).not.toContain('2'.repeat(64));
   });
 
-  it('offers no new code to a person who is not the administrator, nor for the computer Lys runs on', async () => {
+  it('offers a code to the owner, refuses another person’s row, and never rejoins the computer Lys runs on', async () => {
     await mount('#/network', { ...served({ runner: null, answers: null, joining: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
+    expect(button('Get a new connection code')).not.toBeNull();
+    unmountAll(); document.body.innerHTML = '';
+    await mount('#/network', { ...served({ runner: null, answers: null, joining: true }), '/people': ok(OWN),
+      '/directory/people': refused(403, 'NotAdmitted', 'not administrator'),
+      '/network': ok({ machines: [{ ...remote, named_by: BEA, may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }], reports_served: true }) });
     expect(button('Get a new connection code')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
     await mount('#/network', served({ runner: { kind: 'lys' }, answers: true, joining: false }));

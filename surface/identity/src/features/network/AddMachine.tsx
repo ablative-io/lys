@@ -102,8 +102,8 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
  * The computers table's own last row, which adds one: the name under Computer, how the addition stands under Status,
  * which computer it is in a cell of its own, the button in the last column.
  */
-export function AddComputerRow({ person, changed, name, connect }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void }) {
-  const [chosen, setChosen] = useState<'this' | 'another'>('this');
+export function AddComputerRow({ person, changed, name, connect, selfService = false }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean }) {
+  const [chosen, setChosen] = useState<'this' | 'another'>(selfService ? 'another' : 'this');
   const { submit, blocked, standing, pendingRemote } = useAddition({ person, changed, remote: chosen === 'another', connect });
   // A kept addition is finished as it was begun, whatever is chosen now.
   const where = pendingRemote ? 'another' : chosen;
@@ -113,7 +113,7 @@ export function AddComputerRow({ person, changed, name, connect }: Omit<Adding, 
     <td>{standing}</td>
     <td><div className="seg" role="group" aria-label="Which computer">
       {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>
-        <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked} onClick={() => setChosen(key)}>{label}</button>)}
+        <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked || (selfService && key === 'this')} onClick={() => setChosen(key)}>{label}</button>)}
     </div></td>
     <td><Act symbol="add" name={where === 'another' ? 'Add and get its code' : 'Add this computer'} word="Add" tone="primary" type="submit" form={id} disabled={blocked} /></td>
   </tr>;

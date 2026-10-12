@@ -174,19 +174,63 @@ describe('Running sessions', () => {
     expect($('.terminal-renderer')?.textContent).toBe('This browser is not offering WebGPU, so the terminal is drawn with Canvas 2D instead.');
   });
 
-  it('shows the terminal alone: no line to type into and no key buttons, since the screen takes typing itself', async () => {
+  it('keeps direct typing and sends each terminal key button to its session', async () => {
     const { posted } = await mount('#/canvas/' + SCRIBE, {
       ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }),
       ['POST ' + base + '/read-bytes']: readOnce('$ '),
+      ['POST ' + base + '/keys']: ok({ receipt: { index: 3 } }),
     });
     expect($('.terminal')).not.toBeNull();
     expect($('.terminal form')).toBeNull();
     expect($('.terminal input')).toBeNull();
-    expect($$('button[data-key]')).toEqual([]);
+    const keys = [['Escape', 'escape'], ['Enter', 'enter'], ['Up', 'up'], ['Down', 'down'], ['Tab', 'tab'], ['Ctrl-C', 'ctrl_c']];
+    expect($$('button[data-key]').map((button) => button.textContent)).toEqual(keys.map(([label]) => label));
     expect($('.terminal-head')?.textContent).toContain('Scribe');
     expect($('.terminal-head')?.textContent).toContain('on Dean laptop');
     expect($('.terminal-head')?.textContent).not.toContain(ID);
     expect(posted.filter((entry) => entry.path.endsWith('/input') || entry.path.endsWith('/keys'))).toEqual([]);
+    for (const [label, key] of keys) {
+      await click($$('button[data-key]').find((button) => button.textContent === label) ?? null);
+      expect(posted.at(-1)).toEqual({ path: base + '/keys', body: { keys: [key] } });
+    }
+    expect(posted.filter((entry) => entry.path === base + '/keys')).toHaveLength(6);
+  });
+
+
+  it('confirms Restart, sends the agent and session once, and cancels without a request', async () => {
+    const { posted } = await mount('#/canvas/' + SCRIBE, {
+      ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }),
+      '/runtime/live': ok({ sessions: [running], unanswered: [] }),
+      ['POST ' + base + '/read-bytes']: readOnce('$ '),
+      ['POST /agents/' + SCRIBE + '/restart']: ok({ session: 'op-' + '9'.repeat(32) }),
+    });
+    await click($('button[data-act="restart"]'));
+    expect($('[role="alertdialog"]')?.textContent).toContain('Restart Scribe?');
+    expect(posted.some((entry) => entry.path.endsWith('/restart'))).toBe(false);
+    await click($('button[data-act="cancel-restart"]'));
+    expect($('[role="alertdialog"]')).toBeNull();
+    await click($('button[data-act="restart"]'));
+    await click($('button[data-act="confirm-restart"]'));
+    const restarts = posted.filter((entry) => entry.path === '/agents/' + SCRIBE + '/restart');
+    expect(restarts).toHaveLength(1);
+    expect(restarts[0].body).toEqual({ session: ID, operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) });
+  });
+
+  it('names a refused terminal key and a refused restart without claiming either succeeded', async () => {
+    const { posted } = await mount('#/canvas/' + SCRIBE, {
+      ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }),
+      '/runtime/live': ok({ sessions: [running], unanswered: [] }),
+      ['POST ' + base + '/read-bytes']: readOnce('$ '),
+      ['POST ' + base + '/keys']: refused(403, 'NotAdmitted', 'keys are not granted'),
+      ['POST /agents/' + SCRIBE + '/restart']: refused(409, 'conversation_held', 'another run holds it'),
+    });
+    await click($('button[data-key="ctrl_c"]'));
+    expect(text()).toContain('NotAdmitted: keys are not granted');
+    await click($('button[data-act="restart"]'));
+    await click($('button[data-act="confirm-restart"]'));
+    expect(text()).toContain('conversation_held: another run holds it');
+    expect($('[role="alertdialog"]')).not.toBeNull();
+    expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toHaveLength(1);
   });
 
   it('asks before Stop by naming the agent, then ends the session', async () => {
