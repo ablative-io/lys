@@ -109,7 +109,11 @@ async fn a_profile_records_its_plugins_and_refuses_a_malformed_or_unrendered_one
         }
         Ok(body)
     };
-    let named = json!(["argus@ablative", "argus@ablative", "frontend-design@claude-plugins-official"]);
+    let named = json!([
+        "argus@ablative",
+        "argus@ablative",
+        "frontend-design@claude-plugins-official"
+    ]);
     let (status, set) = table
         .service
         .post(&path, Some(&table.ada), &body(0, named, &table.harness())?)
@@ -123,10 +127,20 @@ async fn a_profile_records_its_plugins_and_refuses_a_malformed_or_unrendered_one
     let (status, read) = table.service.get(&path, Some(&table.ada)).await?;
     assert_eq!(status, 200, "{read}");
     assert_eq!(read["profile"]["plugins"], set["profile"]["plugins"]);
-    for malformed in ["argus", "@ablative", "argus@", "argus@ablative@more", "ar gus@ablative"] {
+    for malformed in [
+        "argus",
+        "@ablative",
+        "argus@",
+        "argus@ablative@more",
+        "ar gus@ablative",
+    ] {
         let (status, refused) = table
             .service
-            .post(&path, Some(&table.ada), &body(1, json!([malformed]), &table.harness())?)
+            .post(
+                &path,
+                Some(&table.ada),
+                &body(1, json!([malformed]), &table.harness())?,
+            )
             .await?;
         assert_eq!(
             (status, &refused["refusal"]),
@@ -136,7 +150,11 @@ async fn a_profile_records_its_plugins_and_refuses_a_malformed_or_unrendered_one
     }
     let (status, refused) = table
         .service
-        .post(&path, Some(&table.ada), &body(1, json!(["argus@ablative"]), &Value::Null)?)
+        .post(
+            &path,
+            Some(&table.ada),
+            &body(1, json!(["argus@ablative"]), &Value::Null)?,
+        )
         .await?;
     assert_eq!(
         (status, &refused["refusal"]),
@@ -145,6 +163,9 @@ async fn a_profile_records_its_plugins_and_refuses_a_malformed_or_unrendered_one
     );
     let (status, unchanged) = table.service.get(&path, Some(&table.ada)).await?;
     assert_eq!(status, 200, "{unchanged}");
-    assert_eq!(unchanged["profile"]["version"], 1, "a refused change records nothing");
+    assert_eq!(
+        unchanged["profile"]["version"], 1,
+        "a refused change records nothing"
+    );
     table.close()
 }

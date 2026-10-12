@@ -213,7 +213,10 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
 
 /// `given` without repeats, each `name@marketplace`, for a harness whose
 /// launch writes them into its settings file; Codex has no such file.
-fn plugins(given: &[String], harness: Option<&DeclaredHarness>) -> Result<Vec<String>, ServerError> {
+fn plugins(
+    given: &[String],
+    harness: Option<&DeclaredHarness>,
+) -> Result<Vec<String>, ServerError> {
     let mut kept: Vec<String> = Vec::new();
     for one in given {
         if !lys_home::harness::claude_code::template::plugin_named(one) {

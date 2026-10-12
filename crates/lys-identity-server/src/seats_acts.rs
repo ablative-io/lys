@@ -225,12 +225,18 @@ pub(crate) async fn live_session(
     // died can still be stopped, retired and started again (12 Oct 2026: a seat
     // whose session was gone refused stop as session_unknown, retire as
     // seat_running, and start as session_unknown, and could never move again).
-    held(liveness(state, machine, Some(session.to_owned())).await, session)
+    held(
+        liveness(state, machine, Some(session.to_owned())).await,
+        session,
+    )
 }
 
 /// `session` from a runner's liveness answer: absent when the runner holds no
 /// such session, and every other refusal passed on as it came.
-fn held(answer: Result<Vec<Live>, ServerError>, session: &str) -> Result<Option<Live>, ServerError> {
+fn held(
+    answer: Result<Vec<Live>, ServerError>,
+    session: &str,
+) -> Result<Option<Live>, ServerError> {
     match answer {
         Ok(sessions) => Ok(sessions.into_iter().find(|live| live.session == session)),
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => Ok(None),
@@ -310,7 +316,10 @@ mod held_tests {
     /// died can be stopped and started again; any other refusal still refuses.
     #[test]
     fn an_unheld_session_is_absent_and_other_refusals_pass_on() {
-        assert!(matches!(held(Err(refused("session_unknown")), "op-a"), Ok(None)));
+        assert!(matches!(
+            held(Err(refused("session_unknown")), "op-a"),
+            Ok(None)
+        ));
         assert!(matches!(
             held(Err(refused("runner_unreachable")), "op-a"),
             Err(ServerError::Runner { refusal, .. }) if refusal == "runner_unreachable"
