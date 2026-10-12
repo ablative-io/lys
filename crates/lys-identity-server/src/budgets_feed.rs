@@ -149,6 +149,16 @@ pub async fn keep_page(
 /// context.
 pub type Windows = std::collections::BTreeMap<String, Option<u64>>;
 
+fn context_percent(
+    record: &UsageRecord,
+    context: u64,
+    windows: &Windows,
+    unavailable: &mut Vec<Unavailable>,
+) -> Result<Option<u64>, ServerError> {
+    context_figure(record, context, windows, unavailable)
+        .map(|figure| figure.map(|figure| figure.percent))
+}
+
 /// A measured context figure and the declaration used to compute it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ContextFigure {
@@ -268,9 +278,7 @@ pub fn convert(
         0
     };
     let context_percent = match record.figures.context_tokens {
-        Some(context) => {
-            context_figure(record, context, windows, &mut unavailable)?.map(|figure| figure.percent)
-        }
+        Some(context) => context_percent(record, context, windows, &mut unavailable)?,
         None => None,
     };
     let usage = Usage {
