@@ -5,13 +5,12 @@
 //!
 //! The files are kept where `lys identity install` keeps its own runner's:
 //! the socket and the server's public key in the run folder, the held
-//! sessions and this computer's key in the data folder.
+//! sessions in the data folder and this computer's key in the keys folder.
 
 use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use lys_core::Ed25519Identity;
 use lys_runner::dial::Dial;
 use lys_runner::dial::join::{Join, reachable};
 use lys_runner::protocol::hex;
@@ -22,7 +21,7 @@ use crate::commands::error::{CliError, CliResult};
 use crate::identity::install::layout::Layout;
 use crate::identity::private_files;
 
-/// This computer's own key, in the data folder: a raw 32-byte Ed25519 seed.
+/// The private key's file name: a raw 32-byte Ed25519 seed.
 pub const MACHINE_KEY: &str = "runner-machine.key";
 
 /// The server's public key, in the run folder, where the install keeps it.
@@ -48,8 +47,9 @@ pub fn run(
     for directory in [layout.run_dir(), layout.data_dir()] {
         private_files::ensure_dir(&directory)?;
     }
-    let key = Arc::new(Ed25519Identity::load_or_generate(
-        &layout.data_dir().join(MACHINE_KEY),
+    let key = Arc::new(crate::identity::install::layout::runner_machine::provide(
+        &layout,
+        &mut lys_runner::error::said,
     )?);
     let server_key = Join {
         server,

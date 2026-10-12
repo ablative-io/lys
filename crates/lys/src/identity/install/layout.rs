@@ -9,6 +9,9 @@ use std::path::PathBuf;
 
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
 
+#[path = "runner_machine.rs"]
+pub mod runner_machine;
+
 /// The environment variable that names the data root outright.
 pub const HOME_VARIABLE: &str = "LYS_IDENTITY_HOME";
 
@@ -77,6 +80,11 @@ impl Layout {
     /// The directory service's signing key.
     pub fn service_key(&self) -> PathBuf {
         self.root.join("keys").join("service.key")
+    }
+
+    /// This computer's private key, shared by installation and runner joins.
+    pub fn runner_machine_key(&self) -> PathBuf {
+        self.root.join("keys").join("runner-machine.key")
     }
 
     /// The secrets broker's store.
