@@ -145,7 +145,10 @@ async fn retirement_controls(table: &mut Table, add: &Value) -> TestResult {
     again["operation"] = json!(operation()?);
     assert_eq!(table.ok("/seats", &again).await?["revision"], 1);
     for (route, body) in [
-        ("/seats/absent/version", json!({"operation":operation()?,"profile_version":1})),
+        (
+            "/seats/absent/version",
+            json!({"operation":operation()?,"profile_version":1}),
+        ),
         ("/seats/absent/retire", json!({"operation":operation()?})),
     ] {
         refused(
