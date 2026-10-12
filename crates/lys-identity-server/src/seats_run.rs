@@ -263,7 +263,7 @@ async fn begin(
     })?;
     let harness_session = match kept {
         Line::Started(kept) => kept.harness_session.or(harness_session),
-        Line::Added(_) | Line::Stopped(_) | Line::Sent(_) => harness_session,
+        Line::Added(_) | Line::Stopped(_) | Line::Sent(_) | Line::Moved(_) | Line::Retired(_) => harness_session,
     };
     Ok(Begun {
         session,

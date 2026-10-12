@@ -115,6 +115,8 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
     entries.extend(crate::openapi_goals_types::goals(api));
     entries.extend(crate::openapi_agents_types::agents(api));
     entries.extend(crate::seats_api::types(api));
+    entries.push((POST, "/seats/{name}/version", Some(api.schema::<crate::seats_views::SeatVersionBody>()), Some(api.schema::<crate::seats_views::SeatView>())));
+    entries.push((POST, "/seats/{name}/retire", Some(api.schema::<crate::seats_views::SeatOperationBody>()), Some(api.schema::<crate::seats_edit::SeatRetired>())));
     entries.extend(crate::seat_import_api::types(api));
     entries
         .into_iter()

@@ -44,6 +44,16 @@ pub struct SeatOperationBody {
     pub operation: String,
 }
 
+/// Select a reviewed profile version for a stopped seat.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SeatVersionBody {
+    /// The operation selecting it.
+    pub operation: String,
+    /// The reviewed version to select.
+    pub profile_version: u32,
+}
+
 /// A stop or a restart.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -287,7 +297,7 @@ pub(crate) fn view(seat: &Seat, responsible: Option<String>, reading: &Reading<'
         responsible,
         session: seat.session.clone(),
         harness_session: seat.harness_session.clone().or(harness_session),
-        state: state.to_owned(),
+        state: if seat.retired { "retired" } else { state }.to_owned(),
         last_signal_at,
         reason,
         created_by: added.by.clone(),
@@ -320,6 +330,7 @@ mod tests {
             harness_session: None,
             running: session.is_some(),
             revision: 1,
+            retired: false,
         }
     }
 

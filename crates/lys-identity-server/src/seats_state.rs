@@ -103,6 +103,38 @@ pub struct Sent {
     pub at: u64,
 }
 
+/// A stopped seat selecting another reviewed profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Moved {
+    /// The operation that selected the version.
+    pub operation: String,
+    /// The seat whose version changed.
+    pub name: String,
+    /// The selected reviewed version.
+    pub profile_version: u32,
+    /// The selected version's declared harness.
+    pub harness: String,
+    /// Who selected it.
+    pub by: String,
+    /// When it was selected.
+    pub at: u64,
+}
+
+/// A stopped seat whose name is released while its history is retained.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Retired {
+    /// The operation that retired it.
+    pub operation: String,
+    /// The retired seat.
+    pub name: String,
+    /// Who retired it.
+    pub by: String,
+    /// When it was retired.
+    pub at: u64,
+}
+
 /// One line of the seats' log.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -115,6 +147,10 @@ pub enum Line {
     Stopped(Stopped),
     /// A message sent to a seat.
     Sent(Sent),
+    /// A reviewed profile selected for a stopped seat.
+    Moved(Moved),
+    /// A stopped seat retired without discarding its history.
+    Retired(Retired),
 }
 
 impl Line {
@@ -125,6 +161,8 @@ impl Line {
             Self::Started(line) => &line.operation,
             Self::Stopped(line) => &line.operation,
             Self::Sent(line) => &line.operation,
+            Self::Moved(line) => &line.operation,
+            Self::Retired(line) => &line.operation,
         }
     }
 
@@ -135,6 +173,8 @@ impl Line {
             Self::Started(line) => &line.name,
             Self::Stopped(line) => &line.name,
             Self::Sent(line) => &line.name,
+            Self::Moved(line) => &line.name,
+            Self::Retired(line) => &line.name,
         }
     }
 
@@ -157,6 +197,9 @@ impl Line {
             (Self::Sent(kept), Self::Sent(asked)) => {
                 kept.name == asked.name && kept.text == asked.text && kept.act == asked.act
             }
+            (Self::Moved(kept), Self::Moved(asked)) => kept.name == asked.name
+                && kept.profile_version == asked.profile_version && kept.harness == asked.harness,
+            (Self::Retired(kept), Self::Retired(asked)) => kept.name == asked.name,
             _ => false,
         }
     }
@@ -176,6 +219,9 @@ pub struct Seat {
     pub running: bool,
     /// Raised by every line that changes it, from 1.
     pub revision: u64,
+    /// Whether this incarnation has released its name.
+    #[serde(default)]
+    pub retired: bool,
 }
 
 /// The seats as their log folds them, in the order added.
@@ -251,7 +297,7 @@ impl Held {
         let name = line.name().to_owned();
         match &line {
             Line::Added(added) => {
-                if self.index.contains_key(&name) {
+                if self.seat(&name).is_some_and(|seat| !seat.retired) {
                     return Err(format!("seat `{name}` is already added"));
                 }
                 Arc::make_mut(&mut self.index).insert(name, self.seats.len());
@@ -261,6 +307,7 @@ impl Held {
                     harness_session: None,
                     running: false,
                     revision: 1,
+                    retired: false,
                 });
             }
             Line::Started(started) => {
@@ -289,6 +336,23 @@ impl Held {
                         sent.session
                     ));
                 }
+            }
+            Line::Moved(moved) => {
+                let seat = self.changed(&name)?;
+                if seat.running || seat.retired {
+                    return Err(format!("seat `{name}` is running or retired"));
+                }
+                seat.added.profile_version = moved.profile_version;
+                seat.added.harness.clone_from(&moved.harness);
+                seat.revision += 1;
+            }
+            Line::Retired(_) => {
+                let seat = self.changed(&name)?;
+                if seat.running || seat.retired {
+                    return Err(format!("seat `{name}` is running or retired"));
+                }
+                seat.retired = true;
+                seat.revision += 1;
             }
         }
         self.operations.insert(line.operation().to_owned(), line);
@@ -412,7 +476,7 @@ mod tests {
         assert!(!legacy.seat("waffles").ok_or("no legacy seat")?.retired);
         held.hold(Line::Moved(Moved {
             operation: "op-b".to_owned(), name: "waffles".to_owned(),
-            profile_version: 2, by: "person".to_owned(), at: 2,
+            profile_version: 2, harness: "claude".to_owned(), by: "person".to_owned(), at: 2,
         }))?;
         assert_eq!(held.seat("waffles").ok_or("no moved seat")?.added.profile_version, 2);
         held.hold(Line::Retired(Retired {
@@ -442,7 +506,7 @@ mod tests {
         let before = held.clone();
         assert!(held.hold(Line::Moved(Moved {
             operation: "op-c".to_owned(), name: "waffles".to_owned(),
-            profile_version: 2, by: "person".to_owned(), at: 3,
+            profile_version: 2, harness: "claude".to_owned(), by: "person".to_owned(), at: 3,
         })).is_err());
         assert_eq!(held, before);
         assert!(held.hold(Line::Retired(Retired {

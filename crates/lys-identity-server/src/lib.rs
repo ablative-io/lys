@@ -306,6 +306,7 @@ pub mod error_seat;
 pub mod seat_supervision;
 pub mod seats_acts;
 pub mod seats_api;
+mod seats_edit;
 mod seats_monitor;
 mod seats_run;
 mod seats_send;
