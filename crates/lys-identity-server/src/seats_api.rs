@@ -313,8 +313,10 @@ async fn list(
         read.insert(machine, answer);
     }
     // A supervised seat's session lives in its owner, which the machine's runner does
-    // not list: each such session is asked of its owner on its own.
-    let mut owned: BTreeMap<String, Live> = BTreeMap::new();
+    // not list: each such session is asked of its owner on its own. An owner that
+    // cannot be asked leaves its seat unread, named, never read as stopped: a
+    // running seat shown as stopped invites a second start on its conversation.
+    let mut owned: BTreeMap<String, Result<Live, String>> = BTreeMap::new();
     for seat in &seats {
         let (Some(session), Some(Ok(held))) = (&seat.session, read.get(&seat.added.machine)) else {
             continue;
@@ -322,30 +324,44 @@ async fn list(
         if held.iter().any(|live| &live.session == session) {
             continue;
         }
-        if let Ok(Some(live)) =
-            crate::seats_acts::live_session(&state, &seat.added.machine, session).await
-        {
-            owned.insert(session.clone(), live);
+        match crate::seats_acts::live_session(&state, &seat.added.machine, session).await {
+            Ok(Some(live)) => {
+                owned.insert(session.clone(), Ok(live));
+            }
+            Ok(None) => {}
+            Err(refused) => {
+                owned.insert(session.clone(), Err(refused.to_string()));
+            }
         }
     }
-    let unread: Vec<String> = read
-        .iter()
-        .filter_map(|(machine, answer)| {
-            answer.as_ref().err().map(|reason| {
-                format!("the runner of machine {machine} could not be read: {reason}")
+    let unread: Vec<String> =
+        read.iter()
+            .filter_map(|(machine, answer)| {
+                answer.as_ref().err().map(|reason| {
+                    format!("the runner of machine {machine} could not be read: {reason}")
+                })
             })
-        })
-        .collect();
+            .chain(owned.iter().filter_map(|(session, answer)| {
+                answer.as_ref().err().map(|reason| {
+                    format!("the owner of session {session} could not be read: {reason}")
+                })
+            }))
+            .collect();
     let views = seats
         .iter()
         .map(|seat| {
             let person = people.get(&seat.added.agent).cloned().flatten();
             let reading = match (read.get(&seat.added.machine), &seat.session) {
-                (Some(Ok(held)), Some(session)) => Reading::Read(
-                    held.iter()
-                        .find(|live| &live.session == session)
-                        .or_else(|| owned.get(session)),
-                ),
+                (Some(Ok(held)), Some(session)) => {
+                    match (
+                        held.iter().find(|live| &live.session == session),
+                        owned.get(session),
+                    ) {
+                        (Some(live), _) | (None, Some(Ok(live))) => Reading::Read(Some(live)),
+                        (None, Some(Err(reason))) => Reading::Unread(reason),
+                        (None, None) => Reading::Read(None),
+                    }
+                }
                 (Some(Err(reason)), Some(_)) => Reading::Unread(reason),
                 _ => Reading::Read(None),
             };
