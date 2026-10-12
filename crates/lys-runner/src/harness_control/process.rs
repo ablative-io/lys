@@ -17,6 +17,9 @@ use super::{Binding, Executable, Transport};
 use crate::error::RunnerError;
 use crate::peer::Leader;
 
+#[cfg(test)]
+mod qualification;
+
 struct Qualification {
     adapter: &'static str,
     version: &'static str,
@@ -271,11 +274,10 @@ pub(crate) fn spawn(
             ),
         )
     })?;
-    if !status.success()
-        || !QUALIFIED
-            .iter()
-            .any(|proof| proof.adapter == adapter && proof.version == harness_version)
-    {
+    let admitted = QUALIFIED.iter().any(|proof| proof.adapter == adapter && proof.version == harness_version);
+    #[cfg(test)]
+    let admitted = admitted || qualification::approved(adapter, &harness_version)?;
+    if !status.success() || !admitted {
         return Err(failed(
             "control_adapter_unqualified",
             format!(
@@ -287,9 +289,13 @@ pub(crate) fn spawn(
     let harness = executable(&selected)?;
     let adapter = adapter.to_owned();
     let arguments = match transport {
-        Transport::Claude => if resume {
-            super::claude::resume_arguments(&launch.arguments, conversation)?
-        } else { super::claude::arguments(&launch.arguments, conversation)? },
+        Transport::Claude => {
+            if resume {
+                super::claude::resume_arguments(&launch.arguments, conversation)?
+            } else {
+                super::claude::arguments(&launch.arguments, conversation)?
+            }
+        }
         Transport::Codex => super::codex::arguments(&launch.arguments)?,
         Transport::Pty => {
             return Err(failed(
@@ -298,8 +304,11 @@ pub(crate) fn spawn(
             ));
         }
     };
-    let current =
-        std::env::current_exe().map_err(|error| failed("control_entry_unproved", error))?;
+    #[cfg(test)]
+    let current = qualification::entry()?.map_or_else(std::env::current_exe, Ok)
+        .map_err(|error| failed("control_entry_unproved", error))?;
+    #[cfg(not(test))]
+    let current = std::env::current_exe().map_err(|error| failed("control_entry_unproved", error))?;
     let entry_identity = executable(&current)?;
     let mut child = Command::new(&current)
         .args(["runner", "managed-entry"])

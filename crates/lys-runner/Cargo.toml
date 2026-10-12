@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "lys-runner"
 description = "The lys runner: holds each started agent in its own background pseudo-terminal, driven over a published, signed protocol on a Unix socket."
 version.workspace = true
@@ -63,3 +64,211 @@ name = "fake_seat_owner"
 
 [lints]
 workspace = true
+
+[[test]]
+name = "admitted_launch"
+path = "tests/admitted_launch.rs"
+
+[[test]]
+name = "agent_requests"
+path = "tests/agent_requests.rs"
+
+[[test]]
+name = "as_caller"
+path = "tests/as_caller.rs"
+
+[[test]]
+name = "attach"
+path = "tests/attach.rs"
+
+[[test]]
+name = "budget_figures"
+path = "tests/budget_figures.rs"
+
+[[test]]
+name = "claude_judge"
+path = "tests/claude_judge.rs"
+
+[[test]]
+name = "codex_judge"
+path = "tests/codex_judge.rs"
+
+[[test]]
+name = "codex_judge_client"
+path = "tests/codex_judge_client.rs"
+
+[[test]]
+name = "codex_policy"
+path = "tests/codex_policy.rs"
+
+[[test]]
+name = "codex_policy_contract"
+path = "tests/codex_policy_contract.rs"
+
+[[test]]
+name = "codex_refusals"
+path = "tests/codex_refusals.rs"
+
+[[test]]
+name = "conformance"
+path = "tests/conformance.rs"
+
+[[test]]
+name = "containment_inputs"
+path = "tests/containment_inputs.rs"
+
+[[test]]
+name = "containment_macos"
+path = "tests/containment_macos.rs"
+
+[[test]]
+name = "containment_native_entry"
+path = "tests/containment_native_entry.rs"
+
+[[test]]
+name = "containment_paths"
+path = "tests/containment_paths.rs"
+
+[[test]]
+name = "containment_policy"
+path = "tests/containment_policy.rs"
+
+[[test]]
+name = "context_control"
+path = "tests/context_control.rs"
+
+[[test]]
+name = "control_recovery"
+path = "tests/control_recovery.rs"
+
+[[test]]
+name = "dial_channel"
+path = "tests/dial_channel.rs"
+
+[[test]]
+name = "feed"
+path = "tests/feed.rs"
+
+[[test]]
+name = "feed_act"
+path = "tests/feed_act.rs"
+
+[[test]]
+name = "folders_act"
+path = "tests/folders_act.rs"
+
+[[test]]
+name = "harness_claude"
+path = "tests/harness_claude.rs"
+
+[[test]]
+name = "harness_codex"
+path = "tests/harness_codex.rs"
+
+[[test]]
+name = "harness_control"
+path = "tests/harness_control.rs"
+
+[[test]]
+name = "judge"
+path = "tests/judge.rs"
+
+[[test]]
+name = "judge_cwd"
+path = "tests/judge_cwd.rs"
+
+[[test]]
+name = "judge_paths"
+path = "tests/judge_paths.rs"
+
+[[test]]
+name = "launch_config"
+path = "tests/launch_config.rs"
+
+[[test]]
+name = "liveness"
+path = "tests/liveness.rs"
+
+[[test]]
+name = "operations"
+path = "tests/operations.rs"
+
+[[test]]
+name = "peer_restart"
+path = "tests/peer_restart.rs"
+
+[[test]]
+name = "peer_socket"
+path = "tests/peer_socket.rs"
+
+[[test]]
+name = "pty_isolated"
+path = "tests/pty_isolated.rs"
+
+[[test]]
+name = "pty_stop"
+path = "tests/pty_stop.rs"
+
+[[test]]
+name = "qualify_evidence"
+path = "tests/qualify_evidence.rs"
+
+[[test]]
+name = "reminder_delivery"
+path = "tests/reminder_delivery.rs"
+
+[[test]]
+name = "render"
+path = "tests/render.rs"
+
+[[test]]
+name = "restart_group"
+path = "tests/restart_group.rs"
+
+[[test]]
+name = "rotation_windows"
+path = "tests/rotation_windows.rs"
+
+[[test]]
+name = "runner"
+path = "tests/runner.rs"
+
+[[test]]
+name = "runner_regressions"
+path = "tests/runner_regressions.rs"
+
+[[test]]
+name = "seat_conversation"
+path = "tests/seat_conversation.rs"
+
+[[test]]
+name = "seat_cost"
+path = "tests/seat_cost.rs"
+
+[[test]]
+name = "seat_owner_store"
+path = "tests/seat_owner_store.rs"
+
+[[test]]
+name = "seat_restart"
+path = "tests/seat_restart.rs"
+
+[[test]]
+name = "seat_scale"
+path = "tests/seat_scale.rs"
+
+[[test]]
+name = "seat_survival"
+path = "tests/seat_survival.rs"
+
+[[test]]
+name = "seat_survival_faults"
+path = "tests/seat_survival_faults.rs"
+
+[[test]]
+name = "seat_upgrade"
+path = "tests/seat_upgrade.rs"
+
+[[test]]
+name = "stop_settling"
+path = "tests/stop_settling.rs"
