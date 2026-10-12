@@ -347,6 +347,18 @@ pub enum HomeError {
         config_dir: PathBuf,
     },
 
+    /// The installed plugins file is JSON but carries no `plugins` object, so
+    /// what the directory has installed cannot be told; it is never read as
+    /// none installed.
+    #[error(
+        "plugins_unreadable: {} has no plugins object; reinstall the plugins into that config directory",
+        path.display()
+    )]
+    PluginsFileMalformed {
+        /// The installed plugins file.
+        path: PathBuf,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {

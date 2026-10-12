@@ -17,7 +17,8 @@ pub const INSTALLED_FILE: &str = "plugins/installed_plugins.json";
 /// # Errors
 ///
 /// [`HomeError::Io`] when the file exists but cannot be read, and
-/// [`HomeError::Json`] when it is not the program's shape.
+/// [`HomeError::Json`] when it is not JSON, and
+/// [`HomeError::PluginsFileMalformed`] when it carries no `plugins` object.
 pub fn installed(config_dir: &Path) -> Result<BTreeSet<String>, HomeError> {
     let path = config_dir.join(INSTALLED_FILE);
     let bytes = match std::fs::read(&path) {
@@ -34,11 +35,11 @@ pub fn installed(config_dir: &Path) -> Result<BTreeSet<String>, HomeError> {
             context: "the installed plugins file is not JSON",
             source,
         })?;
-    Ok(value
+    value
         .get("plugins")
         .and_then(serde_json::Value::as_object)
         .map(|plugins| plugins.keys().cloned().collect())
-        .unwrap_or_default())
+        .ok_or(HomeError::PluginsFileMalformed { path })
 }
 
 /// Refuses the first of `named` that `config_dir` has not installed.
