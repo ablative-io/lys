@@ -25,13 +25,31 @@ pub(super) enum Exit {
 
 /// Whether `pid` exits within `within`. A pid that cannot name a process is gone.
 pub(super) fn exit_within(pid: u32, within: Duration) -> Exit {
-    let Some(id) = i32::try_from(pid)
-        .ok()
-        .and_then(rustix::process::Pid::from_raw)
-    else {
-        return Exit::Gone;
+    let id = match i32::try_from(pid) {
+        Ok(raw) if raw > 1 => match rustix::process::Pid::from_raw(raw) {
+            Some(id) => id,
+            None => return Exit::Unwatched(format!("{pid} is not a process id")),
+        },
+        Ok(_) | Err(_) => return Exit::Unwatched(format!("{pid} is not a process id")),
     };
     exited(id, Instant::now() + within)
+}
+
+impl crate::protocol::Ended {
+    /// Require the status or signal returned by the harness child's reap.
+    ///
+    /// # Errors
+    ///
+    /// `process_exit_unconfirmed` when the runner could not read its child's exit.
+    pub fn require_reaped(&self, session: &str) -> Result<(), crate::error::RunnerError> {
+        if self.at == 0 || (self.status.is_none() && self.signal.is_none()) {
+            return Err(crate::error::RunnerError::refused(
+                "process_exit_unconfirmed",
+                format!("session {session}: the harness has no reaped exit status or signal"),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -119,6 +137,16 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
 mod tests {
     use super::{Exit, exit_within};
     use std::time::{Duration, Instant};
+
+    #[test]
+    fn exit_rejects_invalid_process_ids_as_unwatched() {
+        for pid in [0, 1, u32::MAX] {
+            assert!(matches!(
+                exit_within(pid, Duration::ZERO),
+                Exit::Unwatched(_)
+            ));
+        }
+    }
 
     #[test]
     fn an_exit_is_told_at_once_and_a_live_process_holds_to_the_bound()

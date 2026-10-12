@@ -48,6 +48,9 @@ use crate::session::now;
 use crate::stops_state::Stop;
 use crate::stops_store::StopStore;
 
+#[path = "stop_api/exit.rs"]
+mod exit;
+
 /// A stop to make.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -197,6 +200,7 @@ fn confirmed(state: &AppState, mut view: StopView) -> Result<StopView, ServerErr
             })
             .collect())
     })?;
+    exit::read_refusals(state, &mut view)?;
     Ok(view)
 }
 
@@ -234,15 +238,15 @@ async fn end_session(state: &Arc<AppState>, session: &str, by: &str) -> Vec<Stri
             return refused;
         }
     };
-    let act = lys_runner::Act::End {
-        session: session.to_owned(),
-    };
-    let answered =
-        crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
+    let answered = exit::end_within(state, &driven).await;
     let kept = match &answered {
-        Ok(lys_runner::Answer::Ended { ended, .. }) => {
-            crate::runner_sessions::record_end(state, &driven, ended)
-        }
+        Ok(lys_runner::Answer::Ended {
+            session: answered,
+            ended,
+        }) if answered == session => ended
+            .require_reaped(session)
+            .map_err(ServerError::from)
+            .and_then(|()| crate::runner_sessions::record_end(state, &driven, ended)),
         Ok(other) => Err(ServerError::Runner {
             refusal: "runner_reply_malformed".to_owned(),
             words: format!(
@@ -257,7 +261,12 @@ async fn end_session(state: &Arc<AppState>, session: &str, by: &str) -> Vec<Stri
     };
     let outcome = kept
         .as_ref()
-        .map_or_else(ServerError::name, |()| "ended".to_owned());
+        .map_or_else(ToString::to_string, |()| "ended".to_owned());
+    let refusal_record = if kept.is_err() {
+        exit::keep_refusal(state, &driven, by, &outcome)
+    } else {
+        Ok(())
+    };
     let receipt = crate::runner_sessions::keep_act(
         state,
         crate::runner_acts::RunnerAct {
@@ -272,7 +281,10 @@ async fn end_session(state: &Arc<AppState>, session: &str, by: &str) -> Vec<Stri
             outcome,
         },
     );
-    for failed in [kept.err(), receipt.err()].into_iter().flatten() {
+    for failed in [kept.err(), receipt.err(), refusal_record.err()]
+        .into_iter()
+        .flatten()
+    {
         refused.push(format!("{session}: {failed}"));
     }
     refused

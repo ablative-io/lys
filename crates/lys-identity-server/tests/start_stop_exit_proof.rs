@@ -37,30 +37,63 @@ async fn stop_refuses_an_exit_answer_without_reap_evidence() -> Result<(), Box<d
     let key = table.server_key.public_key_bytes();
     let replying_session = session.clone();
     let answering = std::thread::spawn(move || -> Result<(), String> {
-        let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
-        let greeting = Greeting::fresh("00");
-        let mut writer = &stream;
-        writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
-        let mut line = String::new();
-        BufReader::new(&stream)
-            .read_line(&mut line)
-            .map_err(|error| error.to_string())?;
-        let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
-        if !matches!(act, Act::End { .. }) {
-            return Err(format!("expected End, got {act:?}"));
+        let mut liveness = 0;
+        let mut ends = 0;
+        for _ in 0..4 {
+            let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
+            let greeting = Greeting::fresh("00");
+            let mut writer = &stream;
+            writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
+            let mut line = String::new();
+            BufReader::new(&stream)
+                .read_line(&mut line)
+                .map_err(|error| error.to_string())?;
+            let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
+            let answer = match act {
+                Act::Owned => Answer::Owned {
+                    owners: Vec::new(),
+                    unreachable: Vec::new(),
+                },
+                Act::Liveness {
+                    session: Some(session),
+                } if session == replying_session => {
+                    liveness += 1;
+                    Answer::Liveness {
+                        sessions: vec![lys_runner::liveness::LivenessView {
+                            session,
+                            pid: Some(41),
+                            alive: true,
+                            managed: false,
+                            harness_session: None,
+                            turn_active: false,
+                            last_signal_at: None,
+                            started_at: 1,
+                            ended: false,
+                        }],
+                    }
+                }
+                Act::End { session } if session == replying_session => {
+                    ends += 1;
+                    Answer::Ended {
+                        session,
+                        ended: Ended {
+                            how: EndedHow::Exited,
+                            at: 1,
+                            status: None,
+                            signal: None,
+                            reason: Some("the process exit could not be read".to_owned()),
+                            stopped: None,
+                        },
+                    }
+                }
+                other => return Err(format!("expected Owned, Liveness or End, got {other:?}")),
+            };
+            writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
         }
-        let answer = Answer::Ended {
-            session: replying_session,
-            ended: Ended {
-                how: EndedHow::Exited,
-                at: 1,
-                status: None,
-                signal: None,
-                reason: Some("the process exit could not be read".to_owned()),
-                stopped: None,
-            },
-        };
-        writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())
+        if liveness != 1 || ends != 1 {
+            return Err(format!("liveness={liveness}, ends={ends}"));
+        }
+        Ok(())
     });
     let sent = table
         .service
