@@ -50,13 +50,14 @@ pub fn hand(socket: &Path, stdin: &str) -> Result<String, RunnerError> {
     }
 }
 
-/// The line the harness shows: that Lys counts this run, or, when the
+/// The line the harness shows: the runner's own words on what it kept, so a
+/// line the runner kept nothing of never reads as counted, or, when the
 /// figures could not be handed over, that they were not and why. A failure
 /// is said on the run's own screen, never passed over.
 #[must_use]
 pub fn shown(handed: &Result<String, RunnerError>) -> String {
     match handed {
-        Ok(_) => "Lys: counted".to_owned(),
+        Ok(words) => format!("Lys: {words}"),
         Err(error) => format!("Lys: dollars and running time not counted ({error})"),
     }
 }
@@ -84,12 +85,15 @@ mod tests {
     }
 
     #[test]
-    fn a_failure_is_said_on_the_line_and_never_shown_as_counted() {
+    fn the_line_says_what_the_runner_kept_and_a_failure_is_never_shown_as_counted() {
         let failed = Err(RunnerError::Malformed {
             reason: "no runner".to_owned(),
         });
         let line = shown(&failed);
         assert!(line.contains("not counted") && line.contains("no runner"));
-        assert_eq!(shown(&Ok("held".to_owned())), "Lys: counted");
+        assert_eq!(
+            shown(&Ok("nothing kept".to_owned())),
+            "Lys: nothing kept"
+        );
     }
 }
