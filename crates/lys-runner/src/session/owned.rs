@@ -12,6 +12,86 @@ use crate::tracking::Tracking;
 use super::Sessions;
 
 impl Sessions {
+    /// Resolve the selected account through a local broker and spawn with
+    /// its credential in a temporary child environment. The broker must
+    /// complete its admission and settlement before returning success.
+    /// Neither the held launch nor the rotation receives the value.
+    ///
+    /// # Errors
+    /// Refuses an unsupported variable, missing or invalid credential,
+    /// repeated forwarding, a broker refusal, or a failed process spawn.
+    pub fn spawn_account(
+        spawn: &crate::pty::Spawn<'_>,
+        rotation: &crate::rotation::RotationState,
+        variable: &str,
+        resolve: impl FnOnce(
+            &str,
+            &mut dyn FnMut(&[u8]) -> Result<(), RunnerError>,
+        ) -> Result<(), RunnerError>,
+    ) -> Result<crate::pty::Spawned, RunnerError> {
+        if !matches!(
+            variable,
+            "CLAUDE_CODE_OAUTH_TOKEN" | "CODEX_API_KEY" | "OPENAI_API_KEY"
+        ) {
+            return Err(RunnerError::refused(
+                "account_variable_unsupported",
+                "the harness has no supported account credential variable",
+            ));
+        }
+        let mut environment = spawn.environment.clone();
+        let mut placed = false;
+        let mut invalid = false;
+        resolve(rotation.account(), &mut |bytes| {
+            if placed {
+                invalid = true;
+                return Err(RunnerError::refused(
+                    "account_credential_repeated",
+                    "the broker forwarded more than one credential",
+                ));
+            }
+            let text = std::str::from_utf8(bytes).map_err(|_| {
+                invalid = true;
+                RunnerError::refused("account_credential_invalid", "the credential is not UTF-8")
+            })?;
+            if text.is_empty() || text.chars().any(char::is_control) {
+                invalid = true;
+                return Err(RunnerError::refused(
+                    "account_credential_invalid",
+                    "the credential is empty or contains control characters",
+                ));
+            }
+            environment.insert(
+                rotation.variable().to_owned(),
+                rotation.account().to_owned(),
+            );
+            environment.insert(variable.to_owned(), text.to_owned());
+            placed = true;
+            Ok(())
+        })
+        .map_err(|error| {
+            // A broker's explanatory text can contain the credential.
+            // Only its stable refusal name may leave the spawn boundary.
+            RunnerError::refused(
+                &error.name(),
+                "the local account broker refused credential placement",
+            )
+        })?;
+        if !placed || invalid {
+            return Err(RunnerError::refused(
+                "account_credential_missing",
+                "the broker did not forward exactly one valid credential",
+            ));
+        }
+        crate::pty::spawn(&crate::pty::Spawn {
+            program: spawn.program,
+            arguments: spawn.arguments,
+            directory: spawn.directory,
+            environment: &environment,
+            columns: spawn.columns,
+            rows: spawn.rows,
+        })
+    }
+
     /// Start with a verified responsible person supplied by the admitting caller.
     ///
     /// # Errors

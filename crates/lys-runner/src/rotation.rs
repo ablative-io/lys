@@ -1,10 +1,10 @@
 //! Account rotation at a usage limit.
 //!
 //! A session may be given an ordered list of account handles, each held by
-//! the secrets broker. The handle in use is set in one environment variable
-//! of the session's process, and the broker swaps it for the account's
-//! credential on the way out, so no account value ever reaches the runner,
-//! its answers or its record. Rotation changes only that variable: the
+//! the secrets broker. The held launch and rotation keep only handles.
+//! A local broker may forward the selected account's credential into a
+//! temporary environment at the spawn boundary; it never enters the held
+//! launch, answers or record. Rotation changes only the account: the
 //! session's directory, and so where its harness keeps its session store and
 //! transcripts, never changes, and a moved session resumes.
 //!

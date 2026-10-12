@@ -7,6 +7,9 @@ use lys_runner::tracking_budget::PlanWindow;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "rotation_accounts.rs"]
+mod rotation_accounts;
+
 fn rotation() -> Result<RotationState, Box<dyn Error>> {
     Ok(RotationState::new(serde_json::from_str::<Rotation>(
         r#"{"accounts":["first","second"],"variable":"ACCOUNT","limit":{"signal":"plan_window"}}"#,
