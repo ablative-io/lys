@@ -225,7 +225,13 @@ pub(crate) async fn live_session(
     // died can still be stopped, retired and started again (12 Oct 2026: a seat
     // whose session was gone refused stop as session_unknown, retire as
     // seat_running, and start as session_unknown, and could never move again).
-    match liveness(state, machine, Some(session.to_owned())).await {
+    held(liveness(state, machine, Some(session.to_owned())).await, session)
+}
+
+/// `session` from a runner's liveness answer: absent when the runner holds no
+/// such session, and every other refusal passed on as it came.
+fn held(answer: Result<Vec<Live>, ServerError>, session: &str) -> Result<Option<Live>, ServerError> {
+    match answer {
         Ok(sessions) => Ok(sessions.into_iter().find(|live| live.session == session)),
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => Ok(None),
         Err(error) => Err(error),
@@ -272,4 +278,45 @@ pub(crate) async fn act(
         },
     )?;
     Ok((answered?, receipt))
+}
+
+#[cfg(test)]
+mod held_tests {
+    use super::{Live, held};
+    use crate::error::ServerError;
+
+    fn live(session: &str) -> Live {
+        Live {
+            session: session.to_owned(),
+            pid: Some(4242),
+            alive: true,
+            managed: true,
+            harness_session: None,
+            turn_active: false,
+            last_signal_at: None,
+            started_at: 1,
+            ended: false,
+        }
+    }
+
+    fn refused(refusal: &str) -> ServerError {
+        ServerError::Runner {
+            refusal: refusal.to_owned(),
+            words: format!("{refusal}: test"),
+        }
+    }
+
+    /// A session no runner holds reads as not live, so a seat whose session
+    /// died can be stopped and started again; any other refusal still refuses.
+    #[test]
+    fn an_unheld_session_is_absent_and_other_refusals_pass_on() {
+        assert!(matches!(held(Err(refused("session_unknown")), "op-a"), Ok(None)));
+        assert!(matches!(
+            held(Err(refused("runner_unreachable")), "op-a"),
+            Err(ServerError::Runner { refusal, .. }) if refusal == "runner_unreachable"
+        ));
+        let found = held(Ok(vec![live("op-b"), live("op-a")]), "op-a");
+        assert!(matches!(found, Ok(Some(live)) if live.session == "op-a"));
+        assert!(matches!(held(Ok(vec![live("op-b")]), "op-a"), Ok(None)));
+    }
 }
