@@ -35,9 +35,7 @@ use crate::runner_sessions::{driven, ended_in, kind};
 use crate::seats_acts::{RESTART, START, STOP, Standing, act, admitted, live_session};
 use crate::seats_api::{body, seat, shown, with_seats};
 use crate::seats_state::{Line, Seat, Started, Stopped};
-use crate::seats_views::{
-    SeatStartBody, SeatRestarted, SeatStarted, SeatStopBody, SeatStopped,
-};
+use crate::seats_views::{SeatRestarted, SeatStartBody, SeatStarted, SeatStopBody, SeatStopped};
 use crate::session::now;
 
 /// A seat's session started, as the start answers it.
@@ -65,6 +63,9 @@ pub(crate) async fn start(
     let given = body(given)?;
     OperationId::from_str(&given.operation)?;
     let held = seat(&state, &name)?;
+    if let Some(conversation) = &given.conversation {
+        lys_runner::harness_control::Transport::Codex.validate_resume(conversation)?;
+    }
     let (admission, standing) = admitted(&state, &headers, &held, START, &uri.to_string())?;
     let begun = Box::pin(begin(
         &state,

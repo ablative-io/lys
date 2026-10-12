@@ -53,11 +53,18 @@ pub(super) fn select_transport(act: Act) -> Act {
     }
 }
 
-pub(super) fn select_resume(act: Act, conversation: Option<&str>) -> Result<Act, crate::error::ServerError> {
+pub(super) fn select_resume(
+    act: Act,
+    conversation: Option<&str>,
+) -> Result<Act, crate::error::ServerError> {
     let mut act = select_transport(act);
     if let Some(conversation) = conversation {
         let Act::StartManaged { managed, .. } = &mut act else {
-            return Err(lys_runner::RunnerError::refused("control_binding_invalid", "a resumed conversation requires a managed harness").into());
+            return Err(lys_runner::RunnerError::refused(
+                "control_binding_invalid",
+                "a resumed conversation requires a managed harness",
+            )
+            .into());
         };
         managed.transport.validate_resume(conversation)?;
         conversation.clone_into(&mut managed.conversation);
@@ -96,7 +103,7 @@ mod tests {
     }
     #[test]
     fn an_existing_harness_conversation_is_forwarded_without_creating_another()
-        -> Result<(), Box<dyn std::error::Error>> {
+    -> Result<(), Box<dyn std::error::Error>> {
         let conversation = "019c6e27-e55b-73d1-87d8-4e01f1f75043";
         for harness in ["claude_code", "codex"] {
             let launch: Launch = serde_json::from_value(json!({
@@ -105,11 +112,16 @@ mod tests {
                 "config":{"files":[],"argument_files":{},"environment_paths":{},"working_directory":false,
                     "harness":harness,"requires_controls":true}
             }))?;
-            let act = Act::Start { launch:Box::new(launch), lys_mcp:None, proxy:None };
+            let act = Act::Start {
+                launch: Box::new(launch),
+                lys_mcp: None,
+                proxy: None,
+            };
             for invalid in ["", "../thread", "not-a-uuid"] {
                 assert!(super::select_resume(act.clone(), Some(invalid)).is_err());
             }
-            let Act::StartManaged { managed, .. } = super::select_resume(act, Some(conversation))? else {
+            let Act::StartManaged { managed, .. } = super::select_resume(act, Some(conversation))?
+            else {
                 return Err("resume did not select managed transport".into());
             };
             assert_eq!(managed.conversation, conversation);
@@ -117,5 +129,4 @@ mod tests {
         }
         Ok(())
     }
-
 }

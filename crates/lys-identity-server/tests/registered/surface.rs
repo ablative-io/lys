@@ -155,7 +155,10 @@ async fn the_api_answers_the_key_set_the_origin_publishes() -> TestResult {
     assert_eq!(api_status.as_u16(), 503, "{api_body}");
     let refused: serde_json::Value = serde_json::from_str(&api_body)?;
     assert_eq!(refused["refusal"], "ProviderUnavailable");
-    assert_eq!(api_status, origin_status, "origin={origin_body}; api={api_body}");
+    assert_eq!(
+        api_status, origin_status,
+        "origin={origin_body}; api={api_body}"
+    );
     assert_eq!(api_body, origin_body);
     assert!(!api_body.contains("not an API route"), "{api_body}");
     Ok(())

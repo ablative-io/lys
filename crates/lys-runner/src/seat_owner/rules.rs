@@ -198,11 +198,17 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
             }
             record.harness = Some(start.clone());
         }
-        Intent::Conversation { session, conversation } => {
+        Intent::Conversation {
+            session,
+            conversation,
+        } => {
             validate_name(conversation, "a proved conversation")?;
             let record = held(projection, session)?;
             if !record.conversation.is_empty() && record.conversation != *conversation {
-                return Err(refused("seat_owner_binding_mismatch", "the proved conversation cannot replace the owned conversation"));
+                return Err(refused(
+                    "seat_owner_binding_mismatch",
+                    "the proved conversation cannot replace the owned conversation",
+                ));
             }
             record.conversation.clone_from(conversation);
         }

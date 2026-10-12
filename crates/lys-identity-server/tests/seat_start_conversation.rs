@@ -4,19 +4,24 @@
 #[path = "support/runner_start.rs"]
 pub mod support;
 
-use std::error::Error;
 use serde_json::json;
+use std::error::Error;
 use support::{Table, operation};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_starting()
-    -> Result<(), Box<dyn Error>> {
+-> Result<(), Box<dyn Error>> {
     let table = Table::set().await?;
     let machine = table.lys_machine("Fixture").await?;
-    table.ok("/seats", &json!({
-        "operation":operation()?, "name":"conversation-seat", "agent":table.agent(),
-        "profile_version":1, "machine":machine,
-    })).await?;
+    table
+        .ok(
+            "/seats",
+            &json!({
+                "operation":operation()?, "name":"conversation-seat", "agent":table.agent(),
+                "profile_version":1, "machine":machine,
+            }),
+        )
+        .await?;
     let path = "/seats/conversation-seat/start";
     for conversation in ["", " padded ", "../thread", "not-a-uuid"] {
         let request = json!({"operation":operation()?, "conversation":conversation});
@@ -35,7 +40,10 @@ async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_st
     }
     let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
     assert_eq!(live["sessions"].as_array().map(Vec::len), Some(0), "{live}");
-    let (_, held) = table.service.get("/seats/conversation-seat", Some(&table.ada)).await?;
+    let (_, held) = table
+        .service
+        .get("/seats/conversation-seat", Some(&table.ada))
+        .await?;
     assert_eq!(held["revision"], 1);
     assert!(held.get("session").is_none());
     table.close()

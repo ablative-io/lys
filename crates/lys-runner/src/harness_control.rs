@@ -10,8 +10,8 @@ use crate::protocol::Launch;
 pub use crate::tracking_store::managed::{Binding, Executable, ManagedEvent};
 
 mod approval;
-mod conversation;
 mod context;
+mod conversation;
 mod initialize;
 mod reminders;
 pub use context::{
@@ -46,7 +46,7 @@ pub struct ManagedLaunch {
     /// An explicit conversation to resume, or empty for a new Codex thread.
     pub conversation: String,
     /// Resume the named conversation instead of creating it.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "conversation::is_fresh")]
     pub resume: bool,
     /// Whether a manual transport must refuse the launch.
     pub requires_controls: bool,

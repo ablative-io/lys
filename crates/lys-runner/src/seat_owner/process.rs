@@ -290,8 +290,10 @@ pub fn answer(
             prove_client(client, &client_start, peer)?;
             let view = state.view()?;
             let initial = binding.conversation.is_empty() && state.binding.conversation.is_empty();
-            if binding.seat != view.binding.seat || binding.session != view.binding.session
-                || (!initial && binding.conversation != view.binding.conversation) {
+            if binding.seat != view.binding.seat
+                || binding.session != view.binding.session
+                || (!initial && binding.conversation != view.binding.conversation)
+            {
                 return Err(RunnerError::refused(
                     "seat_owner_binding_mismatch",
                     format!(

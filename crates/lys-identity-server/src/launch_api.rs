@@ -220,7 +220,11 @@ pub(crate) async fn start_as(
     (machine, operation): (&str, &str),
     chosen: Chosen,
 ) -> Result<Json<Value>, ServerError> {
-    let Chosen { profile, directory, conversation } = chosen;
+    let Chosen {
+        profile,
+        directory,
+        conversation,
+    } = chosen;
     // The body's shape is refused before any record is consulted, as a start
     // naming no machine already is: a folder that is not an absolute, plain
     // path is RequestMalformed whatever the machine's or the agent's state.
@@ -267,17 +271,25 @@ pub(crate) async fn start_as(
     let (version, runtime, admitted_by) = match admission {
         Admission::Kept(kept, admitted_by) => {
             if kept.get("conversation").and_then(Value::as_str) != conversation.as_deref() {
-                return Err(ServerError::RuntimeReportReused { operation:session });
+                return Err(ServerError::RuntimeReportReused { operation: session });
             }
             return run(state, kept, &admitted_by).await;
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
     if let Some(conversation) = &conversation {
-        let harness = version.settings.harness.as_ref().and_then(crate::launch_template::runner_harness);
+        let harness = version
+            .settings
+            .harness
+            .as_ref()
+            .and_then(crate::launch_template::runner_harness);
         let transport = match harness {
-            Some(lys_runner::tracking::Harness::ClaudeCode) => lys_runner::harness_control::Transport::Claude,
-            Some(lys_runner::tracking::Harness::Codex) => lys_runner::harness_control::Transport::Codex,
+            Some(lys_runner::tracking::Harness::ClaudeCode) => {
+                lys_runner::harness_control::Transport::Claude
+            }
+            Some(lys_runner::tracking::Harness::Codex) => {
+                lys_runner::harness_control::Transport::Codex
+            }
             None => lys_runner::harness_control::Transport::Pty,
         };
         transport.validate_resume(conversation)?;
@@ -423,7 +435,13 @@ async fn run(
     let mut launch = with_provisioning(state, |store| kept_launch(store, &view))?;
     launch.policy = crate::agent_policy_api::launch_policy(state, &agent)?;
     let conversation = view.get("conversation").and_then(Value::as_str);
-    let ran = crate::runner_sessions::run_resuming(state, (&agent, &machine, admitted_by), launch, conversation).await?;
+    let ran = crate::runner_sessions::run_resuming(
+        state,
+        (&agent, &machine, admitted_by),
+        launch,
+        conversation,
+    )
+    .await?;
     let mut view = view;
     view["runner"] = ran;
     Ok(Json(view))

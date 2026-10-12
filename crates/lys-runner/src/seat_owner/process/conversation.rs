@@ -11,13 +11,22 @@ impl OwnerState {
     /// The store's errors or `seat_owner_binding_mismatch` for another session or conversation.
     pub fn bind_conversation(&self, session: &str, conversation: &str) -> Result<(), RunnerError> {
         if session != self.binding.session || conversation.is_empty() {
-            return Err(RunnerError::refused("seat_owner_binding_mismatch", "the proof must name this owner's session and a nonempty conversation"));
+            return Err(RunnerError::refused(
+                "seat_owner_binding_mismatch",
+                "the proof must name this owner's session and a nonempty conversation",
+            ));
         }
         if self.view()?.binding.conversation == conversation {
             return Ok(());
         }
         let intent = super::derived_intent(session, conversation);
-        self.record(&intent, &Intent::Conversation { session:session.to_owned(), conversation:conversation.to_owned() })?;
+        self.record(
+            &intent,
+            &Intent::Conversation {
+                session: session.to_owned(),
+                conversation: conversation.to_owned(),
+            },
+        )?;
         Ok(())
     }
 }

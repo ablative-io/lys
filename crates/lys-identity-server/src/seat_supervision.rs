@@ -38,20 +38,26 @@ pub(crate) fn bind_owner(
     if !matches!(act, Act::StartManaged { .. }) {
         return Ok(act);
     }
-    let seat = with_seats(state, |store| Ok(chosen_seat(store.seats(), agent, machine)))?;
+    let seat = with_seats(state, |store| {
+        Ok(chosen_seat(store.seats(), agent, machine))
+    })?;
     bind_selected(act, seat)
 }
 
 fn chosen_seat(seats: &[crate::seats_state::Seat], agent: &str, machine: &str) -> Option<String> {
-    seats.iter()
+    seats
+        .iter()
         .filter(|seat| !seat.retired && seat.added.agent == agent && seat.added.machine == machine)
         .min_by(|left, right| left.added.name.cmp(&right.added.name))
         .map(|seat| seat.added.name.clone())
 }
 
 fn machines(seats: &[crate::seats_state::Seat]) -> BTreeSet<String> {
-    seats.iter().filter(|seat| !seat.retired)
-        .map(|seat| seat.added.machine.clone()).collect()
+    seats
+        .iter()
+        .filter(|seat| !seat.retired)
+        .map(|seat| seat.added.machine.clone())
+        .collect()
 }
 
 fn bind_selected(act: Act, seat: Option<String>) -> Result<Act, ServerError> {
@@ -188,11 +194,22 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let seat = |name: &str, machine: &str, retired| Seat {
             added: Added {
-                operation: name.to_owned(), name: name.to_owned(), agent: "agent".to_owned(),
-                harness: "claude".to_owned(), profile_version: 1, machine: machine.to_owned(),
-                working_folder: None, account: None, by: "person".to_owned(), at: 1,
+                operation: name.to_owned(),
+                name: name.to_owned(),
+                agent: "agent".to_owned(),
+                harness: "claude".to_owned(),
+                profile_version: 1,
+                machine: machine.to_owned(),
+                working_folder: None,
+                account: None,
+                by: "person".to_owned(),
+                at: 1,
             },
-            session: None, harness_session: None, running: false, revision: 1, retired,
+            session: None,
+            harness_session: None,
+            running: false,
+            revision: 1,
+            retired,
         };
         let mut seats = vec![
             seat("fairy-bread", "machine", true),
@@ -208,15 +225,30 @@ mod tests {
             "transport":{"mode":"claude"},
             "conversation":"0f3c9a1e-5b7d-4c2a-8e6f-1b3d5a7c9e2f", "requires_controls":false,
         }))?;
-        let bound = bind_selected(Act::StartManaged { managed, lys_mcp: None, proxy: None }, selected)?;
-        let Act::StartManaged { managed, .. } = bound else { return Err("managed launch changed kind".into()); };
+        let bound = bind_selected(
+            Act::StartManaged {
+                managed,
+                lys_mcp: None,
+                proxy: None,
+            },
+            selected,
+        )?;
+        let Act::StartManaged { managed, .. } = bound else {
+            return Err("managed launch changed kind".into());
+        };
         let owner = managed.owner.ok_or("no owner binding")?;
         assert_eq!(owner.seat, "fairybread");
         assert_eq!(owner.session, "session");
         assert_eq!(owner.generation, 1);
         seats.reverse();
-        assert_eq!(chosen_seat(&seats, "agent", "machine").as_deref(), Some("fairybread"));
-        assert_eq!(machines(&seats), std::collections::BTreeSet::from(["machine".to_owned()]));
+        assert_eq!(
+            chosen_seat(&seats, "agent", "machine").as_deref(),
+            Some("fairybread")
+        );
+        assert_eq!(
+            machines(&seats),
+            std::collections::BTreeSet::from(["machine".to_owned()])
+        );
         assert!(chosen_seat(&seats, "agent", "absent").is_none());
         Ok(())
     }

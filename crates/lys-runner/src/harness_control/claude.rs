@@ -50,8 +50,13 @@ pub fn arguments(given: &[String], conversation: &str) -> Result<Vec<String>, Ru
 pub fn resume_arguments(given: &[String], conversation: &str) -> Result<Vec<String>, RunnerError> {
     super::Transport::Claude.validate_resume(conversation)?;
     let mut arguments = arguments(given, conversation)?;
-    let flag = arguments.len().checked_sub(2).ok_or_else(|| RunnerError::refused("control_launch_invalid", "managed arguments have no conversation flag"))?;
-    arguments[flag] = "--resume".to_owned();
+    let flag = arguments.len().checked_sub(2).ok_or_else(|| {
+        RunnerError::refused(
+            "control_launch_invalid",
+            "managed arguments have no conversation flag",
+        )
+    })?;
+    "--resume".clone_into(&mut arguments[flag]);
     Ok(arguments)
 }
 
