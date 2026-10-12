@@ -525,7 +525,7 @@ fn every_run_is_given_the_status_line_proxied_or_on_a_plan() {
         plain["statusLine"],
         json!({
             "type": "command",
-            "command": "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\""
+            "command": lys_home::harness::rendering::STATUS_LINE_COMMAND
         })
     );
     template.env.insert(
@@ -537,7 +537,7 @@ fn every_run_is_given_the_status_line_proxied_or_on_a_plan() {
         proxied["statusLine"],
         json!({
             "type": "command",
-            "command": "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\""
+            "command": lys_home::harness::rendering::STATUS_LINE_COMMAND
         })
     );
     // The command names the two variables the runner sets and no path of

@@ -73,9 +73,10 @@ pub const SOCKET_VARIABLE: &str = "LYS_RUNNER_SOCKET";
 /// windows are what the harness itself reports to its status line, and this
 /// command hands them to the runner. It names the two variables the runner
 /// sets, never a path of its own, so one template writes one sequence of
-/// bytes on every machine.
-pub const STATUS_LINE_COMMAND: &str =
-    "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"";
+/// bytes on every machine. A run no runner started (`lys home launch` run by
+/// hand) has neither variable, and its line says so rather than running an
+/// empty program on an empty socket.
+pub const STATUS_LINE_COMMAND: &str = "if [ -n \"$LYS_PROGRAM\" ] && [ -n \"$LYS_RUNNER_SOCKET\" ]; then \"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"; else echo 'Lys: not counted (no runner started this run)'; fi";
 
 /// The proxy's address with `run` put first on its path:
 /// `http://host:port/anthropic` becomes `http://host:port/<run>/anthropic`.
