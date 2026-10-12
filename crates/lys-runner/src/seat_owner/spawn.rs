@@ -410,7 +410,7 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
     let ended = match peer::start_identity(owner.pid) {
         Ok(start) if start == owner.start => {
             let group = ended_group(owner.pid);
-            if gone_within(owner.pid, std::time::Duration::from_secs(5)) {
+            if super::exit_wait::gone_within(owner.pid, std::time::Duration::from_secs(5)) {
                 format!("the owner was ended{group}")
             } else {
                 format!("the owner did not end within 5 s{group}")
@@ -434,26 +434,6 @@ fn ended_group(pid: u32) -> String {
         Ok(()) => ", with its process group".to_owned(),
         Err(rustix::io::Errno::SRCH) => String::new(),
         Err(error) => format!(", its process group not ended: {error}"),
-    }
-}
-
-/// Whether `pid` is gone, polled until `within`.
-fn gone_within(pid: u32, within: std::time::Duration) -> bool {
-    let Some(id) = i32::try_from(pid)
-        .ok()
-        .and_then(rustix::process::Pid::from_raw)
-    else {
-        return true;
-    };
-    let until = std::time::Instant::now() + within;
-    loop {
-        if rustix::process::test_kill_process(id).is_err() {
-            return true;
-        }
-        if std::time::Instant::now() >= until {
-            return false;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
 
