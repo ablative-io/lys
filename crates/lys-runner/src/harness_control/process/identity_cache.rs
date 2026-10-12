@@ -115,7 +115,7 @@ pub fn sha256(path: &Path, metadata: &Metadata) -> Option<String> {
 /// Keep `sha256` for the file at `path` as it is now.
 pub fn remember_sha256(path: &Path, metadata: &Metadata, sha256: &str) {
     remember(path, metadata, |known| {
-        known.sha256 = Some(sha256.to_owned())
+        known.sha256 = Some(sha256.to_owned());
     });
 }
 
@@ -130,7 +130,7 @@ pub fn version(path: &Path) -> Option<String> {
 pub fn remember_version(path: &Path, reported: &str) {
     if let Ok(metadata) = std::fs::metadata(path) {
         remember(path, &metadata, |known| {
-            known.version = Some(reported.to_owned())
+            known.version = Some(reported.to_owned());
         });
     }
 }

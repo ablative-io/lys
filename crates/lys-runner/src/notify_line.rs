@@ -58,15 +58,22 @@ pub fn hand(socket: &Path, json: &str) -> Result<Answer, RunnerError> {
 /// Hand one completed turn to its runner; ignore every other notification.
 /// Every outcome exits zero with no standard output and at most one named
 /// diagnostic on standard error.
-pub fn run(args: Args<'_>) -> i32 {
-    let handed = request(args.notification).and_then(|request| {
+pub fn run(
+    Args {
+        socket,
+        notification,
+        stdout: _,
+        stderr,
+    }: Args<'_>,
+) -> i32 {
+    let handed = request(notification).and_then(|request| {
         request
             .as_ref()
-            .map(|request| exchange(args.socket, request))
+            .map(|request| exchange(socket, request))
             .transpose()
     });
     if let Err(error) = handed {
-        report(args.stderr, "notify", &error);
+        report(stderr, "notify", &error);
     }
     0
 }

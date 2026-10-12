@@ -334,10 +334,10 @@ directory::directory_refusals! {
         reason: String,
     },
     /// A refusal of Lys's `OpenID` provider.
-    #[error(transparent)]
+    #[error("{0}")]
     Provider(#[from] crate::error_provider::ProviderError),
     /// A refusal of the grant change stream or a pass binding (DIRECTORY-089).
-    #[error(transparent)]
+    #[error("{0}")]
     GrantStream(#[from] crate::error_grant_stream::GrantStreamError),
     /// A sign-in provider refused the client id it was proved with.
     #[error("ProviderRefused: {provider} did not accept this client id ({status}): {reason}")]
@@ -390,4 +390,29 @@ directory::directory_refusals! {
         /// Why, in words.
         words: String,
     },
+}
+
+#[cfg(test)]
+mod repair_tests {
+    use super::ServerError;
+
+    #[test]
+    fn provider_conversion_preserves_refusal_words_and_status() {
+        let original = crate::error_provider::ProviderError::ClientUnknown;
+        let words = original.to_string();
+        let error = ServerError::from(original);
+        assert_eq!(error.to_string(), words);
+        assert_eq!(error.status(), axum::http::StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn grant_stream_conversion_preserves_refusal_words_and_status() {
+        let original = crate::error_grant_stream::GrantStreamError::BindingDegraded {
+            refusal: "projection unavailable".to_owned(),
+        };
+        let words = original.to_string();
+        let error = ServerError::from(original);
+        assert_eq!(error.to_string(), words);
+        assert_eq!(error.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+    }
 }

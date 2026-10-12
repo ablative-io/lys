@@ -27,15 +27,13 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::body::Bytes;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, Method};
+use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::{AgentId, IdentityError, IdentityId, LifecycleState, OperationId, Transition};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::certificates_store::Withdrawn;
@@ -50,6 +48,10 @@ use crate::stops_store::StopStore;
 
 #[path = "stop_api/exit.rs"]
 mod exit;
+mod handles;
+mod runners;
+pub(crate) use handles::{end_handles, end_handles_as_owner};
+use runners::{confirmed, through_runners};
 
 /// A stop to make.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -180,116 +182,6 @@ async fn stops(
     Ok(Json(StopsView { stops }))
 }
 
-/// `view` with each asked session whose end its runtime confirmed.
-fn confirmed(state: &AppState, mut view: StopView) -> Result<StopView, ServerError> {
-    if state.runtime.is_none() {
-        return Ok(view);
-    }
-    view.sessions_confirmed = with_runtime(state, |store| {
-        Ok(view
-            .sessions_asked
-            .iter()
-            .filter_map(|session| store.session(session))
-            .filter(|tracked| tracked.stopped())
-            .filter_map(|tracked| {
-                tracked.latest().map(|report| ConfirmedEnd {
-                    session: tracked.session.clone(),
-                    at: report.at,
-                    confirmation: report.confirmation.clone(),
-                })
-            })
-            .collect())
-    })?;
-    exit::read_refusals(state, &mut view)?;
-    Ok(view)
-}
-
-/// Ask the runner of each session to end it, every session at once so no
-/// runner waits on another, answering, by name, each session whose runner
-/// refused or could not be reached. A session on a machine that names no
-/// runner stays asked, as its runtime has not said.
-async fn end_sessions(state: &Arc<AppState>, sessions: Vec<String>, by: &str) -> Vec<String> {
-    let mut asked = tokio::task::JoinSet::new();
-    for session in sessions {
-        let (state, by) = (Arc::clone(state), by.to_owned());
-        asked.spawn(async move { end_session(&state, &session, &by).await });
-    }
-    let mut refused = Vec::new();
-    while let Some(ended) = asked.join_next().await {
-        match ended {
-            Ok(named) => refused.extend(named),
-            Err(failed) => refused.push(format!(
-                "runner_unreachable: asking a runner to end a session ended abnormally: {failed}"
-            )),
-        }
-    }
-    refused.sort();
-    refused
-}
-
-/// Ask the runner of `session` to end it, answering each refusal by name.
-async fn end_session(state: &Arc<AppState>, session: &str, by: &str) -> Vec<String> {
-    let mut refused = Vec::new();
-    let driven = match crate::runner_sessions::driven(state, session) {
-        Ok(driven) => driven,
-        Err(ServerError::RunnerAbsent { .. }) => return refused,
-        Err(other) => {
-            refused.push(format!("{session}: {other}"));
-            return refused;
-        }
-    };
-    let answered = exit::end_within(state, &driven).await;
-    let kept = match &answered {
-        Ok(lys_runner::Answer::Ended {
-            session: answered,
-            ended,
-        }) if answered == session => ended
-            .require_reaped(session)
-            .map_err(ServerError::from)
-            .and_then(|()| crate::runner_sessions::record_end(state, &driven, ended)),
-        Ok(other) => Err(ServerError::Runner {
-            refusal: "runner_reply_malformed".to_owned(),
-            words: format!(
-                "an end was answered {}",
-                crate::runner_sessions::kind(other)
-            ),
-        }),
-        Err(error) => Err(ServerError::Runner {
-            refusal: error.name(),
-            words: error.to_string(),
-        }),
-    };
-    let outcome = kept
-        .as_ref()
-        .map_or_else(ToString::to_string, |()| "ended".to_owned());
-    let refusal_record = if kept.is_err() {
-        exit::keep_refusal(state, &driven, by, &outcome)
-    } else {
-        Ok(())
-    };
-    let receipt = crate::runner_sessions::keep_act(
-        state,
-        crate::runner_acts::RunnerAct {
-            act: "end".to_owned(),
-            caller: by.to_owned(),
-            session: session.to_owned(),
-            agent: driven.agent.clone(),
-            machine: driven.machine.clone(),
-            at: now(),
-            text: None,
-            keys: Vec::new(),
-            outcome,
-        },
-    );
-    for failed in [kept.err(), receipt.err(), refusal_record.err()]
-        .into_iter()
-        .flatten()
-    {
-        refused.push(format!("{session}: {failed}"));
-    }
-    refused
-}
-
 fn malformed(reason: impl Into<String>) -> ServerError {
     ServerError::RequestMalformed {
         reason: reason.into(),
@@ -416,31 +308,6 @@ async fn stop(
     view.map(Json)
 }
 
-/// `view` once each asked session not yet confirmed ended has been asked of
-/// its runner, all at once, with each confirmed end and each refusal.
-async fn through_runners(
-    state: &Arc<AppState>,
-    view: StopView,
-    by: &str,
-) -> Result<StopView, ServerError> {
-    let view = confirmed(state, view)?;
-    let unconfirmed: Vec<String> = view
-        .sessions_asked
-        .iter()
-        .filter(|session| {
-            !view
-                .sessions_confirmed
-                .iter()
-                .any(|end| &end.session == *session)
-        })
-        .cloned()
-        .collect();
-    let sessions_refused = end_sessions(state, unconfirmed, by).await;
-    let mut view = confirmed(state, view)?;
-    view.sessions_refused = sessions_refused;
-    Ok(view)
-}
-
 /// Withdraw every certificate of the agent that stands, naming the stop.
 fn withdraw_certificates(
     state: &AppState,
@@ -519,108 +386,4 @@ fn ask_sessions(
         asked.push(session);
     }
     Ok(asked)
-}
-
-/// End every handle the agent holds at the broker, each under an operation
-/// id made from the stop's, so a stop cut off and sent again ends nothing
-/// twice; a handle ended by this stop counts, one ended by anyone else does
-/// not.
-pub(crate) async fn end_handles(
-    state: &AppState,
-    headers: &HeaderMap,
-    agent: &str,
-    operation: &str,
-) -> Result<Vec<String>, ServerError> {
-    end_handles_by(state, HandleCaller::Session(headers), agent, operation).await
-}
-
-/// A console stop speaks to the broker for the agent's recorded responsible person.
-pub(crate) async fn end_handles_as_owner(
-    state: &AppState,
-    agent: &str,
-    operation: &str,
-) -> Result<Vec<String>, ServerError> {
-    let id = AgentId::from_str(agent)?;
-    let person = with_directory(state, |directory| {
-        directory
-            .projection()?
-            .record(IdentityId::Agent(id))
-            .ok_or(ServerError::AgentNotVisible)?
-            .responsible()
-            .map(|person| person.to_string())
-            .ok_or(ServerError::NoPerson)
-    })?;
-    end_handles_by(state, HandleCaller::Owner(&person), agent, operation).await
-}
-
-#[derive(Clone, Copy)]
-enum HandleCaller<'a> {
-    Session(&'a HeaderMap),
-    Owner(&'a str),
-}
-
-impl HandleCaller<'_> {
-    async fn ask(
-        self,
-        state: &AppState,
-        method: Method,
-        path: &str,
-        body: Bytes,
-    ) -> Result<Value, ServerError> {
-        match self {
-            Self::Session(headers) => {
-                crate::secrets_api::ask(state, headers, method, path, body).await
-            }
-            Self::Owner(person) => {
-                crate::secrets_api::ask_as(state, person, method, path, body).await
-            }
-        }
-    }
-}
-
-async fn end_handles_by(
-    state: &AppState,
-    caller: HandleCaller<'_>,
-    agent: &str,
-    operation: &str,
-) -> Result<Vec<String>, ServerError> {
-    let path = format!("/_lys/handles?holder={agent}");
-    let held = caller.ask(state, Method::GET, &path, Bytes::new()).await?;
-    let handles = held["handles"]
-        .as_array()
-        .ok_or_else(|| ServerError::SecretsUnavailable {
-            reason: "the broker's handles answer lists no handles member".to_owned(),
-        })?;
-    let mut ended = Vec::new();
-    for handle in handles {
-        let Some(id) = handle["id"].as_str() else {
-            return Err(ServerError::SecretsUnavailable {
-                reason: "the broker listed a handle without an id".to_owned(),
-            });
-        };
-        let body = json!({ "handle": id, "operation": part(operation, "handle", id) });
-        let answer: Value = caller
-            .ask(
-                state,
-                Method::POST,
-                "/_lys/drop",
-                Bytes::from(body.to_string()),
-            )
-            .await?;
-        if answer["handle"].as_str() != Some(id) {
-            return Err(ServerError::SecretsUnavailable {
-                reason: format!("the broker did not confirm ending handle {id}"),
-            });
-        }
-        match answer["outcome"].as_str() {
-            Some("ended" | "repeated") => ended.push(id.to_owned()),
-            Some("already_ended") => {}
-            other => {
-                return Err(ServerError::SecretsUnavailable {
-                    reason: format!("the broker answered handle {id} with outcome {other:?}"),
-                });
-            }
-        }
-    }
-    Ok(ended)
 }

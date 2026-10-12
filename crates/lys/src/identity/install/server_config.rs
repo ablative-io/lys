@@ -115,135 +115,8 @@ pub struct Carried {
 /// What `carried` names, an earlier configuration's administrator and
 /// registered products, is written again, so an install run again never
 /// loses either.
-pub fn render(
-    layout: &Layout,
-    config: &DeploymentConfig,
-    carried: &Carried,
-    surface: bool,
-) -> Value {
-    let issuer = issuer(config);
-    let state = config.state_dir();
-    let data = layout.data_dir();
-    let policy = &config.password_policy;
-    let dir = |name: &str| Value::String(data.join(name).display().to_string());
-    let mut rendered = json!({
-        "listen": format!("127.0.0.1:{}", carried.ports.service),
-        "log_dir": dir("directory-log"),
-        "log_origin": LOG_ORIGIN,
-        "event_key_file": layout.service_key().display().to_string(),
-        "profile": carried.profile.unwrap_or_default().word(),
-        "operator_token_file": match carried.profile.unwrap_or_default() {
-            super::Profile::Development => Value::String(state.join(OPERATOR_TOKEN_FILE).display().to_string()),
-            super::Profile::Service => Value::Null,
-        },
-        "operator_upgrade_file": layout.upgrade_intent().display().to_string(),
-        "import_credential_file": super::super::import::credential_path(layout).display().to_string(),
-        "issuer": issuer,
-        "client_id": config.clients.platform.id,
-        "client_secret_file": state
-            .join(format!("{}-client-secret", config.clients.platform.id))
-            .display()
-            .to_string(),
-        "redirect_url": redirect_url(config, carried.ports),
-        "sign_in_api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
-        "setup": {
-            "code_file": state.join(super::setup_code::CODE_FILE).display().to_string(),
-            "administrator_file": layout.administrator_file().display().to_string(),
-            "email": config.deployment.admin_email,
-        },
-        "password_policy": {
-            "length_min": policy.length_min,
-            "length_max": policy.length_max,
-            "lower_case": policy.lower_case,
-            "upper_case": policy.upper_case,
-            "digits": policy.digits,
-            "special": policy.special,
-            "not_recently_used": policy.not_recently_used,
-        },
-        "link_audit_source": {"issuer": issuer, "subject": LINK_AUDIT_SUBJECT},
-        "session_seconds": SESSION_SECONDS,
-        "sessions_file": state.join("sessions.json").display().to_string(),
-        "secure_cookie": false,
-        "grant_log_dir": dir("grant-log"),
-        "grant_log_origin": GRANT_LOG_ORIGIN,
-        "grant_model_file": layout.grant_model().display().to_string(),
-        "spicedb": {
-            "endpoint": format!("127.0.0.1:{}", config.spicedb.http_port),
-            "key_file": state.join("spicedb-preshared-key").display().to_string(),
-        },
-        "secrets": {
-            "broker": format!("http://127.0.0.1:{}", carried.ports.broker),
-            "service": SERVICE_NAME,
-            "service_key_file": layout.service_key().display().to_string(),
-        },
-        "sign_in_providers": {
-            "api": format!("{}/auth/v1", config.issuer.admin_url.trim_end_matches('/')),
-            "api_key_file": state.join(PROVIDERS_KEY_FILE).display().to_string(),
-        },
-        "provider": {
-            "key_file": state.join(PROVIDER_KEY_FILE).display().to_string(),
-            "pass_seconds": config.identity.pass_lifetime,
-        },
-        "requests_dir": dir("requests"),
-        "certificates_dir": dir("certificates"),
-        "network_file": dir("network.json"),
-        "roles_file": dir("roles.json"),
-        "provisioning_file": dir("provisioning.json"),
-        "homes_dir": dir("homes"),
-        "runtime_dir": dir("runtime"),
-        "service_accounts_dir": dir("service-accounts"),
-        "teams_dir": dir("teams"),
-        "budgets_dir": dir("budgets"),
-        "policies_dir": dir("policies"),
-        "stops_dir": dir("stops"),
-        "goals_dir": dir("goals"),
-        "words_dir": dir("words"),
-        "variables_dir": dir("variables"),
-        "schedules_dir": dir("schedules"),
-        "reviews_dir": dir("reviews"),
-        "runner_socket": layout.runner_socket().display().to_string(),
-    });
-    rendered["model_proxy"] = Value::String(carried.ports.proxy_url());
-    // Where that proxy keeps its records, so the service can show a person an agent's calls.
-    rendered["proxy_dir"] = Value::String(layout.data_dir().join("proxy").display().to_string());
-    // When the issuer an earlier configuration named is not this one, the
-    // sign-in service moved: the service is handed the earlier issuer and
-    // records the move in the directory once, and the administrator's login
-    // moves with every other. A move handed over before is handed over
-    // again, which the directory finds already recorded.
-    let moved_from = carried
-        .issuer
-        .clone()
-        .filter(|earlier| *earlier != issuer)
-        .or_else(|| carried.issuer_moved_from.clone())
-        .filter(|earlier| *earlier != issuer);
-    if let Some(administrator) = &carried.administrator {
-        let mut administrator = administrator.clone();
-        if moved_from.is_some() && administrator["issuer"].as_str() == moved_from.as_deref() {
-            administrator["issuer"] = Value::String(issuer);
-        }
-        rendered["administrator"] = administrator;
-    }
-    if let Some(from) = moved_from {
-        rendered["issuer_moved_from"] = Value::String(from);
-    }
-    if let Some(bridge) = &carried.message_service {
-        rendered[MESSAGE_SERVICE] = bridge.clone();
-    }
-    if let Some(proxies) = &carried.trusted_proxies {
-        rendered["trusted_proxies"] = proxies.clone();
-    }
-    if let Some(membership) = &carried.membership {
-        rendered["membership"] = membership.clone();
-    }
-    if let Some(cap) = &carried.rights_bytes {
-        rendered["provider"]["rights_bytes"] = cap.clone();
-    }
-    if surface {
-        rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
-    }
-    rendered
-}
+pub use rendering::render;
+mod rendering;
 
 /// The settings a service with no membership page bounds refuses every
 /// page for, until the operator names them (ACCESS-006 R3, R5).
@@ -440,3 +313,38 @@ pub fn messages_from(path: &Path) -> IdentityResult<Value> {
 #[cfg(test)]
 #[path = "server_config_membership_tests.rs"]
 mod membership_tests;
+
+#[cfg(test)]
+mod repair_tests {
+    #[test]
+    fn service_configuration_keeps_all_required_sections() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("deployment.toml");
+        std::fs::write(&path, include_str!("../config/deployment-2026-09-29.toml"))?;
+        let config = super::DeploymentConfig::load_install(&path)?;
+        let layout = super::Layout::at(folder.path().to_path_buf());
+        let value = super::render(&layout, &config, &super::Carried::default(), true);
+        for section in [
+            "setup",
+            "password_policy",
+            "spicedb",
+            "secrets",
+            "provider",
+            "sign_in_providers",
+            "link_audit_source",
+        ] {
+            assert!(value[section].is_object(), "missing {section}");
+        }
+        assert_eq!(value["session_seconds"], super::SESSION_SECONDS);
+        assert_eq!(
+            value["password_policy"]["length_min"],
+            config.password_policy.length_min
+        );
+        assert_eq!(
+            value["surface_dir"],
+            layout.surface_dir().display().to_string()
+        );
+        Ok(())
+    }
+}

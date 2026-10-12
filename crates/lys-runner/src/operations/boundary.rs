@@ -41,7 +41,7 @@ pub(super) fn arm(table: &mut Table, operation: &str) -> Result<(), RunnerError>
     let delay = BOUNDARY_WAIT.saturating_sub(Duration::from_millis(now_ms().saturating_sub(start)));
     let waited = Duration::from_millis(now_ms().saturating_sub(start));
     let armed = std::time::Instant::now();
-    let owner = table.owner.clone();
+    let owner = std::sync::Weak::clone(&table.owner);
     let operation_id = operation.to_owned();
     let (cancel, cancelled) = mpsc::channel();
     table

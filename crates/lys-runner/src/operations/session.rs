@@ -1,5 +1,7 @@
 //! Session entry points for durable operations.
-use super::*;
+use super::{
+    Operation, OperationOutcome, OperationRequest, OperationState, RunnerError, accept, stop,
+};
 use crate::session::Sessions;
 use std::sync::atomic::AtomicBool;
 

@@ -75,17 +75,24 @@ pub fn hand(socket: &Path, stdin: &str, event: Option<&str>) -> Result<Answer, R
 
 /// Read and hand one hook to its runner. Every outcome exits zero; a failure
 /// is named on standard error, and standard output remains empty.
-pub fn run(args: Args<'_>) -> i32 {
+pub fn run(
+    Args {
+        socket,
+        event,
+        stdin: input,
+        stdout: _,
+        stderr,
+    }: Args<'_>,
+) -> i32 {
     let mut stdin = String::new();
-    let handed = args
-        .stdin
+    let handed = input
         .read_to_string(&mut stdin)
         .map_err(|error| {
             RunnerError::refused("hook_input_unread", format!("reading hook stdin: {error}"))
         })
-        .and_then(|_| hand(args.socket, &stdin, args.event));
+        .and_then(|_| hand(socket, &stdin, event));
     if let Err(error) = handed {
-        report(args.stderr, "hook", &error);
+        report(stderr, "hook", &error);
     }
     0
 }
