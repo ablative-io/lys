@@ -38,6 +38,13 @@ fn serve(dir: &Path) -> Result<Child, Box<dyn Error>> {
     let mut line = String::new();
     BufReader::new(out).read_line(&mut line)?;
     assert!(line.starts_with("listening "), "{line}");
+    // The runner says how long its start took, in milliseconds, on the line its starter waits for.
+    let ready_ms = line
+        .trim_end()
+        .rsplit_once(", ready in ")
+        .and_then(|(_, rest)| rest.strip_suffix(" ms"))
+        .ok_or_else(|| format!("the listening line names no start time: {line}"))?;
+    ready_ms.parse::<u128>()?;
     Ok(child)
 }
 
