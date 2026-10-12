@@ -15,6 +15,8 @@ use crate::routes::AppState;
 #[cfg(test)]
 pub(crate) use compaction::membership_probe;
 use compaction::{compaction_holders, source_agent};
+#[path = "budgets_feed_usage.rs"]
+mod usage_entries;
 
 fn refused(reason: impl Into<String>) -> ServerError {
     ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
@@ -38,31 +40,17 @@ pub async fn keep_page(
     for entry in page.entries {
         match entry.body {
             Body::Usage(record) => {
-                if entry.session != record.session {
-                    return Err(refused(
-                        "runner feed entry and usage name different sessions",
-                    ));
+                if let Some(skipped) = usage_entries::keep(
+                    state,
+                    machine,
+                    (entry.seq, entry.at, &entry.session),
+                    &record,
+                    &windows,
+                )
+                .await?
+                {
+                    refusals.push(skipped);
                 }
-                let agent = crate::runtime_api::with_runtime(state, |store| {
-                    let tracked = store
-                        .session(&record.session)
-                        .ok_or(ServerError::RuntimeSessionUnknown)?;
-                    if tracked.machine != machine {
-                        return Err(refused(
-                            "runner feed usage names a session on another machine",
-                        ));
-                    }
-                    tracked
-                        .agent
-                        .clone()
-                        .ok_or_else(|| refused("runner feed usage has no tracked agent"))
-                })?;
-                let usage = with_budgets(state, |store| {
-                    convert(machine, &agent, &record, store.held(), &windows)
-                })?;
-                crate::budgets_enforce::keep(state, usage).await?;
-                crate::budgets_act::review(state, &record.session, &format!("feed-{}", entry.seq))
-                    .await?;
                 kept = true;
             }
             Body::Refusal(record) => refusals.push(record),

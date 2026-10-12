@@ -270,12 +270,23 @@ macro_rules! budgets_feed_entries {
                 assert_eq!(skipped.check, "feed_entry_skipped");
                 assert_eq!(skipped.session, "bad");
                 assert_eq!(skipped.attempt, "feed-2");
+                assert_eq!(skipped.source, "identity-feed:machine");
+                assert_eq!(skipped.agent, table.agent);
+                assert_eq!(skipped.at, 5);
+                assert!(!skipped.grantable);
                 assert!(skipped.words.contains("seq=2"));
                 assert!(skipped.words.contains("missing"));
                 assert_eq!(held.refusals.cursors.get("machine").map(String::as_str), Some("cursor-4"));
                 Ok(())
             })?;
             assert!(!table.state.runners.links().begin(crate::runner_links::Link::Feed, "machine"), "the live follow stayed held");
+            let key = Arc::new(lys_core::Ed25519Identity::load_or_generate(&table.dir.path().join("key"))?);
+            let replay = crate::budgets_store::BudgetStore::open(&table.dir.path().join("budgets"), key)?;
+            assert_eq!(replay.held().uses.len(), 3, "charges survived reopening");
+            assert_eq!(replay.held().refusals.records.len(), 1, "the skipped receipt survived reopening");
+            assert_eq!(replay.held().refusals.records[0].check, "feed_entry_skipped");
+            assert_eq!(replay.held().refusals.cursors.get("machine").map(String::as_str), Some("cursor-4"));
+            drop(replay);
             table.finish().await
         }
 
@@ -297,6 +308,10 @@ macro_rules! budgets_feed_entries {
                 assert!(store.held().refusals.records.is_empty());
                 Ok(())
             })?;
+            {
+                let messages = table.messages.lock().map_err(|error| error.to_string())?;
+                assert!(messages.iter().any(|line| line.contains("seq=2 session=other-session followed_machine=machine attributed as native:foreign:entry-2")), "the foreign attribution was not named: {messages:?}");
+            }
             table.finish().await
         }
 
@@ -333,6 +348,21 @@ macro_rules! budgets_feed_entries {
                     assert!(receipt.words.contains(reason), "{}", receipt.words);
                 }
                 assert_eq!(store.held().refusals.cursors.get("machine").map(String::as_str), Some("cursor-6"));
+                Ok(())
+            })?;
+            table.finish().await
+        }
+
+        #[tokio::test]
+        async fn budgets_feed_store_failure_does_not_skip_or_advance_the_cursor() -> TestResult {
+            let mut table = fixture().await?;
+            Arc::get_mut(&mut table.state).ok_or("fixture state unexpectedly shared")?.runtime = None;
+            let result = super::keep_page(&table.state, "machine", page(vec![entry(1, "unknown")], "cursor-1")).await;
+            assert!(matches!(result, Err(crate::error::ServerError::RuntimeUnavailable { .. })), "the store failure became an entry skip: {result:?}");
+            crate::budgets_api::with_budgets(&table.state, |store| {
+                assert!(store.held().uses.is_empty());
+                assert!(store.held().refusals.records.is_empty());
+                assert!(store.held().refusals.cursors.is_empty(), "the failed page was acknowledged");
                 Ok(())
             })?;
             table.finish().await

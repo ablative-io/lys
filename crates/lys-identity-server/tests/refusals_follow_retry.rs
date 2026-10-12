@@ -9,8 +9,8 @@ macro_rules! refusals_follow_retry {
         use std::collections::VecDeque;
         use std::error::Error;
         use std::future::{Future, poll_fn, ready};
-        use std::sync::{Arc, Mutex, MutexGuard};
         use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+        use std::sync::{Arc, Mutex, MutexGuard};
         use std::task::{Context, Poll, Waker};
         use std::time::Duration;
 
@@ -63,7 +63,7 @@ macro_rules! refusals_follow_retry {
             ));
             // IO on the signed runner channel completes on its own signal.
             let polled = poll_fn(|context| match follow.as_mut().poll(context) {
-                Poll::Ready(error) => Poll::Ready(Err(error)),
+                Poll::Ready(()) => Poll::Ready(Err(refused("follow_ended"))),
                 Poll::Pending if delays.load(Ordering::SeqCst) > 0 => {
                     Poll::Ready(Err(refused("entry_ended_follow")))
                 }
@@ -75,7 +75,11 @@ macro_rules! refusals_follow_retry {
                 polled.is_ok(),
                 "a skipped entry ended the follow: {polled:?}"
             );
-            assert_eq!(delays.load(Ordering::SeqCst), 0, "entry refusals do not restart the follow");
+            assert_eq!(
+                delays.load(Ordering::SeqCst),
+                0,
+                "entry refusals do not restart the follow"
+            );
             crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 3);
                 assert_eq!(store.held().refusals.records.len(), 1);
@@ -144,12 +148,28 @@ macro_rules! refusals_follow_retry {
                 );
                 assert_eq!(calls.load(Ordering::SeqCst), 1);
                 assert_eq!(*held(&delays), [Duration::from_secs(1)]);
+                assert!(
+                    !table
+                        .state
+                        .runners
+                        .links()
+                        .begin(crate::runner_links::Link::Feed, "machine"),
+                    "the retry retained the follow link"
+                );
                 clock.store(999, Ordering::SeqCst);
                 assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(calls.load(Ordering::SeqCst), 1, "no retry before the deadline");
+                assert_eq!(
+                    calls.load(Ordering::SeqCst),
+                    1,
+                    "no retry before the deadline"
+                );
                 clock.store(1000, Ordering::SeqCst);
                 assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(calls.load(Ordering::SeqCst), 2, "the refused follow restarted at one second");
+                assert_eq!(
+                    calls.load(Ordering::SeqCst),
+                    2,
+                    "the refused follow restarted at one second"
+                );
                 assert_eq!(
                     *held(&delays),
                     [Duration::from_secs(1), Duration::from_secs(2)]
@@ -159,7 +179,11 @@ macro_rules! refusals_follow_retry {
                 assert_eq!(calls.load(Ordering::SeqCst), 2);
                 clock.store(3000, Ordering::SeqCst);
                 assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(calls.load(Ordering::SeqCst), 4, "a successful page was followed immediately");
+                assert_eq!(
+                    calls.load(Ordering::SeqCst),
+                    4,
+                    "a successful page was followed immediately"
+                );
                 assert_eq!(
                     *held(&delays),
                     [
@@ -185,13 +209,17 @@ macro_rules! refusals_follow_retry {
             }
             {
                 let messages = table.messages.lock().map_err(|error| error.to_string())?;
-                let refusals: Vec<_> = messages.iter().filter(|line| line.starts_with("refusals: ")).collect();
+                let refusals: Vec<_> = messages
+                    .iter()
+                    .filter(|line| line.starts_with("refusals: "))
+                    .collect();
                 assert_eq!(
                     refusals.len(),
                     9,
                     "each refusal, including page validation, was named"
                 );
                 for message in refusals {
+                    assert!(message.contains(crate::runner_links::AGAIN), "{message}");
                     assert!(message.contains("begun again"), "{message}");
                     assert!(message.contains("retry in "), "{message}");
                 }
