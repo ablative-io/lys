@@ -1,0 +1,6 @@
+--model
+fixture-model
+-c
+notify=["$LYS_PROGRAM", "runner", "notify", "--socket", "$LYS_RUNNER_SOCKET"]
+--sandbox
+read-only

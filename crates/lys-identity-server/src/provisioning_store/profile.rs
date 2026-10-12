@@ -36,6 +36,17 @@ pub struct Settings {
     /// load an unreviewed plugin.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<String>,
+    /// Commands appended to each declared Claude hook event.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hooks: Option<
+        std::collections::BTreeMap<String, Vec<lys_home::harness::launch_fields::HookCommand>>,
+    >,
+    /// The seat's own status command, preserved as declared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_line: Option<String>,
+    /// Extra native settings without the separately governed keys.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings: Option<serde_json::Map<String, serde_json::Value>>,
     /// Its instructions; may be empty.
     pub instructions: String,
     /// Whether to keep, append to or replace the program's prompt.

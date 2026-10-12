@@ -22,6 +22,9 @@ pub struct Used {
     /// The current figure in the named unit.
     #[schema(value_type = Option<f64>)]
     pub figure: Option<Number>,
+    /// The context declaration that supplied the winning figure, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     /// The current period's start, reported window's start, or recorded expired reset.
     pub since_ms: Option<i64>,
     /// Why the figure is unavailable; absent exactly when a figure is present.
@@ -114,6 +117,7 @@ fn unavailable(limit: &Limit, since_ms: Option<i64>, reason: impl Into<String>) 
         unavailable: Some(reason.into()),
         reported: None,
         account: None,
+        source: None,
     }
 }
 
@@ -126,6 +130,7 @@ fn present(limit: &Limit, since_ms: Option<i64>, amount: u64) -> Result<Used, St
         unavailable: None,
         reported: None,
         account: None,
+        source: None,
     })
 }
 
@@ -404,6 +409,7 @@ fn plan(
             unavailable: None,
             reported: None,
             account: Some(account),
+            source: None,
         }),
         None => Ok(unavailable(
             limit,
@@ -420,22 +426,33 @@ fn context(limit: &Limit, uses: &[&Usage]) -> Result<Used, String> {
     let mut latest = BTreeMap::new();
     for usage in uses {
         if let Some(context) = usage.context_percent {
-            let slot = latest
-                .entry((&usage.agent, &usage.session))
-                .or_insert((i64::MIN, context));
+            let slot = latest.entry((&usage.agent, &usage.session)).or_insert((
+                i64::MIN,
+                context,
+                usage.context_source.as_deref(),
+            ));
             if usage.at_ms >= slot.0 {
-                *slot = (usage.at_ms, context);
+                *slot = (usage.at_ms, context, usage.context_source.as_deref());
             }
         }
     }
-    match latest.values().map(|(_, context)| *context).max() {
-        Some(context) => present(
-            limit,
-            None,
-            context
-                .checked_mul(1_000_000)
-                .ok_or("context percentage overflows")?,
-        ),
+    // Equal percentages retain the greatest source name, so profile precedes model.
+    match latest
+        .values()
+        .map(|(_, context, source)| (*context, *source))
+        .max()
+    {
+        Some((context, source)) => {
+            let mut used = present(
+                limit,
+                None,
+                context
+                    .checked_mul(1_000_000)
+                    .ok_or("context percentage overflows")?,
+            )?;
+            used.source = source.map(str::to_owned);
+            Ok(used)
+        }
         None => Ok(unavailable(
             limit,
             None,

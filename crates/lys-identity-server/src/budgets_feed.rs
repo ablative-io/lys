@@ -149,22 +149,12 @@ pub async fn keep_page(
 /// context.
 pub type Windows = std::collections::BTreeMap<String, Option<u64>>;
 
-fn context_percent(
-    record: &UsageRecord,
-    context: u64,
-    windows: &Windows,
-    unavailable: &mut Vec<Unavailable>,
-) -> Result<Option<u64>, ServerError> {
-    context_figure(record, context, windows, unavailable)
-        .map(|figure| figure.map(|figure| figure.percent))
-}
-
 /// A measured context figure and the declaration used to compute it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ContextFigure {
     /// The fraction of the declared window in use, as a whole percent.
     pub percent: u64,
-    /// The declaration used: `profile` or `model_windows`.
+    /// The declaration used: `profile` or `model`.
     pub source: &'static str,
 }
 
@@ -196,7 +186,7 @@ pub fn context_figure(
     } else {
         match model.and_then(|model| windows.get(model)) {
             Some(Some(0)) => return Err(refused("model_windows must declare positive tokens")),
-            Some(Some(tokens)) if context <= *tokens => (*tokens, "model_windows"),
+            Some(Some(tokens)) if context <= *tokens => (*tokens, "model"),
             Some(Some(tokens)) => {
                 return gap(format!(
                     "the call's context of {context} tokens is larger than the window of {tokens} declared for its model"
@@ -277,8 +267,8 @@ pub fn convert(
     } else {
         0
     };
-    let context_percent = match record.figures.context_tokens {
-        Some(context) => context_percent(record, context, windows, &mut unavailable)?,
+    let context = match record.figures.context_tokens {
+        Some(context) => context_figure(record, context, windows, &mut unavailable)?,
         None => None,
     };
     let usage = Usage {
@@ -294,7 +284,8 @@ pub fn convert(
         native_snapshot: snapshot,
         unavailable,
         session: Some(record.session.clone()),
-        context_percent,
+        context_percent: context.as_ref().map(|figure| figure.percent),
+        context_source: context.map(|figure| figure.source.to_owned()),
         // A spend record the proxy's usage file gave names its run: it counts one call.
         call: record.run.as_ref().filter(|_| !snapshot).map(|run| {
             Box::new(crate::budgets_state::CallSeen {
@@ -365,7 +356,11 @@ fn later_control_outcome(
 mod tests;
 
 #[cfg(test)]
+#[macro_use]
+#[path = "../tests/budgets_feed_entries.rs"]
+mod entry_test_definitions;
+
+#[cfg(test)]
 pub(crate) mod entry_tests {
-    include!("../tests/budgets_feed_entries.rs");
     budgets_feed_entries!();
 }

@@ -72,6 +72,9 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
         skills: names("skills", &body.skills)?,
         mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
         plugins: plugins(&body.plugins, declared.as_ref())?,
+        hooks: body.hooks,
+        status_line: body.status_line,
+        settings: body.settings,
         instructions: body.instructions.trim().to_owned(),
         instructions_mode: body.instructions_mode,
         note: body.note.trim().to_owned(),
@@ -100,6 +103,16 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
             .map(|given| folder("working_folder", given))
             .transpose()?,
     };
+    let seat = SeatFields {
+        hooks: settings.hooks.clone(),
+        status_line: settings.status_line.clone(),
+        settings: settings.settings.clone(),
+        ..SeatFields::default()
+    };
+    seat.check(settings.harness.as_ref().map_or("", |declared| {
+        declared.description.rendering_contract.as_str()
+    }))
+    .map_err(|error| malformed(error.to_string()))?;
     if let Some(declared) = &settings.harness {
         crate::launch_fields::models(declared, &settings.model_access)?;
         crate::launch_fields::mcp(declared, &settings.mcp_servers)?;

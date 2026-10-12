@@ -37,7 +37,8 @@ fn a_named_judge_is_the_hook_for_every_tool_beside_the_same_env() -> Fallible {
             "command": "'/opt/lys/bin/lys' runner judge --harness claude --socket '/run/lys/runner.sock'"
         }]}]})
     );
-    assert_eq!(value.as_object().ok_or("not an object")?.len(), 3);
+    assert_eq!(value["statusLine"], plain["statusLine"]);
+    assert_eq!(value.as_object().ok_or("not an object")?.len(), 4);
     Ok(())
 }
 

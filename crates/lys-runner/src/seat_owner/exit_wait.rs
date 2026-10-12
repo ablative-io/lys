@@ -64,7 +64,9 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
             value if value == isize::from(nix::errno::Errno::ESRCH as i16) => return Exit::Gone,
             value => return Exit::Unwatched(format!("NOTE_EXIT registration: errno {value}")),
         },
-        Ok(count) => return Exit::Unwatched(format!("NOTE_EXIT registration answered {count} events")),
+        Ok(count) => {
+            return Exit::Unwatched(format!("NOTE_EXIT registration answered {count} events"));
+        }
         Err(error) => return Exit::Unwatched(format!("NOTE_EXIT registration: {error}")),
     }
     let mut events = [change];

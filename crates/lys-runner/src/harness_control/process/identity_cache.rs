@@ -25,7 +25,9 @@ static FOLDER: OnceLock<PathBuf> = OnceLock::new();
 /// Keep what is learned in `folder`, said once per process.
 pub fn keep_in(folder: PathBuf) {
     if FOLDER.set(folder).is_err() {
-        crate::error::said("executable_cache_repeated: the cache folder was said twice; the first stands");
+        crate::error::said(
+            "executable_cache_repeated: the cache folder was said twice; the first stands",
+        );
     }
 }
 
@@ -112,7 +114,9 @@ pub fn sha256(path: &Path, metadata: &Metadata) -> Option<String> {
 
 /// Keep `sha256` for the file at `path` as it is now.
 pub fn remember_sha256(path: &Path, metadata: &Metadata, sha256: &str) {
-    remember(path, metadata, |known| known.sha256 = Some(sha256.to_owned()));
+    remember(path, metadata, |known| {
+        known.sha256 = Some(sha256.to_owned())
+    });
 }
 
 /// What `--version` printed for the file at `path`, if it was asked while the
@@ -125,6 +129,8 @@ pub fn version(path: &Path) -> Option<String> {
 /// Keep what a probe that exited zero printed for the file at `path`.
 pub fn remember_version(path: &Path, reported: &str) {
     if let Ok(metadata) = std::fs::metadata(path) {
-        remember(path, &metadata, |known| known.version = Some(reported.to_owned()));
+        remember(path, &metadata, |known| {
+            known.version = Some(reported.to_owned())
+        });
     }
 }

@@ -76,7 +76,7 @@ fn budgets_feed_model_window_is_a_named_fallback() -> Result<(), Box<dyn Error>>
     let windows = Windows::from([("main".to_owned(), Some(100_000))]);
     let figure =
         context_figure(&record, 50_000, &windows, &mut Vec::new())?.ok_or("figure absent")?;
-    assert_eq!((figure.percent, figure.source), (50, "model_windows"));
+    assert_eq!((figure.percent, figure.source), (50, "model"));
     record.context_window = 40_000;
     assert!(context_figure(&record, 50_000, &windows, &mut Vec::new()).is_err());
     Ok(())

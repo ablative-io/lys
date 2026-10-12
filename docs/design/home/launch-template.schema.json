@@ -159,6 +159,80 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$"
           }
+        },
+        "hooks": {
+          "type": "object",
+          "propertyNames": {
+            "enum": [
+              "SessionStart",
+              "UserPromptSubmit",
+              "PreToolUse",
+              "PostToolUse",
+              "PostToolUseFailure",
+              "Stop",
+              "SubagentStop",
+              "PreCompact",
+              "PostCompact",
+              "SessionEnd",
+              "Notification",
+              "FileChanged"
+            ]
+          },
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "command"
+              ],
+              "properties": {
+                "matcher": {
+                  "type": "string"
+                },
+                "command": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "timeout": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4294967295
+                }
+              }
+            }
+          }
+        },
+        "status_line": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settings": {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "enum": [
+                "env",
+                "statusLine",
+                "permissions",
+                "hooks",
+                "enabledPlugins"
+              ]
+            }
+          }
+        },
+        "resume": {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
+        },
+        "context_window": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "config_dir": {
+          "type": "string",
+          "pattern": "^/"
         }
       }
     }

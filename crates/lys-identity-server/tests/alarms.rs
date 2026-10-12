@@ -93,10 +93,15 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
         let other = seeded.people[1].agents[0].id.to_string();
         let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
         let mut runtime = RuntimeStore::open(config.runtime_dir.as_deref().ok_or("no runtime dir")?, key)?;
-        runtime.report(Report { operation: lys_identity::OperationId::generate()?.to_string(),
+        let mut report = Report { operation: lys_identity::OperationId::generate()?.to_string(),
             session: "alarm-run".to_owned(), agent: Some(agent.to_string()), machine: "machine-1".to_owned(),
-            state: Reported::Running, what: "running".to_owned(), confirmation: String::new(),
-            reported_by: "fixture".to_owned(), at: 100, launch: None })?;
+            state: Reported::Starting, what: "starting".to_owned(), confirmation: String::new(),
+            reported_by: "fixture".to_owned(), at: 100, launch: None };
+        runtime.report(report.clone())?;
+        report.operation = lys_identity::OperationId::generate()?.to_string();
+        report.state = Reported::Running;
+        report.what = "running".to_owned();
+        runtime.report(report)?;
         let mut passes = Passes::open(config.log_dir.with_file_name("agent-passes.json"))?;
         let pass = passes.issue(agent, "alarm-launch", "alarm-run")?;
         let path = config.log_dir.with_file_name("alarms");

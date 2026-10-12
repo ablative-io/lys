@@ -69,7 +69,9 @@ pub fn executable(path: &Path) -> Result<Executable, RunnerError> {
         return Ok(Executable {
             path: path
                 .to_str()
-                .ok_or_else(|| failed("control_executable_unproved", "executable path is not text"))?
+                .ok_or_else(|| {
+                    failed("control_executable_unproved", "executable path is not text")
+                })?
                 .to_owned(),
             sha256,
         });

@@ -57,6 +57,19 @@ pub struct VersionView {
     pub mcp_servers: Vec<McpServer>,
     /// The harness plugins its settings turn on, each `name@marketplace`.
     pub plugins: Vec<String>,
+    /// Commands appended to each declared Claude hook event.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub hooks: Option<
+        std::collections::BTreeMap<String, Vec<lys_home::harness::launch_fields::HookCommand>>,
+    >,
+    /// The seat's own status command, preserved as declared.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_line: Option<String>,
+    /// Extra native settings without the separately governed keys.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub settings: Option<serde_json::Map<String, serde_json::Value>>,
     /// Its instructions.
     pub instructions: String,
     /// How instructions affect the program's prompt: keep, append or replace.
@@ -139,7 +152,7 @@ pub struct Recorded {
     pub version: u32,
 }
 
-/// A profile to set. Every member is required.
+/// A profile to set, including optional seat declarations.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = ProvisioningSetBody)]
@@ -153,6 +166,19 @@ pub(crate) struct SetBody {
     /// Harness plugins its settings turn on, each `name@marketplace`.
     #[serde(default)]
     plugins: Vec<String>,
+    /// Commands appended to each declared Claude hook event.
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    hooks: Option<
+        std::collections::BTreeMap<String, Vec<lys_home::harness::launch_fields::HookCommand>>,
+    >,
+    /// The seat's own status command, preserved as declared.
+    #[serde(default)]
+    status_line: Option<String>,
+    /// Extra native settings without the separately governed keys.
+    #[serde(default)]
+    #[schema(value_type = Option<Object>)]
+    settings: Option<serde_json::Map<String, serde_json::Value>>,
     instructions: String,
     #[serde(default)]
     #[schema(schema_with = instructions_mode_schema)]
@@ -255,6 +281,9 @@ fn view(
             skills: version.settings.skills.clone(),
             mcp_servers: version.settings.mcp_servers.clone(),
             plugins: version.settings.plugins.clone(),
+            hooks: version.settings.hooks.clone(),
+            status_line: version.settings.status_line.clone(),
+            settings: version.settings.settings.clone(),
             instructions: version.settings.instructions.clone(),
             instructions_mode: version.settings.instructions_mode,
             session: version.settings.session.clone(),

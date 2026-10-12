@@ -78,29 +78,72 @@ pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
 }
 
 async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) -> ServerError {
-    loop {
-        let cursor = match with_budgets(state, |store| {
-            Ok(store.held().refusals.cursors.get(machine).cloned())
-        }) {
-            Ok(cursor) => cursor,
-            Err(error) => return error,
-        };
-        let act = Act::Feed {
+    follow_with(
+        state,
+        machine,
+        || next_page(state, machine, runner.clone()),
+        tokio::time::sleep,
+    )
+    .await
+}
+
+async fn next_page(
+    state: &Arc<AppState>,
+    machine: &str,
+    runner: RunnerRecord,
+) -> Result<lys_runner::tracking_store::FeedPage, ServerError> {
+    let cursor = with_budgets(state, |store| {
+        Ok(store.held().refusals.cursors.get(machine).cloned())
+    })?;
+    match crate::runner_client::ask(
+        state,
+        machine,
+        runner,
+        Act::Feed {
             cursor,
             follow: true,
-        };
-        let page = match crate::runner_client::ask(state, machine, runner.clone(), act).await {
-            Ok(Answer::Feed { page }) => page,
-            Ok(other) => {
-                return ServerError::Runner {
-                    refusal: "runner_answer_unexpected".to_owned(),
-                    words: format!("the runner answered a feed read with {other:?}"),
-                };
-            }
+        },
+    )
+    .await?
+    {
+        Answer::Feed { page } => Ok(page),
+        other => Err(ServerError::Runner {
+            refusal: "runner_answer_unexpected".to_owned(),
+            words: format!("the runner answered a feed read with {other:?}"),
+        }),
+    }
+}
+
+async fn follow_with<Next, Page, Wait, Delay>(
+    state: &Arc<AppState>,
+    machine: &str,
+    mut next: Next,
+    wait: Wait,
+) -> ServerError
+where
+    Next: FnMut() -> Page + Send,
+    Page: std::future::Future<Output = Result<lys_runner::tracking_store::FeedPage, ServerError>> + Send,
+    Wait: FnMut(std::time::Duration) -> Delay + Send,
+    Delay: std::future::Future<Output = ()> + Send,
+{
+    drop(wait);
+    loop {
+        let page = match next().await {
+            Ok(page) => page,
             Err(error) => return error,
         };
         if let Err(error) = crate::budgets_feed::keep_page(state, machine, page).await {
             return error;
         }
     }
+}
+
+#[cfg(test)]
+#[macro_use]
+#[path = "../tests/refusals_follow_retry.rs"]
+mod retry_test_definitions;
+
+#[cfg(test)]
+mod retry_tests {
+    refusals_follow_retry!();
 }

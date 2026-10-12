@@ -48,6 +48,21 @@ fn native_value(value: &Value) -> Result<String, String> {
     }
 }
 
+fn runner_path(environment: &BTreeMap<String, String>, name: &str) -> Result<String, String> {
+    match environment.get(name) {
+        Some(value)
+            if std::path::Path::new(value).is_absolute()
+                && !value.chars().any(char::is_control) =>
+        {
+            Ok(value.clone())
+        }
+        Some(_) => Err(format!(
+            "environment.{name}: must be an absolute plain path"
+        )),
+        None => Ok(format!("${name}")),
+    }
+}
+
 pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Result<Launch, String> {
     let template = parse(text)?;
     let mut servers = serde_json::Map::new();
@@ -85,12 +100,32 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         let held = check(skill).map_err(|error| error.to_string())?;
         files.push(file(&held.path, skill.text.clone()));
     }
-    // The approval policy and the working directory are the run's own: the
-    // machine's Codex config and the launch's directory (Tom, 3 Oct 2026).
-    // Codex runs on the machine's own setup, its own MCP servers included;
-    // each profile server is one `-c mcp_servers.<name>=` setting beside
-    // them, never a table that replaces them, never a config folder.
+    // Each profile server augments the native setup rather than replacing its table.
     let mut arguments = vec!["--model".to_owned(), template.fields.models[0].clone()];
+    if let Some(settings) = &template.seat.settings {
+        for (key, value) in settings {
+            if key == "notify"
+                || (template.fields.model_proxy.is_some()
+                    && matches!(key.as_str(), "model_provider" | "model_providers"))
+            {
+                continue;
+            }
+            if key.is_empty()
+                || !key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+            {
+                return Err(format!("settings.{key}: is not a bare native config key"));
+            }
+            arguments.extend([
+                "-c".to_owned(),
+                format!(
+                    "{key}={}",
+                    native_value(value).map_err(|error| format!("settings.{key}: {error}"))?
+                ),
+            ]);
+        }
+    }
     for (name, value) in &servers {
         if name.is_empty()
             || !name
@@ -106,6 +141,27 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
             format!("mcp_servers.{name}={}", native_value(value)?),
         ]);
     }
+    let program_path = runner_path(
+        &template.environment,
+        crate::harness::rendering::PROGRAM_VARIABLE,
+    )?;
+    let socket = runner_path(
+        &template.environment,
+        crate::harness::rendering::SOCKET_VARIABLE,
+    )?;
+    arguments.extend([
+        "-c".to_owned(),
+        format!(
+            "notify={}",
+            native_value(&json!([
+                program_path,
+                "runner",
+                "notify",
+                "--socket",
+                socket
+            ]))?
+        ),
+    ]);
     if let Some(proxy) = &template.fields.model_proxy {
         // Codex is pointed at Lys's proxy as a provider of its own, signed
         // in as the machine's Codex is, over plain HTTP event streams: the
@@ -145,6 +201,16 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
     for path in template.permissions.additional_directories {
         arguments.extend(["--add-dir".to_owned(), path]);
     }
+    let mut environment = template.environment;
+    if let Some(directory) = template.seat.config_dir {
+        environment.insert("CODEX_HOME".to_owned(), directory.clone());
+        arguments.extend(["--add-dir".to_owned(), directory]);
+    }
+    if !template.skills.is_empty() {
+        arguments.push("--add-dir".to_owned());
+        argument_files.insert(arguments.len(), String::new());
+        arguments.push(String::new());
+    }
     match mode {
         InstructionsMode::Append if !template.fields.instructions.trim().is_empty() => {
             arguments.extend([
@@ -168,10 +234,13 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         }
         InstructionsMode::Keep | InstructionsMode::Append => {}
     }
+    if let Some(resume) = template.seat.resume {
+        arguments.extend(["resume".to_owned(), resume]);
+    }
     Ok(Launch {
         program: program.to_owned(),
         arguments,
-        environment: template.environment,
+        environment,
         files,
         argument_files,
         environment_paths: BTreeMap::new(),

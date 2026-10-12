@@ -24,16 +24,18 @@ pub(crate) fn missing(usage: &Usage) -> Option<&'static str> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Reading {
     at_ms: i64,
     figure: Option<u64>,
+    source: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Agent {
     sessions: BTreeMap<String, Reading>,
     figures: BTreeMap<u64, usize>,
+    sources: BTreeMap<u64, BTreeMap<Option<String>, usize>>,
     missing: BTreeSet<String>,
     unnamed_at: Option<i64>,
     named_at: Option<i64>,
@@ -48,11 +50,17 @@ impl Agent {
             );
             return Ok(());
         };
-        let previous = self.sessions.get(session).copied();
-        if previous.is_some_and(|reading| reading.at_ms > usage.at_ms) {
+        let previous = self.sessions.get(session).cloned();
+        if previous
+            .as_ref()
+            .is_some_and(|reading| reading.at_ms > usage.at_ms)
+        {
             return Ok(());
         }
-        if let Some(figure) = previous.and_then(|reading| reading.figure) {
+        if let Some(reading) = previous
+            && let Some(figure) = reading.figure
+        {
+            self.remove_source(figure, &reading.source)?;
             let count = self
                 .figures
                 .get_mut(&figure)
@@ -65,6 +73,15 @@ impl Agent {
             }
         }
         if let Some(figure) = usage.context_percent {
+            let count = self
+                .sources
+                .entry(figure)
+                .or_default()
+                .entry(usage.context_source.clone())
+                .or_default();
+            *count = count
+                .checked_add(1)
+                .ok_or("context source count overflows")?;
             let count = self.figures.entry(figure).or_default();
             *count = count
                 .checked_add(1)
@@ -78,6 +95,7 @@ impl Agent {
             Reading {
                 at_ms: usage.at_ms,
                 figure: usage.context_percent,
+                source: usage.context_source.clone(),
             },
         );
         self.named_at = Some(self.named_at.map_or(usage.at_ms, |at| at.max(usage.at_ms)));
@@ -87,6 +105,7 @@ impl Agent {
     fn remove(&mut self, session: &str) -> Result<(), String> {
         if let Some(reading) = self.sessions.remove(session) {
             if let Some(figure) = reading.figure {
+                self.remove_source(figure, &reading.source)?;
                 let count = self
                     .figures
                     .get_mut(&figure)
@@ -102,6 +121,33 @@ impl Agent {
             self.named_at = self.sessions.values().map(|reading| reading.at_ms).max();
         }
         Ok(())
+    }
+
+    fn remove_source(&mut self, figure: u64, source: &Option<String>) -> Result<(), String> {
+        let sources = self
+            .sources
+            .get_mut(&figure)
+            .ok_or("context source figure is absent")?;
+        let count = sources
+            .get_mut(source)
+            .ok_or("context source count is absent")?;
+        *count = count
+            .checked_sub(1)
+            .ok_or("context source count underflows")?;
+        if *count == 0 {
+            sources.remove(source);
+        }
+        if sources.is_empty() {
+            self.sources.remove(&figure);
+        }
+        Ok(())
+    }
+
+    fn source(&self, figure: u64) -> Option<&str> {
+        self.sources
+            .get(&figure)
+            .and_then(|sources| sources.keys().next_back())
+            .and_then(Option::as_deref)
     }
 
     fn gap(&self, at_ms: i64) -> Option<&'static str> {
@@ -213,7 +259,10 @@ impl Availability {
                     gap = Some(NO_CONTEXT);
                     break;
                 };
-                figure = Some(figure.map_or(current, |held: u64| held.max(current)));
+                let current = (current, reading.source.as_deref());
+                if figure.is_none_or(|held| current > held) {
+                    figure = Some(current);
+                }
             }
             if gap.is_some() {
                 break;
@@ -232,7 +281,16 @@ impl Availability {
         Used {
             unit: limit.unit,
             period: limit.period,
-            figure: gap.is_none().then_some(figure).flatten().map(Into::into),
+            figure: gap
+                .is_none()
+                .then_some(figure)
+                .flatten()
+                .map(|(figure, _)| figure.into()),
+            source: gap
+                .is_none()
+                .then_some(figure)
+                .flatten()
+                .and_then(|(_, source)| source.map(str::to_owned)),
             since_ms: None,
             unavailable: gap
                 .or_else(|| figure.is_none().then_some(NO_CONTEXT))
@@ -251,6 +309,7 @@ impl Availability {
                     unit: limit.unit,
                     period: limit.period,
                     figure: None,
+                    source: None,
                     since_ms: None,
                     unavailable: Some(reason.to_owned()),
                     reported: None,
@@ -258,13 +317,18 @@ impl Availability {
                 };
             }
             if let Some((&highest, _)) = agent.figures.last_key_value() {
-                figure = Some(figure.map_or(highest, |held: u64| held.max(highest)));
+                // Equal percentages retain the greatest source name, so profile precedes model.
+                let current = (highest, agent.source(highest));
+                if figure.is_none_or(|held| current > held) {
+                    figure = Some(current);
+                }
             }
         }
         Used {
             unit: limit.unit,
             period: limit.period,
-            figure: figure.map(Into::into),
+            figure: figure.map(|(figure, _)| figure.into()),
+            source: figure.and_then(|(_, source)| source.map(str::to_owned)),
             since_ms: None,
             unavailable: figure.is_none().then(|| NO_CONTEXT.to_owned()),
             reported: None,

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use super::claude_code::launch_env::{confinement_named, env_settings, own_setup_left_out};
+use super::claude_code::launch_env::{Judge, confinement_named, own_setup_left_out, settings};
 use super::claude_code::template::parse_template;
 use super::launch_fields::InstructionsMode;
 use crate::record::blocks::Hash;
@@ -37,7 +37,7 @@ pub struct Launch {
     pub arguments: Vec<String>,
     /// Literal variables, with credentials represented only by handle ids.
     pub environment: BTreeMap<String, String>,
-    /// Argument positions bound to config-relative files.
+    /// Argument positions bound to config-relative locations; empty names the root.
     pub argument_files: BTreeMap<usize, String>,
     /// Variables bound to config-relative locations; empty names its root.
     pub environment_paths: BTreeMap<String, String>,
@@ -90,8 +90,20 @@ pub fn render(
     let template = parse_template(text.as_bytes()).map_err(|error| error.to_string())?;
     confinement_named(&template).map_err(|error| error.to_string())?;
     own_setup_left_out(&template).map_err(|error| error.to_string())?;
-    let settings = String::from_utf8(env_settings(&template).map_err(|error| error.to_string())?)
-        .map_err(|error| error.to_string())?;
+    let judge = Judge::runner(
+        template
+            .env
+            .get(super::rendering::PROGRAM_VARIABLE)
+            .map(String::as_str),
+        template
+            .env
+            .get(super::rendering::SOCKET_VARIABLE)
+            .map(String::as_str),
+    )
+    .map_err(|error| error.to_string())?;
+    let settings =
+        String::from_utf8(settings(&template, Some(&judge)).map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
     let mcp =
         serde_json::to_string_pretty(&template.mcp).map_err(|error| error.to_string())? + "\n";
     let mut files = vec![
@@ -107,11 +119,10 @@ pub fn render(
     for secret in template.use_only {
         environment.insert(secret.env, secret.handle);
     }
-    // The run keeps the machine's sign-in and nothing else of the person's
-    // own Claude Code setup (Tom, 3 Oct 2026 20:47): no config folder is set,
-    // because the sign-in lives under the login's own one, and two flags
-    // leave the rest out. Sources are in
-    // docs/harness/reference/claude-code/CLEAN-START.md.
+    // Inherit the sign-in unless the seat explicitly chose a native config directory.
+    if let Some(directory) = &template.seat.config_dir {
+        environment.insert("CLAUDE_CONFIG_DIR".to_owned(), directory.clone());
+    }
     let mut arguments = vec![
         "--mcp-config".to_owned(),
         "mcp.json".to_owned(),
@@ -141,6 +152,17 @@ pub fn render(
         arguments.push(flag.to_owned());
         argument_files.insert(arguments.len(), "instructions.txt".to_owned());
         arguments.push("instructions.txt".to_owned());
+    }
+    if let Some(directory) = template.seat.config_dir {
+        arguments.extend(["--add-dir".to_owned(), directory]);
+    }
+    if !template.skills.is_empty() {
+        arguments.push("--add-dir".to_owned());
+        argument_files.insert(arguments.len(), String::new());
+        arguments.push(String::new());
+    }
+    if let Some(resume) = template.seat.resume {
+        arguments.extend(["--resume".to_owned(), resume]);
     }
     arguments.extend(
         template

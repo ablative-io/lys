@@ -1,0 +1,156 @@
+{
+  "enabledPlugins": {
+    "fixture@market": true
+  },
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://127.0.0.1:9000/0123456789abcdef0123456789abcdef/anthropic",
+    "LYS_AGENT": "agent-fixture",
+    "LYS_MACHINE": "machine-fixture",
+    "LYS_PROVISIONING_VERSION": "1",
+    "LYS_RUN": "0123456789abcdef0123456789abcdef",
+    "LYS_SESSION": "session-fixture"
+  },
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner judge --harness claude --socket \"$LYS_RUNNER_SOCKET\"",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "seat-before",
+            "timeout": 9,
+            "type": "command"
+          }
+        ],
+        "matcher": "Read"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "seat-stop",
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "nested": {
+    "words": [
+      "keep",
+      "verbatim"
+    ]
+  },
+  "permissions": {
+    "additionalDirectories": [],
+    "allow": [],
+    "ask": [],
+    "defaultMode": "plan",
+    "deny": []
+  },
+  "statusLine": {
+    "command": "lys_status_input=$(cat && printf '.') || exit $?; lys_status_input=${lys_status_input%.}; lys_status_words=$(printf '%s' \"$lys_status_input\" | { if [ -n \"$LYS_PROGRAM\" ] && [ -n \"$LYS_RUNNER_SOCKET\" ]; then \"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"; else echo 'Lys: not counted (no runner started this run)'; fi; }) || exit $?; printf '%s' \"$lys_status_words\" || exit $?; lys_seat_words=$(printf '%s' \"$lys_status_input\" | sh -c 'test -f \"$LYS_RUNNER_SOCKET\" && cat') || { lys_status_exit=$?; printf 'seat status line failed (exit %s)\\n' \"$lys_status_exit\" >&2; exit \"$lys_status_exit\"; }; printf ' | ' || exit $?; printf '%s' \"$lys_seat_words\" | tr '\\n' ' ' || exit $?; printf '\\n'",
+    "type": "command"
+  },
+  "theme": "seat"
+}

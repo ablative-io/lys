@@ -91,9 +91,6 @@ mod tests {
         });
         let line = shown(&failed);
         assert!(line.contains("not counted") && line.contains("no runner"));
-        assert_eq!(
-            shown(&Ok("nothing kept".to_owned())),
-            "Lys: nothing kept"
-        );
+        assert_eq!(shown(&Ok("nothing kept".to_owned())), "Lys: nothing kept");
     }
 }

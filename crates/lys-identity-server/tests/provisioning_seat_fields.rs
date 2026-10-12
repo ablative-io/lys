@@ -155,3 +155,96 @@ async fn provisioning_seat_field_refusals_name_the_governed_value() -> TestResul
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn provisioning_all_six_seat_fields_survive_review_and_get() -> TestResult {
+    let (service, cookie, path) = table().await?;
+    let mut body = profile("claude-code")?;
+    body["hooks"] = json!({"Stop":[{"command":"seat-stop", "matcher":"*", "timeout":5}]});
+    body["status_line"] = json!("seat-status");
+    body["settings"] = json!({"theme":"dark", "nested":{"a":1}});
+    body["session"] = json!({"resume":"019c6e27-e55b-73d1-87d8-4e01f1f75043",
+        "context_window":200_000, "config_dir":"/tmp/chosen-config", "sensitive":false});
+    let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
+    assert_eq!(status, 200, "{answer}");
+    let review = json!({"operation":OperationId::generate()?.to_string()});
+    let (status, answer) = service
+        .post(&format!("{path}/1/review"), Some(&cookie), &review)
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, answer) = service.get(&path, Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert!(answer["profile"]["reviewed_by"].is_string());
+    let store = ProvisioningStore::open(&service.dir.path().join("provisioning.json"))?;
+    let agent = path.split('/').nth(2).ok_or("missing agent")?;
+    let version = store
+        .profile(agent)
+        .ok_or("missing profile")?
+        .versions
+        .first()
+        .ok_or("missing version")?;
+    let stored = serde_json::to_value(&version.settings)?;
+    for field in ["hooks", "status_line", "settings", "session"] {
+        assert_eq!(answer["profile"][field], body[field]);
+        assert_eq!(stored[field], body[field]);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn provisioning_openapi_lists_optional_seat_fields() -> TestResult {
+    let (service, cookie, _) = table().await?;
+    let (status, document) = service.get("/openapi.json", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{document}");
+    for (schema, fields) in [
+        ("ProvisioningSetBody", ["hooks", "status_line", "settings"]),
+        (
+            "ProvisioningVersionView",
+            ["hooks", "status_line", "settings"],
+        ),
+        (
+            "SessionSettings",
+            ["resume", "context_window", "config_dir"],
+        ),
+    ] {
+        let shape = &document["components"]["schemas"][schema];
+        let properties = shape["properties"]
+            .as_object()
+            .ok_or("missing schema properties")?;
+        for field in fields {
+            assert!(properties.contains_key(field), "{schema}.{field}");
+            assert!(
+                !shape["required"]
+                    .as_array()
+                    .is_some_and(|required| required.iter().any(|name| name == field)),
+                "{schema}.{field} is required"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn provisioning_omitted_seat_fields_remain_absent_after_reopen() -> TestResult {
+    let (service, cookie, path) = table().await?;
+    let (status, answer) = service
+        .post(&path, Some(&cookie), &profile("claude-code")?)
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, answer) = service.get(&path, Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    let store = ProvisioningStore::open(&service.dir.path().join("provisioning.json"))?;
+    let agent = path.split('/').nth(2).ok_or("missing agent")?;
+    let version = store
+        .profile(agent)
+        .ok_or("missing profile")?
+        .versions
+        .first()
+        .ok_or("missing version")?;
+    let stored = serde_json::to_value(&version.settings)?;
+    for field in ["hooks", "status_line", "settings", "session"] {
+        assert!(answer["profile"][field].is_null(), "{field}");
+        assert!(stored.get(field).is_none(), "{field}");
+    }
+    Ok(())
+}

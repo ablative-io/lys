@@ -1,0 +1,22 @@
+--model
+fixture-model
+-c
+nested={"words" = ["keep", "verbatim"]}
+-c
+theme="seat"
+-c
+notify=["$LYS_PROGRAM", "runner", "notify", "--socket", "$LYS_RUNNER_SOCKET"]
+-c
+model_providers.lys={name="OpenAI through Lys",base_url="http://127.0.0.1:9000/0123456789abcdef0123456789abcdef/openai/v1",wire_api="responses",requires_openai_auth=true,supports_websockets=false}
+-c
+model_provider="lys"
+--sandbox
+read-only
+--add-dir
+/opt/fixture/seat-config
+--add-dir
+
+-c
+developer_instructions="Reviewed instructions.\n"
+resume
+019c6e27-e55b-73d1-87d8-4e01f1f75043

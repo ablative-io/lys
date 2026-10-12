@@ -1,0 +1,126 @@
+{
+  "env": {
+    "LYS_AGENT": "agent-fixture",
+    "LYS_MACHINE": "machine-fixture",
+    "LYS_PROVISIONING_VERSION": "1",
+    "LYS_SESSION": "session-fixture"
+  },
+  "hooks": {
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner judge --harness claude --socket \"$LYS_RUNNER_SOCKET\"",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "\"$LYS_PROGRAM\" runner hook --socket \"$LYS_RUNNER_SOCKET\"",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "additionalDirectories": [],
+    "allow": [],
+    "ask": [],
+    "defaultMode": "plan",
+    "deny": []
+  },
+  "statusLine": {
+    "command": "if [ -n \"$LYS_PROGRAM\" ] && [ -n \"$LYS_RUNNER_SOCKET\" ]; then \"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"; else echo 'Lys: not counted (no runner started this run)'; fi",
+    "type": "command"
+  }
+}

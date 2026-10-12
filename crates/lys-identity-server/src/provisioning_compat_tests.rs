@@ -124,3 +124,25 @@ fn version_fixture() -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         r#"{"number":2,"operation":"required-controls","settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"","session":{"message_prefix":"","sensitive":false}},"set_by":"ordinary-person","set_at":2}"#,
     )?)
 }
+
+#[test]
+fn provisioning_old_shape_version_keeps_all_six_seat_fields_absent()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = br#"{
+        "number":1, "operation":"old-operation", "set_by":"person", "set_at":1,
+        "settings":{
+            "model_access":[], "tools":[], "skills":[], "mcp_servers":[],
+            "instructions":"", "note":"",
+            "session":{"requires_controls":false, "compact":"/compact", "sensitive":false}
+        }
+    }"#;
+    let version: super::Version = serde_json::from_slice(fixture)?;
+    assert_eq!(version.settings.hooks, None);
+    assert_eq!(version.settings.status_line, None);
+    assert_eq!(version.settings.settings, None);
+    let session = version.settings.session.ok_or("old session absent")?;
+    assert_eq!(session.resume, None);
+    assert_eq!(session.context_window, None);
+    assert_eq!(session.config_dir, None);
+    Ok(())
+}

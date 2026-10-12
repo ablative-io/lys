@@ -135,6 +135,7 @@ fn the_schema_file_names_exactly_the_slots_the_parser_accepts() {
         .collect();
     let accepted: BTreeSet<&str> = SLOTS.iter().copied().collect();
     let optional: BTreeSet<&str> = OPTIONAL_SLOTS.iter().copied().collect();
+    assert_eq!(named.len(), 14);
     assert_eq!(named, &accepted | &optional);
     assert_eq!(slots["additionalProperties"], json!(false));
     let required: BTreeSet<&str> = slots["required"]

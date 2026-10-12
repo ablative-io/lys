@@ -41,3 +41,37 @@ fn start_checks_codex_keeps_the_proxy_and_mints_a_run() -> Result<(), Box<dyn Er
     );
     Ok(())
 }
+
+#[test]
+fn start_checks_carries_every_reviewed_seat_field() -> Result<(), Box<dyn Error>> {
+    let catalogue: Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    let seat = json!({"hooks":{"Stop":[{"command":"seat-stop"}]},
+        "status_line":"seat-status", "settings":{"theme":"dark"},
+        "resume":"019c6e27-e55b-73d1-87d8-4e01f1f75043",
+        "context_window":200_000, "config_dir":"/tmp/chosen-config"});
+    let version: Version = serde_json::from_value(json!({"number":1, "operation":"fixture",
+    "set_by":"fixture", "set_at":1, "settings":{
+        "model_access":["model-a"], "tools":[], "skills":[], "mcp_servers":[],
+        "instructions":"", "note":"", "hooks":seat["hooks"],
+        "status_line":seat["status_line"], "settings":seat["settings"],
+        "session":{"resume":seat["resume"], "context_window":seat["context_window"], "config_dir":seat["config_dir"]},
+        "harness":{"name":"fixture", "program":"/opt/fixture/claude", "package":"fixture", "description":catalogue["description"]}
+    }}))?;
+    let view = fields(
+        &Start {
+            agent: "agent",
+            session: "session",
+            machine: "machine",
+            runtime: "/opt/fixture/lys",
+            version: &version,
+            skills: &[],
+            policy: None,
+            model_proxy: None,
+        },
+        &[],
+    )?;
+    assert_eq!(serde_json::to_value(view.seat)?, seat);
+    Ok(())
+}

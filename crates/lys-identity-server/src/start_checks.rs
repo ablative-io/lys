@@ -191,7 +191,7 @@ pub fn fields(
     // given the proxy is given it under a key minted here for it alone: no
     // start path can give a run the proxy without one.
     let run = model_proxy.as_ref().map(|_| lys_home::record::fresh_id());
-    let seat = settings
+    let mut seat = settings
         .session
         .as_ref()
         .map_or_else(SeatFields::default, |session| SeatFields {
@@ -200,6 +200,9 @@ pub fn fields(
             config_dir: session.config_dir.clone(),
             ..SeatFields::default()
         });
+    seat.hooks.clone_from(&settings.hooks);
+    seat.status_line.clone_from(&settings.status_line);
+    seat.settings.clone_from(&settings.settings);
     seat.check(&harness.description.rendering_contract)
         .map_err(|error| ServerError::LaunchUnrenderable {
             reason: format!("session.{error}"),

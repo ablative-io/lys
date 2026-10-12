@@ -7,7 +7,9 @@ use super::claude_code::HARNESS;
 pub use super::claude_code::launch::shell_word;
 use super::claude_code::template::{FILL_RESUME_BY_PATH, parse_template};
 use super::description::FurtherModels;
-use super::launch_fields::{Channel, LaunchFields, LaunchMcp, Transport};
+use super::launch_fields::{
+    Channel, LaunchFields, LaunchMcp, ProfileLaunchFields, SeatFields, Transport,
+};
 use super::skills::SkillFile;
 
 /// A resolved secret, carried only as a handle identifier.
@@ -78,6 +80,70 @@ pub const SOCKET_VARIABLE: &str = "LYS_RUNNER_SOCKET";
 /// empty program on an empty socket.
 pub const STATUS_LINE_COMMAND: &str = "if [ -n \"$LYS_PROGRAM\" ] && [ -n \"$LYS_RUNNER_SOCKET\" ]; then \"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"; else echo 'Lys: not counted (no runner started this run)'; fi";
 
+/// Inputs retaining optional seat declarations alongside the core launch fields.
+pub trait TemplateFields {
+    /// The declarations shared by every launch.
+    fn launch_fields(&self) -> &LaunchFields;
+    /// The explicitly supplied seat declarations, when carried by this input.
+    fn seat_fields(&self) -> Option<&SeatFields>;
+}
+
+impl TemplateFields for LaunchFields {
+    fn launch_fields(&self) -> &LaunchFields {
+        self
+    }
+    fn seat_fields(&self) -> Option<&SeatFields> {
+        None
+    }
+}
+
+impl TemplateFields for ProfileLaunchFields {
+    fn launch_fields(&self) -> &LaunchFields {
+        &self.launch
+    }
+    fn seat_fields(&self) -> Option<&SeatFields> {
+        Some(&self.seat)
+    }
+}
+
+impl<T: TemplateFields + ?Sized> TemplateFields for &T {
+    fn launch_fields(&self) -> &LaunchFields {
+        T::launch_fields(self)
+    }
+    fn seat_fields(&self) -> Option<&SeatFields> {
+        T::seat_fields(self)
+    }
+}
+
+pub(crate) fn filtered_seat(seat: &SeatFields) -> SeatFields {
+    let mut seat = seat.clone();
+    if let Some(settings) = &mut seat.settings {
+        settings.retain(|key, _| {
+            !matches!(
+                key.as_str(),
+                "env" | "statusLine" | "permissions" | "hooks" | "enabledPlugins"
+            )
+        });
+    }
+    seat
+}
+
+/// Run the seat's status command after Lys with the same input and one output line.
+pub fn status_line_command(command: Option<&str>) -> String {
+    let Some(command) = command else {
+        return STATUS_LINE_COMMAND.to_owned();
+    };
+    let command = shell_word(command);
+    format!(
+        "lys_status_input=$(cat && printf '.') || exit $?; lys_status_input=${{lys_status_input%.}}; \
+         lys_status_words=$(printf '%s' \"$lys_status_input\" | {{ {STATUS_LINE_COMMAND}; }}) || exit $?; \
+         printf '%s' \"$lys_status_words\" || exit $?; \
+         lys_seat_words=$(printf '%s' \"$lys_status_input\" | sh -c {command}) || {{ \
+         lys_status_exit=$?; printf 'seat status line failed (exit %s)\\n' \"$lys_status_exit\" >&2; exit \"$lys_status_exit\"; }}; \
+         printf ' | ' || exit $?; printf '%s' \"$lys_seat_words\" | tr '\\n' ' ' || exit $?; printf '\\n'"
+    )
+}
+
 /// The proxy's address with `run` put first on its path:
 /// `http://host:port/anthropic` becomes `http://host:port/<run>/anthropic`.
 /// None when `proxy` is not an address with a scheme and a host.
@@ -131,12 +197,13 @@ pub fn registered(contract: &str) -> bool {
 
 /// Resolve the explicit rendering contract; display names are never examined.
 pub fn render(
-    fields: &LaunchFields,
+    input: &impl TemplateFields,
     skills: &[SkillFile],
     permissions: &Value,
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
-    match resolve(&fields.harness.description.rendering_contract) {
+    let fields = input.launch_fields();
+    let mut rendered = match resolve(&fields.harness.description.rendering_contract) {
         Some(Contract::Native) => native_template(fields, skills, permissions, secrets),
         Some(Contract::Codex) => {
             super::codex::launch_template::render(fields, skills, permissions, secrets)
@@ -146,7 +213,38 @@ pub fn render(
             "description.rendering_contract",
             "unknown identifier",
         )),
+    }?;
+    if let Some(seat) = input.seat_fields() {
+        let seat = filtered_seat(seat);
+        seat.check(&fields.harness.description.rendering_contract)
+            .map_err(|error| refused(fields, &error.field, error.reason))?;
+        let Value::Object(slots) =
+            serde_json::to_value(&seat).map_err(|error| refused(fields, "seat", &error))?
+        else {
+            return Err(refused(
+                fields,
+                "seat",
+                "the seat declarations are not an object",
+            ));
+        };
+        if !slots.is_empty() {
+            let mut value: Value = serde_json::from_str(&rendered.text)
+                .map_err(|error| refused(fields, "template", &error))?;
+            let target = if rendered.harness == HARNESS {
+                value.get_mut("slots").and_then(Value::as_object_mut)
+            } else {
+                value.as_object_mut()
+            }
+            .ok_or_else(|| refused(fields, "template", "the native slot object is missing"))?;
+            target.extend(slots);
+            rendered.text = serde_json::to_string_pretty(&value)
+                .map_err(|error| refused(fields, "template", &error))?;
+            rendered.sha256 = crate::record::blocks::Hash::of(rendered.text.as_bytes())
+                .as_str()
+                .to_owned();
+        }
     }
+    Ok(rendered)
 }
 
 fn flags(fields: &LaunchFields) -> Result<Vec<String>, RenderRefusal> {

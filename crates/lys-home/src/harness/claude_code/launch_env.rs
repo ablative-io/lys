@@ -67,6 +67,19 @@ pub fn confinement_named(template: &Template) -> Result<(), HomeError> {
 /// template's `permissions` beside `env` when it sets them, and the
 /// `statusLine` every run is given; one trailing newline.
 pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
+    settings(template, None)
+}
+
+fn settings_value(
+    template: &Template,
+    judge: Option<&Judge>,
+) -> Result<serde_json::Value, HomeError> {
+    let mut seat = crate::harness::rendering::filtered_seat(&template.seat);
+    seat.check("claude-code/template-v1")
+        .map_err(|error| HomeError::TemplateShape {
+            field: format!("slots.{}", error.field),
+            reason: error.reason,
+        })?;
     let mut env: BTreeMap<&str, &str> = template
         .env
         .iter()
@@ -75,18 +88,14 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     for secret in &template.use_only {
         env.insert(secret.env.as_str(), secret.handle.as_str());
     }
-    // Every run is given the status line. A run counted through the proxy
-    // reports its dollars and running time there (Tom, 4 October 2026
-    // 20:20), and Claude Code reports a subscription's plan windows
-    // (`rate_limits`) to its status line and nowhere else: a run on a plan,
-    // which never goes through the proxy, would otherwise report no window,
-    // and a `plan_percent` budget on it would be refused as unreported.
-    let mut value = json!({
-        "env": env,
-        "statusLine": {
-            "type": "command",
-            "command": crate::harness::rendering::STATUS_LINE_COMMAND,
-        },
+    let mut value = serde_json::Value::Object(match seat.settings.take() {
+        Some(settings) => settings,
+        None => serde_json::Map::new(),
+    });
+    value["env"] = json!(env);
+    value["statusLine"] = json!({
+        "type": "command",
+        "command": crate::harness::rendering::status_line_command(seat.status_line.as_deref()),
     });
     if let Some(permissions) = &template.permissions {
         value["permissions"] = serde_json::Value::Object(permissions.clone());
@@ -99,9 +108,6 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
         }
     }
     if !template.plugins.is_empty() {
-        // The profile's reviewed plugins, and only those: the person's own
-        // `enabledPlugins` stays out with the rest of their setup (Tom,
-        // 3 October 2026 20:47; Waffles, 12 October 2026).
         value["enabledPlugins"] = template
             .plugins
             .iter()
@@ -109,12 +115,56 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
             .collect::<serde_json::Map<_, _>>()
             .into();
     }
-    let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
-        context: "the environment file could not be serialised",
-        source,
-    })?;
-    bytes.push(b'\n');
-    Ok(bytes)
+    let mut hooks: BTreeMap<String, Vec<serde_json::Value>> = BTreeMap::new();
+    if judge.is_some_and(|judge| judge.collect) {
+        for event in [
+            "SessionStart",
+            "UserPromptSubmit",
+            "Stop",
+            "SessionEnd",
+            "PreCompact",
+            "PostCompact",
+            "PostToolUse",
+            "PostToolUseFailure",
+        ] {
+            let mut entry = json!({"hooks": [{
+                "type": "command",
+                "command": r#""$LYS_PROGRAM" runner hook --socket "$LYS_RUNNER_SOCKET""#,
+                "timeout": 5
+            }]});
+            if !matches!(event, "UserPromptSubmit" | "Stop") {
+                entry["matcher"] = json!("*");
+            }
+            hooks.insert(event.to_owned(), vec![entry]);
+        }
+    }
+    if let Some(judge) = judge {
+        hooks.insert(
+            "PreToolUse".to_owned(),
+            vec![json!({
+                "matcher": "*", "hooks": [{"type": "command", "command": judge.command()}]
+            })],
+        );
+    }
+    if let Some(own) = &seat.hooks {
+        for (event, commands) in own {
+            for command in commands {
+                let mut hook = json!({"type": "command", "command": command.command});
+                if let Some(timeout) = command.timeout {
+                    hook["timeout"] = json!(timeout);
+                }
+                let mut entry = json!({"hooks": [hook]});
+                if let Some(matcher) = &command.matcher {
+                    entry["matcher"] = json!(matcher);
+                }
+                hooks.entry(event.clone()).or_default().push(entry);
+            }
+        }
+    }
+    if !hooks.is_empty() {
+        value["hooks"] = json!(hooks);
+    }
+    Ok(value)
 }
 
 fn workspace_settings(value: &mut serde_json::Value) -> Result<(), HomeError> {
@@ -160,6 +210,7 @@ fn workspace_settings(value: &mut serde_json::Value) -> Result<(), HomeError> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Judge {
     command: String,
+    collect: bool,
 }
 
 impl Judge {
@@ -172,7 +223,32 @@ impl Judge {
         let socket = hook_path("--judge-socket", socket)?;
         Ok(Self {
             command: format!("'{program}' runner judge --harness claude --socket '{socket}'"),
+            collect: false,
         })
+    }
+
+    /// The judge and collector for a runner launch, using its published bindings.
+    ///
+    /// # Errors
+    /// Refuses a supplied program or socket that is not an absolute hook path.
+    pub fn runner(program: Option<&str>, socket: Option<&str>) -> Result<Self, HomeError> {
+        if let Some(program) = program {
+            hook_path("--judge-program", Path::new(program))?;
+        }
+        if let Some(socket) = socket {
+            hook_path("--judge-socket", Path::new(socket))?;
+        }
+        let mut judge = match (program, socket) {
+            (Some(program), Some(socket)) => Self::new(Path::new(program), Path::new(socket))?,
+            _ => Self {
+                command:
+                    "\"$LYS_PROGRAM\" runner judge --harness claude --socket \"$LYS_RUNNER_SOCKET\""
+                        .to_owned(),
+                collect: true,
+            },
+        };
+        judge.collect = true;
+        Ok(judge)
     }
 
     /// The hook's command line.
@@ -194,20 +270,7 @@ fn hook_path<'a>(flag: &'static str, path: &'a Path) -> Result<&'a str, HomeErro
 /// The settings file's bytes with the judge's `PreToolUse` hook beside
 /// `env` when there is a judge; without one, exactly [`env_settings`].
 pub fn settings(template: &Template, judge: Option<&Judge>) -> Result<Vec<u8>, HomeError> {
-    let Some(judge) = judge else {
-        return env_settings(template);
-    };
-    let mut value: serde_json::Value =
-        serde_json::from_slice(&env_settings(template)?).map_err(|source| HomeError::Json {
-            context: "the environment file could not be read back",
-            source,
-        })?;
-    value["hooks"] = json!({
-        "PreToolUse": [{
-            "matcher": "*",
-            "hooks": [{"type": "command", "command": judge.command()}]
-        }]
-    });
+    let value = settings_value(template, judge)?;
     let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
         context: "the environment file could not be serialised",
         source,
@@ -247,3 +310,7 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> Result<Hash, HomeError> {
         .map_err(|e| HomeError::io("syncing a launch file", path, e))?;
     Ok(Hash::of(bytes))
 }
+
+#[cfg(test)]
+#[path = "../../../tests/rendering/runner_launch.rs"]
+mod runner_rendering_tests;
