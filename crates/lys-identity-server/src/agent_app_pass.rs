@@ -103,9 +103,8 @@ async fn pass(
         serde_json::from_slice(&body).map_err(|error| ServerError::RequestMalformed {
             reason: format!("the pass request does not read: {error}"),
         })?;
-    // The rights claim asks SpiceDB once per placed resource over blocking sockets: on a
-    // runtime worker, a few concurrent passes held every worker and Lys answered no one
-    // (11 Oct 2026, a Cambium seat's first pass). It runs on the blocking pool instead.
+    // The rights claim reads placed resources over blocking sockets. Keeping those
+    // reads on the blocking pool leaves runtime workers free to serve requests.
     let issued = {
         let state = Arc::clone(&state);
         let audience = asked.audience.clone();

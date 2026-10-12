@@ -42,10 +42,8 @@ pub fn routes(state: Arc<AppState>) -> Router {
         .with_state(state)
 }
 
-/// The published key set inside the API mount too, for a client given Lys's API address:
-/// lys-pass joins `oauth/jwks` onto the address it holds, and Cambium holds the API's
-/// (`rights.lys_api_url`), so its key fetch met a 404 and no seat's pass verified
-/// (11 Oct 2026). Mounted only where the API sits under `/api`.
+/// Publish keys inside the API mount for registered clients using that address.
+/// The pass verifier resolves the key endpoint relative to its configured API URL.
 pub fn api_keys(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/oauth/jwks", get(jwks))

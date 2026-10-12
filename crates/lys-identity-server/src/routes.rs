@@ -9,31 +9,21 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-use axum::body::Bytes;
-use axum::extract::rejection::BytesRejection;
-use axum::extract::{OriginalUri, Path, State};
+use axum::Router;
 use axum::http::{HeaderMap, header};
-use axum::{Json, Router};
-use lys_identity::{
-    Actor, AgentId, Directory, IdentityId, LoginBinding, OperationId, PersonId, Profile, Transition,
-};
+use lys_identity::{Actor, AgentId, Directory, IdentityId, PersonId};
 use lys_log_store::FileLeafStore;
-use serde::Deserialize;
 
 use lys_identity::signer::load_service_key;
 
 use crate::admission::Admission;
 use crate::config::Config;
-use crate::directory_views::{
-    AgentRegistered, IdentitiesView, IdentityRecordView, PersonRegistered, ReceiptAnswer,
-    receipt_view, record_view,
-};
 use crate::error::ServerError;
 use crate::grants::{GrantSetup, GrantState};
 use crate::oidc::Oidc;
 use crate::reviews_store::ReviewStore;
 use crate::service_accounts_store::ServiceAccountStore;
-use crate::session::{Sessions, now};
+use crate::session::Sessions;
 
 #[path = "people_giving.rs"]
 pub(crate) mod people_giving;
@@ -381,261 +371,8 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
     identity.map_err(ServerError::from)
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-#[schema(as = NamedBody)]
-pub(crate) struct Named {
-    operation: String,
-    display_name: String,
-}
-
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-#[schema(as = AgentRegistrationBody)]
-pub(crate) struct AgentRegistration {
-    operation: String,
-    display_name: String,
-    #[serde(default)]
-    answers_to: Option<String>,
-}
-
-fn registration_target(
-    own: PersonId,
-    requested: Option<&str>,
-    may_choose: bool,
-) -> Result<IdentityId, ServerError> {
-    let target = requested.map_or(Ok(IdentityId::Person(own)), identity_id)?;
-    if target != IdentityId::Person(own) && !may_choose {
-        return Err(ServerError::NotAdmitted {
-            reason: "only an administrator may register an agent under another person",
-        });
-    }
-    Ok(target)
-}
-
-fn operation(text: &str) -> Result<OperationId, ServerError> {
-    OperationId::from_str(text).map_err(ServerError::from)
-}
-
-pub(crate) async fn register_person(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Json(body): Json<Named>,
-) -> Result<Json<PersonRegistered>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
-    let (op, profile) = (
-        operation(&body.operation)?,
-        Profile::new(&body.display_name)?,
-    );
-    with_directory(&state, |directory| {
-        let (id, receipt) = directory.register_person(actor, op, profile, now())?;
-        Ok(Json(PersonRegistered {
-            person: id.to_string(),
-            receipt: receipt_view(&receipt),
-        }))
-    })
-}
-
-pub(crate) async fn register_agent(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Json(body): Json<AgentRegistration>,
-) -> Result<Json<AgentRegistered>, ServerError> {
-    if !headers.contains_key(axum::http::header::AUTHORIZATION) {
-        let actor = signed_in(&state, &headers)?;
-        crate::routes::administrator(&state, &actor)?;
-        let (op, profile) = (
-            operation(&body.operation)?,
-            Profile::new(&body.display_name)?,
-        );
-        return with_directory(&state, |directory| {
-            let projection = directory.projection()?;
-            let own = match crate::caller_admission::active_caller(projection, &actor)? {
-                IdentityId::Person(person) => person,
-                IdentityId::Agent(_)
-                | IdentityId::ServiceAccount(_)
-                | IdentityId::Connector(_)
-                | IdentityId::Machine(_) => {
-                    return Err(ServerError::NotAdmitted {
-                        reason: "an agent registration requires a person or an admitted service account",
-                    });
-                }
-            };
-            let target = registration_target(own, body.answers_to.as_deref(), true)?;
-            crate::agent_policy_api::with_policies(&state, |policies| {
-                let answer =
-                    directory.register_reporting_agent(actor, op, target, profile, now())?;
-                policies.ensure_default(&answer.agent.to_string())?;
-                crate::reporting_api::registered(&answer).map(Json)
-            })
-        });
-    }
-    let (op, profile) = (
-        operation(&body.operation)?,
-        Profile::new(&body.display_name)?,
-    );
-    crate::grants::with_directory_grants(
-        &state,
-        |mut judged| {
-            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-            crate::service_account_grants::admit(&mut judged, caller, "agents")?;
-            let (actor, responsible) = crate::service_account_grants::actor(&judged, caller)?;
-            let target = registration_target(responsible, body.answers_to.as_deref(), false)?;
-            Ok((actor, target))
-        },
-        |directory, (actor, target)| {
-            crate::agent_policy_api::with_policies(&state, |policies| {
-                let answer =
-                    directory.register_reporting_agent(actor, op, target, profile, now())?;
-                policies.ensure_default(&answer.agent.to_string())?;
-                crate::reporting_api::registered(&answer).map(Json)
-            })
-        },
-    )
-}
-
-pub(crate) async fn list(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-) -> Result<Json<IdentitiesView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
-    with_directory(&state, |directory| {
-        let identities = directory
-            .projection()?
-            .records()
-            .map(|(id, record)| record_view(*id, record))
-            .collect::<Vec<_>>();
-        Ok(Json(IdentitiesView { identities }))
-    })
-}
-
-pub(crate) async fn read(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Path(id): Path<String>,
-) -> Result<Json<IdentityRecordView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
-    let id = identity_id(&id)?;
-    with_directory(&state, |directory| {
-        let record =
-            directory
-                .record(id)?
-                .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
-                    identity: id.to_string(),
-                })?;
-        Ok(Json(record_view(id, &record)))
-    })
-}
-
-pub(crate) async fn change_profile(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    OriginalUri(uri): OriginalUri,
-    Path(id): Path<String>,
-    principal: Option<axum::Extension<crate::agent_signature::TokenPrincipal>>,
-    body: Result<Bytes, BytesRejection>,
-) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let bytes = body.map_err(|error| malformed(error.body_text()))?;
-    let actor = people_giving::actor(
-        &state,
-        &headers,
-        ("POST", uri.path(), &bytes),
-        principal.as_ref().map(|value| &value.0),
-    )?;
-    if actor.provenance().agent().is_none() {
-        crate::routes::administrator(&state, &actor)?;
-    }
-    let body = people_giving::body(headers, bytes).await?;
-    let (id, op, profile) = (
-        identity_id(&id)?,
-        operation(&body.operation)?,
-        Profile::new(&body.display_name)?,
-    );
-    if actor.provenance().agent().is_some() {
-        return people_giving::profile(&state, &actor, id, op, profile).map(Json);
-    }
-    with_directory(&state, |directory| {
-        let receipt = directory.change_profile(actor, op, id, profile, now())?;
-        Ok(Json(ReceiptAnswer {
-            receipt: receipt_view(&receipt),
-        }))
-    })
-}
-
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-#[schema(as = TransitionBody)]
-pub(crate) struct Moved {
-    operation: String,
-    transition: String,
-    #[serde(default)]
-    reason: String,
-}
-
-pub(crate) async fn transition(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Path(id): Path<String>,
-    Json(body): Json<Moved>,
-) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
-    let moved = match body.transition.as_str() {
-        "activate" => Transition::Activate,
-        "suspend" => Transition::Suspend,
-        "reinstate" => Transition::Reinstate,
-        "retire" => Transition::Retire,
-        other => return Err(malformed(format!("{other} is not a transition"))),
-    };
-    let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
-    with_directory(&state, |directory| {
-        let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
-        if matches!(moved, Transition::Suspend | Transition::Retire) {
-            let projection = directory.projection()?;
-            state.sessions.end_matching(|actor| {
-                projection
-                    .person_for(actor.binding())
-                    .map(IdentityId::Person)
-                    == Some(id)
-                    || projection.agent_for(actor.binding()).map(IdentityId::Agent) == Some(id)
-                    || actor.provenance().agent().map(IdentityId::Agent) == Some(id)
-            })?;
-        }
-        Ok(Json(ReceiptAnswer {
-            receipt: receipt_view(&receipt),
-        }))
-    })
-}
-
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-#[schema(as = BindLoginBody)]
-pub(crate) struct Bound {
-    operation: String,
-    issuer: String,
-    subject: String,
-}
-
-pub(crate) async fn bind_login(
-    State(state): State<Shared>,
-    headers: HeaderMap,
-    Path(id): Path<String>,
-    Json(body): Json<Bound>,
-) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
-    let person = PersonId::from_str(&id)?;
-    let (op, binding) = (
-        operation(&body.operation)?,
-        LoginBinding::new(&body.issuer, &body.subject)?,
-    );
-    with_directory(&state, |directory| {
-        let receipt = directory.bind_login(actor, op, person, binding, now())?;
-        Ok(Json(ReceiptAnswer {
-            receipt: receipt_view(&receipt),
-        }))
-    })
-}
+mod identities;
+pub(crate) use identities::{
+    AgentRegistration, Bound, Moved, Named, bind_login, change_profile, list, read, register_agent,
+    register_person, transition,
+};

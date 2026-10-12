@@ -47,22 +47,15 @@ use lys_openapi::{Api, Method};
 
 use crate::connections_api::ConnectionsView;
 use crate::directory_views::{
-    AgentRegistered, IdentitiesView, IdentityRecordView, LinkAuditPerson, PersonRegistered,
-    ReceiptAnswer, ReceiptPage, ServiceKeyView, SignedInView,
+    AgentRegistered, IdentitiesView, IdentityRecordView, PersonRegistered, ReceiptAnswer,
+    ReceiptPage, ServiceKeyView, SignedInView,
 };
 use crate::grant_contract::{
     ActionBody, CannotGiveAnswer, DelegateBody, GrantList, GrantView, ModelView, PermitView,
     RecordedView, RevokeBody, RootBody, WhoBody, WhoPage,
 };
 use crate::grants_reach::{ReachAnswer, ReachBody};
-use crate::launch_api::{Launch, StartCommandView};
-use crate::link_audit_api::{Asked, Delivery};
-use crate::network_api::{
-    AgentBody, MachineAgentsChanged, MachineTeamChanged, MachineView, NameBody, NetworkView,
-    TeamBody,
-};
 use crate::openapi_table::{GET, POST};
-use crate::provisioning_api::{ProvisioningView, ReviewBody, SetBody as ProfileBody};
 use crate::read_views::{AgentView, MeView, PeopleView};
 use crate::requests_api::AskBody;
 use crate::requests_decide::{ApproveBody, DeclineBody};
@@ -73,11 +66,8 @@ use crate::reviews_state::Kept;
 use crate::roles_api::{AssignBody, EndBody, MakeBody, MoveBody, VersionBody};
 use crate::roles_views::{MovedView, RoleList, RoleView};
 use crate::routes::{AgentRegistration, Bound, Moved, Named};
-use crate::runtime_api::{ReportBody, SessionView as RuntimeSession, SessionsView as RuntimeList};
 use crate::setup::SetupRequest;
 use crate::sign_in_providers::{ProvidersView, SetBody as ProviderBody};
-use crate::skills_api::{SkillBody, SkillsView};
-use crate::stop_api::{StopBody, StopView, StopsView};
 
 /// A schema's name in the document, or none where a route names none.
 pub(crate) type Schema = Option<Cow<'static, str>>;
@@ -370,202 +360,5 @@ fn roles_and_requests(api: &mut Api) -> Vec<Entry> {
     ]
 }
 
-/// The link audit, the machines, the profiles agents start from and what
-/// the runtimes report of the sessions they run.
-fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
-    let receipt = api.schema::<ReceiptAnswer>();
-    let (delivery, asked) = (api.schema::<Delivery>(), api.schema::<Asked>());
-    let machine = api.schema::<MachineView>();
-    let profile = api.schema::<ProvisioningView>();
-    let skills = api.schema::<SkillsView>();
-    let (set, review) = (api.schema::<ProfileBody>(), api.schema::<ReviewBody>());
-    let (report, session) = (api.schema::<ReportBody>(), api.schema::<RuntimeSession>());
-    let running = api.schema::<RuntimeList>();
-    vec![
-        (
-            GET,
-            "/agents/{id}/mcp-requests",
-            None,
-            Some(api.schema::<crate::mcp_requests_api::McpRequestList>()),
-        ),
-        (
-            POST,
-            "/agents/{id}/mcp-requests",
-            Some(api.schema::<crate::mcp_requests_api::McpAskBody>()),
-            Some(api.schema::<crate::mcp_requests_api::McpRequestView>()),
-        ),
-        (
-            POST,
-            "/agents/{id}/mcp-requests/{request}/approve",
-            Some(api.schema::<crate::mcp_requests_api::McpApproveBody>()),
-            Some(api.schema::<crate::mcp_requests_api::McpRequestView>()),
-        ),
-        (
-            GET,
-            "/harnesses",
-            None,
-            Some(api.schema::<crate::harness_catalogue::CatalogueView>()),
-        ),
-        (
-            GET,
-            "/harnesses/plugins",
-            Some(api.schema::<crate::plugins_installed_api::PluginsQuery>()),
-            Some(api.schema::<crate::plugins_installed_api::InstalledPlugins>()),
-        ),
-        (
-            GET,
-            "/runtime/message-edges",
-            Some(api.schema::<crate::message_edges::EdgeQuery>()),
-            Some(api.schema::<crate::message_edges::EdgePage>()),
-        ),
-        (POST, "/link-audit", Some(delivery), Some(receipt)),
-        (
-            POST,
-            "/link-audit/person",
-            Some(asked),
-            Some(api.schema::<LinkAuditPerson>()),
-        ),
-        (
-            GET,
-            "/network",
-            Some(api.schema::<crate::list_page::ListQuery>()),
-            Some(api.schema::<NetworkView>()),
-        ),
-        (
-            POST,
-            "/network/machines",
-            Some(api.schema::<NameBody>()),
-            Some(machine.clone()),
-        ),
-        (POST, "/network/machines/{id}/retire", None, Some(machine)),
-        (
-            POST,
-            "/network/machines/{id}/team",
-            Some(api.schema::<TeamBody>()),
-            Some(api.schema::<MachineTeamChanged>()),
-        ),
-        (
-            POST,
-            "/network/machines/{id}/agents",
-            Some(api.schema::<AgentBody>()),
-            Some(api.schema::<MachineAgentsChanged>()),
-        ),
-        (
-            GET,
-            "/agents/{id}/provisioning",
-            None,
-            Some(profile.clone()),
-        ),
-        (
-            POST,
-            "/agents/{id}/provisioning",
-            Some(set),
-            Some(profile.clone()),
-        ),
-        (GET, "/skills", None, Some(skills.clone())),
-        (
-            POST,
-            "/skills",
-            Some(api.schema::<SkillBody>()),
-            Some(skills),
-        ),
-        (
-            POST,
-            "/agents/{id}/provisioning/{version}/review",
-            Some(review),
-            Some(profile),
-        ),
-        (
-            POST,
-            "/agents/{id}/start-command",
-            Some(api.schema::<Launch>()),
-            Some(api.schema::<StartCommandView>()),
-        ),
-        (
-            POST,
-            "/agents/{id}/runtime/sessions/{session}/reports",
-            Some(report.clone()),
-            Some(session.clone()),
-        ),
-        (
-            GET,
-            "/agents/{id}/runtime/sessions",
-            None,
-            Some(running.clone()),
-        ),
-        (GET, "/runtime/sessions", None, Some(running.clone())),
-        (
-            POST,
-            "/runtime/found/{session}/reports",
-            Some(report),
-            Some(session),
-        ),
-        (GET, "/runtime/found", None, Some(running)),
-        (
-            POST,
-            "/agents/{id}/stop",
-            Some(api.schema::<StopBody>()),
-            Some(api.schema::<StopView>()),
-        ),
-        (
-            GET,
-            "/agents/{id}/stops",
-            None,
-            Some(api.schema::<StopsView>()),
-        ),
-        (
-            POST,
-            "/sign-in",
-            Some(api.schema::<crate::sign_in::SignInBody>()),
-            None,
-        ),
-        (
-            POST,
-            "/setup/open",
-            Some(api.schema::<crate::setup::Opened>()),
-            None,
-        ),
-        (
-            POST,
-            "/setup/administrator",
-            Some(api.schema::<crate::setup::NewAdministrator>()),
-            None,
-        ),
-        (
-            POST,
-            "/setup/password",
-            Some(api.schema::<crate::setup::NewPassword>()),
-            None,
-        ),
-        (
-            POST,
-            "/me/account/email",
-            Some(api.schema::<crate::accounts::OwnEmail>()),
-            None,
-        ),
-        (
-            POST,
-            "/me/account/password",
-            Some(api.schema::<crate::accounts::OwnPassword>()),
-            None,
-        ),
-        (
-            POST,
-            "/directory/people/{id}/account/email",
-            Some(api.schema::<crate::accounts::NewEmail>()),
-            None,
-        ),
-        (
-            POST,
-            "/directory/people/{id}/account/enabled",
-            Some(api.schema::<crate::accounts::Enabled>()),
-            None,
-        ),
-        (
-            POST,
-            "/directory/people/{id}/account/password",
-            Some(api.schema::<crate::accounts::Reset>()),
-            None,
-        ),
-    ]
-}
+mod machines_runtime;
+use machines_runtime::machines_and_runtime;
