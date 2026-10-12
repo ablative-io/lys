@@ -22,6 +22,32 @@ function refusalOf(error: unknown): StartRefusal {
   return named ? { refusal: named[1], reason: named[2] } : { refusal: 'Unexpected', reason: words };
 }
 
+interface MachineCatalogue {
+  machine: string;
+  programs: { builds: { program: string; from: string }[]; not_found?: string }[];
+}
+
+/** An installed copy must be evidence from the computer the person chose. */
+export async function readMachineHarness(
+  computer: string, program: string,
+  read: (path: string) => Promise<MachineCatalogue> = request,
+): Promise<StartRefusal | null> {
+  const catalogue = await read('/harnesses?machine=' + encodeURIComponent(computer));
+  if (catalogue.machine !== computer) return {
+    refusal: 'harness_catalogue_wrong_machine',
+    reason: 'The harness catalogue did not name the chosen computer ' + computer + '.',
+  };
+  if (catalogue.programs.some((choice) => choice.builds.some((copy) =>
+    copy.program === program && (copy.from === 'installed' || copy.from === 'runner'),
+  ))) return null;
+  const reasons = catalogue.programs.flatMap((choice) => choice.not_found ? [choice.not_found] : []);
+  return {
+    refusal: 'harness_absent_on_machine',
+    reason: 'Computer ' + computer + ' does not have the program ' + program + '.'
+      + (reasons.length ? ' ' + reasons.join('; ') : ''),
+  };
+}
+
 /** The service answered no: nothing of this request is outstanding. Anything else may have been carried out. */
 
 export function Start({ entry, me, admin, changed, settings, straightAway = false }: {
@@ -40,13 +66,24 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     const [identity, network, roles, provisioning] = await Promise.all([
       api.agent(agent), round === 0 ? drawnWith() : request<NetworkView>('/network'), readRoles(), request<ProvisioningAnswer>(prefix + '/provisioning'),
     ]);
-    return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile };
+    const allowed = allowedToRun(network.machines, roles.roles, agent);
+    const saved = allowed.find((machine) => machine.id === provisioning.profile?.runs_on);
+    const choices = saved ? [saved] : allowed;
+    const program = provisioning.profile?.harness?.program;
+    const availability: Record<string, StartRefusal | null> = program ? Object.fromEntries(
+      await Promise.all(choices.map(async (computer) => {
+        try { return [computer.id, await readMachineHarness(computer.id, program)]; }
+        catch (error) { return [computer.id, refusalOf(error)]; }
+      })),
+    ) : {};
+    return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile, availability };
   }, 'team-start:' + agent + ':' + round);
   const [refusal, setRefusal] = useState<StartRefusal | null>(null);
   const [ended, setEnded] = useState('');
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const wanted = useRef(straightAway);
+  const retainedStart = sessionStorage.getItem(key) !== null;
 
   const data = load.status === 'ok' ? load.data : null;
   const profile = data?.profile ?? null;
@@ -73,6 +110,10 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       const start = (version: number, machine: string): Pending => ({ stage: 'start', path: prefix + '/start-command', body: { machine, operation: operationId() }, machine, version });
       // A request this tab already sent and never saw answered is sent again, the same one, before anything new.
       const raw = sessionStorage.getItem(key);
+      if (raw === null && profile.harness) {
+        const unavailable = await readMachineHarness(computer, profile.harness.program);
+        if (unavailable) { setRefusal(unavailable); return; }
+      }
       let current: Pending = raw === null
         ? profile.reviewed_by ? start(profile.version, computer) : review(profile.version, computer)
         : pendingStartOf(JSON.parse(raw), prefix);
@@ -85,6 +126,10 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
           return;
         }
         const confirmed = await sendKept(key, sent, () => profileRequest(agent, sent), true);
+        const program = confirmed.profile.harness?.program;
+        if (!program) throw new Error('HarnessUnnamed: The approved settings name no program.');
+        const unavailable = await readMachineHarness(current.machine, program);
+        if (unavailable) { setRefusal(unavailable); return; }
         current = current.stage === 'profile' && !confirmed.profile.reviewed_by ? review(confirmed.version, current.machine) : start(confirmed.version, current.machine);
       }
     } catch (error) {
@@ -101,7 +146,8 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   useEffect(() => {
     if (!wanted.current || load.status === 'loading') return;
     wanted.current = false;
-    if (load.status === 'ok' && !known && !noProgram && choices.length === 1) void run(choices[0].id);
+    if (load.status === 'ok' && !known && !noProgram && choices.length === 1
+      && (retainedStart || !load.data.availability[choices[0].id])) void run(choices[0].id);
   }, [load]);
 
   if (load.status === 'loading') return wanted.current ? <p role="status" className="team-start-line">Starting {name}…</p> : null;
@@ -118,7 +164,13 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       <Act symbol="open" name="Choose its program" word="Choose" tone="primary" onClick={settings} />
     </div> : null}
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
-    {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => <Act key={computer.id} symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void run(computer.id); }} />)}</div> : null}
+    {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => {
+      const unavailable = data?.availability[computer.id];
+      return <div key={computer.id}>
+        <Act symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy || (Boolean(unavailable) && !retainedStart)} onClick={() => { void run(computer.id); }} />
+        {unavailable ? <p role="alert">On {computer.name}: {unavailable.reason} <small className="refusal-name">{unavailable.refusal}</small></p> : null}
+      </div>;
+    })}</div> : null}
     {!stopped && !noProgram && choices.length === 1 ? <p className="dim team-start-where">On {choices[0].name}, in the folder {profile?.working_folder}.</p> : null}
   </div>;
 }
