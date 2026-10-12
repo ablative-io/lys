@@ -1,7 +1,7 @@
 #![cfg(test)]
 //! Gates on the launch template parser: the fixture parses to what the brief
 //! states, each refusal names its cause, the parser and the schema file agree
-//! on the five slots, and the hash is of the bytes as read.
+//! on the fourteen slots, and the hash is of the bytes as read.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -145,6 +145,10 @@ fn the_schema_file_names_exactly_the_slots_the_parser_accepts() {
         .map(|v| v.as_str().unwrap())
         .collect();
     assert_eq!(required, accepted);
+    for field in crate::harness::launch_fields::SeatFields::NAMES {
+        assert!(optional.contains(field), "{field}");
+        assert!(!required.contains(field), "{field}");
+    }
     assert_eq!(schema["additionalProperties"], json!(false));
     assert_eq!(schema["properties"]["harness"]["const"], "claude-code");
     assert_eq!(

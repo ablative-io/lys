@@ -4,7 +4,7 @@ use super::McpServer;
 #[cfg(test)]
 use super::PROFILE_COPIES;
 use crate::launch_permissions::Permissions;
-use lys_home::harness::launch_fields::{DeclaredHarness, InstructionsMode};
+use lys_home::harness::launch_fields::{DeclaredHarness, InstructionsMode, SeatFields};
 use serde::{Deserialize, Serialize};
 
 /// The skill a profile version names, pinned to the text it was recorded with.
@@ -47,6 +47,15 @@ pub struct Settings {
     /// Extra native settings without the separately governed keys.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settings: Option<serde_json::Map<String, serde_json::Value>>,
+    /// The existing conversation explicitly selected for resume.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resume: Option<String>,
+    /// The context window explicitly declared for this seat, in tokens.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
+    /// The absolute harness config directory explicitly chosen by a person.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_dir: Option<String>,
     /// Its instructions; may be empty.
     pub instructions: String,
     /// Whether to keep, append to or replace the program's prompt.
@@ -76,6 +85,50 @@ pub struct Settings {
     /// agent's own default. Absent, a launch that names no folder is refused by name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub working_folder: Option<String>,
+}
+
+impl Settings {
+    /// Assemble the declared seat fields, preserving the existing session form.
+    ///
+    /// # Errors
+    /// Names a field declared differently at profile and session level.
+    pub fn seat_fields(&self) -> Result<SeatFields, String> {
+        let session = self.session.as_ref();
+        Ok(SeatFields {
+            hooks: self.hooks.clone(),
+            status_line: self.status_line.clone(),
+            settings: self.settings.clone(),
+            resume: chosen(
+                "resume",
+                self.resume.as_ref(),
+                session.and_then(|session| session.resume.as_ref()),
+            )?,
+            context_window: chosen(
+                "context_window",
+                self.context_window.as_ref(),
+                session.and_then(|session| session.context_window.as_ref()),
+            )?,
+            config_dir: chosen(
+                "config_dir",
+                self.config_dir.as_ref(),
+                session.and_then(|session| session.config_dir.as_ref()),
+            )?,
+        })
+    }
+}
+
+fn chosen<T: Clone + PartialEq>(
+    field: &str,
+    profile: Option<&T>,
+    session: Option<&T>,
+) -> Result<Option<T>, String> {
+    match (profile, session) {
+        (Some(profile), Some(session)) if profile != session => {
+            Err(format!("{field}: conflicts with session.{field}"))
+        }
+        (Some(value), _) | (None, Some(value)) => Ok(Some(value.clone())),
+        (None, None) => Ok(None),
+    }
 }
 
 /// How an agent's sessions are driven through a runner.

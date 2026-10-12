@@ -36,6 +36,7 @@ fn budgets_feed_profile_window_precedes_the_model_window() -> Result<(), Box<dyn
         let windows = Windows::from([("main".to_owned(), window)]);
         let usage = convert("machine", "agent", &record, &Held::default(), &windows)?;
         assert_eq!(usage.context_percent, Some(25));
+        assert_eq!(usage.context_source.as_deref(), Some("profile"));
         assert!(
             !usage
                 .unavailable

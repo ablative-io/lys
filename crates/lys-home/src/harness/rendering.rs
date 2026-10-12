@@ -239,9 +239,9 @@ pub fn render(
             target.extend(slots);
             rendered.text = serde_json::to_string_pretty(&value)
                 .map_err(|error| refused(fields, "template", &error))?;
-            rendered.sha256 = crate::record::blocks::Hash::of(rendered.text.as_bytes())
+            crate::record::blocks::Hash::of(rendered.text.as_bytes())
                 .as_str()
-                .to_owned();
+                .clone_into(&mut rendered.sha256);
         }
     }
     Ok(rendered)

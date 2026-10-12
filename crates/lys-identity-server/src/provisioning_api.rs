@@ -70,6 +70,15 @@ pub struct VersionView {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     pub settings: Option<serde_json::Map<String, serde_json::Value>>,
+    /// The existing conversation explicitly selected for resume.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resume: Option<String>,
+    /// The context window explicitly declared for this seat, in tokens.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
+    /// The absolute harness config directory explicitly chosen by a person.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_dir: Option<String>,
     /// Its instructions.
     pub instructions: String,
     /// How instructions affect the program's prompt: keep, append or replace.
@@ -179,6 +188,15 @@ pub(crate) struct SetBody {
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
     settings: Option<serde_json::Map<String, serde_json::Value>>,
+    /// The existing conversation explicitly selected for resume.
+    #[serde(default)]
+    resume: Option<String>,
+    /// The context window explicitly declared for this seat, in tokens.
+    #[serde(default)]
+    context_window: Option<u32>,
+    /// The absolute harness config directory explicitly chosen by a person.
+    #[serde(default)]
+    config_dir: Option<String>,
     instructions: String,
     #[serde(default)]
     #[schema(schema_with = instructions_mode_schema)]
@@ -284,6 +302,9 @@ fn view(
             hooks: version.settings.hooks.clone(),
             status_line: version.settings.status_line.clone(),
             settings: version.settings.settings.clone(),
+            resume: version.settings.resume.clone(),
+            context_window: version.settings.context_window,
+            config_dir: version.settings.config_dir.clone(),
             instructions: version.settings.instructions.clone(),
             instructions_mode: version.settings.instructions_mode,
             session: version.settings.session.clone(),

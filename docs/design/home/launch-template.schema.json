@@ -23,7 +23,7 @@
       }
     },
     "slots": {
-      "description": "The five slots, all required; a slot outside them is refused by name.",
+      "description": "Five required slots and nine optional slots; a slot outside them is refused by name.",
       "type": "object",
       "additionalProperties": false,
       "required": [

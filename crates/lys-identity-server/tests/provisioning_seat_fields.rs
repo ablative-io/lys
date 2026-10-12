@@ -184,7 +184,15 @@ async fn provisioning_all_six_seat_fields_survive_review_and_get() -> TestResult
         .first()
         .ok_or("missing version")?;
     let stored = serde_json::to_value(&version.settings)?;
-    for field in ["hooks", "status_line", "settings", "session"] {
+    for field in [
+        "hooks",
+        "status_line",
+        "settings",
+        "session",
+        "resume",
+        "context_window",
+        "config_dir",
+    ] {
         assert_eq!(answer["profile"][field], body[field]);
         assert_eq!(stored[field], body[field]);
     }
@@ -197,21 +205,38 @@ async fn provisioning_openapi_lists_optional_seat_fields() -> TestResult {
     let (status, document) = service.get("/openapi.json", Some(&cookie)).await?;
     assert_eq!(status, 200, "{document}");
     for (schema, fields) in [
-        ("ProvisioningSetBody", ["hooks", "status_line", "settings"]),
+        (
+            "ProvisioningSetBody",
+            &[
+                "hooks",
+                "status_line",
+                "settings",
+                "resume",
+                "context_window",
+                "config_dir",
+            ][..],
+        ),
         (
             "ProvisioningVersionView",
-            ["hooks", "status_line", "settings"],
+            &[
+                "hooks",
+                "status_line",
+                "settings",
+                "resume",
+                "context_window",
+                "config_dir",
+            ][..],
         ),
         (
             "SessionSettings",
-            ["resume", "context_window", "config_dir"],
+            &["resume", "context_window", "config_dir"][..],
         ),
     ] {
         let shape = &document["components"]["schemas"][schema];
         let properties = shape["properties"]
             .as_object()
             .ok_or("missing schema properties")?;
-        for field in fields {
+        for &field in fields {
             assert!(properties.contains_key(field), "{schema}.{field}");
             assert!(
                 !shape["required"]
@@ -242,9 +267,130 @@ async fn provisioning_omitted_seat_fields_remain_absent_after_reopen() -> TestRe
         .first()
         .ok_or("missing version")?;
     let stored = serde_json::to_value(&version.settings)?;
-    for field in ["hooks", "status_line", "settings", "session"] {
+    for field in [
+        "hooks",
+        "status_line",
+        "settings",
+        "session",
+        "resume",
+        "context_window",
+        "config_dir",
+    ] {
         assert!(answer["profile"][field].is_null(), "{field}");
         assert!(stored.get(field).is_none(), "{field}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn provisioning_profile_seat_fields_survive_review_get_and_reopen() -> TestResult {
+    let (service, cookie, path) = table().await?;
+    let mut body = profile("claude-code")?;
+    let seat = json!({"hooks":{"Stop":[{"command":"seat-stop", "matcher":"*", "timeout":5}]},
+        "status_line":"seat-status", "settings":{"theme":"dark", "nested":{"a":1}},
+        "resume":"019c6e27-e55b-73d1-87d8-4e01f1f75043",
+        "context_window":200_000, "config_dir":"/tmp/chosen-config"});
+    body.as_object_mut()
+        .ok_or("profile is not an object")?
+        .extend(seat.as_object().ok_or("seat is not an object")?.clone());
+    let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
+    assert_eq!(status, 200, "{answer}");
+    let review = json!({"operation":OperationId::generate()?.to_string()});
+    let (status, answer) = service
+        .post(&format!("{path}/1/review"), Some(&cookie), &review)
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, answer) = service.get(&path, Some(&cookie)).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert!(answer["profile"]["reviewed_by"].is_string());
+    assert!(answer["profile"]["session"].is_null());
+    let store = ProvisioningStore::open(&service.dir.path().join("provisioning.json"))?;
+    let agent = path.split('/').nth(2).ok_or("missing agent")?;
+    let version = store.version(agent, 1).ok_or("missing version")?;
+    assert!(version.reviewed.is_some());
+    let stored = serde_json::to_value(&version.settings)?;
+    for field in lys_home::harness::launch_fields::SeatFields::NAMES {
+        assert_eq!(answer["profile"][field], seat[field], "{field}");
+        assert_eq!(stored[field], seat[field], "{field}");
+    }
+    Ok(())
+}
+
+#[test]
+fn provisioning_old_shape_stored_version_has_six_absent_profile_fields() -> TestResult {
+    let fixture = br#"{
+        "profiles":[{"agent":"old-agent", "versions":[{
+            "number":1, "operation":"old-operation", "set_by":"person", "set_at":1,
+            "settings":{"model_access":[], "tools":[], "skills":[], "mcp_servers":[],
+                "instructions":"", "note":"",
+                "session":{"requires_controls":false, "compact":"/compact", "sensitive":false}}
+        }]}]
+    }"#;
+    let dir = tempfile::tempdir()?;
+    let file = dir.path().join("provisioning.json");
+    std::fs::write(&file, fixture)?;
+    let store = ProvisioningStore::open(&file)?;
+    let settings = &store
+        .version("old-agent", 1)
+        .ok_or("old version absent")?
+        .settings;
+    assert_eq!(settings.hooks, None);
+    assert_eq!(settings.status_line, None);
+    assert_eq!(settings.settings, None);
+    assert_eq!(settings.resume, None);
+    assert_eq!(settings.context_window, None);
+    assert_eq!(settings.config_dir, None);
+    let session = settings.session.as_ref().ok_or("old session absent")?;
+    assert_eq!(session.resume, None);
+    assert_eq!(session.context_window, None);
+    assert_eq!(session.config_dir, None);
+    assert_eq!(std::fs::read(&file)?, fixture);
+    Ok(())
+}
+
+#[tokio::test]
+async fn provisioning_profile_session_values_are_validated_and_conflicts_refused() -> TestResult {
+    let (service, cookie, path) = table().await?;
+    for (field, value) in [
+        ("resume", json!("not-an-id")),
+        ("context_window", json!(0)),
+        ("config_dir", json!("relative/config")),
+    ] {
+        let mut body = profile("codex")?;
+        body[field] = value;
+        let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
+        assert_eq!(status, 400, "{answer}");
+        assert!(
+            answer["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains(field)),
+            "{answer}"
+        );
+    }
+    for (field, profile_value, session_value) in [
+        (
+            "resume",
+            json!("019c6e27-e55b-73d1-87d8-4e01f1f75043"),
+            json!("019c6e27-e55b-73d1-87d8-4e01f1f75044"),
+        ),
+        ("context_window", json!(200_000), json!(100_000)),
+        (
+            "config_dir",
+            json!("/tmp/profile-config"),
+            json!("/tmp/session-config"),
+        ),
+    ] {
+        let mut body = profile("codex")?;
+        body[field] = profile_value;
+        body["session"] = json!({field:session_value});
+        let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
+        assert_eq!(status, 400, "{answer}");
+        assert!(
+            answer["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains(field) && reason.contains("conflict")),
+            "{answer}"
+        );
     }
     Ok(())
 }

@@ -72,9 +72,9 @@ pub(crate) fn build(
     ]));
     if let Some(window) = version
         .settings
-        .session
-        .as_ref()
-        .and_then(|settings| settings.context_window)
+        .seat_fields()
+        .map_err(|reason| ServerError::LaunchUnrenderable { reason })?
+        .context_window
     {
         native
             .environment

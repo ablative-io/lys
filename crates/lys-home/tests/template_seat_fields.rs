@@ -60,3 +60,33 @@ fn template_refuses_invalid_seat_slots_by_name() -> Result<(), Box<dyn Error>> {
     }
     Ok(())
 }
+
+#[test]
+fn template_seat_conversion_refusals_keep_the_underlying_error() -> Result<(), Box<dyn Error>> {
+    use lys_home::harness::launch_fields::SeatFields;
+    for (field, value, cause) in [
+        ("context_window", json!(true), "invalid type: boolean"),
+        (
+            "hooks",
+            json!({"Stop":[{"command":"check", "timeout":4_294_967_296_u64}]}),
+            "out of range integral type conversion attempted",
+        ),
+    ] {
+        let slots = json!({field:value});
+        let error = SeatFields::parse(
+            slots.as_object().ok_or("slots are not an object")?,
+            "claude-code/template-v1",
+        )
+        .expect_err("invalid conversion accepted");
+        assert!(error.to_string().contains(cause), "{error}");
+        let mut given = template();
+        given["slots"][field] = slots[field].clone();
+        let error =
+            parse_template(&serde_json::to_vec(&given)?).expect_err("invalid conversion accepted");
+        assert!(
+            error.to_string().contains(field) && error.to_string().contains(cause),
+            "{error}"
+        );
+    }
+    Ok(())
+}

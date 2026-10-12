@@ -6,7 +6,7 @@ use axum::body::Bytes;
 use axum::http::{HeaderMap, Method};
 use lys_home::harness::launch_fields::{
     EnvText, HandleEnv, KeptSkill, LaunchFields, LaunchIdentity, LaunchMcp, ProfileLaunchFields,
-    SeatFields, Transport,
+    Transport,
 };
 use lys_identity::LifecycleState;
 use serde_json::Value;
@@ -191,21 +191,12 @@ pub fn fields(
     // given the proxy is given it under a key minted here for it alone: no
     // start path can give a run the proxy without one.
     let run = model_proxy.as_ref().map(|_| lys_home::record::fresh_id());
-    let mut seat = settings
-        .session
-        .as_ref()
-        .map_or_else(SeatFields::default, |session| SeatFields {
-            resume: session.resume.clone(),
-            context_window: session.context_window,
-            config_dir: session.config_dir.clone(),
-            ..SeatFields::default()
-        });
-    seat.hooks.clone_from(&settings.hooks);
-    seat.status_line.clone_from(&settings.status_line);
-    seat.settings.clone_from(&settings.settings);
+    let seat = settings
+        .seat_fields()
+        .map_err(|reason| ServerError::LaunchUnrenderable { reason })?;
     seat.check(&harness.description.rendering_contract)
         .map_err(|error| ServerError::LaunchUnrenderable {
-            reason: format!("session.{error}"),
+            reason: error.to_string(),
         })?;
     Ok(ProfileLaunchFields {
         seat,

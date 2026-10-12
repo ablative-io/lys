@@ -75,6 +75,9 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
         hooks: body.hooks,
         status_line: body.status_line,
         settings: body.settings,
+        resume: body.resume,
+        context_window: body.context_window,
+        config_dir: body.config_dir,
         instructions: body.instructions.trim().to_owned(),
         instructions_mode: body.instructions_mode,
         note: body.note.trim().to_owned(),
@@ -103,12 +106,7 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
             .map(|given| folder("working_folder", given))
             .transpose()?,
     };
-    let seat = SeatFields {
-        hooks: settings.hooks.clone(),
-        status_line: settings.status_line.clone(),
-        settings: settings.settings.clone(),
-        ..SeatFields::default()
-    };
+    let seat = settings.seat_fields().map_err(malformed)?;
     seat.check(settings.harness.as_ref().map_or("", |declared| {
         declared.description.rendering_contract.as_str()
     }))

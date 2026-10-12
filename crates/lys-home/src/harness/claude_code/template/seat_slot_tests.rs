@@ -32,6 +32,7 @@ fn template_parses_every_seat_slot() -> Result<(), Box<dyn Error>> {
             Err(error) => failures.push(format!("{field}: {error}")),
         }
     }
+    assert!(failures.is_empty(), "{failures:?}");
     Ok(())
 }
 

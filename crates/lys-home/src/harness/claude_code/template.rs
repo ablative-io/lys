@@ -189,9 +189,16 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         .map(|(name, value)| (name.clone(), value.clone()))
         .collect();
     let seat = SeatFields::parse(&seat_slots, "claude-code/template-v1").map_err(|error| {
-        HomeError::TemplateShape {
-            field: format!("slots.{}", error.field),
-            reason: error.reason,
+        if error.detail.is_empty() {
+            HomeError::TemplateShape {
+                field: format!("slots.{}", error.field),
+                reason: error.reason,
+            }
+        } else {
+            HomeError::Json {
+                context: "launch template seat fields",
+                source: <serde_json::Error as serde::de::Error>::custom(error),
+            }
         }
     })?;
     Ok(Template {

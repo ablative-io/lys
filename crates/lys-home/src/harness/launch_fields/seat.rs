@@ -42,20 +42,35 @@ pub struct SeatFields {
     pub config_dir: Option<String>,
 }
 
-/// A refused seat field, without the command or settings contents.
+/// A refused seat field with the cause of a failed conversion.
 #[derive(Debug, thiserror::Error)]
-#[error("{field}: {reason}")]
+#[error("{field}: {reason}{detail}")]
 pub struct SeatFieldRefusal {
     /// The exact field that failed validation.
     pub field: String,
     /// The rule its value failed.
     pub reason: &'static str,
+    /// The underlying conversion failure, including its separator, when present.
+    pub detail: String,
 }
 
 fn seat_refused(field: impl Into<String>, reason: &'static str) -> SeatFieldRefusal {
     SeatFieldRefusal {
         field: field.into(),
         reason,
+        detail: String::new(),
+    }
+}
+
+fn seat_failed(
+    field: impl Into<String>,
+    reason: &'static str,
+    error: impl std::fmt::Display,
+) -> SeatFieldRefusal {
+    SeatFieldRefusal {
+        field: field.into(),
+        reason,
+        detail: format!(": {error}"),
     }
 }
 
@@ -67,7 +82,7 @@ fn member<T: serde::de::DeserializeOwned>(
         .get(name)
         .map(|value| {
             serde_json::from_value(value.clone())
-                .map_err(|_| seat_refused(name, "has an invalid value shape"))
+                .map_err(|error| seat_failed(name, "has an invalid value shape", error))
         })
         .transpose()
 }
@@ -121,7 +136,13 @@ fn hooks(
                     let invalid =
                         || seat_refused(format!("{field}.timeout"), "must be positive u32 seconds");
                     let value = given.as_u64().ok_or_else(invalid)?;
-                    let value = u32::try_from(value).map_err(|_| invalid())?;
+                    let value = u32::try_from(value).map_err(|error| {
+                        seat_failed(
+                            format!("{field}.timeout"),
+                            "must be positive u32 seconds",
+                            error,
+                        )
+                    })?;
                     if value == 0 {
                         return Err(invalid());
                     }
@@ -306,15 +327,14 @@ impl SeatFields {
         if self.context_window == Some(0) {
             return Err(seat_refused("context_window", "must be positive tokens"));
         }
-        if let Some(directory) = &self.config_dir {
-            if !std::path::Path::new(directory).is_absolute()
-                || directory.chars().any(char::is_control)
-            {
-                return Err(seat_refused(
-                    "config_dir",
-                    "must be an absolute path without control characters",
-                ));
-            }
+        if let Some(directory) = &self.config_dir
+            && (!std::path::Path::new(directory).is_absolute()
+                || directory.chars().any(char::is_control))
+        {
+            return Err(seat_refused(
+                "config_dir",
+                "must be an absolute path without control characters",
+            ));
         }
         Ok(())
     }

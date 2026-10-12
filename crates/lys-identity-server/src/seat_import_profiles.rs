@@ -86,44 +86,9 @@ impl Replaced<'_> {
     }
 }
 
-/// The profile members one or more sources contributed, before they become
-/// the profile version destination.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ProfileParts {
-    /// The models it may use.
-    pub models: Vec<String>,
-    /// Its instructions, appended to the harness's own prompt.
-    pub instructions: Option<String>,
-    /// The permissions its settings carried.
-    pub permissions: Option<Permissions>,
-    /// Its MCP servers.
-    pub mcp_servers: Vec<McpServer>,
-    /// The source entries that contributed.
-    pub source_ids: Vec<String>,
-}
-
-impl ProfileParts {
-    /// Whether no source contributed a member.
-    pub fn is_empty(&self) -> bool {
-        self.models.is_empty()
-            && self.instructions.is_none()
-            && self.permissions.is_none()
-            && self.mcp_servers.is_empty()
-    }
-
-    /// Takes `other`'s members alongside these.
-    pub fn absorb(&mut self, other: Self) {
-        self.models.extend(other.models);
-        if other.instructions.is_some() {
-            self.instructions = other.instructions;
-        }
-        if other.permissions.is_some() {
-            self.permissions = other.permissions;
-        }
-        self.mcp_servers.extend(other.mcp_servers);
-        self.source_ids.extend(other.source_ids);
-    }
-}
+#[path = "provisioning_store/imported_parts.rs"]
+mod imported_parts;
+pub use imported_parts::ProfileParts;
 
 /// One source sorted: what it maps, and every member it does not.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -559,6 +524,9 @@ pub fn map_profile(
         hooks: None,
         status_line: None,
         settings: None,
+        resume: None,
+        context_window: None,
+        config_dir: None,
         instructions: parts.instructions.unwrap_or_default(),
         instructions_mode: InstructionsMode::Append,
         note: format!("imported from seat {seat}'s {harness_name} resource files"),
