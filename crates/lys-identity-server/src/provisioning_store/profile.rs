@@ -144,6 +144,9 @@ pub struct SessionSettings {
     /// The absolute harness config directory explicitly chosen by a person.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_dir: Option<String>,
+    /// Maximum age of the last seat signal, in seconds.
+    #[serde(deserialize_with = "stall_after")]
+    pub stall_after: u64,
     /// Whether starts require a qualified managed control adapter.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub requires_controls: bool,
@@ -165,6 +168,16 @@ pub struct SessionSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     pub accounts: Option<lys_runner::Rotation>,
+}
+
+fn stall_after<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<u64, D::Error> {
+    let seconds = u64::deserialize(deserializer)?;
+    if seconds == 0 || seconds.checked_mul(1000).is_none() {
+        return Err(serde::de::Error::custom(
+            "session.stall_after must be positive and fit milliseconds",
+        ));
+    }
+    Ok(seconds)
 }
 
 /// One version of an agent's profile.
@@ -223,5 +236,87 @@ impl Profile {
     /// The number of the latest version.
     pub fn latest(&self) -> u32 {
         self.versions.last().map_or(0, |version| version.number)
+    }
+}
+
+#[cfg(test)]
+mod stall_tests {
+    use serde_json::{Value, json};
+    use sha2::{Digest, Sha256};
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    fn old() -> Value {
+        json!({"profiles":[{"agent":"agent-1", "versions":[{
+            "number":1,"operation":"profile-1","set_by":"person-1","set_at":1,
+            "settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],
+            "instructions":"","note":"","session":{"compact":"/compact"}}
+        }]}]})
+    }
+
+    fn migrated(journal: bool) -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let path = dir.path().join("provisioning.json");
+        let payload = serde_json::to_vec(&old())?;
+        let bytes = if journal {
+            let mut bytes = b"LYSPR01\n".to_vec();
+            bytes.extend_from_slice(&u64::try_from(payload.len())?.to_le_bytes());
+            bytes.extend_from_slice(&Sha256::digest(&payload));
+            bytes.extend_from_slice(&payload);
+            bytes
+        } else {
+            payload
+        };
+        std::fs::write(&path, &bytes)?;
+        let store = super::super::ProvisioningStore::open(&path)?;
+        let profiles = serde_json::to_value(store.profiles())?;
+        assert_eq!(
+            profiles[0]["versions"][0]["settings"]["session"]["stall_after"],
+            300
+        );
+        assert_ne!(
+            std::fs::read(&path)?,
+            bytes,
+            "migration must write the field"
+        );
+        let backup = std::fs::read_dir(dir.path())?
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("provisioning.before-stall-")
+            })
+            .ok_or("missing migration backup")?;
+        assert_eq!(std::fs::read(backup.path())?, bytes);
+        let current = std::fs::read(&path)?;
+        drop(store);
+        super::super::ProvisioningStore::open(&path)?;
+        assert_eq!(std::fs::read(&path)?, current, "migration is idempotent");
+        Ok(())
+    }
+
+    #[test]
+    fn old_snapshot_records_stall_after_with_backup() -> TestResult {
+        migrated(false)
+    }
+    #[test]
+    fn old_journal_records_stall_after_with_backup() -> TestResult {
+        migrated(true)
+    }
+
+    #[test]
+    fn session_stall_after_is_required_positive_and_bounded() -> TestResult {
+        for value in [
+            json!({}),
+            json!({"stall_after":0}),
+            json!({"stall_after":u64::MAX}),
+        ] {
+            assert!(serde_json::from_value::<super::SessionSettings>(value).is_err());
+        }
+        let value = json!({"stall_after":31});
+        let session: super::SessionSettings = serde_json::from_value(value)?;
+        assert_eq!(serde_json::to_value(session)?["stall_after"], 31);
+        Ok(())
     }
 }

@@ -75,6 +75,26 @@ fn read_file(path: &Path, durable: bool) -> Result<(Kept, bool, u64), ServerErro
         #[cfg(test)]
         RECOVERED_TAILS.with(|recoveries| recoveries.set(recoveries.get() + 1));
     }
+    if decoded.migrated {
+        let parent = path
+            .parent()
+            .filter(|parent| !parent.as_os_str().is_empty())
+            .unwrap_or(Path::new("."));
+        let mut backup = tempfile::Builder::new()
+            .prefix("provisioning.before-stall-")
+            .suffix(".json")
+            .tempfile_in(parent)
+            .map_err(unavailable)?;
+        backup.write_all(&bytes).map_err(unavailable)?;
+        backup.as_file().sync_all().map_err(unavailable)?;
+        let (_, backup) = backup.keep().map_err(unavailable)?;
+        sync_parent(path)?;
+        let payload = serde_json::to_vec(&decoded.kept).map_err(unavailable)?;
+        snapshot(path, &payload)?;
+        tracing::warn!(path = %path.display(), backup = %backup.display(), migration = "profile_stall_after_recorded",
+            "provisioning migration wrote session.stall_after=300 for existing session profiles");
+        return Ok((decoded.kept, true, 0));
+    }
     Ok((decoded.kept, decoded.journal, decoded.changes))
 }
 
@@ -107,29 +127,32 @@ struct Decoded {
     journal: bool,
     changes: u64,
     valid_length: usize,
+    migrated: bool,
 }
 
 fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
     if !bytes.starts_with(MAGIC) {
-        return serde_json::from_slice(bytes)
-            .map(|kept| Decoded {
+        return decode_shape(bytes)
+            .map(|(kept, migrated)| Decoded {
                 kept,
                 journal: false,
                 changes: 0,
                 valid_length: bytes.len(),
+                migrated,
             })
             .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())));
     }
     let mut cursor = MAGIC.len();
-    let mut kept: Kept = serde_json::from_slice(frame(bytes, &mut cursor)?)
+    let (mut kept, mut migrated): (Kept, bool) = decode_shape(frame(bytes, &mut cursor)?)
         .map_err(|error| unavailable(format!("provisioning snapshot does not read: {error}")))?;
     let mut changes = 0_u64;
     while cursor < bytes.len() {
         if incomplete_frame(bytes, cursor)? {
             break;
         }
-        let edit = serde_json::from_slice(frame(bytes, &mut cursor)?)
+        let (edit, changed) = decode_shape(frame(bytes, &mut cursor)?)
             .map_err(|error| unavailable(format!("provisioning change does not read: {error}")))?;
+        migrated |= changed;
         edits::apply(&mut kept, edit)?;
         changes = changes
             .checked_add(1)
@@ -142,7 +165,49 @@ fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
         journal: true,
         changes,
         valid_length: cursor,
+        migrated,
     })
+}
+
+fn decode_shape<T: serde::de::DeserializeOwned>(
+    bytes: &[u8],
+) -> Result<(T, bool), serde_json::Error> {
+    let mut value: serde_json::Value = serde_json::from_slice(bytes)?;
+    let mut migrated = false;
+    if let Some(profiles) = value
+        .get_mut("profiles")
+        .and_then(serde_json::Value::as_array_mut)
+    {
+        for profile in profiles {
+            if let Some(versions) = profile
+                .get_mut("versions")
+                .and_then(serde_json::Value::as_array_mut)
+            {
+                for version in versions {
+                    migrated |= migrate_session(version);
+                }
+            }
+        }
+    }
+    if let Some(version) = value.get_mut("Set").and_then(|set| set.get_mut("version")) {
+        migrated |= migrate_session(version);
+    }
+    serde_json::from_value(value).map(|decoded| (decoded, migrated))
+}
+
+fn migrate_session(version: &mut serde_json::Value) -> bool {
+    let Some(session) = version
+        .get_mut("settings")
+        .and_then(|settings| settings.get_mut("session"))
+        .and_then(serde_json::Value::as_object_mut)
+    else {
+        return false;
+    };
+    if session.contains_key("stall_after") {
+        return false;
+    }
+    session.insert("stall_after".to_owned(), 300.into());
+    true
 }
 
 fn incomplete_frame(bytes: &[u8], cursor: usize) -> Result<bool, ServerError> {

@@ -342,6 +342,13 @@ impl ProvisioningStore {
     /// `operation`, and answer its number. `from` is the latest version the
     /// setter saw, 0 for none.
     pub fn set(&mut self, agent: &str, from: u32, version: Version) -> Result<u32, ServerError> {
+        if version.settings.session.as_ref().is_some_and(|session| {
+            session.stall_after == 0 || session.stall_after.checked_mul(1000).is_none()
+        }) {
+            return Err(unavailable(
+                "session.stall_after must be positive and fit milliseconds",
+            ));
+        }
         self.settle()?;
         if let Some((kept_for, kept)) = self.named(&version.operation) {
             let same = kept_for == agent

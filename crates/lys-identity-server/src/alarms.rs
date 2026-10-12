@@ -155,14 +155,35 @@ impl AlarmStore {
         at_ms: u64,
         stall_seconds: u64,
     ) -> Result<bool, AlarmError> {
-        let threshold = stall_seconds
-            .checked_mul(1000)
-            .filter(|value| *value > 0)
-            .ok_or_else(|| {
-                AlarmError::Malformed(
-                    "stall_after_seconds must be positive and fit milliseconds".to_owned(),
-                )
-            })?;
+        self.observe_with(observations, at_ms, |_| Ok(stall_seconds))
+    }
+
+    /// Evaluate a batch with the stall allowance recorded for each session.
+    ///
+    /// # Errors
+    /// Refuses a missing or invalid profile allowance and malformed evidence.
+    pub fn observe_profiles(
+        &mut self,
+        observations: &[Observation],
+        at_ms: u64,
+        thresholds: &std::collections::BTreeMap<String, u64>,
+    ) -> Result<bool, AlarmError> {
+        self.observe_with(observations, at_ms, |seen| {
+            thresholds.get(&seen.session).copied().ok_or_else(|| {
+                AlarmError::Malformed(format!(
+                    "session {} has no profile stall_after",
+                    seen.session
+                ))
+            })
+        })
+    }
+
+    fn observe_with(
+        &mut self,
+        observations: &[Observation],
+        at_ms: u64,
+        seconds: impl Fn(&Observation) -> Result<u64, AlarmError>,
+    ) -> Result<bool, AlarmError> {
         let revision = self
             .held
             .revision
@@ -171,6 +192,16 @@ impl AlarmStore {
         let mut changes = Vec::new();
         let mut sessions = std::collections::BTreeSet::new();
         for seen in observations {
+            let stall_seconds = seconds(seen)?;
+            let threshold = stall_seconds
+                .checked_mul(1000)
+                .filter(|value| *value > 0)
+                .ok_or_else(|| {
+                    AlarmError::Malformed(
+                        "stall_after_seconds must be positive and fit milliseconds".to_owned(),
+                    )
+                })?;
+
             if [&seen.session, &seen.agent, &seen.machine]
                 .iter()
                 .any(|value| value.trim().is_empty())

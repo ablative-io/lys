@@ -103,18 +103,27 @@ macro_rules! alarms_follow {
             Ok(AlarmStore::open(&table.state.estate_plan_file.with_file_name("alarms"))?)
         }
 
-        fn threshold(table: &Fixture) -> TestResult {
+        fn threshold(table: &mut Fixture) -> TestResult {
             let dir = table.state.estate_plan_file.with_file_name("organisation");
             std::fs::create_dir_all(&dir)?;
+            let root = table.state.estate_plan_file.parent().ok_or("no fixture root")?;
+            let mut profiles = $crate::provisioning_store::ProvisioningStore::open(&root.join("profiles.json"))?;
+            let version = serde_json::from_value(json!({
+                "number":1,"operation":"threshold-profile","set_by":"person","set_at":1,
+                "settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],
+                    "instructions":"","note":"","session":{"stall_after":10}}
+            }))?;
+            profiles.set(&table.agent, 0, version)?;
+            Arc::get_mut(&mut table.state).ok_or("fixture state already shared")?.provisioning = Some(Mutex::new(profiles));
             std::fs::write(dir.join("configuration.json"), b"{\"alarms\":{\"stall_after_seconds\":10}}")?;
             Ok(())
         }
 
         #[tokio::test]
         async fn alarm_follow_paused_clock_raises_once_clears_on_signal_and_rearms() -> TestResult {
-            let table = fixture().await?;
+            let mut table = fixture().await?;
             table.track("alarm-session", "machine")?;
-            threshold(&table)?;
+            threshold(&mut table)?;
             let runner = Runner::start(&table)?;
             let clock = AtomicU64::new(11_000);
             read_page(&table, &runner, &clock).await?;
@@ -155,20 +164,24 @@ macro_rules! alarms_follow {
                 "number": 1, "operation": "alarm-profile", "settings": {
                     "model_access": ["fixture-model"], "tools": [], "skills": [], "mcp_servers": [],
                     "permissions": {"default_mode": "plan"}, "instructions": "", "note": "",
+                    "session": {"stall_after":10},
                     "harness": $crate::harness_description::declared()
                 }, "set_by": "fixture-person", "set_at": 1,
                 "reviewed": {"operation": "alarm-review", "by": "fixture-person", "at": 1}
             }))?;
             let root = table.state.estate_plan_file.parent().ok_or("no fixture root")?;
             let mut store = ProvisioningStore::open(&root.join("profiles.json"))?;
-            store.set(&table.agent, 0, version.clone())?;
+            let prior = store.profile(&table.agent).map_or(0, |profile| profile.latest());
+            let mut version = version;
+            version.number = prior + 1;
+            store.set(&table.agent, prior, version.clone())?;
             let rendered = render(&Start {
                 agent: &table.agent, session: "alarm-session", machine: "machine", runtime: "sh",
                 version: &version, skills: &[], policy: None,
                 model_proxy: Some("http://127.0.0.1:18484/anthropic"),
             }, &[])?;
             let launch = json!({"agent": table.agent, "session": "alarm-session", "directory": "/srv/agent",
-                "provisioning_version": 1, "handles": [], "template": rendered.template,
+                "provisioning_version": version.number, "handles": [], "template": rendered.template,
                 "template_sha256": rendered.template_sha256});
             let run = $crate::launch_api::kept_launch(&store, &launch)?.environment
                 .get(lys_home::harness::rendering::RUN_VARIABLE).cloned().ok_or("no fixture proxy run")?;
@@ -191,9 +204,35 @@ macro_rules! alarms_follow {
         }
 
         #[tokio::test]
+        async fn alarm_follow_uses_launched_profile_when_organisation_and_latest_differ() -> TestResult {
+            let mut table = fixture().await?;
+            threshold(&mut table)?;
+            let path = proxied(&mut table)?;
+            let config = table.state.estate_plan_file.with_file_name("organisation").join("configuration.json");
+            std::fs::write(config, b"{\"alarms\":{\"stall_after_seconds\":500}}")?;
+            $crate::provisioning_api::with_provisioning(&table.state, |store| {
+                let mut version = store.profile(&table.agent).and_then(|profile| profile.versions.last()).cloned().ok_or($crate::error::ServerError::LaunchRecordMissing)?;
+                version.operation = "changed-threshold".to_owned();
+                version.settings.session.as_mut().ok_or($crate::error::ServerError::LaunchRecordMissing)?.stall_after = 100;
+                store.set(&table.agent, version.number, version)?;
+                Ok(())
+            })?;
+            let runner = Runner::start(&table)?;
+            let clock = AtomicU64::new(12_000);
+            read_page(&table, &runner, &clock).await?;
+            let raised = alarms(&table)?.list();
+            assert_eq!(raised.len(), 2);
+            assert!(raised.iter().any(|alarm| alarm.kind == Kind::SeatStalled));
+            assert!(raised.iter().any(|alarm| alarm.kind == Kind::SessionUngoverned));
+            assert!(path.is_file());
+            runner.finish(1).await?;
+            table.finish().await
+        }
+
+        #[tokio::test]
         async fn alarm_follow_no_proxy_usage_and_missing_run_file_clear_on_usage() -> TestResult {
             let mut table = fixture().await?;
-            threshold(&table)?;
+            threshold(&mut table)?;
             let path = proxied(&mut table)?;
             let runner = Runner::start(&table)?;
             let clock = AtomicU64::new(11_000);

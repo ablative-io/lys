@@ -101,6 +101,7 @@ pub(crate) async fn tick_with_clock(
             }
         };
     let mut observations = Vec::new();
+    let mut thresholds = std::collections::BTreeMap::new();
     for session in tracked {
         let agent = session
             .agent
@@ -116,6 +117,35 @@ pub(crate) async fn tick_with_clock(
         let first = session
             .first()
             .ok_or_else(|| server(unavailable("tracked alarm session has no start report")))?;
+        let threshold = crate::provisioning_api::with_provisioning(state, |store| {
+            let version = if let Some(launch) = &first.launch {
+                let number = launch
+                    .get("provisioning_version")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| {
+                        server(unavailable("alarm launch has no provisioning version"))
+                    })?;
+                let number = u32::try_from(number).map_err(|error| server(unavailable(error)))?;
+                store.version(agent, number)
+            } else {
+                store
+                    .profile(agent)
+                    .and_then(|profile| profile.versions.last())
+            }
+            .ok_or(ServerError::LaunchRecordMissing)?;
+            version
+                .settings
+                .session
+                .as_ref()
+                .map(|session| session.stall_after)
+                .ok_or_else(|| {
+                    server(unavailable(format!(
+                        "session {} profile has no session.stall_after",
+                        session.session
+                    )))
+                })
+        })?;
+        thresholds.insert(session.session.clone(), threshold);
         let run = if let Some(launch) = &first.launch {
             crate::provisioning_api::with_provisioning(state, |store| {
                 Ok(crate::launch_api::kept_launch(store, launch)?
@@ -149,8 +179,8 @@ pub(crate) async fn tick_with_clock(
         });
     }
     let at_ms = now()?;
-    let changed = super::super::alarms_api::with_store(state, |store, threshold| {
-        store.observe(&observations, at_ms, threshold)
+    let changed = super::super::alarms_api::with_store(state, |store, _threshold| {
+        store.observe_profiles(&observations, at_ms, &thresholds)
     })
     .map_err(server)?;
     if changed {
