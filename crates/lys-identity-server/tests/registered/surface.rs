@@ -152,7 +152,7 @@ async fn the_api_answers_the_key_set_the_origin_publishes() -> TestResult {
     let (origin_status, origin_body) = (origin.status(), origin.text().await?);
     let api = reqwest::get(format!("{}/api/oauth/jwks", service.base)).await?;
     let (api_status, api_body) = (api.status(), api.text().await?);
-    assert_eq!(api_status, origin_status, "{api_body}");
+    assert_eq!(api_status, origin_status, "origin={origin_body}; api={api_body}");
     assert_eq!(api_body, origin_body);
     assert!(!api_body.contains("not an API route"), "{api_body}");
     Ok(())
