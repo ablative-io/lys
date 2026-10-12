@@ -267,6 +267,8 @@ pub struct BuildRecord {
     pub environment: login::EnvironmentRecord,
     /// The settings the service configuration runs with (ACCESS-002 R2).
     pub settings: install::settings::RecordedSettings,
+    /// This install's runner key and its recorded join, when it has joined.
+    pub runner_machine: install::layout::runner_machine::Recorded,
 }
 
 /// The placed screens package.
@@ -328,6 +330,7 @@ pub fn record_build(
         surface,
         environment,
         settings,
+        runner_machine: install::layout::runner_machine::recorded(layout, say)?,
     };
     let text = serde_json::to_vec_pretty(&record).map_err(|error| {
         refuse(
@@ -338,8 +341,7 @@ pub fn record_build(
         )
     })?;
     private_files::ensure_dir(&layout.install_dir())?;
-    let path = layout.build_record();
-    std::fs::write(&path, text).map_err(|error| io("write build record", &path, &error))?;
+    install::layout::runner_machine::write_build_record(layout, &text, say)?;
     Ok(record)
 }
 

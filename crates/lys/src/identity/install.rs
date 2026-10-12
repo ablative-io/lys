@@ -306,6 +306,7 @@ pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResul
 pub fn server_keys(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     provider_key(config)?;
     service_key(layout)?;
+    layout::runner_machine::provide(layout, &mut lys_runner::error::said)?;
     super::import::prepare_credential(layout)?;
     Ok(())
 }

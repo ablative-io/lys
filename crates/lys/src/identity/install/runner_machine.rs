@@ -9,6 +9,10 @@ use super::Layout;
 use crate::identity::error::{ErrorKind, IdentityError, IdentityResult};
 use crate::identity::private_files;
 
+#[path = "runner_machine_record.rs"]
+mod record;
+pub use record::{Recorded, recorded, write_build_record};
+
 fn failure(operation: &'static str, path: &Path, reason: impl ToString) -> IdentityError {
     IdentityError::new(
         ErrorKind::PrivateFileIo,
