@@ -16,7 +16,8 @@ use crate::error::RunnerError;
 use crate::peer::{Collected, PeerAct, PeerRequest};
 use crate::protocol::{Answer, PROTOCOL_VERSION, read_greeting, read_reply};
 
-const EXCHANGE_BUDGET: Duration = Duration::from_secs(3);
+// Readiness can resume after its timeout; leave time to return within three seconds.
+const EXCHANGE_BUDGET: Duration = Duration::from_secs(2);
 
 /// The hook command's inputs and captured process streams.
 pub struct Args<'a> {
@@ -66,8 +67,8 @@ fn request(stdin: &str, event: Option<&str>) -> Result<PeerRequest, RunnerError>
 /// Hand the whole hook input to the runner, preserving its answer.
 ///
 /// # Errors
-/// Names malformed input, an unreachable runner, a refused request or a
-/// connection and exchange that exceed the shared three-second budget.
+/// Names malformed input, an unreachable runner, a refused request or
+/// an exhausted socket wait allowance within the three-second exchange bound.
 pub fn hand(socket: &Path, stdin: &str, event: Option<&str>) -> Result<Answer, RunnerError> {
     exchange(socket, &request(stdin, event)?)
 }
@@ -111,7 +112,7 @@ fn remaining(deadline: Instant, stage: &str) -> Result<Duration, RunnerError> {
         .ok_or_else(|| {
             RunnerError::refused(
                 "collector_timeout",
-                format!("{stage} exceeded the three-second connect and exchange budget"),
+                format!("{stage} exceeded the two-second connect and exchange wait allowance"),
             )
         })
 }
@@ -130,7 +131,7 @@ fn ready(
             Ok(0) => {
                 return Err(RunnerError::refused(
                     "collector_timeout",
-                    format!("{stage} exhausted the three-second connect and exchange budget"),
+                    format!("{stage} exhausted the two-second connect and exchange wait allowance"),
                 ));
             }
             Ok(_) => return Ok(()),

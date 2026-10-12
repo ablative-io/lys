@@ -42,7 +42,8 @@ fn request(json: &str) -> Result<Option<PeerRequest>, RunnerError> {
 ///
 /// # Errors
 /// Names malformed JSON, an unreachable runner, a refused request or an
-/// exhausted three-second exchange budget. Other notification types return
+/// exhausted socket wait allowance within the three-second exchange bound.
+/// Other notification types return
 /// `notify_ignored` without opening a connection.
 pub fn hand(socket: &Path, json: &str) -> Result<Answer, RunnerError> {
     let request = request(json)?.ok_or_else(|| {

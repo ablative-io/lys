@@ -272,3 +272,11 @@ path = "tests/seat_upgrade.rs"
 [[test]]
 name = "stop_settling"
 path = "tests/stop_settling.rs"
+
+[[test]]
+name = "hook_line"
+path = "tests/hook_line.rs"
+
+[[test]]
+name = "notify_line"
+path = "tests/notify_line.rs"

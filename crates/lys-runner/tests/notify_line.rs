@@ -5,6 +5,7 @@ use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixListener;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use lys_runner::notify_line::{Args, hand, run};
 use lys_runner::peer::{Collected, PeerAct, PeerRequest};
@@ -174,4 +175,72 @@ fn success_and_refusal_both_exit_zero_without_stdout() -> TestResult {
         })?;
     }
     Ok(())
+}
+
+fn a_silent_runner_is_bounded(greet: bool) -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let socket = dir.path().join("silent.sock");
+    let listener = UnixListener::bind(&socket)?;
+    let (release, released) = std::sync::mpsc::channel();
+    let server = std::thread::spawn(move || -> Result<(), String> {
+        let serve = || -> TestResult {
+            let (mut stream, _) = listener.accept()?;
+            if greet {
+                writeln!(stream, "{}", Greeting::fresh(&"ab".repeat(32)).line())?;
+                let mut line = String::new();
+                BufReader::new(stream.try_clone()?).read_line(&mut line)?;
+                let request: PeerRequest = serde_json::from_str(&line)?;
+                assert_eq!(
+                    request.peer,
+                    PeerAct::Collect(Collected::Notify {
+                        notification: notification(),
+                    })
+                );
+            }
+            // The socket stays open until the command reports its bounded failure.
+            released.recv()?;
+            drop(stream);
+            Ok(())
+        };
+        serve().map_err(|error| error.to_string())
+    });
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let started = Instant::now();
+    let code = run(Args {
+        socket: &socket,
+        notification: &notification().to_string(),
+        stdout: &mut stdout,
+        stderr: &mut stderr,
+    });
+    let elapsed = started.elapsed();
+    release.send(())?;
+    server
+        .join()
+        .map_err(|error| format!("fixture server panicked: {error:?}"))??;
+    assert_eq!(code, 0);
+    assert!(stdout.is_empty());
+    let error = String::from_utf8(stderr)?;
+    assert_eq!(error.lines().count(), 1);
+    assert!(error.contains("collector_timeout"), "{error}");
+    assert!(
+        elapsed <= Duration::from_secs(3),
+        "exchange took {elapsed:?}"
+    );
+    assert!(error.contains(if greet {
+        "reading collector answer"
+    } else {
+        "reading runner greeting"
+    }));
+    Ok(())
+}
+
+#[test]
+fn a_silent_greeting_is_bounded_without_stalling_the_harness() -> TestResult {
+    a_silent_runner_is_bounded(false)
+}
+
+#[test]
+fn a_silent_answer_is_bounded_without_stalling_the_harness() -> TestResult {
+    a_silent_runner_is_bounded(true)
 }

@@ -5,6 +5,7 @@ use std::error::Error;
 use std::io::{BufRead, BufReader, Cursor, Write};
 use std::os::unix::net::UnixListener;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use lys_runner::hook_line::{Args, hand, run};
 use lys_runner::peer::{Collected, PeerAct, PeerRequest};
@@ -261,6 +262,7 @@ fn a_silent_runner_is_bounded(greet: bool) -> TestResult {
     });
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
+    let started = Instant::now();
     let code = run(Args {
         socket: &socket,
         event: None,
@@ -268,6 +270,7 @@ fn a_silent_runner_is_bounded(greet: bool) -> TestResult {
         stdout: &mut stdout,
         stderr: &mut stderr,
     });
+    let elapsed = started.elapsed();
     release.send(())?;
     server
         .join()
@@ -277,6 +280,10 @@ fn a_silent_runner_is_bounded(greet: bool) -> TestResult {
     let error = String::from_utf8(stderr)?;
     assert_eq!(error.lines().count(), 1);
     assert!(error.contains("collector_timeout"), "{error}");
+    assert!(
+        elapsed <= Duration::from_secs(3),
+        "exchange took {elapsed:?}"
+    );
     assert!(error.contains(if greet {
         "reading collector answer"
     } else {
