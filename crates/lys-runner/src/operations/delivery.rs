@@ -11,6 +11,9 @@ use crate::session::{Table, now_ms};
 use crate::tracking_store::{Body, Commit};
 use std::sync::Weak;
 
+#[path = "delivery_completion.rs"]
+mod completion;
+
 /// Say `outcome` in the feed, naming in the log a feed that cannot take it:
 /// the record of operations still answers it.
 pub(super) fn feed(table: &mut Table, outcome: &OperationOutcome) {
@@ -300,8 +303,6 @@ pub(super) fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<()
         .ok_or_else(|| RunnerError::refused("session_unknown", format!("no session {id}")))?;
     let writer = session.live(id)?.writer.clone();
     session.guard.idle = false;
-    let mut bytes = text.into_bytes();
-    bytes.extend_from_slice(Key::Enter.bytes());
     let owner = Weak::clone(&table.owner);
     let durable = owner
         .upgrade()
@@ -309,24 +310,21 @@ pub(super) fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<()
         .writer
         .clone();
     let operation = operation.to_owned();
-    writer.submit_after(bytes, durable, move |result| {
-        let Some(sessions) = owner.upgrade() else {
-            crate::error::said(&format!(
-                "operation {operation}: input completed after the runner ended"
-            ));
+    let enter_writer = writer.clone();
+    writer.submit_after(text.into_bytes(), durable, move |result| {
+        if let Err(error) = result {
+            completion::record(&owner, &operation, Err(error));
             return;
-        };
-        let Some(mut table) = sessions.lock_logged() else {
-            return;
-        };
-        finish(&mut table, &operation, result);
-        drop(table);
-        if let Err(error) = sessions.writer.barrier() {
-            crate::error::said(&format!(
-                "operation {operation}: delivery_record_uncertain: {error}"
-            ));
         }
-        sessions.wake();
+        // Queue Enter only after the text write and flush complete, so the
+        // harness receives it as a key rather than part of a pasted message.
+        let enter_owner = Weak::clone(&owner);
+        let enter_operation = operation.clone();
+        if let Err(error) = enter_writer.submit(Key::Enter.bytes().to_vec(), move |result| {
+            completion::record(&enter_owner, &enter_operation, result);
+        }) {
+            completion::record(&owner, &operation, Err(error));
+        }
     })
 }
 
@@ -464,3 +462,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "delivery_tests.rs"]
+mod tests;
