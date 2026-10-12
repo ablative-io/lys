@@ -107,7 +107,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
         pending
             .ok_or("no End was held")?
             .join()
-            .map_err(|_| "held End panicked")??;
+            .map_err(|error| format!("held End panicked: {error:?}"))??;
         if liveness != 2 || ends != 1 {
             return Err(format!("liveness={liveness}, ends={ends}"));
         }
@@ -172,7 +172,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
     release.send(())?;
     responder
         .join()
-        .map_err(|_| "runner responder panicked")??;
+        .map_err(|error| format!("runner responder panicked: {error:?}"))??;
     table.close()?;
     assert_eq!(started.0, 409, "{}", started.1);
     assert_eq!(started.1["error"], "process_lingering", "{}", started.1);

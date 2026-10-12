@@ -295,6 +295,11 @@ impl Sessions {
             reason: None,
             stopped,
         };
+        let drains = table
+            .sessions
+            .get(id)
+            .zip(table.feed.source(id))
+            .is_some_and(|(session, source)| session.guard.proxy_source(source).is_some());
         let Some(session) = table
             .sessions
             .get_mut(id)
@@ -303,7 +308,7 @@ impl Sessions {
             return;
         };
         session.ended = Some(ended.clone());
-        super::drain::end_follower(id, session);
+        super::drain::end_follower(id, session, drains);
         if table
             .sessions
             .get(id)

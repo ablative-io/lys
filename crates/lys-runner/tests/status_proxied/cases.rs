@@ -207,3 +207,6 @@ fn a_session_tracked_neither_way_keeps_its_plans_windows_and_nothing_else()
     assert_eq!(usage(&sessions)?.len(), 1, "a repeat keeps nothing");
     Ok(())
 }
+
+#[path = "mixed.rs"]
+mod mixed;

@@ -193,13 +193,17 @@ impl Sessions {
                 .feed
                 .source(id)
                 .map(|source| (source.generation, source.bound.clone()));
-            if source.as_ref().is_some_and(|(_, bound)| bound == thread) {
+            let session = table
+                .sessions
+                .get(id)
+                .ok_or_else(|| crate::session::unknown(id))?;
+            let proxied = table
+                .feed
+                .source(id)
+                .is_some_and(|source| session.guard.proxy_source(source).is_some());
+            if proxied || source.as_ref().is_some_and(|(_, bound)| bound == thread) {
                 None
             } else {
-                let session = table
-                    .sessions
-                    .get(id)
-                    .ok_or_else(|| crate::session::unknown(id))?;
                 let tracking = session
                     .guard
                     .tracking
@@ -299,7 +303,9 @@ fn flushed_at(
             bodies.push(body);
         }
         if let Some(session) = table.sessions.get(id) {
-            if let Some(tracking) = &session.guard.tracking {
+            if session.guard.proxy_source(source).is_none()
+                && let Some(tracking) = &session.guard.tracking
+            {
                 let reading = Reading {
                     runner,
                     session: id,

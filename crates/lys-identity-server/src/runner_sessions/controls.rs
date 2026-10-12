@@ -29,23 +29,28 @@ pub(super) fn select_transport(act: Act) -> Act {
         .as_ref()
         .is_some_and(|config| config.requires_controls);
     if !requires_controls {
-        let tracking = launch
-            .config
-            .as_ref()
-            .and_then(|config| config.harness)
-            .map(|harness| {
-                let variable = match harness {
-                    lys_runner::tracking::Harness::ClaudeCode => "CLAUDE_CONFIG_DIR",
-                    lys_runner::tracking::Harness::Codex => "CODEX_HOME",
-                };
-                lys_runner::protocol::TrackingSpec {
-                    harness,
-                    config_home: launch
-                        .environment
-                        .get(variable)
-                        .map(std::path::PathBuf::from),
-                }
-            });
+        // Provider calls own the usage source of a proxied terminal.
+        let tracking = if proxy.is_some() {
+            None
+        } else {
+            launch
+                .config
+                .as_ref()
+                .and_then(|config| config.harness)
+                .map(|harness| {
+                    let variable = match harness {
+                        lys_runner::tracking::Harness::ClaudeCode => "CLAUDE_CONFIG_DIR",
+                        lys_runner::tracking::Harness::Codex => "CODEX_HOME",
+                    };
+                    lys_runner::protocol::TrackingSpec {
+                        harness,
+                        config_home: launch
+                            .environment
+                            .get(variable)
+                            .map(std::path::PathBuf::from),
+                    }
+                })
+        };
         return Act::Start {
             launch,
             lys_mcp,
@@ -223,6 +228,32 @@ mod tests {
             }))?;
             let selected = serde_json::to_value(select_transport(act))?;
             assert_eq!(selected["tracking"], expected, "{selected}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_proxied_terminal_start_selects_only_the_proxy_usage_adapter()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for harness in ["claude_code", "codex"] {
+            let act: Act = serde_json::from_value(json!({
+                "act":"start", "launch":{
+                    "session":"selected", "program":"/harness", "arguments":[], "directory":"/",
+                    "environment":{}, "columns":80, "rows":24,
+                    "config":{"files":[], "argument_files":{}, "environment_paths":{},
+                        "working_directory":false, "harness":harness, "requires_controls":false}
+                },
+                "proxy":{"run":"0123456789abcdef0123456789abcdef",
+                    "context_window":200000, "profile_version":2}
+            }))?;
+            let Act::Start {
+                tracking, proxy, ..
+            } = select_transport(act)
+            else {
+                return Err("terminal transport changed".into());
+            };
+            assert!(tracking.is_none(), "{harness}: {tracking:?}");
+            assert_eq!(proxy.ok_or("proxy tracking absent")?.profile_version, 2);
         }
         Ok(())
     }

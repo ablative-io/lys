@@ -187,10 +187,14 @@ impl Sessions {
             let Some(session) = table.sessions.get(id) else {
                 return;
             };
-            let tracking = session.guard.tracking.clone();
-            let proxy = session.guard.proxy.clone();
             let Some(mut source) = table.feed.source(id).cloned() else {
                 return;
+            };
+            let proxy = session.guard.proxy_source(&source).cloned();
+            let tracking = if proxy.is_some() {
+                None
+            } else {
+                session.guard.tracking.clone()
             };
             let (current, moves) = tracking.as_ref().map_or((None, Vec::new()), |tracking| {
                 let evidence = accounts(session, tracking);
@@ -215,8 +219,7 @@ impl Sessions {
                 tracking,
                 now,
             });
-            // A session has one stream: its harness's when its harness is
-            // tracked, else its run's usage file under the proxy's state.
+            // The bound source selects the reader even when native hooks are configured.
             let lines = match (&harness, &proxied) {
                 (Some(reading), _) => Lines::Harness(reading),
                 (None, Some(reading)) => Lines::Proxy(reading),

@@ -25,10 +25,8 @@ use crate::tracking_proxy::PROXY_ADAPTER;
 use crate::tracking_store::{Body, Coverage};
 
 /// End the following of `session`, named `id`, whose process has ended.
-pub(super) fn end_follower(id: &str, session: &mut Session) {
-    // The same choice `read_source` makes: the usage file is the stream of
-    // a session whose harness is not tracked.
-    let drains = session.guard.tracking.is_none() && session.guard.proxy.is_some();
+pub(super) fn end_follower(id: &str, session: &mut Session, drains: bool) {
+    // The bound usage source can receive completions after the harness exits.
     if !drains {
         if let Some(follower) = session.follower.take() {
             stop_follower(id, &follower);

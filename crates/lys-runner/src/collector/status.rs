@@ -259,6 +259,14 @@ impl Sessions {
             .sessions
             .get(id)
             .ok_or_else(|| crate::session::unknown(id))?;
+        if let Some(proxy) = table
+            .feed
+            .source(id)
+            .and_then(|source| session.guard.proxy_source(source))
+            .cloned()
+        {
+            return proxied_status(self.runner(), &mut table, id, &proxy, input);
+        }
         let Some(tracking) = session.guard.tracking.as_ref() else {
             let proxy = session.guard.proxy.clone();
             return match proxy {

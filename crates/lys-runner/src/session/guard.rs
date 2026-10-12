@@ -22,3 +22,14 @@ pub struct Guard {
     /// Whether it is between turns, as its harness last said.
     pub idle: bool,
 }
+
+impl Guard {
+    pub(crate) fn proxy_source(
+        &self,
+        source: &crate::tracking_store::SourceState,
+    ) -> Option<&ProxyTracking> {
+        self.proxy
+            .as_ref()
+            .filter(|proxy| source.bound == proxy.run)
+    }
+}
