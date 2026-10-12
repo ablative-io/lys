@@ -376,6 +376,7 @@ fn version(operation: &str, note: &str) -> Version {
                 command: None,
                 channel: Channel::Off,
             }],
+            plugins: Vec::new(),
             instructions: String::new(),
             instructions_mode: InstructionsMode::default(),
             note: note.to_owned(),

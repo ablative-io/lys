@@ -180,6 +180,9 @@ pub struct LaunchFields {
     pub mcp_servers: Vec<LaunchMcp>,
     /// The kept skills.
     pub skills: Vec<KeptSkill>,
+    /// The plugins its settings file turns on, each `name@marketplace`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<String>,
     /// Lys's model proxy for this harness's provider, as a base URL the run
     /// sends its model calls to; absent, the run reaches its provider as the
     /// machine's own setup says.

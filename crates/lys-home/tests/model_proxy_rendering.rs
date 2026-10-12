@@ -34,6 +34,7 @@ fn fields(model_proxy: Option<&str>) -> Result<LaunchFields, Box<dyn Error>> {
         models: Vec::new(),
         mcp_servers: Vec::new(),
         skills: Vec::new(),
+        plugins: Vec::new(),
         model_proxy: model_proxy.map(str::to_owned),
         run: None,
     })

@@ -151,6 +151,14 @@
               "type": "string"
             }
           }
+        },
+        "plugins": {
+          "description": "The plugins the settings file turns on, each name@marketplace: the profile's reviewed list, and never the person's own enabledPlugins.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+$"
+          }
         }
       }
     }

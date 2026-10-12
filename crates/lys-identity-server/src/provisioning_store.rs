@@ -161,6 +161,11 @@ pub struct Settings {
     pub skills: Vec<String>,
     /// The MCP servers it is given.
     pub mcp_servers: Vec<McpServer>,
+    /// The harness plugins its settings turn on, each `name@marketplace`,
+    /// reviewed with the rest of the version; the person's own plugins are
+    /// never loaded (Tom, 3 October 2026 20:47).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<String>,
     /// Its instructions; may be empty.
     pub instructions: String,
     /// Whether to keep, append to or replace the program's prompt.

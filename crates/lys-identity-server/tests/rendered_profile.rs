@@ -95,6 +95,7 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
             "mcp_servers": [{"name": "declared-server", "command": {"program": "/opt/server", "args": ["--serve"],
                 "env": {"LITERAL": true, "TOKEN": {"handle": "server-token"}}}, "channel": "wake"}],
             "permissions": {"allow": ["Read"], "deny": ["Bash(rm *)"], "default_mode": "plan"},
+            "plugins": ["argus@ablative", "frontend-design@claude-plugins-official"],
             "instructions": "Follow these exact instructions.\n", "note": ""
         }
     }))?;
@@ -167,6 +168,11 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
     assert_eq!(settings["permissions"]["allow"], json!(["Read", "Edit"]));
     assert_eq!(settings["permissions"]["deny"], json!(["Bash(rm *)"]));
     assert_eq!(settings["permissions"]["defaultMode"], "plan");
+    assert_eq!(
+        settings["enabledPlugins"],
+        json!({"argus@ablative": true, "frontend-design@claude-plugins-official": true}),
+        "the reviewed plugins, and only those, are turned on"
+    );
     let mcp: serde_json::Value = serde_json::from_str(&file("mcp.json")?.text)?;
     assert_eq!(
         mcp["mcpServers"]["declared-server"]["env"]["TOKEN"],

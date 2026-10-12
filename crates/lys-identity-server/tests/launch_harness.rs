@@ -92,3 +92,59 @@ async fn a_start_from_a_profile_with_no_declared_harness_is_refused_by_name() ->
     );
     table.close()
 }
+
+#[tokio::test]
+async fn a_profile_records_its_plugins_and_refuses_a_malformed_or_unrendered_one() -> TestResult {
+    let table = Table::unprofiled().await?;
+    let path = format!("/agents/{}/provisioning", table.agent());
+    let body = |from: u32, plugins: Value, harness: &Value| -> Result<Value, Box<dyn Error>> {
+        let mut body = json!({
+            "operation": operation()?, "from_version": from, "working_folder": "/tmp",
+            "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
+            "mcp_servers": [], "instructions": "", "note": "", "plugins": plugins,
+        });
+        if !harness.is_null() {
+            body["harness"] = harness.clone();
+            body["permissions"] = json!({"default_mode": "plan"});
+        }
+        Ok(body)
+    };
+    let named = json!(["argus@ablative", "argus@ablative", "frontend-design@claude-plugins-official"]);
+    let (status, set) = table
+        .service
+        .post(&path, Some(&table.ada), &body(0, named, &table.harness())?)
+        .await?;
+    assert_eq!(status, 200, "{set}");
+    assert_eq!(
+        set["profile"]["plugins"],
+        json!(["argus@ablative", "frontend-design@claude-plugins-official"]),
+        "a repeated plugin is kept once, in the order given"
+    );
+    let (status, read) = table.service.get(&path, Some(&table.ada)).await?;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(read["profile"]["plugins"], set["profile"]["plugins"]);
+    for malformed in ["argus", "@ablative", "argus@", "argus@ablative@more", "ar gus@ablative"] {
+        let (status, refused) = table
+            .service
+            .post(&path, Some(&table.ada), &body(1, json!([malformed]), &table.harness())?)
+            .await?;
+        assert_eq!(
+            (status, &refused["refusal"]),
+            (400, &json!("RequestMalformed")),
+            "{malformed}: {refused}"
+        );
+    }
+    let (status, refused) = table
+        .service
+        .post(&path, Some(&table.ada), &body(1, json!(["argus@ablative"]), &Value::Null)?)
+        .await?;
+    assert_eq!(
+        (status, &refused["refusal"]),
+        (400, &json!("RequestMalformed")),
+        "plugins with no Claude Code harness are refused: {refused}"
+    );
+    let (status, unchanged) = table.service.get(&path, Some(&table.ada)).await?;
+    assert_eq!(status, 200, "{unchanged}");
+    assert_eq!(unchanged["profile"]["version"], 1, "a refused change records nothing");
+    table.close()
+}

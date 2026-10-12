@@ -188,3 +188,38 @@ fn a_permissions_slot_is_written_beside_env_and_a_member_off_its_shape_is_refuse
         assert!(err.to_string().contains(member), "{err}");
     }
 }
+
+/// The profile's reviewed plugins reach the settings file as
+/// `enabledPlugins`, each turned on, and nothing else of the person's own
+/// setup comes with them; a name that is not `name@marketplace` is refused.
+#[test]
+fn plugins_are_turned_on_in_the_settings_file_and_a_malformed_name_is_refused() {
+    let mut value = fixture_value();
+    value["slots"]["plugins"] = json!(["argus@ablative", "frontend-design@claude-plugins-official"]);
+    let template = parse_value(&value).unwrap();
+    assert_eq!(
+        template.plugins,
+        ["argus@ablative", "frontend-design@claude-plugins-official"]
+    );
+    let settings: Value = serde_json::from_slice(
+        &crate::harness::claude_code::launch_env::env_settings(&template).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        settings["enabledPlugins"],
+        json!({"argus@ablative": true, "frontend-design@claude-plugins-official": true})
+    );
+
+    let without = parse_value(&fixture_value()).unwrap();
+    let settings: Value = serde_json::from_slice(
+        &crate::harness::claude_code::launch_env::env_settings(&without).unwrap(),
+    )
+    .unwrap();
+    assert!(settings.get("enabledPlugins").is_none(), "{settings}");
+
+    for malformed in ["argus", "@ablative", "argus@", "a b@c", "argus@ablative@x"] {
+        value["slots"]["plugins"] = json!([malformed]);
+        let refused = parse_value(&value).unwrap_err().to_string();
+        assert!(refused.contains("slots.plugins"), "{malformed}: {refused}");
+    }
+}

@@ -168,6 +168,13 @@ pub(crate) fn render(
     granted: &Value,
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
+    if !fields.plugins.is_empty() {
+        return Err(refused(
+            fields,
+            "plugins",
+            "Codex takes no Claude Code plugins; remove them from this profile",
+        ));
+    }
     let permissions: Permissions = serde_json::from_value(granted.clone()).map_err(|error| {
         refused(
             fields,

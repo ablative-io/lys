@@ -58,6 +58,19 @@ export function ToolsNamed({ value, change }: { value: string[]; change: (next: 
   </section>;
 }
 
+/** The Claude Code plugins the settings turn on, each as name@marketplace. Shown only when there are any; this screen adds none. */
+export function PluginsNamed({ value, change }: { value: string[]; change: (next: string[]) => void }) {
+  if (value.length === 0) return null;
+  return <section className="given-plugins wide" aria-label="Plugins named in these settings">
+    <table className="usage-table">
+      <thead><tr><th>Plugins named in these settings</th><th>Change</th></tr></thead>
+      <tbody>{value.map((name) => <tr key={name} className="rule-row"><td><code>{name}</code></td>
+        <td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td></tr>)}</tbody>
+    </table>
+    <p className="dim">Each is turned on in the settings Lys writes for this agent’s runs. A plugin must already be installed for the program to load it.</p>
+  </section>;
+}
+
 /** What the settings do to the program's own prompt, in one sentence. */
 export function promptWords(mode: string, words: string): string {
   const typed = words.trim().length > 0;

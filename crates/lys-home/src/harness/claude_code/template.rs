@@ -3,7 +3,7 @@
 //! Claude Code session. Its schema is `docs/design/home/launch-template.schema.json`
 //! and this parser accepts exactly that shape: `harness`, `flags` and the
 //! five `slots` (`transcript`, `mcp`, `env`, `secrets`, `instructions`),
-//! with `skills` and `permissions` when it carries them.
+//! with `skills`, `permissions` and `plugins` when it carries them.
 //!
 //! Nothing in a template is interpreted, expanded or executed here. A slot
 //! outside the five is refused by name, a missing slot is refused by name, a
@@ -26,7 +26,7 @@ pub const FILL_RESUME_BY_PATH: &str = "resume-by-path";
 /// The five slots, in the schema's order.
 pub const SLOTS: [&str; 5] = ["transcript", "mcp", "env", "secrets", "instructions"];
 /// The slots a template may carry beyond those it must.
-pub const OPTIONAL_SLOTS: [&str; 2] = ["skills", "permissions"];
+pub const OPTIONAL_SLOTS: [&str; 3] = ["skills", "permissions", "plugins"];
 /// The three members of a template.
 pub const MEMBERS: [&str; 3] = ["harness", "flags", "slots"];
 
@@ -60,6 +60,23 @@ pub struct Template {
     pub skills: Vec<SkillFile>,
     /// The permissions the settings file carries, when the template sets them.
     pub permissions: Option<Map<String, Value>>,
+    /// The plugins the settings file turns on, each `name@marketplace`.
+    pub plugins: Vec<String>,
+}
+
+/// Whether `name` is one plugin as Claude Code's `enabledPlugins` names it:
+/// `name@marketplace`, each part letters, digits, `-`, `_` or `.`, and
+/// neither empty.
+#[must_use]
+pub fn plugin_named(name: &str) -> bool {
+    let part = |text: &str| {
+        !text.is_empty()
+            && text
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+    };
+    name.split_once('@')
+        .is_some_and(|(plugin, marketplace)| part(plugin) && part(marketplace))
 }
 
 /// Read a template file and parse it, returning the template and the bytes
@@ -135,6 +152,16 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         }
     };
     let permissions = slots.get("permissions").map(permissions).transpose()?;
+    let plugins = match slots.get("plugins") {
+        None => Vec::new(),
+        Some(given) => {
+            let plugins = string_list("slots.plugins", given)?;
+            if plugins.iter().any(|name| !plugin_named(name)) {
+                return Err(shape("slots.plugins", "each plugin is name@marketplace"));
+            }
+            plugins
+        }
+    };
     let mut named: BTreeSet<&str> = env.keys().map(String::as_str).collect();
     for secret in use_only.iter().chain(readable.iter()) {
         if !named.insert(secret.env.as_str()) {
@@ -153,6 +180,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         instructions: instructions.clone(),
         skills,
         permissions,
+        plugins,
     })
 }
 

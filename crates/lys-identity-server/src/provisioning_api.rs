@@ -52,6 +52,8 @@ pub struct VersionView {
     pub skills: Vec<String>,
     /// The MCP servers it is given.
     pub mcp_servers: Vec<McpServer>,
+    /// The harness plugins its settings turn on, each `name@marketplace`.
+    pub plugins: Vec<String>,
     /// Its instructions.
     pub instructions: String,
     /// How instructions affect the program's prompt: keep, append or replace.
@@ -145,6 +147,9 @@ pub(crate) struct SetBody {
     tools: Vec<String>,
     skills: Vec<String>,
     mcp_servers: Vec<crate::mcp_record::McpServerBody>,
+    /// Harness plugins its settings turn on, each `name@marketplace`.
+    #[serde(default)]
+    plugins: Vec<String>,
     instructions: String,
     #[serde(default)]
     #[schema(schema_with = instructions_mode_schema)]
@@ -206,6 +211,31 @@ fn names(name: &str, given: &[String]) -> Result<Vec<String>, ServerError> {
     Ok(kept)
 }
 
+/// `given` without repeats, each `name@marketplace`, for a harness whose
+/// launch writes them into its settings file; Codex has no such file.
+fn plugins(given: &[String], harness: Option<&DeclaredHarness>) -> Result<Vec<String>, ServerError> {
+    let mut kept: Vec<String> = Vec::new();
+    for one in given {
+        if !lys_home::harness::claude_code::template::plugin_named(one) {
+            return Err(malformed(format!(
+                "plugins: `{one}` is not name@marketplace"
+            )));
+        }
+        if !kept.contains(one) {
+            kept.push(one.clone());
+        }
+    }
+    let renders = harness.is_some_and(|declared| {
+        declared.description.rendering_contract == "claude-code/template-v1"
+    });
+    if !kept.is_empty() && !renders {
+        return Err(malformed(
+            "plugins require a declared Claude Code harness, whose settings file turns them on",
+        ));
+    }
+    Ok(kept)
+}
+
 fn settings(body: SetBody) -> Result<Settings, ServerError> {
     let declared = body.harness.map(harness).transpose()?;
     let permissions = body
@@ -222,6 +252,7 @@ fn settings(body: SetBody) -> Result<Settings, ServerError> {
         tools: names("tools", &body.tools)?,
         skills: names("skills", &body.skills)?,
         mcp_servers: crate::mcp_record::servers(body.mcp_servers)?,
+        plugins: plugins(&body.plugins, declared.as_ref())?,
         instructions: body.instructions.trim().to_owned(),
         instructions_mode: body.instructions_mode,
         note: body.note.trim().to_owned(),
@@ -371,6 +402,7 @@ fn view(
             tools: version.settings.tools.clone(),
             skills: version.settings.skills.clone(),
             mcp_servers: version.settings.mcp_servers.clone(),
+            plugins: version.settings.plugins.clone(),
             instructions: version.settings.instructions.clone(),
             instructions_mode: version.settings.instructions_mode,
             session: version.settings.session.clone(),

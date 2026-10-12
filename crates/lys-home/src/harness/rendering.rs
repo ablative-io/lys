@@ -279,6 +279,9 @@ fn native_template(
     if !skills.is_empty() {
         body["slots"]["skills"] = json!(skills);
     }
+    if !fields.plugins.is_empty() {
+        body["slots"]["plugins"] = json!(fields.plugins);
+    }
     let native = super::rendering_permissions::render(permissions)
         .map_err(|error| refused(fields, "permissions", &error))?;
     let empty = native.as_object().is_some_and(|members| {

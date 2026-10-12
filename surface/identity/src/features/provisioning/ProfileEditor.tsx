@@ -9,7 +9,7 @@ import type { Permissions as PermissionsValue } from './Provisioning';
 import { usable } from '../network/allowed';
 import { SaveSettings } from './SaveSettings';
 import { McpServers } from './McpServers';
-import { Skills, ToolsNamed, promptWords } from './Given';
+import { Skills, ToolsNamed, PluginsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 
 export function ProfileEditor({ id, profile, choices, people, readOnly = false, saved }: {
@@ -57,6 +57,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   // What else the agent is given: the tools its settings name, the skills Lys keeps for it, and its connected tools.
   const [tools, setTools] = useState(profile?.tools ?? []);
   const [skills, setSkills] = useState(profile?.skills ?? []);
+  const [plugins, setPlugins] = useState(profile?.plugins ?? []);
   const [servers, setServers] = useState(profile?.mcp_servers ?? []);
   const [requiresControls, setRequiresControls] = useState(profile?.session?.requires_controls ?? false);
   const builds = program?.builds ?? [];
@@ -80,7 +81,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (folderFirst && !folder) refusal = 'Choose the folder this agent works in.';
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
-    tools, skills, mcp_servers: servers,
+    tools, skills, plugins, mcp_servers: servers,
     instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Settings saved from the settings form',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
@@ -121,6 +122,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <div className="wide"><ModeWords program={program} mode={mode} sentencesOnly /></div>
     <label className="field"><span>Require automatic context and reminder controls</span><input type="checkbox" name="requires_controls" checked={requiresControls} disabled={!canChoose} onChange={(event) => setRequiresControls(event.target.checked)} /><span className="hint">Starts are refused until this program’s managed adapter is qualified.</span></label>
     <ToolsNamed value={tools} change={setTools} />
+    <PluginsNamed value={plugins} change={setPlugins} />
     <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
     <Skills program={program?.name ?? ''} kept={choices.skills} value={skills} change={setSkills} />
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>

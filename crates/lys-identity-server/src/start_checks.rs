@@ -194,6 +194,7 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         models: settings.model_access.clone(),
         mcp_servers,
         skills: skills(settings)?,
+        plugins: settings.plugins.clone(),
         model_proxy,
         run,
     })

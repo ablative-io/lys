@@ -96,6 +96,17 @@ pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
             workspace_settings(&mut value)?;
         }
     }
+    if !template.plugins.is_empty() {
+        // The profile's reviewed plugins, and only those: the person's own
+        // `enabledPlugins` stays out with the rest of their setup (Tom,
+        // 3 October 2026 20:47; Waffles, 12 October 2026).
+        value["enabledPlugins"] = template
+            .plugins
+            .iter()
+            .map(|name| (name.clone(), serde_json::Value::Bool(true)))
+            .collect::<serde_json::Map<_, _>>()
+            .into();
+    }
     let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
         context: "the environment file could not be serialised",
         source,

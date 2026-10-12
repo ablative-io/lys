@@ -22,7 +22,7 @@ export async function saveFolder(agent: string, folder: string, operation: strin
   const profile = held.profile;
   if (held.agent !== agent || !profile) throw new Refused(200, { refusal: 'ProfileMissing', reason: 'This agent has no saved settings yet. Save its settings, then choose its folder.' });
   const saved = await request<ProvisioningAnswer>(path, {
-    operation, from_version: profile.version, model_access: profile.model_access, tools: profile.tools, skills: profile.skills, mcp_servers: profile.mcp_servers,
+    operation, from_version: profile.version, model_access: profile.model_access, tools: profile.tools, skills: profile.skills, plugins: profile.plugins ?? [], mcp_servers: profile.mcp_servers,
     instructions: profile.instructions, note: 'Choose the folder this agent works in', working_folder: folder,
     ...(profile.instructions_mode ? { instructions_mode: profile.instructions_mode } : {}), ...(profile.harness ? { harness: profile.harness } : {}),
     // Permissions are sent whole, exactly as read: every rule list, the mode and the extra folders.

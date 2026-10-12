@@ -555,6 +555,7 @@ pub fn map_profile(
         tools: Vec::new(),
         skills: Vec::new(),
         mcp_servers: parts.mcp_servers,
+        plugins: Vec::new(),
         instructions: parts.instructions.unwrap_or_default(),
         instructions_mode: InstructionsMode::Append,
         note: format!("imported from seat {seat}'s {harness_name} resource files"),
