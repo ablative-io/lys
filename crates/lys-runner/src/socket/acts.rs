@@ -73,19 +73,23 @@ pub(super) fn perform(
             mut launch,
             lys_mcp,
             proxy,
+            tracking,
         } => {
             if let Some(entry) = lys_mcp {
                 crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
             }
             let session = launch.session.clone();
+            let tracking = tracking
+                .map(|spec| crate::tracking::Tracking::from_spec(&spec, &mut launch))
+                .transpose()?;
             let policy = launch
                 .policy
                 .clone()
                 .map(|admitted| Admitted::verified(*admitted))
                 .transpose()?;
             let (pid, started_at) = match proxy {
-                Some(proxy) => sessions.begin_proxied(*launch, policy, proxy)?,
-                None => sessions.begin(*launch, policy, None)?,
+                Some(proxy) => sessions.begin_proxied(*launch, policy, tracking, proxy)?,
+                None => sessions.begin(*launch, policy, tracking)?,
             };
             Ok(Answer::Started {
                 session,
@@ -296,19 +300,25 @@ fn as_caller(
             mut launch,
             lys_mcp,
             proxy,
+            tracking,
         } => {
             if let Some(entry) = lys_mcp {
                 crate::launch_config::add_lys_mcp(&mut launch, &entry)?;
             }
             let session = launch.session.clone();
+            let tracking = tracking
+                .map(|spec| crate::tracking::Tracking::from_spec(&spec, &mut launch))
+                .transpose()?;
             let policy = launch
                 .policy
                 .clone()
                 .map(|admitted| Admitted::verified(*admitted))
                 .transpose()?;
             let (pid, started_at) = match proxy {
-                Some(proxy) => sessions.begin_proxied_for(*launch, policy, proxy, caller)?,
-                None => sessions.begin_for(*launch, policy, None, caller)?,
+                Some(proxy) => {
+                    sessions.begin_proxied_for(*launch, policy, tracking, proxy, caller)?
+                }
+                None => sessions.begin_for(*launch, policy, tracking, caller)?,
             };
             Ok(Answer::Started {
                 session,

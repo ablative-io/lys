@@ -102,6 +102,7 @@ fn shell(session: &str, script: &str) -> Launch {
 
 fn started(client: &Client, launch: Launch) -> TestResult {
     match client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch),
@@ -381,6 +382,7 @@ fn refusal(answer: &Answer) -> &str {
 fn a_request_the_server_did_not_sign_is_refused_by_name() -> TestResult {
     let mut held = Held::start(1 << 16)?;
     let act = serde_json::to_string(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(shell("forged", "exec cat")),

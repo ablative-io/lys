@@ -86,7 +86,7 @@ pub struct Launch {
 }
 
 mod acts;
-pub use acts::{Act, Answer};
+pub use acts::{Act, Answer, TrackingSpec};
 
 /// How a session ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

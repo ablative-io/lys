@@ -19,6 +19,7 @@ pub(super) fn select_transport(act: Act) -> Act {
         launch,
         lys_mcp,
         proxy,
+        ..
     } = act
     else {
         return act;
@@ -28,10 +29,28 @@ pub(super) fn select_transport(act: Act) -> Act {
         .as_ref()
         .is_some_and(|config| config.requires_controls);
     if !requires_controls {
+        let tracking = launch
+            .config
+            .as_ref()
+            .and_then(|config| config.harness)
+            .map(|harness| {
+                let variable = match harness {
+                    lys_runner::tracking::Harness::ClaudeCode => "CLAUDE_CONFIG_DIR",
+                    lys_runner::tracking::Harness::Codex => "CODEX_HOME",
+                };
+                lys_runner::protocol::TrackingSpec {
+                    harness,
+                    config_home: launch
+                        .environment
+                        .get(variable)
+                        .map(std::path::PathBuf::from),
+                }
+            });
         return Act::Start {
             launch,
             lys_mcp,
             proxy,
+            tracking,
         };
     }
     let transport = match launch.config.as_ref().and_then(|config| config.harness) {
@@ -92,6 +111,40 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn controls_pty_tracking_uses_the_rendered_harness_and_config_home()
+    -> Result<(), Box<dyn std::error::Error>> {
+        for (harness, environment, expected) in [
+            (
+                json!("codex"),
+                json!({"CODEX_HOME":"/codex-home", "CLAUDE_CONFIG_DIR":"/other"}),
+                json!({"harness":"codex", "config_home":"/codex-home"}),
+            ),
+            (
+                json!("claude_code"),
+                json!({}),
+                json!({"harness":"claude_code", "config_home":null}),
+            ),
+            (
+                serde_json::Value::Null,
+                json!({"CODEX_HOME":"/other"}),
+                serde_json::Value::Null,
+            ),
+        ] {
+            let act: Act = serde_json::from_value(json!({
+                "act":"start", "launch":{
+                    "session":"selected", "program":"/harness", "arguments":[], "directory":"/",
+                    "environment":environment, "columns":80, "rows":24,
+                    "config":{"files":[], "argument_files":{}, "environment_paths":{},
+                        "working_directory":false, "harness":harness, "requires_controls":false}
+                }
+            }))?;
+            let selected = serde_json::to_value(select_transport(act))?;
+            assert_eq!(selected["tracking"], expected, "{selected}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn only_the_exact_reviewed_config_selects_the_managed_transport()
     -> Result<(), Box<dyn std::error::Error>> {
         for required in [false, true] {
@@ -102,6 +155,7 @@ mod tests {
                     "harness":"claude_code","requires_controls":required}
             }))?;
             let selected = select_transport(Act::Start {
+                tracking: None,
                 launch: Box::new(launch),
                 lys_mcp: None,
                 proxy: None,
@@ -125,6 +179,7 @@ mod tests {
                     "harness":harness,"requires_controls":true}
             }))?;
             let act = Act::Start {
+                tracking: None,
                 launch: Box::new(launch),
                 lys_mcp: None,
                 proxy: None,

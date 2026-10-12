@@ -88,6 +88,7 @@ fn attach_read_on_a_pseudo_terminal_session_is_refused_by_name() -> TestResult {
     let client = Client::new(options.socket, key);
     let directory = dir.path().to_str().ok_or("the test folder is not UTF-8")?;
     match client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(Launch {

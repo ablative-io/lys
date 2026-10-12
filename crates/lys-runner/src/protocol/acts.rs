@@ -4,6 +4,17 @@ use super::{Ended, Key, Launch, LysMcp, Output, StatusView};
 use crate::error::RunnerError;
 use serde::{Deserialize, Serialize};
 
+/// Harness hook tracking supplied by a PTY start, without version evidence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TrackingSpec {
+    /// The harness the launch's rendering contract selected.
+    pub harness: crate::tracking::Harness,
+    /// Its explicit configuration home, when the launch declared one.
+    #[serde(default)]
+    pub config_home: Option<std::path::PathBuf>,
+}
+
 /// One act a request asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "act", rename_all = "snake_case", deny_unknown_fields)]
@@ -39,6 +50,9 @@ pub enum Act {
     Start {
         /// What it is started with.
         launch: Box<Launch>,
+        /// The harness's hooks and configuration, omitted by older clients.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tracking: Option<TrackingSpec>,
         /// Run-only MCP credentials, omitted by older servers.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         lys_mcp: Option<LysMcp>,

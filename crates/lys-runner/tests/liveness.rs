@@ -68,6 +68,7 @@ fn shell(session: &str, directory: &str) -> Launch {
 
 fn started(client: &Client, launch: Launch) -> Result<u32, Box<dyn Error>> {
     match client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch),

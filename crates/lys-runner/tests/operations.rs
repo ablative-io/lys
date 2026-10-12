@@ -87,6 +87,7 @@ fn cat(client: &Client, session: &str) -> TestResult {
         policy: None,
     };
     match client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch),

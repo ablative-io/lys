@@ -61,6 +61,7 @@ fn signed_config_is_written_under_the_session_and_read_by_its_process() -> TestR
     .spawn();
     let client = Client::new(socket, key);
     let Answer::Started { .. } = client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch()),
@@ -202,6 +203,7 @@ fn the_signature_covers_config_files_and_bindings() -> TestResult {
     let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
     let greeting = Greeting::fresh("11");
     let act = Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch()),
@@ -238,6 +240,7 @@ fn a_signed_start_that_binds_arguments_to_files_reads_back_unchanged() -> TestRe
         (10, "settings.json".to_owned()),
     ]);
     let act = Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(bound),
@@ -297,6 +300,7 @@ fn a_start_request_keeps_the_existing_wire_bytes() -> TestResult {
         serde_json::to_string(&launch)?
     );
     let act = Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(launch),
@@ -374,6 +378,7 @@ fn signed_run_pass_reaches_only_the_generated_config_for_both_harnesses() -> Tes
         let key = Ed25519Identity::load_or_generate(&dir.path().join("server.key"))?;
         let greeting = Greeting::fresh("77");
         let act = Act::Start {
+            tracking: None,
             launch: Box::new(mcp_launch(codex)),
             proxy: None,
             lys_mcp: Some(lys_runner::protocol::LysMcp {
@@ -432,6 +437,7 @@ fn a_codex_launch_with_no_files_starts_with_its_pass_in_the_environment() -> Tes
         "printf 'pass:%s\\n' \"$LYS_AGENT_PASS\"; exec cat".to_owned(),
     ];
     let act = Act::Start {
+        tracking: None,
         launch: Box::new(launch),
         proxy: None,
         lys_mcp: Some(lys_runner::protocol::LysMcp {
@@ -484,6 +490,7 @@ fn a_launch_naming_a_relative_directory_is_refused() -> TestResult {
     launch.directory = "relative/folder".to_owned();
     launch.config.as_mut().ok_or("no config")?.working_directory = false;
     let act = Act::Start {
+        tracking: None,
         launch: Box::new(launch),
         lys_mcp: None,
         proxy: None,
@@ -510,6 +517,7 @@ fn an_invalid_signed_original_config_is_refused_before_pass_insertion() -> TestR
     let mut launch = mcp_launch(false);
     launch.config.as_mut().ok_or("no config")?.files[0].sha256 = "wrong".to_owned();
     let act = Act::Start {
+        tracking: None,
         launch: Box::new(launch),
         proxy: None,
         lys_mcp: Some(lys_runner::protocol::LysMcp {
@@ -572,6 +580,7 @@ fn signed_start_without_pass_leaves_both_native_configs_unchanged() -> TestResul
         let launch = mcp_launch(codex);
         let file = launch.config.as_ref().ok_or("no config")?.files[0].clone();
         let act = Act::Start {
+            tracking: None,
             launch: Box::new(launch),
             lys_mcp: None,
             proxy: None,
@@ -638,6 +647,7 @@ fn a_run_outside_the_proxy_is_handed_the_status_lines_program_and_socket() -> Te
             .to_owned(),
     ];
     let Answer::Started { .. } = client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(asked),

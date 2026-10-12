@@ -84,7 +84,7 @@ impl Sessions {
     /// Refuses unsupported transport, invalid conversation or launch/record failures.
     pub fn start_managed(
         self: &Arc<Self>,
-        managed: crate::harness_control::ManagedLaunch,
+        mut managed: crate::harness_control::ManagedLaunch,
         proxy: Option<crate::tracking_proxy::ProxyTracking>,
         responsible: Option<String>,
     ) -> Result<(u32, u64), RunnerError> {
@@ -107,6 +107,22 @@ impl Sessions {
         if let Some(proxy) = &proxy {
             proxy.checked()?;
         }
+        let harness = managed
+            .launch
+            .config
+            .as_ref()
+            .and_then(|config| config.harness);
+        let tracking = harness
+            .map(|harness| {
+                Tracking::from_spec(
+                    &crate::protocol::TrackingSpec {
+                        harness,
+                        config_home: None,
+                    },
+                    &mut managed.launch,
+                )
+            })
+            .transpose()?;
         let settings = if managed.transport == Transport::Pty {
             None
         } else {
@@ -132,6 +148,13 @@ impl Sessions {
                 resume: managed.resume,
             })
         };
-        self.begin_transport(managed.launch, policy, None, proxy, responsible, settings)
+        self.begin_transport(
+            managed.launch,
+            policy,
+            tracking,
+            proxy,
+            responsible,
+            settings,
+        )
     }
 }

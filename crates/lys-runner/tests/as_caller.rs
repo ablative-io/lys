@@ -66,6 +66,7 @@ fn a_session_started_for_a_person_takes_input_only_for_a_verified_caller() -> Te
     let started = ask(&for_caller(
         "person.owner",
         Act::Start {
+            tracking: None,
             launch: Box::new(launch()),
             lys_mcp: None,
             proxy: None,

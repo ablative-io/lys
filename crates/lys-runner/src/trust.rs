@@ -28,26 +28,49 @@ use crate::error::RunnerError;
 /// `CLAUDE_CONFIG_DIR` when set there, else the runner's own `HOME`, which
 /// the harness inherits. Either must be absolute; neither is invented.
 pub fn config_home(environment: &BTreeMap<String, String>) -> Result<PathBuf, RunnerError> {
+    Ok(resolve_config_home("CLAUDE_CONFIG_DIR", None, environment)?.path)
+}
+
+pub(crate) const CONFIG_HOME_SOURCE: &str = "LYS_CONFIG_HOME_SOURCE";
+
+pub(crate) struct ConfigHome {
+    pub(crate) path: PathBuf,
+    pub(crate) source: &'static str,
+}
+
+/// Select an explicit spec before launch configuration and the runner's home.
+pub(crate) fn resolve_config_home(
+    variable: &str,
+    spec: Option<&Path>,
+    environment: &BTreeMap<String, String>,
+) -> Result<ConfigHome, RunnerError> {
     let unknown = |words: String| RunnerError::refused("trust_home_unknown", words);
-    let (name, home) = match environment.get("CLAUDE_CONFIG_DIR") {
-        Some(dir) => ("CLAUDE_CONFIG_DIR", PathBuf::from(dir)),
-        None => (
+    let (name, home, source) = match (spec, environment.get(variable)) {
+        (Some(path), _) => ("tracking.config_home", path.to_owned(), "spec"),
+        (None, Some(dir)) => (variable, PathBuf::from(dir), "environment"),
+        (None, None) => (
             "HOME",
             std::env::var_os("HOME").map(PathBuf::from).ok_or_else(|| {
-                unknown(
-                    "the launch sets no CLAUDE_CONFIG_DIR and the runner has no HOME to find the harness's configuration in"
-                        .to_owned(),
-                )
+                unknown(format!(
+                    "the spec names no configuration home, the launch sets no {variable} and the runner has no HOME"
+                ))
             })?,
+            "home",
         ),
     };
-    if !home.is_absolute() {
+    if !home.is_absolute()
+        || home
+            .as_os_str()
+            .as_encoded_bytes()
+            .iter()
+            .any(u8::is_ascii_control)
+    {
         return Err(unknown(format!(
             "{name} is {}, not an absolute path",
             home.display()
         )));
     }
-    Ok(home)
+    Ok(ConfigHome { path: home, source })
 }
 
 /// The harness's per-project configuration file, under its configuration

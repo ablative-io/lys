@@ -24,6 +24,7 @@ pub(crate) fn act(
     let proxy = proxied(&launch)?;
     if launch.config.is_none() {
         return Ok(Act::Start {
+            tracking: None,
             proxy,
             launch: Box::new(launch),
             lys_mcp: None,
@@ -41,6 +42,7 @@ pub(crate) fn act(
         });
     };
     Ok(Act::Start {
+        tracking: None,
         proxy,
         launch: Box::new(launch),
         lys_mcp: Some(lys_runner::protocol::LysMcp {

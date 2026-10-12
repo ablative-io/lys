@@ -27,57 +27,63 @@ pub(crate) fn bound_directory(directory: &str) -> String {
     )
 }
 
-/// The executable `launch` runs, found as its environment's `PATH` finds
-/// it, and the version it reports, refused `tracking_contract_unsupported`
-/// unless it is the version `tracking` declares.
+/// The executable the launch names, without replacing a missing input.
+fn executable(launch: &Launch) -> Result<String, RunnerError> {
+    let unsupported = |words: String| RunnerError::refused("tracking_contract_unsupported", words);
+    let program = Path::new(&launch.program);
+    let found = if launch.program.contains('/') {
+        program.to_owned()
+    } else {
+        let path = launch
+            .environment
+            .get("PATH")
+            .map(std::ffi::OsString::from)
+            .or_else(|| std::env::var_os("PATH"))
+            .ok_or_else(|| unsupported("the launch and runner name no PATH".to_owned()))?;
+        std::env::split_paths(&path)
+            .map(|dir| dir.join(program))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| unsupported(format!("{} is not found in PATH", launch.program)))?
+    };
+    let canonical = std::fs::canonicalize(&found)
+        .map_err(|error| unsupported(format!("{} does not resolve: {error}", found.display())))?;
+    canonical
+        .to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| unsupported("the executable's resolved path is not UTF-8".to_owned()))
+}
+
+/// Find the executable, measuring its version only when tracking declares one.
 pub(crate) fn launched(
     launch: &Launch,
     tracking: &Tracking,
 ) -> Result<(String, String), RunnerError> {
     let unsupported = |words: String| RunnerError::refused("tracking_contract_unsupported", words);
-    let program = Path::new(&launch.program);
-    let found = if launch.program.contains('/') {
-        Some(program.to_owned())
-    } else {
-        let path = launch
-            .environment
-            .get("PATH")
-            .cloned()
-            .or_else(|| std::env::var("PATH").ok())
-            .unwrap_or_default();
-        std::env::split_paths(&path)
-            .map(|dir| dir.join(program))
-            .find(|candidate| candidate.is_file())
-    };
-    let executable = found
-        .and_then(|found| std::fs::canonicalize(found).ok())
-        .ok_or_else(|| {
-            unsupported(format!(
-                "{} is not found to ask its version",
-                launch.program
-            ))
-        })?;
+    let executable = executable(launch)?;
+    if tracking.version.is_empty() {
+        return Ok((executable, String::new()));
+    }
     let output = std::process::Command::new(&executable)
         .arg("--version")
         .output()
-        .map_err(|error| {
-            unsupported(format!(
-                "{} did not say its version: {error}",
-                executable.display()
-            ))
-        })?;
+        .map_err(|error| unsupported(format!("{executable} did not say its version: {error}")))?;
+    if !output.status.success() {
+        return Err(unsupported(format!(
+            "{executable} --version exited {}",
+            output.status
+        )));
+    }
     let said = String::from_utf8_lossy(&output.stdout);
-    let version = version_in(&said)
-        .ok_or_else(|| unsupported(format!("{} names no version", executable.display())))?;
+    let version =
+        version_in(&said).ok_or_else(|| unsupported(format!("{executable} names no version")))?;
     crate::tracking::measured(&tracking.adapter, &version)?;
     if version != tracking.version {
         return Err(unsupported(format!(
-            "{} is version {version}, and the profile declares {}",
-            executable.display(),
+            "{executable} is version {version}, and the profile declares {}",
             tracking.version
         )));
     }
-    Ok((executable.display().to_string(), version))
+    Ok((executable, version))
 }
 
 /// Say, in the feed, the executable and version launched for session `id`.
@@ -92,14 +98,41 @@ pub(crate) fn tracking_started(
         .get(id)
         .and_then(|session| session.guard.tracking.as_ref());
     let adapter = tracking.map(|tracking| tracking.adapter.clone());
+    let words = if version.is_empty() {
+        let tracking = tracking.ok_or_else(|| {
+            RunnerError::refused(
+                "tracking_start_missing",
+                "an unmeasured start has no held harness tracking",
+            )
+        })?;
+        let source = table
+            .sessions
+            .get(id)
+            .and_then(|session| session.launch.as_ref())
+            .and_then(|launch| launch.environment.get(crate::trust::CONFIG_HOME_SOURCE))
+            .map_or("spec", String::as_str);
+        serde_json::to_string(&serde_json::json!({
+            "executable": executable,
+            "harness": tracking.harness,
+            "harness_version": null,
+            "adapter": tracking.adapter,
+            "context_window": null,
+            "config_home": tracking.config_home,
+            "config_home_source": source,
+            "reason": "hook tracking has no measured version or declared window"
+        }))
+        .map_err(|error| RunnerError::refused("tracking_start_unrecordable", error.to_string()))?
+    } else {
+        format!("launched {executable}, which says it is version {version}")
+    };
     let coverage = Coverage {
         state: "tracking_started".to_owned(),
         source: None,
         generation: 0,
         offset: None,
-        words: format!("launched {executable}, which says it is version {version}"),
+        words,
         executable: Some(executable.to_owned()),
-        harness_version: Some(version.to_owned()),
+        harness_version: (!version.is_empty()).then(|| version.to_owned()),
         adapter,
     };
     append(table, id, vec![Body::Coverage(coverage)], None)

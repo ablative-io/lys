@@ -143,10 +143,11 @@ impl Sessions {
         self: &Arc<Self>,
         launch: Launch,
         policy: Option<Policy>,
+        tracking: Option<Tracking>,
         proxy: crate::tracking_proxy::ProxyTracking,
     ) -> Result<(u32, u64), RunnerError> {
         proxy.checked()?;
-        self.begin_owned(launch, policy, None, Some(proxy), None)
+        self.begin_owned(launch, policy, tracking, Some(proxy), None)
     }
 
     /// Say where the proxy on this machine keeps its state: the directory
@@ -226,6 +227,7 @@ impl Sessions {
         self: &Arc<Self>,
         launch: Launch,
         policy: Option<Policy>,
+        tracking: Option<Tracking>,
         proxy: crate::tracking_proxy::ProxyTracking,
         responsible: &str,
     ) -> Result<(u32, u64), RunnerError> {
@@ -243,7 +245,7 @@ impl Sessions {
         self.begin_owned(
             launch,
             policy,
-            None,
+            tracking,
             Some(proxy),
             Some(responsible.to_owned()),
         )

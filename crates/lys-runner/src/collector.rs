@@ -23,6 +23,10 @@ mod stop;
 mod tracking_tests;
 
 #[cfg(test)]
+#[path = "../tests/collector_wire.rs"]
+mod wire_tests;
+
+#[cfg(test)]
 #[path = "../tests/collector_binding/cases.rs"]
 mod binding_tests;
 

@@ -77,6 +77,7 @@ fn a_settling_ask_leaves_a_session_still_exiting_and_a_second_person_s_ask_ends_
     let serving = runner.spawn();
     let client = Client::new(socket.clone(), Arc::clone(&key));
     let started = client.ask(&Act::Start {
+        tracking: None,
         lys_mcp: None,
         proxy: None,
         launch: Box::new(Launch {
