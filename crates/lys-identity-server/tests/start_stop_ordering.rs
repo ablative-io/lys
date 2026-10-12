@@ -33,7 +33,7 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
                 "model_access": ["claude-fable-5-1"], "tools": [], "skills": [], "mcp_servers": [],
                 "instructions": "", "note": "", "harness": table.harness(),
                 "permissions": {"default_mode": "plan"}, "working_folder": table.dir.path(),
-                "session": {"config_dir": table.dir.path().join("config-home")}
+                "session": {"stall_after":300,"config_dir": table.dir.path().join("config-home")}
             }),
         )
         .await?;

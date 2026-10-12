@@ -216,7 +216,7 @@ fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result
                 "model_access":["fixture-model"],"tools":[],"skills":[],"mcp_servers":[],
                 "instructions":"","note":"","harness":harness_description::declared(),
                 "permissions":{"default_mode":"plan"},
-                "session":{"message_prefix":"","sensitive":false,"requires_controls":required}
+                "session":{"stall_after":300,"message_prefix":"","sensitive":false,"requires_controls":required}
             },"set_by":"person","set_at":1,
             "reviewed":{"operation":"review-original","by":"person","at":1}
         }))?;

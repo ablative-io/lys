@@ -3,8 +3,17 @@
 //! runs unchanged; its existing ready callback exits before recording Started.
 //! This example is never installed and refuses roots without the proof marker.
 
-#[path = "upgrade_window/commands.rs"]
-pub mod commands;
+#[path = "upgrade_window"]
+pub mod commands {
+    #[path = "../../src/commands/error.rs"]
+    pub mod error;
+    #[path = "../../src/commands/output.rs"]
+    pub mod output;
+    #[path = "../../src/commands/runner_join.rs"]
+    pub mod runner_join;
+    #[path = "../../src/commands/started.rs"]
+    pub mod started;
+}
 #[path = "../src/identity/mod.rs"]
 pub mod identity;
 

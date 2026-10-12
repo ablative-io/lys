@@ -15,6 +15,7 @@ fn version(handles: &[&str]) -> Result<Version, Box<dyn Error>> {
         "settings": {
             "model_access": [], "tools": [], "skills": [], "mcp_servers": [],
             "instructions": "", "note": "", "session": {
+                "stall_after":300,
                 "accounts": {
                     "accounts": handles, "variable": "LYS_HANDLE_ACCOUNT",
                     "limit": {"signal": "words", "words": ["usage limit"]}

@@ -49,7 +49,7 @@ async fn provisioning_session_launch_fields_round_trip_and_reopen() -> TestResul
     for harness in ["claude-code", "codex"] {
         let (service, cookie, path) = table().await?;
         let mut body = profile(harness)?;
-        body["session"] = json!({"resume": "019c6e27-e55b-73d1-87d8-4e01f1f75043",
+        body["session"] = json!({"stall_after":300,"resume": "019c6e27-e55b-73d1-87d8-4e01f1f75043",
             "context_window": 200_000, "config_dir": "/tmp/chosen-config", "sensitive": false});
         let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
         assert_eq!(status, 200, "{answer}");
@@ -76,7 +76,7 @@ async fn provisioning_session_values_are_refused_by_name() -> TestResult {
         ("config_dir", json!("relative/config")),
     ] {
         let mut body = profile("codex")?;
-        body["session"] = json!({field: value});
+        body["session"] = json!({"stall_after":300,field: value});
         let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
         assert_eq!(status, 400, "{answer}");
         assert!(
@@ -163,7 +163,7 @@ async fn provisioning_all_six_seat_fields_survive_review_and_get() -> TestResult
     body["hooks"] = json!({"Stop":[{"command":"seat-stop", "matcher":"*", "timeout":5}]});
     body["status_line"] = json!("seat-status");
     body["settings"] = json!({"theme":"dark", "nested":{"a":1}});
-    body["session"] = json!({"resume":"019c6e27-e55b-73d1-87d8-4e01f1f75043",
+    body["session"] = json!({"stall_after":300,"resume":"019c6e27-e55b-73d1-87d8-4e01f1f75043",
         "context_window":200_000, "config_dir":"/tmp/chosen-config", "sensitive":false});
     let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
     assert_eq!(status, 200, "{answer}");
@@ -323,7 +323,7 @@ fn provisioning_old_shape_stored_version_has_six_absent_profile_fields() -> Test
             "number":1, "operation":"old-operation", "set_by":"person", "set_at":1,
             "settings":{"model_access":[], "tools":[], "skills":[], "mcp_servers":[],
                 "instructions":"", "note":"",
-                "session":{"requires_controls":false, "compact":"/compact", "sensitive":false}}
+                "session":{"stall_after":300,"requires_controls":false, "compact":"/compact", "sensitive":false}}
         }]}]
     }"#;
     let dir = tempfile::tempdir()?;
@@ -382,7 +382,7 @@ async fn provisioning_profile_session_values_are_validated_and_conflicts_refused
     ] {
         let mut body = profile("codex")?;
         body[field] = profile_value;
-        body["session"] = json!({field:session_value});
+        body["session"] = json!({"stall_after":300,field:session_value});
         let (status, answer) = service.post(&path, Some(&cookie), &body).await?;
         assert_eq!(status, 400, "{answer}");
         assert!(

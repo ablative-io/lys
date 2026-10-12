@@ -87,18 +87,11 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Ent
 
 pub(crate) fn with_store<T>(
     state: &AppState,
-    act: impl FnOnce(&mut AlarmStore, u64) -> Result<T, AlarmError>,
+    act: impl FnOnce(&mut AlarmStore, ()) -> Result<T, AlarmError>,
 ) -> Result<T, AlarmError> {
     let guard = STORE.lock().map_err(unavailable)?;
-    let threshold = super::alarms::configuration::load(
-        &state
-            .estate_plan_file
-            .with_file_name("organisation")
-            .join("configuration.json"),
-        state.say.as_ref(),
-    )?;
     let mut store = AlarmStore::open(&state.estate_plan_file.with_file_name("alarms"))?;
-    let answer = act(&mut store, threshold);
+    let answer = act(&mut store, ());
     drop(guard);
     answer
 }
@@ -135,7 +128,7 @@ pub(crate) fn listed(
     uri: &Uri,
 ) -> Result<AlarmList, ApiError> {
     let visible = visible(state, headers, uri).map_err(response)?;
-    with_store(state, |store, _| {
+    with_store(state, |store, ()| {
         Ok(AlarmList {
             alarms: store
                 .list()
@@ -154,7 +147,7 @@ pub(crate) fn summary(
 ) -> Result<AlarmSummary, super::Refusal> {
     let uri = Uri::from_static("/alarms");
     let visible = visible(state, headers, &uri).map_err(super::Refusal::from)?;
-    with_store(state, |store, _| {
+    with_store(state, |store, ()| {
         let open: Vec<_> = store
             .list()
             .into_iter()
@@ -215,7 +208,7 @@ async fn acknowledge(
     })
     .map_err(response)?;
     let visible = visible(&state, &headers, &Uri::from_static("/alarms")).map_err(response)?;
-    let alarm = with_store(&state, |store, _| {
+    let alarm = with_store(&state, |store, ()| {
         if !visible.contains(&store.get(&id)?.agent) {
             return Err(AlarmError::Unknown);
         }
@@ -224,4 +217,77 @@ async fn acknowledge(
     .map_err(response)?;
     state.changes.signal().map_err(response)?;
     Ok(Json(alarm))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::alarms::{Observation, ProxyEvidence};
+    use super::super::alarms_state::Kind;
+    use super::with_store;
+    use crate::budgets_feed::entry_tests::fixture;
+    use std::collections::BTreeMap;
+
+    #[tokio::test]
+    async fn alarm_profile_store_ignores_missing_invalid_and_different_organisation_thresholds()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let table = fixture().await?;
+        let path = table
+            .state
+            .estate_plan_file
+            .with_file_name("organisation")
+            .join("configuration.json");
+        std::fs::create_dir_all(path.parent().ok_or("configuration parent missing")?)?;
+        let configurations: [Option<&[u8]>; 4] = [
+            None,
+            Some(b"invalid configuration"),
+            Some(br#"{"alarms":{"stall_after_seconds":0}}"#),
+            Some(br#"{"alarms":{"stall_after_seconds":500}}"#),
+        ];
+        for (index, configuration) in configurations.into_iter().enumerate() {
+            if let Some(bytes) = configuration {
+                std::fs::write(&path, bytes)?;
+            } else if path.exists() {
+                std::fs::remove_file(&path)?;
+            }
+            let observations: Vec<_> = ["short", "long"]
+                .into_iter()
+                .map(|name| Observation {
+                    session: format!("alarm-profile-{index}-{name}"),
+                    agent: table.agent.clone(),
+                    machine: "machine".to_owned(),
+                    live: true,
+                    started_at_ms: 1_000,
+                    last_signal_at_ms: Some(1_000),
+                    proxy: ProxyEvidence::Direct,
+                })
+                .collect();
+            let thresholds = BTreeMap::from([
+                (observations[0].session.clone(), 10),
+                (observations[1].session.clone(), 20),
+            ]);
+            with_store(&table.state, |store, ()| {
+                assert!(!store.observe_profiles(&observations, 11_000, &thresholds)?);
+                assert!(store.observe_profiles(&observations, 12_000, &thresholds)?);
+                let alarms = store.list();
+                assert!(alarms.iter().any(|alarm| {
+                    alarm.session == observations[0].session && alarm.kind == Kind::SeatStalled
+                }));
+                assert!(
+                    alarms
+                        .iter()
+                        .all(|alarm| alarm.session != observations[1].session)
+                );
+                Ok(())
+            })?;
+            if let Some(bytes) = configuration {
+                assert_eq!(std::fs::read(&path)?, bytes);
+            } else {
+                assert!(
+                    !path.exists(),
+                    "profile evaluation created organisation configuration"
+                );
+            }
+        }
+        table.finish().await
+    }
 }

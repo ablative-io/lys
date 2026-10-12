@@ -94,7 +94,7 @@ async fn managed_version(table: &Table) -> TestResult {
         "harness": table.harness(),
         "permissions": {"default_mode": "plan"},
         "working_folder": table.dir.path(),
-        "session": {"requires_controls": true},
+        "session": {"stall_after":300,"requires_controls": true},
     });
     table.ok(&path, &body).await?;
     table

@@ -326,7 +326,7 @@ impl Table {
             "operation": operation()?, "from_version": 0, "working_folder": "/tmp",
             "model_access": ["claude-fable-5-1"], "tools": ["read"], "skills": [],
             "mcp_servers": [], "permissions": {"default_mode": "plan"}, "harness": harness,
-            "instructions": "", "note": "", "session": {},
+            "instructions": "", "note": "", "session": {"stall_after":300},
         });
         self.ok(&path, &body).await?;
         self.ok(

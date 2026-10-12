@@ -1,5 +1,5 @@
 #![cfg(test)]
-//! An ordinary pre-description profile must survive a read and write byte for byte.
+//! Old profiles retain their settings and preserve original bytes before migration.
 use super::{ProvisioningStore, read};
 
 #[test]
@@ -99,8 +99,37 @@ fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
         serde_json::to_value(&version.settings.session)?["requires_controls"],
         serde_json::Value::Null
     );
+    assert_eq!(
+        version
+            .settings
+            .session
+            .as_ref()
+            .ok_or("old session missing")?
+            .stall_after,
+        300
+    );
+    let backups = std::fs::read_dir(directory.path())?
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_string_lossy()
+                .starts_with("provisioning.before-stall-")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(backups.len(), 1);
+    assert_eq!(std::fs::read(backups[0].path())?, original);
+    let migrated = std::fs::read(&path)?;
+    let mut expected: serde_json::Value = serde_json::from_slice(original)?;
+    expected["profiles"][0]["versions"][0]["settings"]["session"]["stall_after"] = 300.into();
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&migrated)?,
+        expected
+    );
     store.write(read(&path)?)?;
-    assert_eq!(std::fs::read(&path)?, original);
+    assert_eq!(std::fs::read(&path)?, migrated);
+    assert_eq!(std::fs::read(backups[0].path())?, original);
     let mut explicit = version_fixture()?;
     explicit["settings"]["session"]["requires_controls"] = serde_json::json!(true);
     let version: super::Version = serde_json::from_value(explicit)?;
@@ -121,7 +150,7 @@ fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
 
 fn version_fixture() -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     Ok(serde_json::from_str(
-        r#"{"number":2,"operation":"required-controls","settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"","session":{"message_prefix":"","sensitive":false}},"set_by":"ordinary-person","set_at":2}"#,
+        r#"{"number":2,"operation":"required-controls","settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"","session":{"stall_after":300,"message_prefix":"","sensitive":false}},"set_by":"ordinary-person","set_at":2}"#,
     )?)
 }
 
@@ -133,7 +162,7 @@ fn provisioning_old_shape_version_keeps_all_six_seat_fields_absent()
         "settings":{
             "model_access":[], "tools":[], "skills":[], "mcp_servers":[],
             "instructions":"", "note":"",
-            "session":{"requires_controls":false, "compact":"/compact", "sensitive":false}
+            "session":{"stall_after":300,"requires_controls":false, "compact":"/compact", "sensitive":false}
         }
     }"#;
     let version: super::Version = serde_json::from_slice(fixture)?;

@@ -26,7 +26,7 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
                 "operation": profile, "from_version": 0, "model_access": ["claude-fable-5-1"],
                 "tools": [], "skills": [], "mcp_servers": [], "instructions": "", "note": "",
                 "harness": table.harness(), "permissions": {"default_mode": "plan"},
-                "working_folder": table.dir.path(), "session": {"resume": conversation}
+                "working_folder": table.dir.path(), "session": {"stall_after":300,"resume": conversation}
             }),
         )
         .await?;
