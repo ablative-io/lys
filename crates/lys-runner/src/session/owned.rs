@@ -49,9 +49,12 @@ impl Sessions {
                     "the broker forwarded more than one credential",
                 ));
             }
-            let text = std::str::from_utf8(bytes).map_err(|_| {
+            let text = std::str::from_utf8(bytes).map_err(|error| {
                 invalid = true;
-                RunnerError::refused("account_credential_invalid", "the credential is not UTF-8")
+                RunnerError::refused(
+                    "account_credential_invalid",
+                    format!("the credential is not UTF-8: {error}"),
+                )
             })?;
             if text.is_empty() || text.chars().any(char::is_control) {
                 invalid = true;
