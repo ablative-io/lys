@@ -235,18 +235,27 @@ impl Sessions {
             endpoint,
             established_at: now_ms(),
         };
-        super::recovery::record_endpoint(&seat)?;
+        // From here the owner runs: a refusal ends it, with its process
+        // group, so a refused start leaves no owner writing to the thread.
+        if let Err(error) = super::recovery::record_endpoint(&seat) {
+            return Err(spawn::end_owner(&seat.endpoint.owner, &error));
+        }
         let pid = seat.endpoint.owner.pid;
         let at = seat.established_at;
-        let mut owned = self.owned_index()?;
+        let mut owned = match self.owned_index() {
+            Ok(owned) => owned,
+            Err(error) => return Err(spawn::end_owner(&seat.endpoint.owner, &error)),
+        };
         if let Some(held) = owned.get(&seat.binding.session) {
-            return Err(refused(
+            let error = refused(
                 "seat_owner_held",
                 format!(
                     "session {} got an owner at pid {} meanwhile",
                     seat.binding.session, held.endpoint.owner.pid
                 ),
-            ));
+            );
+            drop(owned);
+            return Err(spawn::end_owner(&seat.endpoint.owner, &error));
         }
         owned.insert(seat.binding.session.clone(), seat);
         drop(owned);

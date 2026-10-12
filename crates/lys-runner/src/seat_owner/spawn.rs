@@ -250,22 +250,102 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
     let mut child = command.spawn().map_err(|error| {
         start_failed(format!("{} could not start: {error}", spawn.lys.display()))
     })?;
-    let pipe = child
-        .stdout
-        .take()
-        .ok_or_else(|| start_failed("the owner's pipe was not made"))?;
-    let meter = Meter::default();
-    let ready = wait_ready(&mut BufReader::new(pipe), &meter);
-    let (runner, socket, announced, build) = match ready {
+    let Some(pipe) = child.stdout.take() else {
+        return Err(abandon(
+            &mut child,
+            &start_failed("the owner's pipe was not made"),
+        ));
+    };
+    let ready = match ready_within(pipe, READY_WITHIN) {
         Ok(ready) => ready,
         Err(error) => {
-            let status = child.wait().map_or_else(
-                |wait| format!("and its exit could not be read: {wait}"),
-                |status| format!("and exited {status}"),
-            );
-            return Err(start_failed(format!("{error} {status}")));
+            let ended = abandon(&mut child, &error);
+            return Err(with_log_tail(&ended, &dir.join(LOG)));
         }
     };
+    match proved_ready(ready, &child, &planned) {
+        Ok((runner, announced, build)) => {
+            // The owner outlives this runner; reap it if it exits first,
+            // without waiting here.
+            let pid = announced.pid;
+            let reaper = std::thread::Builder::new()
+                .name(format!("lys-owner-reaper-{pid}"))
+                .spawn(move || {
+                    if let Err(error) = child.wait() {
+                        crate::error::said(&format!("seat_owner_reaper_failed: {error}"));
+                    }
+                });
+            if let Err(error) = reaper {
+                // The child moved into the closure that never ran: end the
+                // owner by its proved identity instead.
+                return Err(end_owner(
+                    &announced,
+                    &start_failed(format!("the reaper could not start: {error}")),
+                ));
+            }
+            let mut endpoint = OwnerEndpoint::new(dir, planned, runner, announced);
+            endpoint.build = build;
+            Ok(endpoint)
+        }
+        Err(error) => Err(abandon(&mut child, &error)),
+    }
+}
+
+/// `refusal`, its words ending with the last of the owner's log: an owner
+/// that exits before it is ready says why only there.
+fn with_log_tail(refusal: &RunnerError, log: &Path) -> RunnerError {
+    const TAIL: usize = 2_048;
+    let tail = fs::read(log).map_or_else(
+        |error| format!("its log could not be read: {error}"),
+        |bytes| {
+            let from = bytes.len().saturating_sub(TAIL);
+            let said = String::from_utf8_lossy(bytes.get(from..).unwrap_or_default());
+            format!("its log ends: {}", said.trim())
+        },
+    );
+    RunnerError::refused(&refusal.name(), format!("{refusal}; {tail}"))
+}
+
+/// How long a start waits for its owner's ready line: the owner starts its
+/// harness before it writes it, so this is the harness's start and more.
+pub const READY_WITHIN: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// The owner's ready line, read from `pipe` on a thread of its own, or
+/// `seat_owner_start_failed` once `within` has passed with none: a start is
+/// never left waiting on an owner that neither writes nor exits.
+///
+/// # Errors
+///
+/// [`wait_ready`]'s refusals, and `seat_owner_start_failed` past `within`.
+pub fn ready_within(
+    pipe: impl std::io::Read + Send + 'static,
+    within: std::time::Duration,
+) -> Result<(String, PathBuf, Leader, String), RunnerError> {
+    let (sent, answer) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .name("lys-owner-ready".to_owned())
+        .spawn(move || {
+            let meter = Meter::default();
+            // The receiver is gone only once the start has given up.
+            drop(sent.send(wait_ready(&mut BufReader::new(pipe), &meter)));
+        })
+        .map_err(|error| start_failed(format!("the ready reader could not start: {error}")))?;
+    answer.recv_timeout(within).unwrap_or_else(|_| {
+        Err(start_failed(format!(
+            "the owner wrote no ready line within {} s",
+            within.as_secs()
+        )))
+    })
+}
+
+/// The ready line's runner, owner and build, once the owner it names is
+/// the process this start spawned, proved at the kernel, listening on its
+/// planned socket.
+fn proved_ready(
+    (runner, socket, announced, build): (String, PathBuf, Leader, String),
+    child: &std::process::Child,
+    planned: &Path,
+) -> Result<(String, Leader, String), RunnerError> {
     if announced.pid != child.id() {
         return Err(RunnerError::refused(
             "seat_owner_unproved",
@@ -290,19 +370,80 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             planned.display()
         )));
     }
-    // The owner outlives this runner; reap it if it exits first, without
-    // waiting here.
-    std::thread::Builder::new()
-        .name(format!("lys-owner-reaper-{}", announced.pid))
-        .spawn(move || {
-            if let Err(error) = child.wait() {
-                crate::error::said(&format!("seat_owner_reaper_failed: {error}"));
+    Ok((runner, announced, build))
+}
+
+/// Ends the owner a refused start spawned, with everything it started, and
+/// answers `refusal` saying so: a start refused after its owner was spawned
+/// leaves nothing running. The owner leads a process group of its own once
+/// it has called `setsid`, so that group is killed; before then the owner
+/// alone is. It is then waited for, which proves it gone.
+fn abandon(child: &mut std::process::Child, refusal: &RunnerError) -> RunnerError {
+    let group = ended_group(child.id());
+    let killed = child.kill();
+    let ended = match child.wait() {
+        Ok(status) => format!("the owner was ended ({status}){group}"),
+        Err(error) => format!("the owner could not be waited for: {error}; kill: {killed:?}"),
+    };
+    RunnerError::refused(&refusal.name(), format!("{refusal}; {ended}"))
+}
+
+/// Ends the owner `owner`, proved by its start identity, with its process
+/// group, and waits until the kernel no longer has it, answering `refusal`
+/// saying so. For an owner whose child handle this runner no longer holds.
+///
+/// # Errors
+///
+/// None: the refusal is the answer, with the end's outcome in its words.
+pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
+    let ended = match peer::start_identity(owner.pid) {
+        Ok(start) if start == owner.start => {
+            let group = ended_group(owner.pid);
+            if gone_within(owner.pid, std::time::Duration::from_secs(5)) {
+                format!("the owner was ended{group}")
+            } else {
+                format!("the owner did not end within 5 s{group}")
             }
-        })
-        .map_err(|error| start_failed(format!("the reaper could not start: {error}")))?;
-    let mut endpoint = OwnerEndpoint::new(dir, planned, runner, announced);
-    endpoint.build = build;
-    Ok(endpoint)
+        }
+        Ok(_) => "the owner had already ended".to_owned(),
+        Err(error) => format!("the owner's identity could not be read: {error}"),
+    };
+    RunnerError::refused(&refusal.name(), format!("{refusal}; {ended}"))
+}
+
+/// Kills the process group `pid` leads, answering words for the refusal.
+fn ended_group(pid: u32) -> String {
+    let Some(group) = i32::try_from(pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+    else {
+        return String::new();
+    };
+    match rustix::process::kill_process_group(group, rustix::process::Signal::KILL) {
+        Ok(()) => ", with its process group".to_owned(),
+        Err(rustix::io::Errno::SRCH) => String::new(),
+        Err(error) => format!(", its process group not ended: {error}"),
+    }
+}
+
+/// Whether `pid` is gone, polled until `within`.
+fn gone_within(pid: u32, within: std::time::Duration) -> bool {
+    let Some(id) = i32::try_from(pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+    else {
+        return true;
+    };
+    let until = std::time::Instant::now() + within;
+    loop {
+        if rustix::process::test_kill_process(id).is_err() {
+            return true;
+        }
+        if std::time::Instant::now() >= until {
+            return false;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }
 
 /// Waits on the owner's ready line. The read blocks on the pipe: that is
@@ -327,3 +468,7 @@ pub fn wait_ready(
     meter.copied(u64::try_from(read).unwrap_or(u64::MAX));
     parse_ready_line(&line)
 }
+
+#[cfg(test)]
+#[path = "spawn_tests.rs"]
+mod tests;
