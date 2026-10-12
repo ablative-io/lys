@@ -85,8 +85,13 @@ fn serve(runner: Runner, socket: &Path) -> CliResult<()> {
     let mut said = Ok(());
     runner.serve_until_stopped(|| {
         let mut out = std::io::stdout();
-        said = writeln!(out, "listening {} as runner {id}", socket.display())
-            .and_then(|()| out.flush());
+        said = writeln!(
+            out,
+            "listening {} as runner {id}, ready in {} ms",
+            socket.display(),
+            crate::commands::started::elapsed_ms()
+        )
+        .and_then(|()| out.flush());
         if let Err(error) = &said {
             lys_runner::error::said(&format!(
                 "listening on {}, and that could not be written: {error}",

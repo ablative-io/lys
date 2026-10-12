@@ -38,6 +38,7 @@ fn parse() -> Cli {
 /// Entry point: parse arguments, dispatch, and translate the outcome into an
 /// exit code. Every failure path prints a diagnostic to stderr.
 fn main() -> ExitCode {
+    commands::started::mark();
     let cli = parse();
     let json = cli.json;
     let result = match cli.command {

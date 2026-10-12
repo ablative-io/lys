@@ -131,8 +131,13 @@ fn serve_and_dial(options: &Options, dial: Dial) -> CliResult<()> {
     let mut said = Ok(());
     runner.serve_until_stopped(|| {
         let mut out = std::io::stdout();
-        said = writeln!(out, "listening {} as runner {id}", socket.display())
-            .and_then(|()| out.flush());
+        said = writeln!(
+            out,
+            "listening {} as runner {id}, ready in {} ms",
+            socket.display(),
+            crate::commands::started::elapsed_ms()
+        )
+        .and_then(|()| out.flush());
         std::thread::spawn(move || {
             let error = match dial.bridge() {
                 Ok(()) => RunnerError::Dial {
