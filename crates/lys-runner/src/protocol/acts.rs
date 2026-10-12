@@ -251,6 +251,15 @@ pub enum Act {
     },
     /// The supervised seats this runner started owners for, from its index.
     Owned,
+    /// The Claude Code plugins installed in a config folder on this machine:
+    /// `config_dir` when given, else the folder a run here uses with no
+    /// `CLAUDE_CONFIG_DIR` (the login's `~/.claude`), by the same rule the
+    /// start's `plugin_not_installed` check uses.
+    Plugins {
+        /// An absolute config folder, the run's `CLAUDE_CONFIG_DIR`.
+        #[serde(default)]
+        config_dir: Option<String>,
+    },
 }
 
 impl Act {
@@ -422,6 +431,13 @@ pub enum Answer {
         owners: Vec<crate::seat_owner::sessions::OwnedSeat>,
         /// Each owner on record the kernel did not confirm, named why.
         unreachable: Vec<crate::seat_owner::recovery::Found>,
+    },
+    /// The plugins installed in one config folder.
+    Plugins {
+        /// The folder read, absolute.
+        config_dir: String,
+        /// Each installed plugin as name@marketplace, in order.
+        installed: Vec<String>,
     },
 }
 

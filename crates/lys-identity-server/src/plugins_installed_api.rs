@@ -1,86 +1,93 @@
-//! The Claude Code plugins installed on the computer this service runs on, read
-//! from the login's own config folder, so the agent page can say beside the
-//! plugins field which named plugin a run here would be refused for
-//! (`plugin_not_installed`). A run on another computer is checked by that
-//! computer's runner before it starts.
+//! `GET /harnesses/plugins?machine=<id>&config_dir=<folder>`: the Claude Code
+//! plugins installed in the config folder a run on that machine uses, as that
+//! machine's runner reads them by the same rule its start's
+//! `plugin_not_installed` check uses (the run's `CLAUDE_CONFIG_DIR`, else the
+//! login's `~/.claude`). The agent page asks it for the agent's own computer
+//! and folder, so what it shows is what a start there would find.
+//!
+//! An administrator asks it, the same person who saves an agent's settings.
+//! The machine must be kept (`MachineUnknown`) and name a runner
+//! (`runner_absent`); a folder that is not plain and absolute is
+//! `RequestMalformed`; a folder the runner cannot read is the runner's own
+//! refusal, `plugins_unreadable`, by name.
 
-use std::path::PathBuf;
+use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::rejection::QueryRejection;
+use axum::extract::{Query, State};
 use axum::http::HeaderMap;
-use serde::Serialize;
+use lys_runner::{Act, Answer};
+use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
-use crate::routes::{Shared, signed_in};
+use crate::network_api::with_network;
+use crate::routes::{AppState, signed_in};
 
-/// The plugins installed in this computer's Claude config folder.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct InstalledPlugins {
-    /// The folder read: the login's `~/.claude`, where a run's sign-in lives.
-    pub folder: Option<String>,
-    /// Each installed plugin as name@marketplace; empty when none, or unread.
-    pub installed: Vec<String>,
-    /// Why the folder could not be read, when it could not.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unread: Option<String>,
+/// Which machine to ask, and which of its config folders.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PluginsQuery {
+    /// The machine the run starts on.
+    pub machine: String,
+    /// The run's `CLAUDE_CONFIG_DIR`, absolute; the login's `~/.claude` when absent.
+    #[serde(default)]
+    pub config_dir: Option<String>,
 }
 
-/// What [`read`] answers for `folder`.
-#[must_use]
-pub fn installed_in(folder: Option<PathBuf>) -> InstalledPlugins {
-    let Some(folder) = folder else {
-        return InstalledPlugins {
-            folder: None,
-            installed: Vec::new(),
-            unread: Some("this service has no HOME, so no Claude config folder".to_owned()),
-        };
-    };
-    let shown = folder.display().to_string();
-    match lys_home::harness::claude_code::installed_plugins::installed(&folder) {
-        Ok(installed) => InstalledPlugins {
-            folder: Some(shown),
-            installed: installed.into_iter().collect(),
-            unread: None,
-        },
-        Err(error) => InstalledPlugins {
-            folder: Some(shown),
-            installed: Vec::new(),
-            unread: Some(error.to_string()),
-        },
-    }
+/// The plugins installed in one config folder of one machine.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct InstalledPlugins {
+    /// The machine asked.
+    pub machine: String,
+    /// The folder its runner read, absolute.
+    pub config_dir: String,
+    /// Each installed plugin as name@marketplace, in order.
+    pub installed: Vec<String>,
 }
 
 /// `GET /harnesses/plugins`.
 ///
 /// # Errors
-/// Refuses a caller who is not signed in.
+/// `NotSignedIn`/`NotAdmitted`, `RequestMalformed`, `MachineUnknown`,
+/// `runner_absent`, and the runner's own refusal by name.
 pub(crate) async fn read(
-    State(state): State<Shared>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    given: Result<Query<PluginsQuery>, QueryRejection>,
 ) -> Result<Json<InstalledPlugins>, ServerError> {
-    signed_in(&state, &headers)?;
-    let folder = std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".claude"));
-    Ok(Json(installed_in(folder)))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::installed_in;
-
-    #[test]
-    fn the_folder_s_installed_plugins_are_listed_and_a_missing_home_is_named() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir
-            .path()
-            .join(lys_home::harness::claude_code::installed_plugins::INSTALLED_FILE);
-        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        std::fs::write(&file, r#"{"version":2,"plugins":{"argus@ablative":[{}]}}"#).unwrap();
-        let answer = installed_in(Some(dir.path().to_path_buf()));
-        assert_eq!(answer.installed, vec!["argus@ablative".to_owned()]);
-        assert!(answer.unread.is_none());
-        let none = installed_in(None);
-        assert!(none.installed.is_empty());
-        assert!(none.unread.is_some());
+    let actor = signed_in(&state, &headers)?;
+    crate::routes::administrator(&state, &actor)?;
+    let Query(query) = given.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let config_dir = query
+        .config_dir
+        .map(|given| crate::provisioning_api::folder("config_dir", given))
+        .transpose()?;
+    let machine = query.machine;
+    let runner = with_network(&state, |store| {
+        store.machine(&machine).ok_or(ServerError::MachineUnknown)?;
+        Ok(store.runner(&machine).cloned())
+    })?
+    .ok_or_else(|| ServerError::RunnerAbsent {
+        machine: machine.clone(),
+    })?;
+    match crate::runner_client::ask(&state, &machine, runner, Act::Plugins { config_dir }).await? {
+        Answer::Plugins {
+            config_dir,
+            installed,
+        } => Ok(Json(InstalledPlugins {
+            machine,
+            config_dir,
+            installed,
+        })),
+        other => Err(ServerError::Runner {
+            refusal: "runner_answer_unexpected".to_owned(),
+            words: format!(
+                "the runner answered a plugins read with {}",
+                crate::runner_sessions::kind(&other)
+            ),
+        }),
     }
 }

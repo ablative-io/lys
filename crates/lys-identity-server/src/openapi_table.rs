@@ -198,7 +198,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("machine", "read", []);
     GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]] scope("harness", "read", []);
-    GET "/harnesses/plugins" "The Claude Code plugins installed on this computer" S [SIGNED] scope("harness", "read", []);
+    GET "/harnesses/plugins" "The Claude Code plugins installed in one config folder of a computer, as its runner reads them" S [ADMIN, &["RequestMalformed", "MachineUnknown", "runner_absent"], &["runner_request_unsigned", "runner_request_malformed", "runner_protocol_mismatch", "runner_request_replayed", "runner_request_misaddressed", "runner_unreachable", "runner_reply_malformed", "runner_stopping", "plugins_unreadable", "plugin_not_installed", "runner_answer_unexpected"]] scope("harness", "read", []);
     POST "/network/machines" "Name a machine" S [ADMIN_BODY, &["MachineReused"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.create", []);
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]] scope("machine", "machine.retire", ["id"]);
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.team.set", ["id"]);

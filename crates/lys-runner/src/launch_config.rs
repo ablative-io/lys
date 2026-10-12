@@ -252,11 +252,40 @@ fn publish(state: &Path, session: &str, config: &Config) -> Result<PathBuf, Runn
     Ok(target)
 }
 
+/// The Claude Code config folder a run uses: its `CLAUDE_CONFIG_DIR`, else
+/// the login's own `~/.claude`, where the sign-in the run keeps lives. The one
+/// rule both the start's plugin check and the `plugins` act read by.
+///
+/// # Errors
+/// `plugin_not_installed` when neither names a folder.
+pub fn claude_config_dir(given: Option<&str>) -> Result<PathBuf, RunnerError> {
+    match given {
+        Some(dir) => Ok(PathBuf::from(dir)),
+        None => std::env::var_os("HOME")
+            .map(|home| PathBuf::from(home).join(".claude"))
+            .ok_or_else(|| {
+                RunnerError::refused(
+                    "plugin_not_installed",
+                    "the run's Claude config directory cannot be named: no CLAUDE_CONFIG_DIR and no HOME",
+                )
+            }),
+    }
+}
+
+/// The plugins installed in `config_dir`, by name@marketplace, in order.
+///
+/// # Errors
+/// `plugins_unreadable` naming the folder and why.
+pub fn installed_plugins(config_dir: &Path) -> Result<Vec<String>, RunnerError> {
+    lys_home::harness::claude_code::installed_plugins::installed(config_dir)
+        .map(|installed| installed.into_iter().collect())
+        .map_err(|error| RunnerError::refused("plugins_unreadable", error.to_string()))
+}
+
 /// Refuses a run whose settings turn on a plugin that the Claude Code config
 /// directory it will use has not installed: the program would start without
-/// it and say nothing. The directory is the run's `CLAUDE_CONFIG_DIR`, else
-/// the login's own `~/.claude`, where the sign-in the run keeps lives. Checked
-/// before anything is published, so a refusal leaves nothing behind.
+/// it and say nothing. Checked before anything is published, so a refusal
+/// leaves nothing behind.
 fn plugins_installed(
     config: &Config,
     environment: &BTreeMap<String, String>,
@@ -278,17 +307,7 @@ fn plugins_installed(
     if named.is_empty() {
         return Ok(());
     }
-    let config_dir = match environment.get("CLAUDE_CONFIG_DIR") {
-        Some(dir) => PathBuf::from(dir),
-        None => std::env::var_os("HOME")
-            .map(|home| PathBuf::from(home).join(".claude"))
-            .ok_or_else(|| {
-                RunnerError::refused(
-                    "plugin_not_installed",
-                    "the run's Claude config directory cannot be named: no CLAUDE_CONFIG_DIR and no HOME",
-                )
-            })?,
-    };
+    let config_dir = claude_config_dir(environment.get("CLAUDE_CONFIG_DIR").map(String::as_str))?;
     lys_home::harness::claude_code::installed_plugins::require(&config_dir, &named)
         .map_err(|error| RunnerError::refused("plugin_not_installed", error.to_string()))
 }

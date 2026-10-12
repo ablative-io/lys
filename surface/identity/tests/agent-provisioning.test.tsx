@@ -107,3 +107,32 @@ describe('Managed controls in the saved setup', () => {
     expect(posted).toEqual([]);
   });
 });
+
+describe('Plugins checked on the agent’s own computer', () => {
+  const withPlugins = { ...profile, plugins: ['argus@ablative', 'manifold@manifold'], runs_on: 'machine-seat' };
+  const asked = '/harnesses/plugins?machine=machine-seat';
+  it('asks the runner of the computer the agent runs on and names the plugin its folder lacks', async () => {
+    const { requests } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
+      [asked]: ok({ machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: ['argus@ablative'] }),
+    });
+    expect(requests).toContain(asked);
+    expect(text()).toContain('Not installed in /Users/seat/.claude on machine-seat: manifold@manifold');
+    expect(text()).toContain('plugin_not_installed');
+  });
+  it('says the check could not be read when the runner refuses, never that all are installed', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
+      [asked]: refused(409, 'plugins_unreadable', 'the installed plugins file is not JSON'),
+    });
+    expect(text()).toContain('could not be read: plugins_unreadable');
+    expect(text()).not.toContain('Each is installed');
+  });
+  it('says each is installed when the computer’s folder holds them all', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
+      [asked]: ok({ machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: ['argus@ablative', 'manifold@manifold'] }),
+    });
+    expect(text()).toContain('Each is installed in /Users/seat/.claude on machine-seat');
+  });
+});

@@ -12,6 +12,8 @@
  *   `settings`). This screen adds none; it shows the ones there and lets
  *   each be removed.
  */
+import { useEffect, useState } from 'react';
+import { Refused, request } from '../../api';
 import { Act } from '../../shell/Act';
 import type { InstalledPlugins } from './choices';
 const count = (n: number, one: string, many: string) => n + ' ' + (n === 1 ? one : many);
@@ -59,15 +61,24 @@ export function ToolsNamed({ value, change }: { value: string[]; change: (next: 
   </section>;
 }
 
-/** The Claude Code plugins the settings turn on, each as name@marketplace. Shown only when there are any; this screen adds none. */
-export function PluginsNamed({ value, change, installed, unanswered, runsOn }: { value: string[]; change: (next: string[]) => void; installed?: InstalledPlugins | null; unanswered?: string; runsOn?: string }) {
+/** The Claude Code plugins the settings turn on, each as name@marketplace, and whether each is installed in the
+ * config folder a run on the agent's own computer uses, as that computer's runner reads it by the rule its start
+ * check uses (plugin_not_installed). Shown only when there are any; this screen adds none. */
+export function PluginsNamed({ value, change, machine, machineName }: { value: string[]; change: (next: string[]) => void; machine: string; machineName: string }) {
+  const [read, setRead] = useState<{ asked: string; installed?: InstalledPlugins; failed?: string } | null>(null);
+  const asked = machine && value.length ? machine : '';
+  useEffect(() => {
+    if (!asked) return undefined;
+    let current = true;
+    request<InstalledPlugins>('/harnesses/plugins?machine=' + encodeURIComponent(asked)).then(
+      (installed) => { if (current) setRead({ asked, installed }); },
+      (error: unknown) => { if (current) setRead({ asked, failed: error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error) }); },
+    );
+    return () => { current = false; };
+  }, [asked]);
   if (value.length === 0) return null;
-  // The same check a start makes (plugin_not_installed), read in the Claude config folder of the computer Lys's
-  // service runs on. A start checks the folder its own run uses (the run's CLAUDE_CONFIG_DIR, else ~/.claude),
-  // on the computer it starts on, so this is said as what was read here, never as the start's verdict.
-  const missing = installed && !installed.unread ? value.filter((name) => !installed.installed.includes(name)) : [];
-  const where = installed?.folder ?? 'this computer’s Claude config folder';
-  const elsewhere = runsOn ? ' This agent is set to run on ' + runsOn + '; if that is another computer, its runner checks its own folder before the start.' : '';
+  const answer = read && read.asked === asked ? read : null;
+  const missing = answer?.installed ? value.filter((name) => !answer.installed?.installed.includes(name)) : [];
   return <section className="given-plugins wide" aria-label="Plugins named in these settings">
     <table className="usage-table">
       <thead><tr><th>Plugins named in these settings</th><th>Change</th></tr></thead>
@@ -75,9 +86,11 @@ export function PluginsNamed({ value, change, installed, unanswered, runsOn }: {
         <td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td></tr>)}</tbody>
     </table>
     <p className="dim">Each is turned on in the settings Lys writes for this agent’s runs. A plugin must already be installed for the program to load it.</p>
-    {missing.length ? <p className="why-not">Not installed in {where}: {missing.join(', ')}. A start that uses that folder is refused (plugin_not_installed) until each is installed there; a run whose settings set CLAUDE_CONFIG_DIR is checked in that folder instead.{elsewhere}</p> : null}
-    {installed?.unread ? <p className="why-not">This computer’s installed plugins could not be read: {installed.unread}{elsewhere}</p> : null}
-    {!installed ? <p className="why-not">Whether these plugins are installed could not be checked{unanswered ? ': ' + unanswered : ''}. A start still checks, and refuses one that is not installed (plugin_not_installed).</p> : null}
+    {!machine ? <p className="why-not">No computer is chosen yet, so whether these are installed cannot be read. The start checks on the computer it runs on, and refuses one that is not installed (plugin_not_installed).</p>
+      : !answer ? <p className="dim">Reading the plugins installed on {machineName}…</p>
+      : answer.failed ? <p className="why-not">The plugins installed on {machineName} could not be read: {answer.failed}. A start there still checks, and refuses one that is not installed (plugin_not_installed).</p>
+      : missing.length ? <p className="why-not">Not installed in {answer.installed?.config_dir} on {machineName}: {missing.join(', ')}. A start there is refused (plugin_not_installed) until each is installed in that folder.</p>
+      : <p className="dim">Each is installed in {answer.installed?.config_dir} on {machineName}.</p>}
   </section>;
 }
 

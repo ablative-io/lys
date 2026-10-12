@@ -141,6 +141,19 @@ pub(super) fn perform(
             owners: sessions.owned_seats()?,
             unreachable: sessions.unreachable_owners()?,
         }),
+        Act::Plugins { config_dir } => {
+            let folder = crate::launch_config::claude_config_dir(config_dir.as_deref())?;
+            if !folder.is_absolute() {
+                return Err(RunnerError::refused(
+                    "plugins_unreadable",
+                    format!("{} is not an absolute folder", folder.display()),
+                ));
+            }
+            Ok(Answer::Plugins {
+                installed: crate::launch_config::installed_plugins(&folder)?,
+                config_dir: folder.to_string_lossy().into_owned(),
+            })
+        }
         Act::End { session } => {
             let ended = sessions.end(&session, left)?;
             Ok(Answer::Ended { session, ended })

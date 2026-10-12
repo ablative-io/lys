@@ -301,6 +301,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::AttachLines { .. } => "attach_lines",
         Answer::Owner { .. } => "owner",
         Answer::Owned { .. } => "owned",
+        Answer::Plugins { .. } => "plugins",
     }
 }
 

@@ -409,7 +409,7 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
         (
             GET,
             "/harnesses/plugins",
-            None,
+            Some(api.schema::<crate::plugins_installed_api::PluginsQuery>()),
             Some(api.schema::<crate::plugins_installed_api::InstalledPlugins>()),
         ),
         (
