@@ -70,10 +70,7 @@ fn the_seat_runner_says_online_offline_or_unknown() -> Result<(), Box<dyn Error>
         view(&seat, None, &Reading::Read(Some(&projected(&dead[0])))).state,
         "offline"
     );
-    assert_eq!(
-        view(&seat, None, &Reading::Read(None)).state,
-        "offline"
-    );
+    assert_eq!(view(&seat, None, &Reading::Read(None)).state, "offline");
     let unknown = view(&seat, None, &Reading::Unread("runner_unreachable"));
     assert_eq!(unknown.state, "unknown");
     assert_eq!(unknown.reason.as_deref(), Some("runner_unreachable"));

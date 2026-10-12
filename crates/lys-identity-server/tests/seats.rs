@@ -344,8 +344,8 @@ async fn the_document_names_every_seat_refusal() -> TestResult {
     }
     for path in ["/seats/{name}/send", "/seats/{name}/type"] {
         assert_eq!(
-            document["paths"][path]["post"]["responses"]["200"]["content"]
-                ["application/json"]["schema"]["$ref"],
+            document["paths"][path]["post"]["responses"]["200"]["content"]["application/json"]["schema"]
+                ["$ref"],
             "#/components/schemas/SeatMessage",
             "{path}"
         );
