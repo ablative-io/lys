@@ -41,14 +41,14 @@ async fn start(
     version: &str,
     machine: &str,
 ) -> Result<(u16, Value), Box<dyn Error>> {
-    Ok(table
+    table
         .service
         .post(
             &format!("/agents/{}/start", table.agent()),
             Some(&table.ada),
             &json!({"profile_version": version, "machine": machine}),
         )
-        .await?)
+        .await
 }
 
 #[tokio::test(flavor = "multi_thread")]

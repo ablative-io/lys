@@ -4,8 +4,6 @@
 #[macro_export]
 macro_rules! refusals_follow_retry {
     () => {
-        use crate::budgets_feed::entry_tests::{entry, fixture, page};
-        use crate::error::ServerError;
         use std::collections::VecDeque;
         use std::error::Error;
         use std::future::{Future, poll_fn, ready};
@@ -13,6 +11,8 @@ macro_rules! refusals_follow_retry {
         use std::sync::{Arc, Mutex, MutexGuard};
         use std::task::{Context, Poll, Waker};
         use std::time::Duration;
+        use $crate::budgets_feed::entry_tests::{entry, fixture, page};
+        use $crate::error::ServerError;
 
         type TestResult = Result<(), Box<dyn Error>>;
 
@@ -80,7 +80,7 @@ macro_rules! refusals_follow_retry {
                 0,
                 "entry refusals do not restart the follow"
             );
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 3);
                 assert_eq!(store.held().refusals.records.len(), 1);
                 assert_eq!(
@@ -153,7 +153,7 @@ macro_rules! refusals_follow_retry {
                         .state
                         .runners
                         .links()
-                        .begin(crate::runner_links::Link::Feed, "machine"),
+                        .begin($crate::runner_links::Link::Feed, "machine"),
                     "the retry retained the follow link"
                 );
                 clock.store(999, Ordering::SeqCst);
@@ -193,7 +193,7 @@ macro_rules! refusals_follow_retry {
                     ],
                     "success reset the backoff"
                 );
-                crate::budgets_api::with_budgets(&table.state, |store| {
+                $crate::budgets_api::with_budgets(&table.state, |store| {
                     assert_eq!(
                         store
                             .held()
@@ -219,7 +219,7 @@ macro_rules! refusals_follow_retry {
                     "each refusal, including page validation, was named"
                 );
                 for message in refusals {
-                    assert!(message.contains(crate::runner_links::AGAIN), "{message}");
+                    assert!(message.contains($crate::runner_links::AGAIN), "{message}");
                     assert!(message.contains("begun again"), "{message}");
                     assert!(message.contains("retry in "), "{message}");
                 }

@@ -97,9 +97,8 @@ fn model_account_start_checks_refuse_an_unheld_account_before_rendering() -> Tes
             policy: None,
             model_proxy: None,
         };
-        let error = match lys_identity_server::start_checks::fields(&start, &[]) {
-            Ok(_) => return Err("start checks admitted an unheld account before rendering".into()),
-            Err(error) => error,
+        let Err(error) = lys_identity_server::start_checks::fields(&start, &[]) else {
+            return Err("start checks admitted an unheld account before rendering".into());
         };
         assert!(
             error.to_string().starts_with("account_handle_unheld:"),

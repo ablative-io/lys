@@ -2,6 +2,8 @@
 
 use std::error::Error;
 
+use lys_identity_server::Config;
+
 use super::{Answer, HARNESS_PASSWORD, Service, answer, location, session_cookie};
 use crate::fake_issuer::Login;
 use crate::harness_serve::{StageTimer, serve};

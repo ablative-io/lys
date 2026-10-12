@@ -162,7 +162,10 @@ mod tests {
         });
         child.kill()?;
         child.wait()?;
-        let (gone, took) = waiter.join().map_err(|_| "the waiter panicked")?;
+        let (gone, took) = match waiter.join() {
+            Ok(answer) => answer,
+            Err(payload) => std::panic::resume_unwind(payload),
+        };
         assert_eq!(gone, Exit::Gone, "the exit was not told");
         assert!(
             took < Duration::from_secs(2),

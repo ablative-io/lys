@@ -39,6 +39,14 @@ fn refused(answer: &(u16, Value), status: u16, name: &str) {
     assert_eq!(answer.1["refusal"], name, "{}", answer.1);
 }
 
+fn broken_config(dir: &std::path::Path) -> Result<String, Box<dyn Error>> {
+    let broken = dir.join("broken-config");
+    std::fs::create_dir_all(broken.join("plugins"))?;
+    std::fs::write(broken.join("plugins/installed_plugins.json"), b"not json")?;
+    let broken = broken.to_str().ok_or("the test folder is not UTF-8")?;
+    Ok(broken.to_owned())
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> TestResult {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
@@ -140,11 +148,9 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
     let folder = home["config_dir"].as_str().ok_or("no folder named")?;
     assert!(folder.ends_with("/.claude"), "{home}");
 
-    let broken = dir.path().join("broken-config");
-    std::fs::create_dir_all(broken.join("plugins"))?;
-    std::fs::write(broken.join("plugins/installed_plugins.json"), b"not json")?;
-    let broken = broken.to_str().ok_or("the test folder is not UTF-8")?;
-    let unreadable = service.get(&asked(broken), Some(&ada)).await?;
+    let unreadable = service
+        .get(&asked(&broken_config(dir.path())?), Some(&ada))
+        .await?;
     refused(&unreadable, 409, "plugins_unreadable");
 
     let by_bea = service.get(&asked(named), Some(&bea)).await?;

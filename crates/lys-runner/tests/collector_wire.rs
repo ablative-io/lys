@@ -28,7 +28,13 @@ impl Wire {
         })
     }
 
-    fn start(&self, tracking: Value, environment: Value, caller: bool, proxy: bool) -> TestResult {
+    fn start(
+        &self,
+        tracking: &Value,
+        environment: &Value,
+        caller: bool,
+        proxy: bool,
+    ) -> TestResult {
         let launch: Launch = serde_json::from_value(json!({
             "session":"wire", "program":"/bin/cat", "arguments":[],
             "directory":"/", "environment":environment, "columns":80, "rows":24
@@ -38,7 +44,7 @@ impl Wire {
             self.sessions
                 .proxy_state(&self.directory.path().join("proxy"));
             value["proxy"] = json!({"run":"0123456789abcdef0123456789abcdef",
-                "context_window":200000, "profile_version":1, "account":null});
+                "context_window":200_000, "profile_version":1, "account":null});
         }
         if caller {
             value = json!({"act":"as_caller", "caller":"person", "done":value});
@@ -107,8 +113,8 @@ fn a_wire_start_binds_only_the_spec_transcript_on_each_start_path() -> TestResul
             std::fs::create_dir_all(path.parent().ok_or("transcript parent absent")?)?;
             std::fs::write(&path, b"")?;
             wire.start(
-                json!({"harness":"claude_code", "config_home":home}),
-                json!({"CLAUDE_CONFIG_DIR":other}),
+                &json!({"harness":"claude_code", "config_home":home}),
+                &json!({"CLAUDE_CONFIG_DIR":other}),
                 caller,
                 proxy,
             )?;
@@ -144,8 +150,8 @@ fn wire_tracking_names_the_environment_config_home_source() -> TestResult {
         let wire = Wire::new()?;
         let home = wire.directory.path().join("environment");
         wire.start(
-            json!({"harness":harness, "config_home":null}),
-            json!({name:home}),
+            &json!({"harness":harness, "config_home":null}),
+            &json!({name:home}),
             false,
             false,
         )?;
@@ -161,7 +167,7 @@ fn wire_tracking_names_the_runner_home_source() -> TestResult {
     let home = PathBuf::from(std::env::var_os("HOME").ok_or("runner HOME absent")?);
     for (harness, folder) in [("claude_code", ".claude"), ("codex", ".codex")] {
         let wire = Wire::new()?;
-        wire.start(json!({"harness":harness}), json!({}), false, false)?;
+        wire.start(&json!({"harness":harness}), &json!({}), false, false)?;
         let record = wire.start_record()?;
         assert_eq!(record["config_home_source"], "home");
         assert_eq!(record["config_home"], json!(home.join(folder)));

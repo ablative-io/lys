@@ -99,7 +99,7 @@ fn actor() -> Result<Actor, Box<dyn Error>> {
 }
 
 fn source(clock: &Arc<ManualClock>) -> ClockSource {
-    let provider: Arc<dyn Clock> = clock.clone();
+    let provider: Arc<dyn Clock> = Arc::clone(clock);
     ClockSource::Supplied(provider)
 }
 

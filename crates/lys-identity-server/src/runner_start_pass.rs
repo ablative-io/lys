@@ -119,6 +119,22 @@ fn proxied(
 /// The variable a launch names its profile version in.
 const PROFILE_VERSION_VARIABLE: &str = "LYS_PROVISIONING_VERSION";
 
+pub(crate) fn record_after_end<T>(
+    ending: Result<(), ServerError>,
+    keep: impl FnOnce() -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    let kept = keep();
+    match (ending, kept) {
+        (Ok(()), result) => result,
+        (Err(ending), Ok(_)) => Err(ending),
+        (Err(ending), Err(recording)) => Err(ServerError::RuntimeUnavailable {
+            reason: format!(
+                "ending the run pass failed: {ending}; keeping the runner act failed: {recording}"
+            ),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod profile_window_tests {
     use super::proxied;
@@ -161,21 +177,5 @@ mod profile_window_tests {
             let error = proxied(&launch(window)).expect_err("invalid window accepted");
             assert!(error.to_string().contains("context_window"), "{error}");
         }
-    }
-}
-
-pub(crate) fn record_after_end<T>(
-    ending: Result<(), ServerError>,
-    keep: impl FnOnce() -> Result<T, ServerError>,
-) -> Result<T, ServerError> {
-    let kept = keep();
-    match (ending, kept) {
-        (Ok(()), result) => result,
-        (Err(ending), Ok(_)) => Err(ending),
-        (Err(ending), Err(recording)) => Err(ServerError::RuntimeUnavailable {
-            reason: format!(
-                "ending the run pass failed: {ending}; keeping the runner act failed: {recording}"
-            ),
-        }),
     }
 }

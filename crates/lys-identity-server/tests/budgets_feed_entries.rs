@@ -14,7 +14,7 @@ macro_rules! budgets_feed_entries {
         type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
         pub(crate) struct Fixture {
-            pub(crate) state: Arc<crate::routes::AppState>,
+            pub(crate) state: Arc<$crate::routes::AppState>,
             pub(crate) agent: String,
             pub(crate) messages: Arc<Mutex<Vec<String>>>,
             workers: Vec<tokio::task::JoinHandle<std::io::Result<()>>>,
@@ -38,11 +38,11 @@ macro_rules! budgets_feed_entries {
 
             pub(crate) fn track(&self, session: &str, machine: &str) -> TestResult {
                 for (at, reported) in [
-                    (1, crate::runtime_state::Reported::Starting),
-                    (2, crate::runtime_state::Reported::Running),
+                    (1, $crate::runtime_state::Reported::Starting),
+                    (2, $crate::runtime_state::Reported::Running),
                 ] {
-                    crate::runtime_api::with_runtime(&self.state, |store| {
-                        store.report(crate::runtime_state::Report {
+                    $crate::runtime_api::with_runtime(&self.state, |store| {
+                        store.report($crate::runtime_state::Report {
                             operation: format!("track-{session}-{at}"),
                             session: session.to_owned(),
                             agent: Some(self.agent.clone()),
@@ -107,10 +107,10 @@ macro_rules! budgets_feed_entries {
             }))
         }
 
-        async fn configured(path: &Path) -> TestResult<(crate::Config, crate::oidc::Oidc)> {
+        async fn configured(path: &Path) -> TestResult<($crate::Config, $crate::oidc::Oidc)> {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
             let issuer = format!("http://{}", listener.local_addr()?);
-            let config: crate::Config = serde_json::from_value(json!({
+            let config: $crate::Config = serde_json::from_value(json!({
                 "listen":"127.0.0.1:0", "log_dir":path.join("directory"),
                 "log_origin":"example.test/lys/feed", "event_key_file":path.join("key"),
                 "issuer":issuer, "client_id":"feed-test", "client_secret_file":path.join("client"),
@@ -134,7 +134,7 @@ macro_rules! budgets_feed_entries {
                 }))
                 .route("/jwks", axum::routing::get(|| async { axum::Json(json!({"keys":[]})) }));
             let discovery = tokio::spawn(async move { axum::serve(listener, app).await });
-            let discovered = crate::oidc::Oidc::discover(&config).await;
+            let discovered = $crate::oidc::Oidc::discover(&config).await;
             discovery.abort();
             match discovery.await {
                 Ok(result) => result?,
@@ -148,13 +148,13 @@ macro_rules! budgets_feed_entries {
         pub(crate) async fn fixture() -> TestResult<Fixture> {
             use std::sync::atomic::AtomicU64;
             use std::sync::RwLock;
-            use crate::routes::AppState;
+            use $crate::routes::AppState;
 
             let dir = tempfile::tempdir()?;
             let path = dir.path();
             let (config, oidc) = configured(path).await?;
             let key = Arc::new(lys_core::Ed25519Identity::load_or_generate(&config.event_key_file)?);
-            let mut directory = crate::routes::open_directory(&config)?;
+            let mut directory = $crate::routes::open_directory(&config)?;
             let binding = lys_identity::LoginBinding::new(&config.issuer, "owner")?;
             let actor = lys_identity::Actor::new(binding.clone(), lys_identity::Provenance::new(lys_identity::AuthMethod::Oidc, 1));
             let (owner, _) = directory.setup_person(actor.clone(), lys_identity::OperationId::generate()?, lys_identity::Profile::new("Owner")?, 1)?;
@@ -162,17 +162,17 @@ macro_rules! budgets_feed_entries {
             directory.transition(actor, lys_identity::OperationId::generate()?, lys_identity::IdentityId::Agent(agent), lys_identity::Transition::Activate, "", 3)?;
             let messages = Arc::new(Mutex::new(Vec::new()));
             let saved = Arc::clone(&messages);
-            let say: crate::Say = Arc::new(move |words| {
+            let say: $crate::Say = Arc::new(move |words| {
                 match saved.lock() {
                     Ok(mut saved) => saved.push(words.to_owned()),
                     Err(error) => panic!("fixture log poisoned: {error}"),
                 }
             });
-            let apps = crate::apps_api::opened(&config, Arc::clone(&key), &*say)?;
-            let mut network = crate::network_store::NetworkStore::open(&path.join("network.json"))?;
+            let apps = $crate::apps_api::opened(&config, Arc::clone(&key), &*say)?;
+            let mut network = $crate::network_store::NetworkStore::open(&path.join("network.json"))?;
             let mut workers = Vec::new();
             for machine in ["machine", "foreign"] {
-                network.name(crate::network_store::Machine {
+                network.name($crate::network_store::Machine {
                     id: machine.to_owned(), name: machine.to_owned(), kind: "computer".to_owned(),
                     runtime: Some("sh".to_owned()), slots: 1, may_run: vec![agent.to_string()],
                     may_run_roles: Vec::new(), may_reach: Vec::new(), named_by: owner.to_string(),
@@ -180,47 +180,47 @@ macro_rules! budgets_feed_entries {
                 })?;
                 let socket = path.join(format!("{machine}.sock"));
                 workers.push(runner(&socket, key.public_key_bytes())?);
-                network.name_runner(machine, Some(crate::runner_client::RunnerRecord::Socket { path: socket.to_string_lossy().into_owned() }))?;
+                network.name_runner(machine, Some($crate::runner_client::RunnerRecord::Socket { path: socket.to_string_lossy().into_owned() }))?;
             }
             let state = Arc::new(AppState {
-                changes: crate::changes::Changes::new()?,
+                changes: $crate::changes::Changes::new()?,
                 directory: Mutex::new(directory), oidc,
-                sign_in: crate::sign_in::IssuerSignIn::configured(&config)?,
+                sign_in: $crate::sign_in::IssuerSignIn::configured(&config)?,
                 provider: None, setup: None, setup_lock: tokio::sync::Mutex::new(()),
                 import_credential_file: None, identity_upstream: "http://127.0.0.1".to_owned(),
                 estate_plan_file: path.join("estate"), password_policy: None, model_proxy: None, proxy_dir: None,
-                sessions: crate::session::Sessions::new(300, false),
-                admission: crate::admission::Admission::new(Some(binding), config.link_audit_binding()?),
+                sessions: $crate::session::Sessions::new(300, false),
+                admission: $crate::admission::Admission::new(Some(binding), config.link_audit_binding()?),
                 grants: Mutex::new(None),
-                grant_setup: crate::grants::GrantSetup {
+                grant_setup: $crate::grants::GrantSetup {
                     log_dir: config.grant_log_dir.clone(), log_origin: config.grant_log_origin.clone(),
                     key_file: config.event_key_file.clone(), model: RwLock::new(apps.model()?),
                     spicedb: None, model_revision: AtomicU64::new(apps.model_revision()),
-                    refresh: Mutex::new(()), changes: crate::grant_changes::GrantChanges::default(),
+                    refresh: Mutex::new(()), changes: $crate::grant_changes::GrantChanges::default(),
                 },
                 secrets: None, requests: None, mcp_requests: None, network: Some(Mutex::new(network)),
                 joins: None, roles: None, provisioning: None, certificates: None,
-                runtime: Some(Mutex::new(crate::runtime_store::RuntimeStore::open(&path.join("runtime"), Arc::clone(&key))?)),
+                runtime: Some(Mutex::new($crate::runtime_store::RuntimeStore::open(&path.join("runtime"), Arc::clone(&key))?)),
                 service_accounts: None, reviews: None, teams: None,
-                budgets: Some(Mutex::new(crate::budgets_store::BudgetStore::open(&path.join("budgets"), Arc::clone(&key))?)),
+                budgets: Some(Mutex::new($crate::budgets_store::BudgetStore::open(&path.join("budgets"), Arc::clone(&key))?)),
                 policies: None, stops: None, goals: None, words: None, variables: None, schedules: None,
-                configuration: Mutex::new(Box::new(crate::configuration_store::ConfigurationStore::open(&path.join("organisation"), Arc::clone(&key))?)),
-                cord: Mutex::new(crate::cord_store::CordStore::open(&path.join("cord"), Arc::clone(&key))?),
-                canvas: crate::canvas_store::CanvasStore::beside(&config.log_dir), apps: Mutex::new(apps),
-                grant_tokens: Mutex::new(crate::grant_token_store::Tokens::open(path.join("tokens.json"))?),
-                agent_passes: Arc::new(Mutex::new(crate::agent_pass_store::Passes::open(path.join("passes.json"))?)),
-                kept_responsibilities: crate::kept_responsibilities::Kept::load(&path.join("responsibilities.json"))?,
-                benches: crate::apps_bench::Benches::new(path.join("benches"), &*say)?,
+                configuration: Mutex::new(Box::new($crate::configuration_store::ConfigurationStore::open(&path.join("organisation"), Arc::clone(&key))?)),
+                cord: Mutex::new($crate::cord_store::CordStore::open(&path.join("cord"), Arc::clone(&key))?),
+                canvas: $crate::canvas_store::CanvasStore::beside(&config.log_dir), apps: Mutex::new(apps),
+                grant_tokens: Mutex::new($crate::grant_token_store::Tokens::open(path.join("tokens.json"))?),
+                agent_passes: Arc::new(Mutex::new($crate::agent_pass_store::Passes::open(path.join("passes.json"))?)),
+                kept_responsibilities: $crate::kept_responsibilities::Kept::load(&path.join("responsibilities.json"))?,
+                benches: $crate::apps_bench::Benches::new(path.join("benches"), &*say)?,
                 sign_in_providers: None, agent_nonces: Mutex::default(), operator_token: None, operator_upgrade_file: None,
-                runners: crate::runner_client::Runners::new(Arc::clone(&key), None),
-                acts: Mutex::new(crate::runner_acts::ActStore::open(&path.join("acts"), Arc::clone(&key))?),
-                say, membership: crate::channel_membership_counts::Membership::new(None),
-                seats: Mutex::new(crate::seats_store::SeatStore::open(&path.join("seats"), Arc::clone(&key))?),
-                seat_imports: crate::seat_import_store::SeatImports::open(&path.join("imports"), key)?,
+                runners: $crate::runner_client::Runners::new(Arc::clone(&key), None),
+                acts: Mutex::new($crate::runner_acts::ActStore::open(&path.join("acts"), Arc::clone(&key))?),
+                say, membership: $crate::channel_membership_counts::Membership::new(None),
+                seats: Mutex::new($crate::seats_store::SeatStore::open(&path.join("seats"), Arc::clone(&key))?),
+                seat_imports: $crate::seat_import_store::SeatImports::open(&path.join("imports"), key)?,
             });
             for machine in ["machine", "foreign"] {
-                assert!(state.runners.links().begin(crate::runner_links::Link::Feed, machine));
-                assert!(state.runners.links().begin(crate::runner_links::Link::Grants, machine));
+                assert!(state.runners.links().begin($crate::runner_links::Link::Feed, machine));
+                assert!(state.runners.links().begin($crate::runner_links::Link::Grants, machine));
             }
             Ok(Fixture { state, agent: agent.to_string(), messages, workers, dir })
         }
@@ -254,14 +254,14 @@ macro_rules! budgets_feed_entries {
             let feed = page(vec![entry(1, "good"), entry(2, "bad"), entry(3, "good")], "cursor-3");
             let result = super::keep_page(&table.state, "machine", feed.clone()).await;
             assert!(result.is_ok(), "a refused entry ended the follow: {result:?}");
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 2);
                 assert_eq!(store.held().refusals.records.len(), 1);
                 Ok(())
             })?;
             super::keep_page(&table.state, "machine", feed).await?;
             super::keep_page(&table.state, "machine", page(vec![entry(4, "good")], "cursor-4")).await?;
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 let held = store.held();
                 assert_eq!(held.uses.len(), 3, "the page replay did not count again and the next page counted");
                 assert_eq!(held.uses.iter().map(|usage| usage.tokens).sum::<u64>(), 6);
@@ -279,9 +279,9 @@ macro_rules! budgets_feed_entries {
                 assert_eq!(held.refusals.cursors.get("machine").map(String::as_str), Some("cursor-4"));
                 Ok(())
             })?;
-            assert!(!table.state.runners.links().begin(crate::runner_links::Link::Feed, "machine"), "the live follow stayed held");
+            assert!(!table.state.runners.links().begin($crate::runner_links::Link::Feed, "machine"), "the live follow stayed held");
             let key = Arc::new(lys_core::Ed25519Identity::load_or_generate(&table.dir.path().join("key"))?);
-            let replay = crate::budgets_store::BudgetStore::open(&table.dir.path().join("budgets"), key)?;
+            let replay = $crate::budgets_store::BudgetStore::open(&table.dir.path().join("budgets"), key)?;
             assert_eq!(replay.held().uses.len(), 3, "charges survived reopening");
             assert_eq!(replay.held().refusals.records.len(), 1, "the skipped receipt survived reopening");
             assert_eq!(replay.held().refusals.records[0].check, "feed_entry_skipped");
@@ -298,7 +298,7 @@ macro_rules! budgets_feed_entries {
             let result = super::keep_page(&table.state, "machine", feed.clone()).await;
             assert!(result.is_ok(), "the live session machine was refused: {result:?}");
             super::keep_page(&table.state, "foreign", feed).await?;
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 1, "a second machine follow did not charge again");
                 let usage = &store.held().uses[0];
                 assert_eq!(usage.event, "native:foreign:entry-2");
@@ -320,8 +320,8 @@ macro_rules! budgets_feed_entries {
             let table = fixture().await?;
             table.track("good", "machine")?;
             table.track("retired-session", "foreign")?;
-            crate::network_api::with_network(&table.state, |store| {
-                store.retire("foreign", crate::network_store::Retirement { by: "owner".to_owned(), at: 6 })
+            $crate::network_api::with_network(&table.state, |store| {
+                store.retire("foreign", $crate::network_store::Retirement { by: "owner".to_owned(), at: 6 })
             })?;
             let mut mismatch = entry(2, "good");
             mismatch.session = "entry-session".to_owned();
@@ -332,7 +332,7 @@ macro_rules! budgets_feed_entries {
             let feed = page(vec![entry(1, "good"), mismatch, entry(3, "unknown"), window, entry(5, "retired-session"), entry(6, "good")], "cursor-6");
             let result = super::keep_page(&table.state, "machine", feed).await;
             assert!(result.is_ok(), "per-entry checks ended the page: {result:?}");
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 2);
                 let records = &store.held().refusals.records;
                 assert_eq!(records.len(), 4);
@@ -358,8 +358,8 @@ macro_rules! budgets_feed_entries {
             let mut table = fixture().await?;
             Arc::get_mut(&mut table.state).ok_or("fixture state unexpectedly shared")?.runtime = None;
             let result = super::keep_page(&table.state, "machine", page(vec![entry(1, "unknown")], "cursor-1")).await;
-            assert!(matches!(result, Err(crate::error::ServerError::RuntimeUnavailable { .. })), "the store failure became an entry skip: {result:?}");
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            assert!(matches!(result, Err($crate::error::ServerError::RuntimeUnavailable { .. })), "the store failure became an entry skip: {result:?}");
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert!(store.held().uses.is_empty());
                 assert!(store.held().refusals.records.is_empty());
                 assert!(store.held().refusals.cursors.is_empty(), "the failed page was acknowledged");

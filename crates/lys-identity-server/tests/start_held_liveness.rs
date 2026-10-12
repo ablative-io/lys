@@ -114,9 +114,10 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
             &json!({"profile_version": profile, "machine": machine}),
         )
         .await;
-    responder
-        .join()
-        .map_err(|_| "runner responder panicked")??;
+    match responder.join() {
+        Ok(answer) => answer?,
+        Err(payload) => std::panic::resume_unwind(payload),
+    }
     let (status, answer) = started?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["error"], "conversation_held", "{answer}");

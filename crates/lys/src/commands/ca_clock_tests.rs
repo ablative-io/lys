@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 //! Stored issuer certificates read the creation clock only when first created.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -19,13 +21,13 @@ impl Clock for RefusingClock {
     }
 }
 
-fn failing_authority(key: &Path) -> (CertificateAuthority, Arc<RefusingClock>) {
+fn failing_authority(key: &Path) -> CliResult<(CertificateAuthority, Arc<RefusingClock>)> {
     let clock = Arc::new(RefusingClock {
         reads: AtomicUsize::new(0),
     });
     let provider = Arc::clone(&clock);
-    let authority = CertificateAuthority::with_clock(load_identity(key).unwrap(), provider);
-    (authority, clock)
+    let authority = CertificateAuthority::with_clock(load_identity(key)?, provider);
+    Ok((authority, clock))
 }
 
 #[test]
@@ -38,7 +40,7 @@ fn stored_issuer_reuse_does_not_read_a_failing_creation_clock() {
         .unwrap();
     let original = pem::encode_certificate(&original).into_bytes();
     std::fs::write(stored_issuer_certificate_path(&key), &original).unwrap();
-    let (authority, clock) = failing_authority(&key);
+    let (authority, clock) = failing_authority(&key).unwrap();
     let stored = stored_issuer_certificate(&key, &authority).unwrap();
     assert_eq!(stored.pem, original);
     assert!(stored.built.is_none());
@@ -56,7 +58,7 @@ fn invalid_stored_issuer_refuses_without_rebuilding_or_reading_time() {
     lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
     let path = stored_issuer_certificate_path(&key);
     std::fs::write(&path, b"invalid stored issuer").unwrap();
-    let (authority, clock) = failing_authority(&key);
+    let (authority, clock) = failing_authority(&key).unwrap();
     let result = stored_issuer_certificate(&key, &authority);
     assert!(matches!(
         result,
@@ -71,7 +73,7 @@ fn absent_stored_issuer_clock_failure_writes_no_certificate() {
     let directory = tempfile::tempdir().unwrap();
     let key = directory.path().join("issuer.key");
     lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
-    let (authority, clock) = failing_authority(&key);
+    let (authority, clock) = failing_authority(&key).unwrap();
     let output = directory.path().join("export.pem");
     let provider = Arc::clone(&clock);
     let result = issuer_cert_with_clock(&key, &output, true, ClockSource::Supplied(provider));

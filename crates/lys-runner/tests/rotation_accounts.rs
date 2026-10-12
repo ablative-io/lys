@@ -92,16 +92,16 @@ impl LocalBroker {
             })?;
         let presentation = Presentation::sign(
             &issued.id,
-            &new_operation_id().map_err(broker_error)?,
+            &new_operation_id().map_err(|error| broker_error(&error))?,
             NOW,
             [7; 32],
             &self.agent,
         )
-        .map_err(broker_error)?;
+        .map_err(|error| broker_error(&error))?;
         match self
             .broker
             .use_handle(&issued.token, &presentation, |value| place(value.expose()))
-            .map_err(broker_error)?
+            .map_err(|error| broker_error(&error))?
         {
             Used::Forwarded { answer, .. } => answer,
             Used::Retried { .. } => Err(RunnerError::refused(
@@ -112,7 +112,7 @@ impl LocalBroker {
     }
 }
 
-fn broker_error(error: lys_secrets::SecretsError) -> RunnerError {
+fn broker_error(error: &lys_secrets::SecretsError) -> RunnerError {
     RunnerError::refused(error.name(), "the local account broker refused the use")
 }
 
