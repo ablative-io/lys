@@ -482,18 +482,5 @@ async fn instructions_mode_refuses_an_unknown_mode_without_recording_it() -> Tes
     Ok(())
 }
 
-#[tokio::test]
-async fn instructions_mode_read_view_preserves_a_saved_session() -> TestResult {
-    let table = Table::set().await?;
-    let path = table.route(1);
-    let mut body = profile(&operation()?, 0, "Saved session settings.");
-    let session = json!({"compact": "/compact", "message_prefix": "/message", "sensitive": true});
-    body["session"] = session.clone();
-    let (status, recorded) = table.service.post(&path, Some(&table.ada), &body).await?;
-    assert_eq!(status, 200, "{recorded}");
-    let (status, read) = table.service.get(&path, Some(&table.ada)).await?;
-    assert_eq!(status, 200, "{read}");
-    assert_eq!(read["profile"]["session"], session);
-    assert_eq!(recorded["profile"]["session"], session);
-    Ok(())
-}
+#[path = "provisioning/saved_session.rs"]
+mod saved_session;

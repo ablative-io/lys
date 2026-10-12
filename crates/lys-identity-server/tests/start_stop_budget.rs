@@ -68,6 +68,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
                 Act::Liveness { session: None } => Answer::Liveness {
                     sessions: Vec::new(),
                 },
+                Act::GrantChannel => Answer::GrantChannel,
                 Act::Owned => Answer::Owned {
                     owners: Vec::new(),
                     unreachable: Vec::new(),
@@ -153,7 +154,7 @@ async fn stop_end_budget_records_lingering_pid_and_refuses_start() -> Result<(),
         "{stops}"
     );
     table.ok(&format!("/identities/{}/transitions", table.agent()),
-        &json!({"operation": operation()?, "transition": "activate", "reason": "try to restart"})).await?;
+        &json!({"operation": operation()?, "transition": "reinstate", "reason": "try to restart"})).await?;
     let (_, profile) = table
         .service
         .get(

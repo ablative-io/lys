@@ -64,7 +64,7 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
     let held_session = session.clone();
     let responder = std::thread::spawn(move || -> Result<(), String> {
         let mut observed = 0;
-        for _ in 0..2 {
+        while observed < 1 {
             let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
             let greeting = Greeting::fresh("00");
             let mut writer = &stream;
@@ -75,6 +75,15 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
                 .map_err(|error| error.to_string())?;
             let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
             let answer = match act {
+                Act::Feed { .. } => Answer::Refused {
+                    refusal: "feed_not_kept".to_owned(),
+                    words: "this fixture keeps no feed".to_owned(),
+                    oldest: None,
+                },
+                Act::Liveness { session: None } => Answer::Liveness {
+                    sessions: Vec::new(),
+                },
+                Act::GrantChannel => Answer::GrantChannel,
                 Act::Owned => Answer::Owned {
                     owners: Vec::new(),
                     unreachable: Vec::new(),

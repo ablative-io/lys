@@ -366,7 +366,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);
     GET "/mcp" "MCP server stream availability" G [SIGNED];
-    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent", "TokenUnknown", "seat_unverifiable"]];
+    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent", "TokenUnknown", "seat_unverifiable", "pass_unknown_or_ended"]];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
     POST "/seats" "Add a seat: a name an agent runs under on one machine from one reviewed profile version" S [SIGNED_BODY, &["seat_name_invalid", "seat_name_taken", "seat_operation_reused", "seats_unavailable", "IdentifierMalformed", "NotAdmitted", "AgentNotVisible", "ProfileVersionUnknown", "ProfileNotReviewed", "HarnessUndeclared", "MachineUnknown", "MachineRetired", "MachineWithoutRunner", "ProvisioningUnavailable", "NetworkUnavailable"]];

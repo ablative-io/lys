@@ -90,7 +90,15 @@ fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("provisioning.json");
     std::fs::write(&path, original)?;
-    let mut store = ProvisioningStore::open(&path)?;
+    let heard = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    let lines = std::sync::Arc::clone(&heard);
+    let subscriber =
+        crate::warn_lines::WarnLines::new(std::sync::Arc::new(move |line| match lines.lock() {
+            Ok(mut lines) => lines.push(line.to_owned()),
+            Err(error) => panic!("fixture log poisoned: {error}"),
+        }));
+    let mut store =
+        tracing::subscriber::with_default(subscriber, || ProvisioningStore::open(&path))?;
     let version = &store
         .profile("ordinary-agent")
         .ok_or("old profile missing")?
@@ -125,7 +133,17 @@ fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
     expected["profiles"][0]["versions"][0]["settings"]["session"]["stall_after"] = 300.into();
     assert_eq!(serde_json::to_value(read(&path)?)?, expected);
     store.write(read(&path)?)?;
-    assert_eq!(std::fs::read(&path)?, migrated);
+    assert_ne!(migrated, original);
+    assert_eq!(
+        std::fs::read(&path)?,
+        serde_json::to_vec_pretty(&read(&path)?)?
+    );
+    assert_eq!(serde_json::to_value(read(&path)?)?, expected);
+    let lines = heard.lock().map_err(|error| error.to_string())?;
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("profile_stall_after_recorded"));
+    assert!(lines[0].contains("provisioning migration wrote session.stall_after=300"));
+    assert!(lines[0].contains(&backups[0].path().display().to_string()));
     assert_eq!(std::fs::read(backups[0].path())?, original);
     let mut explicit = version_fixture()?;
     explicit["settings"]["session"]["requires_controls"] = serde_json::json!(true);

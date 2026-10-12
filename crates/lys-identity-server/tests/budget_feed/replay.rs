@@ -20,21 +20,14 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
         prepare,
     )
     .await?;
-    tokio::select! {
-        result = runner.finish() => { result?; ended.changed().await?; }
-        changed = ended.changed() => {
-            changed?;
-            let reason = ended.borrow().clone().ok_or("no follower end")?;
-            if !reason.contains("RuntimeSessionUnknown") { return Err(reason.into()); }
-            runner.finish().await?;
-        }
-    }
+    runner.finish().await?;
+    ended.changed().await?;
     assert!(
         ended
             .borrow()
             .as_ref()
-            .is_some_and(|reason| reason.contains("RuntimeSessionUnknown")),
-        "the invalid page must name its unknown session"
+            .is_some_and(|reason| reason.contains("the feed of machine")
+                && reason.contains("no longer followed"))
     );
     let cookie = service
         .sign_in(Login {
@@ -175,14 +168,37 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
     let mut held = Held::default();
     held.fold(&tail)?;
     assert_eq!(held.uses.len(), 4);
-    assert_eq!(held.refusals.records.len(), 1);
+    assert_eq!(held.refusals.records.len(), 2);
+    let skipped = held
+        .refusals
+        .records
+        .iter()
+        .find(|record| record.check == "feed_entry_skipped")
+        .ok_or("the invalid page's refusal was not kept")?;
+    assert_eq!(skipped.session, "untracked-session");
+    assert!(
+        skipped.words.contains("RuntimeSessionUnknown"),
+        "{}",
+        skipped.words
+    );
+    assert!(
+        held.refusals
+            .records
+            .iter()
+            .any(|record| record.words == "denied")
+    );
     assert_eq!(
         held.refusals.cursors.get(&machine).map(String::as_str),
-        Some("cursor-five")
+        Some("cursor-bad")
     );
     service.restart().await?;
     let (status, restored) = service.get(&path, Some(&cookie)).await?;
     assert_eq!(status, 200, "{restored}");
     assert_eq!(restored["used"], answer["used"]);
+    let (_, tail) = FrontierLog::open(FileLeafStore::open(&dir)?)?;
+    let mut reopened = Held::default();
+    reopened.fold(&tail)?;
+    assert_eq!(reopened.refusals.records, held.refusals.records);
+    assert_eq!(reopened.refusals.cursors, held.refusals.cursors);
     Ok(())
 }

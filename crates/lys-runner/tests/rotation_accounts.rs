@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::error::Error;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -117,10 +117,12 @@ fn broker_error(error: &lys_secrets::SecretsError) -> RunnerError {
 }
 
 fn output(mut spawned: Spawned) -> Result<String, Box<dyn Error>> {
-    // The harness emits one digest; its frame is the signal, independent
-    // of the terminal's lifetime while its other handles remain held.
+    // The digest frame and acknowledgement bound both directions without
+    // waiting for terminal EOF while its resize and input handles are held.
     let mut digest = [0; 64];
     spawned.reader.read_exact(&mut digest)?;
+    spawned.writer.write_all(b"\n")?;
+    spawned.writer.flush()?;
     let status = spawned.child.wait()?;
     assert!(status.success());
     Ok(String::from_utf8(digest.to_vec())?)
@@ -129,7 +131,9 @@ fn output(mut spawned: Spawned) -> Result<String, Box<dyn Error>> {
 fn digest_arguments(variable: &str) -> Vec<String> {
     vec![
         "-c".to_owned(),
-        format!("printf '%s' \"${variable}\" | /usr/bin/shasum -a 256"),
+        format!(
+            "import hashlib, os, sys; sys.stdout.write(hashlib.sha256(os.environ[{variable:?}].encode()).hexdigest()); sys.stdout.flush(); sys.stdin.buffer.read(1)"
+        ),
     ]
 }
 
@@ -163,7 +167,7 @@ fn rotation_account_value_reaches_only_the_child_environment() -> TestResult {
     for variable in ["CLAUDE_CODE_OAUTH_TOKEN", "CODEX_API_KEY", "OPENAI_API_KEY"] {
         let args = digest_arguments(variable);
         let spawn = Spawn {
-            program: "/bin/sh",
+            program: "/usr/bin/python3",
             arguments: &args,
             directory: "/",
             environment: &environment,
@@ -187,7 +191,7 @@ fn rotation_account_successor_is_resolved_after_usage_limit_words() -> TestResul
     let environment = BTreeMap::new();
     let args = digest_arguments("CLAUDE_CODE_OAUTH_TOKEN");
     let spawn = Spawn {
-        program: "/bin/sh",
+        program: "/usr/bin/python3",
         arguments: &args,
         directory: "/",
         environment: &environment,
@@ -261,7 +265,7 @@ fn rotation_account_value_never_reaches_rendered_files_or_captured_logs() -> Tes
     }
     let args = digest_arguments("CLAUDE_CODE_OAUTH_TOKEN");
     let spawn = Spawn {
-        program: "/bin/sh",
+        program: "/usr/bin/python3",
         arguments: &args,
         directory: "/",
         environment: &rendered.environment,

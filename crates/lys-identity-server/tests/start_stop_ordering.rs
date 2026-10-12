@@ -95,7 +95,7 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
     });
     let (mut release, _) = gate.accept()?;
     let transition =
-        json!({"operation": operation()?, "transition": "activate", "reason": "restart"});
+        json!({"operation": operation()?, "transition": "reinstate", "reason": "restart"});
     table
         .ok(
             &format!("/identities/{}/transitions", table.agent()),
