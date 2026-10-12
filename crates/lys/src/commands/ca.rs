@@ -49,7 +49,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use lys_core::TrustError;
+use lys_core::clock::ClockSource;
+use lys_core::{Ed25519Identity, TrustError};
 use lys_core::ca::{
     CertificateAuthority, LYS_OID_ARC, create_certificate_request, decode_extension,
     encode_extension, verify_certificate_chain_at,
@@ -263,13 +264,29 @@ fn check_stored_issuer(
 /// file is not the key's own; [`CliError::Io`] if a file cannot be read or
 /// written; and [`CliError::Trust`] if the issuer certificate cannot be built.
 pub fn issuer_cert(key: &Path, out: &Path, json: bool) -> CliResult<()> {
+    issuer_cert_with_clock(key, out, json, ClockSource::System)
+}
+
+/// Writes the stored issuer using an instance-owned creation clock.
+///
+/// A valid existing issuer is exported without reading creation time.
+///
+/// # Errors
+///
+/// See [`issuer_cert`]. A refused clock read is propagated before staging.
+pub fn issuer_cert_with_clock(
+    key: &Path,
+    out: &Path,
+    json: bool,
+    clock: ClockSource,
+) -> CliResult<()> {
     let stored_path = stored_issuer_certificate_path(key);
     refuse_shared_paths(&[
         ("issuer certificate file", out),
         (STORED_ISSUER, stored_path.as_path()),
     ])?;
     refuse_existing(out, "issuer certificate file")?;
-    let authority = CertificateAuthority::new(load_identity(key)?);
+    let authority = authority_with_clock(load_identity(key)?, clock);
     let stored = stored_issuer_certificate(key, &authority)?;
     if let Some(built) = stored.built {
         built.place()?;
@@ -308,6 +325,22 @@ pub struct IssueOutputs<'a> {
     pub issuer_certificate: Option<&'a Path>,
     /// The transparency log the certificate is entered in before it is written.
     pub log: LogEntry<'a>,
+}
+
+/// The unchanged issuance inputs, grouped for clock-supplied dispatch.
+pub struct IssueOptions<'a> {
+    /// The issuer's identity key file.
+    pub key: &'a Path,
+    /// The subject this authority chooses to certify.
+    pub subject: &'a str,
+    /// Optional custom capability claims read from this file.
+    pub claims: Option<&'a Path>,
+    /// The certificate's requested validity duration.
+    pub ttl: Duration,
+    /// Optional proof-of-possession certificate-signing request file.
+    pub request_path: Option<&'a Path>,
+    /// Whether to emit the existing JSON result.
+    pub json: bool,
 }
 
 impl IssueOutputs<'_> {
@@ -387,6 +420,39 @@ pub fn issue(
     request_path: Option<&Path>,
     json: bool,
 ) -> CliResult<()> {
+    issue_with_clock(
+        IssueOptions {
+            key,
+            subject,
+            claims,
+            ttl,
+            request_path,
+            json,
+        },
+        outputs,
+        ClockSource::System,
+    )
+}
+
+/// Issues through the existing file and log path with an owned clock.
+///
+/// # Errors
+///
+/// See [`issue`]. Clock failures propagate without publishing a certificate
+/// or appending it to the log.
+pub fn issue_with_clock(
+    options: IssueOptions<'_>,
+    outputs: &IssueOutputs<'_>,
+    clock: ClockSource,
+) -> CliResult<()> {
+    let IssueOptions {
+        key,
+        subject,
+        claims,
+        ttl,
+        request_path,
+        json,
+    } = options;
     let named = outputs.named();
     let stored_path = outputs
         .issuer_certificate
@@ -418,7 +484,7 @@ pub fn issue(
         None => Vec::new(),
     };
 
-    let authority = CertificateAuthority::new(identity);
+    let authority = authority_with_clock(identity, clock);
     // Read, or built and staged, before anything is signed, so a stored
     // issuer certificate that is not this key's stops the run with nothing
     // written or appended.
@@ -522,6 +588,13 @@ pub fn issue(
     Ok(())
 }
 
+fn authority_with_clock(identity: Ed25519Identity, clock: ClockSource) -> CertificateAuthority {
+    match clock {
+        ClockSource::System => CertificateAuthority::new(identity),
+        ClockSource::Supplied(clock) => CertificateAuthority::with_clock(identity, clock),
+    }
+}
+
 /// `lys ca verify --cert <file> --issuer-public-key <hex> [--at <rfc3339>]`.
 ///
 /// # Errors
@@ -603,3 +676,81 @@ pub fn verify(cert: &Path, issuer_public_key: &str, at: Option<&str>, json: bool
 #[cfg(test)]
 #[path = "ca_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod clock_tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::*;
+    use lys_core::clock::{Clock, ClockError};
+
+    #[derive(Debug)]
+    struct RefusingClock {
+        reads: AtomicUsize,
+    }
+
+    impl Clock for RefusingClock {
+        fn now(&self) -> Result<DateTime<Utc>, ClockError> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            Err(ClockError::Unavailable {
+                reason: "creation read refused".to_owned(),
+            })
+        }
+    }
+
+    fn failing_authority(key: &Path) -> (CertificateAuthority, Arc<RefusingClock>) {
+        let clock = Arc::new(RefusingClock {
+            reads: AtomicUsize::new(0),
+        });
+        let provider = Arc::clone(&clock);
+        let authority = CertificateAuthority::with_clock(load_identity(key).unwrap(), provider);
+        (authority, clock)
+    }
+
+    #[test]
+    fn stored_issuer_reuse_does_not_read_a_failing_creation_clock() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("issuer.key");
+        let identity = lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
+        let original = CertificateAuthority::new(identity).issuer_certificate_der().unwrap();
+        let original = pem::encode_certificate(&original).into_bytes();
+        std::fs::write(stored_issuer_certificate_path(&key), &original).unwrap();
+        let (authority, clock) = failing_authority(&key);
+        let stored = stored_issuer_certificate(&key, &authority).unwrap();
+        assert_eq!(stored.pem, original);
+        assert!(stored.built.is_none());
+        assert_eq!(clock.reads.load(Ordering::SeqCst), 0);
+        assert_eq!(std::fs::read(stored_issuer_certificate_path(&key)).unwrap(), original);
+    }
+
+    #[test]
+    fn invalid_stored_issuer_refuses_without_rebuilding_or_reading_time() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("issuer.key");
+        lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
+        let path = stored_issuer_certificate_path(&key);
+        std::fs::write(&path, b"invalid stored issuer").unwrap();
+        let (authority, clock) = failing_authority(&key);
+        let result = stored_issuer_certificate(&key, &authority);
+        assert!(matches!(result, Err(CliError::StoredIssuerCertificateInvalid { .. })));
+        assert_eq!(clock.reads.load(Ordering::SeqCst), 0);
+        assert_eq!(std::fs::read(path).unwrap(), b"invalid stored issuer");
+    }
+
+    #[test]
+    fn absent_stored_issuer_clock_failure_writes_no_certificate() {
+        let directory = tempfile::tempdir().unwrap();
+        let key = directory.path().join("issuer.key");
+        lys_core::Ed25519Identity::load_or_generate(&key).unwrap();
+        let (authority, clock) = failing_authority(&key);
+        let output = directory.path().join("export.pem");
+        let provider = Arc::clone(&clock);
+        let result = issuer_cert_with_clock(&key, &output, true, ClockSource::Supplied(provider));
+        assert!(matches!(result, Err(CliError::Trust(TrustError::CertificateGeneration { .. }))));
+        assert_eq!(clock.reads.load(Ordering::SeqCst), 1);
+        assert!(!stored_issuer_certificate_path(&key).exists());
+        assert!(!output.exists());
+        assert_eq!(authority.public_key_bytes(), load_identity(&key).unwrap().public_key_bytes());
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+}

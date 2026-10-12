@@ -20,6 +20,46 @@ pub(crate) fn path_str(path: &Path) -> &str {
     path.to_str().expect("tempdir path was not UTF-8")
 }
 
+/// Execute the separately built, uninstalled fixture with explicit creation time.
+pub(crate) fn run_lys_at(args: &[&str], at: &str) -> Output {
+    let fixture = std::env::var_os("LYS_CLOCK_FIXTURE")
+        .expect("LYS_CLOCK_FIXTURE must name the prebuilt clock fixture example");
+    let started = std::time::Instant::now();
+    let output = Command::new(fixture).arg(at).args(args).output().expect("clock fixture executes");
+    let elapsed = started.elapsed();
+    let work = clock_work(&output);
+    assert!(u128::from(work.elapsed_nanos) <= elapsed.as_nanos());
+    eprintln!("CLOCK_COMMAND {}", serde_json::json!({
+        "arguments": args,
+        "provider_reads": work.provider_reads,
+        "command_elapsed_nanos": elapsed.as_nanos(),
+        "dispatch_elapsed_nanos": work.elapsed_nanos,
+        "exit_code": output.status.code(),
+        "certificate_creations": null,
+        "physical_syncs": null,
+        "history_visits": null,
+    }));
+    output
+}
+
+pub(crate) struct ClockWork {
+    pub(crate) provider_reads: u64,
+    elapsed_nanos: u64,
+}
+
+pub(crate) fn clock_work(output: &Output) -> ClockWork {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut receipts = stderr.lines().filter_map(|line| line.strip_prefix("CLOCK_WORK "));
+    let receipt: serde_json::Value = serde_json::from_str(receipts.next().expect("completed clock receipt")).unwrap();
+    assert!(receipts.next().is_none(), "one receipt per completed command");
+    assert_eq!(receipt["completed"], true);
+    assert_eq!(receipt["success"], output.status.success());
+    ClockWork {
+        provider_reads: receipt["provider_reads"].as_u64().expect("provider-read count"),
+        elapsed_nanos: receipt["elapsed_nanos"].as_u64().expect("completed dispatch duration"),
+    }
+}
+
 /// Everything a command said, on either stream.
 pub(crate) fn said(output: &Output) -> String {
     format!(
@@ -266,6 +306,13 @@ pub(crate) fn openssl_verify(dir: &Path, issuer: &str, cert: &str) -> Output {
         .current_dir(dir)
         .output()
         .unwrap()
+}
+
+/// Verify the actual files at their explicitly supplied creation instant.
+pub(crate) fn openssl_verify_at(dir: &Path, issuer: &str, cert: &str, at: i64) -> Output {
+    Command::new(openssl())
+        .args(["verify", "-attime", &at.to_string(), "-CAfile", issuer, cert])
+        .current_dir(dir).output().unwrap()
 }
 
 /// `scripts/verify_inclusion.py <artifact> <leaf> [expected-root-base64]`.

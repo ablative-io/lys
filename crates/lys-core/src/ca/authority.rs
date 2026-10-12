@@ -46,6 +46,7 @@ use time::OffsetDateTime;
 use crate::ca::certificate::{CertifiedKey, IssuedCertificate};
 use crate::ca::rcgen_bridge::{IdentitySigner, PresentedKey, distinguished_name};
 use crate::ca::request::verify_certificate_request;
+use crate::clock::{Clock, ClockSource};
 use crate::error::{TrustError, TrustResult};
 use crate::hex_lower;
 use crate::keys::Ed25519Identity;
@@ -58,13 +59,27 @@ pub use verify::{verify_certificate_chain, verify_certificate_chain_at};
 #[derive(Debug)]
 pub struct CertificateAuthority {
     identity: Arc<Ed25519Identity>,
+    clock: ClockSource,
 }
 
 impl CertificateAuthority {
     /// Wraps an [`Ed25519Identity`] as a certificate authority.
+    #[must_use]
     pub fn new(identity: Ed25519Identity) -> Self {
         Self {
             identity: Arc::new(identity),
+            clock: ClockSource::System,
+        }
+    }
+
+    /// Wraps an identity with an instance-owned certificate creation clock.
+    ///
+    /// Verification continues to use its separately supplied instant.
+    #[must_use]
+    pub fn with_clock(identity: Ed25519Identity, clock: Arc<dyn Clock>) -> Self {
+        Self {
+            identity: Arc::new(identity),
+            clock: ClockSource::Supplied(clock),
         }
     }
 
@@ -92,14 +107,16 @@ impl CertificateAuthority {
     ///
     /// Returns [`TrustError::CertificateGeneration`] if `subject` is empty,
     /// `ttl` is zero or out of representable range, subject key generation
-    /// fails, or rcgen cannot build or sign the certificate.
+    /// fails, creation time is unavailable, or rcgen cannot build or sign the
+    /// certificate.
     pub fn issue_certificate(
         &self,
         subject: &str,
         ttl: Duration,
         extensions: Vec<CustomExtension>,
     ) -> TrustResult<IssuedCertificate> {
-        let (issued_at, expires_at) = validity_window(subject, ttl)?;
+        validate_issuance(subject, ttl)?;
+        let (issued_at, expires_at) = validity_window(ttl, self.creation_time()?)?;
 
         let issuer_key = self.issuer_key_pair()?;
         let issuer_cert = self.issuer_certificate(&issuer_key)?;
@@ -153,7 +170,8 @@ impl CertificateAuthority {
     /// [`TrustError::CertificateVerification`] if its proof of possession does
     /// not verify, and [`TrustError::CertificateGeneration`] if `subject` is
     /// empty, disagrees with the request's common name, `ttl` is zero or out
-    /// of representable range, or rcgen cannot build or sign the certificate.
+    /// of representable range, creation time is unavailable, or rcgen cannot
+    /// build or sign the certificate.
     pub fn issue_certificate_for_request(
         &self,
         request_der: &[u8],
@@ -161,7 +179,8 @@ impl CertificateAuthority {
         ttl: Duration,
         extensions: Vec<CustomExtension>,
     ) -> TrustResult<CertifiedKey> {
-        let (issued_at, expires_at) = validity_window(subject, ttl)?;
+        validate_issuance(subject, ttl)?;
+        let (issued_at, expires_at) = validity_window(ttl, self.creation_time()?)?;
 
         let request = verify_certificate_request(request_der)?;
         if request.common_name() != subject {
@@ -219,7 +238,7 @@ impl CertificateAuthority {
     /// # Errors
     ///
     /// Returns [`TrustError::CertificateGeneration`] if the issuer
-    /// certificate cannot be built or signed.
+    /// certificate cannot be built or signed, or creation time is unavailable.
     pub fn issuer_certificate_der(&self) -> TrustResult<Vec<u8>> {
         let issuer_key = self.issuer_key_pair()?;
         Ok(self.issuer_certificate(&issuer_key)?.der().to_vec())
@@ -250,6 +269,7 @@ impl CertificateAuthority {
     /// None of this reaches the certificates it signs: rcgen takes only the
     /// issuer's distinguished name and key identifier method from it.
     fn issuer_certificate(&self, issuer_key: &KeyPair) -> TrustResult<Certificate> {
+        let created_at = self.creation_time()?;
         let mut params = CertificateParams::new(Vec::<String>::new()).map_err(|e| {
             TrustError::CertificateGeneration {
                 reason: format!("failed to build issuer parameters: {e}"),
@@ -259,7 +279,7 @@ impl CertificateAuthority {
         params.distinguished_name = distinguished_name(&common_name);
         params.is_ca = IsCa::Ca(BasicConstraints::Constrained(0));
         params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
-        params.not_before = to_offset_date_time(Utc::now())?;
+        params.not_before = to_offset_date_time(created_at)?;
         params.not_after = OffsetDateTime::from_unix_timestamp(ISSUER_NOT_AFTER).map_err(|e| {
             TrustError::CertificateGeneration {
                 reason: format!("issuer certificate notAfter is out of range: {e}"),
@@ -270,6 +290,12 @@ impl CertificateAuthority {
             .map_err(|e| TrustError::CertificateGeneration {
                 reason: format!("failed to build issuer certificate: {e}"),
             })
+    }
+
+    fn creation_time(&self) -> TrustResult<DateTime<Utc>> {
+        self.clock.now().map_err(|error| TrustError::CertificateGeneration {
+            reason: format!("certificate creation {error}"),
+        })
     }
 }
 
@@ -286,12 +312,8 @@ impl CertificateAuthority {
 /// its own window.
 const ISSUER_NOT_AFTER: i64 = 253_402_300_799;
 
-/// Validates the issuance inputs and computes the certificate's validity
-/// window as `(notBefore, notAfter)`.
-///
-/// Shared by both issuance paths so a certificate's validity semantics cannot
-/// differ depending on where its subject key came from.
-fn validity_window(subject: &str, ttl: Duration) -> TrustResult<(DateTime<Utc>, DateTime<Utc>)> {
+/// Rejects malformed inputs before consulting a creation clock.
+fn validate_issuance(subject: &str, ttl: Duration) -> TrustResult<()> {
     if subject.trim().is_empty() {
         return Err(TrustError::CertificateGeneration {
             reason: "certificate subject must not be empty".to_string(),
@@ -303,7 +325,14 @@ fn validity_window(subject: &str, ttl: Duration) -> TrustResult<(DateTime<Utc>, 
         });
     }
 
-    let issued_at = Utc::now();
+    Ok(())
+}
+
+/// Computes the shared validity window from an explicit creation instant.
+fn validity_window(
+    ttl: Duration,
+    issued_at: DateTime<Utc>,
+) -> TrustResult<(DateTime<Utc>, DateTime<Utc>)> {
     let ttl = chrono::Duration::from_std(ttl).map_err(|e| TrustError::CertificateGeneration {
         reason: format!("certificate TTL is out of representable range: {e}"),
     })?;

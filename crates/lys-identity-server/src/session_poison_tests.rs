@@ -4,11 +4,11 @@ use crate::error::ServerError;
 #[test]
 fn poisoned_sessions_refuse_reads_and_changes_without_restoring_partial_state() {
     let sessions = Sessions::new(60, false);
-    let panic = std::panic::catch_unwind(|| {
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let mut live = sessions.live.lock().expect("fixture session lock");
         live.ids.insert("partial".to_owned(), "absent".to_owned());
         panic!("interrupted session change");
-    });
+    }));
     assert!(panic.is_err());
     let unavailable = |error: ServerError| {
         assert!(matches!(error, ServerError::SessionsUnavailable { .. }));

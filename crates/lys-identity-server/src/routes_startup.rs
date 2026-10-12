@@ -144,9 +144,9 @@ pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, 
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: match &config.sessions_file {
             Some(file) => {
-                Sessions::open(file.clone(), config.session_seconds, config.secure_cookie)?
+                Sessions::open_with_clock(file.clone(), config.session_seconds, config.secure_cookie, clock)?
             }
-            None => Sessions::new(config.session_seconds, config.secure_cookie),
+            None => Sessions::new_with_clock(config.session_seconds, config.secure_cookie, clock),
         },
         admission: Admission::new(
             crate::setup::administrator(config)?,

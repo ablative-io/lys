@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use lys_core::clock::{Clock, ClockSource};
 use lys_identity::Actor;
 use rand::TryRngCore;
 use rand::rngs::OsRng;
@@ -55,6 +56,7 @@ pub struct Sessions {
     file: Option<PathBuf>,
     seconds: u64,
     secure: bool,
+    clock: ClockSource,
 }
 
 #[derive(Default)]
@@ -104,24 +106,39 @@ fn cookie_secret(cookie_header: Option<&str>) -> Result<&str, ServerError> {
 impl Sessions {
     /// No sessions, each to live `seconds`, kept in memory alone.
     pub fn new(seconds: u64, secure: bool) -> Self {
-        Self {
-            live: Mutex::new(Live::default()),
-            file: None,
-            seconds,
-            secure,
-        }
+        Self::new_with_clock(seconds, secure, ClockSource::System)
     }
 
-    /// The sessions kept in `file` that have not yet ended, each new one to
-    /// live `seconds`; every begin and end is written back to `file`.
+    /// No sessions, using the clock supplied by their owner.
+    #[must_use]
+    pub fn new_with_clock(seconds: u64, secure: bool, clock: ClockSource) -> Self {
+        Self { live: Mutex::new(Live::default()), file: None, seconds, secure, clock }
+    }
+
+    /// Open the existing sessions with the production clock.
+    ///
+    /// # Errors
+    /// Refuses unavailable time or unreadable stored sessions.
     pub fn open(file: PathBuf, seconds: u64, secure: bool) -> Result<Self, ServerError> {
-        let live = crate::session_store::load(&file, now())?;
-        Ok(Self {
-            live: Mutex::new(Live::from_entries(live)),
-            file: Some(file),
-            seconds,
-            secure,
-        })
+        Self::open_with_clock(file, seconds, secure, ClockSource::System)
+    }
+
+    /// Open the existing sessions using their owner's supplied clock.
+    ///
+    /// # Errors
+    /// Refuses unavailable time before reading or pruning stored sessions.
+    pub fn open_with_clock(file: PathBuf, seconds: u64, secure: bool, clock: ClockSource) -> Result<Self, ServerError> {
+        let at = clock.unix_seconds().map_err(|error| ServerError::ClockUnavailable { reason: error.to_string() })?;
+        let live = crate::session_store::load(&file, at)?;
+        Ok(Self { live: Mutex::new(Live::from_entries(live)), file: Some(file), seconds, secure, clock })
+    }
+
+    /// Sample the service and session owner's checked whole Unix second.
+    ///
+    /// # Errors
+    /// Propagates a named clock read or conversion failure without fallback.
+    pub fn now(&self) -> Result<u64, ServerError> {
+        self.clock.unix_seconds().map_err(|error| ServerError::ClockUnavailable { reason: error.to_string() })
     }
 
     /// Write `live` to the sessions file, when there is one.
@@ -134,13 +151,17 @@ impl Sessions {
 
     /// The live sessions, with every expired one removed.
     fn pruned(&self) -> Result<MutexGuard<'_, Live>, ServerError> {
+        self.pruned_with(None)
+    }
+
+    fn pruned_with(&self, sampled: Option<u64>) -> Result<MutexGuard<'_, Live>, ServerError> {
         let mut live = self
             .live
             .lock()
             .map_err(|error| ServerError::SessionsUnavailable {
                 reason: format!("the sessions lock is poisoned: {error}"),
             })?;
-        let at = now();
+        let at = match sampled { Some(at) => at, None => self.now()? };
         live.entries.retain(|_, entry| entry.ends_at > at);
         let Live { entries, ids } = &mut *live;
         ids.retain(|_, key| entries.contains_key(key));
@@ -169,8 +190,8 @@ impl Sessions {
                 reason: "an operator credential cannot create a personal session",
             });
         }
+        let started_at = self.now()?;
         let secret = random_hex::<32>()?;
-        let started_at = now();
         let entry = SessionEntry {
             id: random_hex::<16>()?,
             actor,
@@ -178,7 +199,7 @@ impl Sessions {
             ends_at: started_at.saturating_add(self.seconds),
         };
         let key = key_of(&secret);
-        let mut live = self.pruned()?;
+        let mut live = self.pruned_with(Some(started_at))?;
         let id = entry.id.clone();
         live.entries.insert(key.clone(), entry);
         if let Err(error) = self.keep(&live.entries) {
@@ -192,16 +213,14 @@ impl Sessions {
     /// The live session named by a Cookie header.
     fn entry(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
         let secret = cookie_secret(cookie_header)?;
-        self.live
-            .lock()
-            .map_err(|error| ServerError::SessionsUnavailable {
-                reason: format!("the sessions lock is poisoned: {error}"),
-            })?
-            .entries
-            .get(&key_of(secret))
-            .filter(|entry| entry.ends_at > now())
-            .cloned()
-            .ok_or(ServerError::NotSignedIn)
+        let live = self.live.lock().map_err(|error| ServerError::SessionsUnavailable {
+            reason: format!("the sessions lock is poisoned: {error}"),
+        })?;
+        let entry = live.entries.get(&key_of(secret)).ok_or(ServerError::NotSignedIn)?;
+        if entry.ends_at <= self.now()? {
+            return Err(ServerError::NotSignedIn);
+        }
+        Ok(entry.clone())
     }
 
     /// The live session named by a Cookie header, when and until when it lasts.
@@ -221,17 +240,13 @@ impl Sessions {
 
     /// Whether the session named by its public id is still live.
     pub fn is_live(&self, id: &str) -> Result<bool, ServerError> {
-        let live = self
-            .live
-            .lock()
-            .map_err(|error| ServerError::SessionsUnavailable {
-                reason: format!("the sessions lock is poisoned: {error}"),
-            })?;
-        Ok(live
-            .ids
-            .get(id)
-            .and_then(|key| live.entries.get(key))
-            .is_some_and(|entry| entry.ends_at > now()))
+        let live = self.live.lock().map_err(|error| ServerError::SessionsUnavailable {
+            reason: format!("the sessions lock is poisoned: {error}"),
+        })?;
+        match live.ids.get(id).and_then(|key| live.entries.get(key)) {
+            Some(entry) => Ok(entry.ends_at > self.now()?),
+            None => Ok(false),
+        }
     }
 
     /// Every live session whose actor `belongs` admits.

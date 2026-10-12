@@ -246,6 +246,7 @@ impl ServerError {
             | Self::RolesUnavailable { .. }
             | Self::MembershipUnavailable { .. }
             | Self::SessionsUnavailable { .. }
+            | Self::ClockUnavailable { .. }
             | Self::MemoryUnavailable { .. }
             | Self::ProvisioningUnavailable { .. }
             | Self::CertificatesUnavailable { .. }

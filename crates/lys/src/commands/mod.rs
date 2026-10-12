@@ -6,6 +6,7 @@
 
 pub mod attest;
 pub mod ca;
+pub mod ca_dispatch;
 pub mod ca_log;
 pub mod duration;
 pub mod error;
