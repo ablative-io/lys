@@ -135,12 +135,10 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
     let (status, home) = service
         .get(&format!("/harnesses/plugins?machine={machine}"), Some(&ada))
         .await?;
-    if status == 200 {
-        let folder = home["config_dir"].as_str().ok_or("no folder named")?;
-        assert!(folder.ends_with("/.claude"), "{home}");
-    } else {
-        assert_eq!(home["refusal"], "plugin_not_installed", "{home}");
-    }
+    // The test runs under a login with a HOME, so the folder is named: one answer, never either.
+    assert_eq!(status, 200, "{home}");
+    let folder = home["config_dir"].as_str().ok_or("no folder named")?;
+    assert!(folder.ends_with("/.claude"), "{home}");
 
     let broken = dir.path().join("broken-config");
     std::fs::create_dir_all(broken.join("plugins"))?;
