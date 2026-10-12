@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 mod profile;
+mod stall;
 pub use profile::{Profile, Review, SessionSettings, Settings, SkillPin, Version};
 
 #[path = "provisioning_builds.rs"]
@@ -154,6 +155,7 @@ pub struct ProvisioningStore {
     journal: bool,
     since_snapshot: u64,
     uncertain: bool,
+    stall_upgrades: journal::StallUpgrades,
 }
 
 fn unavailable(what: impl std::fmt::Display) -> ServerError {
@@ -164,7 +166,7 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 
 #[cfg(test)]
 fn read(path: &Path) -> Result<Kept, ServerError> {
-    journal::read(path).map(|(kept, _, _)| kept)
+    journal::read(path).map(|(kept, _, _, _)| kept)
 }
 
 fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
@@ -183,7 +185,7 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
-        let (kept, journal, since_snapshot) = journal::read(path)?;
+        let (kept, journal, since_snapshot, stall_upgrades) = journal::read(path)?;
         let indexes = Arc::new(index::Indexes::rebuild(&kept));
         Ok(Self {
             path: path.to_owned(),
@@ -192,19 +194,21 @@ impl ProvisioningStore {
             journal,
             since_snapshot,
             uncertain: false,
+            stall_upgrades,
         })
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
-            let (kept, journal, since_snapshot) = journal::settle(&self.path)?;
+            let (kept, journal, since_snapshot, stall_upgrades) = journal::settle(&self.path)?;
             let indexes = Arc::new(index::Indexes::rebuild(&kept));
             self.kept = kept;
             self.indexes = indexes;
             self.journal = journal;
             self.since_snapshot = since_snapshot;
             self.uncertain = false;
+            self.stall_upgrades.extend(stall_upgrades);
         }
         Ok(())
     }

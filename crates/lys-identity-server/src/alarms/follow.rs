@@ -103,80 +103,18 @@ pub(crate) async fn tick_with_clock(
     let mut observations = Vec::new();
     let mut thresholds = std::collections::BTreeMap::new();
     for session in tracked {
-        let agent = session
-            .agent
-            .as_ref()
-            .ok_or_else(|| server(&unavailable("tracked alarm session has no agent")))?;
-        let seen = live.iter().find(|seen| seen.session == session.session);
-        if !session.stopped() && seen.is_none() {
-            return Err(server(&unavailable(format!(
-                "runner liveness omits tracked session {}",
-                session.session
-            ))));
+        match session_observation(state, machine, &session, &live) {
+            Ok((observation, threshold)) => {
+                thresholds.insert(session.session.clone(), threshold);
+                observations.push(observation);
+            }
+            Err(error) => {
+                (state.say)(&format!(
+                    "refusals: session {} on machine {machine} skipped during alarm evaluation: {error}; the runner feed remains followed",
+                    session.session
+                ));
+            }
         }
-        let first = session
-            .first()
-            .ok_or_else(|| server(&unavailable("tracked alarm session has no start report")))?;
-        let threshold = crate::provisioning_api::with_provisioning(state, |store| {
-            let version = if let Some(launch) = &first.launch {
-                let number = launch
-                    .get("provisioning_version")
-                    .and_then(serde_json::Value::as_u64)
-                    .ok_or_else(|| {
-                        server(&unavailable("alarm launch has no provisioning version"))
-                    })?;
-                let number = u32::try_from(number).map_err(|error| server(&unavailable(error)))?;
-                store.version(agent, number)
-            } else {
-                store
-                    .profile(agent)
-                    .and_then(|profile| profile.versions.last())
-            }
-            .ok_or(ServerError::LaunchRecordMissing)?;
-            version
-                .settings
-                .session
-                .as_ref()
-                .map(|session| session.stall_after)
-                .ok_or_else(|| {
-                    server(&unavailable(format!(
-                        "session {} profile has no session.stall_after",
-                        session.session
-                    )))
-                })
-        })?;
-        thresholds.insert(session.session.clone(), threshold);
-        let run = if let Some(launch) = &first.launch {
-            crate::provisioning_api::with_provisioning(state, |store| {
-                Ok(crate::launch_api::kept_launch(store, launch)?
-                    .environment
-                    .get(lys_home::harness::rendering::RUN_VARIABLE)
-                    .cloned())
-            })?
-        } else {
-            None
-        };
-        let proxy = if let Some(run) = &run {
-            let dir = state.proxy_dir.as_ref().ok_or_else(|| {
-                server(&unavailable("proxied session has no configured proxy_dir"))
-            })?;
-            match proxy_evidence(dir, run).map_err(|error| server(&error))? {
-                (false, _) => ProxyEvidence::MissingFile,
-                (true, false) => ProxyEvidence::AwaitingUsage,
-                (true, true) => ProxyEvidence::UsageSeen,
-            }
-        } else {
-            ProxyEvidence::Direct
-        };
-        observations.push(Observation {
-            session: session.session.clone(),
-            agent: agent.clone(),
-            machine: machine.to_owned(),
-            live: !session.stopped() && seen.is_some_and(|seen| seen.alive && !seen.ended),
-            started_at_ms: seen.map_or(first.at.saturating_mul(1000), |seen| seen.started_at),
-            last_signal_at_ms: seen.and_then(|seen| seen.last_signal_at),
-            proxy,
-        });
     }
     let at_ms = now()?;
     let changed = super::super::alarms_api::with_store(state, |store, _threshold| {
@@ -189,12 +127,91 @@ pub(crate) async fn tick_with_clock(
     Ok(())
 }
 
+fn session_observation(
+    state: &AppState,
+    machine: &str,
+    session: &crate::runtime_state::Tracked,
+    live: &[lys_runner::liveness::LivenessView],
+) -> Result<(Observation, u64), ServerError> {
+    let agent = session
+        .agent
+        .as_ref()
+        .ok_or_else(|| server(&unavailable("tracked alarm session has no agent")))?;
+    let seen = live.iter().find(|seen| seen.session == session.session);
+    if !session.stopped() && seen.is_none() {
+        return Err(server(&unavailable(format!(
+            "runner liveness omits tracked session {}",
+            session.session
+        ))));
+    }
+    let first = session
+        .first()
+        .ok_or_else(|| server(&unavailable("tracked alarm session has no start report")))?;
+    let threshold = crate::provisioning_api::with_provisioning(state, |store| {
+        let number = if let Some(launch) = &first.launch {
+            let number = launch
+                .get("provisioning_version")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| server(&unavailable("alarm launch has no provisioning version")))?;
+            u32::try_from(number).map_err(|error| server(&unavailable(error)))?
+        } else {
+            store
+                .profile(agent)
+                .and_then(|profile| profile.versions.last())
+                .ok_or(ServerError::LaunchRecordMissing)?
+                .number
+        };
+        store.session_stall_after(agent, number, &session.session, &*state.say)
+    })?;
+    let run = if let Some(launch) = &first.launch {
+        crate::provisioning_api::with_provisioning(state, |store| {
+            Ok(crate::launch_api::kept_launch(store, launch)?
+                .environment
+                .get(lys_home::harness::rendering::RUN_VARIABLE)
+                .cloned())
+        })?
+    } else {
+        None
+    };
+    let proxy = if let Some(run) = &run {
+        let dir = state
+            .proxy_dir
+            .as_ref()
+            .ok_or_else(|| server(&unavailable("proxied session has no configured proxy_dir")))?;
+        match proxy_evidence(dir, run).map_err(|error| server(&error))? {
+            (false, _) => ProxyEvidence::MissingFile,
+            (true, false) => ProxyEvidence::AwaitingUsage,
+            (true, true) => ProxyEvidence::UsageSeen,
+        }
+    } else {
+        ProxyEvidence::Direct
+    };
+    Ok((
+        Observation {
+            session: session.session.clone(),
+            agent: agent.clone(),
+            machine: machine.to_owned(),
+            live: !session.stopped() && seen.is_some_and(|seen| seen.alive && !seen.ended),
+            started_at_ms: seen.map_or(first.at.saturating_mul(1000), |seen| seen.started_at),
+            last_signal_at_ms: seen.and_then(|seen| seen.last_signal_at),
+            proxy,
+        },
+        threshold,
+    ))
+}
+
 #[cfg(test)]
 #[macro_use]
 #[path = "../../tests/alarms_follow.rs"]
 mod test_definitions;
 
 #[cfg(test)]
+#[macro_use]
+#[path = "../../tests/kept_feed.rs"]
+mod kept_test_definitions;
+
+#[cfg(test)]
 mod tests {
     alarms_follow!();
+    kept_feed!();
 }

@@ -12,6 +12,9 @@ use crate::error::ServerError;
 const MAGIC: &[u8; 8] = b"LYSPR01\n";
 const FRAME_HEADER: usize = 40;
 
+pub(super) type StallUpgrades = std::collections::BTreeSet<(String, u32)>;
+type ReadResult = (Kept, bool, u64, StallUpgrades);
+
 #[cfg(test)]
 std::thread_local! {
     static FAILED_SETTLE_SYNC: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
@@ -24,22 +27,22 @@ pub(super) fn fail_settle_sync(parent: bool) {
     FAILED_SETTLE_SYNC.with(|failure| failure.set(Some(parent)));
 }
 
-pub(super) fn read(path: &Path) -> Result<(Kept, bool, u64), ServerError> {
+pub(super) fn read(path: &Path) -> Result<ReadResult, ServerError> {
     read_file(path, false)
 }
 
-pub(super) fn settle(path: &Path) -> Result<(Kept, bool, u64), ServerError> {
+pub(super) fn settle(path: &Path) -> Result<ReadResult, ServerError> {
     read_file(path, true)
 }
 
-fn read_file(path: &Path, durable: bool) -> Result<(Kept, bool, u64), ServerError> {
+fn read_file(path: &Path, durable: bool) -> Result<ReadResult, ServerError> {
     let mut file = match OpenOptions::new().read(true).write(durable).open(path) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
             if durable {
                 sync_parent(path)?;
             }
-            return Ok((Kept::default(), false, 0));
+            return Ok((Kept::default(), false, 0, StallUpgrades::new()));
         }
         Err(error) => {
             return Err(unavailable(format!("reading {}: {error}", path.display())));
@@ -75,27 +78,41 @@ fn read_file(path: &Path, durable: bool) -> Result<(Kept, bool, u64), ServerErro
         #[cfg(test)]
         RECOVERED_TAILS.with(|recoveries| recoveries.set(recoveries.get() + 1));
     }
-    if decoded.migrated {
-        let parent = path
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or(Path::new("."));
-        let mut backup = tempfile::Builder::new()
-            .prefix("provisioning.before-stall-")
-            .suffix(".json")
-            .tempfile_in(parent)
-            .map_err(unavailable)?;
-        backup.write_all(&bytes).map_err(unavailable)?;
-        backup.as_file().sync_all().map_err(unavailable)?;
-        let (_, backup) = backup.keep().map_err(unavailable)?;
-        sync_parent(path)?;
-        let payload = serde_json::to_vec(&decoded.kept).map_err(unavailable)?;
-        snapshot(path, &payload)?;
+    if !decoded.migrated.is_empty() {
+        let backup = record_stall(path, &decoded.kept, &bytes)?;
         tracing::warn!(path = %path.display(), backup = %backup.display(), migration = "profile_stall_after_recorded",
             "provisioning migration wrote session.stall_after=300 for existing session profiles");
-        return Ok((decoded.kept, true, 0));
+        return Ok((decoded.kept, true, 0, decoded.migrated));
     }
-    Ok((decoded.kept, decoded.journal, decoded.changes))
+    Ok((
+        decoded.kept,
+        decoded.journal,
+        decoded.changes,
+        decoded.migrated,
+    ))
+}
+
+pub(super) fn record_stall(
+    path: &Path,
+    kept: &Kept,
+    before: &[u8],
+) -> Result<std::path::PathBuf, ServerError> {
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let mut backup = tempfile::Builder::new()
+        .prefix("provisioning.before-stall-")
+        .suffix(".json")
+        .tempfile_in(parent)
+        .map_err(unavailable)?;
+    backup.write_all(before).map_err(unavailable)?;
+    backup.as_file().sync_all().map_err(unavailable)?;
+    let (_, backup) = backup.keep().map_err(unavailable)?;
+    sync_parent(path)?;
+    let payload = serde_json::to_vec(kept).map_err(unavailable)?;
+    snapshot(path, &payload)?;
+    Ok(backup)
 }
 
 #[cfg(test)]
@@ -127,7 +144,7 @@ struct Decoded {
     journal: bool,
     changes: u64,
     valid_length: usize,
-    migrated: bool,
+    migrated: StallUpgrades,
 }
 
 fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
@@ -143,7 +160,7 @@ fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
             .map_err(|error| unavailable(format!("{} does not read: {error}", path.display())));
     }
     let mut cursor = MAGIC.len();
-    let (mut kept, mut migrated): (Kept, bool) = decode_shape(frame(bytes, &mut cursor)?)
+    let (mut kept, mut migrated): (Kept, StallUpgrades) = decode_shape(frame(bytes, &mut cursor)?)
         .map_err(|error| unavailable(format!("provisioning snapshot does not read: {error}")))?;
     let mut changes = 0_u64;
     while cursor < bytes.len() {
@@ -152,7 +169,7 @@ fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
         }
         let (edit, upgraded) = decode_shape(frame(bytes, &mut cursor)?)
             .map_err(|error| unavailable(format!("provisioning change does not read: {error}")))?;
-        migrated |= upgraded;
+        migrated.extend(upgraded);
         edits::apply(&mut kept, edit)?;
         changes = changes
             .checked_add(1)
@@ -171,26 +188,42 @@ fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
 
 fn decode_shape<T: serde::de::DeserializeOwned>(
     bytes: &[u8],
-) -> Result<(T, bool), serde_json::Error> {
+) -> Result<(T, StallUpgrades), serde_json::Error> {
     let mut value: serde_json::Value = serde_json::from_slice(bytes)?;
-    let mut migrated = false;
+    let mut migrated = StallUpgrades::new();
     if let Some(profiles) = value
         .get_mut("profiles")
         .and_then(serde_json::Value::as_array_mut)
     {
         for profile in profiles {
+            let agent = profile
+                .get("agent")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null);
             if let Some(versions) = profile
                 .get_mut("versions")
                 .and_then(serde_json::Value::as_array_mut)
             {
                 for version in versions {
-                    migrated |= migrate_session(version);
+                    if migrate_session(version) {
+                        let agent: String = serde_json::from_value(agent.clone())?;
+                        let number = serde_json::from_value(version["number"].clone())?;
+                        migrated.insert((agent, number));
+                    }
                 }
             }
         }
     }
-    if let Some(version) = value.get_mut("Set").and_then(|set| set.get_mut("version")) {
-        migrated |= migrate_session(version);
+    if let Some(set) = value.get_mut("Set") {
+        let agent = set.get("agent").cloned().unwrap_or(serde_json::Value::Null);
+        if let Some(version) = set.get_mut("version")
+            && migrate_session(version)
+        {
+            migrated.insert((
+                serde_json::from_value(agent)?,
+                serde_json::from_value(version["number"].clone())?,
+            ));
+        }
     }
     serde_json::from_value(value).map(|decoded| (decoded, migrated))
 }

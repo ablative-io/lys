@@ -22,6 +22,8 @@ macro_rules! alarms_follow {
         struct Runner {
             record: RunnerRecord,
             live: Arc<Mutex<LivenessView>>,
+            extra_live: Arc<Mutex<Vec<LivenessView>>>,
+            entries: Arc<Mutex<Vec<lys_runner::tracking_store::FeedEntry>>>,
             stop: tokio::sync::oneshot::Sender<()>,
             task: tokio::task::JoinHandle<std::io::Result<u64>>,
             dir: tempfile::TempDir,
@@ -40,6 +42,10 @@ macro_rules! alarms_follow {
                     last_signal_at: Some(1_000), started_at: 1_000, ended: false,
                 }));
                 let evidence = Arc::clone(&live);
+                let extra_live = Arc::new(Mutex::new(Vec::<LivenessView>::new()));
+                let extra_evidence = Arc::clone(&extra_live);
+                let entries = Arc::new(Mutex::new(Vec::new()));
+                let feed_entries = Arc::clone(&entries);
                 let (stop, mut stopped) = tokio::sync::oneshot::channel();
                 let task = tokio::spawn(async move {
                     let mut pages = 0;
@@ -62,13 +68,17 @@ macro_rules! alarms_follow {
                             Act::Feed { follow: true, .. } => {
                                 pages += 1;
                                 Answer::Feed { page: FeedPage {
-                                    format: FEED_FORMAT.to_owned(), entries: Vec::new(),
+                                    format: FEED_FORMAT.to_owned(), entries: feed_entries.lock()
+                                        .map_err(|error| std::io::Error::other(error.to_string()))?.clone(),
                                     cursor: format!("alarm-page-{pages}"),
                                 }}
                             }
-                            Act::Liveness { session: None } => Answer::Liveness {
-                                sessions: vec![evidence.lock()
-                                    .map_err(|error| std::io::Error::other(error.to_string()))?.clone()],
+                            Act::Liveness { session: None } => {
+                                let mut sessions = vec![evidence.lock()
+                                    .map_err(|error| std::io::Error::other(error.to_string()))?.clone()];
+                                sessions.extend(extra_evidence.lock()
+                                    .map_err(|error| std::io::Error::other(error.to_string()))?.clone());
+                                Answer::Liveness { sessions }
                             },
                             other => return Err(std::io::Error::other(format!("unexpected alarm request {other:?}"))),
                         };
@@ -79,7 +89,7 @@ macro_rules! alarms_follow {
                     }
                 });
                 Ok(Self { record: RunnerRecord::Socket { path: socket.to_string_lossy().into_owned() },
-                    live, stop, task, dir })
+                    live, extra_live, entries, stop, task, dir })
             }
 
             async fn finish(self, expected_pages: u64) -> TestResult {
