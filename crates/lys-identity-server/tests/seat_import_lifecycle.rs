@@ -336,6 +336,11 @@ async fn seat_import_survives_lifecycle() -> TestResult {
 /// handoff ([`survives`]).
 #[tokio::test(flavor = "multi_thread")]
 async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
+    // A seat's start runs its owner as the workspace's `lys`; without it the
+    // owner is the test binary and the start is refused for that alone.
+    support::owner_program()?.ok_or(
+        "owner_program_missing: build the workspace's lys binary beside the tests (cargo nextest run --workspace)",
+    )?;
     let scene = scene().await?;
     let (plan, confirming, completed) = scene.imported().await?;
     let answer = scene.start().await?;

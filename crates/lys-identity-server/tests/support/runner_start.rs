@@ -67,6 +67,22 @@ pub struct Table {
     lys_machine: OnceLock<String>,
 }
 
+/// The workspace's `lys`, built beside this test binary, which seat owners
+/// are started as (`lys runner seat-owner`); `None` when it was not built,
+/// as under `-p lys-identity-server`. Unsaid, the runner starts owners as
+/// its own executable, here the test binary, which refuses the owner's
+/// arguments ("Unrecognized option: 'dir'", exit 101); a test that starts a
+/// seat asserts it was built ([`owner_program`] in the test itself).
+pub fn owner_program() -> Result<Option<std::path::PathBuf>, Box<dyn Error>> {
+    let exe = std::env::current_exe()?;
+    let target = exe
+        .parent()
+        .and_then(std::path::Path::parent)
+        .ok_or("the test binary has no target directory")?;
+    let lys = target.join("lys");
+    Ok(lys.exists().then_some(lys))
+}
+
 impl Table {
     /// Start with a reviewed profile for the declared fixture program.
     pub async fn set() -> Result<Self, Box<dyn Error>> {
@@ -147,6 +163,9 @@ impl Table {
                     server_key: key.public_key_bytes(),
                     scrollback: 1 << 16,
                 })?;
+                if let Some(lys) = owner_program()? {
+                    runner.sessions().set_owner_program(lys);
+                }
                 Ok((seeded, runner.spawn(), key))
             },
         )
