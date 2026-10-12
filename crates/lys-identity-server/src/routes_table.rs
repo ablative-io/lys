@@ -59,6 +59,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::agent_policy_api::routes())
         .merge(crate::refusals_api::routes())
         .merge(crate::goals_api::routes())
+        .merge(crate::dashboard_api::alarms_api::routes())
         .merge(crate::words_api::routes())
         .merge(crate::variables_api::routes())
         .merge(crate::schedules_api::routes())

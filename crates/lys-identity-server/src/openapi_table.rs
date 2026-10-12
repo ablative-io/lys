@@ -292,6 +292,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "ProviderUnavailable"]] scope("account", "person.sign-in.set", ["id"]);
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]] scope("account", "person.password.set", ["id"]);
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]] scope("agent", "read", ["id"]);
+    GET "/alarms" "The caller's alarms, open first" G [AGENT, SIGNED, &["NoPerson", "AlarmsUnavailable", "AlarmMalformed"]] scope("agent", "read", []);
+    GET "/alarms/{id}" "One of the caller's alarms" G [AGENT, SIGNED, &["NoPerson", "AlarmUnknown", "AlarmsUnavailable", "AlarmMalformed"]] scope("agent", "read", []);
+    POST "/alarms/{id}/acknowledge" "A person acknowledges an alarm" C [SIGNED_BODY, &["NoPerson", "AlarmUnknown", "AlarmsUnavailable", "AlarmMalformed"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];
     GET "/teams/{id}/goals" "A team's goals" S [SIGNED, &["NotAdmitted", "TeamUnknown"]] scope("team", "read", ["id"]);
     POST "/teams/{id}/goals" "Set a goal on a team" S [SIGNED_BODY, &["NotAdmitted", "TeamUnknown", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];

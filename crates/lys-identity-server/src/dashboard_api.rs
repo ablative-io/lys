@@ -40,18 +40,27 @@ use crate::read_views::AgentSummary;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::SessionView;
 
+#[path = "alarms.rs"]
+pub mod alarms;
+#[path = "alarms_api.rs"]
+pub mod alarms_api;
+#[path = "alarms_state.rs"]
+pub mod alarms_state;
+
 /// The dashboard's route.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new().route("/dashboard", get(dashboard))
 }
 
 pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Entry> {
-    vec![(
+    let mut entries = vec![(
         lys_openapi::Method::Get,
         "/dashboard",
         Some(api.schema::<ListQuery>()),
         Some(api.schema::<DashboardView>()),
-    )]
+    )];
+    entries.extend(alarms_api::types(api));
+    entries
 }
 
 /// A part that could not be read: the refusal its own route answers.
@@ -127,6 +136,11 @@ part!(
     usize,
     "How many wait on the caller, or the refusal of the route they are counted from."
 );
+part!(
+    AlarmsPart,
+    alarms_api::AlarmSummary,
+    "The caller's open alarm count and three newest open alarms, or the alarm route's refusal."
+);
 
 /// One of the caller's agents and how it is going.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -171,6 +185,8 @@ pub struct DashboardView {
     pub agents: Vec<DashboardAgent>,
     /// What waits on the caller.
     pub waiting: Waiting,
+    /// The caller's open alarms, read from the same log as the alarm routes.
+    pub alarms: AlarmsPart,
     /// Counters and continuation of the agents, absent when no query was supplied.
     #[serde(flatten)]
     pub page: Option<Totals>,
@@ -322,6 +338,7 @@ async fn dashboard(
     Ok(Json(DashboardView {
         agents,
         waiting: waiting(&state, &headers),
+        alarms: alarms_api::summary(&state, &headers).into(),
         page,
     }))
 }
