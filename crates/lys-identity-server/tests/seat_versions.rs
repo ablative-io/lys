@@ -37,6 +37,12 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
     let machine = table.lys_machine("Fixture").await?;
     let add = json!({"operation":operation()?,"name":"fixture-seat","agent":table.agent(),"profile_version":1,"machine":machine});
     table.ok("/seats", &add).await?;
+    version_controls(&table).await?;
+    retirement_controls(&mut table, &add).await?;
+    table.close()
+}
+
+async fn version_controls(table: &Table) -> TestResult {
     let path = "/seats/fixture-seat/version";
     let edit = |version| -> Result<Value, Box<dyn Error>> {
         Ok(json!({"operation":operation()?,"profile_version":version}))
@@ -49,7 +55,7 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
         404,
         "ProfileVersionUnknown",
     );
-    profile(&table, 1, Some(table.harness())).await?;
+    profile(table, 1, Some(table.harness())).await?;
     refused(
         &table
             .service
@@ -99,7 +105,7 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
             "NotSignedIn",
         );
     }
-    profile(&table, 2, None).await?;
+    profile(table, 2, None).await?;
     table
         .ok(
             &format!("/agents/{}/provisioning/3/review", table.agent()),
@@ -114,6 +120,10 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
         409,
         "HarnessUndeclared",
     );
+    Ok(())
+}
+
+async fn retirement_controls(table: &mut Table, add: &Value) -> TestResult {
     let retire = json!({"operation":operation()?});
     assert_eq!(
         table.ok("/seats/fixture-seat/retire", &retire).await?["name"],
@@ -131,11 +141,11 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
     table.service.restart().await?;
     let listed = table.service.get("/seats", Some(&table.ada)).await?;
     assert!(listed.1["seats"].as_array().ok_or("no seats")?.is_empty());
-    let mut again = add;
+    let mut again = add.clone();
     again["operation"] = json!(operation()?);
     assert_eq!(table.ok("/seats", &again).await?["revision"], 1);
     for (route, body) in [
-        ("/seats/absent/version", edit(1)?),
+        ("/seats/absent/version", json!({"operation":operation()?,"profile_version":1})),
         ("/seats/absent/retire", json!({"operation":operation()?})),
     ] {
         refused(
@@ -144,5 +154,5 @@ async fn stopped_seat_edits_are_checked_idempotent_and_retained_across_restart()
             "seat_unknown",
         );
     }
-    table.close()
+    Ok(())
 }
