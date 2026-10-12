@@ -97,6 +97,8 @@ fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult
         "--model",
         "gpt-6.1-sol",
         "-c",
+        "notify=[\"$LYS_PROGRAM\", \"runner\", \"notify\", \"--socket\", \"$LYS_RUNNER_SOCKET\"]",
+        "-c",
         "sandbox_workspace_write.network_access=false",
         "-c",
         "sandbox_workspace_write.writable_roots=[]",

@@ -242,6 +242,7 @@ fn old_owner_records_still_read_and_a_long_socket_is_refused_by_name() -> TestRe
     use lys_runner::seat_owner::protocol::{SOCKET, SUN_PATH_BYTES, fits_socket};
     use lys_runner::seat_owner::spawn::OwnerPlan;
     let dir = tempfile::tempdir()?;
+    let owner_dir = dir.path().join("data/runner/owners/old");
     let mut plan = serde_json::to_value(OwnerPlan::new(
         supervised("old")?.owner.ok_or("the launch is supervised")?,
         supervised("old")?,
@@ -253,7 +254,23 @@ fn old_owner_records_still_read_and_a_long_socket_is_refused_by_name() -> TestRe
         "a new plan says no socket before start"
     );
     let plan: OwnerPlan = serde_json::from_value(plan)?;
-    assert_eq!(plan.socket_in(dir.path()), dir.path().join(SOCKET));
+    let expected =
+        lys_runner::seat_owner::protocol::owner_socket(&dir.path().join("run/owners"), "old");
+    assert_eq!(plan.socket_in(&owner_dir), expected);
+    let name = expected
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .ok_or("no socket name")?;
+    assert_eq!(name.len(), 16);
+    assert!(name.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    assert_eq!(
+        expected.extension().and_then(|name| name.to_str()),
+        Some("sock")
+    );
+    let mut legacy = serde_json::to_value(&plan)?;
+    legacy["socket"] = serde_json::json!(owner_dir.join(SOCKET));
+    let legacy: OwnerPlan = serde_json::from_value(legacy)?;
+    assert_eq!(legacy.socket_in(&owner_dir), expected);
     let long = std::path::PathBuf::from(format!("/{}", "s".repeat(SUN_PATH_BYTES - 1)));
     match fits_socket(&long) {
         Err(RunnerError::Refused { refusal, .. }) => {

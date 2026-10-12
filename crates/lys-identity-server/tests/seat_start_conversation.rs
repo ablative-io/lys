@@ -35,16 +35,34 @@ async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_st
             request["conversation"] = json!(conversation);
         }
         let (status, reply) = table.service.post(path, Some(&table.ada), &request).await?;
-        assert_eq!(status, 409, "{reply}");
-        assert_eq!(reply["refusal"], "seat_not_managed", "{reply}");
+        assert_eq!(status, 200, "{reply}");
+        assert_eq!(reply["admission"]["by"], "administrator");
+        assert_eq!(reply["admission"]["action"], "seat.start");
+        assert_eq!(reply["start"]["conversation"], json!(conversation));
+        assert_eq!(reply["seat"]["transport"], "pty");
+        let session = reply["session"].as_str().ok_or("no admitted session")?;
+        let live = table
+            .serving
+            .as_ref()
+            .ok_or("no runner")?
+            .sessions()
+            .liveness(Some(session))?;
+        assert_eq!(live.len(), 1);
+        assert!(live[0].alive && !live[0].managed && !live[0].ended);
+        let (_, repeated) = table.service.post(path, Some(&table.ada), &request).await?;
+        assert_eq!(repeated["session"], reply["session"]);
+        table
+            .ok(
+                "/seats/conversation-seat/stop",
+                &json!({"operation":operation()?, "force":true}),
+            )
+            .await?;
     }
-    let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
-    assert_eq!(live["sessions"].as_array().map(Vec::len), Some(0), "{live}");
     let (_, held) = table
         .service
         .get("/seats/conversation-seat", Some(&table.ada))
         .await?;
-    assert_eq!(held["revision"], 1);
-    assert!(held.get("session").is_none());
+    assert_eq!(held["revision"], 5);
+    assert_eq!(held["transport"], "pty");
     table.close()
 }

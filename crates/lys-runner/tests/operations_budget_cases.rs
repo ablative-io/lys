@@ -187,6 +187,27 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
         crossed["receipts"][0]["acted"]["stands"], "accepted",
         "{crossed}"
     );
+    let operation = crossed["receipts"][0]["crossing"]["operation"]
+        .as_str()
+        .ok_or("no operation")?;
+    assert_eq!(sessions.outcome(operation)?.state, OperationState::Accepted);
+    let client = lys_runner::Client::new(
+        table.socket.clone(),
+        std::sync::Arc::new(lys_core::Ed25519Identity::load(
+            &table.service.config.event_key_file,
+        )?),
+    );
+    let output = client.ask(&lys_runner::Act::Read {
+        session: session.clone(),
+        cursor: Some(0),
+        lines: None,
+        bytes: None,
+        follow: false,
+    })?;
+    let lys_runner::Answer::Output { output } = output else {
+        return Err("no output".into());
+    };
+    assert!(!output.text.contains("Context is at 46 percent"));
     sessions.collect(
         &session,
         &lys_runner::session::Collected::Hook {
@@ -195,6 +216,15 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
         },
     )?;
     table.waited(&session, "Context is at 46 percent").await?;
-    table.end(&session).await?;
+    assert_eq!(
+        sessions.outcome(operation)?.state,
+        OperationState::Delivered
+    );
+    let shown = table.end(&session).await?;
+    assert_eq!(
+        shown.matches("Context is at 46 percent").count(),
+        1,
+        "{shown}"
+    );
     table.stop_runner()
 }

@@ -37,6 +37,9 @@
 //! refused before a new start is kept. Existing starts remain intact when
 //! their runner is removed. The service asks the runner over its socket.
 
+mod kept;
+pub use kept::kept_launch;
+
 mod runner;
 use runner::{keep_with_runner, run};
 
@@ -425,103 +428,6 @@ pub(crate) fn admitted(
             })
     })
 }
-
-/// Build the signed launch using only the kept template and its exact version.
-///
-/// # Errors
-/// Refuses unreadable starts, missing kept versions and invalid template bytes.
-pub fn kept_launch(
-    store: &crate::provisioning_store::ProvisioningStore,
-    view: &Value,
-) -> Result<lys_runner::Launch, ServerError> {
-    let text = |member: &str| {
-        view.get(member)
-            .and_then(Value::as_str)
-            .ok_or_else(|| ServerError::LaunchUnrenderable {
-                reason: format!("the kept start names no {member}"),
-            })
-    };
-    let number = view
-        .get("provisioning_version")
-        .and_then(Value::as_u64)
-        .and_then(|number| u32::try_from(number).ok())
-        .ok_or_else(|| ServerError::LaunchUnrenderable {
-            reason: "the kept start names no profile version".to_owned(),
-        })?;
-    let version = store
-        .profile(text("agent")?)
-        .and_then(|profile| {
-            profile
-                .versions
-                .iter()
-                .find(|version| version.number == number)
-        })
-        .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
-    reviewed(version)?;
-    let mut native = crate::launch_template::from_template(
-        version,
-        text("template")?,
-        text("template_sha256")?,
-    )?;
-    let handles: Vec<HandleName> =
-        serde_json::from_value(view.get("handles").cloned().ok_or_else(|| {
-            ServerError::LaunchUnrenderable {
-                reason: "the kept start names no handles".to_owned(),
-            }
-        })?)
-        .map_err(|error| ServerError::LaunchUnrenderable {
-            reason: format!("the kept handles do not read: {error}"),
-        })?;
-    native.environment.insert(
-        "LYS_LAUNCH_TEMPLATE".to_owned(),
-        text("template_sha256")?.to_owned(),
-    );
-    native.environment.insert(
-        "LYS_HANDLES".to_owned(),
-        handles
-            .iter()
-            .map(|handle| handle.id.as_str())
-            .collect::<Vec<_>>()
-            .join(","),
-    );
-    let files = native
-        .files
-        .into_iter()
-        .map(|file| lys_runner::launch_config::File {
-            path: file.path,
-            text: file.text,
-            sha256: file.sha256,
-        })
-        .collect();
-    Ok(lys_runner::Launch {
-        session: text("session")?.to_owned(),
-        program: native.program,
-        arguments: native.arguments,
-        directory: text("directory")?.to_owned(),
-        environment: native.environment,
-        config: Some(lys_runner::launch_config::Config {
-            requires_controls: crate::launch_template::requires_controls(version),
-            files,
-            argument_files: native.argument_files,
-            environment_paths: native.environment_paths,
-            working_directory: false,
-            harness: version
-                .settings
-                .harness
-                .as_ref()
-                .and_then(crate::launch_template::runner_harness),
-        }),
-        columns: crate::runner_sessions::COLUMNS,
-        rows: crate::runner_sessions::ROWS,
-        rotation: version
-            .settings
-            .session
-            .as_ref()
-            .and_then(|session| session.accounts.clone()),
-        policy: None,
-    })
-}
-
 /// A latest reviewed profile is applied only after its whole native launch ran.
 pub(crate) fn enforced(
     state: &AppState,

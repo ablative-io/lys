@@ -1651,6 +1651,13 @@ fn receipt_answer(
 ) -> Result<(&'static str, lys_runner::Answer), String> {
     use lys_runner::{Act, Answer};
     match act {
+        Act::Owned => Ok((
+            "owners",
+            Answer::Owned {
+                owners: Vec::new(),
+                unreachable: Vec::new(),
+            },
+        )),
         Act::Feed { .. } | Act::GrantChannel => Ok((
             if matches!(act, Act::GrantChannel) {
                 "grants"
@@ -1752,7 +1759,7 @@ impl ReceiptTable {
         };
         let controls = requests
             .into_iter()
-            .filter(|request| !matches!(*request, "feed" | "grants"))
+            .filter(|request| !matches!(*request, "feed" | "grants" | "owners"))
             .collect::<Vec<_>>();
         assert_eq!(controls, expected);
         Ok(())
@@ -2058,5 +2065,19 @@ async fn resend_lookup_names_a_signed_snapshot_occurrence_without_a_delivery() -
         .await?;
     assert_eq!(status, 409, "{answer}");
     assert_eq!(answer["refusal"], "goal_resend_invalid");
+    table.finish(&[]).await
+}
+
+#[tokio::test]
+async fn controls_documents_an_unreachable_runner() -> TestResult {
+    let mut table = ReceiptTable::start(ReceiptCase::Mismatched).await?;
+    let runner = table.runner.take().ok_or("missing runner")?;
+    runner.finish().await?;
+    let (status, answer) = table
+        .service
+        .get("/runtime/sessions/session/controls", Some(&table.cookie))
+        .await?;
+    assert_eq!(status, 502, "{answer}");
+    assert_eq!(answer["refusal"], "runner_unreachable", "{answer}");
     table.finish(&[]).await
 }

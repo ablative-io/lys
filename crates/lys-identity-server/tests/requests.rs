@@ -59,6 +59,18 @@ fn request_extent(table: &Table) -> Result<u64, Box<dyn Error>> {
     )
 }
 
+fn request_leaves(table: &Table) -> Result<Vec<Value>, Box<dyn Error>> {
+    use lys_log_store::LeafStore;
+    let store =
+        lys_log_store::FileLeafStore::open_read_only(&table.service.dir.path().join("requests"))?;
+    (0..store.extent())
+        .map(|index| {
+            let bytes = store.leaf(index)?.ok_or("request leaf absent")?;
+            Ok(serde_json::from_slice(&bytes)?)
+        })
+        .collect()
+}
+
 impl RequestWork {
     fn begin(table: &Table, clock: &ManualClock) -> Result<Self, Box<dyn Error>> {
         let extent = request_extent(table)?;
@@ -418,21 +430,30 @@ async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestRe
         .service
         .post("/requests", Some(&table.bea), &body)
         .await?;
-    before.completed(&table, &clock, "append", status, 2, 1)?;
+    before.completed(&table, &clock, "append", status, 4, 1)?;
     assert_eq!(status, 200, "{first}");
+    let recorded = json!({
+        "line":"asked", "id":body["operation"],
+        "asked_by":table.seeded.people[1].id.to_string(),
+        "responsible":table.seeded.people[1].id.to_string(),
+        "resource_kind":"doc", "resource_id":"4", "relation":"beta",
+        "ends_at":soon, "why":body["why"], "asked_at":1_700_000_000,
+    });
+    assert_eq!(request_leaves(&table)?, [recorded.clone()]);
     clock.set(1_700_000_003);
     let before = RequestWork::begin(&table, &clock)?;
     let (status, replayed) = table
         .service
         .post("/requests", Some(&table.bea), &body)
         .await?;
-    before.completed(&table, &clock, "replay", status, 2, 0)?;
+    before.completed(&table, &clock, "replay", status, 4, 0)?;
     assert_eq!(
         status, 200,
         "the kept request is answered, not judged again: {replayed}"
     );
     assert_eq!(replayed["id"], first["id"]);
     assert_eq!(replayed["asked_at"], first["asked_at"]);
+    assert_eq!(request_leaves(&table)?, [recorded.clone()]);
     let mut late = Table::ask_body("4", "beta")?;
     late["ends_at"] = json!(soon);
     let before = RequestWork::begin(&table, &clock)?;
@@ -440,8 +461,9 @@ async fn a_kept_request_is_answered_again_after_the_end_it_asked_for() -> TestRe
         .service
         .post("/requests", Some(&table.bea), &late)
         .await?;
-    before.completed(&table, &clock, "refusal", fresh.0, 2, 0)?;
+    before.completed(&table, &clock, "refusal", fresh.0, 4, 0)?;
     refused(&fresh, 400, "RequestMalformed");
+    assert_eq!(request_leaves(&table)?, [recorded]);
     Ok(())
 }
 

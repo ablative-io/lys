@@ -50,7 +50,7 @@ const RECORDED: [(&str, &str); 5] = [
     ),
     (
         "env.json",
-        "ac30c06cda110b33ab11da81cd353b197b9f567feef17230d614479e5562650e",
+        "00f7a205797545f36dd61cc07712d00dbd1fda9a677c17e3d01b383222040427",
     ),
     (
         "instructions.md",
@@ -346,10 +346,14 @@ fn the_environment_file_holds_the_variables_and_the_handle_and_nothing_else_twic
         value,
         json!({
             "env": {"LYS_FIXTURE_MODE": "fixture", "LYS_FIXTURE_TOKEN": HANDLE},
-            "permissions": {"defaultMode": "plan"}
+            "permissions": {"defaultMode": "plan"},
+            "statusLine": {
+                "type": "command",
+                "command": "if [ -n \"$LYS_PROGRAM\" ] && [ -n \"$LYS_RUNNER_SOCKET\" ]; then \"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\"; else echo 'Lys: not counted (no runner started this run)'; fi"
+            }
         })
     );
-    assert_eq!(value.as_object().unwrap().len(), 2);
+    assert_eq!(value.as_object().unwrap().len(), 3);
     assert_eq!(value["env"].as_object().unwrap().len(), 2);
     assert!(!String::from_utf8_lossy(&first).contains(SECRET_VALUE));
 }

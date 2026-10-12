@@ -246,6 +246,10 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
             .ok_or("missing feed request")?;
         let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
         let answer = match act {
+            Act::Owned => Answer::Owned {
+                owners: Vec::new(),
+                unreachable: Vec::new(),
+            },
             Act::ControlStatus { session } => Answer::ControlStatus {
                 session,
                 control: None,
@@ -588,6 +592,10 @@ async fn serve_late(
             .ok_or("missing request")?;
         let answer =
             match verify_request(&line, &key, &greeting).map_err(|error| error.to_string())? {
+                Act::Owned => Answer::Owned {
+                    owners: Vec::new(),
+                    unreachable: Vec::new(),
+                },
                 Act::ControlStatus { session } => Answer::ControlStatus {
                     session,
                     control: None,
@@ -764,6 +772,10 @@ async fn serve_holding(
         let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
         let channel = matches!(act, Act::GrantChannel);
         let answer = match act {
+            Act::Owned => Answer::Owned {
+                owners: Vec::new(),
+                unreachable: Vec::new(),
+            },
             Act::ControlStatus { session } => Answer::ControlStatus {
                 session,
                 control: None,

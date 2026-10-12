@@ -75,6 +75,13 @@ impl Runner {
                         };
                         (answer, Some(session))
                     }
+                    Act::Owned => (
+                        Answer::Owned {
+                            owners: Vec::new(),
+                            unreachable: Vec::new(),
+                        },
+                        None,
+                    ),
                     Act::GrantChannel => (Answer::GrantChannel, None),
                     Act::Feed { .. } => {
                         held.push((lines, write));

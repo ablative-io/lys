@@ -129,6 +129,17 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
                 BufReader::new(&stream).read_line(&mut line)?;
                 let done = match verify_request(&line, &key, &greeting)? {
                     Act::AsCaller { done, .. } => done,
+                    Act::Owned => {
+                        writeln!(
+                            writer,
+                            "{}",
+                            reply_line(Answer::Owned {
+                                owners: Vec::new(),
+                                unreachable: Vec::new()
+                            })
+                        )?;
+                        continue;
+                    }
                     Act::ControlStatus { session } => {
                         writeln!(
                             writer,
@@ -205,13 +216,13 @@ async fn an_ai_lys_starts_stands_on_one_certificate_and_its_withdrawal_ends_the_
     let agent = table.agent();
     let certificates = format!("/agents/{agent}/certificates");
 
-    let (status, _) = table
+    let (status, answer) = table
         .start(
             &agent,
             &json!({"machine":machine, "operation":operation()?}),
         )
         .await?;
-    assert_eq!(status, 200);
+    assert_eq!(status, 200, "{answer}");
     let (_, first) = receive.recv()?;
     let (status, held) = table.service.get(&certificates, Some(&table.ada)).await?;
     assert_eq!(status, 200);
@@ -249,13 +260,13 @@ async fn an_ai_lys_starts_stands_on_one_certificate_and_its_withdrawal_ends_the_
         "a withdrawn certificate ends the AI's runs"
     );
 
-    let (status, _) = table
+    let (status, answer) = table
         .start(
             &agent,
             &json!({"machine":machine, "operation":operation()?}),
         )
         .await?;
-    assert_eq!(status, 200);
+    assert_eq!(status, 200, "{answer}");
     let (_, second) = receive.recv()?;
     let (_, held) = table.service.get(&certificates, Some(&table.ada)).await?;
     let issued = held["certificates"].as_array().ok_or("no certificates")?;

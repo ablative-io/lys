@@ -164,6 +164,10 @@ async fn with_the_right_the_act_is_admitted_and_judged_on_the_seat() -> TestResu
         )
         .await?;
     live_pty(&table, &answer)?;
+    assert_eq!(answer.1["admission"]["by"], "grant");
+    assert_eq!(answer.1["admission"]["action"], "seat.start");
+    assert_eq!(answer.1["admission"]["grant"], granted["grant"]);
+    assert!(answer.1["admission"]["use_event"].as_u64().is_some());
     // The grant names one seat; another is still refused.
     let answer = table
         .service
@@ -182,8 +186,8 @@ mod seat_attach {
     use serde_json::json;
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn the_responsible_person_stands_without_a_grant_and_a_stranger_cannot_attach() -> TestResult
-    {
+    async fn the_responsible_person_stands_without_a_grant_and_a_stranger_cannot_attach()
+    -> TestResult {
         let table = Table::set_judging(MODEL).await?;
         seated(&table).await?;
         let answer = table
@@ -204,6 +208,8 @@ mod seat_attach {
             )
             .await?;
         let session = live_pty(&table, &answer)?;
+        assert_eq!(answer.1["admission"]["by"], "administrator");
+        assert_eq!(answer.1["admission"]["action"], "seat.restart");
         let stopped = table
             .ok(
                 "/seats/waffles/stop",

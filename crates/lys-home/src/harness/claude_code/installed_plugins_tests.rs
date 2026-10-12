@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A run's named plugins are checked against the config directory it uses.
 
 use super::installed_plugins::{INSTALLED_FILE, require};

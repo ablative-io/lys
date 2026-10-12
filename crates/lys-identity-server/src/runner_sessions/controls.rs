@@ -90,6 +90,47 @@ pub(super) fn select_resume(
 ) -> Result<Act, crate::error::ServerError> {
     let mut act = select_transport(act);
     if let Some(conversation) = conversation {
+        if let Act::Start { launch, .. } = &mut act {
+            let transport = match launch.config.as_ref().and_then(|config| config.harness) {
+                Some(lys_runner::tracking::Harness::ClaudeCode) => {
+                    lys_runner::harness_control::Transport::Claude
+                }
+                Some(lys_runner::tracking::Harness::Codex) => {
+                    lys_runner::harness_control::Transport::Codex
+                }
+                None => lys_runner::harness_control::Transport::Pty,
+            };
+            transport.validate_resume(conversation)?;
+            let flag = match transport {
+                lys_runner::harness_control::Transport::Claude => "--resume",
+                lys_runner::harness_control::Transport::Codex => "resume",
+                lys_runner::harness_control::Transport::Pty => {
+                    return Err(lys_runner::RunnerError::refused(
+                        "control_binding_invalid",
+                        "a resumed conversation requires a declared harness",
+                    )
+                    .into());
+                }
+            };
+            if let Some(index) = launch
+                .arguments
+                .iter()
+                .position(|argument| argument == flag)
+            {
+                let prior = launch.arguments.get_mut(index + 1).ok_or_else(|| {
+                    lys_runner::RunnerError::refused(
+                        "control_binding_invalid",
+                        "the native resume flag names no conversation",
+                    )
+                })?;
+                conversation.clone_into(prior);
+            } else {
+                launch
+                    .arguments
+                    .extend([flag.to_owned(), conversation.to_owned()]);
+            }
+            return Ok(act);
+        }
         let Act::StartManaged { managed, .. } = &mut act else {
             return Err(lys_runner::RunnerError::refused(
                 "control_binding_invalid",
@@ -109,6 +150,48 @@ mod tests {
     use super::select_transport;
     use lys_runner::{Act, Launch};
     use serde_json::json;
+
+    #[test]
+    fn a_terminal_resume_retains_tracking_and_names_the_native_conversation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let conversation = "019c6e27-e55b-73d1-87d8-4e01f1f75043";
+        for (harness, flag) in [("claude_code", "--resume"), ("codex", "resume")] {
+            let act: Act = serde_json::from_value(json!({
+                "act":"start", "launch":{
+                    "session":"selected", "program":"/harness", "arguments":[], "directory":"/",
+                    "environment":{}, "columns":80, "rows":24,
+                    "config":{"files":[], "argument_files":{}, "environment_paths":{},
+                        "working_directory":false, "harness":harness, "requires_controls":false}
+                }
+            }))?;
+            for invalid in ["", "../thread", "not-a-uuid"] {
+                assert!(super::select_resume(act.clone(), Some(invalid)).is_err());
+            }
+            let Act::Start {
+                launch,
+                tracking: Some(tracking),
+                ..
+            } = super::select_resume(act, Some(conversation))?
+            else {
+                return Err("terminal resume lost its tracked transport".into());
+            };
+            assert_eq!(launch.arguments, [flag, conversation]);
+            assert_eq!(serde_json::to_value(tracking.harness)?, harness);
+            let replacement = "019c6e27-e55b-73d1-87d8-4e01f1f75044";
+            let selected = Act::Start {
+                launch,
+                tracking: Some(tracking),
+                lys_mcp: None,
+                proxy: None,
+            };
+            let Act::Start { launch, .. } = super::select_resume(selected, Some(replacement))?
+            else {
+                return Err("terminal resume changed its transport".into());
+            };
+            assert_eq!(launch.arguments, [flag, replacement]);
+        }
+        Ok(())
+    }
 
     #[test]
     fn controls_pty_tracking_uses_the_rendered_harness_and_config_home()

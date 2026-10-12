@@ -75,6 +75,10 @@ impl Runner {
                         }
                         other => return Err(format!("unexpected act for a caller: {other:?}")),
                     },
+                    RunnerAct::Owned => Answer::Owned {
+                        owners: Vec::new(),
+                        unreachable: Vec::new(),
+                    },
                     RunnerAct::ControlStatus { session } => {
                         read_count.fetch_add(1, Ordering::SeqCst);
                         if refuse_control {
