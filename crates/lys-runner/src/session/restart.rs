@@ -3,7 +3,8 @@
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use super::{Sessions, lifecycle, now_ms, unknown, valid_id};
+use super::launch::valid_id;
+use super::{Sessions, lifecycle, now_ms, unknown};
 use crate::error::RunnerError;
 use crate::operations::{OperationOutcome, begin_restart, finish_restart};
 use crate::peer::Leader;
@@ -99,6 +100,34 @@ impl Sessions {
                 "the runner stopped before the prepared restart was installed",
             ));
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::error::Error;
+
+    use super::{Leader, Sessions};
+    use crate::peer::StartIdentity;
+
+    #[test]
+    fn restart_refuses_invalid_operation_ids_before_finding_a_session() -> Result<(), Box<dyn Error>>
+    {
+        let dir = tempfile::tempdir()?;
+        let sessions = Sessions::open(dir.path(), 4096)?;
+        let leader = Leader {
+            pid: std::process::id(),
+            start: StartIdentity("unproved".to_owned()),
+        };
+        for operation in ["", "../restart", "restart name", "restart-é"] {
+            let error = sessions
+                .restart_proved("missing", operation, &leader)
+                .err()
+                .ok_or("invalid restart operation id was accepted")?;
+            assert_eq!(error.name(), "operation_invalid", "{operation:?}: {error}");
+        }
+        assert!(sessions.read_lock()?.sessions.is_empty());
         Ok(())
     }
 }

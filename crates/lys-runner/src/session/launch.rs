@@ -9,7 +9,7 @@ use crate::protocol::Launch;
 use crate::rotation::RotationState;
 use crate::tracking::Tracking;
 
-fn valid_id(id: &str) -> bool {
+pub(super) fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id
             .chars()
@@ -173,5 +173,66 @@ impl Sessions {
         self.writer.barrier()?;
         self.wake();
         Ok((pid, started_at))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+    use std::error::Error;
+
+    use super::{Launch, Sessions, valid_id};
+
+    #[test]
+    fn session_id_check_accepts_every_allowed_ascii_character() {
+        for id in [
+            "a",
+            "Z",
+            "0",
+            "-",
+            "_",
+            "Az09-_",
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_",
+        ] {
+            assert!(valid_id(id), "refused {id:?}");
+        }
+    }
+
+    #[test]
+    fn session_id_check_rejects_empty_non_ascii_and_punctuation() {
+        for id in ["", " ", "a b", "a/b", "a.b", "a\n", "a\0", "é", "aé", "中"] {
+            assert!(!valid_id(id), "accepted {id:?}");
+        }
+        for character in '\0'..='\x7f' {
+            if !character.is_ascii_alphanumeric() && character != '-' && character != '_' {
+                assert!(!valid_id(&character.to_string()), "accepted {character:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn launch_refuses_invalid_session_ids_before_spawning() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let sessions = Sessions::open(dir.path(), 4096)?;
+        for id in ["", "../session", "session name", "session-é"] {
+            let error = sessions
+                .start(Launch {
+                    session: id.to_owned(),
+                    program: "/no-such-session-program".to_owned(),
+                    arguments: Vec::new(),
+                    directory: dir.path().display().to_string(),
+                    environment: BTreeMap::new(),
+                    config: None,
+                    columns: 80,
+                    rows: 24,
+                    rotation: None,
+                    policy: None,
+                })
+                .err()
+                .ok_or("invalid session id was accepted")?;
+            assert_eq!(error.name(), "session_invalid", "{id:?}: {error}");
+        }
+        assert!(sessions.read_lock()?.sessions.is_empty());
+        Ok(())
     }
 }
