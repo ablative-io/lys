@@ -2,6 +2,7 @@
 
 use super::*;
 
+/// Whether `error` says the peer has left: its end is closed or reset.
 fn left(error: &std::io::Error) -> bool {
     matches!(
         error.kind(),

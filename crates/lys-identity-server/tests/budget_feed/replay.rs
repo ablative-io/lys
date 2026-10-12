@@ -187,5 +187,3 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
     Ok(())
 }
 
-/// A machine named with a runner at a socket, one tracked session on it,
-/// and the page its runner's feed holds.

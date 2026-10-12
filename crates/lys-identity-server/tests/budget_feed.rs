@@ -301,6 +301,8 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
     Ok(())
 }
 
+/// A machine named with a runner at a socket, one tracked session on it,
+/// and the page its runner's feed holds.
 struct Named {
     agent: String,
     machine: String,

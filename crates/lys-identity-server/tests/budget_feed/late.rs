@@ -151,4 +151,3 @@ async fn a_runner_that_comes_up_after_the_service_is_followed_from_the_first_req
     Ok(())
 }
 
-/// Whether `error` says the peer has left: its end is closed or reset.
