@@ -4,10 +4,10 @@
 #[macro_export]
 macro_rules! alarms_follow {
     () => {
-        use crate::budgets_feed::entry_tests::{Fixture, fixture};
-        use crate::dashboard_api::alarms::AlarmStore;
-        use crate::dashboard_api::alarms_state::Kind;
-        use crate::runner_client::RunnerRecord;
+        use $crate::budgets_feed::entry_tests::{Fixture, fixture};
+        use $crate::dashboard_api::alarms::AlarmStore;
+        use $crate::dashboard_api::alarms_state::Kind;
+        use $crate::runner_client::RunnerRecord;
         use lys_runner::liveness::LivenessView;
         use lys_runner::tracking_store::{FEED_FORMAT, FeedPage};
         use lys_runner::{Act, Answer};
@@ -91,11 +91,11 @@ macro_rules! alarms_follow {
         }
 
         async fn read_page(table: &Fixture, runner: &Runner, clock: &AtomicU64) -> TestResult {
-            let page = crate::refusals_follow::alarm_page(
+            let page = $crate::refusals_follow::alarm_page(
                 &table.state, "machine", runner.record.clone(),
                 || Ok(clock.load(Ordering::SeqCst)),
             ).await?;
-            crate::budgets_feed::keep_page(&table.state, "machine", page).await?;
+            $crate::budgets_feed::keep_page(&table.state, "machine", page).await?;
             Ok(())
         }
 
@@ -140,7 +140,7 @@ macro_rules! alarms_follow {
             runner.live.lock().map_err(|error| error.to_string())?.alive = false;
             read_page(&table, &runner, &clock).await?;
             assert!(alarms(&table)?.list().iter().all(|alarm| alarm.cleared_at.is_some()));
-            crate::budgets_api::with_budgets(&table.state, |store| {
+            $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().refusals.cursors.get("machine").map(String::as_str), Some("alarm-page-6"));
                 Ok(())
             })?;
@@ -149,13 +149,13 @@ macro_rules! alarms_follow {
         }
 
         fn proxied(table: &mut Fixture) -> TestResult<std::path::PathBuf> {
-            use crate::launch_template::{Start, render};
-            use crate::provisioning_store::{ProvisioningStore, Version};
+            use $crate::launch_template::{Start, render};
+            use $crate::provisioning_store::{ProvisioningStore, Version};
             let version: Version = serde_json::from_value(json!({
                 "number": 1, "operation": "alarm-profile", "settings": {
                     "model_access": ["fixture-model"], "tools": [], "skills": [], "mcp_servers": [],
                     "permissions": {"default_mode": "plan"}, "instructions": "", "note": "",
-                    "harness": crate::harness_description::declared()
+                    "harness": $crate::harness_description::declared()
                 }, "set_by": "fixture-person", "set_at": 1,
                 "reviewed": {"operation": "alarm-review", "by": "fixture-person", "at": 1}
             }))?;
@@ -170,7 +170,7 @@ macro_rules! alarms_follow {
             let launch = json!({"agent": table.agent, "session": "alarm-session", "directory": "/srv/agent",
                 "provisioning_version": 1, "handles": [], "template": rendered.template,
                 "template_sha256": rendered.template_sha256});
-            let run = crate::launch_api::kept_launch(&store, &launch)?.environment
+            let run = $crate::launch_api::kept_launch(&store, &launch)?.environment
                 .get(lys_home::harness::rendering::RUN_VARIABLE).cloned().ok_or("no fixture proxy run")?;
             let proxy = root.join("proxy");
             std::fs::create_dir_all(proxy.join("usage"))?;
@@ -179,8 +179,8 @@ macro_rules! alarms_follow {
             let state = Arc::get_mut(&mut table.state).ok_or("fixture state is already shared")?;
             state.proxy_dir = Some(proxy);
             state.provisioning = Some(Mutex::new(store));
-            for (at, reported) in [(1, crate::runtime_state::Reported::Starting), (2, crate::runtime_state::Reported::Running)] {
-                crate::runtime_api::with_runtime(state, |store| store.report(crate::runtime_state::Report {
+            for (at, reported) in [(1, $crate::runtime_state::Reported::Starting), (2, $crate::runtime_state::Reported::Running)] {
+                $crate::runtime_api::with_runtime(state, |store| store.report($crate::runtime_state::Report {
                     operation: format!("alarm-track-{at}"), session: "alarm-session".to_owned(),
                     agent: Some(table.agent.clone()), machine: "machine".to_owned(), state: reported,
                     what: String::new(), confirmation: String::new(), reported_by: "fixture".to_owned(),
