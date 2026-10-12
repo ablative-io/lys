@@ -195,7 +195,8 @@ fn a_permissions_slot_is_written_beside_env_and_a_member_off_its_shape_is_refuse
 #[test]
 fn plugins_are_turned_on_in_the_settings_file_and_a_malformed_name_is_refused() {
     let mut value = fixture_value();
-    value["slots"]["plugins"] = json!(["argus@ablative", "frontend-design@claude-plugins-official"]);
+    value["slots"]["plugins"] =
+        json!(["argus@ablative", "frontend-design@claude-plugins-official"]);
     let template = parse_value(&value).unwrap();
     assert_eq!(
         template.plugins,

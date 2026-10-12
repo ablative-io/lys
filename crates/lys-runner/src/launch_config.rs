@@ -252,6 +252,47 @@ fn publish(state: &Path, session: &str, config: &Config) -> Result<PathBuf, Runn
     Ok(target)
 }
 
+/// Refuses a run whose settings turn on a plugin that the Claude Code config
+/// directory it will use has not installed: the program would start without
+/// it and say nothing. The directory is the run's `CLAUDE_CONFIG_DIR`, else
+/// the login's own `~/.claude`, where the sign-in the run keeps lives. Checked
+/// before anything is published, so a refusal leaves nothing behind.
+fn plugins_installed(
+    config: &Config,
+    environment: &BTreeMap<String, String>,
+) -> Result<(), RunnerError> {
+    let Some(settings) = config
+        .files
+        .iter()
+        .find(|file| file.path == "settings.json")
+    else {
+        return Ok(());
+    };
+    let value: serde_json::Value = serde_json::from_str(&settings.text)
+        .map_err(|error| refused(format!("settings.json is not JSON: {error}")))?;
+    let named: Vec<String> = value
+        .get("enabledPlugins")
+        .and_then(serde_json::Value::as_object)
+        .map(|plugins| plugins.keys().cloned().collect())
+        .unwrap_or_default();
+    if named.is_empty() {
+        return Ok(());
+    }
+    let config_dir = match environment.get("CLAUDE_CONFIG_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => std::env::var_os("HOME")
+            .map(|home| PathBuf::from(home).join(".claude"))
+            .ok_or_else(|| {
+                RunnerError::refused(
+                    "plugin_not_installed",
+                    "the run's Claude config directory cannot be named: no CLAUDE_CONFIG_DIR and no HOME",
+                )
+            })?,
+    };
+    lys_home::harness::claude_code::installed_plugins::require(&config_dir, &named)
+        .map_err(|error| RunnerError::refused("plugin_not_installed", error.to_string()))
+}
+
 /// Validate every input, publish all files, then bind process locations.
 ///
 /// # Errors
@@ -261,6 +302,7 @@ pub(crate) fn prepare(state: &Path, launch: &mut Launch) -> Result<(), RunnerErr
         return Ok(());
     };
     checked(config, launch.arguments.len())?;
+    plugins_installed(config, &launch.environment)?;
     let dir = publish(state, &launch.session, config)?;
     for (index, path) in &config.argument_files {
         let bound = dir

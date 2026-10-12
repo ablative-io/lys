@@ -334,6 +334,19 @@ pub enum HomeError {
         path: PathBuf,
     },
 
+    /// A plugin the profile turns on is not installed in the config directory
+    /// the run uses, so the program would start without it and say nothing.
+    #[error(
+        "plugin_not_installed: {name} is not installed in {}; install it into that config directory, or remove it from the profile",
+        config_dir.display()
+    )]
+    PluginNotInstalled {
+        /// The plugin, as name@marketplace.
+        name: String,
+        /// The config directory the run uses.
+        config_dir: PathBuf,
+    },
+
     /// A file render-launch would write already exists.
     #[error("render-launch target already exists: {}", path.display())]
     LaunchTargetExists {

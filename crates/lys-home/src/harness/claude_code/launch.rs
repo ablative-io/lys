@@ -169,6 +169,9 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
             path: config_dir.path,
         });
     }
+    // Before anything is written: a plugin the run's config directory lacks
+    // would be turned on and silently not load.
+    super::installed_plugins::require(&config_dir.path, &template.plugins)?;
     let session_head = session.head_hash()?;
     let head = session.head()?.map(str::to_owned);
     let target = RenderTarget {
