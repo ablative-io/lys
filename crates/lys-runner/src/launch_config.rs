@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::RunnerError;
 use crate::protocol::{Launch, hex};
+use crate::tracking::Harness;
 
 pub use lys_home::harness::rendering_launch::File;
 
@@ -100,7 +101,7 @@ fn checked(config: &Config, arguments: usize) -> Result<(), RunnerError> {
         }
     }
     for (index, path) in &config.argument_files {
-        if *index >= arguments || !paths.contains(path.as_str()) {
+        if *index >= arguments || !(path.is_empty() || paths.contains(path.as_str())) {
             return Err(refused(format!(
                 "argument {index} names no supplied config file `{path}`"
             )));
@@ -300,6 +301,9 @@ fn plugins_installed(
     config: &Config,
     environment: &BTreeMap<String, String>,
 ) -> Result<(), RunnerError> {
+    if config.harness != Some(Harness::ClaudeCode) {
+        return Ok(());
+    }
     let Some(settings) = config
         .files
         .iter()
@@ -373,3 +377,11 @@ pub(crate) fn prepare(state: &Path, launch: &mut Launch) -> Result<(), RunnerErr
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "../tests/launch_config_admission.rs"]
+mod launch_config_tests;
+
+#[cfg(test)]
+#[path = "../../lys-home/tests/rendering/runner_admission.rs"]
+mod rendering_launch_config_tests;
