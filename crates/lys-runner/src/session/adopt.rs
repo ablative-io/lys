@@ -110,6 +110,7 @@ impl Sessions {
             },
             follower: None,
             pending_status: None,
+            plan_windows: None,
             stopped: handed.stopped.clone(),
         }
     }

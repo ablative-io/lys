@@ -146,6 +146,9 @@ pub(crate) struct Session {
     pub(crate) guard: Guard,
     pub(crate) follower: Option<mpsc::Sender<Wake>>,
     pub(crate) pending_status: Option<crate::collector::status::PendingStatus>,
+    /// The account and plan windows last kept from the status line of a
+    /// session tracked neither natively nor through the proxy.
+    pub(crate) plan_windows: Option<(String, Vec<crate::tracking_budget::PlanWindow>)>,
     pub(crate) stopped: Option<Stopped>,
     /// Its managed frames rendered as lines, bounded like its output.
     pub(crate) attach: crate::attach::Ring,
@@ -347,6 +350,7 @@ impl Sessions {
                     guard: Guard::default(),
                     follower: None,
                     pending_status: None,
+                    plan_windows: None,
                     stopped: None,
                     attach: crate::attach::Ring::new(scrollback),
                     last_signal: None,
@@ -529,6 +533,7 @@ impl Sessions {
             },
             follower: None,
             pending_status: None,
+            plan_windows: None,
             stopped: None,
             attach: crate::attach::Ring::new(self.scrollback),
             last_signal: None,

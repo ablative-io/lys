@@ -144,8 +144,13 @@ fn a_proxied_runs_status_reports_are_held_and_written_before_its_next_calls()
     Ok(())
 }
 
+/// A run on a plan is tracked neither way: its status line keeps its plan's
+/// windows, and nothing else, so a `plan_percent` budget on it is no longer
+/// refused as "plan window unreported". A line without `rate_limits`, and one
+/// repeating the windows last kept, keep nothing.
 #[test]
-fn a_session_tracked_neither_way_keeps_nothing_of_a_status_line() -> Result<(), Box<dyn Error>> {
+fn a_session_tracked_neither_way_keeps_its_plans_windows_and_nothing_else()
+-> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let (sessions, _) = proxied(directory.path())?;
     sessions
@@ -155,7 +160,50 @@ fn a_session_tracked_neither_way_keeps_nothing_of_a_status_line() -> Result<(), 
         .ok_or("session missing")?
         .guard
         .proxy = None;
-    assert!(tick(&sessions, 0.25, 4000)?.contains("not tracked"));
+    assert!(tick(&sessions, 0.25, 4000)?.contains("no plan window"));
     assert!(usage(&sessions)?.is_empty());
+
+    let resets = crate::session::now_ms() / 1000 + 3_600;
+    let line = serde_json::json!({
+        "session_id": "native",
+        "model": {"id": "claude-opus-5-5"},
+        "rate_limits": {
+            "five_hour": {"used_percentage": 42, "resets_at": resets},
+            "seven_day": {"used_percentage": 7, "resets_at": resets + 86_400}
+        }
+    });
+    let plan = |input: &serde_json::Value| {
+        sessions.collect(
+            "session",
+            &Collected::StatusLine {
+                input: input.clone(),
+            },
+        )
+    };
+    assert!(plan(&line)?.contains("kept"));
+    let records = usage(&sessions)?;
+    let [record] = records.as_slice() else {
+        return Err(format!("one plan record, found {records:?}").into());
+    };
+    assert_eq!(record.measure, Measure::Snapshot);
+    assert_eq!(record.session, "session");
+    assert_eq!(
+        record.account.as_deref(),
+        Some(format!("login@{}", sessions.runner()).as_str())
+    );
+    assert_eq!(
+        record
+            .figures
+            .plan_windows
+            .iter()
+            .map(|window| (window.duration_minutes, window.resets_at_ms))
+            .collect::<Vec<_>>(),
+        [(300, resets * 1000), (10_080, (resets + 86_400) * 1000)]
+    );
+    assert_eq!(record.figures.dollars_micros, None);
+    assert_eq!(record.figures.input_tokens, None);
+
+    assert!(plan(&line)?.contains("repeat"));
+    assert_eq!(usage(&sessions)?.len(), 1, "a repeat keeps nothing");
     Ok(())
 }

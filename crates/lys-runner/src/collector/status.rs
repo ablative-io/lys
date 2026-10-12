@@ -166,6 +166,92 @@ fn proxied_status(
     Ok("dollars and running time held until the run's next calls are read".to_owned())
 }
 
+/// Keep what the status line of session `id`, tracked neither natively nor
+/// through the proxy, reported of its plan's windows. A run on a Claude
+/// subscription goes through no proxy, and Claude Code reports a plan's
+/// windows (`rate_limits`) to its status line and nowhere else, so without
+/// this a `plan_percent` budget on it was refused as "plan window
+/// unreported". Only a change is kept, as a snapshot claiming no tokens,
+/// dollars or running time. The account is the rotation's current one, or,
+/// for a run that does not rotate, the sign-in of this runner's own login,
+/// named `login@<runner>`.
+fn plan_status(
+    runner: &str,
+    table: &mut Table,
+    id: &str,
+    input: &Value,
+) -> Result<String, RunnerError> {
+    let now = now_ms();
+    let mut unavailable = Vec::new();
+    let mut windows = crate::tracking_budget::windows(input, &mut unavailable);
+    crate::tracking_budget::live(&mut windows, now, &mut unavailable);
+    if windows.is_empty() {
+        return Ok("the status line named no plan window: nothing is kept".to_owned());
+    }
+    let session = table
+        .sessions
+        .get_mut(id)
+        .ok_or_else(|| crate::session::unknown(id))?;
+    let account = session.rotation.as_ref().map_or_else(
+        || format!("login@{runner}"),
+        |rotation| rotation.account().to_owned(),
+    );
+    let held = (account.clone(), windows.clone());
+    if session.plan_windows.as_ref() == Some(&held) {
+        return Ok("the plan's windows repeat the last ones kept".to_owned());
+    }
+    for figure in [
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_tokens",
+        "cache_read_tokens",
+        "context_tokens",
+        "dollars_micros",
+        "running_ms",
+    ] {
+        unavailable.push(crate::tracking::Unavailable {
+            figure: figure.to_owned(),
+            reason: "a plan run's status line is read for its plan windows only".to_owned(),
+        });
+    }
+    let model = input
+        .get("model")
+        .and_then(|model| model.get("id"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let record = UsageRecord {
+        version: crate::tracking::RECORD_VERSION,
+        id: format!("plan-status:{id}:{}", table.feed.end()),
+        runner: runner.to_owned(),
+        session: id.to_owned(),
+        generation: 0,
+        offset: None,
+        turn: None,
+        observed_at: now,
+        measure: crate::tracking::Measure::Snapshot,
+        figures: Figures {
+            plan_windows: windows,
+            ..Figures::default()
+        },
+        unavailable,
+        adapter: crate::tracking::CLAUDE_ADAPTER.to_owned(),
+        model,
+        account: Some(account),
+        account_unknown: None,
+        context_window: 0,
+        profile_version: 0,
+        run: None,
+        record: None,
+    };
+    append(table, id, vec![Body::Usage(record)], None)?;
+    table
+        .sessions
+        .get_mut(id)
+        .ok_or_else(|| crate::session::unknown(id))?
+        .plan_windows = Some(held);
+    Ok("the plan's windows are kept".to_owned())
+}
+
 impl Sessions {
     pub(super) fn status_line(&self, id: &str, input: &Value) -> Result<String, RunnerError> {
         let mut table = self.lock()?;
@@ -177,7 +263,7 @@ impl Sessions {
             let proxy = session.guard.proxy.clone();
             return match proxy {
                 Some(proxy) => proxied_status(self.runner(), &mut table, id, &proxy, input),
-                None => Ok("the session is not tracked: nothing is kept".to_owned()),
+                None => plan_status(self.runner(), &mut table, id, input),
             };
         };
         let Some(mut source) = table.feed.source(id).cloned() else {
