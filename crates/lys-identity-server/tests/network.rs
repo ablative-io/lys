@@ -61,8 +61,13 @@ async fn the_administrator_names_and_retires_machines_and_admitted_people_read_t
         .find(|agent| agent.state == lys_identity::LifecycleState::Active)
         .ok_or("active agent missing")?;
     body["may_run"] = json!([admitted.id.to_string()]);
-    let by_bea = service.post("/network/machines", Some(&bea), &body).await?;
-    refused(&by_bea, 403, "NotAdmitted");
+    let foreign = seeded.people[0].agents.iter()
+        .find(|agent| agent.state == lys_identity::LifecycleState::Active)
+        .ok_or("administrator active agent missing")?;
+    let mut not_owned = body.clone();
+    not_owned["may_run"] = json!([foreign.id.to_string()]);
+    let by_bea = service.post("/network/machines", Some(&bea), &not_owned).await?;
+    refused(&by_bea, 403, "agent_not_yours");
     let (status, named) = service.post("/network/machines", Some(&ada), &body).await?;
     assert_eq!(status, 200, "{named}");
     assert_eq!(named["id"], operation);
