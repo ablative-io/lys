@@ -85,6 +85,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::Canvas(..)
         | ServerError::ProductDraft(..)
         | ServerError::SessionsUnavailable { .. }
+        | ServerError::ClockUnavailable { .. }
         | ServerError::MemoryUnavailable { .. }
         | ServerError::ProvisioningUnavailable { .. }
         | ServerError::ProvisioningChanged { .. }

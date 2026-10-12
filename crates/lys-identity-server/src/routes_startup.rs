@@ -18,7 +18,11 @@ use crate::session::Sessions;
 #[path = "issuer_admin.rs"]
 mod issuer_admin;
 
-pub(crate) async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
+pub(crate) async fn service_saying_with_clock(
+    config: &Config,
+    say: Say,
+    clock: lys_core::clock::ClockSource,
+) -> Result<Router, ServerError> {
     let kept_responsibilities = crate::kept_responsibilities::Kept::load(
         &config.log_dir.with_file_name("kept-responsibilities.json"),
     )?;
