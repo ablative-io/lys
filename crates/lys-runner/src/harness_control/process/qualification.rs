@@ -42,7 +42,7 @@ impl Drop for Admission {
                 drop(slot.take());
             }
             Err(error) => {
-                crate::error::said(&format!("qualification_seam_cleanup_failed: {error}"))
+                crate::error::said(&format!("qualification_seam_cleanup_failed: {error}"));
             }
         });
     }

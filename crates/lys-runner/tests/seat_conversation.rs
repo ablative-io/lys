@@ -36,7 +36,7 @@ fn plan() -> Result<OwnerPlan, serde_json::Error> {
 fn a_fresh_codex_owner_can_wait_for_its_proved_thread() -> TestResult {
     let plan = plan()?;
     plan.validate()?;
-    let mut claude = plan.clone();
+    let mut claude = plan;
     claude.managed.transport = Transport::Claude;
     assert!(claude.validate().is_err());
     Ok(())

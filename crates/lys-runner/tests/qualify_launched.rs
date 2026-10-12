@@ -26,7 +26,7 @@ impl Drop for Owned {
                 Ok(Some(_)) => return,
                 Ok(None) => {}
                 Err(error) => {
-                    crate::error::said(&format!("qualification_exit_unconfirmed: {error}"))
+                    crate::error::said(&format!("qualification_exit_unconfirmed: {error}"));
                 }
             }
             if let Err(error) = crate::pty::end(&self.spawned.binding.leader) {
@@ -234,7 +234,7 @@ fn qualify(
         session: "qualification".to_owned(),
         program: binary
             .into_string()
-            .map_err(|_| "qualification_binary_path_not_text")?,
+            .map_err(|path| format!("qualification_binary_path_not_text: {}", path.display()))?,
         arguments: Vec::new(),
         directory: working
             .to_str()
@@ -315,7 +315,9 @@ fn qualify(
     let drain = std::thread::Builder::new()
         .spawn(move || std::io::copy(&mut reader, &mut std::io::sink()))?;
     let status = owned.spawned.child.wait();
-    let drained = drain.join().map_err(|_| "qualification_reader_panicked")?;
+    let drained = drain
+        .join()
+        .map_err(|panic| format!("qualification_reader_panicked: {panic:?}"))?;
     drained?;
     let status = status?;
     owned.stopped = true;
