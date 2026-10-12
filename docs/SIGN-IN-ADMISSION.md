@@ -25,9 +25,11 @@ issuer's trust in the directory service.
 
 The front proxy must append the actual peer address it accepted to
 `X-Forwarded-For`. Lys walks the header from right to left, skipping configured
-trusted proxies and using the first untrusted address. Missing or malformed
-trusted hops refuse sign-in. Arbitrary left entries cannot override a client's
-address. If a proxy is not configured, all its clients share its peer's quota.
+trusted proxies and using the first untrusted address. A trusted peer with no
+header is a direct connection and resolves to itself. A present header that is
+malformed or names only trusted hops refuses sign-in. Arbitrary left entries
+cannot override a client's address. If a proxy is not configured, all its
+clients share its peer's quota.
 Do not trust loopback if untrusted local processes can call the service directly.
 
 Install and upgrade omit this key unless the operator already set it. Upgrade

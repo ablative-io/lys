@@ -19,7 +19,23 @@ fn only_explicitly_trusted_peers_can_supply_a_client_address() -> TestResult {
     headers.insert("x-forwarded-for", "not-an-ip".parse()?);
     assert_eq!(resolve(peer, &headers, &[])?, peer);
     assert!(resolve(peer, &headers, &[peer]).is_err());
-    assert!(resolve(peer, &HeaderMap::new(), &[peer]).is_err());
+    assert_eq!(resolve(peer, &HeaderMap::new(), &[peer])?, peer);
+    Ok(())
+}
+
+#[test]
+fn a_trusted_peer_with_no_forwarded_header_is_a_direct_connection() -> TestResult {
+    let peer: IpAddr = "127.0.0.1".parse()?;
+    assert_eq!(resolve(peer, &HeaderMap::new(), &[peer])?, peer);
+
+    let mut headers = HeaderMap::new();
+    headers.insert("x-forwarded-for", "127.0.0.1".parse()?);
+    assert!(resolve(peer, &headers, &[peer]).is_err());
+    headers.insert("x-forwarded-for", "not-an-ip".parse()?);
+    assert!(resolve(peer, &headers, &[peer]).is_err());
+
+    let peer: IpAddr = "::1".parse()?;
+    assert_eq!(resolve(peer, &HeaderMap::new(), &[peer])?, peer);
     Ok(())
 }
 

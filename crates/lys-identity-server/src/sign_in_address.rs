@@ -1,7 +1,7 @@
 //! Forwarded addresses are authoritative only from explicitly named peers.
 //! Walk X-Forwarded-For from the right, skipping trusted hops. An untrusted
-//! peer's header is ignored, including malformed text. No proxy is trusted
-//! by default. The proxy must append the actual peer it accepted.
+//! peer's header is ignored, including malformed text. A trusted peer with
+//! no header resolves to itself; a present header must name a valid client.
 use crate::error::ServerError;
 use axum::http::HeaderMap;
 use std::net::IpAddr;
@@ -26,6 +26,9 @@ pub(crate) fn resolve(
         return Ok(peer);
     }
     let lines: Vec<_> = headers.get_all("x-forwarded-for").iter().collect();
+    if lines.is_empty() {
+        return Ok(peer);
+    }
     for line in lines.iter().rev() {
         let Ok(line) = line.to_str() else {
             return Err(refused());
