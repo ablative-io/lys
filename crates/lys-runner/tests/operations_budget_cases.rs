@@ -194,7 +194,7 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
     let client = lys_runner::Client::new(
         table.socket.clone(),
         std::sync::Arc::new(lys_core::Ed25519Identity::load(
-            &table.service.config.event_key_file,
+            table.service.event_key_file(),
         )?),
     );
     let output = client.ask(&lys_runner::Act::Read {
