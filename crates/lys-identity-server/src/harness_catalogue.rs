@@ -367,7 +367,10 @@ fn validate(program: &ProgramFile) -> Result<(), &'static str> {
 }
 
 pub(crate) fn routes() -> Router<Shared> {
-    Router::new().route("/harnesses", get(read))
+    Router::new().route("/harnesses", get(read)).route(
+        "/harnesses/plugins",
+        get(crate::plugins_installed_api::read),
+    )
 }
 
 async fn read(

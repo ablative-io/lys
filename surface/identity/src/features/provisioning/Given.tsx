@@ -13,6 +13,7 @@
  *   each be removed.
  */
 import { Act } from '../../shell/Act';
+import type { InstalledPlugins } from './choices';
 const count = (n: number, one: string, many: string) => n + ' ' + (n === 1 ? one : many);
 
 /** The skills that reach a run beside the ones Lys gives, said only for a program it is known of (CLEAN-START.md rows 10 and 16). */
@@ -59,8 +60,10 @@ export function ToolsNamed({ value, change }: { value: string[]; change: (next: 
 }
 
 /** The Claude Code plugins the settings turn on, each as name@marketplace. Shown only when there are any; this screen adds none. */
-export function PluginsNamed({ value, change }: { value: string[]; change: (next: string[]) => void }) {
+export function PluginsNamed({ value, change, installed }: { value: string[]; change: (next: string[]) => void; installed?: InstalledPlugins | null }) {
   if (value.length === 0) return null;
+  // The same check a start makes (plugin_not_installed), read on this computer.
+  const missing = installed && !installed.unread ? value.filter((name) => !installed.installed.includes(name)) : [];
   return <section className="given-plugins wide" aria-label="Plugins named in these settings">
     <table className="usage-table">
       <thead><tr><th>Plugins named in these settings</th><th>Change</th></tr></thead>
@@ -68,6 +71,8 @@ export function PluginsNamed({ value, change }: { value: string[]; change: (next
         <td><Act symbol="remove" name={'Remove ' + name} onClick={() => change(value.filter((one) => one !== name))} /></td></tr>)}</tbody>
     </table>
     <p className="dim">Each is turned on in the settings Lys writes for this agent’s runs. A plugin must already be installed for the program to load it.</p>
+    {missing.length ? <p className="why-not">Not installed in {installed?.folder ?? 'this computer’s Claude config folder'}: {missing.join(', ')}. A start on this computer is refused (plugin_not_installed) until each is installed there.</p> : null}
+    {installed?.unread ? <p className="why-not">This computer’s installed plugins could not be read: {installed.unread}</p> : null}
   </section>;
 }
 

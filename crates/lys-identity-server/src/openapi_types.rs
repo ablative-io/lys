@@ -408,6 +408,12 @@ fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
         ),
         (
             GET,
+            "/harnesses/plugins",
+            None,
+            Some(api.schema::<crate::plugins_installed_api::InstalledPlugins>()),
+        ),
+        (
+            GET,
             "/runtime/message-edges",
             Some(api.schema::<crate::message_edges::EdgeQuery>()),
             Some(api.schema::<crate::message_edges::EdgePage>()),

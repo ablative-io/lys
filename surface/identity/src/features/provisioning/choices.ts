@@ -17,7 +17,10 @@ export interface Choices {
   machines: NetworkView['machines'];
   skills: string[] | null;
   secrets: string[] | null;
+  /** The plugins installed on this computer (GET /harnesses/plugins); absent when the service does not answer it. */
+  plugins?: InstalledPlugins | null;
 }
+export interface InstalledPlugins { folder: string | null; installed: string[]; unread?: string }
 
 async function optional<T>(path: string): Promise<{ value: T | null; missing: string }> {
   try { return { value: await request<T>(path), missing: '' }; } catch (error) {
@@ -27,16 +30,18 @@ async function optional<T>(path: string): Promise<{ value: T | null; missing: st
 }
 
 export async function readChoices(servedNetwork?: NetworkView): Promise<Choices> {
-  const [programs, network, skills, secrets] = await Promise.all([
+  const [programs, network, skills, secrets, plugins] = await Promise.all([
     optional<{ programs: Program[] }>('/harnesses'),
     servedNetwork ? Promise.resolve({ value: servedNetwork, missing: '' }) : optional<NetworkView>('/network'),
     optional<{ skills: { name: string }[] }>('/skills'),
     optional<{ secrets: { name: string }[] }>('/secrets'),
+    optional<InstalledPlugins>('/harnesses/plugins'),
   ]);
   return {
     programs: programs.value?.programs ?? null, programsMissing: programs.missing,
     machines: (network.value?.machines ?? []).filter((machine) => machine.state === 'in_use'),
     skills: skills.value ? skills.value.skills.map((skill) => skill.name) : null,
     secrets: secrets.value ? secrets.value.secrets.map((secret) => secret.name) : null,
+    plugins: plugins.value,
   };
 }

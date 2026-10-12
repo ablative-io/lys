@@ -135,6 +135,7 @@ pub mod grants_batch;
 pub mod grants_reach;
 pub mod grants_refusals;
 pub mod harness_catalogue;
+pub mod plugins_installed_api;
 /// The harness description the tests of a start are built on, loaded once for every test module here.
 #[cfg(test)]
 #[path = "../tests/support/harness_description.rs"]
