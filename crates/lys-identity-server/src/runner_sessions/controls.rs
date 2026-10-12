@@ -1,6 +1,18 @@
 //! The exact reviewed launch config chooses its signed transport request.
 
+use super::{AppState, Arc, Launch, ServerError, Value};
 use lys_runner::Act;
+
+/// Start `launch` for `agent` on `machine`'s runner and keep it running;
+/// refuse when the machine names no runner. A start sent again finds the
+/// session the runner already holds.
+pub async fn run_on_runner(
+    state: &Arc<AppState>,
+    (agent, machine, caller): (&str, &str, &str),
+    launch: Launch,
+) -> Result<Value, ServerError> {
+    super::run_resuming(state, (agent, machine, caller), launch, None).await
+}
 
 pub(super) fn select_transport(act: Act) -> Act {
     let Act::Start {

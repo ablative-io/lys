@@ -7,6 +7,7 @@
 //! the runtime report the runner's answer confirms, never inferred.
 
 mod controls;
+pub use controls::run_on_runner;
 #[path = "runner_sessions_refused.rs"]
 mod refused;
 use refused::{record_refused, refused_before, started_nothing};
@@ -312,17 +313,6 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
             reason: format!("runner act store unavailable: {error}"),
         })?;
     acts.keep(act)
-}
-
-/// Start `launch` for `agent` on `machine`'s runner and keep it running;
-/// refuse when the machine names no runner. A start sent again finds the
-/// session the runner already holds.
-pub async fn run_on_runner(
-    state: &Arc<AppState>,
-    (agent, machine, caller): (&str, &str, &str),
-    launch: Launch,
-) -> Result<Value, ServerError> {
-    run_resuming(state, (agent, machine, caller), launch, None).await
 }
 
 pub(crate) async fn run_resuming(

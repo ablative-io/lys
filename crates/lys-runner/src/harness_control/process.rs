@@ -274,7 +274,9 @@ pub(crate) fn spawn(
             ),
         )
     })?;
-    let admitted = QUALIFIED.iter().any(|proof| proof.adapter == adapter && proof.version == harness_version);
+    let admitted = QUALIFIED
+        .iter()
+        .any(|proof| proof.adapter == adapter && proof.version == harness_version);
     #[cfg(test)]
     let admitted = admitted || qualification::approved(adapter, &harness_version)?;
     if !status.success() || !admitted {
@@ -305,10 +307,12 @@ pub(crate) fn spawn(
         }
     };
     #[cfg(test)]
-    let current = qualification::entry()?.map_or_else(std::env::current_exe, Ok)
+    let current = qualification::entry()?
+        .map_or_else(std::env::current_exe, Ok)
         .map_err(|error| failed("control_entry_unproved", error))?;
     #[cfg(not(test))]
-    let current = std::env::current_exe().map_err(|error| failed("control_entry_unproved", error))?;
+    let current =
+        std::env::current_exe().map_err(|error| failed("control_entry_unproved", error))?;
     let entry_identity = executable(&current)?;
     let mut child = Command::new(&current)
         .args(["runner", "managed-entry"])
