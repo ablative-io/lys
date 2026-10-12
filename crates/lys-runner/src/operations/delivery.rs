@@ -122,6 +122,12 @@ pub(crate) fn accept(
         };
         (OperationState::Accepted, words)
     };
+    let words = match &operation.request {
+        OperationRequest::WakeUp { compaction, .. } if !words.starts_with("wake_up ") => {
+            format!("wake_up compaction={compaction}; {words}")
+        }
+        _ => words,
+    };
     let outcome = OperationOutcome {
         operation: operation.operation.clone(),
         session: operation.session.clone(),
@@ -440,7 +446,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
             .and_then(|mut outcome| {
                 outcome.state = next;
                 outcome.at = now_ms();
-                outcome.words = words;
+                outcome.words = super::receipt_words(&outcome.words, words);
                 if next == OperationState::Confirmed {
                     outcome.ended = Some(ended.clone());
                 }
