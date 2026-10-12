@@ -14,6 +14,14 @@ function problem(error: unknown): PartRefused {
   return error instanceof Refused ? error.refusal : { refusal: 'AlarmsUnreadable', reason: String(error) };
 }
 
+function shownAlarm(reported: Alarm, local: Alarm | undefined): Alarm {
+  if (reported.cleared_at !== null || !local) return reported;
+  if (local.cleared_at !== null) return local;
+  return reported.acknowledged_by ? reported : { ...reported,
+    acknowledged_by: local.acknowledged_by, acknowledged_at: local.acknowledged_at,
+  };
+}
+
 export function Alarms({ summary, agents }: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
   const [acknowledged, setAcknowledged] = useState<Record<string, Alarm>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -37,17 +45,17 @@ export function Alarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
       setAll(answer.alarms);
     } catch (error) { setFailure(problem(error)); }
   }
-  const rows = refusedPart(summary) ? [] : all ?? summary.newest;
+  const reported = refusedPart(summary) ? [] : all ?? summary.newest;
+  const rows = reported.map((alarm) => shownAlarm(alarm, acknowledged[alarm.id]));
+  const recovered = reported.filter((alarm, index) => alarm.cleared_at === null && rows[index].cleared_at !== null).length;
+  const count = refusedPart(summary) ? '?' : all === null ? summary.open_count - recovered
+    : rows.filter((alarm) => alarm.cleared_at === null).length;
   return <section className="dash-widget" aria-label="Alarms">
-    <div className="section-h"><span>Alarms</span><b className="dash-count">{refusedPart(summary) ? '?' : summary.open_count}</b>
+    <div className="section-h"><span>Alarms</span><b className="dash-count">{count}</b>
       {!refusedPart(summary) && all === null ? <button type="button" className="btn" onClick={() => void readAll()}>Show all</button> : null}</div>
     <div className="you-scroll">
       {refusedPart(summary) ? <p className="why-not" role="alert" title={summary.reason}>{summary.refusal}</p>
-        : <table className="dash-table"><tbody>{rows.map((reported) => {
-          const local = acknowledged[reported.id];
-          const alarm = local && !reported.acknowledged_by ? { ...reported,
-            acknowledged_by: local.acknowledged_by, acknowledged_at: local.acknowledged_at,
-          } : reported;
+        : <table className="dash-table"><tbody>{rows.map((alarm) => {
           return <tr key={alarm.id} data-alarm={alarm.id}>
             <td>{agents.find((row) => row.agent.id === alarm.agent)?.agent.display_name ?? 'Agent name unavailable'}
               <div className="sec">{alarm.kind === 'seat_stalled' ? 'Seat stopped signalling' : 'Session has no proxy usage'}</div>

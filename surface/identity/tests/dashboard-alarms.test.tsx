@@ -74,4 +74,13 @@ describe('Dashboard alarms', () => {
     expect($('section[aria-label="Alarms"] [role="alert"]')?.textContent).toContain('AlarmsUnreadable');
     expect($$('tr[data-alarm]')).toHaveLength(0);
   });
+
+  it('shows a clear returned by acknowledgement while the dashboard snapshot is older', async () => {
+    await mount('#/', { ...routes,
+      'POST /alarms/alarm-4/acknowledge': ok({ ...alarm('alarm-4'), acknowledged_by: ADA, acknowledged_at: 110, cleared_at: 120 }),
+    });
+    await click($('tr[data-alarm="alarm-4"] button'));
+    expect($('tr[data-alarm="alarm-4"]')?.textContent).toContain('Cleared');
+    expect($('section[aria-label="Alarms"] .dash-count')?.textContent).toBe('3');
+  });
 });
