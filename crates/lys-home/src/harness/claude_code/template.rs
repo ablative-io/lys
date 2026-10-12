@@ -3,10 +3,10 @@
 //! Claude Code session. Its schema is `docs/design/home/launch-template.schema.json`
 //! and this parser accepts exactly that shape: `harness`, `flags` and the
 //! five `slots` (`transcript`, `mcp`, `env`, `secrets`, `instructions`),
-//! with `skills`, `permissions` and `plugins` when it carries them.
+//! with optional skills, permissions, plugins and seat declarations.
 //!
 //! Nothing in a template is interpreted, expanded or executed here. A slot
-//! outside the five is refused by name, a missing slot is refused by name, a
+//! outside the declared set is refused by name, a missing required slot is refused by name, a
 //! readable secret is refused because no broker reader exists yet, and a
 //! variable named twice is refused by name. No error carries the
 //! instructions text, an environment value or the MCP contents.
@@ -18,6 +18,7 @@ use serde_json::{Map, Value};
 
 use crate::error::HomeError;
 use crate::harness::claude_code::HARNESS;
+use crate::harness::launch_fields::SeatFields;
 use crate::harness::skills::{SkillFile, check};
 use crate::record::blocks::Hash;
 
@@ -26,7 +27,17 @@ pub const FILL_RESUME_BY_PATH: &str = "resume-by-path";
 /// The five slots, in the schema's order.
 pub const SLOTS: [&str; 5] = ["transcript", "mcp", "env", "secrets", "instructions"];
 /// The slots a template may carry beyond those it must.
-pub const OPTIONAL_SLOTS: [&str; 3] = ["skills", "permissions", "plugins"];
+pub const OPTIONAL_SLOTS: [&str; 9] = [
+    "skills",
+    "permissions",
+    "plugins",
+    "hooks",
+    "status_line",
+    "settings",
+    "resume",
+    "context_window",
+    "config_dir",
+];
 /// The three members of a template.
 pub const MEMBERS: [&str; 3] = ["harness", "flags", "slots"];
 
@@ -62,6 +73,8 @@ pub struct Template {
     pub permissions: Option<Map<String, Value>>,
     /// The plugins the settings file turns on, each `name@marketplace`.
     pub plugins: Vec<String>,
+    /// The seat's own optional declarations, retained for native rendering.
+    pub seat: SeatFields,
 }
 
 /// Whether `name` is one plugin as Claude Code's `enabledPlugins` names it:
@@ -170,6 +183,17 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
             });
         }
     }
+    let seat_slots = slots
+        .iter()
+        .filter(|(name, _)| SeatFields::NAMES.contains(&name.as_str()))
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect();
+    let seat = SeatFields::parse(&seat_slots, "claude-code/template-v1").map_err(|error| {
+        HomeError::TemplateShape {
+            field: format!("slots.{}", error.field),
+            reason: error.reason,
+        }
+    })?;
     Ok(Template {
         hash,
         flags,
@@ -181,6 +205,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
         skills,
         permissions,
         plugins,
+        seat,
     })
 }
 
@@ -340,3 +365,6 @@ fn secret_list(field: &str, value: &Value) -> Result<Vec<SecretRef>, HomeError> 
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod seat_slot_tests;

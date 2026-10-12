@@ -53,8 +53,8 @@ pub(crate) fn act(
 
 /// How the run is tracked through the proxy, when its launch minted it a run
 /// key: the key and the profile version, as the launch wrote them in its
-/// environment. No profile declares a context window yet, so none is said,
-/// and the account is the one each call's own headers name.
+/// environment, with the window the profile explicitly declared. The account
+/// is the one each call's own headers name.
 ///
 /// A launch that names no run key does not go through the proxy and is
 /// tracked through none. One that names a key and no profile version that
@@ -89,9 +89,26 @@ fn proxied(
                  (LYS_PROVISIONING_VERSION: {error})"
             ))
         })?;
+    let context_window = launch
+        .environment
+        .get("LYS_CONTEXT_WINDOW")
+        .map(|given| {
+            given
+                .parse::<u32>()
+                .map_err(|error| refused(&format!("an invalid session.context_window: {error}")))
+                .and_then(|window| {
+                    if window == 0 {
+                        Err(refused("session.context_window must be positive"))
+                    } else {
+                        Ok(u64::from(window))
+                    }
+                })
+        })
+        .transpose()?
+        .unwrap_or(0);
     Ok(Some(lys_runner::tracking_proxy::ProxyTracking {
         run: run.clone(),
-        context_window: 0,
+        context_window,
         profile_version,
         account: None,
     }))
@@ -99,6 +116,51 @@ fn proxied(
 
 /// The variable a launch names its profile version in.
 const PROFILE_VERSION_VARIABLE: &str = "LYS_PROVISIONING_VERSION";
+
+#[cfg(test)]
+mod profile_window_tests {
+    use super::proxied;
+    use lys_runner::Launch;
+    use std::collections::BTreeMap;
+    use std::error::Error;
+
+    fn launch(window: &str) -> Launch {
+        Launch {
+            session: "session".to_owned(),
+            program: "/bin/sh".to_owned(),
+            arguments: Vec::new(),
+            directory: "/tmp".to_owned(),
+            environment: BTreeMap::from([
+                (
+                    "LYS_RUN".to_owned(),
+                    "0123456789abcdef0123456789abcdef".to_owned(),
+                ),
+                ("LYS_PROVISIONING_VERSION".to_owned(), "1".to_owned()),
+                ("LYS_CONTEXT_WINDOW".to_owned(), window.to_owned()),
+            ]),
+            config: None,
+            columns: 120,
+            rows: 30,
+            rotation: None,
+            policy: None,
+        }
+    }
+
+    #[test]
+    fn runner_start_uses_the_profiles_context_window() -> Result<(), Box<dyn Error>> {
+        let tracking = proxied(&launch("200000"))?.ok_or("proxy tracking absent")?;
+        assert_eq!(tracking.context_window, 200_000);
+        Ok(())
+    }
+
+    #[test]
+    fn runner_start_refuses_invalid_declared_windows_by_name() {
+        for window in ["0", "word", "4294967296"] {
+            let error = proxied(&launch(window)).expect_err("invalid window accepted");
+            assert!(error.to_string().contains("context_window"), "{error}");
+        }
+    }
+}
 
 pub(crate) fn record_after_end<T>(
     ending: Result<(), ServerError>,

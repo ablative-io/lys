@@ -5,7 +5,8 @@ use std::collections::BTreeSet;
 use axum::body::Bytes;
 use axum::http::{HeaderMap, Method};
 use lys_home::harness::launch_fields::{
-    EnvText, HandleEnv, KeptSkill, LaunchFields, LaunchIdentity, LaunchMcp, Transport,
+    EnvText, HandleEnv, KeptSkill, LaunchFields, LaunchIdentity, LaunchMcp, ProfileLaunchFields,
+    SeatFields, Transport,
 };
 use lys_identity::LifecycleState;
 use serde_json::Value;
@@ -157,7 +158,13 @@ pub(crate) async fn handles(
 
 /// The launch fields `start` gives, with each secret resolved to one of the
 /// agent's `handles`; a profile that declares no harness is refused.
-pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields, ServerError> {
+///
+/// # Errors
+/// Names a missing harness, unsupported model or server, unknown skill or invalid seat declaration.
+pub fn fields(
+    start: &Start<'_>,
+    handles: &[HandleName],
+) -> Result<ProfileLaunchFields, ServerError> {
     let settings = &start.version.settings;
     let harness = settings
         .harness
@@ -165,8 +172,6 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         .ok_or(ServerError::HarnessUndeclared {
             version: start.version.number,
         })?;
-    // Only Claude Code's model calls go through Lys's proxy for now.
-    let harness_is_claude = harness.description.rendering_contract == "claude-code/template-v1";
     crate::launch_fields::models(&harness, &settings.model_access)?;
     crate::launch_fields::mcp(&harness, &settings.mcp_servers)?;
     let mcp_servers = settings
@@ -174,29 +179,42 @@ pub fn fields(start: &Start<'_>, handles: &[HandleName]) -> Result<LaunchFields,
         .iter()
         .map(|server| server_fields(server, handles))
         .collect::<Result<Vec<_>, _>>()?;
-    let model_proxy = start
-        .model_proxy
-        .filter(|_| harness_is_claude)
-        .map(str::to_owned);
+    let model_proxy = start.model_proxy.map(str::to_owned);
     // Every start is rendered from these fields, so every start that is
     // given the proxy is given it under a key minted here for it alone: no
     // start path can give a run the proxy without one.
     let run = model_proxy.as_ref().map(|_| lys_home::record::fresh_id());
-    Ok(LaunchFields {
-        identity: LaunchIdentity {
-            agent: start.agent.to_owned(),
-            session: start.session.to_owned(),
-            machine: start.machine.to_owned(),
-            version: start.version.number,
+    let seat = settings
+        .session
+        .as_ref()
+        .map_or_else(SeatFields::default, |session| SeatFields {
+            resume: session.resume.clone(),
+            context_window: session.context_window,
+            config_dir: session.config_dir.clone(),
+            ..SeatFields::default()
+        });
+    seat.check(&harness.description.rendering_contract)
+        .map_err(|error| ServerError::LaunchUnrenderable {
+            reason: format!("session.{error}"),
+        })?;
+    Ok(ProfileLaunchFields {
+        seat,
+        launch: LaunchFields {
+            identity: LaunchIdentity {
+                agent: start.agent.to_owned(),
+                session: start.session.to_owned(),
+                machine: start.machine.to_owned(),
+                version: start.version.number,
+            },
+            harness,
+            instructions: settings.instructions.clone(),
+            models: settings.model_access.clone(),
+            mcp_servers,
+            skills: skills(settings)?,
+            plugins: settings.plugins.clone(),
+            model_proxy,
+            run,
         },
-        harness,
-        instructions: settings.instructions.clone(),
-        models: settings.model_access.clone(),
-        mcp_servers,
-        skills: skills(settings)?,
-        plugins: settings.plugins.clone(),
-        model_proxy,
-        run,
     })
 }
 

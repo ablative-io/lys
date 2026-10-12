@@ -5,16 +5,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::harness::launch_fields::{Channel, LaunchFields, Transport};
+use crate::harness::launch_fields::{Channel, LaunchFields, SeatFields, Transport};
 use crate::harness::rendering::{RenderRefusal, RenderedTemplate, SecretBinding, refused};
 use crate::harness::skills::{SkillFile, check};
 use crate::record::blocks::Hash;
 
 #[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct Template {
     pub(super) harness: String,
     pub(super) fields: LaunchFields,
+    #[serde(flatten)]
+    pub(super) seat: SeatFields,
     pub(super) skills: Vec<SkillFile>,
     pub(super) permissions: Permissions,
     pub(super) environment: BTreeMap<String, String>,
@@ -75,6 +76,10 @@ fn checked(template: &Template) -> Result<(), String> {
         return Err("description.rendering_contract: mismatched native template".to_owned());
     }
     let fields = &template.fields;
+    template
+        .seat
+        .check("codex/template-v1")
+        .map_err(|error| error.to_string())?;
     if fields.models.len() != 1 || fields.models.iter().any(|model| !plain(model)) {
         return Err("models: the native launch requires exactly one plain model".to_owned());
     }
@@ -156,8 +161,33 @@ fn checked(template: &Template) -> Result<(), String> {
 }
 
 pub(super) fn parse(text: &str) -> Result<Template, String> {
-    let template: Template = serde_json::from_str(text)
+    let root: Value = serde_json::from_str(text)
         .map_err(|error| format!("template: invalid native template shape: {error}"))?;
+    let members = root.as_object().ok_or("template: must be an object")?;
+    let mut seat_slots = serde_json::Map::new();
+    for (name, value) in members {
+        if SeatFields::NAMES.contains(&name.as_str()) {
+            seat_slots.insert(name.clone(), value.clone());
+        } else if !["harness", "fields", "skills", "permissions", "environment"]
+            .contains(&name.as_str())
+        {
+            return Err(format!("template.{name}: unknown member"));
+        }
+    }
+    if let Some(fields) = root.get("fields").and_then(Value::as_object) {
+        for (name, value) in fields {
+            if SeatFields::NAMES.contains(&name.as_str())
+                && seat_slots.insert(name.clone(), value.clone()).is_some()
+            {
+                return Err(format!("{name}: repeated seat field"));
+            }
+        }
+    }
+    let seat =
+        SeatFields::parse(&seat_slots, "codex/template-v1").map_err(|error| error.to_string())?;
+    let mut template: Template = serde_json::from_value(root)
+        .map_err(|error| format!("template: invalid native template shape: {error}"))?;
+    template.seat = seat;
     checked(&template)?;
     Ok(template)
 }
@@ -222,6 +252,7 @@ pub(crate) fn render(
     let template = Template {
         harness: "codex".to_owned(),
         fields: fields.clone(),
+        seat: SeatFields::default(),
         skills: skills.to_vec(),
         permissions,
         environment,

@@ -17,11 +17,12 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use lys_home::harness::launch_fields::{Channel, DeclaredHarness, InstructionsMode, Literal};
+use lys_home::harness::launch_fields::{Channel, Literal};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
-use crate::launch_permissions::Permissions;
+mod profile;
+pub use profile::{Profile, Review, SessionSettings, Settings, SkillPin, Version};
 
 #[path = "provisioning_builds.rs"]
 mod builds;
@@ -134,153 +135,6 @@ impl Clone for SkillText {
             len: self.len,
             sha256: self.sha256.clone(),
         }
-    }
-}
-
-/// The skill a profile version names, pinned to the text it was recorded with.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SkillPin {
-    /// The skill's name.
-    pub name: String,
-    /// The length of that text in bytes.
-    pub len: u64,
-    /// The SHA-256 of the text the version was recorded with.
-    pub sha256: String,
-}
-
-/// What an agent is set up with.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Settings {
-    /// The models it may use.
-    pub model_access: Vec<String>,
-    /// The tools it is given.
-    pub tools: Vec<String>,
-    /// The skills it is given.
-    pub skills: Vec<String>,
-    /// The MCP servers it is given.
-    pub mcp_servers: Vec<McpServer>,
-    /// The harness plugins its settings turn on, each `name@marketplace`,
-    /// reviewed with the rest of the version; the person's own plugins are
-    /// never loaded (Tom, 3 October 2026 20:47).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub plugins: Vec<String>,
-    /// Its instructions; may be empty.
-    pub instructions: String,
-    /// Whether to keep, append to or replace the program's prompt.
-    #[serde(default, skip_serializing_if = "InstructionsMode::is_append")]
-    pub instructions_mode: InstructionsMode,
-    /// Why this version was set; may be empty.
-    pub note: String,
-    /// How its sessions are driven through a runner, when the profile says.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session: Option<SessionSettings>,
-    /// The harness build it is started with, as the operator declared it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub harness: Option<DeclaredHarness>,
-    /// Each named skill's text as it was when this version was recorded.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub skill_pins: Vec<SkillPin>,
-    /// The permissions its settings file carries, when the profile sets them.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub permissions: Option<Permissions>,
-    /// The machine the reviewed version starts on when no machine is requested.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runs_on: Option<String>,
-    /// The single folder the reviewed version permits the seat to write.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub writable: Option<String>,
-    /// The folder the agent's runs start in when a launch names none: this
-    /// agent's own default, never one folder for every agent (Tom, 3 October
-    /// 2026). Absent, a launch that names no folder is refused by name.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub working_folder: Option<String>,
-}
-
-/// How an agent's sessions are driven through a runner.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub struct SessionSettings {
-    /// Whether starts require a qualified managed control adapter.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub requires_controls: bool,
-    /// The harness's compaction command, typed as one line; none when the
-    /// harness has none, and then a compaction is refused by name.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compact: Option<String>,
-    /// What is typed before a message to deliver it, as the harness takes
-    /// one; empty for none. The message follows it, then Enter.
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub message_prefix: String,
-    /// Whether the session is sensitive. No receipt carries typed text for
-    /// any session: text is kept as its length and digest alone.
-    #[serde(default)]
-    pub sensitive: bool,
-    /// The account handles the session moves between at a usage limit,
-    /// the variable the handle in use is set in, and what says a limit.
-    /// Handles only: the broker swaps each for its account on the way out.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<Object>)]
-    pub accounts: Option<lys_runner::Rotation>,
-}
-
-/// One version of an agent's profile.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Version {
-    /// Its number, from 1.
-    pub number: u32,
-    /// The operation id it was set with.
-    pub operation: String,
-    /// What it sets.
-    pub settings: Settings,
-    /// The person who set it.
-    pub set_by: String,
-    /// When it was set, in seconds since the Unix epoch.
-    pub set_at: u64,
-    /// Its review, null until someone answering for the agent reviewed it.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reviewed: Option<Review>,
-}
-
-/// A profile version's review.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Review {
-    /// The operation id it was recorded with.
-    pub operation: String,
-    /// The person who reviewed it.
-    pub by: String,
-    /// When, in seconds since the Unix epoch.
-    pub at: u64,
-}
-
-/// An agent's profile: every version, in order.
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Profile {
-    /// The agent.
-    pub agent: String,
-    /// Its versions, in order from 1.
-    pub versions: Vec<Version>,
-}
-
-impl Clone for Profile {
-    fn clone(&self) -> Self {
-        #[cfg(test)]
-        PROFILE_COPIES.with(|copies| copies.set(copies.get() + 1));
-        Self {
-            agent: self.agent.clone(),
-            versions: self.versions.clone(),
-        }
-    }
-}
-
-impl Profile {
-    /// The number of the latest version.
-    pub fn latest(&self) -> u32 {
-        self.versions.last().map_or(0, |version| version.number)
     }
 }
 

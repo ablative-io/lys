@@ -8,6 +8,9 @@
 
 use serde::{Deserialize, Serialize};
 
+mod seat;
+pub use seat::{HookCommand, ProfileLaunchFields, SeatFieldRefusal, SeatFields};
+
 /// The harness build a profile declares, as the operator declared it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

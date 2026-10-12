@@ -70,6 +70,16 @@ pub(crate) fn build(
         ("LYS_HANDLES".to_owned(), record.credential_ids.join(",")),
         ("LYS_LAUNCH_TEMPLATE".to_owned(), rendered.template_sha256),
     ]));
+    if let Some(window) = version
+        .settings
+        .session
+        .as_ref()
+        .and_then(|settings| settings.context_window)
+    {
+        native
+            .environment
+            .insert("LYS_CONTEXT_WINDOW".to_owned(), window.to_string());
+    }
     Ok(Launch {
         session,
         program: native.program,
