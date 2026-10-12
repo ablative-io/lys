@@ -119,9 +119,11 @@ fn broker_error(error: lys_secrets::SecretsError) -> RunnerError {
 fn output(mut spawned: Spawned) -> Result<String, Box<dyn Error>> {
     let status = spawned.child.wait()?;
     assert!(status.success());
-    let mut text = String::new();
-    spawned.reader.read_to_string(&mut text)?;
-    Ok(text)
+    // The harness emits one digest; its frame is the signal, independent
+    // of the terminal's lifetime while its other handles remain held.
+    let mut digest = [0; 64];
+    spawned.reader.read_exact(&mut digest)?;
+    Ok(String::from_utf8(digest.to_vec())?)
 }
 
 fn digest_arguments(variable: &str) -> Vec<String> {

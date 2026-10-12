@@ -84,23 +84,26 @@ fn model_account_start_checks_refuse_an_unheld_account_before_rendering() -> Tes
         "name":"fixture", "program":"/bin/sh", "package":"fixture",
         "description": catalogue["description"]
     }))?);
-    let start = lys_identity_server::launch_template::Start {
-        agent: "agent",
-        session: "session",
-        machine: "machine",
-        runtime: "/bin/lys",
-        version: &profile,
-        skills: &[],
-        policy: None,
-        model_proxy: None,
-    };
-    let error = match lys_identity_server::start_checks::fields(&start, &[]) {
-        Ok(_) => return Err("start checks admitted an unheld account before rendering".into()),
-        Err(error) => error,
-    };
-    assert!(
-        error.to_string().starts_with("account_handle_unheld:"),
-        "{error}"
-    );
+    for models in [vec!["model-a".to_owned()], Vec::new()] {
+        profile.settings.model_access = models;
+        let start = lys_identity_server::launch_template::Start {
+            agent: "agent",
+            session: "session",
+            machine: "machine",
+            runtime: "/bin/lys",
+            version: &profile,
+            skills: &[],
+            policy: None,
+            model_proxy: None,
+        };
+        let error = match lys_identity_server::start_checks::fields(&start, &[]) {
+            Ok(_) => return Err("start checks admitted an unheld account before rendering".into()),
+            Err(error) => error,
+        };
+        assert!(
+            error.to_string().starts_with("account_handle_unheld:"),
+            "{error}"
+        );
+    }
     Ok(())
 }
