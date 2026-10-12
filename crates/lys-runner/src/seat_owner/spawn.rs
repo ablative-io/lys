@@ -223,7 +223,10 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             .and_then(|()| fs::set_permissions(made, fs::Permissions::from_mode(0o700)))
             .map_err(|error| start_failed(format!("making {}: {error}", made.display())))?;
     }
+    let began = std::time::Instant::now();
     plan.write(&dir)?;
+    crate::error::step("owner_plan_written", began);
+    let began = std::time::Instant::now();
     let log = fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -257,7 +260,10 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
         ));
     };
     let ready = match ready_within(pipe, READY_WITHIN) {
-        Ok(ready) => ready,
+        Ok(ready) => {
+            crate::error::step("owner_spawned_to_ready", began);
+            ready
+        }
         Err(error) => {
             let ended = abandon(&mut child, &error);
             return Err(with_log_tail(&ended, &dir.join(LOG)));

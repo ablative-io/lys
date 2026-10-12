@@ -184,6 +184,15 @@ fn read_sink(slot: &std::sync::Mutex<HeldSink>) -> Result<HeldSink, RunnerError>
 /// no caller to answer saw, by name. A line names a session, a process or
 /// an account's handle; never an account's value or the text a session was
 /// given.
+/// Says how long one step of a start took, so a slow start shows where its
+/// milliseconds went: `start_step step=<name> elapsed_ms=<n>`.
+pub fn step(name: &str, began: std::time::Instant) {
+    said(&format!(
+        "start_step step={name} elapsed_ms={}",
+        began.elapsed().as_millis()
+    ));
+}
+
 pub fn said(line: &str) {
     let line = format!("lys-runner {line}");
     eprintln!("{line}");

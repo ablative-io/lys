@@ -220,7 +220,14 @@ pub fn detach() -> Result<(), RunnerError> {
 /// started before the lease is recorded, and the ready line is not written
 /// before the harness is recorded.
 pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
+    let began = std::time::Instant::now();
     detach()?;
+    // What a start learns of an executable is kept beside the runner's state
+    // (`<state>/owners/<session>` is this owner's folder), so the next owner
+    // of an unchanged harness neither runs nor fingerprints it again.
+    if let Some(state) = serve.dir.parent().and_then(std::path::Path::parent) {
+        crate::harness_control::process::identity_cache::keep_in(state.join("executables"));
+    }
     let plan = OwnerPlan::read(&serve.dir)?;
     let pid = std::process::id();
     let own = Leader {
@@ -229,6 +236,8 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
     };
     let mut store = OwnerStore::open(&serve.dir)?;
     establish(&mut store, &plan, &own)?;
+    crate::error::step("owner_store_established", began);
+    let began = std::time::Instant::now();
     let socket = plan.socket_in(&serve.dir);
     super::protocol::fits_socket(&socket)?;
     let runner = crate::Runner::open(&crate::Options {
@@ -247,7 +256,11 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
         socket.clone(),
     ));
     sessions.adopt_owner(Arc::clone(&state))?;
+    crate::error::step("owner_runner_open", began);
+    let began = std::time::Instant::now();
     sessions.start_managed(plan.managed.clone(), None, plan.responsible.clone())?;
+    crate::error::step("owner_harness_started", began);
+    let began = std::time::Instant::now();
     let harness = sessions.leader_of(&plan.binding.session)?;
     state.record(
         &plan.harness,
@@ -256,6 +269,7 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
             start: harness,
         },
     )?;
+    crate::error::step("owner_harness_recorded", began);
     let ready = ready_line(&runner_id, &socket, &own, super::protocol::BUILD);
     runner.serve_until_stopped(move || {
         let mut out = std::io::stdout();

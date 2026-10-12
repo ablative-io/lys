@@ -23,6 +23,8 @@ mod qualification;
 mod qualified;
 use qualified::QUALIFIED;
 
+pub mod identity_cache;
+
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
@@ -61,6 +63,18 @@ pub fn executable(path: &Path) -> Result<Executable, RunnerError> {
             "selected file is not an executable",
         ));
     }
+    // An unchanged file's fingerprint is read back, never recomputed: a
+    // harness binary is hundreds of megabytes (`identity_cache`).
+    if let Some(sha256) = identity_cache::sha256(&path, &metadata) {
+        return Ok(Executable {
+            path: path
+                .to_str()
+                .ok_or_else(|| failed("control_executable_unproved", "executable path is not text"))?
+                .to_owned(),
+            sha256,
+        });
+    }
+    let began = std::time::Instant::now();
     let mut hash = Sha256::new();
     let mut buffer = [0; 16384];
     loop {
@@ -72,12 +86,15 @@ pub fn executable(path: &Path) -> Result<Executable, RunnerError> {
         }
         hash.update(&buffer[..read]);
     }
+    let sha256 = crate::protocol::hex(&hash.finalize());
+    crate::error::step("fingerprint_executable", began);
+    identity_cache::remember_sha256(&path, &metadata, &sha256);
     Ok(Executable {
         path: path
             .to_str()
             .ok_or_else(|| failed("control_executable_unproved", "executable path is not text"))?
             .to_owned(),
-        sha256: crate::protocol::hex(&hash.finalize()),
+        sha256,
     })
 }
 
@@ -241,31 +258,51 @@ pub(crate) fn spawn(
             ));
         }
     };
-    let (status, bytes) = report_version(&selected, &launch.environment).map_err(|error| {
-        failed(
-            "control_adapter_unqualified",
-            format!(
-                "{harness_name} binary {} could not report its version: {error}",
-                selected.display()
-            ),
-        )
-    })?;
-    let reported = String::from_utf8(bytes).map_err(|error| {
-        failed(
-            "control_adapter_unqualified",
-            format!(
-                "{harness_name} binary {} reported a non-UTF-8 version: {error}",
-                selected.display()
-            ),
-        )
-    })?;
+    // A file whose version was asked while it had its present identity is
+    // not run again to say it (`identity_cache`); Claude Code's `--version`
+    // is a whole program start.
+    let (exited, reported) = if let Some(reported) = identity_cache::version(&selected) {
+        ("0 (kept)".to_owned(), reported)
+    } else {
+        let began = std::time::Instant::now();
+        let (status, bytes) = report_version(&selected, &launch.environment).map_err(|error| {
+            failed(
+                "control_adapter_unqualified",
+                format!(
+                    "{harness_name} binary {} could not report its version: {error}",
+                    selected.display()
+                ),
+            )
+        })?;
+        crate::error::step("harness_version_probe", began);
+        let reported = String::from_utf8(bytes).map_err(|error| {
+            failed(
+                "control_adapter_unqualified",
+                format!(
+                    "{harness_name} binary {} reported a non-UTF-8 version: {error}",
+                    selected.display()
+                ),
+            )
+        })?;
+        if !status.success() {
+            return Err(failed(
+                "control_adapter_unqualified",
+                format!(
+                    "{harness_name} binary {} could not report its version (exit {status})",
+                    selected.display()
+                ),
+            ));
+        }
+        identity_cache::remember_version(&selected, &reported);
+        (status.to_string(), reported)
+    };
     let harness_version = crate::tracking::version_in(&reported).ok_or_else(|| {
         failed(
             "control_adapter_unqualified",
             format!(
                 "{harness_name} binary {} reported no version (exit {})",
                 selected.display(),
-                status
+                exited
             ),
         )
     })?;
@@ -274,7 +311,7 @@ pub(crate) fn spawn(
         .any(|proof| proof.adapter == adapter && proof.version == harness_version);
     #[cfg(test)]
     let admitted = admitted || qualification::approved(adapter, &harness_version)?;
-    if !status.success() || !admitted {
+    if !admitted {
         return Err(failed(
             "control_adapter_unqualified",
             format!(
