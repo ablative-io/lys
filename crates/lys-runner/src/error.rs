@@ -179,11 +179,6 @@ fn read_sink(slot: &std::sync::Mutex<HeldSink>) -> Result<HeldSink, RunnerError>
     Ok(held.as_ref().map(std::sync::Arc::clone))
 }
 
-/// Say `line` on the runner's standard error, which the install keeps as
-/// the runner's log, and to the sink [`also_to`] gave: what a thread with
-/// no caller to answer saw, by name. A line names a session, a process or
-/// an account's handle; never an account's value or the text a session was
-/// given.
 /// Says how long one step of a start took, so a slow start shows where its
 /// milliseconds went: `start_step step=<name> elapsed_ms=<n>`.
 pub fn step(name: &str, began: std::time::Instant) {
@@ -193,6 +188,11 @@ pub fn step(name: &str, began: std::time::Instant) {
     ));
 }
 
+/// Say `line` on the runner's standard error, which the install keeps as
+/// the runner's log, and to the sink [`also_to`] gave: what a thread with
+/// no caller to answer saw, by name. A line names a session, a process or
+/// an account's handle; never an account's value or the text a session was
+/// given.
 pub fn said(line: &str) {
     let line = format!("lys-runner {line}");
     eprintln!("{line}");
