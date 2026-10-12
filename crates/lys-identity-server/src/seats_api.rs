@@ -290,7 +290,14 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<SeatList>, ServerError> {
     signed_in(&state, &headers)?;
-    let seats = with_seats(&state, |store| Ok(store.seats().iter().filter(|seat| !seat.retired).cloned().collect::<Vec<_>>()))?;
+    let seats = with_seats(&state, |store| {
+        Ok(store
+            .seats()
+            .iter()
+            .filter(|seat| !seat.retired)
+            .cloned()
+            .collect::<Vec<_>>())
+    })?;
     let agents = seats.iter().map(|seat| seat.added.agent.clone()).collect();
     let people = responsible(&state, &agents)?;
     let machines: BTreeSet<String> = seats

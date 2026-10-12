@@ -187,12 +187,16 @@ impl<S: LeafStore> SeatStore<S> {
 
     /// The seat named `name`, refused `seat_unknown` when none is.
     pub fn named(&self, name: &str) -> Result<Seat, ServerError> {
-        self.held.seat(name).filter(|seat| !seat.retired).cloned().ok_or_else(|| {
-            SeatError::Unknown {
-                name: name.to_owned(),
-            }
-            .into()
-        })
+        self.held
+            .seat(name)
+            .filter(|seat| !seat.retired)
+            .cloned()
+            .ok_or_else(|| {
+                SeatError::Unknown {
+                    name: name.to_owned(),
+                }
+                .into()
+            })
     }
 
     /// The line kept under `operation`.
@@ -215,13 +219,20 @@ impl<S: LeafStore> SeatStore<S> {
             }
             .into());
         }
-        if matches!(line, Line::Added(_)) && self.held.seat(line.name()).is_some_and(|seat| !seat.retired) {
+        if matches!(line, Line::Added(_))
+            && self
+                .held
+                .seat(line.name())
+                .is_some_and(|seat| !seat.retired)
+        {
             return Err(SeatError::NameTaken {
                 name: line.name().to_owned(),
             }
             .into());
         }
-        if !matches!(line, Line::Added(_)) && self.held.seat(line.name()).is_none_or(|seat| seat.retired) {
+        if !matches!(line, Line::Added(_))
+            && self.held.seat(line.name()).is_none_or(|seat| seat.retired)
+        {
             return Err(SeatError::Unknown {
                 name: line.name().to_owned(),
             }
@@ -230,8 +241,15 @@ impl<S: LeafStore> SeatStore<S> {
         if matches!(line, Line::Moved(_) | Line::Retired(_))
             && let Some(seat) = self.held.seat(line.name()).filter(|seat| seat.running)
         {
-            let session = seat.session.clone().ok_or_else(|| unavailable("a running seat names no session"))?;
-            return Err(SeatError::Running { name: line.name().to_owned(), session }.into());
+            let session = seat
+                .session
+                .clone()
+                .ok_or_else(|| unavailable("a running seat names no session"))?;
+            return Err(SeatError::Running {
+                name: line.name().to_owned(),
+                session,
+            }
+            .into());
         }
         self.append(line.clone())?;
         Ok(line)
@@ -345,27 +363,49 @@ mod tests {
     }
 
     #[test]
-    fn edits_refuse_running_before_appending_and_retirement_is_reusable() -> Result<(), Box<dyn Error>> {
+    fn edits_refuse_running_before_appending_and_retirement_is_reusable()
+    -> Result<(), Box<dyn Error>> {
         let dir = tempfile::tempdir()?;
         let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
         let path = dir.path().join("seats");
         let mut store = SeatStore::open(&path, Arc::clone(&key))?;
         store.keep(added("op-a", "fixture-seat"))?;
         store.keep(Line::Started(Started {
-            operation: "op-b".to_owned(), name: "fixture-seat".to_owned(), session: "op-b".to_owned(),
-            harness_session: None, by: "person".to_owned(), at: 2,
+            operation: "op-b".to_owned(),
+            name: "fixture-seat".to_owned(),
+            session: "op-b".to_owned(),
+            harness_session: None,
+            by: "person".to_owned(),
+            at: 2,
         }))?;
         for line in [
-            Line::Moved(Moved {operation:"op-c".to_owned(),name:"fixture-seat".to_owned(),profile_version:2,harness:"claude".to_owned(),by:"person".to_owned(),at:3}),
-            Line::Retired(Retired {operation:"op-d".to_owned(),name:"fixture-seat".to_owned(),by:"person".to_owned(),at:3}),
+            Line::Moved(Moved {
+                operation: "op-c".to_owned(),
+                name: "fixture-seat".to_owned(),
+                profile_version: 2,
+                harness: "claude".to_owned(),
+                by: "person".to_owned(),
+                at: 3,
+            }),
+            Line::Retired(Retired {
+                operation: "op-d".to_owned(),
+                name: "fixture-seat".to_owned(),
+                by: "person".to_owned(),
+                at: 3,
+            }),
         ] {
-            assert!(matches!(store.keep(line), Err(ServerError::Agents(AgentsError::Seat(SeatError::Running {..})))));
+            assert!(matches!(
+                store.keep(line),
+                Err(ServerError::Agents(AgentsError::Seat(
+                    SeatError::Running { .. }
+                )))
+            ));
         }
         assert!(store.recorded("op-c").is_none());
         assert!(store.recorded("op-d").is_none());
-        assert_eq!(store.named("fixture-seat")?.added.profile_version,1);
+        assert_eq!(store.named("fixture-seat")?.added.profile_version, 1);
         drop(store);
-        assert!(SeatStore::open(&path,key)?.named("fixture-seat")?.running);
+        assert!(SeatStore::open(&path, key)?.named("fixture-seat")?.running);
         Ok(())
     }
 }

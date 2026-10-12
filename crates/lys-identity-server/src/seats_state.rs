@@ -197,8 +197,11 @@ impl Line {
             (Self::Sent(kept), Self::Sent(asked)) => {
                 kept.name == asked.name && kept.text == asked.text && kept.act == asked.act
             }
-            (Self::Moved(kept), Self::Moved(asked)) => kept.name == asked.name
-                && kept.profile_version == asked.profile_version && kept.harness == asked.harness,
+            (Self::Moved(kept), Self::Moved(asked)) => {
+                kept.name == asked.name
+                    && kept.profile_version == asked.profile_version
+                    && kept.harness == asked.harness
+            }
             (Self::Retired(kept), Self::Retired(asked)) => kept.name == asked.name,
             _ => false,
         }
@@ -467,25 +470,44 @@ mod tests {
     }
 
     #[test]
-    fn moves_and_retirement_survive_snapshots_without_losing_old_operations() -> Result<(), String> {
+    fn moves_and_retirement_survive_snapshots_without_losing_old_operations() -> Result<(), String>
+    {
         let mut held = Held::default();
         held.hold(added("op-a", "waffles"))?;
         let mut legacy = serde_json::to_value(&held).map_err(|error| error.to_string())?;
-        legacy["seats"][0].as_object_mut().ok_or("no seat object")?.remove("retired");
+        legacy["seats"][0]
+            .as_object_mut()
+            .ok_or("no seat object")?
+            .remove("retired");
         let legacy: Held = serde_json::from_value(legacy).map_err(|error| error.to_string())?;
         assert!(!legacy.seat("waffles").ok_or("no legacy seat")?.retired);
         held.hold(Line::Moved(Moved {
-            operation: "op-b".to_owned(), name: "waffles".to_owned(),
-            profile_version: 2, harness: "claude".to_owned(), by: "person".to_owned(), at: 2,
+            operation: "op-b".to_owned(),
+            name: "waffles".to_owned(),
+            profile_version: 2,
+            harness: "claude".to_owned(),
+            by: "person".to_owned(),
+            at: 2,
         }))?;
-        assert_eq!(held.seat("waffles").ok_or("no moved seat")?.added.profile_version, 2);
+        assert_eq!(
+            held.seat("waffles")
+                .ok_or("no moved seat")?
+                .added
+                .profile_version,
+            2
+        );
         held.hold(Line::Retired(Retired {
-            operation: "op-c".to_owned(), name: "waffles".to_owned(),
-            by: "person".to_owned(), at: 3,
+            operation: "op-c".to_owned(),
+            name: "waffles".to_owned(),
+            by: "person".to_owned(),
+            at: 3,
         }))?;
         let restored = Held::decode(&held.encode()?)?;
         assert!(restored.seat("waffles").ok_or("no retired seat")?.retired);
-        assert_eq!(restored.seat("waffles").ok_or("no retired seat")?.revision, 3);
+        assert_eq!(
+            restored.seat("waffles").ok_or("no retired seat")?.revision,
+            3
+        );
         held.hold(added("op-d", "waffles"))?;
         assert!(!held.seat("waffles").ok_or("no new seat")?.retired);
         assert_eq!(held.operations.len(), 4);
@@ -499,20 +521,35 @@ mod tests {
         let mut held = Held::default();
         held.hold(added("op-a", "waffles"))?;
         held.hold(Line::Started(Started {
-            operation: "op-b".to_owned(), name: "waffles".to_owned(),
-            session: "op-b".to_owned(), harness_session: None,
-            by: "person".to_owned(), at: 2,
+            operation: "op-b".to_owned(),
+            name: "waffles".to_owned(),
+            session: "op-b".to_owned(),
+            harness_session: None,
+            by: "person".to_owned(),
+            at: 2,
         }))?;
         let before = held.clone();
-        assert!(held.hold(Line::Moved(Moved {
-            operation: "op-c".to_owned(), name: "waffles".to_owned(),
-            profile_version: 2, harness: "claude".to_owned(), by: "person".to_owned(), at: 3,
-        })).is_err());
+        assert!(
+            held.hold(Line::Moved(Moved {
+                operation: "op-c".to_owned(),
+                name: "waffles".to_owned(),
+                profile_version: 2,
+                harness: "claude".to_owned(),
+                by: "person".to_owned(),
+                at: 3,
+            }))
+            .is_err()
+        );
         assert_eq!(held, before);
-        assert!(held.hold(Line::Retired(Retired {
-            operation: "op-d".to_owned(), name: "waffles".to_owned(),
-            by: "person".to_owned(), at: 3,
-        })).is_err());
+        assert!(
+            held.hold(Line::Retired(Retired {
+                operation: "op-d".to_owned(),
+                name: "waffles".to_owned(),
+                by: "person".to_owned(),
+                at: 3,
+            }))
+            .is_err()
+        );
         assert_eq!(held, before);
         Ok(())
     }
