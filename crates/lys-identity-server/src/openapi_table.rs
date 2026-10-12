@@ -152,7 +152,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/identities" "Every identity the directory holds" S [ADMIN] scope("identity", "read", []);
     GET "/identities/{id}" "One identity" S [ADMIN, &["IdentifierMalformed"]] scope("identity", "read", ["id"]);
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
-    POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY] scope("identity", "identity.transition", ["id"]);
+    POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY, &["TransitionRefused"]] scope("identity", "identity.transition", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
     POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, first root grant" S [ADMIN_BODY, &["RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
@@ -366,7 +366,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);
     GET "/mcp" "MCP server stream availability" G [SIGNED];
-    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent", "TokenUnknown"]];
+    POST "/mcp" "MCP calls through the admitted HTTP router" G [SIGNED, AGENT, &["GrantTokenCookieConflict", "TokenScopeUndeclared", "TokenHolderNotAgent", "TokenUnknown", "seat_unverifiable"]];
     GET "/surface-contract" "The surface registration and computer admission contract" P [];
     GET "/openapi.json" "This document" P [];
     POST "/seats" "Add a seat: a name an agent runs under on one machine from one reviewed profile version" S [SIGNED_BODY, &["seat_name_invalid", "seat_name_taken", "seat_operation_reused", "seats_unavailable", "IdentifierMalformed", "NotAdmitted", "AgentNotVisible", "ProfileVersionUnknown", "ProfileNotReviewed", "HarnessUndeclared", "MachineUnknown", "MachineRetired", "MachineWithoutRunner", "ProvisioningUnavailable", "NetworkUnavailable"]];

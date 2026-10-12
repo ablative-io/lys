@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
     routing::{get, post},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
@@ -63,6 +63,11 @@ pub struct AlarmSummary {
     pub newest: Vec<Alarm>,
 }
 
+/// Acknowledgement carries no caller-controlled fields.
+#[derive(Deserialize, Serialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AlarmAcknowledgement {}
+
 /// Mount the alarm routes beside the goal routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -79,11 +84,15 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<crate::openapi_types::Ent
         (
             Post,
             "/alarms/{id}/acknowledge",
-            None,
+            Some(api.schema::<AlarmAcknowledgement>()),
             Some(api.schema::<Alarm>()),
         ),
     ]
 }
+
+#[cfg(test)]
+#[path = "alarms_api_tests.rs"]
+mod refusal_tests;
 
 pub(crate) fn with_store<T>(
     state: &AppState,

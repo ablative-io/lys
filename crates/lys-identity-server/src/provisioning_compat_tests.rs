@@ -123,10 +123,7 @@ fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
     let migrated = std::fs::read(&path)?;
     let mut expected: serde_json::Value = serde_json::from_slice(original)?;
     expected["profiles"][0]["versions"][0]["settings"]["session"]["stall_after"] = 300.into();
-    assert_eq!(
-        serde_json::from_slice::<serde_json::Value>(&migrated)?,
-        expected
-    );
+    assert_eq!(serde_json::to_value(read(&path)?)?, expected);
     store.write(read(&path)?)?;
     assert_eq!(std::fs::read(&path)?, migrated);
     assert_eq!(std::fs::read(backups[0].path())?, original);

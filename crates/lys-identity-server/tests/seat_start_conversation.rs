@@ -49,7 +49,8 @@ async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_st
             .liveness(Some(session))?;
         assert_eq!(live.len(), 1);
         assert!(live[0].alive && !live[0].managed && !live[0].ended);
-        let (_, repeated) = table.service.post(path, Some(&table.ada), &request).await?;
+        let (status, repeated) = table.service.post(path, Some(&table.ada), &request).await?;
+        assert_eq!(status, 200, "{repeated}");
         assert_eq!(repeated["session"], reply["session"]);
         table
             .ok(

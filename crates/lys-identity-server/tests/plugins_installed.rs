@@ -146,7 +146,9 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
     // The test runs under a login with a HOME, so the folder is named: one answer, never either.
     assert_eq!(status, 200, "{home}");
     let folder = home["config_dir"].as_str().ok_or("no folder named")?;
-    assert!(folder.ends_with("/.claude"), "{home}");
+    let expected =
+        lys_runner::launch_config::claude_config_dir(&std::collections::BTreeMap::new())?;
+    assert_eq!(std::path::Path::new(folder), expected, "{home}");
 
     let unreadable = service
         .get(&asked(&broken_config(dir.path())?), Some(&ada))

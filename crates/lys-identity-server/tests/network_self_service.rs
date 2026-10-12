@@ -39,7 +39,7 @@ async fn fixture() -> Result<(Service, Seeded, String, String), Box<dyn Error>> 
         None,
         None,
         None,
-        |config| config.redirect_url = "https://lys.example.test/api/callback".to_owned(),
+        |config| "https://lys.example.test/api/callback".clone_into(&mut config.redirect_url),
         |config| Ok(seed_configured(config, [ADMINISTRATOR, MEMBER])?),
     )
     .await?;

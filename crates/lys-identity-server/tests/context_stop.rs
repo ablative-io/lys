@@ -41,6 +41,7 @@ impl Runner {
         let read_count = Arc::clone(&control_reads);
         let task = tokio::spawn(async move {
             let mut operations = Vec::new();
+            let mut review_pending = false;
             let mut channels = Vec::new();
             loop {
                 let socket = tokio::select! {
@@ -66,6 +67,7 @@ impl Runner {
                     RunnerAct::AsCaller { done, .. } => match *done {
                         RunnerAct::Operate { operation } => {
                             operations.push(operation);
+                            review_pending = true;
                             Answer::Refused {
                                 refusal: "fixture_stop_observed".to_owned(),
                                 words: "the fixture records requests without starting processes"
@@ -80,7 +82,10 @@ impl Runner {
                         unreachable: Vec::new(),
                     },
                     RunnerAct::ControlStatus { session } => {
-                        read_count.fetch_add(1, Ordering::SeqCst);
+                        if review_pending {
+                            read_count.fetch_add(1, Ordering::SeqCst);
+                            review_pending = false;
+                        }
                         if refuse_control {
                             Answer::Refused {
                                 refusal: "fixture_control_refused".to_owned(),

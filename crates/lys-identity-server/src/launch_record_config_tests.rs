@@ -253,7 +253,7 @@ fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result
         later.number = 2;
         later.operation = "profile-later".to_owned();
         later.settings.session = serde_json::from_value(
-            json!({"message_prefix":"","sensitive":false,"requires_controls":!required}),
+            json!({"stall_after":300,"message_prefix":"","sensitive":false,"requires_controls":!required}),
         )?;
         store.set("agent", 0, version)?;
         store.set("agent", 1, later)?;

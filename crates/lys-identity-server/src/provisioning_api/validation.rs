@@ -84,7 +84,7 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
         session: body
             .session
             .clone()
-            .map(|given| session(given, declared.as_ref()))
+            .map(|given| session(given.settings, declared.as_ref()))
             .transpose()?,
         harness: declared,
         skill_pins: Vec::new(),

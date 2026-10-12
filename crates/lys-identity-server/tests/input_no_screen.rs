@@ -214,6 +214,17 @@ async fn budget_compaction_and_notice_reach_a_session_before_any_viewer_opens() 
         "{compacted}"
     );
     assert!(held.status(other)?.ended.is_none());
+    held.serving
+        .as_ref()
+        .ok_or("runner missing")?
+        .sessions()
+        .collect(
+            session,
+            &lys_runner::peer::Collected::Hook {
+                event: "Stop".to_owned(),
+                input: json!({}),
+            },
+        )?;
     let budget = json!({"limits": [{"unit": "context_percent", "amount": 80, "period": null, "act": "notice"}], "warn_at": null, "version": 1});
     let (status, set) = send(
         &held.service,

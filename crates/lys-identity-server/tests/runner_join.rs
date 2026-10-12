@@ -235,7 +235,7 @@ async fn only_the_administrator_asks_for_a_code_and_never_twice_under_one_operat
     let nobody = issued(&service, None, &machine, &asked).await?;
     refused(&nobody, 401, "NotSignedIn");
     let by_bea = issued(&service, Some(&bea), &machine, &asked).await?;
-    refused(&by_bea, 403, "NotAdmitted");
+    refused(&by_bea, 403, "not_your_computer");
     let unknown = issued(&service, Some(&ada), &operation()?, &asked).await?;
     refused(&unknown, 404, "MachineUnknown");
 

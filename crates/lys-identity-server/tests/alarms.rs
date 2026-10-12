@@ -133,7 +133,7 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
         "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}})).await?;
     assert_eq!(status, 200, "{given}");
     let response = reqwest::Client::new()
-        .post(format!("{}/api/mcp", service.base))
+        .post(format!("{}/mcp", service.base))
         .header("accept", "application/json, text/event-stream")
         .header("lys-agent-pass", pass.as_str())
         .json(

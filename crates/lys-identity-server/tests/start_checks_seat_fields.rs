@@ -56,7 +56,7 @@ fn start_checks_carries_every_reviewed_seat_field() -> Result<(), Box<dyn Error>
         "model_access":["model-a"], "tools":[], "skills":[], "mcp_servers":[],
         "instructions":"", "note":"", "hooks":seat["hooks"],
         "status_line":seat["status_line"], "settings":seat["settings"],
-        "session":{"stall_after":300,"resume":seat["resume"], "context_window":seat["context_window"], "config_dir":seat["config_dir"]},
+        "session":{"stall_after":300,"stall_after":300,"resume":seat["resume"], "context_window":seat["context_window"], "config_dir":seat["config_dir"]},
         "harness":{"name":"fixture", "program":"/opt/fixture/claude", "package":"fixture", "description":catalogue["description"]}
     }}))?;
     let view = fields(

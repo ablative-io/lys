@@ -127,7 +127,7 @@ mod tests {
                 "reviewed":{"operation":"review-original", "by":"person", "at":1}
             });
             if session_form {
-                value["settings"]["session"] = json!({"context_window":128_000});
+                value["settings"]["session"] = json!({"stall_after":300,"context_window":128_000});
             } else {
                 value["settings"]["context_window"] = json!(128_000);
             }

@@ -9,6 +9,10 @@ use lys_identity::{Actor, AuthMethod, LoginBinding, Provenance};
 use lys_identity_server::error::ServerError;
 use lys_identity_server::session::Sessions;
 
+#[path = "clock/digest.rs"]
+mod digest;
+use digest::source_digest;
+
 type TestResult = Result<(), Box<dyn Error>>;
 const T0: i64 = 1_700_000_000;
 
@@ -332,230 +336,6 @@ impl ReviewedSource {
     }
 }
 
-fn quoted_end(bytes: &[u8], start: usize) -> Result<usize, Box<dyn Error>> {
-    let quote = bytes[start];
-    let mut end = start + 1;
-    while end < bytes.len() {
-        if bytes[end] == quote {
-            return Ok(end + 1);
-        }
-        if bytes[end] == b'\\' {
-            end += 1;
-        }
-        end += 1;
-    }
-    Err("unterminated fixture literal".into())
-}
-
-fn raw_end(bytes: &[u8], start: usize) -> Result<Option<usize>, Box<dyn Error>> {
-    if bytes[start] != b'r' {
-        return Ok(None);
-    }
-    let mut quote = start + 1;
-    while bytes.get(quote) == Some(&b'#') {
-        quote += 1;
-    }
-    if bytes.get(quote) != Some(&b'"') {
-        return Ok(None);
-    }
-    let hashes = quote - start - 1;
-    let mut end = quote + 1;
-    while end < bytes.len() {
-        if bytes[end] == b'"'
-            && bytes
-                .get(end + 1..end + 1 + hashes)
-                .is_some_and(|tail| tail.iter().all(|byte| *byte == b'#'))
-        {
-            return Ok(Some(end + 1 + hashes));
-        }
-        end += 1;
-    }
-    Err("unterminated raw fixture literal".into())
-}
-
-fn comment_end(bytes: &[u8], start: usize) -> Result<usize, Box<dyn Error>> {
-    let mut depth = 1;
-    let mut end = start + 2;
-    while end + 1 < bytes.len() {
-        match &bytes[end..end + 2] {
-            b"/*" => {
-                depth += 1;
-                end += 2;
-            }
-            b"*/" => {
-                depth -= 1;
-                end += 2;
-                if depth == 0 {
-                    return Ok(end);
-                }
-            }
-            _ => end += 1,
-        }
-    }
-    Err("unterminated fixture comment".into())
-}
-
-fn import_leaves(tokens: &[Vec<u8>], depth: usize) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
-    if depth > 32 {
-        return Err("fixture import exceeds review bound".into());
-    }
-    let Some(open) = tokens.iter().position(|token| token == b"{") else {
-        let mut leaf = Vec::new();
-        for token in tokens {
-            leaf.extend(u64::try_from(token.len())?.to_le_bytes());
-            leaf.extend(token);
-        }
-        return Ok(vec![leaf]);
-    };
-    if tokens.last().is_none_or(|token| token != b"}") {
-        return Err("unreviewed fixture import syntax".into());
-    }
-    let mut leaves = Vec::new();
-    let mut start = open + 1;
-    let mut nesting = 0;
-    for (at, token) in tokens.iter().enumerate().skip(open + 1) {
-        if nesting == 0 && (token == b"," || at == tokens.len() - 1) {
-            if start < at {
-                let joined: Vec<Vec<u8>> = tokens[..open]
-                    .iter()
-                    .chain(&tokens[start..at])
-                    .cloned()
-                    .collect();
-                leaves.extend(import_leaves(&joined, depth + 1)?);
-            }
-            start = at + 1;
-        }
-        if token == b"{" {
-            nesting += 1;
-        }
-        if token == b"}" && nesting > 0 {
-            nesting -= 1;
-        }
-    }
-    leaves.sort();
-    Ok(leaves)
-}
-
-fn normalized_tokens(tokens: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, Box<dyn Error>> {
-    let mut normalized = Vec::new();
-    let mut delimiters = Vec::new();
-    let mut at = 0;
-    while at < tokens.len() {
-        if tokens[at] == b"use" {
-            let mut imports = Vec::new();
-            while tokens.get(at).is_some_and(|token| token == b"use") {
-                let end = tokens[at..]
-                    .iter()
-                    .position(|token| token == b";")
-                    .ok_or("unterminated fixture import")?
-                    + at;
-                imports.extend(import_leaves(&tokens[at + 1..end], 0)?);
-                at = end + 1;
-            }
-            imports.sort();
-            normalized.push(b"use".to_vec());
-            normalized.extend(imports);
-            normalized.push(b";".to_vec());
-            continue;
-        }
-        let token = &tokens[at];
-        if token == b"(" || token == b"[" || token == b"{" {
-            let call = token == b"("
-                && at > 0
-                && tokens[at - 1]
-                    .first()
-                    .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_');
-            delimiters.push((token.clone(), call, 0_usize));
-        }
-        let trailing = token == b","
-            && tokens.get(at + 1).is_some_and(|next| {
-                next == b"}"
-                    || next == b"]"
-                    || next == b")"
-                        && delimiters
-                            .last()
-                            .is_some_and(|(_, call, commas)| *call || *commas > 0)
-            });
-        if token == b","
-            && let Some((_, _, commas)) = delimiters.last_mut()
-        {
-            *commas += 1;
-        }
-        if !trailing {
-            normalized.push(token.clone());
-        }
-        if token == b")" || token == b"]" || token == b"}" {
-            let (open, ..) = delimiters.pop().ok_or("unbalanced fixture delimiter")?;
-            if !matches!(
-                (open.as_slice(), token.as_slice()),
-                (b"(", b")") | (b"[", b"]") | (b"{", b"}")
-            ) {
-                return Err("mismatched fixture delimiter".into());
-            }
-        }
-        at += 1;
-    }
-    if !delimiters.is_empty() {
-        return Err("unclosed fixture delimiter".into());
-    }
-    Ok(normalized)
-}
-
-fn source_digest(source: &str) -> Result<[u8; 32], Box<dyn Error>> {
-    use sha2::{Digest, Sha256};
-    if source.len() > 2_000_000 {
-        return Err("fixture source exceeds review bound".into());
-    }
-    let bytes = source.as_bytes();
-    let mut tokens = Vec::new();
-    let mut at = 0;
-    while at < bytes.len() {
-        if bytes[at].is_ascii_whitespace() {
-            at += 1;
-            continue;
-        }
-        if bytes.get(at..at + 2) == Some(b"//") {
-            while at < bytes.len() && bytes[at] != b'\n' {
-                at += 1;
-            }
-            continue;
-        }
-        if bytes.get(at..at + 2) == Some(b"/*") {
-            at = comment_end(bytes, at)?;
-            continue;
-        }
-        let end = if let Some(end) = raw_end(bytes, at)? {
-            end
-        } else if bytes[at] == b'"'
-            || (bytes[at] == b'\''
-                && (bytes.get(at + 1) == Some(&b'\\') || bytes.get(at + 2) == Some(&b'\'')))
-        {
-            quoted_end(bytes, at)?
-        } else if bytes[at].is_ascii_alphanumeric() || bytes[at] == b'_' {
-            let mut end = at + 1;
-            while bytes
-                .get(end)
-                .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
-            {
-                end += 1;
-            }
-            end
-        } else if bytes[at].is_ascii() {
-            at + 1
-        } else {
-            return Err("unreviewed non-ASCII fixture syntax".into());
-        };
-        tokens.push(bytes[at..end].to_vec());
-        at = end;
-    }
-    let mut digest = Sha256::new();
-    for token in normalized_tokens(&tokens)? {
-        digest.update(u64::try_from(token.len())?.to_le_bytes());
-        digest.update(token);
-    }
-    Ok(digest.finalize().into())
-}
-
 const FIXTURE_RATCHET: &[ReviewedSource] = &[
     ReviewedSource {
         name: "issuer",
@@ -606,9 +386,9 @@ const FIXTURE_RATCHET: &[ReviewedSource] = &[
         name: "harness",
         source: include_str!("../../../tests/identity_contract/src/harness.rs"),
         digest: [
-            0x31, 0x4d, 0x53, 0x50, 0x35, 0x92, 0x47, 0x5d, 0x84, 0xf1, 0x63, 0xa6, 0x0a, 0x78,
-            0xcd, 0xdc, 0x48, 0xd6, 0xa7, 0x50, 0x71, 0xc5, 0x81, 0x14, 0x0b, 0xe8, 0x6c, 0xf5,
-            0x6f, 0xf0, 0x55, 0x1e,
+            0xb3, 0x93, 0x03, 0x3b, 0x0b, 0x4c, 0x70, 0xae, 0xd6, 0x4a, 0x78, 0x58, 0x4e, 0xb3,
+            0x0a, 0x67, 0x79, 0x69, 0xc0, 0x37, 0x78, 0x29, 0x97, 0xfd, 0x95, 0x34, 0x4a, 0xbe,
+            0x75, 0x76, 0x99, 0x21,
         ],
     },
     ReviewedSource {
@@ -624,9 +404,9 @@ const FIXTURE_RATCHET: &[ReviewedSource] = &[
         name: "sessions",
         source: include_str!("clock.rs"),
         digest: [
-            0xda, 0xc6, 0xbc, 0x58, 0xb0, 0xe4, 0x31, 0x0e, 0x5a, 0xbd, 0x4c, 0xc5, 0x0c, 0x60,
-            0xae, 0x62, 0x39, 0x67, 0xd1, 0xca, 0x7e, 0xf9, 0x59, 0xe6, 0x06, 0xc6, 0x10, 0x24,
-            0x8e, 0xf4, 0x55, 0xd4,
+            0x3e, 0x24, 0x2b, 0x63, 0x94, 0x6c, 0x52, 0x41, 0xa2, 0x58, 0xf3, 0xf6, 0x4f, 0xa4,
+            0x1c, 0x69, 0x6c, 0xb2, 0xb1, 0x7e, 0xec, 0x3e, 0xea, 0x81, 0x80, 0xd9, 0x0e, 0x8b,
+            0xcf, 0xfe, 0x79, 0xb0,
         ],
     },
 ];

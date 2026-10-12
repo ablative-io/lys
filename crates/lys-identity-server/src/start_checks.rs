@@ -172,6 +172,10 @@ pub fn fields(
         .ok_or(ServerError::HarnessUndeclared {
             version: start.version.number,
         })?;
+    drop(crate::model_account_start::accounts(
+        start.version,
+        handles,
+    )?);
     crate::launch_fields::models(&harness, &settings.model_access)?;
     crate::launch_fields::mcp(&harness, &settings.mcp_servers)?;
     let mcp_servers = settings

@@ -247,7 +247,7 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     for caller in [None, Some(table.bea.as_str())] {
         let answer = table.service.post(&path, caller, &grant).await?;
         let (status, name) = if caller.is_some() {
-            (403, "NotAdmitted")
+            (403, "agent_not_yours")
         } else {
             (401, "NotSignedIn")
         };

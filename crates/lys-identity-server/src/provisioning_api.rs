@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use crate::agent_sight::seen_agent;
 use crate::error::ServerError;
 use crate::launch_permissions::Permissions;
+mod session;
 mod validation;
 use crate::provisioning_store::{
     McpServer, Profile, ProvisioningStore, Review, SessionSettings, SkillPin, Version,
@@ -203,7 +204,8 @@ pub(crate) struct SetBody {
     instructions_mode: InstructionsMode,
     note: String,
     #[serde(default)]
-    session: Option<SessionSettings>,
+    #[schema(value_type = Option<SessionSettings>)]
+    session: Option<session::IncomingSession>,
     #[serde(default)]
     #[schema(value_type = Option<Object>)]
     harness: Option<DeclaredHarness>,
@@ -365,6 +367,10 @@ async fn set(
             return Err(ServerError::AgentNotVisible);
         }
         let from_version = body.from_version;
+        let migrated = body
+            .session
+            .as_ref()
+            .is_some_and(|session| session.migrated);
         let version = Version {
             number: 0,
             operation: OperationId::from_str(&body.operation)?.to_string(),
@@ -381,7 +387,16 @@ async fn set(
                 Some(recorded) => recorded,
                 None => store.pins(&version.settings.skills)?,
             };
+            let written = !store.profile(&agent).is_some_and(|profile| {
+                profile
+                    .versions
+                    .iter()
+                    .any(|kept| kept.operation == operation)
+            });
             let version = store.set(&agent, from_version, version)?;
+            if migrated && written {
+                session::recorded(&agent, version);
+            }
             let recorded = Recorded { operation, version };
             Ok(Json(view(
                 &state,

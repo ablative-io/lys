@@ -96,7 +96,7 @@ fn a_code_read_from_standard_input_is_never_said_or_kept() -> TestResult {
     )?;
     assert!(!output.status.success(), "{}", said(&output));
     assert!(!said(&output).contains(code), "{}", said(&output));
-    let key = home.path().join("data").join("runner-machine.key");
+    let key = home.path().join("keys").join("runner-machine.key");
     assert_eq!(
         std::fs::read(&key)?.len(),
         32,

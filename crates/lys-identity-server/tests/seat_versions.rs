@@ -17,6 +17,7 @@ fn refused(answer: &(u16, Value), status: u16, name: &str) {
 }
 
 async fn profile(table: &Table, from: u32, harness: Option<Value>) -> TestResult {
+    let permissions = harness.as_ref().map(|_| json!({"default_mode":"plan"}));
     table
         .ok(
             &format!("/agents/{}/provisioning", table.agent()),
@@ -24,7 +25,7 @@ async fn profile(table: &Table, from: u32, harness: Option<Value>) -> TestResult
                 "operation": operation()?, "from_version": from,
                 "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
                 "mcp_servers": [], "instructions": "", "note": "", "harness": harness,
-                "permissions": {"default_mode": "plan"}, "working_folder": table.dir.path(),
+                "permissions": permissions, "working_folder": table.dir.path(),
             }),
         )
         .await?;
@@ -103,6 +104,20 @@ async fn version_controls(table: &Table) -> TestResult {
             "NotSignedIn",
         );
     }
+    let invalid = table
+        .service
+        .post(
+            &format!("/agents/{}/provisioning", table.agent()),
+            Some(&table.ada),
+            &json!({"operation":operation()?, "from_version":2,
+            "model_access":["claude-fable-5-1"], "tools":[], "skills":[], "mcp_servers":[],
+            "instructions":"", "note":"", "permissions":{"default_mode":"plan"}}),
+        )
+        .await?;
+    refused(&invalid, 400, "RequestMalformed");
+    assert!(invalid.1["reason"].as_str().is_some_and(|reason| {
+        reason.contains("permissions require harness.description.permissions")
+    }));
     profile(table, 2, None).await?;
     table
         .ok(
