@@ -352,16 +352,7 @@ async fn list(
         .map(|seat| {
             let person = people.get(&seat.added.agent).cloned().flatten();
             let reading = match (read.get(&seat.added.machine), &seat.session) {
-                (Some(Ok(held)), Some(session)) => {
-                    match (
-                        held.iter().find(|live| &live.session == session),
-                        owned.get(session),
-                    ) {
-                        (Some(live), _) | (None, Some(Ok(live))) => Reading::Read(Some(live)),
-                        (None, Some(Err(reason))) => Reading::Unread(reason),
-                        (None, None) => Reading::Read(None),
-                    }
-                }
+                (Some(Ok(held)), Some(session)) => reading_of(held, &owned, session),
                 (Some(Err(reason)), Some(_)) => Reading::Unread(reason),
                 _ => Reading::Read(None),
             };
@@ -373,6 +364,24 @@ async fn list(
         runner: (if unread.is_empty() { "read" } else { "unknown" }).to_owned(),
         reason: (!unread.is_empty()).then(|| unread.join("; ")),
     }))
+}
+
+/// A seat's reading once its machine's runner answered: the session the runner
+/// lists, else what its owner answered, an owner that could not be asked read as
+/// unread with its reason and never as stopped.
+fn reading_of<'a>(
+    held: &'a [Live],
+    owned: &'a BTreeMap<String, Result<Live, String>>,
+    session: &str,
+) -> Reading<'a> {
+    match (
+        held.iter().find(|live| live.session == session),
+        owned.get(session),
+    ) {
+        (Some(live), _) | (None, Some(Ok(live))) => Reading::Read(Some(live)),
+        (None, Some(Err(reason))) => Reading::Unread(reason),
+        (None, None) => Reading::Read(None),
+    }
 }
 
 /// The sessions every machine's runner holds that no seat's latest session
@@ -446,3 +455,7 @@ fn session_agent(state: &AppState, session: &str) -> Result<Option<String>, Serv
             .and_then(|tracked| tracked.agent.clone()))
     })
 }
+
+#[cfg(test)]
+#[path = "seats_api_tests.rs"]
+mod reading_tests;
