@@ -193,6 +193,7 @@ mod tests {
     fn a_managed_launch_ignores_retired_seats_and_selects_active_names_deterministically()
     -> Result<(), Box<dyn std::error::Error>> {
         let seat = |name: &str, machine: &str, retired| Seat {
+            transport: None,
             added: Added {
                 operation: name.to_owned(),
                 name: name.to_owned(),

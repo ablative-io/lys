@@ -16,6 +16,8 @@ use serde::Deserialize;
 use crate::error::ServerError;
 use crate::spicedb::SpiceDbSettings;
 
+mod retired;
+
 /// An issuer and subject pair as the configuration names it.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -313,6 +315,7 @@ impl Config {
     pub fn load(path: &Path) -> Result<Self, ServerError> {
         let text = std::fs::read_to_string(path)
             .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
+        retired::refuse(&text, path)?;
         let config: Self = serde_json::from_str(&text).map_err(|error| {
             if error
                 .to_string()

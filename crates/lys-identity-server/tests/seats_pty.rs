@@ -302,6 +302,10 @@ async fn seat_pty_send_waits_for_the_signalled_boundary_and_returns_its_operatio
     hook(&table, &session, "Stop")?;
     wait(&table, &session, "received:boundary-message")?;
     delivery_recorded(&table, &session, &operation, "boundary-message")?;
+    assert_eq!(
+        sessions(&table)?.outcome(&operation)?.state,
+        OperationState::Delivered
+    );
     let repeated = table.ok("/seats/waffles/send", &body).await?;
     assert_eq!(repeated["operation"]["state"], "delivered", "{repeated}");
     assert_eq!(repeated["delivered"], true);
@@ -334,6 +338,15 @@ fn seat_config_refuses_the_retired_argus_key_and_names_the_line_to_delete() -> T
         words.contains("delete") && words.contains("line 2"),
         "{words}"
     );
+    std::fs::write(
+        &path,
+        "{\n  \"unknown_setting\": true,\n  \"LYS_MONITOR_URL\": \"http://127.0.0.1:9\"\n}\n",
+    )?;
+    let error = lys_identity_server::Config::load(&path).expect_err("retired key accepted");
+    let words = error.to_string();
+    assert!(words.contains("LYS_MONITOR_URL"), "{words}");
+    assert!(words.contains("delete line 3"), "{words}");
+    assert!(!words.contains("unknown field"), "{words}");
     Ok(())
 }
 

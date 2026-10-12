@@ -101,6 +101,8 @@ pub struct SeatAttachBody {
 /// A seat as the screens and the CLI show it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct SeatView {
+    /// The transport of its latest session; null before a start.
+    pub transport: Option<String>,
     /// Its name.
     pub name: String,
     /// The agent identity it runs as.
@@ -298,6 +300,7 @@ pub(crate) fn view(seat: &Seat, responsible: Option<String>, reading: &Reading<'
     };
     let added = &seat.added;
     SeatView {
+        transport: seat.transport.clone(),
         name: added.name.clone(),
         agent: added.agent.clone(),
         harness: added.harness.clone(),
@@ -324,7 +327,7 @@ mod tests {
     use crate::seats_state::{Added, Seat};
 
     #[test]
-    fn a_seat_log_before_transport_loads_folds_and_serves_unknown_transport()
+    fn a_seat_log_before_transport_loads_folds_and_serves_managed_transport()
     -> Result<(), Box<dyn std::error::Error>> {
         use std::sync::Arc;
 
@@ -356,13 +359,20 @@ mod tests {
             assert_eq!(seat.session.as_deref(), Some("op-b"));
             assert_eq!(seat.revision, 2);
             let served = serde_json::to_value(view(&seat, None, &Reading::Read(None)))?;
-            assert_eq!(served.get("transport"), Some(&serde_json::Value::Null));
+            assert_eq!(served["transport"], "managed");
+            assert_eq!(seat.transport.as_deref(), Some("managed"));
+            let kept = store.recorded("op-b").ok_or("old start missing")?;
+            assert_eq!(
+                serde_json::to_value(kept)?["started"]["transport"],
+                "managed"
+            );
         }
         Ok(())
     }
 
     fn seat(session: Option<&str>) -> Seat {
         Seat {
+            transport: None,
             added: Added {
                 operation: "op-a".to_owned(),
                 name: "waffles".to_owned(),

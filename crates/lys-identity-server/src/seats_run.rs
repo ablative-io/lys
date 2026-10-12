@@ -197,6 +197,12 @@ async fn begin(
             .ok_or(ServerError::ProfileVersionUnknown { version: number })
     })?;
     let mut notes = vec![crate::seats_monitor::check(&name)?];
+    let transport = if crate::launch_template::requires_controls(&version) {
+        "managed"
+    } else {
+        "pty"
+    }
+    .to_owned();
     let chosen = Chosen {
         profile: Some(version),
         directory: held.added.working_folder.clone(),
@@ -244,6 +250,7 @@ async fn begin(
     };
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
+            transport,
             operation: operation.to_owned(),
             name: name.clone(),
             session: session.clone(),
