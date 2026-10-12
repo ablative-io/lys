@@ -4,6 +4,7 @@ import { readEveryPage } from '../../reads';
 import type { Paged } from '../../reads';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import type { BudgetsView, GoalsView, UsageView } from '../usage/contract';
+import type { Alarm, AlarmSummary } from './Alarms';
 
 /** A part the service could not read, by the service's own refusal name and reason. */
 export interface PartRefused { refusal: string; reason: string }
@@ -25,12 +26,26 @@ export interface DashboardAgent {
 /** How many wait on the person, each counted from its own route, or that route's refusal. */
 export interface Waiting { requests: number | PartRefused; drafts: number | PartRefused; reviews: number | PartRefused }
 
-export interface DashboardAnswer extends Paged { agents: DashboardAgent[]; waiting: Waiting }
+export interface DashboardAnswer extends Paged { agents: DashboardAgent[]; waiting: Waiting; alarms: AlarmSummary | PartRefused }
 
 export const refusedPart = (part: unknown): part is PartRefused =>
   !!part && typeof part === 'object' && !Array.isArray(part) && typeof (part as PartRefused).refusal === 'string';
 
 const counted = (value: unknown): boolean => refusedPart(value) || (Number.isSafeInteger(value) && (value as number) >= 0);
+
+/** An alarm is displayed only when its identity and lifecycle are complete. */
+export function validAlarm(value: unknown): value is Alarm {
+  if (!value || typeof value !== 'object') return false;
+  const alarm = value as Partial<Alarm>;
+  const instant = (at: unknown): at is number => Number.isSafeInteger(at) && (at as number) >= 0;
+  const word = (text: unknown): text is string => typeof text === 'string' && text.trim().length > 0;
+  return [alarm.id, alarm.session, alarm.agent, alarm.machine, alarm.detail].every(word)
+    && (alarm.kind === 'seat_stalled' || alarm.kind === 'session_ungoverned')
+    && instant(alarm.raised_at)
+    && ((alarm.acknowledged_by === null && alarm.acknowledged_at === null)
+      || (word(alarm.acknowledged_by) && instant(alarm.acknowledged_at) && alarm.acknowledged_at >= alarm.raised_at))
+    && (alarm.cleared_at === null || (instant(alarm.cleared_at) && alarm.cleared_at >= alarm.raised_at));
+}
 
 /** Read the dashboard, every page of it, and refuse an answer it cannot stand behind, so nothing missing is shown as zero or as nothing. */
 export async function readDashboard(): Promise<DashboardAnswer> {
@@ -47,6 +62,12 @@ export async function readDashboard(): Promise<DashboardAnswer> {
     if (!row || !row.agent || typeof row.agent.id !== 'string' || !row.usage || !row.goals || !row.budget) throw new Error('DashboardUnreadable: an agent row is missing its agent, usage, budget or goals.');
     if (!Array.isArray(row.teams) && !refusedPart(row.teams)) throw new Error('DashboardUnreadable: the teams of ' + row.agent.display_name + ' were not a list.');
     if (!Array.isArray(row.sessions) && !refusedPart(row.sessions)) throw new Error('DashboardUnreadable: the sessions of ' + row.agent.display_name + ' were not a list.');
+  }
+  if (!refusedPart(answer.alarms) && (!answer.alarms || !Number.isSafeInteger(answer.alarms.open_count)
+    || answer.alarms.open_count < 0 || !Array.isArray(answer.alarms.newest)
+    || answer.alarms.newest.length > 3 || answer.alarms.open_count < answer.alarms.newest.length
+    || !answer.alarms.newest.every((alarm) => validAlarm(alarm) && alarm.cleared_at === null))) {
+    answer.alarms = { refusal: 'AlarmsUnreadable', reason: 'The service did not answer the open alarm count and newest alarms.' };
   }
   return answer;
 }

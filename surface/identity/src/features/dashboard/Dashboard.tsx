@@ -33,6 +33,7 @@ import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from '
 import { BudgetWidget, DraftsWidget, GoalsWidget, RequestsWidget } from './Widgets';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
+import { Alarms } from './Alarms';
 
 interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
@@ -123,6 +124,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
       </section>
     </div>
     <div className="dash-widgets">
+      <Alarms summary={data.answer.alarms} agents={every} />
       <RequestsWidget requests={data.requests} me={data.me.person.id} />
       <DraftsWidget drafts={data.drafts} />
       <BudgetWidget rows={rows} />
