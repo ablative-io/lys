@@ -60,7 +60,7 @@ pub(crate) async fn version(
         let current = store.named(&name)?;
         if current.added.operation != held.added.operation {
             return Err(SeatError::OperationReused {
-                operation: given.operation.clone(),
+                operation: given.operation,
             }
             .into());
         }
