@@ -33,9 +33,7 @@ pub(super) async fn refuse(
     }
     // Admission precedes liveness, so another caller learns no session or pid.
     let owners = service.owners();
-    let Some(record) = owners.agents.agent(agent) else {
-        return None;
-    };
+    let record = owners.agents.agent(agent)?;
     if lys_identity::start::authority::admit(owners.admission, &caller, &record).is_err() {
         return None;
     }

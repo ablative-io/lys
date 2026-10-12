@@ -268,8 +268,8 @@ impl AlarmStore {
                 }
             }
         }
-        let changed = !changes.is_empty();
+        let recorded = !changes.is_empty();
         self.keep(changes)?;
-        Ok(changed)
+        Ok(recorded)
     }
 }

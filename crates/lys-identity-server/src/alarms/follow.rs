@@ -41,7 +41,7 @@ pub fn proxy_evidence(dir: &Path, run: &str) -> Result<(bool, bool), AlarmError>
     Ok((true, false))
 }
 
-fn server(error: AlarmError) -> ServerError {
+fn server(error: &AlarmError) -> ServerError {
     ServerError::RuntimeUnavailable {
         reason: error.to_string(),
     }
@@ -59,7 +59,7 @@ pub async fn tick_for_machine(state: &Arc<AppState>, machine: &str) -> Result<()
 
 pub(crate) fn now_ms() -> Result<u64, ServerError> {
     u64::try_from(jiff::Timestamp::now().as_millisecond())
-        .map_err(|error| server(unavailable(error)))
+        .map_err(|error| server(&unavailable(error)))
 }
 
 /// Evaluate a read usage page before the next follow request waits.
@@ -106,26 +106,26 @@ pub(crate) async fn tick_with_clock(
         let agent = session
             .agent
             .as_ref()
-            .ok_or_else(|| server(unavailable("tracked alarm session has no agent")))?;
+            .ok_or_else(|| server(&unavailable("tracked alarm session has no agent")))?;
         let seen = live.iter().find(|seen| seen.session == session.session);
         if !session.stopped() && seen.is_none() {
-            return Err(server(unavailable(format!(
+            return Err(server(&unavailable(format!(
                 "runner liveness omits tracked session {}",
                 session.session
             ))));
         }
         let first = session
             .first()
-            .ok_or_else(|| server(unavailable("tracked alarm session has no start report")))?;
+            .ok_or_else(|| server(&unavailable("tracked alarm session has no start report")))?;
         let threshold = crate::provisioning_api::with_provisioning(state, |store| {
             let version = if let Some(launch) = &first.launch {
                 let number = launch
                     .get("provisioning_version")
                     .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| {
-                        server(unavailable("alarm launch has no provisioning version"))
+                        server(&unavailable("alarm launch has no provisioning version"))
                     })?;
-                let number = u32::try_from(number).map_err(|error| server(unavailable(error)))?;
+                let number = u32::try_from(number).map_err(|error| server(&unavailable(error)))?;
                 store.version(agent, number)
             } else {
                 store
@@ -139,7 +139,7 @@ pub(crate) async fn tick_with_clock(
                 .as_ref()
                 .map(|session| session.stall_after)
                 .ok_or_else(|| {
-                    server(unavailable(format!(
+                    server(&unavailable(format!(
                         "session {} profile has no session.stall_after",
                         session.session
                     )))
@@ -158,9 +158,9 @@ pub(crate) async fn tick_with_clock(
         };
         let proxy = if let Some(run) = &run {
             let dir = state.proxy_dir.as_ref().ok_or_else(|| {
-                server(unavailable("proxied session has no configured proxy_dir"))
+                server(&unavailable("proxied session has no configured proxy_dir"))
             })?;
-            match proxy_evidence(dir, run).map_err(server)? {
+            match proxy_evidence(dir, run).map_err(|error| server(&error))? {
                 (false, _) => ProxyEvidence::MissingFile,
                 (true, false) => ProxyEvidence::AwaitingUsage,
                 (true, true) => ProxyEvidence::UsageSeen,
@@ -182,7 +182,7 @@ pub(crate) async fn tick_with_clock(
     let changed = super::super::alarms_api::with_store(state, |store, _threshold| {
         store.observe_profiles(&observations, at_ms, &thresholds)
     })
-    .map_err(server)?;
+    .map_err(|error| server(&error))?;
     if changed {
         state.changes.signal()?;
     }

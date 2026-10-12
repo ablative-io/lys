@@ -28,7 +28,7 @@ pub(super) async fn end_within(
         ),
     )
     .await
-    .map_err(|_| lingering(&driven.session, None))??;
+    .map_err(|error| lingering(&driven.session, None, &error))??;
     let Answer::Liveness { sessions } = liveness else {
         return Err(ServerError::Runner {
             refusal: "runner_reply_malformed".to_owned(),
@@ -71,17 +71,19 @@ async fn bounded(
 ) -> Result<Answer, ServerError> {
     tokio::time::timeout_at(deadline, end)
         .await
-        .map_err(|_| lingering(session, pid))?
+        .map_err(|error| lingering(session, pid, &error))?
 }
 
-fn lingering(session: &str, pid: Option<u32>) -> ServerError {
+fn lingering(session: &str, pid: Option<u32>, error: &tokio::time::error::Elapsed) -> ServerError {
     let process = pid.map_or_else(
         || "an unreported pid".to_owned(),
         |pid| format!("pid {pid}"),
     );
     ServerError::Runner {
         refusal: "process_lingering".to_owned(),
-        words: format!("session {session}: harness process {process} was not reaped within 10 s"),
+        words: format!(
+            "session {session}: harness process {process} was not reaped within 10 s: {error}"
+        ),
     }
 }
 
@@ -159,6 +161,7 @@ mod tests {
         .ok_or("a pending reap was accepted")?;
         assert_eq!(error.name(), "process_lingering");
         assert!(error.to_string().contains("pid 41"));
+        assert!(error.to_string().contains("deadline has elapsed"));
         Ok(())
     }
 

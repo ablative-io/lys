@@ -79,7 +79,7 @@ async fn follow(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
         },
         tokio::time::sleep,
     )
-    .await
+    .await;
 }
 
 pub(crate) async fn alarm_page(

@@ -60,7 +60,7 @@ impl Agent {
         if let Some(reading) = previous
             && let Some(figure) = reading.figure
         {
-            self.remove_source(figure, &reading.source)?;
+            self.remove_source(figure, reading.source)?;
             let count = self
                 .figures
                 .get_mut(&figure)
@@ -105,7 +105,7 @@ impl Agent {
     fn remove(&mut self, session: &str) -> Result<(), String> {
         if let Some(reading) = self.sessions.remove(session) {
             if let Some(figure) = reading.figure {
-                self.remove_source(figure, &reading.source)?;
+                self.remove_source(figure, reading.source)?;
                 let count = self
                     .figures
                     .get_mut(&figure)
@@ -123,19 +123,20 @@ impl Agent {
         Ok(())
     }
 
-    fn remove_source(&mut self, figure: u64, source: &Option<String>) -> Result<(), String> {
+    fn remove_source(&mut self, figure: u64, source: Option<String>) -> Result<(), String> {
         let sources = self
             .sources
             .get_mut(&figure)
             .ok_or("context source figure is absent")?;
-        let count = sources
-            .get_mut(source)
-            .ok_or("context source count is absent")?;
+        let std::collections::btree_map::Entry::Occupied(mut entry) = sources.entry(source) else {
+            return Err("context source count is absent".to_owned());
+        };
+        let count = entry.get_mut();
         *count = count
             .checked_sub(1)
             .ok_or("context source count underflows")?;
         if *count == 0 {
-            sources.remove(source);
+            entry.remove();
         }
         if sources.is_empty() {
             self.sources.remove(&figure);

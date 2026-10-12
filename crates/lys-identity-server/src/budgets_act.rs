@@ -10,6 +10,7 @@
 //! on the exit the runner saw. `GET /agents/{id}/usage` settles what it can
 //! and answers each crossing with what came of it: its receipt.
 
+use std::fmt::Write;
 use std::sync::Arc;
 
 mod control;
@@ -353,10 +354,13 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         Ok(outcome) => match i64::try_from(outcome.at) {
             Ok(observed) => {
                 let mut acted = Acted::from_runner(&outcome, observed);
-                if let Some((_, version, _)) = compact_profile {
-                    acted
-                        .words
-                        .push_str(&format!("; profile_version={version}"));
+                if let Some((_, version, _)) = compact_profile
+                    && let Err(error) = write!(acted.words, "; profile_version={version}")
+                {
+                    return Some(kept(
+                        Stands::Refused,
+                        format!("profile_version_render_failed: {error}"),
+                    ));
                 }
                 Some(acted)
             }

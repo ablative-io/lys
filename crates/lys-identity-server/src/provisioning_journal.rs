@@ -150,9 +150,9 @@ fn decode(path: &Path, bytes: &[u8]) -> Result<Decoded, ServerError> {
         if incomplete_frame(bytes, cursor)? {
             break;
         }
-        let (edit, changed) = decode_shape(frame(bytes, &mut cursor)?)
+        let (edit, upgraded) = decode_shape(frame(bytes, &mut cursor)?)
             .map_err(|error| unavailable(format!("provisioning change does not read: {error}")))?;
-        migrated |= changed;
+        migrated |= upgraded;
         edits::apply(&mut kept, edit)?;
         changes = changes
             .checked_add(1)

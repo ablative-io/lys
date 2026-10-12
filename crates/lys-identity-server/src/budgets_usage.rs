@@ -443,15 +443,15 @@ fn context(limit: &Limit, uses: &[&Usage]) -> Result<Used, String> {
         .max()
     {
         Some((context, source)) => {
-            let mut used = present(
+            let mut measured = present(
                 limit,
                 None,
                 context
                     .checked_mul(1_000_000)
                     .ok_or("context percentage overflows")?,
             )?;
-            used.source = source.map(str::to_owned);
-            Ok(used)
+            measured.source = source.map(str::to_owned);
+            Ok(measured)
         }
         None => Ok(unavailable(
             limit,

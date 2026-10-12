@@ -1,5 +1,8 @@
 //! Warning slots and the wake occurrence are rendered before their operation is asked.
-use super::*;
+use super::{
+    Act, AppState, Arc, Crossing, Operation, OperationRequest, ServerError, Undelivered, operate,
+    with_budgets,
+};
 use crate::budgets_state::Measure;
 use crate::words_state::Slot;
 use std::collections::BTreeMap;

@@ -271,6 +271,9 @@ pub(super) fn deliver_at(table: &mut Table, id: &str, now: u64) {
     let marked = table
         .operations
         .set(&operation, OperationState::Delivering, words);
+    if let Ok(outcome) = &marked {
+        feed(table, outcome);
+    }
     if let Err(error) = marked {
         crate::error::said(&format!(
             "operation {operation} was not typed: its delivery could not be recorded first: {error}"

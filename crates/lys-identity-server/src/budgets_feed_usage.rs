@@ -31,7 +31,7 @@ pub(super) async fn keep(
                 source: format!("identity-feed:{machine}"),
                 attempt: format!("feed-{seq}"),
                 session: session.to_owned(),
-                agent: agent.map_or_else(String::new, std::convert::identity),
+                agent: agent.map_or(String::new(), std::convert::identity),
                 at,
                 tool: "usage".to_owned(),
                 target: format!("seq={seq}; session={session}; followed_machine={machine}"),
