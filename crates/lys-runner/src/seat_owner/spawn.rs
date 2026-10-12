@@ -416,10 +416,20 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
     let ended = match peer::start_identity(owner.pid) {
         Ok(start) if start == owner.start => {
             let group = ended_group(owner.pid);
-            if super::exit_wait::gone_within(owner.pid, std::time::Duration::from_secs(5)) {
-                format!("the owner was ended{group}")
-            } else {
-                format!("the owner did not end within 5 s{group}")
+            // A bare pid can be reused once the owner is reaped, so any answer but
+            // gone is checked against the owner's start identity before it is said.
+            let still = || matches!(peer::start_identity(owner.pid), Ok(start) if start == owner.start);
+            match super::exit_wait::exit_within(owner.pid, std::time::Duration::from_secs(5)) {
+                super::exit_wait::Exit::Gone => format!("the owner was ended{group}"),
+                super::exit_wait::Exit::Running if still() => {
+                    format!("the owner did not end within 5 s{group}")
+                }
+                super::exit_wait::Exit::Unwatched(cause) if still() => {
+                    format!("the owner's end could not be watched ({cause}) and it still runs{group}")
+                }
+                super::exit_wait::Exit::Running | super::exit_wait::Exit::Unwatched(_) => {
+                    format!("the owner was ended{group}")
+                }
             }
         }
         Ok(_) => "the owner had already ended".to_owned(),
