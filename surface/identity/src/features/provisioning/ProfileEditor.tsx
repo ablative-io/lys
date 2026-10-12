@@ -50,8 +50,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [folder, setFolder] = useState(profile?.working_folder ?? '');
   // The computer it runs on is a saved setting like the rest; empty leaves it to be settled when the agent starts.
   const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
-  // Where folders are chosen: the computer the screen already knows, else the saved one.
-  const preferred = computer ?? runsOn;
+  // Where folders and plugins are read: the computer the profile is saved to run on, else the one the screen already knows.
+  const preferred = runsOn || computer;
   const machines = usable(choices.machines);
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
   // What else the agent is given: the tools its settings name, the skills Lys keeps for it, and its connected tools.
