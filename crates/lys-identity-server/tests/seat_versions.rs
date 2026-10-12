@@ -49,10 +49,7 @@ async fn version_controls(table: &Table) -> TestResult {
     };
     let unknown = edit(99)?;
     refused(
-        &table
-            .service
-            .post(path, Some(&table.ada), &unknown)
-            .await?,
+        &table.service.post(path, Some(&table.ada), &unknown).await?,
         404,
         "ProfileVersionUnknown",
     );
@@ -93,10 +90,7 @@ async fn version_controls(table: &Table) -> TestResult {
     let retirement_request = json!({"operation":operation()?});
     for (route, body) in [
         (path, version_request),
-        (
-            "/seats/fixture-seat/retire",
-            retirement_request,
-        ),
+        ("/seats/fixture-seat/retire", retirement_request),
     ] {
         refused(
             &table.service.post(route, Some(&stranger), &body).await?,
