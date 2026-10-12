@@ -312,6 +312,22 @@ async fn list(
             .map_err(|refused| refused.to_string());
         read.insert(machine, answer);
     }
+    // A supervised seat's session lives in its owner, which the machine's runner does
+    // not list: each such session is asked of its owner on its own.
+    let mut owned: BTreeMap<String, Live> = BTreeMap::new();
+    for seat in &seats {
+        let (Some(session), Some(Ok(held))) = (&seat.session, read.get(&seat.added.machine)) else {
+            continue;
+        };
+        if held.iter().any(|live| &live.session == session) {
+            continue;
+        }
+        if let Ok(Some(live)) =
+            crate::seats_acts::live_session(&state, &seat.added.machine, session).await
+        {
+            owned.insert(session.clone(), live);
+        }
+    }
     let unread: Vec<String> = read
         .iter()
         .filter_map(|(machine, answer)| {
@@ -325,9 +341,11 @@ async fn list(
         .map(|seat| {
             let person = people.get(&seat.added.agent).cloned().flatten();
             let reading = match (read.get(&seat.added.machine), &seat.session) {
-                (Some(Ok(held)), Some(session)) => {
-                    Reading::Read(held.iter().find(|live| &live.session == session))
-                }
+                (Some(Ok(held)), Some(session)) => Reading::Read(
+                    held.iter()
+                        .find(|live| &live.session == session)
+                        .or_else(|| owned.get(session)),
+                ),
                 (Some(Err(reason)), Some(_)) => Reading::Unread(reason),
                 _ => Reading::Read(None),
             };
