@@ -300,16 +300,23 @@ pub(crate) fn routes(apps: Arc<Apps>) -> Router {
 /// `router` with every refusal to an unauthenticated caller naming where
 /// the door's protected-resource document is.
 pub(crate) fn challenged(router: Router, metadata: String) -> Router {
-    router.layer(axum::middleware::map_response(
-        move |mut response: Response| {
+    router.layer(axum::middleware::from_fn(
+        move |request: axum::extract::Request, next: axum::middleware::Next| {
             let metadata = metadata.clone();
             async move {
+                let run_credential = request.headers().contains_key(crate::agent_pass::HEADER)
+                    || request.headers().contains_key("lys-seat");
+                let mut response = next.run(request).await;
                 if response.status() == StatusCode::UNAUTHORIZED
+                    && !run_credential
                     && let Ok(value) = format!("Bearer resource_metadata=\"{metadata}\"").parse()
                 {
                     response
                         .headers_mut()
                         .insert(header::WWW_AUTHENTICATE, value);
+                }
+                if run_credential {
+                    response.headers_mut().remove(header::WWW_AUTHENTICATE);
                 }
                 response
             }

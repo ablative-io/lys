@@ -109,3 +109,29 @@ async fn mcp_without_run_credential_retains_oauth_challenge() -> TestResult {
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn mcp_malformed_pass_keeps_the_pass_refusal_words() -> TestResult {
+    let screens = tempfile::tempdir()?;
+    std::fs::write(screens.path().join("index.html"), "<html></html>")?;
+    let (service, ()) = Service::start_adjusted(
+        GRANT_MODEL,
+        None,
+        None,
+        None,
+        |config| {
+            config.surface_dir = Some(screens.path().to_path_buf());
+        },
+        |_| Ok(()),
+    )
+    .await?;
+    let response = mcp(&service, Some(("lys-agent-pass", "malformed"))).await?;
+    assert_eq!(response.status(), 401);
+    assert!(!response.headers().contains_key("www-authenticate"));
+    let body: Value = response.json().await?;
+    assert_eq!(
+        body,
+        json!({"refusal": "pass_refused", "words": "the run pass is malformed", "credential": "pass"})
+    );
+    Ok(())
+}

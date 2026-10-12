@@ -298,12 +298,15 @@ pub(crate) async fn service_saying_with_clock(
         crate::operator::guard,
     ));
     let api = api.merge(crate::mcp_oauth::challenged(
-        guarded(crate::mcp_endpoint::admitted_routes(
-            dispatcher,
-            &origin,
+        crate::mcp_endpoint::run_refusals(
+            guarded(crate::mcp_endpoint::admitted_routes(
+                dispatcher,
+                &origin,
+                Arc::clone(&state),
+                Arc::clone(&apps),
+            )?),
             Arc::clone(&state),
-            Arc::clone(&apps),
-        )?),
+        ),
         apps.metadata_address(),
     ));
     let served = match &config.surface_dir {

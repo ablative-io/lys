@@ -11,6 +11,10 @@ use tower::ServiceExt;
 
 use crate::error::ServerError;
 
+#[path = "mcp_endpoint/run_refusal.rs"]
+mod run_refusal;
+pub(crate) use run_refusal::run_refusals;
+
 #[cfg(test)]
 #[path = "mcp_endpoint_tests.rs"]
 mod tests;
