@@ -3,6 +3,7 @@
 //! runs unchanged; its existing ready callback exits before recording Started.
 //! This example is never installed and refuses roots without the proof marker.
 
+/// Share production commands with the upgrade and runner identity code.
 #[path = "upgrade_window"]
 pub mod commands {
     #[path = "../../src/commands/error.rs"]
