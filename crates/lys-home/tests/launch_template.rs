@@ -511,10 +511,23 @@ fn refused_without_writing(dir: &Path, config: Option<&Path>, name: &str) -> Gat
 }
 
 #[test]
-fn a_run_counted_through_the_proxy_is_given_the_status_line_and_no_other_run_is() {
+fn every_run_is_given_the_status_line_proxied_or_on_a_plan() {
     let mut template = parse_template(&std::fs::read(TEMPLATE).unwrap()).unwrap();
+    // A run on a plan never goes through the proxy, and its plan windows
+    // reach Lys through its status line and nowhere else.
     let plain: Value = serde_json::from_slice(&env_settings(&template).unwrap()).unwrap();
-    assert!(plain.get("statusLine").is_none());
+    assert!(
+        !template
+            .env
+            .contains_key(lys_home::harness::rendering::RUN_VARIABLE)
+    );
+    assert_eq!(
+        plain["statusLine"],
+        json!({
+            "type": "command",
+            "command": "\"$LYS_PROGRAM\" runner status-line --socket \"$LYS_RUNNER_SOCKET\""
+        })
+    );
     template.env.insert(
         lys_home::harness::rendering::RUN_VARIABLE.to_owned(),
         "0123456789abcdef0123456789abcdef".to_owned(),

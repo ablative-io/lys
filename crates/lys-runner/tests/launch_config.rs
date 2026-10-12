@@ -608,3 +608,56 @@ fn old_config_stays_manual_and_control_requirement_is_typed() -> TestResult {
     assert!(serde_json::from_value::<Config>(required).is_err());
     Ok(())
 }
+
+/// A run outside the proxy, as every run on a plan is, is still handed the
+/// runner's program and socket: Claude Code reports a plan's windows to its
+/// status line and nowhere else, and that line's command reads the two
+/// variables (`lys_home::harness::rendering::STATUS_LINE_COMMAND`).
+#[test]
+fn a_run_outside_the_proxy_is_handed_the_status_lines_program_and_socket() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = std::sync::Arc::new(Ed25519Identity::load_or_generate(
+        &dir.path().join("server.key"),
+    )?);
+    let socket = dir.path().join("runner.sock");
+    let serving = Runner::open(&Options {
+        socket: socket.clone(),
+        state: dir.path().to_owned(),
+        server_key: key.public_key_bytes(),
+        scrollback: 1 << 16,
+    })?
+    .spawn();
+    let client = Client::new(socket.clone(), key);
+    let mut asked = launch();
+    asked.session = "plan-session".to_owned();
+    asked.config = None;
+    asked.columns = 500;
+    asked.arguments = vec![
+        "-c".to_owned(),
+        "printf 'program=%s socket=%s;\\n' \"${LYS_PROGRAM:+named}\" \"$LYS_RUNNER_SOCKET\""
+            .to_owned(),
+    ];
+    let Answer::Started { .. } = client.ask(&Act::Start {
+        lys_mcp: None,
+        proxy: None,
+        launch: Box::new(asked),
+    })?
+    else {
+        return Err("the runner did not start the declared process".into());
+    };
+    let expected = format!(
+        "program=named socket={};",
+        socket.to_str().ok_or("the socket path is not text")?
+    );
+    let Answer::Matched { .. } = client.ask(&Act::Wait {
+        session: "plan-session".to_owned(),
+        cursor: Some(0),
+        pattern: expected,
+        regex: false,
+    })?
+    else {
+        return Err("the run was not handed the runner's program and socket".into());
+    };
+    serving.stop()?;
+    Ok(())
+}

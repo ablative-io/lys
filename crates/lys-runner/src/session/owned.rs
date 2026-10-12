@@ -92,12 +92,13 @@ impl Sessions {
         }
     }
 
-    /// Name, in a proxied run's environment, this runner's own program and
+    /// Name, in every run's environment, this runner's own program and
     /// socket: the two variables the run's status line command reads
-    /// (`lys_home::harness::rendering::STATUS_LINE_COMMAND`). A runner that
-    /// cannot name either says so and sets neither: the run still starts and
-    /// its calls are still counted through the proxy, and its status line
-    /// then says on the run's own screen that it reached no runner.
+    /// (`lys_home::harness::rendering::STATUS_LINE_COMMAND`). Every Claude
+    /// Code run is given that status line, because a run on a plan reports
+    /// its plan windows there and nowhere else. A runner that cannot name
+    /// either says so and sets neither: the run still starts, and its status
+    /// line then says on the run's own screen that it reached no runner.
     pub(crate) fn status_line_named(&self, launch: &mut Launch) {
         use lys_home::harness::rendering::{PROGRAM_VARIABLE, SOCKET_VARIABLE};
         let program = std::env::current_exe()
@@ -125,7 +126,7 @@ impl Sessions {
             (program, socket) => {
                 for error in [program.err(), socket.err()].into_iter().flatten() {
                     crate::error::said(&format!(
-                        "session {}: status_line_unnamed: {error}; its dollars and running time will not be reported",
+                        "session {}: status_line_unnamed: {error}; its dollars, running time and plan windows will not be reported",
                         launch.session
                     ));
                 }

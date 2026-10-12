@@ -490,9 +490,7 @@ impl Sessions {
             .transpose()?;
         let harness = launch.config.as_ref().and_then(|config| config.harness);
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
-        if proxy.is_some() {
-            self.status_line_named(&mut launch);
-        }
+        self.status_line_named(&mut launch);
         let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
         // Naming the folder is the trust answer: a Claude Code run's folder

@@ -1,6 +1,6 @@
-//! The status line of a run whose model calls go through the proxy: the
-//! command the run's harness runs hands what the harness reported (its cost
-//! in dollars and its running time among it) to the runner on its socket.
+//! The status line every run is given: the command the run's harness runs
+//! hands what the harness reported (its cost in dollars, its running time and
+//! a plan's windows among it) to the runner on its socket.
 //!
 //! The runner proves the asking process from the socket, never from the
 //! session the input names, as it does for a judge's hook.
