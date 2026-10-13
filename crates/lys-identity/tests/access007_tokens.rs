@@ -16,7 +16,11 @@ use spicedb::{SpiceDb, SpiceDbSettings};
 type Heard = Arc<Mutex<Vec<String>>>;
 const HELD: &str = "definition grant {}\n\ndefinition fixture/doc {}";
 
-fn consistency_engine(written: bool, marker: bool) -> Result<(SpiceDb, Heard), Box<dyn Error>> {
+fn consistency_engine(
+    written: bool,
+    marker: Option<&str>,
+) -> Result<(SpiceDb, Heard), Box<dyn Error>> {
+    let marker = marker.map(str::to_owned);
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let endpoint = listener.local_addr()?.to_string();
     let heard = Arc::new(Mutex::new(Vec::new()));
@@ -51,12 +55,20 @@ fn consistency_engine(written: bool, marker: bool) -> Result<(SpiceDb, Heard), B
                 .push(String::from_utf8(body).expect("fixture JSON"));
             let answer = match path.as_str() {
                 "/v1/schema/read" => serde_json::json!({"schemaText": HELD}).to_string(),
-                "/v1/relationships/write" => serde_json::json!({"writtenAt":{"token":"write-token"}}).to_string(),
-                "/v1/relationships/read" if !marker => String::new(),
-                "/v1/relationships/read" => serde_json::json!({"result":{"readAt":{"token":"read-token"},"relationship":{
-                    "resource":{"objectType":"lys_mirror","objectId":"calls_fixture"},"relation":"revision",
-                    "subject":{"object":{"objectType":"lys_revision","objectId":"1"}}}}}).to_string(),
-                "/v1/permissions/check" => serde_json::json!({"permissionship":"PERMISSIONSHIP_HAS_PERMISSION"}).to_string(),
+                "/v1/relationships/write" => {
+                    serde_json::json!({"writtenAt":{"token":"write-token"}}).to_string()
+                }
+                "/v1/relationships/read" if marker.is_none() => String::new(),
+                "/v1/relationships/read" => {
+                    serde_json::json!({"result":{"readAt":{"token":"read-token"},"relationship":{
+                    "resource":{"objectType":"lys_mirror","objectId":marker},"relation":"revision",
+                    "subject":{"object":{"objectType":"lys_revision","objectId":"1"}}}}})
+                    .to_string()
+                }
+                "/v1/permissions/check" => {
+                    serde_json::json!({"permissionship":"PERMISSIONSHIP_HAS_PERMISSION"})
+                        .to_string()
+                }
                 _ => "{}".to_owned(),
             };
             if write!(
@@ -94,7 +106,7 @@ fn consistency_engine(written: bool, marker: bool) -> Result<(SpiceDb, Heard), B
 
 #[test]
 fn a_write_token_is_used_by_the_next_permission_question() -> Result<(), Box<dyn Error>> {
-    let (engine, heard) = consistency_engine(true, true)?;
+    let (engine, heard) = consistency_engine(true, Some("calls_fixture"))?;
     let subject =
         lys_identity::IdentityId::Person("person-11111111111111111111111111111111".parse()?);
     assert!(engine.check(
@@ -130,7 +142,7 @@ fn a_write_token_is_used_by_the_next_permission_question() -> Result<(), Box<dyn
 
 #[test]
 fn a_restart_learns_one_fully_consistent_token_then_uses_it() -> Result<(), Box<dyn Error>> {
-    let (engine, heard) = consistency_engine(false, true)?;
+    let (engine, heard) = consistency_engine(false, Some("calls_fixture"))?;
     let subject =
         lys_identity::IdentityId::Person("person-11111111111111111111111111111111".parse()?);
     let resource = lys_identity::grants::Resource::new("fixture.doc", "asked")?;
@@ -163,7 +175,7 @@ fn a_restart_learns_one_fully_consistent_token_then_uses_it() -> Result<(), Box<
 
 #[test]
 fn a_missing_settled_revision_marker_refuses_by_its_existing_name() -> Result<(), Box<dyn Error>> {
-    let (engine, _) = consistency_engine(true, false)?;
+    let (engine, _) = consistency_engine(true, None)?;
     let subject =
         lys_identity::IdentityId::Person("person-11111111111111111111111111111111".parse()?);
     let error = engine
@@ -174,6 +186,25 @@ fn a_missing_settled_revision_marker_refuses_by_its_existing_name() -> Result<()
             1,
         )
         .expect_err("an absent mirror marker must refuse");
+    assert!(
+        matches!(error, lys_identity::grants::GrantError::PermissionEngineUnavailable { reason } if reason.contains("settled revision 1"))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_marker_for_another_mirror_does_not_certify_this_revision() -> Result<(), Box<dyn Error>> {
+    let (engine, _) = consistency_engine(true, Some("another_mirror"))?;
+    let subject =
+        lys_identity::IdentityId::Person("person-11111111111111111111111111111111".parse()?);
+    let error = engine
+        .check(
+            &lys_identity::grants::Resource::new("fixture.doc", "asked")?,
+            &lys_identity::grants::Action::new("read")?,
+            subject,
+            1,
+        )
+        .expect_err("another mirror cannot certify the settled revision");
     assert!(
         matches!(error, lys_identity::grants::GrantError::PermissionEngineUnavailable { reason } if reason.contains("settled revision 1"))
     );

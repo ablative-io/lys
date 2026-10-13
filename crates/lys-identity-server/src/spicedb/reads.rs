@@ -110,9 +110,13 @@ impl SpiceDb {
         let (held, token) = self.rows(&json!({"resourceType": "lys_mirror", "optionalResourceId": self.mirror,
             "optionalRelation": "revision", "optionalSubjectFilter": {"subjectType": "lys_revision", "optionalSubjectId": revision.to_string()}}), &consistency)?;
         if revision != 0
-            && !held
-                .iter()
-                .any(|row| row.subject.id == revision.to_string() && row.relation == "revision")
+            && !held.iter().any(|row| {
+                row.resource.kind == "lys_mirror"
+                    && row.resource.id == self.mirror
+                    && row.relation == "revision"
+                    && row.subject.kind == "lys_revision"
+                    && row.subject.id == revision.to_string()
+            })
         {
             return Err(unavailable(format!(
                 "the permission engine's mirror does not hold settled revision {revision}"
