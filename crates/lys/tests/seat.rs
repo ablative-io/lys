@@ -343,3 +343,40 @@ fn the_list_names_an_unread_runner_rather_than_showing_nothing() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn seat_send_names_the_receipt_state_instead_of_inventing_delivery() -> TestResult {
+    for state in [
+        "accepted",
+        "delivering",
+        "delivered",
+        "confirmed",
+        "uncertain",
+        "refused",
+    ] {
+        let root = tempfile::tempdir()?;
+        let words = "boundary_wait=1200s; accepted awaiting turn boundary";
+        let (address, handle) = serve(vec![(
+            200,
+            json!({
+                "seat": {"name":"waffles"}, "session":"session-1",
+                "delivered":matches!(state, "delivered" | "confirmed"),
+                "operation":{"operation":"receipt-1", "state":state, "words":words},
+            }),
+        )])?;
+        install(root.path(), &address, Some(TOKEN))?;
+        let output = lys(root.path(), &["seat", "send", "waffles", "hello"])?;
+        assert_eq!(served(handle)?.len(), 1);
+        assert!(output.status.success(), "{}", printed(&output));
+        let stdout = String::from_utf8(output.stdout)?;
+        assert!(
+            stdout.contains(&format!("{state} to seat waffles as a user turn")),
+            "{stdout}"
+        );
+        assert!(stdout.contains(&format!("receipt: {words}")), "{stdout}");
+        if !matches!(state, "delivered" | "confirmed") {
+            assert!(!stdout.contains("delivered to seat"), "{stdout}");
+        }
+    }
+    Ok(())
+}

@@ -253,8 +253,10 @@ impl Operations {
         })?;
         outcome.state = OperationState::Delivering;
         outcome.at = now_ms();
-        "control_write_armed: delivery may occur after the durability barrier"
-            .clone_into(&mut outcome.words);
+        outcome.words = super::receipt_words(
+            &outcome.words,
+            "control_write_armed: delivery may occur after the durability barrier".to_owned(),
+        );
         self.record_control(outcome, control)
     }
 

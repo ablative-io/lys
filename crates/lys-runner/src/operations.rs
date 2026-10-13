@@ -38,6 +38,10 @@ mod boundary;
 mod wake;
 pub(crate) use wake::confirm_on_turn_end;
 mod delivery;
+#[cfg(test)]
+pub(crate) fn deliver_at(table: &mut crate::session::Table, id: &str, now: u64) {
+    delivery::deliver_at(table, id, now);
+}
 pub(crate) use delivery::{accept, compacting, deliver, ended};
 use delivery::{feed, stop};
 
@@ -322,4 +326,37 @@ fn receipt_words(previous: &str, words: String) -> String {
         }
         _ => words,
     }
+}
+
+#[cfg(test)]
+impl Operations {
+    pub(crate) fn journal_path(&self) -> &std::path::Path {
+        &self.path
+    }
+
+    pub(crate) fn boundary_armed(&self, operation: &str) -> bool {
+        self.boundary_waiters.contains_key(operation)
+    }
+}
+
+pub(crate) fn managed_notice_note(
+    table: &mut crate::session::Table,
+    id: &str,
+    operation: &str,
+    now: u64,
+) -> Result<bool, RunnerError> {
+    let Some(words) = boundary::note_at(table, id, operation, now) else {
+        return Ok(false);
+    };
+    if !words.contains("boundary_unsignalled") {
+        return Ok(false);
+    }
+    table
+        .operations
+        .set(operation, OperationState::Accepted, words)?;
+    Ok(true)
+}
+
+pub(crate) fn managed_feed(table: &mut crate::session::Table, outcome: &OperationOutcome) {
+    feed(table, outcome);
 }

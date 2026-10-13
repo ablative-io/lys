@@ -56,3 +56,11 @@ lys runner status --socket <state>/owners/<session>/owner.sock      # its one se
 # Act::Owner { command: { "command": "status" } }                   # its record
 # Act::Owned on the parent runner                                   # every owner it started, live and unreachable
 ```
+
+## Managed notices and turn boundaries
+
+An explicit notice (`lys seat send`) to a managed session with no turn in flight is written immediately as a protocol user message. It does not await a Stop hook, result event or service boundary reply. A notice arriving during a turn remains accepted until the matching turn ends, then is written as the next user turn.
+
+Managed notices arm the same 1,200-second boundary fallback as terminal notices. If no matching turn end arrives, expiry writes the notice anyway and retains `boundary_unsignalled wait_seconds=<elapsed> boundary_wait=1200s` on its receipt. An early write preserves the active turn and its correlations; it is never resent when that turn eventually ends.
+
+The durable receipt moves from accepted to delivering before the pipe write, then to delivered after the write succeeds. It retains the text byte length and SHA-256. Matching harness admission can subsequently confirm it. `lys seat send` prints the receipt state and words, so an accepted or delivering operation is never reported as delivered. Goal reminders and context compaction retain their existing service authority checks.

@@ -73,7 +73,13 @@ pub fn run(args: SeatArgs, json: bool) -> CliResult<()> {
             let text = text.join(" ");
             let answer = act(&server, &name, "send", json!({ "text": text }))?;
             show(json, &answer, |answer| {
-                println!("delivered to seat {} as a user turn", seat_name(answer));
+                let receipt = &answer["operation"];
+                println!(
+                    "{} to seat {} as a user turn",
+                    shown(receipt, "state"),
+                    seat_name(answer)
+                );
+                println!("receipt: {}", shown(receipt, "words"));
                 println!("session: {}", shown(answer, "session"));
             });
         }

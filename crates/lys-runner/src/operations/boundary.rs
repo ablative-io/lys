@@ -33,7 +33,7 @@ pub(super) fn arm(table: &mut Table, operation: &str) -> Result<(), RunnerError>
         || table
             .sessions
             .get(&held.session)
-            .is_none_or(|session| session.managed.is_some() || session.guard.tracking.is_none())
+            .is_none_or(|session| session.managed.is_none() && session.guard.tracking.is_none())
     {
         return Ok(());
     }
@@ -97,10 +97,9 @@ pub(super) fn arm(table: &mut Table, operation: &str) -> Result<(), RunnerError>
 }
 
 pub(super) fn note_at(table: &Table, id: &str, operation: &str, now: u64) -> Option<String> {
-    let busy = table
-        .sessions
-        .get(id)
-        .is_some_and(|session| session.guard.tracking.is_some() && !session.guard.idle);
+    let busy = table.sessions.get(id).is_some_and(|session| {
+        (session.managed.is_some() || session.guard.tracking.is_some()) && !session.guard.idle
+    });
     if !busy {
         return Some("being typed".to_owned());
     }
