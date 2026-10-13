@@ -17,7 +17,7 @@ Thursday's person opens Lys in a browser, adds the computer in front of them, do
 
 ## Task
 
-Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name. Amendment 23:2x AEDT: R6 added from the ONBOARD-WALK record (section 3: the operator had to register the agent; routes/identities.rs:78 requires an administrator), because Cambium ACCESS-008 has the door certify a seat's key with the person's own pass.
+Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name. Amendment 23:2x AEDT: R6 added from the ONBOARD-WALK record (section 3: the operator had to register the agent; routes/identities.rs:78 requires an administrator), because Cambium ACCESS-008 has the door certify a seat's key with the person's own pass. Amendment 23:3x: the files the lane found it needs (CLI dispatch main.rs, install flags identity/cli.rs, runner protocol and socket acts, qualification admission process.rs, vitest discovery vite.config.ts) are added; a further file the implementation genuinely needs may be touched and is named in the END, the ACCESS-007 lane's files excepted.
 
 ## Requirements
 
@@ -37,6 +37,7 @@ THE SYSTEM SHALL show the add-computer row on #/network to every signed-in perso
 - modify: surface/identity/src/features/network/AddMachine.tsx
 - modify: surface/identity/src/features/network/JoinCode.tsx
 - modify: crates/lys-identity-server/src/network_api.rs
+- modify: surface/identity/vite.config.ts
 
 ### R2: The catalogue and the profile see the chosen computer's programs, not the service host's
 
@@ -59,6 +60,8 @@ THE SYSTEM SHALL answer the harness catalogue for a chosen machine by asking tha
 - modify: crates/lys-runner/src/dial.rs
 - modify: crates/lys-runner/src/dial/dispatch.rs
 - modify: crates/lys-runner/src/lib.rs
+- modify: crates/lys-runner/src/protocol/acts.rs
+- modify: crates/lys-runner/src/socket/acts.rs
 
 ### R3: Lys serves the lys client it was installed with
 
@@ -80,6 +83,8 @@ THE SYSTEM SHALL let `lys identity install` and `lys identity upgrade` take `--c
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: surface/identity/src/features/network/JoinCode.tsx
+- modify: crates/lys/src/main.rs
+- modify: crates/lys/src/identity/cli.rs
 
 ### R4: The lys client works from a person's own computer, as that person, with no install and no operator token
 
@@ -103,6 +108,7 @@ THE SYSTEM SHALL add `lys sign-in --server <base>`: it runs the authorization-co
 - modify: crates/lys/src/commands/attach.rs
 - modify: crates/lys-identity-server/src/mcp_oauth.rs
 - modify: crates/lys-identity-server/src/mcp_oauth_flow.rs
+- modify: crates/lys/src/main.rs
 
 ### R5: A newer version of a qualified adapter is admitted and marked, never refused
 
@@ -119,6 +125,7 @@ THE SYSTEM SHALL, when a seat's harness reports an adapter named in QUALIFIED wi
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-identity-server/src/runner_sessions.rs
 - modify: crates/lys/src/cli/seat.rs
+- modify: crates/lys-runner/src/harness_control/process.rs
 
 ### R6: A person registers their own agent and certifies its key without an administrator
 

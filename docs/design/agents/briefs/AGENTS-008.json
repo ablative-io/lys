@@ -16,7 +16,7 @@
   "stories": [],
   "design_anchor": [],
   "purpose": "Thursday's person opens Lys in a browser, adds the computer in front of them, downloads the lys client Lys built, pastes one command, and from then on starts, sends to and watches their own agent from their own terminal as themselves. No administrator in the loop for their own computer and their own agent, no operator token off the service host, no source build, no certificate or key handed around: Lys is the one place and the one proof.",
-  "task": "Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name. Amendment 23:2x AEDT: R6 added from the ONBOARD-WALK record (section 3: the operator had to register the agent; routes/identities.rs:78 requires an administrator), because Cambium ACCESS-008 has the door certify a seat's key with the person's own pass.",
+  "task": "Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name. Amendment 23:2x AEDT: R6 added from the ONBOARD-WALK record (section 3: the operator had to register the agent; routes/identities.rs:78 requires an administrator), because Cambium ACCESS-008 has the door certify a seat's key with the person's own pass. Amendment 23:3x: the files the lane found it needs (CLI dispatch main.rs, install flags identity/cli.rs, runner protocol and socket acts, qualification admission process.rs, vitest discovery vite.config.ts) are added; a further file the implementation genuinely needs may be touched and is named in the END, the ACCESS-007 lane's files excepted.",
   "requirements": [
     {
       "id": "R1",
@@ -36,7 +36,8 @@
           "surface/identity/src/features/network/Network.tsx",
           "surface/identity/src/features/network/AddMachine.tsx",
           "surface/identity/src/features/network/JoinCode.tsx",
-          "crates/lys-identity-server/src/network_api.rs"
+          "crates/lys-identity-server/src/network_api.rs",
+          "surface/identity/vite.config.ts"
         ],
         "delete": []
       },
@@ -66,7 +67,9 @@
           "crates/lys-identity-server/src/lib.rs",
           "crates/lys-runner/src/dial.rs",
           "crates/lys-runner/src/dial/dispatch.rs",
-          "crates/lys-runner/src/lib.rs"
+          "crates/lys-runner/src/lib.rs",
+          "crates/lys-runner/src/protocol/acts.rs",
+          "crates/lys-runner/src/socket/acts.rs"
         ],
         "delete": []
       },
@@ -95,7 +98,9 @@
           "crates/lys-identity-server/src/routes.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
           "crates/lys-identity-server/src/lib.rs",
-          "surface/identity/src/features/network/JoinCode.tsx"
+          "surface/identity/src/features/network/JoinCode.tsx",
+          "crates/lys/src/main.rs",
+          "crates/lys/src/identity/cli.rs"
         ],
         "delete": []
       },
@@ -126,7 +131,8 @@
           "crates/lys/src/commands/seat_client.rs",
           "crates/lys/src/commands/attach.rs",
           "crates/lys-identity-server/src/mcp_oauth.rs",
-          "crates/lys-identity-server/src/mcp_oauth_flow.rs"
+          "crates/lys-identity-server/src/mcp_oauth_flow.rs",
+          "crates/lys/src/main.rs"
         ],
         "delete": []
       },
@@ -150,7 +156,8 @@
           "crates/lys-runner/src/harness_control/process/qualified.rs",
           "crates/lys-runner/src/harness_control.rs",
           "crates/lys-identity-server/src/runner_sessions.rs",
-          "crates/lys/src/cli/seat.rs"
+          "crates/lys/src/cli/seat.rs",
+          "crates/lys-runner/src/harness_control/process.rs"
         ],
         "delete": []
       },

@@ -324,6 +324,26 @@
       "path": "crates/lys-identity-server/src/routes.rs",
       "note": "the route table's administrator gate",
       "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys/src/identity/cli.rs",
+      "note": "the identity install and upgrade flags",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys-runner/src/protocol/",
+      "note": "the runner protocol's acts",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys-runner/src/socket/",
+      "note": "the runner socket's dispatch",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys-runner/src/harness_control/",
+      "note": "harness admission and qualification",
+      "brief": "AGENTS-008"
     }
   ],
   "principles": [

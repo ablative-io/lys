@@ -117,6 +117,10 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys/src/cli/` | the lys CLI's seat and sign-in verbs | AGENTS-008 |
 | `crates/lys-identity-server/src/routes/` | the identities routes: a person registers and certifies their own agent | AGENTS-008 |
 | `crates/lys-identity-server/src/routes.rs` | the route table's administrator gate | AGENTS-008 |
+| `crates/lys/src/identity/cli.rs` | the identity install and upgrade flags | AGENTS-008 |
+| `crates/lys-runner/src/protocol/` | the runner protocol's acts | AGENTS-008 |
+| `crates/lys-runner/src/socket/` | the runner socket's dispatch | AGENTS-008 |
+| `crates/lys-runner/src/harness_control/` | harness admission and qualification | AGENTS-008 |
 
 ## Inventory
 
