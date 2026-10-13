@@ -247,11 +247,23 @@ mod tests {
 
 #[cfg(test)]
 mod seatfix_tests {
-    use crate::budgets_feed::entry_tests::fixture;
+    use crate::budgets_feed::entry_tests::{entry, fixture, page};
     use crate::runner_client::RunnerRecord;
     use lys_runner::{Act, Answer};
     use std::error::Error;
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    fn context_entry(
+        seq: u64,
+        session: &str,
+        context: u64,
+    ) -> lys_runner::tracking_store::FeedEntry {
+        let mut entry = entry(seq, session);
+        if let lys_runner::tracking_store::Body::Usage(record) = &mut entry.body {
+            record.figures.context_tokens = Some(context);
+        }
+        entry
+    }
 
     #[tokio::test]
     async fn seatfix_unknown_phantoms_end_once_and_are_never_polled_again()
@@ -264,6 +276,9 @@ mod seatfix_tests {
             "op-a1dc3d3bd3cf0faf6f08a5bcfa3471f2",
         ];
         for session in phantoms {
+            table.track(session, "machine")?;
+        }
+        for session in ["other-good", "another-good"] {
             table.track(session, "machine")?;
         }
         let root = table.state.estate_plan_file.parent().ok_or("no root")?;
@@ -280,8 +295,9 @@ mod seatfix_tests {
         let (stop, mut stopped) = tokio::sync::oneshot::channel();
         let worker = tokio::spawn(async move {
             let mut statuses = 0;
+            let mut pages = 0;
             loop {
-                let (stream, _) = tokio::select! { accepted = listener.accept() => accepted?, result = &mut stopped => { result.map_err(std::io::Error::other)?; return Ok::<_, std::io::Error>(statuses); } };
+                let (stream, _) = tokio::select! { accepted = listener.accept() => accepted?, result = &mut stopped => { result.map_err(std::io::Error::other)?; return Ok::<_, std::io::Error>((statuses, pages)); } };
                 let greeting =
                     lys_runner::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
                 let mut stream = BufReader::new(stream);
@@ -294,8 +310,35 @@ mod seatfix_tests {
                 let act = lys_runner::protocol::verify_request(&line, &key, &greeting)
                     .map_err(std::io::Error::other)?;
                 let answer = match act {
+                    Act::Feed { follow: true, .. } => {
+                        pages += 1;
+                        let entries = [(1, "other-good", 25), (2, "another-good", 60)]
+                            .into_iter()
+                            .map(|(seq, session, context)| context_entry(seq, session, context))
+                            .collect();
+                        Answer::Feed {
+                            page: page(entries, &format!("seatfix-page-{pages}")),
+                        }
+                    }
                     Act::Liveness { session: None } => Answer::Liveness {
-                        sessions: Vec::new(),
+                        sessions: ["other-good", "another-good"]
+                            .into_iter()
+                            .map(|session| lys_runner::liveness::LivenessView {
+                                session: session.to_owned(),
+                                pid: Some(1),
+                                alive: true,
+                                managed: false,
+                                harness_session: None,
+                                turn_active: false,
+                                last_signal_at: Some(1_000),
+                                started_at: 1_000,
+                                ended: false,
+                            })
+                            .collect(),
+                    },
+                    Act::ControlStatus { session } => Answer::ControlStatus {
+                        session,
+                        control: None,
                     },
                     Act::Owned => Answer::Owned {
                         owners: Vec::new(),
@@ -317,7 +360,31 @@ mod seatfix_tests {
             }
         });
         let result = async {
-            super::tick_with_clock(&table.state, "machine", record.clone(), || Ok(3000)).await?;
+            let seeded = page(
+                vec![
+                    context_entry(1, "other-good", 25),
+                    context_entry(2, "another-good", 60),
+                    context_entry(3, phantoms[0], 90),
+                ],
+                "before-reconciliation",
+            );
+            crate::budgets_feed::keep_page(&table.state, "machine", seeded).await?;
+            crate::budgets_api::with_budgets(&table.state, |store| {
+                assert_eq!(
+                    store
+                        .held()
+                        .context_availability
+                        .reading(&table.agent, phantoms[0]),
+                    Some((5, Some(90)))
+                );
+                Ok(())
+            })?;
+            let page =
+                crate::refusals_follow::alarm_page(&table.state, "machine", record.clone(), || {
+                    Ok(3000)
+                })
+                .await?;
+            crate::budgets_feed::keep_page(&table.state, "machine", page).await?;
             crate::runtime_api::with_runtime(&table.state, |store| {
                 for session in phantoms {
                     let tracked = store
@@ -335,7 +402,37 @@ mod seatfix_tests {
                 }
                 Ok(())
             })?;
-            super::tick_with_clock(&table.state, "machine", record.clone(), || Ok(4000)).await?;
+            let page =
+                crate::refusals_follow::alarm_page(&table.state, "machine", record.clone(), || {
+                    Ok(4000)
+                })
+                .await?;
+            crate::budgets_feed::keep_page(&table.state, "machine", page).await?;
+            crate::budgets_api::with_budgets(&table.state, |store| {
+                let held = store.held();
+                assert_eq!(held.uses.len(), 3, "replayed figures must be kept once");
+                assert_eq!(
+                    held.context_availability.reading(&table.agent, phantoms[0]),
+                    None
+                );
+                for (session, figure) in [("other-good", 25), ("another-good", 60)] {
+                    let usage = held
+                        .uses
+                        .iter()
+                        .find(|usage| usage.session.as_deref() == Some(session))
+                        .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?;
+                    assert_eq!(usage.context_percent, Some(figure));
+                    assert_eq!(
+                        held.context_availability.reading(&table.agent, session),
+                        Some((5, Some(figure)))
+                    );
+                }
+                assert_eq!(
+                    held.refusals.cursors.get("machine").map(String::as_str),
+                    Some("seatfix-page-2")
+                );
+                Ok(())
+            })?;
             for session in phantoms {
                 let refused = crate::runner_client::ask(
                     &table.state,
@@ -351,6 +448,13 @@ mod seatfix_tests {
                 assert_eq!(refused.name(), "session_unknown");
             }
             crate::runtime_api::with_runtime(&table.state, |store| {
+                for session in ["other-good", "another-good"] {
+                    let tracked = store
+                        .session(session)
+                        .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?;
+                    assert!(!tracked.stopped(), "{session} was ended with the phantoms");
+                    assert_eq!(tracked.reports.len(), 2);
+                }
                 for session in phantoms {
                     assert_eq!(
                         store
@@ -366,11 +470,14 @@ mod seatfix_tests {
             Ok::<_, Box<dyn Error>>(())
         }
         .await;
-        stop.send(()).map_err(|()| "worker ended")?;
-        let statuses = worker.await??;
+        let stopped = stop.send(()).map_err(|()| "worker ended");
+        let answered = worker.await;
         table.finish().await?;
+        let (statuses, pages) = answered??;
+        stopped?;
         result?;
         assert_eq!(statuses, 4);
+        assert_eq!(pages, 2);
         Ok(())
     }
 }
