@@ -43,7 +43,10 @@ fn a_placeholder_that_does_not_read_is_refused_without_being_quoted()
         let headers = carrying("authorization", &format!("Bearer {broken}"))?;
         match Drawn::carried(&headers) {
             Err(ProxyError::ModelAccount { reason, .. }) => {
-                assert!(!reason.contains(TOKEN) && !reason.contains(HANDLE), "{reason}");
+                assert!(
+                    !reason.contains(TOKEN) && !reason.contains(HANDLE),
+                    "{reason}"
+                );
             }
             Err(other) => return Err(format!("refused as {other}").into()),
             Ok(_) => return Err(format!("{broken} was read").into()),

@@ -5,6 +5,9 @@
 
 #![warn(clippy::await_holding_lock)]
 
+mod account_binding;
+#[cfg(test)]
+mod account_binding_tests;
 mod app_client;
 mod app_client_tests;
 mod args;

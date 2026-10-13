@@ -10,6 +10,63 @@ use crate::secret::Secret;
 use super::Broker;
 
 impl<P: PermissionCheck> Broker<P> {
+    /// Bind a held account to the proxy while retaining all ancestral limits.
+    ///
+    /// # Errors
+    /// Returns the handle, grant, lifetime, storage and audit refusals.
+    pub fn proxy_draw(
+        &mut self,
+        agent: &str,
+        source: &str,
+        key: [u8; 32],
+    ) -> Result<crate::IssuedHandle, SecretsError> {
+        let parent = self
+            .handles
+            .get(source)
+            .filter(|record| record.identity == agent)
+            .ok_or(SecretsError::HandleUnknown)?;
+        if self.line_dropped(source) {
+            return Err(SecretsError::HandleDropped {
+                handle: source.to_owned(),
+            });
+        }
+        if (self.clock)() > parent.not_after_ms {
+            return Err(SecretsError::LeaseWindowClosed {
+                handle: source.to_owned(),
+            });
+        }
+        self.ancestry_admits(parent, Some(0))?;
+        self.permitted(parent, None)?;
+        if parent.used >= parent.max_uses {
+            return Err(SecretsError::LeaseExhausted {
+                handle: source.to_owned(),
+            });
+        }
+        let mut draw = parent.clone();
+        let id = crate::HandleId::generate()?;
+        let token = crate::HandleToken::generate()?;
+        draw.id = id.as_str().to_owned();
+        draw.digest = crate::encoding::hex(&token.digest());
+        draw.holder_key = crate::encoding::hex(&key);
+        draw.parent = Some(source.to_owned());
+        draw.used = 0;
+        draw.settled = 0;
+        draw.operations.clear();
+        draw.open.clear();
+        draw.held = None;
+        let outcome = format!("derived from {source}");
+        self.record(
+            AuditKind::Issue,
+            (Some(id.as_str()), Some(agent), Some(&draw.secret)),
+            None,
+            Some(0),
+            &outcome,
+        )?;
+        self.handles.insert(draw);
+        self.write_handles()?;
+        Ok(crate::IssuedHandle { id, token })
+    }
+
     /// Seals another account of `secret`.
     ///
     /// # Errors

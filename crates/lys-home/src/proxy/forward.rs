@@ -67,6 +67,9 @@ pub struct Base {
 
 impl Base {
     /// Check and keep a base as the operator gave it.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub fn parse(base: &str) -> Result<Self, ProxyError> {
         let bad = |reason: String| ProxyError::BadUpstream {
             base: base.to_owned(),
@@ -94,6 +97,9 @@ impl Base {
     }
 
     /// The full upstream URI for a request path and query.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub fn target(&self, path_and_query: &str) -> Result<Uri, ProxyError> {
         format!("{}{path_and_query}", self.text)
             .parse()
@@ -113,6 +119,9 @@ pub struct Upstream {
 impl Upstream {
     /// A transport over TLS with the Mozilla roots, or plain HTTP for an
     /// `http` base (a loopback fake), with no request ever sent twice.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub fn new() -> Result<Self, ProxyError> {
         let connector = HttpsConnectorBuilder::new()
             .with_provider_and_webpki_roots(rustls::crypto::ring::default_provider())
@@ -129,6 +138,9 @@ impl Upstream {
 
     /// Send a request to `base`, its path and query joined onto the base,
     /// its headers as they came but `host`, and its body as it streams.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub async fn send(
         &self,
         base: &Base,
@@ -255,6 +267,9 @@ pub fn refusal(status: StatusCode, reason: &str) -> Response<ProxyBody> {
 
 /// Accepts and serves each connection without a proxy admission limit.
 /// The connection tasks are reaped when they finish.
+///
+/// # Errors
+/// Returns named listener and connection failures.
 pub async fn serve<H, F>(listener: TcpListener, handle: H) -> Result<(), ProxyError>
 where
     H: Fn(Request<Incoming>) -> F + Send + Sync + 'static,
@@ -345,6 +360,7 @@ pub struct Proxy {
     capture: PathBuf,
     journal: Journal,
     sink: Sink,
+    accounts: super::account_runs::Accounts,
 }
 
 /// A proxy started: itself, the calls a previous run left open (each now
@@ -363,6 +379,9 @@ pub struct Started {
 impl Proxy {
     /// Open the home, the journal and the capture directory, record every
     /// call a previous run left open as `lost`, and start the sink.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub fn start(config: ProxyConfig) -> Result<Started, ProxyError> {
         let home = Home::open(&config.home)?;
         let journal = Journal::open(config.state.join("journal"))?;
@@ -373,6 +392,7 @@ impl Proxy {
         let upstream = Upstream::new()?;
         let (tx, reports) = mpsc::channel();
         let sink = Sink::start(home, journal.clone(), tx);
+        let accounts = super::account_runs::Accounts::open(&config.state)?;
         let proxy = Self {
             upstream,
             anthropic: config.anthropic,
@@ -381,6 +401,7 @@ impl Proxy {
             capture,
             journal,
             sink,
+            accounts,
         };
         Ok(Started {
             proxy: Arc::new(proxy),
@@ -396,6 +417,9 @@ impl Proxy {
     }
 
     /// Serve on `listener` for as long as it accepts.
+    ///
+    /// # Errors
+    /// Returns named address, transport, journal or storage failures.
     pub async fn serve(self: Arc<Self>, listener: TcpListener) -> Result<(), ProxyError> {
         serve(listener, move |request| {
             let proxy = Arc::clone(&self);
@@ -403,104 +427,10 @@ impl Proxy {
         })
         .await
     }
-
-    fn route(&self, path_and_query: &str) -> Option<(&'static str, &Base, String)> {
-        let providers = [("anthropic", &self.anthropic), ("openai", &self.openai)];
-        providers.into_iter().find_map(|(provider, base)| {
-            let rest = path_and_query.strip_prefix('/')?.strip_prefix(provider)?;
-            match rest.chars().next() {
-                None => Some((provider, base, String::from("/"))),
-                Some('/') => Some((provider, base, rest.to_owned())),
-                Some('?') => Some((provider, base, format!("/{rest}"))),
-                Some(_) => None,
-            }
-        })
-    }
-
-    /// Answer one request: forward it, and for a model call journal it
-    /// first, capture it as it passes and hand it to the sink at its end.
-    pub async fn handle(&self, request: Request<Incoming>) -> Response<ProxyBody> {
-        let path_and_query = request
-            .uri()
-            .path_and_query()
-            .map_or("/", PathAndQuery::as_str)
-            .to_owned();
-        let (run, unkeyed) = run_key(&path_and_query);
-        let Some((provider, base, rest)) = self.route(unkeyed) else {
-            return refusal(
-                StatusCode::NOT_FOUND,
-                "lys-proxy refused the call: its path names no provider. A path begins \
-                 /anthropic or /openai, after its run key when it carries one, and a run key \
-                 is the 32 lowercase hexadecimal digits a Lys launch gave the run; any other \
-                 first part is not a key",
-            );
-        };
-        let api = api_of(request.method(), &rest);
-        // A Codex signed in with ChatGPT sends its account's id, and is
-        // answered by ChatGPT's Codex backend, whose paths carry no `/v1`.
-        // One header lookup; the machine's own Codex sign-in decides.
-        let chatgpt = provider == "openai" && request.headers().contains_key(CHATGPT_ACCOUNT);
-        let (base, rest) = if chatgpt {
-            let rest = rest.strip_prefix("/v1").unwrap_or(&rest).to_owned();
-            (&self.chatgpt, rest)
-        } else {
-            (base, rest)
-        };
-        let Some(api) = api else {
-            // Not a model call: forwarded as it came, and not recorded.
-            let request = request.map(BodyExt::boxed_unsync);
-            return match self.upstream.send(base, &rest, request).await {
-                Ok(response) => response.map(BodyExt::boxed_unsync),
-                Err(error) => refusal(StatusCode::BAD_GATEWAY, &format!("lys-proxy: {error}")),
-            };
-        };
-        let mut open = OpenCall {
-            call_id: fresh_id(),
-            provider: provider.to_owned(),
-            api,
-            started_at: now(),
-            // Codex names its session in a header; a Messages call names
-            // its own in the body, read as the request passes.
-            session: request
-                .headers()
-                .get(CODEX_SESSION)
-                .and_then(|value| value.to_str().ok())
-                .and_then(|id| super::link::Link::from_record(Some(id)).to_record()),
-            run: run.map(str::to_owned),
-            admission_ns: None,
-            completed: None,
-        };
-        // Admission gate: the request waits only for its journal record to
-        // be put in place. The sync that makes the record hold through a
-        // loss of power is made beside the call, never in its way.
-        let admission = std::time::Instant::now();
-        if let Err(error) = self.journal.put(&open) {
-            return refusal(
-                StatusCode::SERVICE_UNAVAILABLE,
-                &format!("lys-proxy refused the call: {error}"),
-            );
-        }
-        open.admission_ns = Some(u64::try_from(admission.elapsed().as_nanos()).unwrap_or(u64::MAX));
-        self.journal.settle_beside(&open.call_id);
-        let call = Call::admit(open, &self.capture, self.journal.clone(), self.sink.clone());
-        call.asked(request.headers());
-        let request = request.map(|body| Tee::new(body, call.request_side()).boxed_unsync());
-        match self.upstream.send(base, &rest, request).await {
-            Ok(response) => {
-                let side = call.response_side(
-                    is_event_stream(response.headers()),
-                    response.status().as_u16(),
-                    response.headers(),
-                );
-                response.map(|body| Tee::new(body, side).boxed_unsync())
-            }
-            Err(error) => {
-                call.finish(End::Failed);
-                refusal(StatusCode::BAD_GATEWAY, &format!("lys-proxy: {error}"))
-            }
-        }
-    }
 }
+
+#[path = "handling.rs"]
+mod handling;
 
 /// The header a Codex signed in with `ChatGPT` sends its account's id in.
 const CHATGPT_ACCOUNT: &str = "chatgpt-account-id";

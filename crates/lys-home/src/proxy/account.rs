@@ -90,7 +90,9 @@ fn plain(text: &str) -> bool {
 }
 
 fn hexadecimal(text: &str) -> bool {
-    !text.is_empty() && text.len() % 2 == 0 && text.bytes().all(|byte| byte.is_ascii_hexdigit())
+    !text.is_empty()
+        && text.len().is_multiple_of(2)
+        && text.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 impl Drawn {
@@ -193,9 +195,9 @@ pub fn presentation(
         .map_err(|error| unread(&format!("the secure random source failed: {error}")))?;
     let signed_at = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|since| i64::try_from(since.as_millis()).ok())
-        .ok_or_else(|| unread("the clock reads before the epoch"))?;
+        .map_err(|error| unread(&format!("the clock reads before the epoch: {error}")))?;
+    let signed_at = i64::try_from(signed_at.as_millis())
+        .map_err(|error| unread(&format!("the signing time cannot be represented: {error}")))?;
     let digest = request_digest(method, path, body)?;
     let mut payload = Vec::new();
     field(&mut payload, PRESENTATION_DOMAIN.as_bytes())?;

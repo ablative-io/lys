@@ -85,6 +85,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/secrets/recipients", post(recipients))
         .route("/secrets/drop", post(drop_handle))
         .route("/secrets/add", post(add))
+        .route("/secrets/accounts/hold", post(hold_account))
         .route("/secrets/replace", post(replace))
         .route("/secrets/retire", post(retire))
 }
@@ -327,4 +328,88 @@ fn now_ms() -> Result<i64, ServerError> {
         .map_err(|error| unreadable(format!("the clock reads before the epoch: {error}")))?;
     i64::try_from(since.as_millis())
         .map_err(|_overflow| unreadable("the clock is past what a signing time holds".to_owned()))
+}
+
+/// The proxy relays the signed binding to the broker and holds its draws.
+pub(crate) async fn bind_proxy(
+    state: &AppState,
+    person: &str,
+    proxy: &str,
+    run: &str,
+    agent: &str,
+    rotation: &lys_runner::Rotation,
+    provider: &str,
+) -> Result<(), ServerError> {
+    let broker = state
+        .secrets
+        .as_ref()
+        .ok_or_else(|| ServerError::SecretsUnavailable {
+            reason: "account broker absent".to_owned(),
+        })?;
+    let unavailable = |reason: &str| ServerError::SecretsUnavailable {
+        reason: reason.to_owned(),
+    };
+    let key = broker
+        .client
+        .get(format!("{proxy}/_lys/account/key"))
+        .send()
+        .await
+        .map_err(|error| unavailable(&format!("account proxy key request failed: {error}")))?
+        .error_for_status()
+        .map_err(|error| unavailable(&format!("account proxy key refused: {error}")))?
+        .text()
+        .await
+        .map_err(|error| unavailable(&format!("account proxy key unreadable: {error}")))?;
+    let path = "/_lys/account/bind";
+    let body=serde_json::to_vec(&serde_json::json!({"broker":broker.base,"run":run,"agent":agent,"provider":provider,"accounts":rotation.accounts,"proxy_key":key.trim()})).map_err(|_|unavailable("account binding encoding failed"))?;
+    let [service, on_behalf_of, operation, signed_at, signature] = crate::secrets_sign::headers(
+        &crate::secrets_sign::Asked {
+            service: &broker.service,
+            person,
+            method: "POST",
+            path,
+            body: &body,
+            signed_at_ms: now_ms()?,
+        },
+        &broker.key,
+    )?;
+    let response = broker
+        .client
+        .post(format!("{proxy}{path}"))
+        .header("lys-service", service)
+        .header("lys-on-behalf-of", on_behalf_of)
+        .header("lys-operation", operation)
+        .header("lys-signed-at", signed_at)
+        .header("lys-service-signature", signature)
+        .header("content-type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .map_err(|error| unavailable(&format!("account proxy binding request failed: {error}")))?;
+    let status = response.status();
+    if !status.is_success() {
+        let text = response.text().await.map_err(|error| {
+            unavailable(&format!("account binding refusal unreadable: {error}"))
+        })?;
+        let (refusal, reason) = text
+            .trim()
+            .split_once(": ")
+            .unwrap_or(("account_binding_refused", text.trim()));
+        return Err(ServerError::SecretsRefused {
+            status,
+            refusal: refusal.to_owned(),
+            reason: reason.to_owned(),
+        });
+    }
+    Ok(())
+}
+
+async fn hold_account(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<Value>, ServerError> {
+    Ok(Json(
+        ask(&state, &headers, Method::POST, "/_lys/account/hold", body).await?,
+    ))
 }

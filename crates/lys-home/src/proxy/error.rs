@@ -13,6 +13,14 @@ use crate::error::HomeError;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ProxyError {
+    /// A run's account binding or presentation was refused.
+    #[error("model_account_refused: account {account}: {reason}")]
+    ModelAccount {
+        /// The account's public name.
+        account: String,
+        /// The refusal, without credential bytes.
+        reason: String,
+    },
     /// An I/O operation failed at a named path.
     #[error("{context} at {}: {source}", path.display())]
     Io {

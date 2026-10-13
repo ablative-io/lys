@@ -107,3 +107,41 @@ fn model_account_start_checks_refuse_an_unheld_account_before_rendering() -> Tes
     }
     Ok(())
 }
+
+#[test]
+fn account_provider_is_checked_by_handle_before_review() -> TestResult {
+    let mut profile = version(&["first"])?;
+    let catalogue: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    profile.settings.harness = Some(serde_json::from_value(
+        json!({"name":"fixture","program":"/bin/sh","package":"fixture","description":catalogue["description"]}),
+    )?);
+    let rotation = profile
+        .settings
+        .session
+        .as_ref()
+        .and_then(|s| s.accounts.as_ref())
+        .ok_or("rotation absent")?;
+    let inventory = json!({"secrets":[{"name":"login","class":"credential","upstream":"https://api.openai.com","header":"authorization"}]});
+    let error = lys_identity_server::model_account_start::routed(
+        &profile,
+        rotation,
+        &[held("first", "login")],
+        &inventory,
+    )
+    .expect_err("wrong provider admitted");
+    assert!(error.to_string().starts_with("account_provider_mismatch:"));
+    assert!(error.to_string().contains("first"));
+    let inventory = json!({"secrets":[{"name":"login","class":"credential","upstream":"https://api.anthropic.com","header":"authorization"}]});
+    assert_eq!(
+        lys_identity_server::model_account_start::routed(
+            &profile,
+            rotation,
+            &[held("first", "login")],
+            &inventory
+        )?,
+        "https://api.anthropic.com"
+    );
+    Ok(())
+}

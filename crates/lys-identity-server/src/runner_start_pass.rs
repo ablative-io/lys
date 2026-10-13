@@ -112,7 +112,10 @@ fn proxied(
         run: run.clone(),
         context_window,
         profile_version,
-        account: None,
+        account: launch
+            .rotation
+            .as_ref()
+            .and_then(|rotation| rotation.accounts.first().cloned()),
     }))
 }
 
@@ -177,5 +180,19 @@ mod profile_window_tests {
             let error = proxied(&launch(window)).expect_err("invalid window accepted");
             assert!(error.to_string().contains("context_window"), "{error}");
         }
+    }
+    #[test]
+    fn run_tracking_records_the_account_handle_without_a_value() -> Result<(), Box<dyn Error>> {
+        let mut launch = launch("200000");
+        launch.rotation = Some(lys_runner::Rotation {
+            accounts: vec!["account-handle".to_owned()],
+            variable: "ACCOUNT".to_owned(),
+            limit: lys_runner::rotation::Limit::ExitStatus { status: 9 },
+            resume_arguments: Vec::new(),
+        });
+        let tracking = proxied(&launch)?.ok_or("proxy tracking absent")?;
+        assert_eq!(tracking.account.as_deref(), Some("account-handle"));
+        assert_eq!(serde_json::to_value(tracking)?["account"], "account-handle");
+        Ok(())
     }
 }

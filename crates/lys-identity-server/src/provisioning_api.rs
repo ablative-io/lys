@@ -429,6 +429,28 @@ async fn review(
             .record(IdentityId::Agent(agent))
             .ok_or(ServerError::AgentNotVisible)?;
         let person = own_person(directory, &actor)?;
+        if !state.admission.is_administrator(directory, &actor)?
+            && record.responsible() != Some(person)
+        {
+            return Err(ServerError::NotAdmitted {
+                reason: "only the responsible person or administrator reviews accounts",
+            });
+        }
+        Ok(())
+    })?;
+    let candidate = with_provisioning(&state, |store| {
+        store
+            .version(&agent.to_string(), number)
+            .cloned()
+            .ok_or(ServerError::ProfileVersionUnknown { version: number })
+    })?;
+    crate::model_account_start::admit(&state, &headers, &agent.to_string(), &candidate).await?;
+    with_directory(&state, |directory| {
+        let directory = directory.projection()?;
+        let record = directory
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        let person = own_person(directory, &actor)?;
         let answers = state.admission.is_administrator(directory, &actor)?
             || record.responsible() == Some(person);
         if !answers {

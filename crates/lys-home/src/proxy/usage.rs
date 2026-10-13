@@ -222,7 +222,8 @@ fn first<'a>(
 /// The organisation Anthropic's response named, or the account a Codex
 /// request named.
 fn account(head: &Head) -> Option<String> {
-    first(&head.response.values, "anthropic-organization-id")
+    first(&head.request.values, "lys-model-account")
+        .or_else(|| first(&head.response.values, "anthropic-organization-id"))
         .or_else(|| first(&head.request.values, "chatgpt-account-id"))
         .map(str::to_owned)
 }

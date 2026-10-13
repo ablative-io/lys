@@ -17,6 +17,8 @@
 //! - No header value and no body byte is logged, and none is stored outside
 //!   the spool and the home's block store ([`error`] names paths and ids).
 
+pub mod account;
+mod account_runs;
 pub mod capture;
 #[cfg(test)]
 mod capture_decode_tests;
