@@ -80,6 +80,9 @@ macro_rules! alarms_follow {
                                     .map_err(|error| std::io::Error::other(error.to_string()))?.clone());
                                 Answer::Liveness { sessions }
                             },
+                            Act::Owned => Answer::Owned { owners: Vec::new(), unreachable: Vec::new() },
+                            Act::Status { session: Some(session) } => Answer::refusal(&lys_runner::RunnerError::refused(
+                                "session_unknown", format!("no session {session} is held"))),
                             other => return Err(std::io::Error::other(format!("unexpected alarm request {other:?}"))),
                         };
                         let reply = serde_json::to_string(&lys_runner::protocol::Reply {

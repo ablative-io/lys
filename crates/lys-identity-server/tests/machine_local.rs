@@ -38,7 +38,7 @@ async fn world(key_text: Option<&str>) -> Result<World, Box<dyn Error>> {
         },
         None,
         move |config| {
-            let seeded = seed_configured(config, [ADMINISTRATOR])?;
+            let seeded = seed_configured(config, [ADMINISTRATOR, "local-machine-peer"])?;
             let owner = seeded.people[0].id.to_string();
             let machine = OperationId::generate()?.to_string();
             let network = config.network_file.as_ref().ok_or("no network")?;
