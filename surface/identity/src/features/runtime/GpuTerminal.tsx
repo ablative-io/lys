@@ -111,7 +111,7 @@ export function GpuTerminal({ session, onEnd, onFailure }: {
     void start().catch(failed);
     return () => { controller.abort(); terminal?.dispose(); };
   }, [session]);
-  return <div className="terminal-display">
+  return <div className="terminal-display" data-session={session}>
     {status !== 'ready' ? <p role="status">{status === 'failed' ? 'Terminal disconnected. See the reason below.' : 'Opening terminal…'}</p> : null}
     {status === 'ready' && backend !== 'webgpu' ? <p className="terminal-renderer">This browser is not offering WebGPU, so the terminal is drawn with {RENDERERS[backend]} instead.</p> : null}
     <div className="terminal-screen" data-renderer={status === 'ready' ? backend : status} ref={host} />

@@ -13,9 +13,9 @@ title: The operations screen opens on a network tree of machines and their runni
 > - ADR-117 — Lys runs the agents it starts: its own background terminal, or a runner another tool provides — Lys runs the agents it starts. A runner is the part that holds an agent's terminal: Lys ships one of its own, a background process on each machine that runs each started agent in its own pseudo-terminal, and accepts any other runner that speaks the same small, published runner protocol. Through a runner, Lys starts, types into, presses keys in, reads, waits on, resizes, compacts and stops a session, rotates it across its accounts when it reports a usage limit, and wakes it with a message, each act under the caller's grants and recorded. Lys depends on no particular runner: its own is the default, another is chosen per machine.
 > - ADR-137 — Argus's remaining functions move into Lys as data beside goals, and a seat is a Lys record launched by the runner through the proxy; no shared library — Words (five slots, four layers, templates), variables (per agent and session, revision, author, expiry), schedules and seats are identity-server records in Lys's log, rendered and acted on at delivery through DIRECTORY-064's dispatcher with the contributing revisions in the receipt. No shared library: Lodestone is a read-only query engine over a store and holds nothing; haematite is the store under Lys already; a library would be a second place for the same data. Seat start, stop and restart are deliberate acts under Lys rights (ADR-136). Argus's alarms, rules, launches and queue are not moved into Lys: they become liminal services and aion work (ADR-136 section 3). A seat moves off herdr and Argus one at a time, Waffles's first.
 > **Checklist:**
-> - C737 — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1).
-> - C738 — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2).
-> - C739 — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3).
+> - C737 — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1). Functional component proof: NetworkTree.test.tsx — C737 draws every state and empty branch, excludes retired machines and names runner reasons; C737 starts an offline seat with a fresh operation and immediately uses the answered state; C737 reads all machine pages and refuses malformed or repeated pages. Not proven: the 50 ms rendering acceptance fails under shared load (57.60 ms in components-final; 228.71 ms in suite-last).
+> - C738 — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2). Component proof: NetworkTreePane.test.tsx — C738 switches PTY terminals and aborts the previous stream exactly once; C738 follows managed attach lines, preserves the cursor, and names the stream end; C738 sends a user turn on Enter, clears only on delivery and names refusals; C738 offline and unknown leaves show their state and reason without mounting a terminal.
+> - C739 — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3). Not proven on the served API: canvas_store.rs Arrangement denies unknown fields and has no operations member. Component tests prove the default, restoration from a fixture with operations, one write per change and a named refusal; they do not prove persistence on today's server.
 > **Stories:**
 > - S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
 
@@ -47,10 +47,30 @@ Behavioural. WHEN the operations screen shows the network tree THE SYSTEM SHALL 
 - modify: surface/identity/src/api.ts
 
 **Checklist:**
-- C737 — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1).
+- C737 — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1). Functional component proof: NetworkTree.test.tsx — C737 draws every state and empty branch, excludes retired machines and names runner reasons; C737 starts an offline seat with a fresh operation and immediately uses the answered state; C737 reads all machine pages and refuses malformed or repeated pages. Not proven: the 50 ms rendering acceptance fails under shared load (57.60 ms in components-final; 228.71 ms in suite-last).
 
 **Stories:**
 - S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
+
+#### R1 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: Reads the complete paged network and the live seat list, resolves display names, groups non-retired machines without dropping empty branches, shows exact state/transport/reasons and keeps uncertain start operation ids. React-render timing is asserted below 50 ms; preceding failing timing measurements remain in the lane logs.
+- Deviation: The current canvas uses a change signal, so no polling interval was added. Vitest includes the named tests under src. Leaf rendering was reduced to two DOM elements, without reducing the 200-seat fixture or increasing 50 ms. The timing assertion still fails under shared load; C737 is not marked proven.
+- Files changed:
+  - created: `surface/identity/src/features/runtime/NetworkTree.tsx` — Network tree and terminal component implementation.
+  - created: `surface/identity/src/features/runtime/network-tree.ts` — Network tree and terminal component implementation.
+  - created: `surface/identity/src/features/runtime/network-tree.css` — Network tree and terminal component implementation.
+  - created: `surface/identity/src/features/runtime/NetworkTree.test.tsx` — Network tree and terminal component implementation.
+  - modified: `surface/identity/src/api.ts` — Network tree and terminal component implementation.
+  - modified: `surface/identity/vite.config.ts` — Includes the named component tests under src.
+  - modified: `surface/identity/tests/bare-buttons.standing.ts` — Keeps the unchanged canvas control count at its child module.
+- Checklist delivery:
+  - [ ] C737 — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1). Functional component proof: NetworkTree.test.tsx — C737 draws every state and empty branch, excludes retired machines and names runner reasons; C737 starts an offline seat with a fresh operation and immediately uses the answered state; C737 reads all machine pages and refuses malformed or repeated pages. Not proven: the 50 ms rendering acceptance fails under shared load (57.60 ms in components-final; 228.71 ms in suite-last). — Functional tree and start checks passed; the unchanged 50 ms assertion failed at 57.60 ms in the final focused run and 228.71 ms in the final full suite.
+- Story delivery:
+  - [ ] S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away. — Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures.
 
 ### R2: Selecting a running leaf shows its terminal
 
@@ -68,10 +88,26 @@ Behavioural. WHEN a person selects a leaf whose seat is online THE SYSTEM SHALL 
 - modify: surface/identity/src/features/runtime/GpuTerminal.tsx
 
 **Checklist:**
-- C738 — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2).
+- C738 — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2). Component proof: NetworkTreePane.test.tsx — C738 switches PTY terminals and aborts the previous stream exactly once; C738 follows managed attach lines, preserves the cursor, and names the stream end; C738 sends a user turn on Enter, clears only on delivery and names refusals; C738 offline and unknown leaves show their state and reason without mounting a terminal.
 
 **Stories:**
 - S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
+
+#### R2 — Execution record
+
+**Dev (recorded):**
+
+- Status: implemented
+- How: PTY terminals use the existing byte transport and GPU component; managed seats follow validated attach lines with cursor and session binding. Selection aborts the earlier read. Seat send and stop use operation receipts, retain uncertain operations, preserve a newer draft and distinguish an unconfirmed stop from an ended session.
+- Deviation: Managed transports render attach lines instead of mounting a byte terminal, as the current attach route requires. Existing terminal transport code was reused.
+- Files changed:
+  - created: `surface/identity/src/features/runtime/NetworkTreePane.tsx` — Network tree and terminal component implementation.
+  - created: `surface/identity/src/features/runtime/NetworkTreePane.test.tsx` — Network tree and terminal component implementation.
+  - modified: `surface/identity/src/features/runtime/GpuTerminal.tsx` — Network tree and terminal component implementation.
+- Checklist delivery:
+  - [x] C738 — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2). Component proof: NetworkTreePane.test.tsx — C738 switches PTY terminals and aborts the previous stream exactly once; C738 follows managed attach lines, preserves the cursor, and names the stream end; C738 sends a user turn on Enter, clears only on delivery and names refusals; C738 offline and unknown leaves show their state and reason without mounting a terminal. — Component proof: NetworkTreePane.test.tsx — C738 switches PTY terminals and aborts the previous stream exactly once; C738 follows managed attach lines, preserves the cursor, and names the stream end; C738 sends a user turn on Enter, clears only on delivery and names refusals; C738 offline and unknown leaves show their state and reason without mounting a terminal.
+- Story delivery:
+  - [x] S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away. — Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures.
 
 ### R3: The tree is the default view and a person's choice is kept
 
@@ -92,10 +128,26 @@ Behavioural. THE SYSTEM SHALL open the operations screen (route #/canvas, and th
 - modify: surface/identity/src/shell/Palette.tsx
 
 **Checklist:**
-- C739 — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3).
+- C739 — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3). Not proven on the served API: canvas_store.rs Arrangement denies unknown fields and has no operations member. Component tests prove the default, restoration from a fixture with operations, one write per change and a named refusal; they do not prove persistence on today's server.
 
 **Stories:**
 - S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
+
+#### R3 — Execution record
+
+**Dev (recorded):**
+
+- Status: blocked
+- How: The route opens on the network tree, offers canvas, sessions and the existing proxy view, and reads/writes operations.view, operations.selected and operations.pane_width through the canvas route. Named service refusals are shown without browser persistence. The current server cannot keep the new shape. Explicit agent, layout and panel destinations keep their canvas destination; no kept view on a plain operations visit still opens the tree.
+- Deviation: Blocked: the server rejects operations in Arrangement. No Rust changes are authorized. Existing canvas tests were kept unchanged and still assume the previous default. Rail, palette and routes already point to the operations wrapper and needed no change. No package, install or push was run.
+- Files changed:
+  - modified: `surface/identity/src/features/runtime/SessionCanvas.tsx` — Network tree and terminal component implementation.
+  - modified: `surface/identity/src/features/runtime/canvas-kept.ts` — Network tree and terminal component implementation.
+  - created: `surface/identity/src/features/runtime/CanvasSurface.tsx` — Moves the existing canvas into a child module below 500 lines without changing its arrangements or controls.
+- Checklist delivery:
+  - [ ] C739 — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3). Not proven on the served API: canvas_store.rs Arrangement denies unknown fields and has no operations member. Component tests prove the default, restoration from a fixture with operations, one write per change and a named refusal; they do not prove persistence on today's server. — Not proven on the served API: canvas_store.rs Arrangement denies unknown fields and has no operations member. Component tests prove the default, restoration from a fixture with operations, one write per change and a named refusal; they do not prove persistence on today's server.
+- Story delivery:
+  - [ ] S420 (Tom, owner) — As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away. — Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures.
 
 ## Boundaries
 

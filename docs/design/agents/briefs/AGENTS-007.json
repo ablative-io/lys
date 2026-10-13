@@ -48,7 +48,63 @@
       ],
       "stories": [
         "S420"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/runtime/NetworkTree.tsx",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/network-tree.ts",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/network-tree.css",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/NetworkTree.test.tsx",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/api.ts",
+            "change": "modified",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/vite.config.ts",
+            "change": "modified",
+            "note": "Includes the named component tests under src."
+          },
+          {
+            "path": "surface/identity/tests/bare-buttons.standing.ts",
+            "change": "modified",
+            "note": "Keeps the unchanged canvas control count at its child module."
+          }
+        ],
+        "how": "Reads the complete paged network and the live seat list, resolves display names, groups non-retired machines without dropping empty branches, shows exact state/transport/reasons and keeps uncertain start operation ids. React-render timing is asserted below 50 ms; preceding failing timing measurements remain in the lane logs.",
+        "deviation": "The current canvas uses a change signal, so no polling interval was added. Vitest includes the named tests under src. Leaf rendering was reduced to two DOM elements, without reducing the 200-seat fixture or increasing 50 ms. The timing assertion still fails under shared load; C737 is not marked proven.",
+        "checklist": [
+          {
+            "id": "C737",
+            "done": false,
+            "note": "Functional tree and start checks passed; the unchanged 50 ms assertion failed at 57.60 ms in the final focused run and 228.71 ms in the final full suite."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S420",
+            "satisfied": false,
+            "note": "Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures."
+          }
+        ]
+      }
     },
     {
       "id": "R2",
@@ -75,7 +131,43 @@
       ],
       "stories": [
         "S420"
-      ]
+      ],
+      "dev": {
+        "status": "implemented",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/runtime/NetworkTreePane.tsx",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/NetworkTreePane.test.tsx",
+            "change": "created",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/GpuTerminal.tsx",
+            "change": "modified",
+            "note": "Network tree and terminal component implementation."
+          }
+        ],
+        "how": "PTY terminals use the existing byte transport and GPU component; managed seats follow validated attach lines with cursor and session binding. Selection aborts the earlier read. Seat send and stop use operation receipts, retain uncertain operations, preserve a newer draft and distinguish an unconfirmed stop from an ended session.",
+        "deviation": "Managed transports render attach lines instead of mounting a byte terminal, as the current attach route requires. Existing terminal transport code was reused.",
+        "checklist": [
+          {
+            "id": "C738",
+            "done": true,
+            "note": "Component proof: NetworkTreePane.test.tsx \u2014 C738 switches PTY terminals and aborts the previous stream exactly once; C738 follows managed attach lines, preserves the cursor, and names the stream end; C738 sends a user turn on Enter, clears only on delivery and names refusals; C738 offline and unknown leaves show their state and reason without mounting a terminal."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S420",
+            "satisfied": true,
+            "note": "Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures."
+          }
+        ]
+      }
     },
     {
       "id": "R3",
@@ -104,7 +196,43 @@
       ],
       "stories": [
         "S420"
-      ]
+      ],
+      "dev": {
+        "status": "blocked",
+        "files_changed": [
+          {
+            "path": "surface/identity/src/features/runtime/SessionCanvas.tsx",
+            "change": "modified",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/canvas-kept.ts",
+            "change": "modified",
+            "note": "Network tree and terminal component implementation."
+          },
+          {
+            "path": "surface/identity/src/features/runtime/CanvasSurface.tsx",
+            "change": "created",
+            "note": "Moves the existing canvas into a child module below 500 lines without changing its arrangements or controls."
+          }
+        ],
+        "how": "The route opens on the network tree, offers canvas, sessions and the existing proxy view, and reads/writes operations.view, operations.selected and operations.pane_width through the canvas route. Named service refusals are shown without browser persistence. The current server cannot keep the new shape. Explicit agent, layout and panel destinations keep their canvas destination; no kept view on a plain operations visit still opens the tree.",
+        "deviation": "Blocked: the server rejects operations in Arrangement. No Rust changes are authorized. Existing canvas tests were kept unchanged and still assume the previous default. Rail, palette and routes already point to the operations wrapper and needed no change. No package, install or push was run.",
+        "checklist": [
+          {
+            "id": "C739",
+            "done": false,
+            "note": "Not proven on the served API: canvas_store.rs Arrangement denies unknown fields and has no operations member. Component tests prove the default, restoration from a fixture with operations, one write per change and a named refusal; they do not prove persistence on today's server."
+          }
+        ],
+        "stories": [
+          {
+            "id": "S420",
+            "satisfied": false,
+            "note": "Component behavior verified; overall delivery remains blocked by R3 and the full-suite failures."
+          }
+        ]
+      }
     }
   ],
   "boundaries": [

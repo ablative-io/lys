@@ -20,7 +20,7 @@ export const STANDING: Record<string, number> = {
   'features/runtime/CanvasDock.tsx': 4,
   'features/runtime/CanvasMarks.tsx': 4,
   'features/runtime/CanvasWidgets.tsx': 7,
-  'features/runtime/SessionCanvas.tsx': 5,
+  'features/runtime/CanvasSurface.tsx': 5,
   'features/settings/Settings.tsx': 4,
   'features/teams/Teams.tsx': 1,
   'shell/Explain.tsx': 1,

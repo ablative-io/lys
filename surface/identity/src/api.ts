@@ -332,8 +332,9 @@ export type SeatState = 'online-working' | 'online-idle' | 'offline' | 'not-seen
 const SEAT_STATES: readonly SeatState[] = ['online-working', 'online-idle', 'offline', 'not-seen', 'unknown'];
 /** One seat: its record and its liveness. `last_signal_at` is milliseconds since the epoch, as the runner keeps it. */
 export interface SeatView {
-  name: string; agent: string; harness: string; profile_version: number; machine: string; working_folder: string; account?: string | null;
-  responsible: string; session?: string | null; harness_session?: string | null; state: SeatState; last_signal_at?: number | null;
+  transport?: 'pty' | 'managed' | null; reason?: string;
+  name: string; agent: string; harness: string; profile_version: number; machine: string; working_folder: string | null; account?: string | null;
+  responsible: string | null; session?: string | null; harness_session?: string | null; state: SeatState; last_signal_at?: number | null;
   created_by: string; created_at: number; revision: number;
 }
 /** GET /seats: every seat, and whether the runner was read; when it was not, `reason` says why and every state is unknown. */
@@ -344,7 +345,8 @@ export interface UnregisteredSession { session: string; machine: string; agent?:
 function seatsUnreadable(reason: string): never { throw new Refused(0, { refusal: 'SeatsUnreadable', reason }); }
 const seatPath = (name: string, act: string) => '/seats/' + encodeURIComponent(name) + '/' + act;
 function seatAnswer<T extends { seat: SeatView; session: string }>(answer: T, name: string): T {
-  if (typeof answer !== 'object' || answer === null || answer.seat?.name !== name || typeof answer.session !== 'string' || !answer.session) seatsUnreadable('The answer did not name this seat and its session; its outcome is not assumed.');
+  if (typeof answer !== 'object' || answer === null || answer.seat?.name !== name || !SEAT_STATES.includes(answer.seat.state)
+    || typeof answer.session !== 'string' || !answer.session) seatsUnreadable('The answer did not name this seat, its state and its session; its outcome is not assumed.');
   return answer;
 }
 
@@ -352,8 +354,11 @@ function seatAnswer<T extends { seat: SeatView; session: string }>(answer: T, na
 export const seats = {
   list: async (): Promise<SeatList> => {
     const answer = await request<SeatList>('/seats');
-    if (!Array.isArray(answer.seats) || (answer.runner !== 'read' && answer.runner !== 'unknown')) seatsUnreadable('The service did not answer a seat list with whether its runner was read.');
-    if (answer.seats.some((seat) => typeof seat.name !== 'string' || !seat.name || !SEAT_STATES.includes(seat.state))) seatsUnreadable('A seat has no name or an unknown state; its state is not assumed.');
+    if (!answer || !Array.isArray(answer.seats) || (answer.runner !== 'read' && answer.runner !== 'unknown')) seatsUnreadable('The service did not answer a seat list with whether its runner was read.');
+    if (answer.seats.some((seat) => !seat || typeof seat.name !== 'string' || !seat.name || typeof seat.agent !== 'string' || !seat.agent
+      || typeof seat.machine !== 'string' || !seat.machine || !SEAT_STATES.includes(seat.state)
+      || (seat.transport !== undefined && seat.transport !== null && seat.transport !== 'pty' && seat.transport !== 'managed')
+      || (seat.reason !== undefined && typeof seat.reason !== 'string'))) seatsUnreadable('A seat has no name, an unknown state or an unreadable transport or reason; its state is not assumed.');
     return answer;
   },
   unregistered: async (): Promise<UnregisteredSession[]> => {

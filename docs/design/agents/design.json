@@ -279,6 +279,21 @@
       "path": "surface/identity/src/api.ts",
       "note": "GET /network and GET /seats read for the tree",
       "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/CanvasSurface.tsx",
+      "note": "the existing canvas separated from the operations wrapper to keep source files below 500 lines",
+      "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/vite.config.ts",
+      "note": "discovers the network tree component acceptance tests",
+      "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/tests/bare-buttons.standing.ts",
+      "note": "keeps the existing canvas control count at its child module",
+      "brief": "AGENTS-007"
     }
   ],
   "principles": [

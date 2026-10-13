@@ -20,15 +20,6 @@ On 6 October 2026 every seat is started through herdr (a third-party terminal wo
 
 Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt words in four layers with templates, variables per agent and session with revision and expiry, countdown and goal substitutions rendered at delivery with the contributing revisions captured, and schedules with interval and occurrence bounds, all delivered through 064's dispatcher and shown on the Usage screen; the agent reads and sets its own variables through lys and the Lys MCP server. AGENTS-002: a seat is a Lys record launched by the runner through the proxy with the profile HOME-037 carries, a registry with liveness (online, not seen, seen but unregistered), start, stop and restart as deliberate acts under Lys rights, an attach command that shows a seat's terminal, and the move of a seat off herdr and Argus one at a time, proved by the first warning arriving from Lys. ADR-137 settles where the data lives: in Lys beside goals, rendered at delivery; no shared library (Lodestone is a read-only query engine; haematite is already the store under Lys); alarms, rules and launches go to liminal services and aion per ADR-136 section 3.
 
-For a seat using a PTY, the runner flushes operation text before scheduling
-Enter through the existing input writer. Nonempty text has a named 300 ms gap,
-`ENTER_AFTER_TEXT`, so Claude Code and Codex finish detecting the paste burst
-before the carriage return arrives as a submit key. One shared timer queue
-handles these gaps. Empty text submits Enter immediately; managed delivery
-uses its existing control transport. An exit during the gap records a named
-refusal instead of leaving the operation delivering. Once Enter has been
-submitted, an exit before its completion is recorded remains uncertain.
-
 ## Principles
 
 - **P1** — Nothing a seat needs is typed into a terminal: warnings, compaction, reminders and stops go through the harness's control channel and the runner (ADR-130).
@@ -117,6 +108,9 @@ submitted, an exit before its completion is recorded remains uncertain.
 | `surface/identity/src/routes.tsx` | the operations route lands on the kept view | AGENTS-007 |
 | `surface/identity/src/shell/` | the rail's and the palette's operations entries | AGENTS-007 |
 | `surface/identity/src/api.ts` | GET /network and GET /seats read for the tree | AGENTS-007 |
+| `surface/identity/src/features/runtime/CanvasSurface.tsx` | the existing canvas separated from the operations wrapper to keep source files below 500 lines | AGENTS-007 |
+| `surface/identity/vite.config.ts` | discovers the network tree component acceptance tests | AGENTS-007 |
+| `surface/identity/tests/bare-buttons.standing.ts` | keeps the existing canvas control count at its child module | AGENTS-007 |
 
 ## Inventory
 

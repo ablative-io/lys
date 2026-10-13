@@ -20,6 +20,31 @@ export interface Keeping {
   /** The arrangement being worked in as the service has it; null when it keeps none, or when this browser is keeping it. */
   arrangement: Arrangement | null;
   layouts: SavedLayout[];
+  operations: OperationsChoice;
+}
+
+export interface OperationsChoice { view: 'tree' | 'canvas' | 'sessions'; selected: string | null; pane_width: number }
+export const FIRST_OPERATIONS: OperationsChoice = { view: 'tree', selected: null, pane_width: 600 };
+
+function operationsOf(arrangement: unknown): OperationsChoice {
+  const choice = (arrangement as { operations?: unknown } | null)?.operations;
+  if (choice === undefined) return FIRST_OPERATIONS;
+  if (!choice || typeof choice !== 'object') throw unreadable();
+  const given = choice as OperationsChoice;
+  if (!['tree', 'canvas', 'sessions'].includes(given.view) || (given.selected !== null && typeof given.selected !== 'string')
+    || !Number.isFinite(given.pane_width) || given.pane_width < 280 || given.pane_width > 1200) throw unreadable();
+  return { view: given.view, selected: given.selected, pane_width: given.pane_width };
+}
+
+/** The view travels with the arrangement; a service that refuses its shape is named, never replaced by browser storage. */
+export async function keepOperations(choice: OperationsChoice): Promise<void> {
+  const before = await request<{ arrangement: unknown }>('/canvas');
+  const arrangement = before.arrangement === null ? { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [] } : readArrangement(before.arrangement);
+  if (!arrangement) throw unreadable();
+  const answer = await request<{ arrangement: unknown }>('/canvas', { arrangement: { ...arrangement, operations: choice } }, 'PUT');
+  if (!(answer.arrangement as { operations?: unknown } | null)?.operations) throw new Refused(0, { refusal: 'OperationsNotKept', reason: 'The service did not retain the operations view fields.' });
+  const kept = operationsOf(answer.arrangement);
+  if (JSON.stringify(kept) !== JSON.stringify(choice)) throw new Refused(0, { refusal: 'OperationsNotKept', reason: 'The service did not confirm the operations view, selected seat and pane width.' });
 }
 
 const LAYOUTS = 'lys.canvas.layouts';
@@ -56,16 +81,20 @@ export async function readKeeping(): Promise<Keeping> {
     const answer = await request<{ arrangement: unknown; layouts: unknown }>('/canvas');
     const arrangement = answer.arrangement === null ? null : readArrangement(answer.arrangement);
     if (answer.arrangement !== null && !arrangement) throw unreadable();
-    return { where: 'service', why: null, arrangement, layouts: answered(answer) };
+    return { where: 'service', why: null, arrangement, layouts: answered(answer), operations: operationsOf(answer.arrangement) };
   } catch (error) {
     const refused = error instanceof Refused ? error.refusal : { refusal: 'Unanswered', reason: String(error) };
-    return { where: 'browser', why: refused.refusal + ': ' + refused.reason, arrangement: null, layouts: inBrowser() };
+    return { where: 'browser', why: refused.refusal + ': ' + refused.reason, arrangement: null, layouts: inBrowser(), operations: FIRST_OPERATIONS };
   }
 }
 
 /** Keeps the arrangement being worked in. This browser keeps its own copy as the canvas changes, so only the service is told here. */
 export async function keepArrangement(where: Keeping['where'], arrangement: Arrangement): Promise<void> {
-  if (where === 'service') await request('/canvas', { arrangement }, 'PUT');
+  if (where === 'service') {
+    const before = await request<{ arrangement: { operations?: unknown } | null }>('/canvas');
+    const operations = before.arrangement?.operations;
+    await request('/canvas', { arrangement: { ...arrangement, ...(operations === undefined ? {} : { operations: operationsOf(before.arrangement) }) } }, 'PUT');
+  }
 }
 
 /** Saves the arrangement under a name, over any layout of that name, and answers every saved layout. */
