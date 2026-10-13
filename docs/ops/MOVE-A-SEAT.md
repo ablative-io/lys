@@ -11,6 +11,78 @@ In the steps below, `<seat>` is the seat's name in Lys: lowercase letters, digit
 for example `waffles`. `<agent>` is the Lys agent identity the seat runs as. `<machine>` is the Lys machine record
 whose runner is this install's own (kind `lys`). Every value comes from your own install. None is written here.
 
+## Join a second Mac
+
+The second Mac needs the device clients, its own machine key and its own harness installation and account.
+The identity service stays on its existing host. A runner is the process that holds sessions; a computer record
+names where an agent may run; joining makes a machine identity from the device's public key. A seat names an
+agent, a reviewed profile version and the computer whose runner starts it.
+
+The following client commands are a source-derived procedure, not a completed device proof. Authenticate Git
+for this private repository and its private dependencies first. Run them in a new directory you own. The
+checkout uses the toolchain pinned in `rust-toolchain.toml`; an existing Rust 1.94.1 does not satisfy that pin.
+Check `sysctl -n hw.logicalcpu` before building: four build jobs leave two slots free only on a device with at
+least six logical CPUs. Keep the default Cargo target directory in this checkout.
+
+```sh
+caffeinate -i nice -n 19 git clone https://github.com/ablative-io/lys.git lys-device
+cd lys-device
+git rev-parse HEAD
+export CARGO_NET_GIT_FETCH_WITH_CLI=true CARGO_BUILD_JOBS=4 NEXTEST_TEST_THREADS=4
+caffeinate -i nice -n 19 rustup toolchain install 1.98.1 --component rustfmt --component clippy
+caffeinate -i nice -n 9 sh -c 'nice -n 10 cargo build --locked --release -p lys'
+caffeinate -i nice -n 9 sh -c 'nice -n 10 cargo build --locked --release -p lys-runner'
+mkdir bin
+install -m 755 target/release/lys target/release/lys-containment-entry bin/
+export PATH="$PWD/bin:$PATH"
+export LYS_IDENTITY_HOME="$PWD/device-state"
+lys --version
+lys runner join --help
+```
+
+The outer nice increment of nine and Cargo's increment of ten give Cargo an effective niceness of nineteen.
+`lys-runner` provides the `lys-containment-entry` executable; its serve and dial commands are subcommands of
+`lys`. Keep both executables together. Record the harness's absolute executable path and version on this Mac
+with `command -v claude` / `claude --version` or `command -v codex` / `codex --version`. Sign in to the harness
+on this Mac with its own account. Never copy another device's credentials or harness configuration.
+
+In the browser, the person opens the issuer's `/#/sign-in`, enters their own **Email** and **Password** and
+clicks **Sign in**, or clicks the offered provider sign-in link and completes it themselves. In **Network**,
+an administrator uses **Computer**, enters the computer's **Name**, chooses **Another computer**, and clicks
+**Add**. The **Connect** row shows a command and a one-time code with separate **Copy** buttons. The form is
+currently displayed only to administrators; a new person needs that administrator's assistance even though
+the server serves an own-computer join-code route. Do not describe an operator token as a personal login.
+
+Run the command the browser gave on the second Mac, under `caffeinate -i nice -n 19`. Preserve its full server
+address, including `/api` when present:
+
+```sh
+caffeinate -i nice -n 19 lys runner join --server <server-from-the-command> --machine <computer-id>
+```
+
+It prompts `Paste the connection code Lys gave for this computer, then press Return:`. Paste the code into
+stdin, never into an argument or shell history. Successful join prints `This computer joined Lys at ... as
+computer ...`, then `listening ... as runner ...`. Leave this command running. Control-C stops it and ends
+the sessions it holds. A later `join` needs a new one-time code; the device keeps its private key locally.
+
+Have the administrator allow the agent on this computer and review a profile that names the executable's
+absolute path on this Mac, the intended model, a working folder on this Mac and managed controls. The
+catalogue's installed builds are read on the service host, so a path shown there is not proof of a path on
+this device. Record and start the seat from the service host with `lys seat add` and `lys seat start`, as in
+steps 2 and 6 below, using the joined computer's id. The fresh device's `lys seat` and `lys attach` commands
+require a local identity-service configuration and operator token; they cannot log in to the remote issuer.
+Use the browser's Operations screen to send a turn, read its answer and stop the seat, or use the service
+host's CLI as in steps 7 and 8. Only the runner's answer and a completed turn prove device execution.
+
+At source revision `307f6a6e`, managed starts accept only the launched-binary qualifications in
+`crates/lys-runner/src/harness_control/process/qualified.rs`: Claude Code `2.1.296` and Codex
+`0.161.0-alpha.3`. A different device build is refused `control_adapter_unqualified`; installing a harness
+without checking its version does not qualify a seat. Managed seats use `lys runner managed-entry`.
+
+For a disposable proof, stop and retire its seat, retire its agent and computer, stop the owned runner and
+remove only the checkout and device-state directory you made. Remove a newly installed Rust toolchain only
+when it was absent before this proof and no other work uses it. Preserve existing installations and caches.
+
 ## Before you start
 
 - Lys is installed and running on this computer, and `lys` reaches it (the CLI reads the operator token itself and

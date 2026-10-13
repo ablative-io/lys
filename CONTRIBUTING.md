@@ -5,12 +5,13 @@ what you need to build, test, and submit changes.
 
 ## Prerequisites
 
-- **Rust** stable (>= 1.85) with `rustfmt` and `clippy` components.
-  Install via [rustup](https://rustup.rs):
+- **Rust** at the version in `rust-toolchain.toml`, with its `rustfmt` and
+  `clippy` components. The package's minimum Rust version does not override
+  the checkout's pinned toolchain. Install the current pin via
+  [rustup](https://rustup.rs):
 
   ```console
-  $ rustup toolchain install stable
-  $ rustup component add rustfmt clippy
+  $ rustup toolchain install 1.98.1 --component rustfmt --component clippy
   ```
 
 - **Go** stable (for wire-format conformance tests only). The test suite
