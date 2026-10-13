@@ -181,3 +181,68 @@ Tom, 11:11: keep it smaller today, one slice at a time, nobody waiting on anyone
 Each slice's handback is read against this page, not against memory. A slice that adds a
 limit, a second parse of the stream, a hook, or a function that holds the call without saying
 so is handed back.
+
+
+## Named model accounts
+
+Source implementation: `3ba633f5b2d19a6cd91fcdef8733f65f643c6836`. Full gates and installation are not confirmed.
+
+A model account is a `credential` entry with a provider route. No new stored class or
+required configuration key is introduced. Add the value once through the signed-in
+person's secrets route, which seals it and never returns it:
+
+```sh
+curl --fail-with-body -X POST http://127.0.0.1:8490/api/secrets/add \
+  -H 'Cookie: lys_directory_session=<signed-in-session>' -H 'Content-Type: application/json' \
+  --data '{"operation":"account-add-0123456789abcdef","name":"anthropic-main","class":"credential","upstream":"https://api.anthropic.com","header":"authorization","prefix":"Bearer ","value":"<TOKEN>"}'
+```
+
+Use a path-safe account name, with letters, digits, underscores and hyphens. For Codex,
+use `https://api.openai.com` or `https://chatgpt.com/backend-api/codex`, with the provider's
+Bearer authorization token. A profile's account list uses one of those upstreams throughout.
+Grant the intended agents use of `secret/<name>` through the existing permission source
+(the directory source's configured use action is `edit`). Read the proxy's public key:
+
+```sh
+curl --fail-with-body http://127.0.0.1:8484/_lys/account/key
+curl --fail-with-body -X POST http://127.0.0.1:8490/api/secrets/accounts/hold \
+  -H 'Cookie: lys_directory_session=<signed-in-session>' -H 'Content-Type: application/json' \
+  --data '{"agent":"<AGENT-ID>","secret":"anthropic-main","proxy_key":"<PUBLIC-KEY>","max_uses":100000,"not_after_ms":2100000000000}'
+```
+
+The hold route runs inside the live broker and answers only the handle id, holder and
+secret name. Its explicit lifetime and use count must fit the person's grant. Issue one
+handle for each permitted agent, then name the returned id in the profile:
+
+```json
+{"session":{"stall_after":300,"accounts":{"accounts":["<HANDLE-ID>"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"},"resume_arguments":[]}}}
+```
+
+Review checks every handle against the agent's current inventory and refuses
+`account_handle_unheld` or `account_provider_mismatch`, naming the handle. Start repeats
+those checks. Before dispatching the runner start, the server signs a run registration
+for the broker and sends it through the proxy. The registration includes the proxy's
+public key; the proxy checks that it is its own, and the broker verifies the service's
+signature. The broker issues proxy draws descended from the original account handles,
+so every call counts against their limits and an ancestor's revocation ends the draws.
+Only the proxy keeps those draws, in private account-binding files beside its state.
+A previous install with no account bindings continues to forward ordinary calls.
+
+The child receives `ANTHROPIC_AUTH_TOKEN=lys-account.<handle-id>` for Claude, or
+`CODEX_API_KEY=lys-account.<handle-id>` for Codex. Rotation selects the next id at each
+spawn. Claude's competing API and OAuth environment variables are masked for account
+launches. Claude Code 2.1.296 was measured with an empty login directory: the non-empty
+`ANTHROPIC_AUTH_TOKEN` bypasses local login and becomes a Bearer header. The proxy removes
+that placeholder and presents the selected draw to the broker. Only the broker attaches
+the real value in the routed header, forwards upstream and redacts the returned answer.
+Account calls are buffered for the broker's request-bound signature; ordinary calls keep
+their streaming path. An account selector whose binding is missing is refused before
+forwarding. Provider refusals remain visible, including model or plan restrictions.
+
+The runner's proxy tracking record names the original handle id. Each usage line's
+`account` is that same id, overriding a provider organization label for an account run.
+The value reaches no child environment, rendered file, launch receipt, seats or attach
+answer. The proxy's records and reports carry no value; broker responses are redacted.
+The integration proof scans every fixture file outside sealed entries and uses an empty
+Claude login directory through both proxy and broker. Real provider acceptance, Codex's
+local login behavior and an installed identity-server launch require separate proof.
