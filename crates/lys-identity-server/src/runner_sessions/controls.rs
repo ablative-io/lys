@@ -244,7 +244,7 @@ mod tests {
                         "working_directory":false, "harness":harness, "requires_controls":false}
                 },
                 "proxy":{"run":"0123456789abcdef0123456789abcdef",
-                    "context_window":200000, "profile_version":2}
+                    "context_window":200_000, "profile_version":2}
             }))?;
             let Act::Start {
                 tracking, proxy, ..

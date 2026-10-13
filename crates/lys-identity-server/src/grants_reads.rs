@@ -85,7 +85,11 @@ pub(crate) fn with_read_directory_grants<A, T>(
                 ))
             })?;
         let stamp = plan.execute(&mut engine)?;
+        let reads_started = std::time::Instant::now();
+        let mut resources_read = 0;
         let mut prepared = Prepared {
+            resources_read: 0,
+            reads_elapsed_ms: 0,
             revision: stamp.revision(),
             stamp: Some(stamp.clone()),
             validation: engine.certify(stamp.revision()),
@@ -96,7 +100,10 @@ pub(crate) fn with_read_directory_grants<A, T>(
             let reading = prepared
                 .readings
                 .entry((subject, resource.clone()))
-                .or_insert_with(|| stamp.read_about(&engine, subject, &resource))
+                .or_insert_with(|| {
+                    resources_read += 1;
+                    stamp.read_about(&engine, subject, &resource)
+                })
                 .clone();
             for resource in reach {
                 prepared
@@ -119,6 +126,8 @@ pub(crate) fn with_read_directory_grants<A, T>(
             }
             drop(request);
         }
+        prepared.resources_read = resources_read;
+        prepared.reads_elapsed_ms = reads_started.elapsed().as_millis();
         let guard = Hold::enter(&prepared);
         let result = with_prepared_directory_grants(
             state,

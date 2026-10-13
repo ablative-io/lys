@@ -34,6 +34,7 @@ use lys_pass::rights::Resource as PassResource;
 use lys_pass::{Claims, Holder, Right};
 
 use super::grant_binding::{Decided, binding};
+use super::rights_cache::Read;
 use super::{OpenIdProvider, unavailable};
 use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
@@ -50,12 +51,8 @@ pub(super) struct Pass {
     pub(super) expires_at: u64,
     /// Its signed grant binding, when one was asked for.
     pub(super) binding: Option<String>,
-}
-
-/// The rights a reading decided, and each grant's ancestry as it read it.
-struct Read {
-    rights: Vec<Right>,
-    paths: BTreeMap<String, Vec<String>>,
+    /// Whether rights preparation was bypassed by a current cached reading.
+    pub(super) cache_hit: bool,
 }
 
 /// The pass for `holder` to the app `app` at `at`, living the provider's
@@ -85,38 +82,8 @@ pub(super) fn pass(
     } else {
         None
     };
-    let (asserted, read, decided) = crate::grants_reads::with_read_grants(
-        state,
-        None,
-        at,
-        |judged| crate::grants_reads::subject_questions(judged, holder, Some(app)),
-        |mut judged| {
-            let asserted = holder_of(judged.directory, holder)?;
-            let required = if bind {
-                // Settled first, so the revision taken is the one decided at.
-                judged.grants.read_stamp(None)?;
-                Some(judged.grants.revision())
-            } else {
-                None
-            };
-            let read = rights(&mut judged, holder, app, at, required)?;
-            let decided = match required {
-                None => None,
-                Some(revision) => {
-                    let now = judged.grants.revision();
-                    if now != revision {
-                        return Err(GrantStreamError::BindingRevisionMoved {
-                            decided: revision,
-                            now,
-                        }
-                        .into());
-                    }
-                    Some(revision)
-                }
-            };
-            Ok((asserted, read, decided))
-        },
-    )?;
+    let (asserted, read, decided, cache_hit) =
+        super::rights_cached::read(state, holder, app, at, bind)?;
     let Read { rights, paths } = read;
     let (rights, rights_truncated) =
         bounded(rights, app, provider.rights_bytes, &provider.rights_seen)?;
@@ -153,6 +120,7 @@ pub(super) fn pass(
         token,
         expires_at,
         binding,
+        cache_hit,
     })
 }
 
@@ -241,13 +209,18 @@ const fn mode_of(mode: Mode) -> lys_pass::Mode {
 /// decision reflecting `required` when it names a revision, with each
 /// grant's ancestry as it was read. Under a required revision a right
 /// decided from a degraded reading refuses the whole reading.
-fn rights(
+pub(super) fn rights(
     judged: &mut Judged<'_>,
     holder: IdentityId,
     app: &str,
     at: u64,
     required: Option<u64>,
 ) -> Result<Read, ServerError> {
+    if let Some(prepared) = judged.prepared {
+        tracing::info!(target: "lys_identity_server::passfast", app,
+            resources_read = prepared.resources_read, elapsed_ms = prepared.reads_elapsed_ms,
+            "pass rights SpiceDB reads");
+    }
     let mut paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let Some(schema) = judged.apps.schema(app) else {
         return Ok(Read {

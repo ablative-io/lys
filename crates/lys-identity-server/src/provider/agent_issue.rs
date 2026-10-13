@@ -26,6 +26,7 @@ use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 
 use super::endpoints::{apps, provider};
+use super::exchange_timing::{Act, Timing};
 use super::rights_claim::pass;
 use crate::apps_binding::sign_in_app;
 use crate::error::ServerError;
@@ -52,32 +53,37 @@ pub(crate) fn agent_app_pass(
     agent: AgentId,
     app: &str,
 ) -> Result<AgentAppPass, ServerError> {
+    let mut timing = Timing::new("agent", app);
     let provider = provider(state)?;
-    let audience = {
+    let audience = timing.measure(Act::IsLive, || {
         let mut apps = apps(state)?;
         apps.settle()?;
-        sign_in_app(apps.held(), app)
+        let audience = sign_in_app(apps.held(), app)
             .map_err(|error| AppPassError::AudienceNotApproved {
                 audience: app.to_owned(),
                 reason: error.to_string(),
             })?
             .registered
             .app
-            .clone()
-    };
+            .clone();
+        Ok::<_, ServerError>(audience)
+    })?;
     let at = now();
-    let issued = pass(
-        state,
-        provider,
-        (IdentityId::Agent(agent), audience.as_str()),
-        (at, at.saturating_add(provider.pass_seconds)),
-        false,
-    )?;
-    Ok(AgentAppPass {
+    let issued = timing.measure(Act::Pass, || {
+        pass(
+            state,
+            provider,
+            (IdentityId::Agent(agent), audience.as_str()),
+            (at, at.saturating_add(provider.pass_seconds)),
+            false,
+        )
+    })?;
+    timing.cache(issued.cache_hit);
+    Ok(timing.measure(Act::Issue, || AgentAppPass {
         pass: issued.token,
         expires_at: issued.expires_at,
         audience,
-    })
+    }))
 }
 
 /// Snapshot only the agent's current signing certificates, releasing their store before decoding.

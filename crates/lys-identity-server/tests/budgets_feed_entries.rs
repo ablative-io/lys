@@ -192,6 +192,7 @@ macro_rules! budgets_feed_entries {
                 sessions: $crate::session::Sessions::new(300, false),
                 admission: $crate::admission::Admission::new(Some(binding), config.link_audit_binding()?),
                 grants: Mutex::new(None),
+                rights_cache: Mutex::default(),
                 grant_setup: $crate::grants::GrantSetup {
                     log_dir: config.grant_log_dir.clone(), log_origin: config.grant_log_origin.clone(),
                     key_file: config.event_key_file.clone(), model: RwLock::new(apps.model()?),

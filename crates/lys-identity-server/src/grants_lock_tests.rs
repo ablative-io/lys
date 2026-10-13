@@ -184,9 +184,10 @@ async fn a_batch_reuses_one_subject_resource_read() -> Result<(), Box<dyn Error>
             counted.fetch_add(1, Ordering::SeqCst);
             Ok(())
         })))?;
+    let headers = administrator_headers(&table)?;
     let answer = crate::grants_batch::batch(
         State(Arc::clone(&table.state)),
-        administrator_headers(&table)?,
+        headers,
         Ok(Json(body(&table, IdentityId::Person(table.asker), 12))),
     )
     .await?;
@@ -251,9 +252,10 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
             }
             Ok(())
         })))?;
+    let headers = administrator_headers(&table)?;
     let answer = crate::grants_batch::batch(
         State(Arc::clone(&table.state)),
-        administrator_headers(&table)?,
+        headers,
         Ok(Json(body(&table, IdentityId::Person(table.asker), 1))),
     )
     .await;
@@ -271,7 +273,12 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
         "read once, then re-read once"
     );
     Arc::try_unwrap(table)
-        .map_err(|_| "fixture state still shared")?
+        .map_err(|shared| {
+            format!(
+                "fixture state still shared by {} owners",
+                Arc::strong_count(&shared)
+            )
+        })?
         .close()?;
     Ok(())
 }
@@ -306,12 +313,10 @@ async fn distinct_resources_read_at_most_once_each() -> Result<(), Box<dyn Error
         })))?;
     let mut request = body(&table, IdentityId::Person(table.asker), 2);
     request.checks[1].id = table.holder.to_string();
-    let answer = crate::grants_batch::batch(
-        State(Arc::clone(&table.state)),
-        administrator_headers(&table)?,
-        Ok(Json(request)),
-    )
-    .await?;
+    let headers = administrator_headers(&table)?;
+    let answer =
+        crate::grants_batch::batch(State(Arc::clone(&table.state)), headers, Ok(Json(request)))
+            .await?;
     assert_eq!(answer.results.len(), 2);
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     table.close()?;

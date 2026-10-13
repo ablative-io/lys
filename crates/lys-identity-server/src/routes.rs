@@ -67,6 +67,8 @@ pub struct AppState {
     pub admission: Admission,
     /// The grants, opened on first use once the root authority exists.
     pub grants: Mutex<Option<GrantState>>,
+    /// Rights snapshots bounded to the active holder/app population.
+    pub(crate) rights_cache: Mutex<crate::provider::rights_cache::Cache>,
     /// What the grants are opened from.
     pub grant_setup: GrantSetup,
     /// The secrets broker the secrets screens ask, when one is configured.

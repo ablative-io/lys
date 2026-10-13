@@ -2,7 +2,8 @@
 //! event at WARN or ERROR is said as one line through the `say` sink every
 //! log line goes through, which the install keeps as identity.log, with its
 //! level, its target, its message and every other field as `name=value`.
-//! Events below WARN are said nowhere and cost no formatting. Spans are
+//! Pass timing INFO events are also said, so exchanges can be measured.
+//! Other events below WARN are said nowhere and cost no formatting. Spans are
 //! accepted and ignored. Without it the server's warnings reached no one.
 
 use std::fmt;
@@ -81,6 +82,8 @@ fn line(event: &Event<'_>) -> String {
 impl Subscriber for WarnLines {
     fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         *metadata.level() <= Level::WARN
+            || (*metadata.level() == Level::INFO
+                && metadata.target() == "lys_identity_server::passfast")
     }
 
     // Spans are accepted and ignored: each gets an id, and nothing of it is said.
@@ -177,6 +180,29 @@ mod tests {
                     .to_owned()
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn pass_timings_name_cache_hit_and_miss() -> Result<(), Box<dyn std::error::Error>> {
+        let (say, heard) = capture();
+        tracing::subscriber::with_default(WarnLines::new(say), || {
+            for cache in ["hit", "miss"] {
+                tracing::info!(target: "lys_identity_server::passfast", holder_kind = "person",
+                    app = "cambium", act = "pass", cache, elapsed_ms = 1, "token exchange");
+            }
+        });
+        let lines = heard.lock().map_err(|error| error.to_string())?;
+        assert_eq!(
+            lines.len(),
+            2,
+            "both pass timing events must reach the service log"
+        );
+        assert!(lines[0].contains("cache=hit"));
+        assert!(lines[1].contains("cache=miss"));
+        assert!(lines.iter().all(|line| line.contains("holder_kind=person")
+            && line.contains("app=cambium")
+            && line.contains("elapsed_ms=1")));
         Ok(())
     }
 }

@@ -160,6 +160,7 @@ pub(crate) async fn service_saying_with_clock(
             config.link_audit_binding()?,
         ),
         grants: Mutex::new(None),
+        rights_cache: Mutex::default(),
         grant_setup: GrantSetup {
             log_dir: config.grant_log_dir.clone(),
             log_origin: config.grant_log_origin.clone(),

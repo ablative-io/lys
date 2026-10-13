@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::endpoints::{Exchange, admitted_client, display_name, malformed, provider};
+use super::exchange_timing::{Act, Timing};
 use super::grant_binding::asked;
 use super::rights_claim::{Pass, pass};
 use super::{Access, ID_TOKEN_SECONDS, Kind, held, random};
@@ -43,6 +44,7 @@ fn digest(token: &str) -> String {
 /// The exchange of a code for a pass, an ID token and a refresh token. The
 /// app and its return address are judged again here, at this request.
 fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
+    let mut timing = Timing::new("person", client);
     let provider = provider(state)?;
     // An unsupported binding version is refused before the code is taken.
     let bind = asked(form.grant_binding.as_deref())?;
@@ -50,18 +52,20 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
     let client_id = admitted.app;
     let at = now();
     // The first act on the provider's state: the code verified and marked used.
-    let taken = provider.take_grant(
-        &form.code,
-        &client_id,
-        &form.redirect_uri,
-        &form.code_verifier,
-        at,
-    )?;
+    let taken = timing.measure(Act::TakeGrant, || {
+        provider.take_grant(
+            &form.code,
+            &client_id,
+            &form.redirect_uri,
+            &form.code_verifier,
+            at,
+        )
+    })?;
     // Between the two acts, with no provider guard held: the session, the
     // setting, the name and the rights. The name goes into the ID token only
     // when the authorization asked for it and the app's setting still grants
     // it at this exchange; it is read from the directory now and kept nowhere.
-    if !state.sessions.is_live(&taken.session_id)? {
+    if !timing.measure(Act::IsLive, || state.sessions.is_live(&taken.session_id))? {
         return Err(ServerError::Provider(ProviderError::CodeExpired));
     }
     let profile = taken.profile && admitted.profile;
@@ -86,13 +90,16 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
         claims["name"] = Value::String(name);
     }
     let id_token = provider.signed(&claims)?;
-    let issued = pass(
-        state,
-        provider,
-        (IdentityId::Person(taken.person), client_id.as_str()),
-        (at, ends_at),
-        bind,
-    )?;
+    let issued = timing.measure(Act::Pass, || {
+        pass(
+            state,
+            provider,
+            (IdentityId::Person(taken.person), client_id.as_str()),
+            (at, ends_at),
+            bind,
+        )
+    })?;
+    timing.cache(issued.cache_hit);
     let refresh = random::<32>()?;
     let kept = |expires_at, kind| Access {
         session_id: taken.session_id.clone(),
@@ -104,13 +111,15 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
     };
     // The second act: the pass and the refresh token kept together and
     // remembered by the code, or refused when the code was replayed between.
-    provider.issue(
-        &form.code,
-        digest(&issued.token),
-        kept(issued.expires_at, None),
-        Some((digest(&refresh), kept(ends_at, Some(Kind::Refresh)))),
-        at,
-    )?;
+    timing.measure(Act::Issue, || {
+        provider.issue(
+            &form.code,
+            digest(&issued.token),
+            kept(issued.expires_at, None),
+            Some((digest(&refresh), kept(ends_at, Some(Kind::Refresh)))),
+            at,
+        )
+    })?;
     Ok(answered(
         json!({
             "access_token": issued.token,
@@ -135,12 +144,13 @@ fn answered(mut answer: Value, binding: Option<String>) -> Value {
 /// a grant revoked since the last pass is absent from this one. The refresh
 /// token stands on the Lys sign-in it was issued in, and ends with it.
 fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, ServerError> {
+    let mut timing = Timing::new("person", client);
     let provider = provider(state)?;
     let bind = asked(form.grant_binding.as_deref())?;
     let at = now();
     let lookup = digest(&form.refresh_token);
     let unknown = || ServerError::Provider(ProviderError::RefreshUnknown);
-    let (session_id, subject, profile, ends_at) = {
+    let (session_id, subject, profile, ends_at) = timing.measure(Act::TakeGrant, || {
         let tokens = held(&provider.tokens)?;
         let kept = tokens.get(&lookup, at).map_err(|error| match error {
             ServerError::Provider(ProviderError::TokenUnknown) => unknown(),
@@ -149,17 +159,17 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
         if kept.kind != Some(Kind::Refresh) || kept.app != client {
             return Err(unknown());
         }
-        (
+        Ok((
             kept.session_id.clone(),
             kept.subject.clone(),
             kept.profile,
             kept.expires_at,
-        )
-    };
+        ))
+    })?;
     let person = subject
         .parse::<lys_identity::PersonId>()
         .map_err(ServerError::Identity)?;
-    if !state.sessions.is_live(&session_id)? {
+    if !timing.measure(Act::IsLive, || state.sessions.is_live(&session_id))? {
         held(&provider.tokens)?.revoke(&lookup)?;
         // Retiring or suspending a holder also ends its sign-ins: the
         // holder's state is named first, the ended sign-in otherwise.
@@ -168,25 +178,30 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
         })?;
         return Err(ServerError::Provider(ProviderError::SessionEnded));
     }
-    let issued: Pass = pass(
-        state,
-        provider,
-        (IdentityId::Person(person), client),
-        (at, ends_at),
-        bind,
-    )?;
-    held(&provider.tokens)?.insert(
-        digest(&issued.token),
-        Access {
-            session_id,
-            subject,
-            app: client.to_owned(),
-            profile,
-            expires_at: issued.expires_at,
-            kind: None,
-        },
-        at,
-    )?;
+    let issued: Pass = timing.measure(Act::Pass, || {
+        pass(
+            state,
+            provider,
+            (IdentityId::Person(person), client),
+            (at, ends_at),
+            bind,
+        )
+    })?;
+    timing.cache(issued.cache_hit);
+    timing.measure(Act::Issue, || {
+        held(&provider.tokens)?.insert(
+            digest(&issued.token),
+            Access {
+                session_id,
+                subject,
+                app: client.to_owned(),
+                profile,
+                expires_at: issued.expires_at,
+                kind: None,
+            },
+            at,
+        )
+    })?;
     Ok(answered(
         json!({
             "access_token": issued.token,

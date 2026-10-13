@@ -371,7 +371,6 @@ pub(crate) fn prepare_refresh(
     let cookie = state.sessions.begin(actor)?;
     let session_id = state.sessions.current(cookie.split(';').next())?;
     let at = crate::session::now();
-    use sha2::Digest;
     let lookup = crate::routes::hex(&sha2::Sha256::digest(b"fixture-refresh"));
     held(&provider.tokens)?.insert(
         lookup,

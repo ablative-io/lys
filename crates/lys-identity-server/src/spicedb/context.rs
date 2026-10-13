@@ -9,6 +9,8 @@ pub(crate) type Question = (IdentityId, Resource);
 #[derive(Clone)]
 pub(crate) struct Data {
     pub(crate) revision: u64,
+    pub(crate) resources_read: usize,
+    pub(crate) reads_elapsed_ms: u128,
     pub(crate) stamp: Option<ReadStamp>,
     pub(crate) validation: Result<(), GrantError>,
     pub(crate) readings: BTreeMap<Question, Result<Reading, GrantError>>,
@@ -127,6 +129,8 @@ mod tests {
         assert!(check(subject, &resource, &action).is_none());
         let data = Data {
             revision: 1,
+            resources_read: 0,
+            reads_elapsed_ms: 0,
             stamp: None,
             validation: Ok(()),
             readings: BTreeMap::new(),
