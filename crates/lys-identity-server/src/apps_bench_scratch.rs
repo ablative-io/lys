@@ -312,6 +312,7 @@ fn answer(
     let asked = resource(&question.resource)?;
     let reached = apps.reach(&asked);
     let mut judged = Judged {
+        prepared: None,
         directory: &directory,
         grants: &mut grants,
         root,

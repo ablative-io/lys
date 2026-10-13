@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::apps_binding::{Acting, acting};
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, decide, decide_in, with_grants};
+use crate::grants::{Decision, Judged, decide, decide_in};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
 
@@ -244,18 +244,57 @@ pub async fn batch(
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let acting_for = asker(&state, &headers)?;
     let at = now();
-    with_grants(&state, |mut judged| {
-        let results: Vec<CheckAnswer> = body
-            .checks
-            .iter()
-            .map(|check| one(&mut judged, acting_for.as_deref(), check, at, body.at_least))
-            .collect();
-        Ok(Json(BatchAnswer {
-            revision: judged.grants.revision(),
-            degraded: results.iter().find_map(|answer| answer.degraded.clone()),
-            results,
-        }))
-    })
+    if body.checks.is_empty() {
+        return crate::grants::with_grants(&state, |judged| {
+            Ok(Json(BatchAnswer {
+                revision: judged.grants.revision(),
+                results: Vec::new(),
+                degraded: None,
+            }))
+        });
+    }
+    crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        at,
+        |judged| {
+            Ok(body
+                .checks
+                .iter()
+                .filter_map(|check| {
+                    if judged
+                        .apps
+                        .admit_kind(acting_for.as_deref(), &check.kind)
+                        .is_err()
+                        || judged
+                            .apps
+                            .admit_action(&check.kind, &check.action)
+                            .is_err()
+                    {
+                        return None;
+                    }
+                    Some(ExerciseRequest {
+                        caller: identity_id(&check.subject).ok()?,
+                        route: Route::Api,
+                        resource: Resource::new(&check.kind, &check.id).ok()?,
+                        action: Action::new(&check.action).ok()?,
+                    })
+                })
+                .collect())
+        },
+        |mut judged| {
+            let results: Vec<CheckAnswer> = body
+                .checks
+                .iter()
+                .map(|check| one(&mut judged, acting_for.as_deref(), check, at, body.at_least))
+                .collect();
+            Ok(Json(BatchAnswer {
+                revision: judged.grants.revision(),
+                degraded: results.iter().find_map(|answer| answer.degraded.clone()),
+                results,
+            }))
+        },
+    )
 }
 
 /// The ids of `kind` a subject may take `action` on, a page at a time.
@@ -272,65 +311,90 @@ pub async fn which(
     let subject: IdentityId = identity_id(&body.subject)?;
     let action = Action::new(&body.action)?;
     let at = now();
-    with_grants(&state, |judged| {
-        judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
-        judged.apps.admit_action(&body.kind, action.as_str())?;
-        let frame = judged.grants.frame(judged.directory, body.at_least)?;
-        let mut candidates: BTreeSet<String> = judged
-            .grants
-            .book()
-            .held_by(subject)
-            .map(|record| record.grant().resource())
-            .filter(|resource| resource.kind() == body.kind)
-            .map(|resource| resource.id().to_owned())
-            .collect();
-        candidates.extend(
-            judged
-                .apps
-                .held()
-                .placements
-                .iter()
-                .filter(|placed| placed.child_kind == body.kind)
-                .map(|placed| placed.child_id.clone()),
-        );
-        let after = body.after.as_deref();
-        let mut ids = Vec::new();
-        let mut modes = Vec::new();
-        let mut more = false;
-        for id in candidates
+    crate::grants_reads::with_read_grants(
+        &state,
+        body.at_least,
+        at,
+        |judged| {
+            judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
+            judged.apps.admit_action(&body.kind, action.as_str())?;
+            Ok(crate::grants_reads::subject_questions(
+                judged,
+                subject,
+                Some(lys_identity::grants::owner_of(&body.kind)),
+            )?
             .into_iter()
-            .filter(|id| after.is_none_or(|after| id.as_str() > after))
-        {
-            let request = ExerciseRequest {
-                caller: subject,
-                route: Route::Api,
-                resource: Resource::new(&body.kind, &id)?,
-                action: action.clone(),
-            };
-            let right = match decide_in(&judged, &frame, &request, at) {
-                Ok((permit, _)) => match mode_of(&judged, permit.grant) {
-                    Some(held) => held,
-                    None => continue,
-                },
-                Err(error) if unanswered(&error) => return Err(error.into()),
-                Err(_) => continue,
-            };
-            if ids.len() == body.page_size {
-                more = true;
-                break;
+            .filter(|asked| asked.resource.kind() == body.kind && asked.action == action)
+            .collect())
+        },
+        |judged| {
+            judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
+            judged.apps.admit_action(&body.kind, action.as_str())?;
+            let revision = judged.grants.read_stamp(body.at_least)?.revision();
+            let mut degraded = None;
+            let mut candidates: BTreeSet<String> = judged
+                .grants
+                .book()
+                .held_by(subject)
+                .map(|record| record.grant().resource())
+                .filter(|resource| resource.kind() == body.kind)
+                .map(|resource| resource.id().to_owned())
+                .collect();
+            candidates.extend(
+                judged
+                    .apps
+                    .held()
+                    .placements
+                    .iter()
+                    .filter(|placed| placed.child_kind == body.kind)
+                    .map(|placed| placed.child_id.clone()),
+            );
+            let after = body.after.as_deref();
+            let mut ids = Vec::new();
+            let mut modes = Vec::new();
+            let mut more = false;
+            for id in candidates
+                .into_iter()
+                .filter(|id| after.is_none_or(|after| id.as_str() > after))
+            {
+                let request = ExerciseRequest {
+                    caller: subject,
+                    route: Route::Api,
+                    resource: Resource::new(&body.kind, &id)?,
+                    action: action.clone(),
+                };
+                let frame = judged
+                    .prepared
+                    .ok_or_else(|| malformed("the resource question has no prepared reading"))?
+                    .frame(&judged, &request)?;
+                if degraded.is_none() {
+                    degraded = frame
+                        .degradation()
+                        .map(|held| crate::grants::DegradedView::from(held.as_ref()));
+                }
+                let right = match decide_in(&judged, &frame, &request, at) {
+                    Ok((permit, _)) => match mode_of(&judged, permit.grant) {
+                        Some(held) => held,
+                        None => continue,
+                    },
+                    Err(error) if unanswered(&error) => return Err(error.into()),
+                    Err(_) => continue,
+                };
+                if ids.len() == body.page_size {
+                    more = true;
+                    break;
+                }
+                ids.push(id);
+                modes.push(right.as_str().to_owned());
             }
-            ids.push(id);
-            modes.push(right.as_str().to_owned());
-        }
-        let next = if more { ids.last().cloned() } else { None };
-        Ok(Json(WhichPage {
-            ids,
-            modes,
-            next,
-            revision: frame.revision(),
-            degraded: frame
-                .degradation()
-                .map(|held| crate::grants::DegradedView::from(held.as_ref())),
-        }))
-    })
+            let next = if more { ids.last().cloned() } else { None };
+            Ok(Json(WhichPage {
+                ids,
+                modes,
+                next,
+                revision,
+                degraded,
+            }))
+        },
+    )
 }

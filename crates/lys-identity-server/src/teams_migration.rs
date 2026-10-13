@@ -11,7 +11,6 @@ use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
 use crate::error_team::TeamError;
-use crate::grants::with_grants;
 use crate::routes::{AppState, hex, with_directory};
 use crate::session::now;
 use crate::teams_api::with_teams;
@@ -134,20 +133,34 @@ fn permitted(state: &AppState, added: &Changed) -> Result<bool, ServerError> {
     if responsible {
         return Ok(true);
     }
-    with_grants(state, |judged| {
-        let request = ExerciseRequest {
-            caller: IdentityId::Person(caller),
-            route: Route::Api,
-            resource: Resource::new("agent", &added.member)?,
-            action: Action::new(crate::runner_sessions::OPERATE)?,
-        };
-        Ok(crate::grants::allowed(judged.grants.explain(
-            judged.directory,
-            &request,
-            now(),
-            None,
-        ))?)
-    })
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        crate::session::now(),
+        |_| {
+            let request = ExerciseRequest {
+                caller: IdentityId::Person(caller),
+                route: Route::Api,
+                resource: Resource::new("agent", &added.member)?,
+                action: Action::new(crate::runner_sessions::OPERATE)?,
+            };
+            Ok(vec![request])
+        },
+        |judged| {
+            let request = ExerciseRequest {
+                caller: IdentityId::Person(caller),
+                route: Route::Api,
+                resource: Resource::new("agent", &added.member)?,
+                action: Action::new(crate::runner_sessions::OPERATE)?,
+            };
+            Ok(crate::grants::allowed(judged.grants.explain(
+                judged.directory,
+                &request,
+                now(),
+                None,
+            ))?)
+        },
+    )
 }
 
 #[cfg(test)]

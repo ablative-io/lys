@@ -58,7 +58,7 @@ fn note_history_read() {
 }
 
 impl<'d> Frame<'d> {
-    /// Read `grants`' relationships once, after `settled`, with `directory`.
+    /// Whole-set read of `grants`' relationships once, after `settled`, with `directory`.
     pub(super) fn read<S: LeafStore, R: RelationshipStore>(
         grants: &Grants<S, R>,
         directory: &'d Projection,
@@ -72,6 +72,50 @@ impl<'d> Frame<'d> {
             unresolved: settled.unresolved,
             degraded: settled.degraded,
         };
+        frame.current_degraded_revision(grants)?;
+        Ok(frame)
+    }
+
+    pub(super) fn read_about<S: LeafStore, R: RelationshipStore>(
+        grants: &Grants<S, R>,
+        directory: &'d Projection,
+        settled: Settled,
+        subject: crate::IdentityId,
+        resource: &super::Resource,
+    ) -> Result<Self, GrantError> {
+        let frame = Frame {
+            directory,
+            folded: grants.folded,
+            projected: settled.projected,
+            held: grants
+                .relationships
+                .read_about_at(subject, resource, settled.projected)?,
+            unresolved: settled.unresolved,
+            degraded: settled.degraded,
+        };
+        frame.current_degraded_revision(grants)?;
+        Ok(frame)
+    }
+
+    pub(super) fn from_reading<S: LeafStore, R: RelationshipStore>(
+        grants: &Grants<S, R>,
+        directory: &'d Projection,
+        reading: super::Reading,
+    ) -> Result<Self, GrantError> {
+        let frame = Self {
+            directory,
+            folded: reading.stamp.folded,
+            projected: reading.stamp.settled.projected,
+            held: reading.held,
+            unresolved: reading.stamp.settled.unresolved,
+            degraded: reading.stamp.settled.degraded,
+        };
+        if frame.folded != grants.folded {
+            return Err(GrantError::StaleDecision {
+                required: grants.folded,
+                projected: frame.projected,
+            });
+        }
         frame.current_degraded_revision(grants)?;
         Ok(frame)
     }
@@ -151,6 +195,18 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         Frame::read(self, directory, settled)
     }
 
+    /// Read one subject/resource instead of the whole-set audit frame.
+    pub fn frame_about<'d>(
+        &mut self,
+        directory: &'d Projection,
+        subject: crate::IdentityId,
+        resource: &super::Resource,
+        at_least: Option<u64>,
+    ) -> Result<Frame<'d>, GrantError> {
+        let settled = self.settle(at_least)?;
+        Frame::read_about(self, directory, settled, subject, resource)
+    }
+
     /// Settle the log and project the relationships, refusing a projection
     /// older than `at_least`, and name the revocation held unresolved.
     pub(super) fn settle(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
@@ -163,6 +219,17 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Project the settled log's relationships, refusing a projection older
     /// than `at_least`, and name the revocation held unresolved.
     fn settled(&mut self, at_least: Option<u64>) -> Result<Settled, GrantError> {
+        if let Some(stamp) = self.relationships.prepared_stamp() {
+            if stamp.folded != self.folded
+                || at_least.is_some_and(|required| stamp.revision() < required)
+            {
+                return Err(GrantError::StaleDecision {
+                    required: at_least.unwrap_or(self.folded),
+                    projected: stamp.revision(),
+                });
+            }
+            return Ok(stamp.settled);
+        }
         let reading = self.project_reading()?;
         let projected = reading.revision;
         if let Some(required) = at_least
@@ -182,7 +249,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// The revocation the ledger holds unresolved, with its operation.
-    fn unresolved_revocation(&self) -> Option<(OperationId, GrantId)> {
+    pub(super) fn unresolved_revocation(&self) -> Option<(OperationId, GrantId)> {
         self.ledger
             .uncertain()
             .and_then(|held| match held.event.change() {
@@ -281,6 +348,12 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             }
             self.fresh(&lineage.path, frame.projected)?;
             confirm(&frame.held, &lineage.path, at)?;
+            let expected = super::permission::relationships_of(record.grant());
+            if !frame.held.contains(&expected[2]) {
+                return Err(GrantError::PermissionAbsent {
+                    grant: record.grant().id().to_string(),
+                });
+            }
             Ok(lineage)
         })
     }

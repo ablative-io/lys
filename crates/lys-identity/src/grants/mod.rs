@@ -2,6 +2,7 @@
 //! admission, its signed events and their projections, the one authority
 //! owner every route calls, and what a person cannot give from it.
 
+pub mod about;
 pub mod admission;
 pub mod authority;
 pub mod cannot_give;
@@ -11,15 +12,19 @@ pub mod channel_membership_index;
 mod checkpoint_reset;
 pub mod codec;
 mod commit;
+mod decision;
 pub mod error;
 pub mod events;
 pub mod expiry;
 pub mod frame;
+#[cfg(test)]
+mod frame_about_tests;
 pub mod lineage;
 mod mode;
 pub mod model;
 pub mod permission;
 pub mod projection;
+pub mod reading;
 pub mod receipt;
 pub mod recovery;
 mod refusal_codec;
@@ -59,6 +64,7 @@ pub use permission::{
     placement,
 };
 pub use projection::{GrantBook, GrantRecord, LastUse, Revocation};
+pub use reading::{ReadPlan, ReadStamp, Reading};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};
 pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};

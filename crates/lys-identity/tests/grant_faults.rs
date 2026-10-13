@@ -178,6 +178,32 @@ impl RelationshipStore for FaultEngine {
             EngineFault::Held => Err(refused()),
         }
     }
+    fn read_about(
+        &self,
+        subject: lys_identity::IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        let held = self.read()?;
+        lys_identity::grants::about::select(
+            subject,
+            resource,
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.subject == *object)
+                    .cloned()
+                    .collect())
+            },
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.resource == *object)
+                    .cloned()
+                    .collect())
+            },
+        )
+    }
+
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
         self.inner.read()
     }

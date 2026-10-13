@@ -468,6 +468,7 @@ fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
     let team_grant = give(&mut grants, team.clone(), "writer", "write")?;
     let actor = Actor::new(binding, Provenance::new(AuthMethod::AgentPass(agent), 5));
     let mut judged = Judged {
+        prepared: None,
         directory: projection,
         grants: &mut grants,
         root: person,

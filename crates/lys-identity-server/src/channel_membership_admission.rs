@@ -28,7 +28,7 @@ use lys_pass::membership_admission::{self, AdmissionDecision, AdmissionRequest, 
 use crate::channel_membership::{Named, contract_resource, named, served_log, within};
 use crate::channel_membership_counts::Counts;
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grants::{Decision, Judged, decide};
 use crate::grants_batch::{asker, unanswered};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
@@ -145,15 +145,29 @@ pub async fn admit(
     let decided = served_log(&state).and_then(|served| {
         let at = now();
         counts.hold();
-        with_grants(&state, |mut judged| {
-            Ok(admission(
-                &mut judged,
-                (acting_for.as_deref(), counts),
-                &served,
-                &request,
-                at,
-            ))
-        })
+        crate::grants_reads::with_read_grants(
+            &state,
+            None,
+            at,
+            |judged| {
+                Ok(questions(
+                    judged,
+                    (acting_for.as_deref(), &Counts::default()),
+                    &request,
+                )
+                .map(|asked| asked.into_values().collect())
+                .unwrap_or_default())
+            },
+            |mut judged| {
+                Ok(admission(
+                    &mut judged,
+                    (acting_for.as_deref(), counts),
+                    &served,
+                    &request,
+                    at,
+                ))
+            },
+        )
     });
     counts.decided(
         decided

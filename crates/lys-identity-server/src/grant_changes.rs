@@ -37,7 +37,6 @@ use tokio::sync::watch;
 
 use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
-use crate::grants::with_grants;
 use crate::grants_batch::asker;
 use crate::routes::AppState;
 
@@ -165,9 +164,13 @@ pub async fn changes(
     // wakes this wait.
     let mut live = state.grant_setup.changes.revision.subscribe();
     let mut placing = state.grant_setup.changes.placements.subscribe();
-    let read = with_grants(&state, |mut judged| {
-        stream::page(&mut judged, acting_for.as_deref(), &log, &request)
-    })?;
+    let read = crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        crate::session::now(),
+        |_| Ok(Vec::new()),
+        |mut judged| stream::page(&mut judged, acting_for.as_deref(), &log, &request),
+    )?;
     if !(request.wait && read.idle) {
         return Ok(Json(read.page));
     }
@@ -186,9 +189,13 @@ pub async fn changes(
     })?;
     drop(place);
     let acting_for = asker(&state, &headers)?;
-    let read = with_grants(&state, |mut judged| {
-        stream::page(&mut judged, acting_for.as_deref(), &log, &request)
-    })?;
+    let read = crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        crate::session::now(),
+        |_| Ok(Vec::new()),
+        |mut judged| stream::page(&mut judged, acting_for.as_deref(), &log, &request),
+    )?;
     Ok(Json(read.page))
 }
 

@@ -14,7 +14,7 @@ use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
-use super::permission::{Relationship, RelationshipStore, naming, relationships_of};
+use super::permission::{Relationship, RelationshipStore, relationships_of};
 use super::projection::Changed;
 use super::receipt::GrantReceipt;
 use super::state;
@@ -92,7 +92,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// The relationships the event at `index` writes and deletes, judged from
     /// what the book records at that index and the book as it stands.
-    fn delta(&self, index: u64, changes: &BTreeMap<u64, Changed>) -> Result<Delta, GrantError> {
+    pub(super) fn delta(
+        &self,
+        index: u64,
+        changes: &BTreeMap<u64, Changed>,
+    ) -> Result<Delta, GrantError> {
         if self.book.refused().contains_key(&index) {
             return Ok((Vec::new(), Vec::new()));
         }
@@ -121,7 +125,12 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             Some(Changed::Revoked(id)) => {
                 let mut tree: BTreeSet<GrantId> = self.book.descendants(*id).into_iter().collect();
                 tree.insert(*id);
-                Ok((Vec::new(), naming(&self.relationships.read()?, &tree)))
+                let delete = tree
+                    .iter()
+                    .filter_map(|id| self.book.grant(*id))
+                    .flat_map(relationships_of)
+                    .collect();
+                Ok((Vec::new(), delete))
             }
             None => Ok((Vec::new(), Vec::new())),
         }

@@ -353,3 +353,46 @@ fn a_refused_token_requests_line_names_the_client_and_the_reason() {
         )
     );
 }
+
+pub(crate) fn prepare_refresh(
+    state: &mut crate::routes::AppState,
+    actor: lys_identity::Actor,
+    holder: lys_identity::PersonId,
+) -> Result<(), Box<dyn Error>> {
+    let provider = OpenIdProvider::open(
+        &ProviderSettings {
+            key_file: state.grant_setup.key_file.clone(),
+            code_seconds: 60,
+            pass_seconds: 600,
+            rights_bytes: None,
+        },
+        "https://fixture.test".to_owned(),
+    )?;
+    let cookie = state.sessions.begin(actor)?;
+    let session_id = state.sessions.current(cookie.split(';').next())?;
+    let at = crate::session::now();
+    use sha2::Digest;
+    let lookup = crate::routes::hex(&sha2::Sha256::digest(b"fixture-refresh"));
+    held(&provider.tokens)?.insert(
+        lookup,
+        Access {
+            session_id,
+            subject: holder.to_string(),
+            app: "lys".to_owned(),
+            profile: false,
+            expires_at: at + 300,
+            kind: Some(super::Kind::Refresh),
+        },
+        at,
+    )?;
+    state.provider = Some(provider);
+    Ok(())
+}
+
+pub(crate) fn refresh(state: &crate::routes::AppState) -> Result<serde_json::Value, ServerError> {
+    let form: Exchange = serde_json::from_value(
+        json!({"grant_type":"refresh_token", "refresh_token":"fixture-refresh"}),
+    )
+    .map_err(|error| super::unavailable(error.to_string()))?;
+    super::issue::exchange(state, &form, "lys")
+}

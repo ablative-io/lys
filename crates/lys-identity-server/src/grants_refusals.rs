@@ -18,7 +18,6 @@ use lys_identity::{AgentId, IdentityId};
 use lys_runner::refusals::{GrantAnswer, GrantQuestion};
 
 use crate::error::ServerError;
-use crate::grants::with_grants;
 use crate::network_api::with_network;
 use crate::routes::AppState;
 use crate::runner_client::{Leave, LeaveOnDrop, RunnerRecord};
@@ -136,18 +135,32 @@ pub fn judged(state: &AppState, question: &GrantQuestion) -> GrantAnswer {
 
 fn permits(state: &AppState, question: &GrantQuestion) -> Result<bool, ServerError> {
     let agent = AgentId::from_str(&question.agent)?;
-    with_grants(state, |judged| {
-        let request = ExerciseRequest {
-            caller: IdentityId::Agent(agent),
-            route: Route::Api,
-            resource: Resource::new(&question.resource.kind, &question.resource.id)?,
-            action: Action::new(&question.action)?,
-        };
-        Ok(crate::grants::allowed(judged.grants.explain(
-            judged.directory,
-            &request,
-            now(),
-            None,
-        ))?)
-    })
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        crate::session::now(),
+        |_| {
+            let request = ExerciseRequest {
+                caller: IdentityId::Agent(agent),
+                route: Route::Api,
+                resource: Resource::new(&question.resource.kind, &question.resource.id)?,
+                action: Action::new(&question.action)?,
+            };
+            Ok(vec![request])
+        },
+        |judged| {
+            let request = ExerciseRequest {
+                caller: IdentityId::Agent(agent),
+                route: Route::Api,
+                resource: Resource::new(&question.resource.kind, &question.resource.id)?,
+                action: Action::new(&question.action)?,
+            };
+            Ok(crate::grants::allowed(judged.grants.explain(
+                judged.directory,
+                &request,
+                now(),
+                None,
+            ))?)
+        },
+    )
 }

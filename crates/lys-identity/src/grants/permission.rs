@@ -179,7 +179,29 @@ pub trait RelationshipStore {
         delete: &[Relationship],
     ) -> Result<(), GrantError>;
 
-    /// Every relationship at the current revision.
+    /// The subject's grants and source lineage, and the asked resource's ancestry.
+    fn read_about(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError>;
+
+    /// A scoped reading at the revision settled by its authority owner.
+    fn read_about_at(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+        _: u64,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        self.read_about(subject, resource)
+    }
+
+    /// Settlement already completed by an unlocked read owner, while its judgement is held.
+    fn prepared_stamp(&self) -> Option<super::ReadStamp> {
+        None
+    }
+
+    /// Every relationship at the current revision: the whole-set audit read.
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError>;
 }
 
@@ -187,7 +209,7 @@ pub trait RelationshipStore {
 /// as clients of one engine do, so a reopened owner finds what was written.
 #[derive(Debug, Clone, Default)]
 pub struct MemoryRelationships {
-    state: Arc<Mutex<(u64, BTreeSet<Relationship>)>>,
+    state: Arc<Mutex<super::about::MemoryState>>,
 }
 
 impl RelationshipStore for MemoryRelationships {
@@ -202,7 +224,7 @@ impl RelationshipStore for MemoryRelationships {
             .map_err(|error| GrantError::PermissionEngineUnavailable {
                 reason: format!("permission relationships lock poisoned: {error}"),
             })?
-            .0)
+            .revision)
     }
 
     fn write(
@@ -217,17 +239,35 @@ impl RelationshipStore for MemoryRelationships {
                 .map_err(|error| GrantError::PermissionEngineUnavailable {
                     reason: format!("permission relationships lock poisoned: {error}"),
                 })?;
-        if revision != state.0 + 1 {
+        if revision != state.revision + 1 {
             return Err(GrantError::PermissionEngineUnavailable {
-                reason: format!("a write at revision {revision} does not follow {}", state.0),
+                reason: format!(
+                    "a write at revision {revision} does not follow {}",
+                    state.revision
+                ),
             });
         }
         for relationship in delete {
-            state.1.remove(relationship);
+            state.remove(relationship);
         }
-        state.1.extend(touch.iter().cloned());
-        state.0 = revision;
+        for relationship in touch {
+            state.insert(relationship.clone());
+        }
+        state.revision = revision;
         Ok(())
+    }
+
+    fn read_about(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        self.state
+            .lock()
+            .map_err(|error| GrantError::PermissionEngineUnavailable {
+                reason: format!("permission relationships lock poisoned: {error}"),
+            })?
+            .about(subject, resource)
     }
 
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
@@ -237,7 +277,7 @@ impl RelationshipStore for MemoryRelationships {
             .map_err(|error| GrantError::PermissionEngineUnavailable {
                 reason: format!("permission relationships lock poisoned: {error}"),
             })?
-            .1
+            .held
             .clone())
     }
 }
@@ -292,7 +332,7 @@ mod poison_tests {
                 Ok(state) => state,
                 Err(error) => panic!("fixture_lock_poisoned: {error}"),
             };
-            state.0 = 2;
+            state.revision = 2;
             panic!("injected partial permission update");
         });
         assert!(panic.is_err());

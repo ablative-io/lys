@@ -78,7 +78,7 @@ async fn discover(
 }
 
 struct Table {
-    state: AppState,
+    state: Arc<AppState>,
     fault: Arc<AtomicBool>,
     engine: MemoryRelationships,
     dir: tempfile::TempDir,
@@ -160,7 +160,7 @@ impl Table {
         let dir = tempfile::TempDir::new()?;
         match Self::prepare(dir.path()).await {
             Ok(ready) => Ok(Self {
-                state: ready.state,
+                state: Arc::new(ready.state),
                 fault: ready.fault,
                 engine: ready.engine,
                 dir,
@@ -915,3 +915,6 @@ async fn projection_degradation_is_private_to_its_service_instance() -> TestResu
     assert!(!shared_fault);
     Ok(())
 }
+
+#[path = "grants_lock_tests.rs"]
+mod lock_tests;

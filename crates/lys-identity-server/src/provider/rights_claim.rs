@@ -38,7 +38,7 @@ use super::{OpenIdProvider, unavailable};
 use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
-use crate::grants::{Judged, decide_in, with_grants};
+use crate::grants::{Judged, decide_in};
 use crate::grants_batch::unanswered;
 use crate::routes::AppState;
 
@@ -85,32 +85,38 @@ pub(super) fn pass(
     } else {
         None
     };
-    let (asserted, read, decided) = with_grants(state, |mut judged| {
-        let asserted = holder_of(judged.directory, holder)?;
-        let required = if bind {
-            // Settled first, so the revision taken is the one decided at.
-            judged.grants.frame(judged.directory, None)?;
-            Some(judged.grants.revision())
-        } else {
-            None
-        };
-        let read = rights(&mut judged, holder, app, at, required)?;
-        let decided = match required {
-            None => None,
-            Some(revision) => {
-                let now = judged.grants.revision();
-                if now != revision {
-                    return Err(GrantStreamError::BindingRevisionMoved {
-                        decided: revision,
-                        now,
+    let (asserted, read, decided) = crate::grants_reads::with_read_grants(
+        state,
+        None,
+        at,
+        |judged| crate::grants_reads::subject_questions(judged, holder, Some(app)),
+        |mut judged| {
+            let asserted = holder_of(judged.directory, holder)?;
+            let required = if bind {
+                // Settled first, so the revision taken is the one decided at.
+                judged.grants.read_stamp(None)?;
+                Some(judged.grants.revision())
+            } else {
+                None
+            };
+            let read = rights(&mut judged, holder, app, at, required)?;
+            let decided = match required {
+                None => None,
+                Some(revision) => {
+                    let now = judged.grants.revision();
+                    if now != revision {
+                        return Err(GrantStreamError::BindingRevisionMoved {
+                            decided: revision,
+                            now,
+                        }
+                        .into());
                     }
-                    .into());
+                    Some(revision)
                 }
-                Some(revision)
-            }
-        };
-        Ok((asserted, read, decided))
-    })?;
+            };
+            Ok((asserted, read, decided))
+        },
+    )?;
     let Read { rights, paths } = read;
     let (rights, rights_truncated) =
         bounded(rights, app, provider.rights_bytes, &provider.rights_seen)?;
@@ -242,8 +248,6 @@ fn rights(
     at: u64,
     required: Option<u64>,
 ) -> Result<Read, ServerError> {
-    // Every decision below reads the same snapshot: ask the engine once per distinct read.
-    let _reads = crate::spicedb::PassReads::hold();
     let mut paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let Some(schema) = judged.apps.schema(app) else {
         return Ok(Read {
@@ -260,7 +264,7 @@ fn rights(
     // One settle and one snapshot for the whole reading, as `/grants/which`
     // decides: every decision is made at the same revision, and the log is
     // not settled again for each candidate and action.
-    let frame = judged.grants.frame(judged.directory, required)?;
+    let revision = judged.grants.read_stamp(required)?.revision();
     let mut found: BTreeMap<(String, String, String), (lys_pass::Mode, Vec<String>)> =
         BTreeMap::new();
     for (kind, actions) in kinds {
@@ -273,6 +277,17 @@ fn rights(
                     resource: resource.clone(),
                     action: action.clone(),
                 };
+                let frame = judged
+                    .prepared
+                    .ok_or_else(|| unavailable("the pass has no prepared relationship reading"))?
+                    .frame(judged, &request)?;
+                if frame.revision() != revision {
+                    return Err(GrantStreamError::BindingRevisionMoved {
+                        decided: revision,
+                        now: frame.revision(),
+                    }
+                    .into());
+                }
                 let permit = match decide_in(judged, &frame, &request, at) {
                     Ok((permit, _)) => permit,
                     Err(error) if unanswered(&error) => return Err(error.into()),

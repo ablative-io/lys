@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::grants::{caller, with_grants};
+use crate::grants::caller;
 use crate::network_api::with_network;
 use crate::routes::start::{LaunchFuture, Launcher};
 use crate::routes::{AppState, hex, signed_in, with_directory};
@@ -159,20 +159,34 @@ pub fn operator(
     if answers {
         return Ok(asker.to_string());
     }
-    let granted = with_grants(state, |judged| {
-        let request = ExerciseRequest {
-            caller: asker,
-            route: Route::Api,
-            resource: Resource::new("agent", agent)?,
-            action: Action::new(OPERATE)?,
-        };
-        Ok(crate::grants::allowed(judged.grants.explain(
-            judged.directory,
-            &request,
-            now(),
-            None,
-        ))?)
-    })?;
+    let granted = crate::grants_reads::with_read_grants(
+        state,
+        None,
+        crate::session::now(),
+        |_| {
+            let request = ExerciseRequest {
+                caller: asker,
+                route: Route::Api,
+                resource: Resource::new("agent", agent)?,
+                action: Action::new(OPERATE)?,
+            };
+            Ok(vec![request])
+        },
+        |judged| {
+            let request = ExerciseRequest {
+                caller: asker,
+                route: Route::Api,
+                resource: Resource::new("agent", agent)?,
+                action: Action::new(OPERATE)?,
+            };
+            Ok(crate::grants::allowed(judged.grants.explain(
+                judged.directory,
+                &request,
+                now(),
+                None,
+            ))?)
+        },
+    )?;
     if granted {
         return Ok(asker.to_string());
     }

@@ -1,0 +1,253 @@
+//! Scoped reads retain the private consistency token and reassert the public revision marker.
+
+use super::wire::{object_json, relationship_of};
+use super::{SpiceDb, definition, engine_ident_on, unavailable};
+use lys_identity::IdentityId;
+use lys_identity::grants::{
+    Action, GrantError, ObjectRef, Relationship, RelationshipStore, Resource,
+};
+use serde_json::{Value, json};
+use std::collections::BTreeSet;
+
+impl SpiceDb {
+    pub(super) fn keep_token(
+        &self,
+        revision: u64,
+        body: &str,
+        pointer: &str,
+    ) -> Result<(), GrantError> {
+        let answer: Value = serde_json::from_str(body).map_err(|error| {
+            unavailable(format!(
+                "the permission engine answered an unreadable consistency token: {error}"
+            ))
+        })?;
+        let token = answer
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .filter(|token| !token.is_empty())
+            .ok_or_else(|| {
+                unavailable("the permission engine answered without its consistency token")
+            })?;
+        self.tokens
+            .lock()
+            .map_err(|error| {
+                unavailable(format!(
+                    "permission consistency tokens lock poisoned: {error}"
+                ))
+            })?
+            .insert(revision, token.to_owned());
+        Ok(())
+    }
+
+    fn consistency(&self, revision: u64) -> Result<Value, GrantError> {
+        Ok(
+            match self
+                .tokens
+                .lock()
+                .map_err(|error| {
+                    unavailable(format!(
+                        "permission consistency tokens lock poisoned: {error}"
+                    ))
+                })?
+                .get(&revision)
+            {
+                Some(token) => json!({"atLeastAsFresh": {"token": token}}),
+                None => json!({"fullyConsistent": true}),
+            },
+        )
+    }
+
+    pub(super) fn rows(
+        &self,
+        filter: &Value,
+        consistency: &Value,
+    ) -> Result<(BTreeSet<Relationship>, Option<String>), GrantError> {
+        let (status, body) = self.call(
+            "/v1/relationships/read",
+            &json!({"consistency": consistency, "relationshipFilter": filter}),
+        )?;
+        if status != 200 {
+            return Err(unavailable(format!(
+                "the relationships could not be read: {body}"
+            )));
+        }
+        let mut held = BTreeSet::new();
+        let mut token = None;
+        for line in body.lines().filter(|line| !line.trim().is_empty()) {
+            let row: Value = serde_json::from_str(line).map_err(|error| {
+                unavailable(format!(
+                    "the permission engine answered an unreadable relationship: {error}"
+                ))
+            })?;
+            held.insert(
+                row.pointer("/result/relationship")
+                    .and_then(relationship_of)
+                    .ok_or_else(|| {
+                        unavailable("the permission engine answered without a relationship")
+                    })?,
+            );
+            if let Some(read) = row
+                .pointer("/result/readAt/token")
+                .and_then(Value::as_str)
+                .filter(|token| !token.is_empty())
+            {
+                token = Some(read.to_owned());
+            }
+        }
+        Ok((held, token))
+    }
+
+    pub(super) fn read_of(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
+        Ok(self
+            .rows(filter, &json!({"fullyConsistent": true}))?
+            .0
+            .into_iter()
+            .collect())
+    }
+
+    pub(super) fn certify(&self, revision: u64) -> Result<Value, GrantError> {
+        let consistency = self.consistency(revision)?;
+        let (held, token) = self.rows(&json!({"resourceType": "lys_mirror", "optionalResourceId": self.mirror,
+            "optionalRelation": "revision", "optionalSubjectFilter": {"subjectType": "lys_revision", "optionalSubjectId": revision.to_string()}}), &consistency)?;
+        if revision != 0
+            && !held
+                .iter()
+                .any(|row| row.subject.id == revision.to_string() && row.relation == "revision")
+        {
+            return Err(unavailable(format!(
+                "the permission engine's mirror does not hold settled revision {revision}"
+            )));
+        }
+        if let Some(token) = token {
+            self.tokens
+                .lock()
+                .map_err(|error| {
+                    unavailable(format!(
+                        "permission consistency tokens lock poisoned: {error}"
+                    ))
+                })?
+                .insert(revision, token);
+        } else if revision != 0 && consistency.get("fullyConsistent").is_some() {
+            return Err(unavailable(
+                "the permission engine answered without its read consistency token",
+            ));
+        }
+        self.consistency(revision)
+    }
+
+    pub(super) fn about(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+        revision: u64,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        let consistency = self.certify(revision)?;
+        let mut ancestors = BTreeSet::new();
+        let mut pending = vec![ObjectRef::resource(resource)];
+        let mut placements = BTreeSet::new();
+        while let Some(object) = pending.pop() {
+            if !ancestors.insert(object.clone()) {
+                continue;
+            }
+            let parents = self
+                .app_kinds
+                .lock()
+                .map_err(|error| unavailable(format!("app kinds unavailable: {error}")))?
+                .get(&object.kind)
+                .map(|model| model.parents.clone())
+                .unwrap_or_default();
+            for parent in parents {
+                let (rows, _) = self.rows(&json!({"resourceType": definition(&object.kind), "optionalResourceId": object.id.replace('.', "|"),
+                    "optionalRelation": lys_identity::grants::parent_relation(&parent)}), &consistency)?;
+                pending.extend(rows.iter().map(|row| row.subject.clone()));
+                placements.extend(rows);
+            }
+        }
+        let mut held = lys_identity::grants::about::select(
+            subject,
+            resource,
+            |object| {
+                if object.kind != "grant" {
+                    return self.rows(&json!({"resourceType": "grant", "optionalRelation": "holder",
+                        "optionalSubjectFilter": {"subjectType": definition(&object.kind), "optionalSubjectId": object.id.replace('.', "|")}}), &consistency).map(|(held, _)| held);
+                }
+                let mut held = BTreeSet::new();
+                for ancestor in &ancestors {
+                    held.extend(self.rows(&json!({"resourceType": definition(&ancestor.kind), "optionalResourceId": ancestor.id.replace('.', "|"),
+                        "optionalSubjectFilter": {"subjectType": "grant", "optionalSubjectId": object.id}}), &consistency)?.0);
+                }
+                Ok(held)
+            },
+            |object| {
+                if object.kind != "grant" {
+                    return Ok(placements
+                        .iter()
+                        .filter(|row| row.resource == *object)
+                        .cloned()
+                        .collect());
+                }
+                self.rows(
+                    &json!({"resourceType": "grant", "optionalResourceId": object.id}),
+                    &consistency,
+                )
+                .map(|(held, _)| held)
+            },
+        )?;
+        held.extend(placements);
+        Ok(held)
+    }
+
+    /// Ask one permission at the engine's confirmed public revision and private token.
+    pub fn check(
+        &self,
+        resource: &Resource,
+        action: &Action,
+        subject: IdentityId,
+        now: u64,
+    ) -> Result<bool, GrantError> {
+        if let Some(allowed) = super::context::check(subject, resource, action) {
+            return allowed;
+        }
+        let revision = self.revision()?;
+        self.check_at(resource, action, subject, now, revision)
+    }
+
+    pub(crate) fn check_at(
+        &self,
+        resource: &Resource,
+        action: &Action,
+        subject: IdentityId,
+        now: u64,
+        revision: u64,
+    ) -> Result<bool, GrantError> {
+        let carried = resource.kind().contains('.')
+            || self
+                .relations
+                .values()
+                .any(|actions| actions.contains(action.as_str()));
+        if !carried || !self.kinds()?.contains(resource.kind()) {
+            return Ok(false);
+        }
+        let consistency = self.certify(revision)?;
+        let request = json!({"consistency": consistency, "resource": object_json(&ObjectRef::resource(resource)),
+            "permission": engine_ident_on(resource.kind(), action.as_str()), "subject": {"object": object_json(&ObjectRef::identity(subject))}, "context": {"now": now}});
+        let (status, body) = self.call("/v1/permissions/check", &request)?;
+        if status != 200 {
+            return Err(unavailable(format!("the check was refused: {body}")));
+        }
+        let answer: Value = serde_json::from_str(&body).map_err(|error| {
+            unavailable(format!(
+                "the permission engine answered an unreadable check: {error}"
+            ))
+        })?;
+        match answer.get("permissionship").and_then(Value::as_str) {
+            Some("PERMISSIONSHIP_HAS_PERMISSION") => Ok(true),
+            Some("PERMISSIONSHIP_NO_PERMISSION" | "PERMISSIONSHIP_CONDITIONAL_PERMISSION") => {
+                Ok(false)
+            }
+            _ => Err(unavailable(
+                "the permission engine answered without a permission verdict",
+            )),
+        }
+    }
+}

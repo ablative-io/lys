@@ -108,8 +108,19 @@ pub(crate) async fn register_agent(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
-    crate::grants::with_directory_grants(
+    crate::grants_reads::with_read_directory_grants(
         &state,
+        None,
+        now(),
+        |judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, judged)?;
+            Ok(vec![lys_identity::grants::ExerciseRequest {
+                caller,
+                route: lys_identity::grants::Route::Api,
+                resource: lys_identity::grants::Resource::new("directory", "agents")?,
+                action: lys_identity::grants::Action::new("edit")?,
+            }])
+        },
         |mut judged| {
             let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
             crate::service_account_grants::admit(&mut judged, caller, "agents")?;

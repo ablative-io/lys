@@ -45,7 +45,7 @@ use crate::channel_membership::{Named, contract_resource, named, pass_mode, serv
 use crate::channel_membership_counts::{Counts, Membership};
 use crate::channel_membership_cursors::{Asked, Continued, HANDLE_BYTES};
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, decide, with_grants};
+use crate::grants::{Decision, Judged, decide};
 use crate::grants_batch::{asker, mode_of, unanswered};
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
@@ -417,6 +417,7 @@ fn serve<T>(
     state: &AppState,
     headers: &HeaderMap,
     request: &T,
+    prepare: impl Fn(&mut Judged<'_>, &T) -> Result<Vec<ExerciseRequest>, ServerError>,
     page: impl FnOnce(&mut Judged<'_>, &Asking<'_>, &T) -> Result<MembershipPage, Named>,
 ) -> Result<Json<MembershipPage>, ServerError> {
     let acting_for = asker(state, headers)?;
@@ -433,14 +434,20 @@ fn serve<T>(
             membership,
         };
         membership.counts.hold();
-        with_grants(state, |mut judged| {
-            Ok(Json(page(&mut judged, &asking, request).unwrap_or_else(
-                |(name, reason)| {
-                    membership.counts.refused_page();
-                    membership_pages::refused_page(&served, &name, &reason)
-                },
-            )))
-        })
+        crate::grants_reads::with_read_grants(
+            state,
+            None,
+            asking.at,
+            |judged| prepare(judged, request),
+            |mut judged| {
+                Ok(Json(page(&mut judged, &asking, request).unwrap_or_else(
+                    |(name, reason)| {
+                        membership.counts.refused_page();
+                        membership_pages::refused_page(&served, &name, &reason)
+                    },
+                )))
+            },
+        )
     });
     if paged.is_err() {
         membership.counts.failed();
@@ -457,7 +464,38 @@ pub async fn resources(
     let Json(request) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    serve(&state, &headers, &request, resources_page)
+    serve(
+        &state,
+        &headers,
+        &request,
+        |judged, request| {
+            let Ok(subject) = identity_id(&request.subject.id) else {
+                return Ok(Vec::new());
+            };
+            let Ok(action) = Action::new(&request.action) else {
+                return Ok(Vec::new());
+            };
+            let Ok(workspace) = Resource::new(&request.workspace.kind, &request.workspace.id)
+            else {
+                return Ok(Vec::new());
+            };
+            Ok(held_resources(
+                judged,
+                subject,
+                (&request.kind, &workspace),
+                &Counts::default(),
+            )
+            .into_iter()
+            .map(|resource| ExerciseRequest {
+                caller: subject,
+                route: Route::Api,
+                resource,
+                action: action.clone(),
+            })
+            .collect())
+        },
+        resources_page,
+    )
 }
 
 /// A page of the subjects who may act on one channel.
@@ -469,5 +507,21 @@ pub async fn recipients(
     let Json(request) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    serve(&state, &headers, &request, recipients_page)
+    serve(
+        &state,
+        &headers,
+        &request,
+        |judged, request| {
+            let (Ok(resource), Ok(action)) = (
+                Resource::new(&request.resource.kind, &request.resource.id),
+                Action::new(&request.action),
+            ) else {
+                return Ok(Vec::new());
+            };
+            Ok(crate::grants_reads::resource_questions(
+                judged, &resource, &action,
+            ))
+        },
+        recipients_page,
+    )
 }

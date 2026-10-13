@@ -29,7 +29,7 @@ use super::wire::{
 use super::{digest32, malformed, reaches, with_connector};
 use crate::error::ServerError;
 use crate::error_product_draft::ProductDraftError;
-use crate::grants::{Judged, with_directory_grants};
+use crate::grants::Judged;
 use crate::routes::{AppState, hex};
 use crate::session::now;
 
@@ -174,8 +174,25 @@ pub(super) async fn approve(
     let digest = digest32(&body.request_digest, "request_digest")?;
     let draft = OperationId::from_str(&id)?;
     let operation = OperationId::from_str(&body.operation)?;
-    with_directory_grants(
+    crate::grants_reads::with_read_directory_grants(
         &state,
+        None,
+        now(),
+        |judged| {
+            let person = crate::read_api::own_person(judged.directory, &actor)?;
+            let held = judged.directory.product_draft(draft).ok_or_else(|| {
+                IdentityError::DraftNotFound {
+                    draft: draft.to_string(),
+                }
+            })?;
+            let target = &held.created.target;
+            Ok(vec![lys_identity::grants::ExerciseRequest {
+                caller: IdentityId::Person(person),
+                route: lys_identity::grants::Route::Api,
+                resource: Resource::new(&target.kind, &target.id)?,
+                action: Action::new(&target.action)?,
+            }])
+        },
         |mut judged| {
             judged_decision(
                 &mut judged,
@@ -213,8 +230,25 @@ pub(super) async fn refuse(
     let digest = digest32(&body.request_digest, "request_digest")?;
     let draft = OperationId::from_str(&id)?;
     let operation = OperationId::from_str(&body.operation)?;
-    with_directory_grants(
+    crate::grants_reads::with_read_directory_grants(
         &state,
+        None,
+        now(),
+        |judged| {
+            let person = crate::read_api::own_person(judged.directory, &actor)?;
+            let held = judged.directory.product_draft(draft).ok_or_else(|| {
+                IdentityError::DraftNotFound {
+                    draft: draft.to_string(),
+                }
+            })?;
+            let target = &held.created.target;
+            Ok(vec![lys_identity::grants::ExerciseRequest {
+                caller: IdentityId::Person(person),
+                route: lys_identity::grants::Route::Api,
+                resource: Resource::new(&target.kind, &target.id)?,
+                action: Action::new(&target.action)?,
+            }])
+        },
         |mut judged| {
             judged_decision(
                 &mut judged,

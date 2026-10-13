@@ -201,21 +201,37 @@ pub(super) async fn check(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
-    with_grants(&state, |mut judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        judged.apps.admit_kind(None, resource.kind())?;
-        judged.apps.admit_action(resource.kind(), action.as_str())?;
-        let request = ExerciseRequest {
-            caller,
-            route,
-            resource,
-            action,
-        };
-        match decide(&mut judged, &request, now(), None, Decision::Exercise) {
-            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
-            Err(error) => Err(as_seen_by(&judged, caller, error)),
-        }
-    })
+    crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        now(),
+        |judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, judged)?;
+            judged.apps.admit_kind(None, resource.kind())?;
+            judged.apps.admit_action(resource.kind(), action.as_str())?;
+            Ok(vec![ExerciseRequest {
+                caller,
+                route,
+                resource: resource.clone(),
+                action: action.clone(),
+            }])
+        },
+        |mut judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            judged.apps.admit_kind(None, resource.kind())?;
+            judged.apps.admit_action(resource.kind(), action.as_str())?;
+            let request = ExerciseRequest {
+                caller,
+                route,
+                resource: resource.clone(),
+                action: action.clone(),
+            };
+            match decide(&mut judged, &request, now(), None, Decision::Exercise) {
+                Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
+                Err(error) => Err(as_seen_by(&judged, caller, error)),
+            }
+        },
+    )
 }
 
 pub(super) async fn why(
@@ -224,21 +240,37 @@ pub(super) async fn why(
     Json(body): Json<ActionBody>,
 ) -> Result<Json<PermitView>, ServerError> {
     let (route, resource, action) = body.parts()?;
-    with_grants(&state, |mut judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        judged.apps.admit_kind(None, resource.kind())?;
-        judged.apps.admit_action(resource.kind(), action.as_str())?;
-        let request = ExerciseRequest {
-            caller,
-            route,
-            resource,
-            action,
-        };
-        match decide(&mut judged, &request, now(), None, Decision::Explain) {
-            Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
-            Err(error) => Err(as_seen_by(&judged, caller, error)),
-        }
-    })
+    crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        now(),
+        |judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, judged)?;
+            judged.apps.admit_kind(None, resource.kind())?;
+            judged.apps.admit_action(resource.kind(), action.as_str())?;
+            Ok(vec![ExerciseRequest {
+                caller,
+                route,
+                resource: resource.clone(),
+                action: action.clone(),
+            }])
+        },
+        |mut judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            judged.apps.admit_kind(None, resource.kind())?;
+            judged.apps.admit_action(resource.kind(), action.as_str())?;
+            let request = ExerciseRequest {
+                caller,
+                route,
+                resource: resource.clone(),
+                action: action.clone(),
+            };
+            match decide(&mut judged, &request, now(), None, Decision::Explain) {
+                Ok((permit, _)) => Ok(Json(PermitView::from(&permit))),
+                Err(error) => Err(as_seen_by(&judged, caller, error)),
+            }
+        },
+    )
 }
 
 pub(super) async fn who(
@@ -253,75 +285,85 @@ pub(super) async fn who(
     }
     let (route, resource, action) = body.question.parts()?;
     let at = now();
-    with_grants(&state, |judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        judged.apps.admit_kind(None, resource.kind())?;
-        judged.apps.admit_action(resource.kind(), action.as_str())?;
-        let after = body.after.as_deref();
-        let mut known = HashMap::new();
-        let holders: BTreeSet<(String, IdentityId)> = judged
-            .grants
-            .book()
-            .on_resource(&resource)
-            .filter(|record| {
-                // A grant naming a role is judged as the role's actions now.
-                judged
-                    .grants
-                    .model()
-                    .actions_of(record.grant())
-                    .contains(&action)
-                    && sees_with(&judged, caller, record, &mut known)
-            })
-            .map(|record| {
-                let holder = record.grant().holder();
-                (holder.to_string(), holder)
-            })
-            .filter(|(text, _)| after.is_none_or(|after| text.as_str() > after))
-            .collect();
-        // A holder is on a page only when its own grant permits the action,
-        // and the page names a next holder only when a later holder permits.
-        let frame = judged.grants.frame(judged.directory, None)?;
-        // A decision that could not be made is the answer, never a holder
-        // left off the page.
-        let mut page = Vec::new();
-        let mut more = false;
-        for (text, holder) in holders {
-            let request = ExerciseRequest {
-                caller: holder,
-                route,
-                resource: resource.clone(),
-                action: action.clone(),
-            };
-            match judged.grants.explain_in(&frame, &request, at) {
-                Ok(_) if page.len() == body.page_size => {
-                    more = true;
-                    break;
+    crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        at,
+        |judged| {
+            Ok(crate::grants_reads::resource_questions(
+                judged, &resource, &action,
+            ))
+        },
+        |judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            judged.apps.admit_kind(None, resource.kind())?;
+            judged.apps.admit_action(resource.kind(), action.as_str())?;
+            let after = body.after.as_deref();
+            let mut known = HashMap::new();
+            let holders: BTreeSet<(String, IdentityId)> = judged
+                .grants
+                .book()
+                .on_resource(&resource)
+                .filter(|record| {
+                    // A grant naming a role is judged as the role's actions now.
+                    judged
+                        .grants
+                        .model()
+                        .actions_of(record.grant())
+                        .contains(&action)
+                        && sees_with(&judged, caller, record, &mut known)
+                })
+                .map(|record| {
+                    let holder = record.grant().holder();
+                    (holder.to_string(), holder)
+                })
+                .filter(|(text, _)| after.is_none_or(|after| text.as_str() > after))
+                .collect();
+            // A holder is on a page only when its own grant permits the action,
+            // and the page names a next holder only when a later holder permits.
+            let frame = judged.grants.frame(judged.directory, None)?;
+            // A decision that could not be made is the answer, never a holder
+            // left off the page.
+            let mut page = Vec::new();
+            let mut more = false;
+            for (text, holder) in holders {
+                let request = ExerciseRequest {
+                    caller: holder,
+                    route,
+                    resource: resource.clone(),
+                    action: action.clone(),
+                };
+                match judged.grants.explain_in(&frame, &request, at) {
+                    Ok(_) if page.len() == body.page_size => {
+                        more = true;
+                        break;
+                    }
+                    Ok(permit) => page.push(HolderView {
+                        holder: text,
+                        permit: PermitView::from(&permit),
+                    }),
+                    Err(error) if crate::grants_batch::unanswered(&error) => {
+                        return Err(error.into());
+                    }
+                    Err(_) => {}
                 }
-                Ok(permit) => page.push(HolderView {
-                    holder: text,
-                    permit: PermitView::from(&permit),
-                }),
-                Err(error) if crate::grants_batch::unanswered(&error) => {
-                    return Err(error.into());
-                }
-                Err(_) => {}
             }
-        }
-        let next = if more {
-            page.last().map(|last| last.holder.clone())
-        } else {
-            None
-        };
-        Ok(Json(WhoPage {
-            holders: page,
-            revision: frame.revision(),
-            complete: next.is_none(),
-            next,
-            degraded: frame
-                .degradation()
-                .map(|held| crate::grants::DegradedView::from(held.as_ref())),
-        }))
-    })
+            let next = if more {
+                page.last().map(|last| last.holder.clone())
+            } else {
+                None
+            };
+            Ok(Json(WhoPage {
+                holders: page,
+                revision: frame.revision(),
+                complete: next.is_none(),
+                next,
+                degraded: frame
+                    .degradation()
+                    .map(|held| crate::grants::DegradedView::from(held.as_ref())),
+            }))
+        },
+    )
 }
 
 /// Whether `caller` may name `recipient` on the delegation form: a person the

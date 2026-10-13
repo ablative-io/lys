@@ -26,7 +26,7 @@ use lys_runner::{Act, Answer};
 use serde::Serialize;
 
 use crate::error::ServerError;
-use crate::grants::{Decision, caller, decide, with_grants};
+use crate::grants::{Decision, caller, decide};
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_acts::{ActReceipt, Digested, RunnerAct};
 use crate::runner_sessions::{Driven, ended_in, keep_act, kind, record_end};
@@ -125,30 +125,45 @@ pub(crate) fn admitted(
         let admission = admission("pass", None, None);
         return Ok((admission, standing));
     }
-    let exercised = with_grants(state, |mut judged| {
-        judged.apps.admit_kind(None, KIND)?;
-        judged.apps.admit_action(KIND, action)?;
-        let request = ExerciseRequest {
-            caller: standing.asker,
-            route: Route::Api,
-            resource: Resource::new(KIND, &seat.added.name)?,
-            action: Action::new(action)?,
-        };
-        match decide(&mut judged, &request, now(), None, Decision::Exercise) {
-            Ok((permit, _)) => match permit.use_event {
-                Some(Ok(index)) => Ok(Some((permit.grant.to_string(), index))),
-                Some(Err(error)) => Err(error.into()),
-                None => Err(lys_identity::grants::GrantError::LogUnavailable {
-                    reason: format!("the exercise of {action} has no recorded use event"),
+    let exercised = crate::grants_reads::with_read_grants(
+        state,
+        None,
+        now(),
+        |_| {
+            Ok(vec![ExerciseRequest {
+                caller: standing.asker,
+                route: Route::Api,
+                resource: Resource::new(KIND, &seat.added.name)?,
+                action: Action::new(action)?,
+            }])
+        },
+        |mut judged| {
+            judged.apps.admit_kind(None, KIND)?;
+            judged.apps.admit_action(KIND, action)?;
+            let request = ExerciseRequest {
+                caller: standing.asker,
+                route: Route::Api,
+                resource: Resource::new(KIND, &seat.added.name)?,
+                action: Action::new(action)?,
+            };
+            match decide(&mut judged, &request, now(), None, Decision::Exercise) {
+                Ok((permit, _)) => match permit.use_event {
+                    Some(Ok(index)) => Ok(Some((permit.grant.to_string(), index))),
+                    Some(Err(error)) => Err(error.into()),
+                    None => Err(lys_identity::grants::GrantError::LogUnavailable {
+                        reason: format!("the exercise of {action} has no recorded use event"),
+                    }
+                    .into()),
+                },
+                Err(error)
+                    if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN =>
+                {
+                    Ok(None)
                 }
-                .into()),
-            },
-            Err(error) if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN => {
-                Ok(None)
+                Err(error) => Err(error.into()),
             }
-            Err(error) => Err(error.into()),
-        }
-    })?;
+        },
+    )?;
     let admission = match exercised {
         Some((grant, index)) => admission("grant", Some(grant), Some(index)),
         None if standing.administrator => admission("administrator", None, None),

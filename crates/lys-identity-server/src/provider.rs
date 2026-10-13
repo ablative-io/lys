@@ -319,4 +319,4 @@ impl OpenIdProvider {
 
 #[cfg(test)]
 #[path = "provider_tests.rs"]
-mod tests;
+pub(crate) mod tests;

@@ -13,6 +13,9 @@ fn poisoned_app_kinds_cannot_produce_or_replace_a_permission_schema() -> Result<
         relations: BTreeMap::new(),
         app_kinds: Mutex::default(),
         scope: None,
+        client: Arc::default(),
+        tokens: Arc::default(),
+        confirmed: Arc::default(),
     };
     let poisoned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let held = engine
@@ -26,6 +29,7 @@ fn poisoned_app_kinds_cannot_produce_or_replace_a_permission_schema() -> Result<
     for refusal in [
         engine.schema(&BTreeSet::new()).map(drop),
         engine.set_app_kinds(&BTreeMap::new()),
+        engine.hold_app_kinds(&BTreeMap::new()),
         engine.write_schema(&BTreeSet::new()),
         engine.schema_writer().map(drop),
     ] {

@@ -22,7 +22,6 @@ use lys_identity::grants::GrantError;
 use serde_json::{Value, json};
 
 use super::{SpiceDb, SpiceDbConnection, unavailable};
-use crate::spicedb_http::post_json;
 
 /// The prefix every scratch name is held under.
 pub(crate) const SCRATCH: &str = "lys/";
@@ -214,9 +213,12 @@ fn text_of(body: &str) -> Result<String, GrantError> {
 
 impl SpiceDb {
     fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
-        let answer =
-            post_json(&self.endpoint, path, &self.key, &body.to_string()).map_err(unavailable)?;
-        Ok((answer.status, answer.body))
+        let answer = self
+            .client
+            .post_json(&self.endpoint, path, &self.key, &body.to_string())
+            .map_err(unavailable)?;
+        let body = answer.body.replace(self.key.as_ref(), "[redacted]");
+        Ok((answer.status, body))
     }
 
     /// The whole schema text the engine holds, every scope's names in it.
@@ -276,6 +278,9 @@ impl SpiceDb {
             relations: BTreeMap::new(),
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: Some(scope.to_owned()),
+            client: Arc::default(),
+            tokens: Arc::default(),
+            confirmed: Arc::default(),
         };
         let schema_guard = super::SCHEMA_WRITE
             .lock()
@@ -317,6 +322,9 @@ impl SpiceDb {
             relations: BTreeMap::new(),
             app_kinds: Mutex::new(BTreeMap::new()),
             scope: None,
+            client: Arc::default(),
+            tokens: Arc::default(),
+            confirmed: Arc::default(),
         };
         let scopes: BTreeSet<String> = blocks(&engine.held_text()?)
             .into_iter()

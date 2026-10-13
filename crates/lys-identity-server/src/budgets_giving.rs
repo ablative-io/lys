@@ -12,7 +12,7 @@ use crate::budgets_state::{Holder, HolderKind, Measure};
 use crate::budgets_store::BudgetStore;
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
-use crate::grants::{Decision, decide, with_grants};
+use crate::grants::{Decision, decide};
 use crate::routes::{AppState, signed_in, with_directory};
 
 pub(crate) enum Giver {
@@ -86,41 +86,56 @@ pub(crate) fn append(
 ) -> Result<(), ServerError> {
     crate::budgets_migration::require_committed(state)?;
     crate::budgets_migration::advance(state)?;
+    let question_resource = format!("{}.{}", kind(limits.holder.kind), limits.holder.id);
     match giver {
         Giver::Person(_) | Giver::Pass(_) => with_budgets(state, |store| {
             validate(store, &limits, expected, zone, agents, at_ms)?;
             store.set_limits(limits, expected)?;
             Ok(())
         }),
-        Giver::Agent(agent) => with_grants(state, |mut judged| {
-            let request = ExerciseRequest {
-                caller: IdentityId::Agent(*agent),
-                route: Route::Api,
-                resource: Resource::new(
-                    "budget",
-                    &format!("{}.{}", kind(limits.holder.kind), limits.holder.id),
-                )?,
-                action: Action::new("write")?,
-            };
-            judged.apps.admit_kind(None, "budget")?;
-            judged.apps.admit_action("budget", "write")?;
-            decide(&mut judged, &request, limits.at, None, Decision::Explain)?;
-            with_budgets(state, |store| {
-                crate::budgets_holding::holds(
-                    store.held(),
-                    &Holder {
-                        kind: HolderKind::Agent,
-                        id: agent.to_string(),
-                    },
-                    &limits.limits,
-                    zone,
-                )?;
-                validate(store, &limits, expected, zone, agents, at_ms)?;
-                decide(&mut judged, &request, limits.at, None, Decision::Exercise)?;
-                store.set_limits(limits, expected)?;
-                Ok(())
-            })
-        }),
+        Giver::Agent(agent) => crate::grants_reads::with_read_grants(
+            state,
+            None,
+            crate::session::now(),
+            |_| {
+                let request = ExerciseRequest {
+                    caller: IdentityId::Agent(*agent),
+                    route: Route::Api,
+                    resource: Resource::new("budget", &question_resource)?,
+                    action: Action::new("write")?,
+                };
+                Ok(vec![request])
+            },
+            |mut judged| {
+                let request = ExerciseRequest {
+                    caller: IdentityId::Agent(*agent),
+                    route: Route::Api,
+                    resource: Resource::new(
+                        "budget",
+                        &format!("{}.{}", kind(limits.holder.kind), limits.holder.id),
+                    )?,
+                    action: Action::new("write")?,
+                };
+                judged.apps.admit_kind(None, "budget")?;
+                judged.apps.admit_action("budget", "write")?;
+                decide(&mut judged, &request, limits.at, None, Decision::Explain)?;
+                with_budgets(state, |store| {
+                    crate::budgets_holding::holds(
+                        store.held(),
+                        &Holder {
+                            kind: HolderKind::Agent,
+                            id: agent.to_string(),
+                        },
+                        &limits.limits,
+                        zone,
+                    )?;
+                    validate(store, &limits, expected, zone, agents, at_ms)?;
+                    decide(&mut judged, &request, limits.at, None, Decision::Exercise)?;
+                    store.set_limits(limits, expected)?;
+                    Ok(())
+                })
+            },
+        ),
     }
 }
 

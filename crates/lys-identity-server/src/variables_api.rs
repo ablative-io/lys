@@ -22,7 +22,7 @@ use serde::Deserialize;
 
 use crate::agent_signature::signed_agent;
 use crate::error::ServerError;
-use crate::grants::{caller, with_grants};
+use crate::grants::caller;
 use crate::read_api::own_person;
 use crate::routes::{AppState, is_administrator, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
@@ -178,20 +178,34 @@ pub(crate) fn admit(
         if asking == agent_id {
             return Ok(());
         }
-        let granted = with_grants(state, |held| {
-            let request = ExerciseRequest {
-                caller: asker,
-                route: Route::Api,
-                resource: Resource::new("agent", agent)?,
-                action: Action::new(action)?,
-            };
-            Ok(crate::grants::allowed(held.grants.explain(
-                held.directory,
-                &request,
-                now(),
-                None,
-            ))?)
-        })?;
+        let granted = crate::grants_reads::with_read_grants(
+            state,
+            None,
+            crate::session::now(),
+            |_| {
+                let request = ExerciseRequest {
+                    caller: asker,
+                    route: Route::Api,
+                    resource: Resource::new("agent", agent)?,
+                    action: Action::new(action)?,
+                };
+                Ok(vec![request])
+            },
+            |held| {
+                let request = ExerciseRequest {
+                    caller: asker,
+                    route: Route::Api,
+                    resource: Resource::new("agent", agent)?,
+                    action: Action::new(action)?,
+                };
+                Ok(crate::grants::allowed(held.grants.explain(
+                    held.directory,
+                    &request,
+                    now(),
+                    None,
+                ))?)
+            },
+        )?;
         if granted {
             return Ok(());
         }

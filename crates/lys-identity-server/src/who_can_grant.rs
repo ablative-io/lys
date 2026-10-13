@@ -40,9 +40,17 @@ pub fn for_agent(
     resource: &Resource,
     action: &Action,
 ) -> Result<Vec<CanGrant>, ServerError> {
-    crate::grants::with_grants(state, |mut judged| {
-        for_judged(&mut judged, agent, resource, action, crate::session::now())
-    })
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        crate::session::now(),
+        |judged| {
+            Ok(crate::grants_reads::resource_questions(
+                judged, resource, action,
+            ))
+        },
+        |mut judged| for_judged(&mut judged, agent, resource, action, crate::session::now()),
+    )
 }
 
 fn named(

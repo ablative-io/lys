@@ -26,20 +26,31 @@ use std::sync::{Arc, Mutex};
 
 use lys_identity::IdentityId;
 use lys_identity::grants::{
-    Action, GrantError, KindModel, MemoryRelationships, Model, ObjectRef, Relationship,
-    RelationshipStore, Resource, placement,
+    GrantError, KindModel, Model, Relationship, RelationshipStore, Resource, placement,
 };
 use serde_json::{Value, json};
 
 use crate::spicedb_apps::definition;
 
+#[path = "spicedb/context.rs"]
+pub(crate) mod context;
+#[path = "spicedb/credential.rs"]
 mod credential;
+#[path = "spicedb/names.rs"]
 mod names;
+#[path = "spicedb/reads.rs"]
+mod reads;
+#[path = "spicedb/relationships.rs"]
+mod relationships;
+#[path = "spicedb/schema.rs"]
 mod schema;
+#[path = "spicedb/wire.rs"]
 mod wire;
 pub use credential::{SpiceDbConnection, SpiceDbEngine, SpiceDbSettings};
 use names::{FIXED, RESOURCE_SUBJECTS, engine_ident_on, engine_name_for, lys_name_on};
-use wire::{object_json, relationship_json, relationship_of};
+use wire::relationship_json;
+#[cfg(test)]
+use wire::relationship_of;
 
 #[path = "spicedb_scope.rs"]
 pub(crate) mod scope;
@@ -57,6 +68,9 @@ pub struct SpiceDb {
     relations: BTreeMap<String, BTreeSet<String>>,
     app_kinds: Mutex<BTreeMap<String, KindModel>>,
     scope: Option<String>,
+    client: Arc<crate::spicedb_http::Client>,
+    tokens: Arc<Mutex<BTreeMap<u64, String>>>,
+    confirmed: Arc<Mutex<Option<u64>>>,
 }
 
 impl std::fmt::Debug for SpiceDb {
@@ -151,6 +165,9 @@ impl SpiceDb {
             relations,
             app_kinds: Mutex::new(model.kinds().clone()),
             scope,
+            client: Arc::default(),
+            tokens: Arc::default(),
+            confirmed: Arc::default(),
         };
         if let Some(both) = engine
             .relations
@@ -173,54 +190,13 @@ impl SpiceDb {
             "operation": "OPERATION_TOUCH",
             "relationship": relationship_json(&placement(child, parent)),
         });
-        PassReads::forget();
         let (status, body) = self.call("/v1/relationships/write", &json!({"updates": [update]}))?;
         if status == 200 {
+            let revision = self.revision()?;
+            self.keep_token(revision, &body, "/writtenAt/token")?;
             return Ok(());
         }
         Err(unavailable(format!("the placement was refused: {body}")))
-    }
-
-    fn read_of(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
-        let key = filter.to_string();
-        if let Some(held) = PASS_READS.with(|memo| {
-            memo.borrow()
-                .as_ref()
-                .and_then(|reads| reads.get(&key).cloned())
-        }) {
-            return Ok(held);
-        }
-        let held = self.read_of_engine(filter)?;
-        PASS_READS.with(|memo| {
-            if let Some(reads) = memo.borrow_mut().as_mut() {
-                reads.insert(key, held.clone());
-            }
-        });
-        Ok(held)
-    }
-
-    fn read_of_engine(&self, filter: &Value) -> Result<Vec<Relationship>, GrantError> {
-        let request =
-            json!({"consistency": {"fullyConsistent": true}, "relationshipFilter": filter});
-        let (status, body) = self.call("/v1/relationships/read", &request)?;
-        if status != 200 {
-            return Err(unavailable(format!(
-                "the relationships could not be read: {body}"
-            )));
-        }
-        body.lines()
-            .filter(|line| !line.trim().is_empty())
-            .map(|line| {
-                serde_json::from_str::<Value>(line)
-                    .ok()
-                    .as_ref()
-                    .and_then(|row| row.pointer("/result/relationship"))
-                    .and_then(relationship_of)
-                    .ok_or_else(|| {
-                        unavailable(format!("a relationship could not be read from {line}"))
-                    })
-            })
-            .collect()
     }
 
     fn marker(&self, revision: u64) -> Value {
@@ -229,37 +205,6 @@ impl SpiceDb {
             "relation": "revision",
             "subject": {"object": {"objectType": "lys_revision", "objectId": revision.to_string()}},
         })
-    }
-
-    /// Whether the engine gives `subject` the permission `action` on
-    /// `resource` at `now`, read at full consistency.
-    pub fn check(
-        &self,
-        resource: &Resource,
-        action: &Action,
-        subject: IdentityId,
-        now: u64,
-    ) -> Result<bool, GrantError> {
-        let carried = resource.kind().contains('.')
-            || self
-                .relations
-                .values()
-                .any(|actions| actions.contains(action.as_str()));
-        if !carried || !self.kinds()?.contains(resource.kind()) {
-            return Ok(false);
-        }
-        let request = json!({
-            "consistency": {"fullyConsistent": true},
-            "resource": object_json(&ObjectRef::resource(resource)),
-            "permission": engine_ident_on(resource.kind(), action.as_str()),
-            "subject": {"object": object_json(&ObjectRef::identity(subject))},
-            "context": {"now": now},
-        });
-        let (status, body) = self.call("/v1/permissions/check", &request)?;
-        if status != 200 {
-            return Err(unavailable(format!("the check was refused: {body}")));
-        }
-        Ok(body.contains("PERMISSIONSHIP_HAS_PERMISSION"))
     }
 }
 
@@ -302,10 +247,20 @@ impl RelationshipStore for SpiceDb {
     }
 
     fn revision(&self) -> Result<u64, GrantError> {
-        let held = self.read_of(&json!({
-            "resourceType": "lys_mirror",
-            "optionalResourceId": self.mirror,
-        }))?;
+        if let Some(revision) = *self
+            .confirmed
+            .lock()
+            .map_err(|error| unavailable(format!("permission revision lock poisoned: {error}")))?
+        {
+            return Ok(revision);
+        }
+        let (held, token) = self.rows(
+            &json!({
+                "resourceType": "lys_mirror",
+                "optionalResourceId": self.mirror,
+            }),
+            &json!({"fullyConsistent": true}),
+        )?;
         let revisions = held
             .iter()
             .map(|relationship| {
@@ -317,7 +272,21 @@ impl RelationshipStore for SpiceDb {
                 })
             })
             .collect::<Result<Vec<u64>, GrantError>>()?;
-        Ok(revisions.into_iter().max().unwrap_or(0))
+        let revision = revisions.into_iter().max().unwrap_or(0);
+        if let Some(token) = token {
+            self.tokens
+                .lock()
+                .map_err(|error| {
+                    unavailable(format!(
+                        "permission consistency tokens lock poisoned: {error}"
+                    ))
+                })?
+                .insert(revision, token);
+        }
+        *self.confirmed.lock().map_err(|error| {
+            unavailable(format!("permission revision lock poisoned: {error}"))
+        })? = Some(revision);
+        Ok(revision)
     }
 
     fn write(
@@ -362,9 +331,18 @@ impl RelationshipStore for SpiceDb {
         };
         updates.push(update("OPERATION_TOUCH", self.marker(revision)));
         let request = json!({"updates": updates, "optionalPreconditions": [precondition]});
-        PassReads::forget();
-        let (status, body) = self.call("/v1/relationships/write", &request)?;
+        let result = self.call("/v1/relationships/write", &request);
+        if !result.as_ref().is_ok_and(|(status, _)| *status == 200) {
+            *self.confirmed.lock().map_err(|error| {
+                unavailable(format!("permission revision lock poisoned: {error}"))
+            })? = None;
+        }
+        let (status, body) = result?;
         if status == 200 {
+            self.keep_token(revision, &body, "/writtenAt/token")?;
+            *self.confirmed.lock().map_err(|error| {
+                unavailable(format!("permission revision lock poisoned: {error}"))
+            })? = Some(revision);
             return Ok(());
         }
         if body.contains("PRECONDITION") {
@@ -375,7 +353,34 @@ impl RelationshipStore for SpiceDb {
         Err(unavailable(format!("the write was refused: {body}")))
     }
 
+    fn prepared_stamp(&self) -> Option<lys_identity::grants::ReadStamp> {
+        context::stamp()
+    }
+
+    fn read_about(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        self.read_about_at(subject, resource, self.revision()?)
+    }
+
+    fn read_about_at(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+        revision: u64,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        if let Some(held) = context::about(subject, resource, revision) {
+            return held;
+        }
+        self.about(subject, resource, revision)
+    }
+
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
+        if let Some(held) = context::whole() {
+            return held;
+        }
         let kinds = self.kinds()?;
         let mut held = BTreeSet::new();
         for kind in kinds.iter().map(String::as_str).chain(["grant"]) {
@@ -385,134 +390,11 @@ impl RelationshipStore for SpiceDb {
     }
 }
 
-/// The permission engine the service runs the grants on.
-#[derive(Debug)]
-pub enum Relationships {
-    /// Relationships held in this process, gone when it stops.
-    Memory(MemoryRelationships),
-    /// Relationships held in `SpiceDB`.
-    SpiceDb(SpiceDb),
-    #[cfg(test)]
-    /// An instance-private failure of the in-process permission engine.
-    Fixture(FaultRelationships),
-}
-
 #[cfg(test)]
-#[derive(Debug)]
-/// Fault state used only by the service's grant-settlement tests.
-pub struct FaultRelationships {
-    held: MemoryRelationships,
-    unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    projection_only: bool,
-    writes: std::sync::Arc<std::sync::atomic::AtomicU64>,
-}
-
+pub use relationships::FaultRelationships;
 #[cfg(test)]
-impl Relationships {
-    pub(crate) fn faulted(
-        held: MemoryRelationships,
-        unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    ) -> Self {
-        Self::Fixture(FaultRelationships {
-            held,
-            unavailable,
-            projection_only: false,
-            writes: std::sync::Arc::default(),
-        })
-    }
-
-    pub(crate) fn faulted_projection(
-        held: MemoryRelationships,
-        unavailable: std::sync::Arc<std::sync::atomic::AtomicBool>,
-        writes: std::sync::Arc<std::sync::atomic::AtomicU64>,
-    ) -> Self {
-        Self::Fixture(FaultRelationships {
-            held,
-            unavailable,
-            projection_only: true,
-            writes,
-        })
-    }
-}
-
-#[cfg(test)]
-impl FaultRelationships {
-    fn readable(&self) -> Result<(), GrantError> {
-        if self.projection_only {
-            Ok(())
-        } else {
-            self.ready()
-        }
-    }
-
-    fn ready(&self) -> Result<(), GrantError> {
-        if self.unavailable.load(std::sync::atomic::Ordering::Acquire) {
-            Err(GrantError::PermissionEngineUnavailable {
-                reason: "instance-private settlement refusal".to_owned(),
-            })
-        } else {
-            Ok(())
-        }
-    }
-}
-
-impl RelationshipStore for Relationships {
-    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
-        match self {
-            Self::Memory(held) => held.admit_resource(resource),
-            Self::SpiceDb(engine) => engine.admit_resource(resource),
-            #[cfg(test)]
-            Self::Fixture(engine) => {
-                engine.readable()?;
-                engine.held.admit_resource(resource)
-            }
-        }
-    }
-
-    fn revision(&self) -> Result<u64, GrantError> {
-        match self {
-            Self::Memory(held) => held.revision(),
-            Self::SpiceDb(engine) => engine.revision(),
-            #[cfg(test)]
-            Self::Fixture(engine) => {
-                engine.readable()?;
-                engine.held.revision()
-            }
-        }
-    }
-
-    fn write(
-        &mut self,
-        revision: u64,
-        touch: &[Relationship],
-        delete: &[Relationship],
-    ) -> Result<(), GrantError> {
-        match self {
-            Self::Memory(held) => held.write(revision, touch, delete),
-            Self::SpiceDb(engine) => engine.write(revision, touch, delete),
-            #[cfg(test)]
-            Self::Fixture(engine) => {
-                engine
-                    .writes
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                engine.ready()?;
-                engine.held.write(revision, touch, delete)
-            }
-        }
-    }
-
-    fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
-        match self {
-            Self::Memory(held) => held.read(),
-            Self::SpiceDb(engine) => engine.read(),
-            #[cfg(test)]
-            Self::Fixture(engine) => {
-                engine.readable()?;
-                engine.held.read()
-            }
-        }
-    }
-}
+pub(crate) use relationships::ReadHook;
+pub use relationships::Relationships;
 
 #[cfg(test)]
 #[path = "spicedb_upgrade_tests.rs"]
@@ -529,37 +411,3 @@ mod key_tests;
 #[cfg(test)]
 #[path = "spicedb_poison_tests.rs"]
 mod poison_tests;
-
-thread_local! {
-    /// Relationship reads answered once while a [`PassReads`] is held on this thread.
-    static PASS_READS: std::cell::RefCell<Option<std::collections::HashMap<String, Vec<Relationship>>>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// While held, each distinct relationship read on this thread is asked of the engine once
-/// and repeated from memory. One pass decides every (resource, action) pair of an app
-/// against one snapshot, and each decision's frame would otherwise re-read the whole relationship set.
-/// A write on this thread forgets them.
-pub(crate) struct PassReads;
-
-impl PassReads {
-    /// Start answering repeated reads from memory until the guard drops.
-    pub(crate) fn hold() -> Self {
-        PASS_READS.with(|memo| *memo.borrow_mut() = Some(std::collections::HashMap::new()));
-        Self
-    }
-
-    fn forget() {
-        PASS_READS.with(|memo| {
-            if let Some(reads) = memo.borrow_mut().as_mut() {
-                reads.clear();
-            }
-        });
-    }
-}
-
-impl Drop for PassReads {
-    fn drop(&mut self) {
-        PASS_READS.with(|memo| *memo.borrow_mut() = None);
-    }
-}

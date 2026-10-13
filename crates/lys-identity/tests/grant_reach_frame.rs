@@ -56,6 +56,32 @@ impl RelationshipStore for Measured {
         self.inner.write(revision, touch, delete)
     }
 
+    fn read_about(
+        &self,
+        subject: lys_identity::IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        let held = self.read()?;
+        lys_identity::grants::about::select(
+            subject,
+            resource,
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.subject == *object)
+                    .cloned()
+                    .collect())
+            },
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.resource == *object)
+                    .cloned()
+                    .collect())
+            },
+        )
+    }
+
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
         self.reads.fetch_add(1, Ordering::SeqCst);
         if self.broken.load(Ordering::SeqCst) {
@@ -342,6 +368,32 @@ impl RelationshipStore for Stalled {
             });
         }
         Ok(())
+    }
+
+    fn read_about(
+        &self,
+        subject: lys_identity::IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        let held = self.read()?;
+        lys_identity::grants::about::select(
+            subject,
+            resource,
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.subject == *object)
+                    .cloned()
+                    .collect())
+            },
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.resource == *object)
+                    .cloned()
+                    .collect())
+            },
+        )
     }
 
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {

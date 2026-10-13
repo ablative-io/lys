@@ -16,6 +16,10 @@ pub struct ProjectionDegraded {
 }
 
 impl ProjectionDegraded {
+    pub(super) fn at(error: GrantError, revision: u64) -> Self {
+        Self { error, revision }
+    }
+
     /// The original projection failure, retained without changing its name.
     #[must_use]
     pub fn error(&self) -> &GrantError {

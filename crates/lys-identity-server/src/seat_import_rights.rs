@@ -22,7 +22,7 @@ use lys_identity::grants::{Action, ExerciseRequest, Resource, Route};
 
 use crate::error::ServerError;
 use crate::error_seat_import::SeatImportError;
-use crate::grants::{Decision, decide, with_grants};
+use crate::grants::{Decision, decide};
 use crate::routes::AppState;
 use crate::seat_import_state::Confirmation;
 use crate::seats_acts::{KIND, Standing, standing};
@@ -80,30 +80,45 @@ pub(crate) fn confirmed_by(
     url: &str,
 ) -> Result<Confirmation, ServerError> {
     let standing = person(state, headers, seat)?;
-    let exercised = with_grants(state, |mut judged| {
-        judged.apps.admit_kind(None, KIND)?;
-        judged.apps.admit_action(KIND, IMPORT)?;
-        let request = ExerciseRequest {
-            caller: standing.asker,
-            route: Route::Api,
-            resource: Resource::new(KIND, &seat.added.name)?,
-            action: Action::new(IMPORT)?,
-        };
-        match decide(&mut judged, &request, now(), None, Decision::Exercise) {
-            Ok((permit, _)) => match permit.use_event {
-                Some(Ok(index)) => Ok(Some((permit.grant.to_string(), index))),
-                Some(Err(error)) => Err(error.into()),
-                None => Err(lys_identity::grants::GrantError::LogUnavailable {
-                    reason: format!("the exercise of {IMPORT} has no recorded use event"),
+    let exercised = crate::grants_reads::with_read_grants(
+        state,
+        None,
+        now(),
+        |_| {
+            Ok(vec![ExerciseRequest {
+                caller: standing.asker,
+                route: Route::Api,
+                resource: Resource::new(KIND, &seat.added.name)?,
+                action: Action::new(IMPORT)?,
+            }])
+        },
+        |mut judged| {
+            judged.apps.admit_kind(None, KIND)?;
+            judged.apps.admit_action(KIND, IMPORT)?;
+            let request = ExerciseRequest {
+                caller: standing.asker,
+                route: Route::Api,
+                resource: Resource::new(KIND, &seat.added.name)?,
+                action: Action::new(IMPORT)?,
+            };
+            match decide(&mut judged, &request, now(), None, Decision::Exercise) {
+                Ok((permit, _)) => match permit.use_event {
+                    Some(Ok(index)) => Ok(Some((permit.grant.to_string(), index))),
+                    Some(Err(error)) => Err(error.into()),
+                    None => Err(lys_identity::grants::GrantError::LogUnavailable {
+                        reason: format!("the exercise of {IMPORT} has no recorded use event"),
+                    }
+                    .into()),
+                },
+                Err(error)
+                    if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN =>
+                {
+                    Ok(None)
                 }
-                .into()),
-            },
-            Err(error) if crate::error_status::grant_status(&error) == StatusCode::FORBIDDEN => {
-                Ok(None)
+                Err(error) => Err(error.into()),
             }
-            Err(error) => Err(error.into()),
-        }
-    })?;
+        },
+    )?;
     let confirmation = |by: &str, grant: Option<String>, use_event: Option<u64>| Confirmation {
         person: standing.asker.to_string(),
         by: by.to_owned(),

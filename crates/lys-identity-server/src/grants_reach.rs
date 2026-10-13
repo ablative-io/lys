@@ -28,7 +28,6 @@ use serde::{Deserialize, Serialize};
 use crate::error::ServerError;
 use crate::grant_contract::RouteWire;
 use crate::grant_sight::sees_with;
-use crate::grants::with_grants;
 use crate::grants_batch::unanswered;
 use crate::session::now;
 
@@ -105,83 +104,102 @@ pub(crate) async fn reach(
     }
     let route = body.route.into();
     let at = now();
-    with_grants(&state, |judged| {
-        let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-        let mut asked = Vec::with_capacity(body.resources.len());
-        for wire in &body.resources {
-            judged.apps.admit_kind(None, &wire.kind)?;
-            let mut actions = Vec::with_capacity(wire.actions.len());
-            for action in &wire.actions {
-                judged.apps.admit_action(&wire.kind, action)?;
-                actions.push(Action::new(action)?);
-            }
-            asked.push((wire, Resource::new(&wire.kind, &wire.id)?, actions));
-        }
-        let frame = judged.grants.frame(judged.directory, None)?;
-        let mut known = HashMap::new();
-        let mut resources = Vec::with_capacity(asked.len());
-        for (wire, resource, actions) in asked {
-            let mut holders: BTreeMap<String, (IdentityId, Vec<&Action>)> = BTreeMap::new();
-            for record in judged.grants.book().on_resource(&resource) {
-                if !sees_with(&judged, caller, record, &mut known) {
-                    continue;
+    crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        at,
+        |judged| {
+            let mut asked = Vec::new();
+            for wire in &body.resources {
+                let resource = Resource::new(&wire.kind, &wire.id)?;
+                for action in &wire.actions {
+                    asked.extend(crate::grants_reads::resource_questions(
+                        judged,
+                        &resource,
+                        &Action::new(action)?,
+                    ));
                 }
-                let holder = record.grant().holder();
-                let entry = holders
-                    .entry(holder.to_string())
-                    .or_insert_with(|| (holder, Vec::new()));
-                let held = judged.grants.model().actions_of(record.grant());
-                for action in &actions {
-                    if held.contains(action) && !entry.1.contains(&action) {
-                        entry.1.push(action);
+            }
+            Ok(asked)
+        },
+        |judged| {
+            let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
+            let mut asked = Vec::with_capacity(body.resources.len());
+            for wire in &body.resources {
+                judged.apps.admit_kind(None, &wire.kind)?;
+                let mut actions = Vec::with_capacity(wire.actions.len());
+                for action in &wire.actions {
+                    judged.apps.admit_action(&wire.kind, action)?;
+                    actions.push(Action::new(action)?);
+                }
+                asked.push((wire, Resource::new(&wire.kind, &wire.id)?, actions));
+            }
+            let frame = judged.grants.frame(judged.directory, None)?;
+            let mut known = HashMap::new();
+            let mut resources = Vec::with_capacity(asked.len());
+            for (wire, resource, actions) in asked {
+                let mut holders: BTreeMap<String, (IdentityId, Vec<&Action>)> = BTreeMap::new();
+                for record in judged.grants.book().on_resource(&resource) {
+                    if !sees_with(&judged, caller, record, &mut known) {
+                        continue;
                     }
-                }
-            }
-            let mut permitted = Vec::new();
-            for (text, (holder, held)) in holders {
-                let mut may = Vec::new();
-                let mut modes = Vec::new();
-                for action in actions.iter().filter(|action| held.contains(action)) {
-                    let request = ExerciseRequest {
-                        caller: holder,
-                        route,
-                        resource: resource.clone(),
-                        action: action.clone(),
-                    };
-                    match judged.grants.explain_in(&frame, &request, at) {
-                        // A permit naming a grant the book no longer holds is
-                        // answered as not permitted, as `which` answers it.
-                        Ok(permit) => {
-                            if let Some(grant) = judged.grants.book().grant(permit.grant) {
-                                may.push(action.to_string());
-                                modes.push(Grant::mode(grant).as_str());
-                            }
+                    let holder = record.grant().holder();
+                    let entry = holders
+                        .entry(holder.to_string())
+                        .or_insert_with(|| (holder, Vec::new()));
+                    let held = judged.grants.model().actions_of(record.grant());
+                    for action in &actions {
+                        if held.contains(action) && !entry.1.contains(&action) {
+                            entry.1.push(action);
                         }
-                        Err(error) if unanswered(&error) => return Err(error.into()),
-                        Err(_) => {}
                     }
                 }
-                if !may.is_empty() {
-                    permitted.push(ReachHolder {
-                        holder: text,
-                        actions: may,
-                        modes,
-                    });
+                let mut permitted = Vec::new();
+                for (text, (holder, held)) in holders {
+                    let mut may = Vec::new();
+                    let mut modes = Vec::new();
+                    for action in actions.iter().filter(|action| held.contains(action)) {
+                        let request = ExerciseRequest {
+                            caller: holder,
+                            route,
+                            resource: resource.clone(),
+                            action: action.clone(),
+                        };
+                        match judged.grants.explain_in(&frame, &request, at) {
+                            // A permit naming a grant the book no longer holds is
+                            // answered as not permitted, as `which` answers it.
+                            Ok(permit) => {
+                                if let Some(grant) = judged.grants.book().grant(permit.grant) {
+                                    may.push(action.to_string());
+                                    modes.push(Grant::mode(grant).as_str());
+                                }
+                            }
+                            Err(error) if unanswered(&error) => return Err(error.into()),
+                            Err(_) => {}
+                        }
+                    }
+                    if !may.is_empty() {
+                        permitted.push(ReachHolder {
+                            holder: text,
+                            actions: may,
+                            modes,
+                        });
+                    }
                 }
+                resources.push(ReachView {
+                    kind: wire.kind.clone(),
+                    id: wire.id.clone(),
+                    holders: permitted,
+                    restricted: judged.apps.is_restricted(&resource),
+                });
             }
-            resources.push(ReachView {
-                kind: wire.kind.clone(),
-                id: wire.id.clone(),
-                holders: permitted,
-                restricted: judged.apps.is_restricted(&resource),
-            });
-        }
-        Ok(Json(ReachAnswer {
-            revision: frame.revision(),
-            resources,
-            degraded: frame
-                .degradation()
-                .map(|held| crate::grants::DegradedView::from(held.as_ref())),
-        }))
-    })
+            Ok(Json(ReachAnswer {
+                revision: frame.revision(),
+                resources,
+                degraded: frame
+                    .degradation()
+                    .map(|held| crate::grants::DegradedView::from(held.as_ref())),
+            }))
+        },
+    )
 }

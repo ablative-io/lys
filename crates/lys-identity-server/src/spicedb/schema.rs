@@ -67,6 +67,9 @@ impl SpiceDb {
             mirror: self.mirror.clone(),
             relations: self.relations.clone(),
             scope: self.scope.clone(),
+            client: Arc::clone(&self.client),
+            tokens: Arc::clone(&self.tokens),
+            confirmed: Arc::clone(&self.confirmed),
             app_kinds: Mutex::new(
                 self.app_kinds
                     .lock()

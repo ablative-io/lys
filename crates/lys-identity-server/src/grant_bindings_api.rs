@@ -33,7 +33,6 @@ use serde::{Deserialize, Serialize};
 use crate::channel_membership::served_log;
 use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
-use crate::grants::with_grants;
 use crate::grants_batch::asker;
 use crate::routes::{AppState, identity_id};
 use crate::session::now;
@@ -129,59 +128,81 @@ pub async fn bind(
     let holder = identity_id(&request.sub)?;
     let log: GrantLog = served_log(&state)?;
     let at = now();
-    let (revision, dependencies) = with_grants(&state, |judged| {
-        // Settled and projected through the revision taken, or refused.
-        let frame = judged.grants.frame(judged.directory, None)?;
-        if let Some(degraded) = frame.degradation() {
-            return Err(GrantStreamError::BindingDegraded {
-                refusal: ServerError::Grant(degraded.error().clone()).name(),
+    let (revision, dependencies) = crate::grants_reads::with_read_grants(
+        &state,
+        None,
+        at,
+        |judged| {
+            let mut questions = Vec::new();
+            for text in &request.grants {
+                let id: GrantId = text.parse()?;
+                if let Some(grant) = judged.grants.book().grant(id) {
+                    for action in judged.grants.model().actions_of(grant) {
+                        questions.push(lys_identity::grants::ExerciseRequest {
+                            caller: holder,
+                            route: lys_identity::grants::Route::Api,
+                            resource: grant.resource().clone(),
+                            action: action.clone(),
+                        });
+                    }
+                }
             }
-            .into());
-        }
-        let revision = judged.grants.revision();
-        judged.grants.frame(judged.directory, Some(revision))?;
-        if let Some(held) = judged.grants.ledger().uncertain() {
-            return Err(GrantError::OperationUnresolved {
-                operation: held.operation.to_string(),
-                grant: held.grant.to_string(),
-            }
-            .into());
-        }
-        let book = judged.grants.book();
-        let mut dependencies = Vec::with_capacity(request.grants.len());
-        for text in &request.grants {
-            let id: GrantId = text.parse()?;
-            let grant = book.grant(id).ok_or_else(|| GrantError::GrantUnknown {
-                grant: text.clone(),
-            })?;
-            if grant.holder() != holder {
-                return Err(GrantError::NotHolder {
-                    caller: request.sub.clone(),
-                    grant: text.clone(),
+            Ok(questions)
+        },
+        |judged| {
+            // Settled and projected through the revision taken, or refused.
+            let frame = judged.grants.frame(judged.directory, None)?;
+            if let Some(degraded) = frame.degradation() {
+                return Err(GrantStreamError::BindingDegraded {
+                    refusal: ServerError::Grant(degraded.error().clone()).name(),
                 }
                 .into());
             }
-            if owner_of(grant.resource().kind()) != request.aud {
-                return Err(ServerError::NotAdmitted {
-                    reason: "a named grant is not on a kind the audience app owns",
+            let revision = judged.grants.revision();
+            judged.grants.frame(judged.directory, Some(revision))?;
+            if let Some(held) = judged.grants.ledger().uncertain() {
+                return Err(GrantError::OperationUnresolved {
+                    operation: held.operation.to_string(),
+                    grant: held.grant.to_string(),
+                }
+                .into());
+            }
+            let book = judged.grants.book();
+            let mut dependencies = Vec::with_capacity(request.grants.len());
+            for text in &request.grants {
+                let id: GrantId = text.parse()?;
+                let grant = book.grant(id).ok_or_else(|| GrantError::GrantUnknown {
+                    grant: text.clone(),
+                })?;
+                if grant.holder() != holder {
+                    return Err(GrantError::NotHolder {
+                        caller: request.sub.clone(),
+                        grant: text.clone(),
+                    }
+                    .into());
+                }
+                if owner_of(grant.resource().kind()) != request.aud {
+                    return Err(ServerError::NotAdmitted {
+                        reason: "a named grant is not on a kind the audience app owns",
+                    });
+                }
+                let lineage = effective(book, judged.directory, id, at)?;
+                dependencies.push(Dependency {
+                    grant: text.clone(),
+                    path: lineage.path.iter().map(ToString::to_string).collect(),
                 });
             }
-            let lineage = effective(book, judged.directory, id, at)?;
-            dependencies.push(Dependency {
-                grant: text.clone(),
-                path: lineage.path.iter().map(ToString::to_string).collect(),
-            });
-        }
-        if judged.grants.revision() != revision {
-            return Err(GrantStreamError::BindingRevisionMoved {
-                decided: revision,
-                now: judged.grants.revision(),
+            if judged.grants.revision() != revision {
+                return Err(GrantStreamError::BindingRevisionMoved {
+                    decided: revision,
+                    now: judged.grants.revision(),
+                }
+                .into());
             }
-            .into());
-        }
-        dependencies.sort_by(|a, b| a.grant.cmp(&b.grant));
-        Ok((revision, dependencies))
-    })?;
+            dependencies.sort_by(|a, b| a.grant.cmp(&b.grant));
+            Ok((revision, dependencies))
+        },
+    )?;
     let claims = BindingClaims {
         binding: BINDING_VERSION,
         iss: request.iss,

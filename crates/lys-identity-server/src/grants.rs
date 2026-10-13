@@ -225,9 +225,19 @@ pub(crate) fn decide_in<S: LeafStore>(
             .grants
             .explain_in_by(frame, &asked, only, at)
             .and_then(|permit| {
-                if let Relationships::SpiceDb(engine) = judged.grants.relationships()
-                    && !engine.check(&asked.resource, &asked.action, asked.caller, at)?
-                {
+                let allowed = match judged.prepared {
+                    Some(prepared) => prepared.permits(&asked)?,
+                    None => match judged.grants.relationships() {
+                        Relationships::SpiceDb(engine) => {
+                            engine.check(&asked.resource, &asked.action, asked.caller, at)?
+                        }
+                        #[cfg(not(test))]
+                        Relationships::Memory(_) => true,
+                        #[cfg(test)]
+                        Relationships::Memory(_) | Relationships::Fixture(_) => true,
+                    },
+                };
+                if !allowed {
                     return Err(GrantError::PermissionAbsent {
                         grant: permit.grant.to_string(),
                     });
@@ -302,6 +312,7 @@ pub struct Judged<'a, S: LeafStore = FileLeafStore> {
     pub root: PersonId,
     /// The apps, whose approved schemas say which kinds are judged at all.
     pub apps: &'a mut AppStore<S>,
+    pub(crate) prepared: Option<&'a crate::grants_reads::Prepared>,
 }
 
 /// Run `act` with the directory's projection, the apps and the grants, in
@@ -314,6 +325,15 @@ pub(crate) fn with_grants<T>(
     with_directory_grants(state, act, |_, answer| Ok(answer))
 }
 
+pub(crate) fn with_prepared_directory_grants<A, T>(
+    state: &AppState,
+    prepared: &crate::grants_reads::Prepared,
+    judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory_grants_model(state, true, Some(prepared), judge, apply)
+}
+
 /// Hold the directory and grants together for a directory mutation whose
 /// caller must first exercise an ordinary grant. No lock is reacquired.
 pub(crate) fn with_directory_grants<A, T>(
@@ -321,19 +341,20 @@ pub(crate) fn with_directory_grants<A, T>(
     judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
     apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, true, judge, apply)
+    with_directory_grants_model(state, true, None, judge, apply)
 }
 
 pub(crate) fn with_schema_grants<T>(
     state: &AppState,
     act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory_grants_model(state, false, act, |_, answer| Ok(answer))
+    with_directory_grants_model(state, false, None, act, |_, answer| Ok(answer))
 }
 
 fn with_directory_grants_model<A, T>(
     state: &AppState,
     require_model: bool,
+    prepared: Option<&crate::grants_reads::Prepared>,
     judge: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
     apply: impl FnOnce(&mut lys_identity::Directory<FileLeafStore>, A) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
@@ -383,6 +404,7 @@ fn with_directory_grants_model<A, T>(
             grants: &mut *grants,
             root,
             apps: &mut apps,
+            prepared,
         });
         // Every commit is made under this hold: its revision is signalled
         // before the hold ends, whether the act was answered or refused.
@@ -467,7 +489,28 @@ pub(crate) fn decide<S: LeafStore>(
         // A caller admitted by a grant token rests on that token's grant
         // alone; any other grant it holds is never considered.
         let only = crate::agent_signature::token_grant(asked.caller);
-        let decided =
+        let decided = if let Some(prepared) = judged.prepared {
+            prepared.frame(judged, &asked).and_then(|frame| {
+                if let Some(required) = at_least
+                    && frame.revision() < required
+                {
+                    return Err(GrantError::StaleDecision {
+                        required,
+                        projected: frame.revision(),
+                    });
+                }
+                if !prepared.permits(&asked)? {
+                    let permit = judged.grants.explain_in_by(&frame, &asked, only, at)?;
+                    return Err(GrantError::PermissionAbsent {
+                        grant: permit.grant.to_string(),
+                    });
+                }
+                match decision {
+                    Decision::Exercise => judged.grants.check_in_by(&frame, &asked, only, at),
+                    Decision::Explain => judged.grants.explain_in_by(&frame, &asked, only, at),
+                }
+            })
+        } else {
             engine_permits(judged.grants, judged.directory, &asked, at).and_then(
                 |()| match decision {
                     Decision::Exercise => {
@@ -481,7 +524,8 @@ pub(crate) fn decide<S: LeafStore>(
                             .explain_by(judged.directory, &asked, only, at, at_least)
                     }
                 },
-            );
+            )
+        };
         match decided {
             Ok(permit) => return Ok((permit, resource)),
             Err(error) => {

@@ -202,9 +202,17 @@ pub fn validate(
     action: &Action,
 ) -> Result<GrantId, TokenError> {
     let at = crate::session::now();
-    crate::grants::with_grants(state, |mut judged| {
-        Ok(scoped(state, &mut judged, token, resource, action, at))
-    })?
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        at,
+        |judged| {
+            Ok(crate::grants_reads::resource_questions(
+                judged, resource, action,
+            ))
+        },
+        |mut judged| Ok(scoped(state, &mut judged, token, resource, action, at)),
+    )?
 }
 
 /// Personal administration routes; token admission belongs to the consumer.
@@ -286,21 +294,31 @@ pub(crate) fn principal(
     action: &Action,
 ) -> Result<crate::agent_signature::TokenPrincipal, TokenError> {
     let at = crate::session::now();
-    crate::grants::with_grants(state, |mut judged| {
-        Ok((|| {
-            let grant = scoped(state, &mut judged, token, resource, action, at)?;
-            let holder = judged
-                .grants
-                .book()
-                .grant(grant)
-                .ok_or(TokenError::Unknown)?
-                .holder();
-            let IdentityId::Agent(holder) = holder else {
-                return Err(TokenError::HolderNotAgent);
-            };
-            Ok(crate::agent_signature::TokenPrincipal { holder, grant })
-        })())
-    })?
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        at,
+        |judged| {
+            Ok(crate::grants_reads::resource_questions(
+                judged, resource, action,
+            ))
+        },
+        |mut judged| {
+            Ok((|| {
+                let grant = scoped(state, &mut judged, token, resource, action, at)?;
+                let holder = judged
+                    .grants
+                    .book()
+                    .grant(grant)
+                    .ok_or(TokenError::Unknown)?
+                    .holder();
+                let IdentityId::Agent(holder) = holder else {
+                    return Err(TokenError::HolderNotAgent);
+                };
+                Ok(crate::agent_signature::TokenPrincipal { holder, grant })
+            })())
+        },
+    )?
 }
 
 fn scoped(

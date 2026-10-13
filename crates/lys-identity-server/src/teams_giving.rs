@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use crate::error::ServerError;
 use crate::error_holding::HoldingError;
 use crate::error_team::TeamError;
-use crate::grants::{Decision, Judged, decide, decide_as, with_grants};
+use crate::grants::{Decision, Judged, decide, decide_as};
 use crate::read_api::login;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::session::now;
@@ -141,34 +141,49 @@ pub(crate) fn add(
 ) -> Result<TeamChanged, ServerError> {
     let agent = actor.provenance().agent().ok_or(ServerError::NoPerson)?;
     crate::teams_migration::advance(state)?;
-    with_grants(state, |mut judged| {
-        crate::caller_admission::active_caller(judged.directory, actor)?;
-        let team_request = team_request(&mut judged, agent, &changed.team)?;
-        decide_as(
-            actor,
-            &mut judged,
-            &team_request,
-            changed.at,
-            None,
-            Decision::Explain,
-        )?;
-        with_teams(state, |store| {
-            let team = store.team(&changed.team).ok_or(TeamError::Unknown)?;
-            holds(team, agent)?;
-            let member_request = member_request(&mut judged, agent, &changed.member)?;
-            decide_member(&mut judged, &member_request, changed.at, Decision::Explain)?;
+    let question_team = changed.team.clone();
+    let question_member = changed.member.clone();
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        changed.at,
+        |judged| {
+            Ok(vec![
+                team_request(judged, agent, &question_team)?,
+                member_request(judged, agent, &question_member)?,
+            ])
+        },
+        |mut judged| {
+            crate::caller_admission::active_caller(judged.directory, actor)?;
+            let team_request = team_request(&mut judged, agent, &changed.team)?;
             decide_as(
                 actor,
                 &mut judged,
                 &team_request,
                 changed.at,
                 None,
-                Decision::Exercise,
+                Decision::Explain,
             )?;
-            decide_member(&mut judged, &member_request, changed.at, Decision::Exercise)?;
-            kept(store, Line::Added(changed))
-        })
-    })
+            with_teams(state, |store| {
+                let team = store.team(&changed.team).ok_or(TeamError::Unknown)?;
+                holds(team, agent)?;
+                let member_request = member_request(&mut judged, agent, &changed.member)?;
+                decide_member(&mut judged, &member_request, changed.at, Decision::Explain)?;
+                let frame = judged.grants.frame(judged.directory, None)?;
+                let mut exercises = vec![member_request];
+                if !matches!(
+                    actor.provenance().method(),
+                    lys_identity::AuthMethod::AgentPass(_)
+                ) {
+                    exercises.insert(0, team_request);
+                }
+                judged
+                    .grants
+                    .check_many_in(&frame, &exercises, changed.at)?;
+                kept(store, Line::Added(changed))
+            })
+        },
+    )
 }
 
 pub(crate) fn create(
@@ -187,35 +202,42 @@ pub(crate) fn create(
     })?;
     crate::teams_migration::advance(state)?;
     let at = now();
-    with_grants(state, |mut judged| {
-        crate::caller_admission::active_caller(judged.directory, actor)?;
-        let owner = judged
-            .directory
-            .record(IdentityId::Agent(agent))
-            .and_then(lys_identity::projection::Record::responsible)
-            .ok_or(ServerError::NoPerson)?;
-        let request = team_request(&mut judged, agent, &parent)?;
-        decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
-        with_teams(state, |store| {
-            let team = store.team(&parent).ok_or(TeamError::Unknown)?;
-            holds(team, agent)?;
-            if let Some(lead) = lead {
-                return Err(TeamError::LeadNotMember { team: id, lead }.into());
-            }
-            let line = Line::CreatedV1(CreatedV1 {
-                created: Created {
-                    id,
-                    owner: owner.to_string(),
-                    name,
-                    description,
-                    by: login(actor.binding()),
-                    at,
-                },
-                parent: Some(parent),
-                lead: None,
-            });
-            decide_as(actor, &mut judged, &request, at, None, Decision::Exercise)?;
-            kept(store, line)
-        })
-    })
+    let question_parent = parent.clone();
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        at,
+        |judged| Ok(vec![team_request(judged, agent, &question_parent)?]),
+        |mut judged| {
+            crate::caller_admission::active_caller(judged.directory, actor)?;
+            let owner = judged
+                .directory
+                .record(IdentityId::Agent(agent))
+                .and_then(lys_identity::projection::Record::responsible)
+                .ok_or(ServerError::NoPerson)?;
+            let request = team_request(&mut judged, agent, &parent)?;
+            decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
+            with_teams(state, |store| {
+                let team = store.team(&parent).ok_or(TeamError::Unknown)?;
+                holds(team, agent)?;
+                if let Some(lead) = lead {
+                    return Err(TeamError::LeadNotMember { team: id, lead }.into());
+                }
+                let line = Line::CreatedV1(CreatedV1 {
+                    created: Created {
+                        id,
+                        owner: owner.to_string(),
+                        name,
+                        description,
+                        by: login(actor.binding()),
+                        at,
+                    },
+                    parent: Some(parent),
+                    lead: None,
+                });
+                decide_as(actor, &mut judged, &request, at, None, Decision::Exercise)?;
+                kept(store, line)
+            })
+        },
+    )
 }

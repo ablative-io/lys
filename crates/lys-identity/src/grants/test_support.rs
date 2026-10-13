@@ -57,6 +57,32 @@ impl RelationshipStore for FailingRelationships {
         self.inner.write(revision, touch, delete)
     }
 
+    fn read_about(
+        &self,
+        subject: crate::IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<Relationship>, GrantError> {
+        let held = self.read()?;
+        super::about::select(
+            subject,
+            resource,
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.subject == *object)
+                    .cloned()
+                    .collect())
+            },
+            |object| {
+                Ok(held
+                    .iter()
+                    .filter(|row| row.resource == *object)
+                    .cloned()
+                    .collect())
+            },
+        )
+    }
+
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError> {
         self.up()?;
         self.inner.read()

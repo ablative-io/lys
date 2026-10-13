@@ -11,7 +11,7 @@ use crate::directory_views::{ReceiptAnswer, receipt_view};
 use crate::error::ServerError;
 use crate::error_holding::HoldingError;
 use crate::error_team::TeamError;
-use crate::grants::{Decision, decide_as, with_directory_grants};
+use crate::grants::{Decision, decide_as};
 use crate::routes::{AppState, Named, malformed, signed_in, with_directory};
 use crate::session::now;
 use crate::teams_state::Team;
@@ -98,8 +98,18 @@ pub(super) fn profile(
     };
     let agent = actor.provenance().agent().ok_or(ServerError::NoPerson)?;
     let at = now();
-    with_directory_grants(
+    crate::grants_reads::with_read_directory_grants(
         state,
+        None,
+        at,
+        |_| {
+            Ok(vec![ExerciseRequest {
+                caller: IdentityId::Agent(agent),
+                route: Route::Api,
+                resource: Resource::new("person", &person.to_string())?,
+                action: Action::new("write")?,
+            }])
+        },
         |mut judged| {
             crate::caller_admission::active_caller(judged.directory, actor)?;
             judged.apps.admit_kind(None, "person")?;

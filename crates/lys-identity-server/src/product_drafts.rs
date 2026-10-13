@@ -28,7 +28,7 @@ use crate::apps_binding::{Acting, acting};
 use crate::apps_error::AppError;
 use crate::error::ServerError;
 use crate::error_product_draft::ProductDraftError;
-use crate::grants::{Judged, with_directory_grants};
+use crate::grants::Judged;
 use crate::list_page::Page;
 use crate::routes::{AppState, hex, with_directory};
 use crate::session::now;
@@ -240,8 +240,20 @@ async fn create(
         }
         None => None,
     };
-    with_directory_grants(
+    let question_target = body.target.clone();
+    crate::grants_reads::with_read_directory_grants(
         &state,
+        None,
+        now(),
+        |judged| {
+            let caller = holder(&state, &headers, judged, passed)?;
+            Ok(vec![ExerciseRequest {
+                caller,
+                route: Route::Api,
+                resource: Resource::new(&question_target.kind, &question_target.id)?,
+                action: Action::new(&question_target.action)?,
+            }])
+        },
         |judged| judge(&state, &headers, judged, body, passed),
         |directory, created| {
             let draft = created.operation;

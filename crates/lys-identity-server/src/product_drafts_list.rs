@@ -69,22 +69,44 @@ pub(super) fn seen(
     headers: &HeaderMap,
 ) -> Result<Vec<ProductDraftRecord>, ServerError> {
     let actor = crate::routes::signed_in(state, headers)?;
-    crate::grants::with_grants(state, |mut judged| {
-        let person = crate::read_api::own_person(judged.directory, &actor)?;
-        let administrator = state.admission.is_administrator(judged.directory, &actor)?;
-        let records: Vec<ProductDraftRecord> = judged.directory.product_drafts().cloned().collect();
-        let mut seen = Vec::new();
-        for record in records {
-            if administrator
-                || record.created.holder == IdentityId::Person(person)
-                || record.created.responsible == person
-                || super::decide::may_grant(&mut judged, person, &record)
-            {
-                seen.push(record);
+    crate::grants_reads::with_read_grants(
+        state,
+        None,
+        crate::session::now(),
+        |judged| {
+            let person = crate::read_api::own_person(judged.directory, &actor)?;
+            judged
+                .directory
+                .product_drafts()
+                .map(|held| {
+                    let target = &held.created.target;
+                    Ok(lys_identity::grants::ExerciseRequest {
+                        caller: IdentityId::Person(person),
+                        route: lys_identity::grants::Route::Api,
+                        resource: lys_identity::grants::Resource::new(&target.kind, &target.id)?,
+                        action: lys_identity::grants::Action::new(&target.action)?,
+                    })
+                })
+                .collect()
+        },
+        |mut judged| {
+            let person = crate::read_api::own_person(judged.directory, &actor)?;
+            let administrator = state.admission.is_administrator(judged.directory, &actor)?;
+            let records: Vec<ProductDraftRecord> =
+                judged.directory.product_drafts().cloned().collect();
+            let mut seen = Vec::new();
+            for record in records {
+                if administrator
+                    || record.created.holder == IdentityId::Person(person)
+                    || record.created.responsible == person
+                    || super::decide::may_grant(&mut judged, person, &record)
+                {
+                    seen.push(record);
+                }
             }
-        }
-        Ok(seen)
-    })
+            Ok(seen)
+        },
+    )
 }
 
 /// One `page` of the product drafts the signed-in caller may see, with
