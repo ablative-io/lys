@@ -25,9 +25,22 @@ pub async fn ask(
             words: "runner never held it".to_owned(),
         });
     }
-    let answered = match holder_of(state, machine, &record, &act).await? {
-        Some(owner) => ask_exactly(state, machine, owner, act, false).await,
-        None => ask_exactly(state, machine, record, act, true).await,
+    let answered = match holder_of(state, machine, &record, &act).await {
+        Ok(Some(owner)) => ask_exactly(state, machine, owner, act, false).await,
+        Ok(None) => {
+            let answered = ask_exactly(state, machine, record, act, true).await;
+            // Only the machine runner's own answer proves it has no owner.
+            // A failed connection to an owner's socket proves nothing.
+            match answered {
+                Err(ServerError::Runner { refusal, .. })
+                    if session.is_some() && refusal == "runner_owner_unreachable" =>
+                {
+                    Err(unknown())
+                }
+                other => other,
+            }
+        }
+        Err(error) => Err(error),
     };
     if let Some(session) = &session
         && matches!(&answered, Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown")
@@ -35,6 +48,13 @@ pub async fn ask(
         record_unknown(state, machine, session)?;
     }
     answered
+}
+
+fn unknown() -> ServerError {
+    ServerError::Runner {
+        refusal: "session_unknown".to_owned(),
+        words: "runner never held it".to_owned(),
+    }
 }
 
 fn never_held(
@@ -110,15 +130,32 @@ async fn holder_of(
     if matches!(record, RunnerRecord::Dialled { .. }) {
         return Ok(None);
     }
-    match ask_exactly(state, machine, record.clone(), Act::Owned, true).await? {
+    let answer = match ask_exactly(state, machine, record.clone(), Act::Owned, true).await {
+        Err(ServerError::Runner { refusal, .. }) if refusal == "runner_owner_unreachable" => {
+            return Err(unknown());
+        }
+        other => other?,
+    };
+    match answer {
         Answer::Owned {
             owners,
             unreachable,
         } => {
-            if unreachable
+            if let Some(found) = unreachable
                 .iter()
-                .any(|found| found.seat.binding.session == session)
+                .find(|found| found.seat.binding.session == session)
             {
+                // A proved exit or reused pid means the recorded owner is gone;
+                // an unreadable kernel still leaves its authority unknown.
+                if matches!(
+                    found.unreachable,
+                    Some(
+                        lys_runner::seat_owner::recovery::Unreachable::Exited
+                            | lys_runner::seat_owner::recovery::Unreachable::PidReused { .. }
+                    )
+                ) {
+                    return Err(unknown());
+                }
                 return Err(ServerError::Runner {
                     refusal: "runner_owner_unreachable".to_owned(),
                     words: format!(
@@ -203,6 +240,40 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+    #[tokio::test]
+    async fn seatfix_reconcile_socket_down_never_ends_a_session() -> Result<(), Box<dyn Error>> {
+        let table = fixture().await?;
+        table.track("socket-down", "machine")?;
+        let dir = tempfile::tempdir()?;
+        let refused = super::ask(
+            &table.state,
+            "machine",
+            RunnerRecord::Socket {
+                path: dir
+                    .path()
+                    .join("absent.sock")
+                    .to_string_lossy()
+                    .into_owned(),
+            },
+            Act::Status {
+                session: Some("socket-down".to_owned()),
+            },
+        )
+        .await
+        .err()
+        .ok_or("unreachable socket answered")?;
+        assert_eq!(refused.name(), "runner_unreachable");
+        crate::runtime_api::with_runtime(&table.state, |store| {
+            let tracked = store
+                .session("socket-down")
+                .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?;
+            assert!(!tracked.stopped());
+            assert_eq!(tracked.reports.len(), 2);
+            Ok(())
+        })?;
+        table.finish().await
+    }
 
     #[tokio::test]
     async fn seatfix_unread_owner_evidence_never_ends_a_tracked_session()

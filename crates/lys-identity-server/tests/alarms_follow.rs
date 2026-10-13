@@ -82,7 +82,7 @@ macro_rules! alarms_follow {
                             },
                             Act::Owned => Answer::Owned { owners: Vec::new(), unreachable: Vec::new() },
                             Act::Status { session: Some(session) } => Answer::refusal(&lys_runner::RunnerError::refused(
-                                "session_unknown", format!("no session {session} is held"))),
+                                "runner_status_unavailable", format!("the fixture has no status evidence for session {session}"))),
                             other => return Err(std::io::Error::other(format!("unexpected alarm request {other:?}"))),
                         };
                         let reply = serde_json::to_string(&lys_runner::protocol::Reply {
