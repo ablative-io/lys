@@ -159,9 +159,11 @@ async fn a_slow_decision_releases_the_locks_for_an_unrelated_decision_and_refres
     );
     assert!(elapsed < Duration::from_secs(2));
     drop(release);
-    first
+    let answer = first
         .join()
         .map_err(|p| format!("decision panicked: {p:?}"))??;
+    assert_eq!(answer.results.len(), 1);
+    assert!(answer.results[0].allowed);
     Ok(())
 }
 
