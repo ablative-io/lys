@@ -115,6 +115,8 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `surface/identity/src/features/network-self-service.test.tsx` | the self-service add, connect and download rows under test | AGENTS-008 |
 | `crates/lys/src/identity/install/layout.rs` | the install's layout gains the clients folder | AGENTS-008 |
 | `crates/lys/src/cli/` | the lys CLI's seat and sign-in verbs | AGENTS-008 |
+| `crates/lys-identity-server/src/routes/` | the identities routes: a person registers and certifies their own agent | AGENTS-008 |
+| `crates/lys-identity-server/src/routes.rs` | the route table's administrator gate | AGENTS-008 |
 
 ## Inventory
 

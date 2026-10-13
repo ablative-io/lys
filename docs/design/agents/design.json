@@ -314,6 +314,16 @@
       "path": "crates/lys/src/cli/",
       "note": "the lys CLI's seat and sign-in verbs",
       "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes/",
+      "note": "the identities routes: a person registers and certifies their own agent",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes.rs",
+      "note": "the route table's administrator gate",
+      "brief": "AGENTS-008"
     }
   ],
   "principles": [

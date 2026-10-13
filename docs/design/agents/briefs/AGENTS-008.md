@@ -17,7 +17,7 @@ Thursday's person opens Lys in a browser, adds the computer in front of them, do
 
 ## Task
 
-Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name.
+Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name. Amendment 23:2x AEDT: R6 added from the ONBOARD-WALK record (section 3: the operator had to register the agent; routes/identities.rs:78 requires an administrator), because Cambium ACCESS-008 has the door certify a seat's key with the person's own pass.
 
 ## Requirements
 
@@ -119,6 +119,22 @@ THE SYSTEM SHALL, when a seat's harness reports an adapter named in QUALIFIED wi
 - modify: crates/lys-runner/src/harness_control.rs
 - modify: crates/lys-identity-server/src/runner_sessions.rs
 - modify: crates/lys/src/cli/seat.rs
+
+### R6: A person registers their own agent and certifies its key without an administrator
+
+THE SYSTEM SHALL let a signed-in person POST /agents to register an agent they answer for (holder.responsible = that person) and POST /agents/{id}/certificates to issue a certificate for an agent they answer for, with the same bodies, names and audit lines the administrator's calls write today; the administrator's calls and refusals SHALL stay as they are. A person naming another person as responsible, or certifying an agent they do not answer for, SHALL be refused NotAdmitted. The Agents screen SHALL show a signed-in person the add row for their own agent. This is what the Cambium ACCESS-008 Add seat relies on: the door asks POST /agents/{id}/certificates with the person's own pass.
+
+**Acceptance:**
+- Red (nextest, lys-identity-server): a person's POST /agents with themselves as responsible answers the agent and writes the same audit line as the administrator's; naming another person is refused NotAdmitted; today a person is refused outright (routes/identities.rs register_agent requires administrator).
+- Red: a person's POST /agents/{id}/certificates for their own agent answers the certificate and it appears in GET /agents/{id}/certificates and in the next pass's agent_key_thumbprints; for an agent they do not answer for it is refused NotAdmitted.
+- Red: the administrator's existing register and certificate tests pass unchanged.
+- Red (vitest, surface/identity): a signed-in non-administrator sees the add-agent row and the certificate issue act on their own agent.
+
+**Files:**
+- create: crates/lys-identity-server/src/routes/identities_self_tests.rs
+- modify: crates/lys-identity-server/src/routes/identities.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/routes.rs
 
 ## Boundaries
 
