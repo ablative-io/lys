@@ -1,0 +1,176 @@
+{
+  "id": "AGENTS-008",
+  "cluster": "agents",
+  "title": "A person joins their own computer, gets the lys client from Lys, and starts and reaches their agent from that computer as themselves",
+  "depends_on": [
+    "AGENTS-002",
+    "AGENTS-006",
+    "DIRECTORY-064"
+  ],
+  "blocked_by": [
+    "Tom, 13 Oct 2026 22:2x: people need an easy way to launch or reach their agents through Lys (a lys command wrapper or federated Lys), Thursday 15 and Friday 16 Oct onboard people, and a wrong refusal that stops a person using it is the failure that cannot happen.",
+    "The second-device walk of 13 Oct 2026 (Codex, ONBOARD-ANNABEL, record JOIN.md at 22:32 to 23:0x AEDT, base 307f6a6e, installed ca2da3f9) found the path a person would follow today: build the lys client from source on their Mac (no built client is offered anywhere; crates.io's `lys` is a stranger's crate); ask an administrator to add their computer, because the add row on #/network sits inside `admin ? ... : null` (surface/identity/src/features/network/Network.tsx:180-183) although network_api.rs line 4 already admits a person naming their own computer and AddComputerRow carries a selfService flag nobody passes (AddMachine.tsx:105-116); have the administrator declare a profile whose program is an absolute path on the device (provisioning_api/validation.rs:147-148) that the catalogue cannot see, because the catalogue reads the service host's PATH (harness_catalogue.rs:237-242); and then run nothing themselves, because `lys seat` and `lys attach` open the install's service configuration and send the operator token to loopback only (commands/seat_client.rs:86-108 and 310-321). The qualified list (lys-runner harness_control/process/qualified.rs:13-26) names Claude Code 2.1.296 and codex-cli 0.161.0-alpha.3 only. Annabel's laptop did not answer SSH (four exits 255; Tailscale offline), so no second device was proven.",
+    "Lands on Lys main by hand; a Codex lane implements it on the main checkout alongside the ACCESS-007 lane, in these files only, and the install is the one upgrade after both lanes' ENDs, not a second."
+  ],
+  "checklist": [],
+  "stories": [],
+  "design_anchor": [],
+  "purpose": "Thursday's person opens Lys in a browser, adds the computer in front of them, downloads the lys client Lys built, pastes one command, and from then on starts, sends to and watches their own agent from their own terminal as themselves. No administrator in the loop for their own computer and their own agent, no operator token off the service host, no source build, no certificate or key handed around: Lys is the one place and the one proof.",
+  "task": "Authoring START 2026-10-13 23:0x AEDT; source base 793d5fe9 (Lys main after the walk lanes' two commits). Waffles, from the ONBOARD-ANNABEL record. Decisions taken by Tom's rules, with reasons: (1) the client is served by the identity server from what the install was given, not from crates.io (the name is taken by a stranger) and not from a GitHub release (the repository is private and a person on day one has no key); (2) the person's CLI authenticates with a pass minted by the same authorization-code flow the MCP already runs (mcp_oauth.rs), because that flow exists, is proven, and a pass is already what AGENTS-006 writes to an owner-only file; (3) a harness whose adapter is qualified but whose version is newer than the qualified one is admitted and marked, not refused, because Tom's 13 Oct rule puts a wrong refusal above every polish fault, and the mark keeps DIRECTORY-064's proof honest; a harness whose adapter is unknown is still refused by name.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A signed-in person adds their own computer and gets its join code",
+      "spec": "THE SYSTEM SHALL show the add-computer row on #/network to every signed-in person, with selfService true for a person who is not an administrator so that 'Another computer' is the choice and 'This computer' is not offered to them, and SHALL answer that person's add with the Connect row (the join command and the one-use code, each with Copy) exactly as the administrator sees it today. The computer so added SHALL be owned by that person and SHALL allow that person's own agents by default (may_run), without an administrator's act. network_api.rs SHALL refuse, by its existing names, a person naming a computer for someone else.",
+      "acceptance": [
+        "Red (vitest, surface/identity): a signed-in non-administrator sees the add-computer row with 'This computer' disabled and 'Another computer' chosen; today the row is absent.",
+        "Red (vitest): after Add, the Connect row shows the command with /api in the server address and the code once, with Copy on each; Done hides it.",
+        "Red (nextest, lys-identity-server): POST /network/machines by a person for themselves answers the machine with owner = that person and may_run holding each agent the person owns; the same POST naming another person is refused NotAdmitted as today.",
+        "Red: the administrator's view is unchanged (the existing network tests pass)."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/network-self-service.test.tsx"
+        ],
+        "modify": [
+          "surface/identity/src/features/network/Network.tsx",
+          "surface/identity/src/features/network/AddMachine.tsx",
+          "surface/identity/src/features/network/JoinCode.tsx",
+          "crates/lys-identity-server/src/network_api.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R2",
+      "title": "The catalogue and the profile see the chosen computer's programs, not the service host's",
+      "spec": "THE SYSTEM SHALL answer the harness catalogue for a chosen machine by asking that machine's runner which harness programs it holds (absolute path, the version the program reports of itself, the adapter that fits), over the runner link the server already holds, and SHALL validate a declared profile's program against that machine's answer instead of the service host's PATH. A machine whose runner is not connected SHALL be answered with an empty catalogue named runner_unreachable in words, never with the service host's programs. The service host's own machine keeps today's behaviour because its runner answers the same way.",
+      "acceptance": [
+        "Red (nextest, lys-identity-server): with a fake runner for machine M answering two programs, GET the catalogue for M lists those two with their paths and versions and none of the host's; today the host's PATH is listed for every machine.",
+        "Red: a profile for M naming a program M's runner did not report is refused by name with the programs M reported; a program M reported is accepted.",
+        "Red (nextest, lys-runner): the runner answers the programs ask with the absolute path and the reported version of each harness found on its login PATH, and an empty list in words when none is found.",
+        "Red: a machine whose runner is disconnected answers runner_unreachable, not the host's programs."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/harness_catalogue_machine_tests.rs",
+          "crates/lys-runner/src/dial/programs.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/harness_catalogue.rs",
+          "crates/lys-identity-server/src/runner_client.rs",
+          "crates/lys-identity-server/src/runner_api.rs",
+          "crates/lys-identity-server/src/provisioning_api/validation.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-runner/src/dial.rs",
+          "crates/lys-runner/src/dial/dispatch.rs",
+          "crates/lys-runner/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R3",
+      "title": "Lys serves the lys client it was installed with",
+      "spec": "THE SYSTEM SHALL let `lys identity install` and `lys identity upgrade` take `--clients <dir>` holding one subfolder per platform (`aarch64-apple-darwin`, `x86_64-apple-darwin`, ...) each with `lys` and `lys-containment-entry` built at the install's commit, SHALL place them under the install as clients/<platform>/<sha>/, SHALL name them in build.json, and SHALL serve GET /api/clients and GET /api/clients/<platform>/<name> to any signed-in person, answering the file with its sha256 and the commit. The Connect row SHALL offer 'Download lys for this Mac' beside the join command, naming the commit, and SHALL say in words when no client is held for the person's platform. The host platform's client SHALL be taken from `--from` when `--clients` is absent, so the host platform is always served.",
+      "acceptance": [
+        "Red (nextest, lys): an install given --clients with two platforms places both, names both in build.json, and refuses a folder missing either binary by name; an upgrade replaces them and the previous set stays in the snapshot the way back uses (ACCESS-006 shape).",
+        "Red (nextest, lys-identity-server): GET /api/clients lists platforms and the commit; GET of a held file answers bytes whose sha256 matches the listing; an unknown platform answers client_platform_unknown in words; an unsigned ask is refused as every signed route is.",
+        "Red (vitest): the Connect row shows the download for the person's platform and the commit, and the words for a platform without a client.",
+        "Readback: on the installed server, the served lys for this Mac answers `--version` with the install's commit."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/clients_api.rs",
+          "crates/lys-identity-server/src/clients_api_tests.rs"
+        ],
+        "modify": [
+          "crates/lys/src/identity/install.rs",
+          "crates/lys/src/identity/upgrade.rs",
+          "crates/lys/src/identity/install/layout.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "surface/identity/src/features/network/JoinCode.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R4",
+      "title": "The lys client works from a person's own computer, as that person, with no install and no operator token",
+      "spec": "THE SYSTEM SHALL add `lys sign-in --server <base>`: it runs the authorization-code flow mcp_oauth.rs already serves, as a registered native client with a loopback redirect, opens the person's browser, receives the code on loopback, exchanges it for a pass and writes the pass owner-only under the client's own folder (the layout AGENTS-006 R3 writes agent passes to), never printing it. `lys seat list|start|stop|restart|send`, `lys attach` and `lys identity upgrade` not involved SHALL, when `--server` names a non-loopback address or no install is found, read that pass and send it as the bearer, so the server's signed routes answer as that person; the operator token path SHALL stay exactly as today for loopback with an install. A pass that has expired SHALL be refused in words naming `lys sign-in`, and `lys sign-in` SHALL refresh a pass it holds without the browser when the server allows it.",
+      "acceptance": [
+        "Red (nextest, lys): with a fake server, `lys sign-in --server http://127.0.0.1:<port>/api` opens the authorize address, takes the code on loopback, writes the pass at mode 0600, and prints only where it wrote and who it signed in as.",
+        "Red: `lys seat list --server https://<fake>` with no install reads the pass and sends it as the bearer; with no pass it is refused in words naming `lys sign-in`; today it is refused not_installed.",
+        "Red: `lys seat start <seat> --server https://<fake>` as a person who may run that seat's agent on that machine starts it; as a person who may not, the server's own NotAdmitted name is shown unchanged.",
+        "Red (nextest, lys-identity-server): the lys CLI client is registered for the code flow with a loopback redirect; a redirect to any other host is refused by the existing name.",
+        "Readback: from a second LYS_IDENTITY_HOME on this Mac with no install, `lys sign-in --server https://lys.ablative.com.au/api` then `lys seat list` answer as the signed-in person."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/commands/sign_in.rs",
+          "crates/lys/src/cli/sign_in.rs",
+          "crates/lys/tests/sign_in.rs"
+        ],
+        "modify": [
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/cli/seat.rs",
+          "crates/lys/src/commands/mod.rs",
+          "crates/lys/src/commands/seat_client.rs",
+          "crates/lys/src/commands/attach.rs",
+          "crates/lys-identity-server/src/mcp_oauth.rs",
+          "crates/lys-identity-server/src/mcp_oauth_flow.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R5",
+      "title": "A newer version of a qualified adapter is admitted and marked, never refused",
+      "spec": "THE SYSTEM SHALL, when a seat's harness reports an adapter named in QUALIFIED with a version other than the qualified one, start the seat and mark the start answer, the seat record and `lys seat list` with 'unqualified version <reported>; qualified <listed>', and SHALL keep refusing by name a harness whose adapter is not in QUALIFIED. The refusal and the mark SHALL name both versions in words. The QUALIFIED list itself SHALL change only by the pin commit DIRECTORY-064 R6 requires.",
+      "acceptance": [
+        "Red (nextest, lys-runner): a fake Claude Code reporting 2.1.300 with the claude-stream-json/1 adapter starts, and the start answer carries the mark with both versions; today the start is refused.",
+        "Red: a fake reporting an adapter not listed is refused by the existing name, unchanged.",
+        "Red: `lys seat list` shows the mark on a seat so started and nothing on a seat at the qualified version."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-runner/src/harness_control/process/qualified_mark_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-runner/src/harness_control/process/qualified.rs",
+          "crates/lys-runner/src/harness_control.rs",
+          "crates/lys-identity-server/src/runner_sessions.rs",
+          "crates/lys/src/cli/seat.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT send the operator token anywhere but a numeric loopback address, and SHALL NOT print, log or answer any pass, token, code or key.",
+    "SHALL NOT let a person add, retire or assign a computer that is not their own; the administrator's names and refusals in network_api.rs are kept.",
+    "SHALL NOT change the QUALIFIED list, the adapters, or the refusal of an unknown adapter.",
+    "SHALL NOT add a dependency, a git dependency or a [patch]; the loopback receiver and the browser opening use what the lys crate already has.",
+    "SHALL NOT add a configuration key the program does not write into the file itself with a backup and a log line (Tom, 12 Oct 2026).",
+    "SHALL NOT touch crates/lys-identity/src/grants, crates/lys-identity-server/src/grants.rs, spicedb*.rs or grants_batch.rs: those are the ACCESS-007 lane's files tonight.",
+    "SHALL NOT build or test until every line is written; one battery, and the one upgrade of the night after both lanes' ENDs."
+  ],
+  "verification": [
+    "sh scripts/design/gate.sh at the committed source; parse the validate, coverage and rendered-comparison lines, never the exit code alone.",
+    "cargo nextest run -p lys -p lys-identity-server -p lys-runner at the head with LYS_CLOCK_FIXTURE set as .land/gates.sh sets it, counts stated per crate; cargo test --doc; clippy pedantic -D warnings on the touched crates; cargo fmt; file-length gate 500 lines (ADR-111) on every touched file; vitest in surface/identity on this Mac.",
+    "Readback after the upgrade: a second LYS_IDENTITY_HOME on this Mac with no install downloads the served lys, signs in as a person Tom names or the proof person, adds a computer as that person, joins it with the code, starts a seat on it from the terminal, sends one turn, attaches, stops; each answer quoted. When Annabel's laptop answers SSH the same walk runs there and is quoted.",
+    "If this code were used in a hospital, the worst credible failure is a person's pass written where another login can read it, letting that login act as the person on every route; the owner-only write and its test are the guard, and the loopback-only operator rule is kept."
+  ]
+}

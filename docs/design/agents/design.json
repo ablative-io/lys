@@ -294,6 +294,26 @@
       "path": "surface/identity/tests/bare-buttons.standing.ts",
       "note": "keeps the existing canvas control count at its child module",
       "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/src/features/network/",
+      "note": "the Network screen: a person adds their own computer, gets its code and the lys client",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "surface/identity/src/features/network-self-service.test.tsx",
+      "note": "the self-service add, connect and download rows under test",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys/src/identity/install/layout.rs",
+      "note": "the install's layout gains the clients folder",
+      "brief": "AGENTS-008"
+    },
+    {
+      "path": "crates/lys/src/cli/",
+      "note": "the lys CLI's seat and sign-in verbs",
+      "brief": "AGENTS-008"
     }
   ],
   "principles": [

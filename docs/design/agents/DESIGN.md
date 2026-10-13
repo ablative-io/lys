@@ -111,6 +111,10 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `surface/identity/src/features/runtime/CanvasSurface.tsx` | the existing canvas separated from the operations wrapper to keep source files below 500 lines | AGENTS-007 |
 | `surface/identity/vite.config.ts` | discovers the network tree component acceptance tests | AGENTS-007 |
 | `surface/identity/tests/bare-buttons.standing.ts` | keeps the existing canvas control count at its child module | AGENTS-007 |
+| `surface/identity/src/features/network/` | the Network screen: a person adds their own computer, gets its code and the lys client | AGENTS-008 |
+| `surface/identity/src/features/network-self-service.test.tsx` | the self-service add, connect and download rows under test | AGENTS-008 |
+| `crates/lys/src/identity/install/layout.rs` | the install's layout gains the clients folder | AGENTS-008 |
+| `crates/lys/src/cli/` | the lys CLI's seat and sign-in verbs | AGENTS-008 |
 
 ## Inventory
 
