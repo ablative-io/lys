@@ -17,7 +17,6 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
@@ -58,6 +57,9 @@ pub enum RunnerRecord {
 impl RunnerRecord {
     /// The record, refused by name when a socket is not an absolute path
     /// or a key is not a key.
+    ///
+    /// # Errors
+    /// Refuses invalid socket paths and dial identities.
     pub fn checked(self) -> Result<Self, ServerError> {
         let malformed = |reason: &str| ServerError::RequestMalformed {
             reason: reason.to_owned(),
@@ -85,11 +87,13 @@ impl RunnerRecord {
 }
 
 /// Whether `text` is a runner's id: 32 lowercase hexadecimal characters.
+#[must_use]
 pub fn runner_id(text: &str) -> bool {
     text.len() == 32 && unhex(text).is_some()
 }
 
 /// The public key `text` spells.
+#[must_use]
 pub fn dial_key(text: &str) -> Option<[u8; 32]> {
     unhex(text).and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
 }
@@ -110,80 +114,8 @@ impl From<RunnerError> for ServerError {
 
 type Hook = Box<dyn FnOnce() + Send>;
 
-/// A caller's leaving: what closes the request it was waiting on.
-#[derive(Default)]
-pub struct Leave {
-    left: AtomicBool,
-    hook: Mutex<Option<Hook>>,
-}
-
-impl Leave {
-    /// Hold `hook` to run when the caller leaves; run at once when it has.
-    pub fn hold(&self, hook: Hook) -> Result<(), RunnerError> {
-        let mut held = match self.hook.lock() {
-            Ok(held) => held,
-            Err(error) => {
-                hook();
-                return Err(RunnerError::Unreachable {
-                    reason: format!("caller leave hook unavailable: {error}"),
-                });
-            }
-        };
-        if self.left.load(Ordering::SeqCst) {
-            drop(held);
-            hook();
-            return Ok(());
-        }
-        *held = Some(hook);
-        Ok(())
-    }
-
-    /// The caller left.
-    pub fn leave(&self) -> Result<(), RunnerError> {
-        self.left.store(true, Ordering::SeqCst);
-        let hook = self
-            .hook
-            .lock()
-            .map_err(|error| RunnerError::Unreachable {
-                reason: format!("caller leave hook unavailable: {error}"),
-            })?
-            .take();
-        if let Some(hook) = hook {
-            hook();
-        }
-        Ok(())
-    }
-
-    /// Whether the caller has left.
-    pub fn left(&self) -> bool {
-        self.left.load(Ordering::SeqCst)
-    }
-
-    /// The request was answered: nothing is left to close.
-    pub fn done(&self) -> Result<(), RunnerError> {
-        drop(
-            self.hook
-                .lock()
-                .map_err(|error| RunnerError::Unreachable {
-                    reason: format!("caller leave hook unavailable: {error}"),
-                })?
-                .take(),
-        );
-        Ok(())
-    }
-}
-
-/// Leaves when dropped: an HTTP handler holds one while it waits, so a
-/// caller that goes drops it.
-pub struct LeaveOnDrop(pub Arc<Leave>);
-
-impl Drop for LeaveOnDrop {
-    fn drop(&mut self) {
-        if let Err(error) = self.0.leave() {
-            tracing::error!("runner caller leave refused: {error}");
-        }
-    }
-}
+mod leave;
+pub use leave::{Leave, LeaveOnDrop};
 
 /// What a caller waiting on a dialled runner is answered: the reply line,
 /// or why there is none.
@@ -273,6 +205,9 @@ impl DialHub {
     }
 
     /// Whether `nonce` is new for `machine` in this epoch, holding it.
+    ///
+    /// # Errors
+    /// Returns a refusal when the dial hub lock is unavailable.
     pub fn fresh(&self, machine: &str, nonce: &str) -> Result<bool, ServerError> {
         Ok(self.with(machine, |held| held.nonces.insert(nonce.to_owned()))?)
     }
@@ -310,6 +245,9 @@ impl DialHub {
     /// Whether `machine`'s runner is dialled in now: a bridge of its waits
     /// for its next request, or holds one it has not yet answered. A runner
     /// that is not is never asked, since nothing would take the request.
+    ///
+    /// # Errors
+    /// Returns a refusal when the dial hub lock is unavailable.
     pub fn bridged(&self, machine: &str) -> Result<bool, RunnerError> {
         self.with(machine, |held| {
             held.bridges > 0 || !held.delivered.is_empty()
@@ -317,6 +255,9 @@ impl DialHub {
     }
 
     /// The next act for `machine` and its ticket, once there is one.
+    ///
+    /// # Errors
+    /// Returns dial hub failures while registering or taking the next request.
     pub async fn next(&self, machine: &str) -> Result<(String, Act), ServerError> {
         self.with(machine, |held| held.bridges += 1)?;
         let _waiting = Bridged { hub: self, machine };
@@ -336,6 +277,9 @@ impl DialHub {
     }
 
     /// Hand `reply` to the caller waiting on `ticket`.
+    ///
+    /// # Errors
+    /// Refuses unavailable hub state, an unknown ticket or a departed caller.
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
         let waiting = self.with(machine, |held| held.delivered.remove(ticket))?;
         let waiting = waiting.ok_or_else(|| {
@@ -359,17 +303,20 @@ pub struct Runners {
     own: Option<PathBuf>,
     hub: Arc<DialHub>,
     links: crate::runner_links::Links,
+    starts: Mutex<HashMap<(String, String), usize>>,
 }
 
 impl Runners {
     /// Runners reached with requests signed by `key`, this install's own at
     /// `own` when the configuration names it.
+    #[must_use]
     pub fn new(key: Arc<Ed25519Identity>, own: Option<PathBuf>) -> Self {
         Self {
             key,
             own,
             hub: Arc::new(DialHub::default()),
             links: crate::runner_links::Links::default(),
+            starts: Mutex::new(HashMap::new()),
         }
     }
 
@@ -390,6 +337,9 @@ impl Runners {
     }
 
     /// The request line for `act` to the runner that gave `greeting`.
+    ///
+    /// # Errors
+    /// Returns request encoding or signing failures.
     pub fn sign(&self, greeting: &Greeting, act: &Act) -> Result<String, RunnerError> {
         sign_request(&self.key, greeting, act)
     }
@@ -397,6 +347,9 @@ impl Runners {
     /// Ask `act` of `machine`'s runner, as `record` names it, until it
     /// answers or the caller leaves through `leave`. Blocks: run it off the
     /// async workers.
+    ///
+    /// # Errors
+    /// Returns connection, signing, protocol and caller cancellation failures.
     pub fn ask(
         &self,
         machine: &str,
@@ -439,6 +392,9 @@ impl Runners {
     /// leaves. A runner that dials in holds no connection the server can
     /// keep, and is refused by name: its grantable rules are then denied
     /// `grant_state_unavailable`.
+    ///
+    /// # Errors
+    /// Refuses missing sockets, dialled runners and connection or signing failures.
     pub fn grant_channel(
         &self,
         record: &RunnerRecord,
@@ -484,8 +440,10 @@ impl Runners {
     }
 }
 
+mod pending_starts;
 mod session;
 pub use session::ask;
+pub(crate) use session::outcome;
 use session::withdraw_on_leave;
 
 #[cfg(test)]

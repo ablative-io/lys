@@ -137,10 +137,18 @@ pub(crate) const WHICH: &[&str] = &[
 ];
 
 /// A profile review that can approve only the latest recorded version.
-pub(crate) const PROFILE_REVIEW: &[&str] = &["ProfileVersionReplaced"];
+pub(crate) const PROFILE_REVIEW: &[&str] = &[
+    "ProfileVersionReplaced",
+    "account_handle_unheld",
+    "account_provider_mismatch",
+    "SecretsUnavailable",
+];
 
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
+    "account_handle_unheld",
+    "account_provider_mismatch",
+    "SecretsUnavailable",
     "AgentHasNoPolicy",
     "AgentNotActive",
     "AgentNotVisible",
@@ -177,6 +185,8 @@ pub(crate) const START_RUNNER: &[&str] = &[
 
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
+    "account_handle_unheld",
+    "account_provider_mismatch",
     "AgentHasNoPolicy",
     "CertificatesUnavailable",
     "PolicyUnavailable",

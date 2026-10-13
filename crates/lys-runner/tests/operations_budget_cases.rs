@@ -1,5 +1,5 @@
 //! Budget delivery exercises through the identity routes and the real runner.
-use super::*;
+use super::{Table, TestResult, context, json};
 use lys_runner::operations::{OperationState, TextDigest};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -216,6 +216,28 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
         },
     )?;
     table.waited(&session, "Context is at 46 percent").await?;
+    let mut cursor = None;
+    loop {
+        let lys_runner::Answer::Feed { page } = client.ask(&lys_runner::Act::Feed {
+            cursor,
+            follow: true,
+        })?
+        else {
+            return Err("delivery wait was not answered with a feed page".into());
+        };
+        let settled = page.entries.iter().any(|entry| {
+            matches!(
+                &entry.body,
+                lys_runner::tracking_store::Body::Operation(outcome)
+                    if outcome.operation == operation
+                        && !matches!(outcome.state, OperationState::Accepted | OperationState::Delivering)
+            )
+        });
+        if settled {
+            break;
+        }
+        cursor = Some(page.cursor);
+    }
     assert_eq!(
         sessions.outcome(operation)?.state,
         OperationState::Delivered

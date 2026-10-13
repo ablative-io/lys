@@ -3,8 +3,7 @@
 use serde_json::json;
 
 use super::{
-    SEAT, Scene, TestResult, Value, operation, qualified_is_empty, scene, start_refused, support,
-    surviving,
+    SEAT, Scene, TestResult, Value, harness, operation, scene, start_refused, support, surviving,
 };
 
 /// Without a launched seat: import status and the completed manifest
@@ -65,11 +64,8 @@ async fn seat_import_survives_lifecycle() -> TestResult {
     scene.table.close()
 }
 
-/// DIRECTORY-064's pin, held: lys-runner's `QUALIFIED` list is empty and the
-/// imported seat's start is refused by name, nothing starting. When the
-/// pin lands and the start answers, this is the survival test: the seat's
-/// session survives an attachment exit, a service exit and an upgrade
-/// handoff ([`survives`]).
+/// The managed fixture starts through its owner and retains the same
+/// session across attachment exit, service restart and upgrade handoff.
 #[tokio::test(flavor = "multi_thread")]
 async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
     // A seat's start runs its owner as the workspace's `lys`; without it the
@@ -78,22 +74,11 @@ async fn seat_import_survives_lifecycle_once_qualified() -> TestResult {
         "owner_program_missing: build the workspace's lys binary beside the tests (cargo nextest run --workspace)",
     )?;
     let scene = scene().await?;
+    let confirmation = harness::install(&scene.table)?;
     let (plan, confirming, completed) = scene.imported().await?;
     let answer = scene.start().await?;
-    if answer.0 == 200 {
-        return survives(scene, &plan, &confirming, &completed).await;
-    }
-    assert!(
-        qualified_is_empty()?,
-        "lys-runner names a qualified binary, yet the start was refused: {}",
-        answer.1
-    );
-    start_refused(&answer);
-    assert_eq!(
-        surviving(scene.status().await?),
-        surviving(completed.clone())
-    );
-    scene.table.close()
+    assert_eq!(answer.0, 200, "managed fixture start refused: {}", answer.1);
+    survives(scene, &plan, &confirming, &completed, &confirmation).await
 }
 
 /// With the moved seat running: its session survives an attachment exit, a
@@ -104,11 +89,20 @@ async fn survives(
     plan: &Value,
     confirming: &str,
     completed: &Value,
+    confirmation: &std::os::unix::net::UnixListener,
 ) -> TestResult {
     let sessions = scene.seat_sessions().await?;
-    assert_eq!(sessions.len(), 1, "{sessions:?}");
-    let seat = scene.get(&format!("/seats/{SEAT}")).await?;
-
+    let diagnostics = if sessions.len() == 1 {
+        Value::Null
+    } else {
+        let runtime = scene.get("/runtime/live").await?;
+        let owners = scene.get("/seats/owned").await?;
+        let history = scene
+            .get(&format!("/agents/{}/runtime/sessions", scene.table.agent()))
+            .await?;
+        json!({"runtime":runtime,"owners":owners,"history":history,"native":harness::status(&scene.table)?})
+    };
+    assert_eq!(sessions.len(), 1, "{diagnostics}");
     // A correlated operation in flight across every event: the same send
     // answered the same way, never delivered twice.
     let sending = operation()?;
@@ -120,12 +114,15 @@ async fn survives(
         .post(&send_path, Some(&scene.table.ada), &send)
         .await?;
     assert_eq!(delivery.0, 200, "{}", delivery.1);
+    assert_eq!(delivery.1["operation"]["state"], "delivered");
+    let seat = scene.get(&format!("/seats/{SEAT}")).await?;
 
     scene.attach_and_exit().await?;
     assert_eq!(
         scene.seat_sessions().await?,
         sessions,
-        "attach exit moved the seat"
+        "attach exit moved the seat: {}",
+        harness::status(&scene.table)?
     );
 
     scene.table.service.restart().await?;
@@ -157,6 +154,7 @@ async fn survives(
         "the in-flight send was not resolved as itself"
     );
     assert_eq!(scene.get(&format!("/seats/{SEAT}")).await?, seat);
+    confirmed_message(&scene, confirmation, &send, &delivery.1).await?;
     assert_eq!(
         surviving(scene.status().await?),
         surviving(completed.clone())
@@ -176,6 +174,30 @@ async fn survives(
         "the importer restarted the seat"
     );
     scene.table.close()
+}
+
+async fn confirmed_message(
+    scene: &Scene,
+    confirmation: &std::os::unix::net::UnixListener,
+    send: &Value,
+    delivered: &Value,
+) -> TestResult {
+    let operation = send["operation"].as_str().ok_or("send operation missing")?;
+    harness::confirm(confirmation, &scene.table, operation)?;
+    let confirmed = scene
+        .table
+        .service
+        .post(&format!("/seats/{SEAT}/send"), Some(&scene.table.ada), send)
+        .await?;
+    assert_eq!(confirmed.0, 200, "{}", confirmed.1);
+    assert_eq!(confirmed.1["operation"]["operation"], operation);
+    assert_eq!(confirmed.1["operation"]["state"], "confirmed");
+    assert_eq!(
+        confirmed.1["operation"]["text"],
+        delivered["operation"]["text"]
+    );
+    assert_eq!(confirmed.1["session"], delivered["session"]);
+    Ok(())
 }
 
 /// The upgrade owner refuses the confirmation by name and the intent is
@@ -273,11 +295,7 @@ async fn seat_import_preserves_session_controls_and_message_prefix() -> TestResu
     let scene = scene().await?;
     let path = format!("/agents/{}/provisioning", scene.table.agent());
     let before = scene.get(&path).await?;
-    let session = &before["versions"]
-        .as_array()
-        .ok_or("versions missing")?
-        .last()
-        .ok_or("version missing")?["settings"]["session"];
+    let session = &before["profile"]["session"];
     assert_eq!(session["requires_controls"], true);
     assert_eq!(session["message_prefix"], "[Seat] ");
     let plan = scene.dry_run().await?;
@@ -290,10 +308,7 @@ async fn seat_import_preserves_session_controls_and_message_prefix() -> TestResu
     let after = scene.get(&path).await?;
     let versions = after["versions"].as_array().ok_or("versions missing")?;
     assert_eq!(versions.len(), 3);
-    assert_eq!(
-        versions.last().ok_or("imported version missing")?["settings"]["session"],
-        *session
-    );
+    assert_eq!(after["profile"]["session"], *session);
     scene.table.close()
 }
 

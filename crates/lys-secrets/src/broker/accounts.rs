@@ -45,7 +45,7 @@ impl<P: PermissionCheck> Broker<P> {
         let mut draw = parent.clone();
         let id = crate::HandleId::generate()?;
         let token = crate::HandleToken::generate()?;
-        draw.id = id.as_str().to_owned();
+        id.as_str().clone_into(&mut draw.id);
         draw.digest = crate::encoding::hex(&token.digest());
         draw.holder_key = crate::encoding::hex(&key);
         draw.parent = Some(source.to_owned());

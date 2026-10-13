@@ -181,44 +181,7 @@ fn page(session: &str, agent: &str, at: u64, kept: &str) -> TestResult<FeedPage>
             words: "denied".to_owned(),
         }),
     });
-    let binding = lys_runner::tracking_store::managed::Binding {
-        session: session.to_owned(),
-        generation: 1,
-        leader: lys_runner::peer::Leader {
-            pid: 42,
-            start: lys_runner::peer::StartIdentity("fixture-start".to_owned()),
-        },
-        conversation: "fixture-thread".to_owned(),
-        entry: lys_runner::tracking_store::managed::Executable {
-            path: "fixture-entry".to_owned(),
-            sha256: "fixture-entry-digest".to_owned(),
-        },
-        harness: lys_runner::tracking_store::managed::Executable {
-            path: "fixture-harness".to_owned(),
-            sha256: "fixture-harness-digest".to_owned(),
-        },
-        harness_version: "fixture-version".to_owned(),
-        adapter: "fixture-adapter/1".to_owned(),
-    };
-    for event in [
-        "turn_start",
-        "turn_end",
-        "turn_end",
-        "harness_compacted",
-        "harness_compacted",
-    ] {
-        entries.push(FeedEntry {
-            seq: u64::try_from(entries.len())?,
-            at,
-            session: session.to_owned(),
-            body: Body::Managed(lys_runner::tracking_store::managed::ManagedEvent {
-                binding: binding.clone(),
-                event: event.to_owned(),
-                turn: Some("fixture-turn".to_owned()),
-                operation: Some("fixture-operation".to_owned()),
-            }),
-        });
-    }
+    managed_entries(&mut entries, session, at)?;
     Ok(FeedPage {
         format: FEED_FORMAT.to_owned(),
         entries,
@@ -230,7 +193,8 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
     let expected = [None, Some("cursor-five"), Some("cursor-five")];
     let mut index = 0;
     let mut grant_seen = false;
-    while index < expected.len() || !grant_seen {
+    let mut finished = false;
+    while !finished {
         let (socket, _) = listener.accept().await.map_err(|error| error.to_string())?;
         let (read, mut write) = socket.into_split();
         let greeting = Greeting::fresh("0123456789abcdef0123456789abcdef");
@@ -257,6 +221,7 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
                 session,
                 control: None,
             },
+            Act::Status { session } => status(&page, session.as_deref())?,
             // A grant channel this stand-in closed is held again after the
             // next request it answers, so it may be asked for more than once.
             Act::GrantChannel => {
@@ -264,27 +229,40 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
                 Answer::GrantChannel
             }
             Act::Feed { cursor, follow } => {
-                let next = expected.get(index).ok_or("extra feed request")?;
-                if !follow || cursor.as_deref() != *next {
-                    return Err(format!(
-                        "unexpected feed cursor {cursor:?}, follow {follow}"
-                    ));
-                }
-                let answer = if index < 2 {
-                    Answer::Feed { page: page.clone() }
+                if index == expected.len() {
+                    if !grant_seen || !follow || cursor.as_deref() != Some("cursor-bad") {
+                        return Err(
+                            "final feed request did not acknowledge every fixture page".to_owned()
+                        );
+                    }
+                    finished = true;
+                    Answer::refusal(&lys_runner::RunnerError::refused(
+                        "fixture_feed_finished",
+                        "every fixture page was acknowledged",
+                    ))
                 } else {
-                    let mut invalid = page.clone();
-                    "cursor-bad".clone_into(&mut invalid.cursor);
-                    invalid.entries.truncate(1);
-                    "untracked-session".clone_into(&mut invalid.entries[0].session);
-                    let Body::Usage(record) = &mut invalid.entries[0].body else {
-                        return Err("missing fixture usage".to_owned());
+                    let next = expected.get(index).ok_or("extra feed request")?;
+                    if !follow || cursor.as_deref() != *next {
+                        return Err(format!(
+                            "unexpected feed cursor {cursor:?}, follow {follow}"
+                        ));
+                    }
+                    let answer = if index < 2 {
+                        Answer::Feed { page: page.clone() }
+                    } else {
+                        let mut invalid = page.clone();
+                        "cursor-bad".clone_into(&mut invalid.cursor);
+                        invalid.entries.truncate(1);
+                        "untracked-session".clone_into(&mut invalid.entries[0].session);
+                        let Body::Usage(record) = &mut invalid.entries[0].body else {
+                            return Err("missing fixture usage".to_owned());
+                        };
+                        "untracked-session".clone_into(&mut record.session);
+                        Answer::Feed { page: invalid }
                     };
-                    "untracked-session".clone_into(&mut record.session);
-                    Answer::Feed { page: invalid }
-                };
-                index += 1;
-                answer
+                    index += 1;
+                    answer
+                }
             }
             other => return Err(format!("unexpected feed fixture request: {other:?}")),
         };
@@ -299,6 +277,33 @@ async fn serve(listener: UnixListener, key: [u8; 32], page: FeedPage) -> Result<
             .map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+fn status(page: &FeedPage, only: Option<&str>) -> Result<Answer, String> {
+    let entry = page.entries.first().ok_or("fixture has no session")?;
+    if only.is_some_and(|session| session != entry.session) {
+        return Err("status requested an unknown fixture session".to_owned());
+    }
+    Ok(Answer::Status {
+        status: lys_runner::protocol::StatusView {
+            runner: "0123456789abcdef0123456789abcdef".to_owned(),
+            protocol: lys_runner::protocol::PROTOCOL_VERSION,
+            sessions: vec![lys_runner::protocol::SessionView {
+                session: entry.session.clone(),
+                pid: Some(42),
+                started_at: entry.at,
+                columns: 80,
+                rows: 40,
+                oldest: 0,
+                cursor: 0,
+                account: Some("shared-account".to_owned()),
+                moves: Vec::new(),
+                ended: None,
+                policy: None,
+                control: None,
+            }],
+        },
+    })
 }
 
 /// A machine named with a runner at a socket, one tracked session on it,
@@ -389,3 +394,45 @@ mod late;
 mod peers;
 #[path = "budget_feed/replay.rs"]
 mod replay;
+
+fn managed_entries(entries: &mut Vec<FeedEntry>, session: &str, at: u64) -> TestResult {
+    let binding = lys_runner::tracking_store::managed::Binding {
+        session: session.to_owned(),
+        generation: 1,
+        leader: lys_runner::peer::Leader {
+            pid: 42,
+            start: lys_runner::peer::StartIdentity("fixture-start".to_owned()),
+        },
+        conversation: "fixture-thread".to_owned(),
+        entry: lys_runner::tracking_store::managed::Executable {
+            path: "fixture-entry".to_owned(),
+            sha256: "fixture-entry-digest".to_owned(),
+        },
+        harness: lys_runner::tracking_store::managed::Executable {
+            path: "fixture-harness".to_owned(),
+            sha256: "fixture-harness-digest".to_owned(),
+        },
+        harness_version: "fixture-version".to_owned(),
+        adapter: "fixture-adapter/1".to_owned(),
+    };
+    for event in [
+        "turn_start",
+        "turn_end",
+        "turn_end",
+        "harness_compacted",
+        "harness_compacted",
+    ] {
+        entries.push(FeedEntry {
+            seq: u64::try_from(entries.len())?,
+            at,
+            session: session.to_owned(),
+            body: Body::Managed(lys_runner::tracking_store::managed::ManagedEvent {
+                binding: binding.clone(),
+                event: event.to_owned(),
+                turn: Some("fixture-turn".to_owned()),
+                operation: Some("fixture-operation".to_owned()),
+            }),
+        });
+    }
+    Ok(())
+}

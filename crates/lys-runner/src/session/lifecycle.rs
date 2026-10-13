@@ -34,6 +34,9 @@ mod managed;
 mod stream;
 mod terminal;
 
+#[cfg(test)]
+mod account_tests;
+
 pub(crate) use launch::{
     bound_directory, launched, tracking_started, trust_dialog, trust_recorded, window_limit,
 };
@@ -305,18 +308,7 @@ impl Sessions {
                 );
             }
         }
-        let pumped = Arc::clone(self);
-        let owned = id.to_owned();
-        let pumped_output = Arc::clone(&output);
-        let pump = match std::thread::Builder::new()
-            .name("runner-output".to_owned())
-            .spawn(move || {
-                if managed {
-                    pumped.managed_read(&owned, generation, reader);
-                } else {
-                    pumped.pump(&owned, generation, &pumped_output, reader);
-                }
-            }) {
+        let pump = match self.output_worker(id, generation, &output, reader, managed) {
             Ok(pump) => pump,
             Err(error) => {
                 let failure =

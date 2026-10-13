@@ -5,18 +5,9 @@
 //! either changes nothing and starts nothing; an upgrade owner's refusal and
 //! a lost reply are named and recovered into the same operation.
 //!
-//! Seat survival through a real launched binary waits on DIRECTORY-064's
-//! qualification pin: lys-runner's `QUALIFIED` list is empty, so no managed
-//! harness can start. A seat starts through its own owner (AGENTS-004 R1),
-//! and the owner asks the adapter's qualification once it runs; this
-//! service's fixture runner has no owner program to start, so here the
-//! imported seat's start is refused by name, `seat_owner_start_failed`,
-//! before any owner or harness exists, and that is what is asserted (the
-//! adapter's own `control_adapter_unqualified` is lys-runner's to prove). The survival
-//! legs are written whole in `survives`, called only from
-//! `seat_import_survives_lifecycle_once_qualified`, which asserts the list is
-//! empty and the refusal holds, and becomes the survival test itself the day
-//! the pin lands and the start answers.
+//! A versionless fixture proves the refused-start contract. A managed
+//! fixture supplies correlated initialization and turn envelopes through
+//! the ordinary owner process, so every session-survival leg executes.
 //!
 //! Every call goes through the public routes; every event is explicit (a
 //! restart that returns when the new service is ready, an attach the test
@@ -26,7 +17,7 @@
 pub mod support;
 
 use std::error::Error;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde_json::{Value, json};
 use support::{Table, operation};
@@ -37,8 +28,9 @@ const SEAT: &str = "waffles";
 /// The refusal a seat's start answers under this fixture: its owner cannot
 /// be started, so nothing starts.
 const START_REFUSED: &str = "seat_owner_start_failed";
-/// lys-runner's list of qualified launched binaries, empty until the pin.
-const QUALIFIED_EMPTY: &str = "const QUALIFIED: &[Qualification] = &[];";
+
+#[path = "seat_import_lifecycle/harness.rs"]
+mod harness;
 
 /// A service with one seat and its Claude resource folder.
 struct Scene {
@@ -104,14 +96,6 @@ async fn managed_version(table: &Table) -> TestResult {
         )
         .await?;
     Ok(())
-}
-
-/// Whether lys-runner's `QUALIFIED` list is still empty, read from its
-/// source as DIRECTORY-064's pin leaves it.
-fn qualified_is_empty() -> Result<bool, Box<dyn Error>> {
-    let process =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../lys-runner/src/harness_control/process.rs");
-    Ok(std::fs::read_to_string(process)?.contains(QUALIFIED_EMPTY))
 }
 
 /// What of an answer an event must leave unchanged: everything but the

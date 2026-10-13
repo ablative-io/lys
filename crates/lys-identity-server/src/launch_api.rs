@@ -41,7 +41,10 @@ mod kept;
 pub use kept::kept_launch;
 
 mod runner;
-use runner::{keep_with_runner, run};
+pub(crate) use runner::enforced;
+#[cfg(test)]
+use runner::keep_with_runner;
+use runner::run;
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -242,37 +245,7 @@ pub(crate) async fn start_as(
         Who::Caller(actor) => start_caller(state, headers, actor, &agent)?,
         Who::Admitted(by) => by,
     };
-    let admission = with_directory(state, |directory| {
-        let directory = directory.projection()?;
-        let parsed = AgentId::from_str(&agent)?;
-        let record = directory
-            .record(IdentityId::Agent(parsed))
-            .ok_or(ServerError::AgentNotVisible)?;
-        if let Some(kept) = admitted(state, &session, &agent)? {
-            return Ok(Admission::Kept(kept, admitted_by));
-        }
-        active(record.state())?;
-        let version = match profile {
-            Some(version) => version,
-            None => with_provisioning(state, |store| {
-                store
-                    .profile(&agent)
-                    .and_then(|profile| profile.versions.last().cloned())
-                    .ok_or(ServerError::LaunchRecordMissing)
-            })?,
-        };
-        reviewed(&version)?;
-        let held = crate::roles_api::held_roles(state, &agent, now())?;
-        let runtime = with_network(state, |store| {
-            let machine = placed(store, machine, (&agent, &held))?;
-            reaches(machine, &version)?;
-            machine
-                .runtime
-                .clone()
-                .ok_or(ServerError::MachineWithoutRuntime)
-        })?;
-        Ok(Admission::New(Box::new(version), runtime, admitted_by))
-    })?;
+    let admission = admit_start(state, (&agent, &session, machine), profile, admitted_by)?;
     let (version, runtime, admitted_by) = match admission {
         Admission::Kept(kept, admitted_by) => {
             if kept.get("conversation").and_then(Value::as_str) != conversation.as_deref() {
@@ -282,23 +255,7 @@ pub(crate) async fn start_as(
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
-    if let Some(conversation) = &conversation {
-        let harness = version
-            .settings
-            .harness
-            .as_ref()
-            .and_then(crate::launch_template::runner_harness);
-        let transport = match harness {
-            Some(lys_runner::tracking::Harness::ClaudeCode) => {
-                lys_runner::harness_control::Transport::Claude
-            }
-            Some(lys_runner::tracking::Harness::Codex) => {
-                lys_runner::harness_control::Transport::Codex
-            }
-            None => lys_runner::harness_control::Transport::Pty,
-        };
-        transport.validate_resume(conversation)?;
-    }
+    validate_conversation(&version, conversation.as_deref())?;
     let directory = match named {
         Some(given) => given,
         None => version
@@ -345,32 +302,29 @@ pub(crate) async fn start_as(
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
     })?;
-    let network = state
-        .network
-        .as_ref()
-        .ok_or(ServerError::MachineWithoutRunner)?;
-    // Session reads take runtime before network; admission must use the same order.
-    let kept = with_runtime(state, |store| {
-        keep_with_runner(network, machine, || {
-            store.report(Report {
-                operation: session.clone(),
-                session: session.clone(),
-                agent: Some(agent.clone()),
-                machine: machine.to_owned(),
-                state: Reported::Starting,
-                what: format!("start admitted, template {}", rendered.template_sha256),
-                confirmation: String::new(),
-                reported_by: admitted_by.clone(),
-                at: now(),
-                launch: Some(view),
-            })
-        })
-    })?;
+    let pending = state.runners.begin_start(machine, &session)?;
+    let kept = runner::keep_start(
+        state,
+        Report {
+            operation: session.clone(),
+            session: session.clone(),
+            agent: Some(agent.clone()),
+            machine: machine.to_owned(),
+            state: Reported::Starting,
+            what: format!("start admitted, template {}", rendered.template_sha256),
+            confirmation: String::new(),
+            reported_by: admitted_by.clone(),
+            at: now(),
+            launch: Some(view),
+        },
+    )?;
     let kept = kept
         .first()
         .and_then(|first| first.launch.clone())
         .ok_or(ServerError::RuntimeReportReused { operation: session })?;
-    run(state, kept, &admitted_by).await
+    let result = run(state, kept, &admitted_by).await;
+    drop(pending);
+    result
 }
 
 /// Authenticate the caller and require the existing start authority.
@@ -428,231 +382,67 @@ pub(crate) fn admitted(
             })
     })
 }
-/// A latest reviewed profile is applied only after its whole native launch ran.
-pub(crate) fn enforced(
-    state: &AppState,
-    agent: &str,
-    version: Option<&Version>,
-) -> Result<bool, ServerError> {
-    let Some(version) = version.filter(|version| version.reviewed.is_some()) else {
-        return Ok(false);
-    };
-    if state.runtime.is_none() {
-        return Ok(false);
+
+fn validate_conversation(version: &Version, conversation: Option<&str>) -> Result<(), ServerError> {
+    if let Some(conversation) = conversation {
+        let harness = version
+            .settings
+            .harness
+            .as_ref()
+            .and_then(crate::launch_template::runner_harness);
+        let transport = match harness {
+            Some(lys_runner::tracking::Harness::ClaudeCode) => {
+                lys_runner::harness_control::Transport::Claude
+            }
+            Some(lys_runner::tracking::Harness::Codex) => {
+                lys_runner::harness_control::Transport::Codex
+            }
+            None => lys_runner::harness_control::Transport::Pty,
+        };
+        transport.validate_resume(conversation)?;
     }
-    with_runtime(state, |store| {
-        for tracked in store
-            .sessions()
-            .iter()
-            .filter(|tracked| tracked.agent.as_deref() == Some(agent))
-        {
-            let Some(latest) = tracked.latest() else {
-                continue;
-            };
-            if latest.state != Reported::Running
-                || latest.reported_by != format!("the runner of machine {}", tracked.machine)
-                || !latest.what.starts_with("the runner started process ")
-            {
-                continue;
-            }
-            let Some(view) = tracked.first().and_then(|first| first.launch.as_ref()) else {
-                continue;
-            };
-            if view.get("provisioning_version").and_then(Value::as_u64)
-                != Some(u64::from(version.number))
-                || !view
-                    .get("left_out")
-                    .and_then(Value::as_array)
-                    .is_some_and(Vec::is_empty)
-            {
-                continue;
-            }
-            let template = view
-                .get("template")
-                .and_then(Value::as_str)
-                .ok_or_else(|| ServerError::LaunchUnrenderable {
-                    reason: "the running start names no template".to_owned(),
-                })?;
-            let digest = view
-                .get("template_sha256")
-                .and_then(Value::as_str)
-                .ok_or_else(|| ServerError::LaunchUnrenderable {
-                    reason: "the running start names no template digest".to_owned(),
-                })?;
-            let native = crate::launch_template::from_template(version, template, digest)?;
-            let handles: Vec<HandleName> =
-                serde_json::from_value(view.get("handles").cloned().ok_or_else(|| {
-                    ServerError::LaunchUnrenderable {
-                        reason: "the running start names no handles".to_owned(),
-                    }
-                })?)
-                .map_err(|error| ServerError::LaunchUnrenderable {
-                    reason: error.to_string(),
-                })?;
-            if view.get("command").and_then(Value::as_str)
-                == Some(crate::launch_template::command(&native, digest, &handles).as_str())
-            {
-                return Ok(true);
-            }
+    Ok(())
+}
+
+fn admit_start(
+    state: &AppState,
+    (agent, session, machine): (&str, &str, &str),
+    profile: Option<Version>,
+    admitted_by: String,
+) -> Result<Admission, ServerError> {
+    with_directory(state, |directory| {
+        let directory = directory.projection()?;
+        let parsed = AgentId::from_str(agent)?;
+        let record = directory
+            .record(IdentityId::Agent(parsed))
+            .ok_or(ServerError::AgentNotVisible)?;
+        if let Some(kept) = admitted(state, session, agent)? {
+            return Ok(Admission::Kept(kept, admitted_by));
         }
-        Ok(false)
+        active(record.state())?;
+        let version = match profile {
+            Some(version) => version,
+            None => with_provisioning(state, |store| {
+                store
+                    .profile(agent)
+                    .and_then(|profile| profile.versions.last().cloned())
+                    .ok_or(ServerError::LaunchRecordMissing)
+            })?,
+        };
+        reviewed(&version)?;
+        let held = crate::roles_api::held_roles(state, agent, now())?;
+        let runtime = with_network(state, |store| {
+            let machine = placed(store, machine, (agent, &held))?;
+            reaches(machine, &version)?;
+            machine
+                .runtime
+                .clone()
+                .ok_or(ServerError::MachineWithoutRuntime)
+        })?;
+        Ok(Admission::New(Box::new(version), runtime, admitted_by))
     })
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-    use std::error::Error;
-    use std::path::{Path, PathBuf};
-    use std::sync::{Arc, Mutex, TryLockError};
-
-    use lys_core::Ed25519Identity;
-    use serde_json::json;
-
-    use super::keep_with_runner;
-    use crate::error::ServerError;
-    use crate::network_store::{Machine, NetworkStore};
-    use crate::runner_client::RunnerRecord;
-    use crate::runtime_state::{Report, Reported};
-    use crate::runtime_store::RuntimeStore;
-
-    fn bytes(root: &Path) -> Result<BTreeMap<PathBuf, Vec<u8>>, Box<dyn Error>> {
-        let mut kept = BTreeMap::new();
-        for entry in std::fs::read_dir(root)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                kept.extend(bytes(&entry.path())?);
-            } else {
-                kept.insert(entry.path(), std::fs::read(entry.path())?);
-            }
-        }
-        Ok(kept)
-    }
-
-    fn remove_at_append(network: &Mutex<NetworkStore>, machine: &str) -> Result<bool, ServerError> {
-        match network.try_lock() {
-            Ok(mut store) => {
-                store.name_runner(machine, None)?;
-                Ok(true)
-            }
-            Err(TryLockError::WouldBlock) => Ok(false),
-            Err(TryLockError::Poisoned(error)) => Err(ServerError::NetworkUnavailable {
-                reason: format!("the network lock is poisoned: {error}"),
-            }),
-        }
-    }
-
-    #[test]
-    fn runner_removal_is_ordered_before_or_after_the_starting_append() -> Result<(), Box<dyn Error>>
-    {
-        let dir = tempfile::tempdir()?;
-        let runtime_path = dir.path().join("runtime");
-        let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
-        let mut runtime = RuntimeStore::open(&runtime_path, key)?;
-        let mut network = NetworkStore::open(&dir.path().join("network.json"))?;
-        let machine = "op-00000000000000000000000000000001";
-        network.name(Machine {
-            id: machine.to_owned(),
-            name: "Computer".to_owned(),
-            kind: "computer".to_owned(),
-            runtime: Some("sh".to_owned()),
-            slots: 1,
-            may_run: vec!["agent".to_owned()],
-            may_run_roles: Vec::new(),
-            may_reach: Vec::new(),
-            named_by: "person".to_owned(),
-            named_at: 1,
-            retired: None,
-            team: None,
-            creation_team: None,
-        })?;
-        network.name_runner(machine, Some(RunnerRecord::Lys))?;
-        network.name_runner(machine, None)?;
-        let network = Mutex::new(network);
-        let report = Report {
-            operation: "start".to_owned(),
-            session: "start".to_owned(),
-            agent: Some("agent".to_owned()),
-            machine: machine.to_owned(),
-            state: Reported::Starting,
-            what: "start admitted".to_owned(),
-            confirmation: String::new(),
-            reported_by: "person".to_owned(),
-            at: 1,
-            launch: Some(json!({"session": "start"})),
-        };
-        let before = bytes(&runtime_path)?;
-        let mut called = false;
-        let refused = keep_with_runner(&network, machine, || {
-            called = true;
-            runtime.report(report.clone())
-        });
-        assert!(
-            matches!(refused, Err(ServerError::MachineWithoutRunner)),
-            "{refused:?}"
-        );
-        assert!(!called, "removal before admission must prevent the append");
-        assert!(runtime.sessions().is_empty());
-        assert_eq!(bytes(&runtime_path)?, before);
-
-        network
-            .lock()
-            .map_err(|error| error.to_string())?
-            .name_runner(machine, Some(RunnerRecord::Lys))?;
-        let mut removed = None;
-        let held = keep_with_runner(&network, machine, || {
-            removed = Some(remove_at_append(&network, machine)?);
-            runtime.report(report.clone())
-        })?;
-        assert_eq!(
-            removed,
-            Some(false),
-            "runner removal completed between admission and the Starting append"
-        );
-        assert_eq!(held.first(), Some(&report));
-        assert_eq!(held.reports.len(), 1);
-        assert_eq!(runtime.sessions().len(), 1);
-        assert_eq!(
-            network
-                .lock()
-                .map_err(|error| error.to_string())?
-                .runner(machine),
-            Some(&RunnerRecord::Lys)
-        );
-        let appended = bytes(&runtime_path)?;
-        assert_ne!(appended, before);
-        assert!(
-            remove_at_append(&network, machine)?,
-            "the append must release the network lock"
-        );
-        assert!(
-            network
-                .lock()
-                .map_err(|error| error.to_string())?
-                .runner(machine)
-                .is_none()
-        );
-        assert_eq!(runtime.session("start"), Some(&held));
-        assert_eq!(bytes(&runtime_path)?, appended);
-
-        network
-            .lock()
-            .map_err(|error| error.to_string())?
-            .name_runner(machine, Some(RunnerRecord::Lys))?;
-        let failed = keep_with_runner(&network, machine, || {
-            Err(ServerError::RuntimeUnavailable {
-                reason: "append refused".to_owned(),
-            })
-        });
-        assert!(
-            matches!(failed, Err(ServerError::RuntimeUnavailable { ref reason }) if reason == "append refused")
-        );
-        assert_eq!(bytes(&runtime_path)?, appended);
-        assert!(
-            remove_at_append(&network, machine)?,
-            "a refused append must release the network lock"
-        );
-        assert_eq!(runtime.session("start"), Some(&held));
-        Ok(())
-    }
-}
+#[path = "launch_api/admission_tests.rs"]
+mod tests;

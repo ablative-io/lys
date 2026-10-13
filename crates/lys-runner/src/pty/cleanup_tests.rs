@@ -74,6 +74,8 @@ mod cycle_tests {
         unproved: Option<u32>,
         unregistered: Option<u32>,
         gone_on_registration: Option<u32>,
+        gone_on_basename: Option<u32>,
+        unreadable_basename: Option<u32>,
         unsignalled: Option<u32>,
         unreadable: bool,
         cancelled: bool,
@@ -101,7 +103,20 @@ mod cycle_tests {
             }
             Ok(())
         }
-        fn basename(&mut self, _: u32) -> Result<String, RunnerError> {
+        fn basename(&mut self, pid: u32) -> Result<String, RunnerError> {
+            if self.gone_on_basename == Some(pid) {
+                self.gone_on_registration = Some(pid);
+                return Err(RunnerError::refused(
+                    "end_failed",
+                    "process exited before basename",
+                ));
+            }
+            if self.unreadable_basename == Some(pid) {
+                return Err(RunnerError::refused(
+                    "end_failed",
+                    "basename permission denied",
+                ));
+            }
             Ok("harness".to_owned())
         }
         fn register(&mut self, pid: u32) -> Result<bool, RunnerError> {
@@ -160,6 +175,34 @@ mod cycle_tests {
             Err(rustix::io::Errno::PERM),
         )
     }
+    #[test]
+    fn an_exit_during_basename_read_is_confirmed_without_signalling() {
+        let mut ending = with_kernel(vec![vec![11]], |kernel| {
+            kernel.gone_on_basename = Some(11);
+        });
+        assert!(matches!(ending.wait(None), Left::Ended { .. }));
+        assert_eq!(ending.operations.actions, ["register:11"]);
+        assert_eq!(
+            ending.receipts.get(&11),
+            Some(&StartIdentity("first".to_owned()))
+        );
+    }
+
+    #[test]
+    fn an_unreadable_live_basename_still_refuses_cleanup() {
+        let mut ending = with_kernel(vec![vec![11]], |kernel| {
+            kernel.unreadable_basename = Some(11);
+        });
+        assert!(matches!(ending.wait(None), Left::Unended { .. }));
+        assert!(
+            !ending
+                .operations
+                .actions
+                .iter()
+                .any(|action| action.starts_with("signal:"))
+        );
+    }
+
     #[test]
     fn registration_esrch_ends_an_unreaped_member_after_one_listing() {
         let mut ending = with_kernel(vec![vec![11]], |kernel| {

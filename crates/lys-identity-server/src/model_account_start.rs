@@ -91,8 +91,7 @@ pub fn routed(
         .settings
         .harness
         .as_ref()
-        .map(|h| h.description.rendering_contract.as_str())
-        .unwrap_or("");
+        .map_or("", |h| h.description.rendering_contract.as_str());
     let providers: &[&str] = match contract {
         "claude-code/template-v1" => &["https://api.anthropic.com"],
         "codex/template-v1" => &[
@@ -170,42 +169,8 @@ pub(crate) async fn bind(
             .cloned()
             .ok_or(ServerError::ProfileVersionUnknown { version: number })
     })?;
-    let actor = lys_identity::PersonId::from_str(caller).map_err(|_| ServerError::NotAdmitted {
-        reason: "account binding requires its admitting person",
-    })?;
-    let held = crate::secrets_api::ask_as(
-        state,
-        &actor.to_string(),
-        axum::http::Method::GET,
-        &format!("/_lys/handles?holder={agent}"),
-        axum::body::Bytes::new(),
-    )
-    .await?;
-    let handles = held["handles"]
-        .as_array()
-        .ok_or_else(|| ServerError::SecretsUnavailable {
-            reason: "account handle inventory unreadable".to_owned(),
-        })?
-        .iter()
-        .filter(|h| h["dropped"] == false)
-        .map(|h| {
-            let id = h["id"]
-                .as_str()
-                .ok_or_else(|| ServerError::SecretsUnavailable {
-                    reason: "account handle id absent".to_owned(),
-                })?;
-            let secret = h["secret"]
-                .as_str()
-                .ok_or_else(|| ServerError::SecretsUnavailable {
-                    reason: "account handle secret absent".to_owned(),
-                })?;
-            Ok(HandleName {
-                id: id.to_owned(),
-                secret: secret.to_owned(),
-                env: String::new(),
-            })
-        })
-        .collect::<Result<Vec<_>, ServerError>>()?;
+    let actor = lys_identity::PersonId::from_str(caller)?;
+    let handles = held(state, &actor.to_string(), agent).await?;
     drop(accounts(&version, &handles)?);
     let inventory = crate::secrets_api::ask_as(
         state,
@@ -274,4 +239,44 @@ pub(crate) async fn bind(
         ),
     );
     Ok(())
+}
+
+async fn held(
+    state: &crate::routes::AppState,
+    person: &str,
+    agent: &str,
+) -> Result<Vec<HandleName>, ServerError> {
+    let held = crate::secrets_api::ask_as(
+        state,
+        person,
+        axum::http::Method::GET,
+        &format!("/_lys/handles?holder={agent}"),
+        axum::body::Bytes::new(),
+    )
+    .await?;
+    held["handles"]
+        .as_array()
+        .ok_or_else(|| ServerError::SecretsUnavailable {
+            reason: "account handle inventory unreadable".to_owned(),
+        })?
+        .iter()
+        .filter(|h| h["dropped"] == false)
+        .map(|h| {
+            let id = h["id"]
+                .as_str()
+                .ok_or_else(|| ServerError::SecretsUnavailable {
+                    reason: "account handle id absent".to_owned(),
+                })?;
+            let secret = h["secret"]
+                .as_str()
+                .ok_or_else(|| ServerError::SecretsUnavailable {
+                    reason: "account handle secret absent".to_owned(),
+                })?;
+            Ok(HandleName {
+                id: id.to_owned(),
+                secret: secret.to_owned(),
+                env: String::new(),
+            })
+        })
+        .collect::<Result<Vec<_>, ServerError>>()
 }

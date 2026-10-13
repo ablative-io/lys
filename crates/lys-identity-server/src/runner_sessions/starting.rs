@@ -11,6 +11,7 @@ pub(crate) async fn run_resuming(
     mut launch: Launch,
     conversation: Option<&str>,
 ) -> Result<Value, ServerError> {
+    let pending = state.runners.begin_start(machine, &launch.session)?;
     // Every start a runner is asked for comes here: none while everything is
     // stopped. A start already kept as starting is settled, not left open.
     if let Err(stopped) = crate::cord_api::refuse_start(state) {
@@ -45,7 +46,12 @@ pub(crate) async fn run_resuming(
             seat,
         )?
     };
-    let act = controls::select_resume(act, conversation)?;
+    // A replay reads the existing run; it does not select a second resume.
+    let act = if matches!(act, Act::Status { .. }) {
+        act
+    } else {
+        controls::select_resume(act, conversation)?
+    };
     let act = crate::seat_supervision::bind_owner(state, agent, machine, act)?;
     let missing_config = matches!(
         &act,
@@ -67,30 +73,7 @@ pub(crate) async fn run_resuming(
     } else {
         Ok(())
     };
-    let outcome = answer
-        .as_ref()
-        .map_or_else(ServerError::name, |answer| kind(answer).to_owned());
-    let outcome = if missing_config {
-        format!("{outcome}; LysMcpConfigMissing")
-    } else {
-        outcome
-    };
-    crate::runner_start_pass::record_after_end(ending, || {
-        keep_act(
-            state,
-            RunnerAct {
-                act: "start".to_owned(),
-                caller: caller.to_owned(),
-                session: driven.session.clone(),
-                agent: agent.to_owned(),
-                machine: machine.to_owned(),
-                at: now(),
-                text: None,
-                keys: Vec::new(),
-                outcome,
-            },
-        )
-    })?;
+    record_start_answer(state, &driven, caller, missing_config, &answer, ending)?;
     // A start the runner refused by name started nothing: the session kept
     // as starting is kept stopped, so a refused start leaves no session.
     let answer = match answer {
@@ -99,7 +82,42 @@ pub(crate) async fn run_resuming(
         }
         other => other,
     };
-    let (pid, started_at, ended) = match answer? {
+    let Running {
+        pid,
+        started_at,
+        ended,
+    } = record_answer(state, &driven, answer?)?;
+    // A pull recorded while the runner was starting this session never asked
+    // for it. The cord is read again now the session is tracked: under a
+    // pull its computer is asked again, and the start is refused.
+    if ended.is_none()
+        && let Err(stopped) = crate::cord_api::refuse_start(state)
+    {
+        crate::cord_pull::end_late_start(state, machine).await?;
+        return Err(stopped);
+    }
+    drop(pending);
+    Ok(json!({
+        "session": driven.session,
+        "state": if ended.is_some() { "ended" } else { "running" },
+        "pid": pid,
+        "started_at": started_at,
+        "ended": ended,
+    }))
+}
+
+struct Running {
+    pid: Option<u32>,
+    started_at: u64,
+    ended: Option<lys_runner::Ended>,
+}
+
+fn record_answer(
+    state: &AppState,
+    driven: &Driven,
+    answer: Answer,
+) -> Result<Running, ServerError> {
+    let (pid, started_at, ended) = match answer {
         Answer::Started {
             pid, started_at, ..
         } => (Some(pid), started_at, None),
@@ -119,7 +137,7 @@ pub(crate) async fn run_resuming(
         }
     };
     match (pid, &ended) {
-        (Some(pid), _) => record_running(state, &driven, pid)?,
+        (Some(pid), _) => record_running(state, driven, pid)?,
         (None, None) => {
             return Err(ServerError::Runner {
                 refusal: "runner_reply_malformed".to_owned(),
@@ -132,22 +150,46 @@ pub(crate) async fn run_resuming(
         (None, Some(_)) => {}
     }
     if let Some(ended) = &ended {
-        record_end(state, &driven, ended)?;
+        record_end(state, driven, ended)?;
     }
-    // A pull recorded while the runner was starting this session never asked
-    // for it. The cord is read again now the session is tracked: under a
-    // pull its computer is asked again, and the start is refused.
-    if ended.is_none()
-        && let Err(stopped) = crate::cord_api::refuse_start(state)
-    {
-        crate::cord_pull::end_late_start(state, machine).await?;
-        return Err(stopped);
-    }
-    Ok(json!({
-        "session": driven.session,
-        "state": if ended.is_some() { "ended" } else { "running" },
-        "pid": pid,
-        "started_at": started_at,
-        "ended": ended,
-    }))
+    Ok(Running {
+        pid,
+        started_at,
+        ended,
+    })
+}
+
+fn record_start_answer(
+    state: &AppState,
+    driven: &Driven,
+    caller: &str,
+    missing_config: bool,
+    answer: &Result<Answer, ServerError>,
+    ending: Result<(), ServerError>,
+) -> Result<(), ServerError> {
+    let outcome = answer
+        .as_ref()
+        .map_or_else(ServerError::name, |answer| kind(answer).to_owned());
+    let outcome = if missing_config {
+        format!("{outcome}; LysMcpConfigMissing")
+    } else {
+        outcome
+    };
+    crate::runner_start_pass::record_after_end(ending, || {
+        keep_act(
+            state,
+            RunnerAct {
+                act: "start".to_owned(),
+                caller: caller.to_owned(),
+                session: driven.session.clone(),
+                agent: driven.agent.clone(),
+                machine: driven.machine.clone(),
+                at: now(),
+                text: None,
+                keys: Vec::new(),
+                outcome,
+            },
+        )
+    })
+    .map(drop)
 }

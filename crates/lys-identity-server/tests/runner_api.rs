@@ -65,19 +65,9 @@ const BEA: &str = "bea-subject";
 /// reach an answer, a receipt or a record.
 const PLANTED: &str = "sk-planted-account-value-7c1e";
 
-async fn broker(request: Request) -> Response {
-    if request.uri().path() != "/_lys/handles" {
-        return axum::Json(json!({})).into_response();
-    }
-    let handles = ["h-live", "h-account-one", "h-account-two"].map(|id| {
-        json!({
-            "id": id, "secret": "model account", "max_uses": 10, "used": 1,
-            "not_after_ms": 0, "dropped": false, "spend_cap": null, "settled": 0,
-            "parent": null, "value": PLANTED, "token": PLANTED,
-        })
-    });
-    axum::Json(json!({ "holder": "any", "handles": handles })).into_response()
-}
+#[path = "runner_api/account_broker.rs"]
+mod account_broker;
+use account_broker::broker;
 
 fn login(subject: &str) -> Login {
     Login {
@@ -117,13 +107,19 @@ impl Table {
         let socket = dir.path().join("runner.sock");
         let state = dir.path().join("runner-state");
         let adjusted = socket.clone();
+        let accounts = session.get("accounts").is_some();
         let lines = Arc::clone(heard());
         let (service, (seeded, serving)) = Box::pin(Service::start_saying(
             GRANT_MODEL,
             None,
             Some(settings),
             None,
-            move |config| config.runner_socket = Some(adjusted),
+            move |config| {
+                config.runner_socket = Some(adjusted);
+                if accounts {
+                    config.model_proxy = Some(format!("http://{address}/anthropic"));
+                }
+            },
             Some(Arc::new(move |line: &str| {
                 lines
                     .lock()

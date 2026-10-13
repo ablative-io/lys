@@ -13,6 +13,7 @@ mod app_client_tests;
 mod args;
 mod callers;
 mod cli;
+mod command_run;
 mod files;
 mod manage;
 mod oauth_proxy;
@@ -38,7 +39,7 @@ mod view;
 mod view_tests;
 mod watched;
 
-use std::io::{Read, Write};
+use std::io::Read;
 use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches};
@@ -113,363 +114,31 @@ fn print_page(broker: &Broker<Grants>, page: &Page) -> Result<(), SecretsError> 
 
 fn run(command: Command) -> Result<(), SecretsError> {
     match command {
-        Command::Init(at) => {
-            let layout = Layout::new(&at.root, &at.keys);
-            layout.prepare()?;
-            Broker::create(
-                &layout.paths(),
-                Grants::File(FileGrants::new(layout.grants())),
-                Box::new(now_ms),
-            )?;
-            println!(
-                "broker made in {}; keys in {}",
-                at.root.display(),
-                at.keys.display()
-            );
+        Command::Init(_) | Command::Seal { .. } | Command::SealOauth { .. } => {
+            command_run::credentials(command)
         }
-        Command::Seal {
-            at,
-            name,
-            owner,
-            upstream,
-            header,
-            prefix,
-            spend_header,
-        } => {
-            let value = read_credential()?;
-            let layout = Layout::new(&at.root, &at.keys);
-            let mut broker = open(&at)?;
-            broker.seal(&name, &owner, &value)?;
-            layout.add_route(
-                &name,
-                Route {
-                    upstream,
-                    header,
-                    prefix,
-                    spend_header,
-                },
-            )?;
-            println!("sealed {name} ({} bytes, not shown)", value.len());
+        Command::SealRecord { .. } | Command::ReadRecord { .. } => command_run::records(command),
+        Command::Grant { .. }
+        | Command::Revoke { .. }
+        | Command::Scope { .. }
+        | Command::Recipients { .. } => command_run::permissions(command),
+        Command::Issue { .. } | Command::Drop { .. } | Command::SpawnLogin { .. } => {
+            command_run::handles(command)
         }
-        Command::Grant {
-            root,
-            identity,
-            secret,
-            by,
-            relation,
-        } => {
-            let relation = Relation::from(relation);
-            FileGrants::new(Layout::grants_in(&root)).set(
-                relation,
-                &identity,
-                &secret,
-                Some(&by),
-            )?;
-            println!(
-                "{identity} holds {} on {secret}, granted by {by}",
-                relation.label()
-            );
+        Command::AddAccount { .. }
+        | Command::NextAccount { .. }
+        | Command::RestoreAccount { .. }
+        | Command::Accounts { .. } => command_run::accounts(command),
+        Command::TrustService { .. } | Command::ServiceKey { .. } | Command::Sign { .. } => {
+            command_run::signing(command)
         }
-        Command::Revoke {
-            root,
-            identity,
-            secret,
-            relation,
-        } => {
-            let relation = Relation::from(relation);
-            FileGrants::new(Layout::grants_in(&root)).remove(relation, &identity, &secret)?;
-            println!(
-                "{identity} no longer holds {} on {secret}",
-                relation.label()
-            );
-        }
-        Command::Issue {
-            at,
-            identity,
-            holder_key,
-            secret,
-            uses,
-            minutes,
-            spend_cap,
-            directory,
-        } => {
-            let key = Ed25519Identity::load(&holder_key)?;
-            let holder = Holder {
-                identity,
-                key: key.public_key_bytes(),
-            };
-            let layout = Layout::new(&at.root, &at.keys);
-            let mut broker = open_with(&at, directory.grants(&layout)?)?;
-            let issued = broker.issue_capped(
-                &holder,
-                &secret,
-                uses,
-                now_ms().saturating_add(minutes.saturating_mul(60_000)),
-                spend_cap,
-            )?;
-            println!("handle_id {}", issued.id);
-            println!("handle {}", to_hex(issued.token.expose()));
-        }
-        Command::AddAccount {
-            at,
-            secret,
-            account,
-        } => {
-            let value = read_credential()?;
-            let mut broker = open(&at)?;
-            broker.add_account(&secret, &account, &value)?;
-            println!(
-                "sealed account {account} of {secret} ({} bytes, not shown)",
-                value.len()
-            );
-        }
-        Command::NextAccount { at, secret } => {
-            let mut broker = open(&at)?;
-            let account = broker.next_account(&secret)?;
-            println!("{secret} now uses account {account}");
-        }
-        Command::RestoreAccount {
-            at,
-            secret,
-            account,
-        } => {
-            let mut broker = open(&at)?;
-            broker.restore_account(&secret, &account)?;
-            println!("account {account} of {secret} is back in service");
-        }
-        Command::Accounts { at, secret } => {
-            let broker = open(&at)?;
-            for view in broker.store().accounts(&secret) {
-                let state = if view.resting {
-                    "resting"
-                } else if view.current {
-                    "in use"
-                } else {
-                    "ready"
-                };
-                println!("{:<16} {state}", view.account);
-            }
-        }
-        Command::Scope {
-            at,
-            secret,
-            by,
-            scope,
-        } => {
-            let scope = Scope::parse(&scope)?;
-            let target = scope.target();
-            open(&at)?.set_scope(&by, &secret, scope)?;
-            println!("{secret} is now in the scope {target}");
-        }
-        Command::Recipients {
-            at,
-            secret,
-            by,
-            people_only,
-        } => {
-            let policy = if people_only {
-                Recipients::PeopleOnly
-            } else {
-                Recipients::Anyone
-            };
-            open(&at)?.set_recipients(&by, &secret, policy)?;
-            println!("{secret} may now be handed to {}", policy.label());
-        }
-        Command::TrustService {
-            at,
-            name,
-            public_key,
-        } => {
-            let key = lys_secrets::from_hex(&public_key)
-                .filter(|bytes| bytes.len() == 32)
-                .ok_or_else(|| SecretsError::Encoding {
-                    context: "service public key",
-                    reason: "not 32 bytes in hex".to_owned(),
-                })?;
-            let layout = Layout::new(&at.root, &at.keys);
-            layout.trust_service(lys_secrets::ServiceKey {
-                name: name.clone(),
-                public_key: to_hex(&key),
-            })?;
-            println!("{name} may now ask on a signed-in person's behalf");
-        }
-        Command::ServiceKey { key } => {
-            let identity = Ed25519Identity::load_or_generate(&key)?;
-            println!("{}", to_hex(&identity.public_key_bytes()));
-        }
-        Command::List { at, identity } => {
-            for entry in open(&at)?.listing(&identity) {
-                println!(
-                    "{:<24} {:?} owned by {}",
-                    entry.name, entry.class, entry.owner
-                );
-            }
-        }
-        Command::Revocation { at, handle_id } => {
-            let state = open(&at)?.revocation_state(&HandleId::from_text(&handle_id))?;
-            let here = if state.stopped_here {
-                "stopped"
-            } else {
-                "still admitted"
-            };
-            println!("use here: {here}");
-            match state.upstream {
-                UpstreamRevocation::NotAsked => println!("provider: not asked"),
-                UpstreamRevocation::Unconfirmed(reason) => {
-                    println!("provider: unconfirmed ({reason})");
-                }
-                UpstreamRevocation::Confirmed => println!("provider: confirmed"),
-            }
-        }
-        Command::ConfirmRevocation {
-            at,
-            handle_id,
-            provider_subject,
-        } => {
-            let id = HandleId::from_text(&handle_id);
-            let changed = open(&at)?.confirm_upstream_revocation(&id, &provider_subject)?;
-            let said = if changed {
-                "now confirmed"
-            } else {
-                "was already confirmed"
-            };
-            println!("provider revocation of {handle_id} {said}");
-        }
-        Command::Drop {
-            at,
-            handle_id,
-            revoke_upstream,
-        } => {
-            let mut broker = open(&at)?;
-            let id = HandleId::from_text(&handle_id);
-            let outcome = broker.drop_handle(&id)?;
-            println!("{handle_id}: {outcome:?}");
-            if revoke_upstream {
-                let confirmed = oauth_proxy::revoke_after_drop(&mut broker, &id)?;
-                let said = if confirmed {
-                    "confirmed"
-                } else {
-                    "not confirmed"
-                };
-                println!("upstream revocation {said}");
-            }
-        }
-        Command::SealOauth {
-            at,
-            name,
-            owner,
-            upstream,
-        } => {
-            let layout = Layout::new(&at.root, &at.keys);
-            let subject = oauth_proxy::seal(
-                &mut open(&at)?,
-                &layout,
-                &name,
-                &owner,
-                upstream,
-                &read_credential()?,
-            )?;
-            println!("sealed OAuth grant {name} for {subject} (tokens not shown)");
-        }
-        Command::SpawnLogin {
-            at,
-            seat,
-            secret,
-            directory,
-        } => {
-            let layout = Layout::new(&at.root, &at.keys);
-            let mut broker = open_with(&at, directory.grants(&layout)?)?;
-            let (account, login) = broker.spawn_login(&seat, &secret)?;
-            std::io::stdout()
-                .write_all(login.expose())
-                .map_err(|source| SecretsError::Io {
-                    context: "writing the login to standard output".to_owned(),
-                    source,
-                })?;
-            eprintln!("{seat} took the login of {secret}@{account}");
-        }
-        Command::Sign {
-            key,
-            handle_id,
-            method,
-            path,
-            body,
-        } => {
-            let key = Ed25519Identity::load(&key)?;
-            let body = match body {
-                Some(file) => std::fs::read(&file).map_err(|error| SecretsError::Io {
-                    context: format!("reading {}", file.display()),
-                    source: error,
-                })?,
-                None => Vec::new(),
-            };
-            let presentation = Presentation::sign(
-                &HandleId::from_text(&handle_id),
-                &new_operation_id()?,
-                now_ms(),
-                request_digest(&method, &path, &body)?,
-                &key,
-            )?;
-            let [id, operation, signed_at, signature] = presentation.to_wire();
-            println!("lys-handle-id: {id}");
-            println!("lys-operation: {operation}");
-            println!("lys-signed-at: {signed_at}");
-            println!("lys-presentation: {signature}");
-        }
-        Command::Log { at, page } => print_page(&open(&at)?, &page)?,
-        Command::Audit(at) => {
-            let broker = open(&at)?;
-            let checked = broker.audit().audit_every_line()?.len();
-            println!(
-                "audit sound: every one of {checked} lines is signed by {}",
-                to_hex(&broker.audit().verifying_key())
-            );
-        }
-        Command::Serve {
-            at,
-            listen,
-            directory,
-        } => {
-            let layout = Layout::new(&at.root, &at.keys);
-            let broker = open_with(&at, directory.grants(&layout)?)?;
-            serve::serve(broker, layout, &listen)?;
-        }
-        Command::SealRecord {
-            at,
-            name,
-            owner,
-            class,
-        } => {
-            let value = read_credential()?;
-            let class = match class {
-                RecordClass::Memory => EntryClass::Memory,
-                RecordClass::Key => EntryClass::Key,
-            };
-            open(&at)?.seal_record(&name, class, &owner, &value)?;
-            println!("sealed {name} ({} bytes, not shown)", value.len());
-        }
-        Command::ReadRecord {
-            at,
-            identity,
-            name,
-            from,
-            len,
-            directory,
-        } => {
-            let layout = Layout::new(&at.root, &at.keys);
-            let mut broker = open_with(&at, directory.grants(&layout)?)?;
-            let piece = len.map(|len| from..from.saturating_add(len));
-            let piece = piece.or((from > 0).then_some(from..usize::MAX));
-            let read = broker.read_record(&identity, &name, piece)?;
-            std::io::stdout()
-                .write_all(read.expose())
-                .map_err(|source| SecretsError::Io {
-                    context: "writing the record to standard output".to_owned(),
-                    source,
-                })?;
-        }
+        Command::List { .. }
+        | Command::Revocation { .. }
+        | Command::ConfirmRevocation { .. }
+        | Command::Log { .. }
+        | Command::Audit { .. }
+        | Command::Serve { .. } => command_run::inspection(command),
     }
-    Ok(())
 }
 
 /// What `--version` prints after the name: the crate version and the commit

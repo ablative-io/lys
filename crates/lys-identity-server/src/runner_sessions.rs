@@ -60,6 +60,9 @@ pub struct Driven {
 
 /// The runner `machine`'s record names; none when it names none, or when
 /// the configuration keeps no machines.
+///
+/// # Errors
+/// Returns network configuration and store read failures.
 pub fn machine_runner(
     state: &AppState,
     machine: &str,
@@ -72,6 +75,9 @@ pub fn machine_runner(
 
 /// The agent's session `session`, as its runner drives it: a found
 /// session, or one on a machine naming no runner, is refused by name.
+///
+/// # Errors
+/// Refuses an unknown runtime session, an absent runner, or unavailable runtime and network stores.
 pub fn driven(state: &AppState, session: &str) -> Result<Driven, ServerError> {
     let tracked = with_runtime(state, |store| {
         store
@@ -128,6 +134,9 @@ pub(crate) fn usage_session(
 /// The caller, admitted to operate `agent` for `act`: the administrator,
 /// the person responsible for the agent, or the holder of a grant of
 /// `operate` on it. Anyone else is refused `not_permitted`, by name.
+///
+/// # Errors
+/// Refuses an unsigned, invisible or unpermitted caller, or an unavailable permission or directory store.
 pub fn operator(
     state: &AppState,
     headers: &HeaderMap,
@@ -197,6 +206,9 @@ fn runner_report(driven: &Driven, state: Reported, what: String, confirmation: S
 }
 
 /// Keep that the runner has `driven`'s process `pid` up, once.
+///
+/// # Errors
+/// Returns runtime store read or durable report failures.
 pub fn record_running(state: &AppState, driven: &Driven, pid: u32) -> Result<(), ServerError> {
     if state.runtime.is_none() {
         return Ok(());
@@ -221,6 +233,7 @@ pub fn record_running(state: &AppState, driven: &Driven, pid: u32) -> Result<(),
 }
 
 /// The runner's words for `ended`.
+#[must_use]
 pub fn confirmation(ended: &Ended) -> String {
     let how = match ended.how {
         EndedHow::Exited => "the process exited",
@@ -241,6 +254,9 @@ pub fn confirmation(ended: &Ended) -> String {
 }
 
 /// Keep `driven`'s end as its runner saw it, once.
+///
+/// # Errors
+/// Returns runtime report, pass revocation or budget context failures.
 pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<(), ServerError> {
     if state.runtime.is_none() {
         return crate::agent_pass::end_session(state, &driven.session);
@@ -265,6 +281,7 @@ pub fn record_end(state: &AppState, driven: &Driven, ended: &Ended) -> Result<()
 }
 
 /// The end an answer carries, when it carries one.
+#[must_use]
 pub fn ended_in(answer: &Answer) -> Option<&Ended> {
     match answer {
         Answer::Ended { ended, .. } => Some(ended),
@@ -279,6 +296,7 @@ pub fn ended_in(answer: &Answer) -> Option<&Ended> {
 }
 
 /// An answer's kind, as a receipt names the outcome.
+#[must_use]
 pub fn kind(answer: &Answer) -> &'static str {
     match answer {
         Answer::Started { .. } => "started",
@@ -308,6 +326,9 @@ pub fn kind(answer: &Answer) -> &'static str {
 }
 
 /// Keep `act`, answering its receipt.
+///
+/// # Errors
+/// Returns an unavailable act store or a durable receipt failure.
 pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerError> {
     let mut acts = state
         .acts
@@ -405,10 +426,17 @@ impl Launcher for DirectoryLauncher {
                 Ok(launch) => launch,
                 Err(refused) => return Some(Err(refused)),
             };
+            let pending = match self.0.runners.begin_start(&record.machine, &driven.session) {
+                Ok(pending) => pending,
+                Err(refused) => return Some(Err(refused)),
+            };
             if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
                 return Some(Err(refused));
             }
-            Some(run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await)
+            let result =
+                run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await;
+            drop(pending);
+            Some(result)
         })
     }
 }

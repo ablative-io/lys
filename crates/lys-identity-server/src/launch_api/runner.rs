@@ -1,9 +1,24 @@
 //! Admitted launches retain their runner checks and their selected conversation.
 
 use super::{AppState, Arc, Json, ServerError, Value, kept_launch, with_provisioning};
+use crate::launch_template::HandleName;
 use crate::network_store::NetworkStore;
-use crate::runtime_state::Tracked;
+use crate::provisioning_store::Version;
+use crate::runtime_api::with_runtime;
+use crate::runtime_state::{Report, Reported, Tracked};
 use std::sync::Mutex;
+
+pub(super) fn keep_start(state: &AppState, report: Report) -> Result<Tracked, ServerError> {
+    let network = state
+        .network
+        .as_ref()
+        .ok_or(ServerError::MachineWithoutRunner)?;
+    let machine = report.machine.clone();
+    // Session reads take runtime before network; admission must use the same order.
+    with_runtime(state, |store| {
+        keep_with_runner(network, &machine, || store.report(report))
+    })
+}
 
 pub(super) fn keep_with_runner(
     network: &Mutex<NetworkStore>,
@@ -55,4 +70,75 @@ pub(super) async fn run(
     let mut view = view;
     view["runner"] = ran;
     Ok(Json(view))
+}
+
+/// A latest reviewed profile is applied only after its whole native launch ran.
+pub(crate) fn enforced(
+    state: &AppState,
+    agent: &str,
+    version: Option<&Version>,
+) -> Result<bool, ServerError> {
+    let Some(version) = version.filter(|version| version.reviewed.is_some()) else {
+        return Ok(false);
+    };
+    if state.runtime.is_none() {
+        return Ok(false);
+    }
+    with_runtime(state, |store| {
+        for tracked in store
+            .sessions()
+            .iter()
+            .filter(|tracked| tracked.agent.as_deref() == Some(agent))
+        {
+            let Some(latest) = tracked.latest() else {
+                continue;
+            };
+            if latest.state != Reported::Running
+                || latest.reported_by != format!("the runner of machine {}", tracked.machine)
+                || !latest.what.starts_with("the runner started process ")
+            {
+                continue;
+            }
+            let Some(view) = tracked.first().and_then(|first| first.launch.as_ref()) else {
+                continue;
+            };
+            if view.get("provisioning_version").and_then(Value::as_u64)
+                != Some(u64::from(version.number))
+                || !view
+                    .get("left_out")
+                    .and_then(Value::as_array)
+                    .is_some_and(Vec::is_empty)
+            {
+                continue;
+            }
+            let template = view
+                .get("template")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ServerError::LaunchUnrenderable {
+                    reason: "the running start names no template".to_owned(),
+                })?;
+            let digest = view
+                .get("template_sha256")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ServerError::LaunchUnrenderable {
+                    reason: "the running start names no template digest".to_owned(),
+                })?;
+            let native = crate::launch_template::from_template(version, template, digest)?;
+            let handles: Vec<HandleName> =
+                serde_json::from_value(view.get("handles").cloned().ok_or_else(|| {
+                    ServerError::LaunchUnrenderable {
+                        reason: "the running start names no handles".to_owned(),
+                    }
+                })?)
+                .map_err(|error| ServerError::LaunchUnrenderable {
+                    reason: error.to_string(),
+                })?;
+            if view.get("command").and_then(Value::as_str)
+                == Some(crate::launch_template::command(&native, digest, &handles).as_str())
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    })
 }

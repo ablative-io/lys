@@ -343,6 +343,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/secrets/scope" "Scope a secret" S [SIGNED_BODY, &["LendingNotPermitted"]] scope("secret", "secret.scope", []);
     POST "/secrets/recipients" "A secret's recipients" S [SIGNED_BODY] scope("secret", "secret.recipients", []);
     POST "/secrets/drop" "Drop a secret handle" S [SIGNED_BODY] scope("secret", "secret.drop", []);
+    POST "/secrets/accounts/hold" "Issue a held model account handle" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "account_handle_unheld", "account_provider_mismatch", "account_proxy_key_invalid"]] scope("secret", "secret.account.hold", []);
     POST "/secrets/add" "Add a secret with its value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "SecretExists", "SecretRetired", "OperationReused", "RouteInvalid", "ValueEmpty"]] scope("secret", "secret.add", []);
     POST "/secrets/replace" "Change a secret's value" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted", "ValueEmpty"]] scope("secret", "secret.replace", []);
     POST "/secrets/retire" "Retire a secret" S [SIGNED_BODY, &["NoPerson", "SecretsUnavailable", "LendingNotPermitted"]] scope("secret", "secret.retire", []);
@@ -360,8 +361,8 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
-    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped", "LaunchUnrenderable"]] scope("agent", "agent.start", ["id"]);
-    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped"]] scope("launch-record", "launch-record.start-again", ["id"]);
+    POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped", "LaunchUnrenderable", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("agent", "agent.start", ["id"]);
+    POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);
     POST "/launch-records/{id}/withdraw" "Withdraw a launch" S [SIGNED_BODY] scope("launch-record", "launch-record.withdraw", ["id"]);
     GET "/launch-records/{id}/state" "A launch's state" S [SIGNED] scope("launch-record", "read", ["id"]);
     GET "/changes" "Wait for the next change signal" S [SIGNED, &["RequestMalformed", "RuntimeUnavailable"]] scope("change", "read", []);

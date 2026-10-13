@@ -90,7 +90,7 @@ pub async fn hold(State(shared): State<Arc<Shared>>, request: Request) -> Answer
             .store()
             .entry(&asked.secret)
             .is_some_and(|e| e.class == EntryClass::Credential);
-        let routed = routes.get(&asked.secret).is_some_and(|route| {
+        let permitted_route = routes.get(&asked.secret).is_some_and(|route| {
             [
                 "https://api.anthropic.com",
                 "https://api.openai.com",
@@ -100,7 +100,7 @@ pub async fn hold(State(shared): State<Arc<Shared>>, request: Request) -> Answer
                 && route.header == "authorization"
                 && route.prefix == "Bearer "
         });
-        if !credential || !routed {
+        if !credential || !permitted_route {
             return Err(refusal("account_provider_mismatch", &asked.secret));
         }
         let holder = lys_secrets::Holder {

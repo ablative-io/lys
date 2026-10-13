@@ -166,18 +166,7 @@ pub(crate) fn admitted(
 }
 
 /// One session of the runner's own knowledge (the contract's `LivenessView`).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Live {
-    pub(crate) session: String,
-    pub(crate) pid: Option<u32>,
-    pub(crate) alive: bool,
-    pub(crate) managed: bool,
-    pub(crate) harness_session: Option<String>,
-    pub(crate) turn_active: bool,
-    pub(crate) last_signal_at: Option<u64>,
-    pub(crate) started_at: u64,
-    pub(crate) ended: bool,
-}
+pub(crate) use lys_runner::liveness::LivenessView as Live;
 
 /// What `machine`'s runner knows of `session`, or of every session it
 /// holds when none is named.
@@ -192,20 +181,7 @@ pub(crate) async fn liveness(
         }
     })?;
     match crate::runner_client::ask(state, machine, runner, Act::Liveness { session }).await? {
-        Answer::Liveness { sessions } => Ok(sessions
-            .into_iter()
-            .map(|view| Live {
-                session: view.session,
-                pid: view.pid,
-                alive: view.alive,
-                managed: view.managed,
-                harness_session: view.harness_session,
-                turn_active: view.turn_active,
-                last_signal_at: view.last_signal_at,
-                started_at: view.started_at,
-                ended: view.ended,
-            })
-            .collect()),
+        Answer::Liveness { sessions } => Ok(sessions),
         other => Err(ServerError::Runner {
             refusal: "runner_reply_malformed".to_owned(),
             words: format!("a liveness read was answered {}", kind(&other)),
@@ -261,8 +237,21 @@ pub(crate) async fn act(
     } else {
         act
     };
-    let answered =
-        crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), act).await;
+    let answered = match act {
+        Act::Outcome { operation } => {
+            crate::runner_client::outcome(
+                state,
+                &driven.machine,
+                driven.runner.clone(),
+                &driven.session,
+                &operation,
+            )
+            .await
+        }
+        other => {
+            crate::runner_client::ask(state, &driven.machine, driven.runner.clone(), other).await
+        }
+    };
     if let Some(ended) = answered.as_ref().ok().and_then(ended_in) {
         record_end(state, driven, ended)?;
     }

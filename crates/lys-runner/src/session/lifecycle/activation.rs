@@ -1,8 +1,32 @@
 //! Failed activation is reaped and recorded before its refusal is returned.
 use super::{Ended, EndedHow, FailedActivation, Sessions, now_ms, stop_follower};
 use crate::error::RunnerError;
+use std::io::Read;
+use std::sync::Arc;
 
 impl Sessions {
+    pub(super) fn output_worker(
+        self: &Arc<Self>,
+        id: &str,
+        generation: u64,
+        output: &Arc<crate::session::output::OutputHandle>,
+        reader: Box<dyn Read + Send>,
+        managed: bool,
+    ) -> std::io::Result<std::thread::JoinHandle<()>> {
+        let pumped = Arc::clone(self);
+        let owned = id.to_owned();
+        let output = Arc::clone(output);
+        std::thread::Builder::new()
+            .name("runner-output".to_owned())
+            .spawn(move || {
+                if managed {
+                    pumped.managed_read(&owned, generation, reader);
+                } else {
+                    pumped.pump(&owned, generation, &output, reader);
+                }
+            })
+    }
+
     pub(super) fn activation_failed(
         &self,
         id: &str,

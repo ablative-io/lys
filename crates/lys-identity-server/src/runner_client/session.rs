@@ -10,6 +10,9 @@ use std::sync::mpsc;
 /// for it: the machine's runner does not hold an owner's session, and
 /// answered every read, input, keys, operation and end on one
 /// `session_unknown`.
+///
+/// # Errors
+/// Returns runner, owner discovery, runtime store and credential revocation refusals.
 pub async fn ask(
     state: &Arc<crate::routes::AppState>,
     machine: &str,
@@ -17,7 +20,36 @@ pub async fn ask(
     act: Act,
 ) -> Result<Answer, ServerError> {
     let session = act.session().map(str::to_owned);
-    if let Some(session) = &session
+    ask_for(state, machine, record, act, session.as_deref()).await
+}
+
+pub(crate) async fn outcome(
+    state: &Arc<crate::routes::AppState>,
+    machine: &str,
+    record: RunnerRecord,
+    session: &str,
+    operation: &str,
+) -> Result<Answer, ServerError> {
+    ask_for(
+        state,
+        machine,
+        record,
+        Act::Outcome {
+            operation: operation.to_owned(),
+        },
+        Some(session),
+    )
+    .await
+}
+
+async fn ask_for(
+    state: &Arc<crate::routes::AppState>,
+    machine: &str,
+    record: RunnerRecord,
+    act: Act,
+    session: Option<&str>,
+) -> Result<Answer, ServerError> {
+    if let Some(session) = session
         && never_held(state, machine, session)?
     {
         return Err(ServerError::Runner {
@@ -25,7 +57,7 @@ pub async fn ask(
             words: "runner never held it".to_owned(),
         });
     }
-    let answered = match holder_of(state, machine, &record, &act).await {
+    let answered = match holder_of(state, machine, &record, session).await {
         Ok(Some(owner)) => ask_exactly(state, machine, owner, act, false).await,
         Ok(None) => {
             let answered = ask_exactly(state, machine, record, act, true).await;
@@ -42,7 +74,7 @@ pub async fn ask(
         }
         Err(error) => Err(error),
     };
-    if let Some(session) = &session
+    if let Some(session) = session
         && matches!(&answered, Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown")
     {
         record_unknown(state, machine, session)?;
@@ -84,28 +116,43 @@ fn record_unknown(
     if state.runtime.is_none() {
         return Ok(());
     }
-    let agent = crate::runtime_api::with_runtime(state, |store| {
-        let Some(tracked) = store.session(session) else {
-            return Ok(None);
-        };
-        if tracked.machine != machine || tracked.stopped() {
-            return Ok(None);
-        }
-        let agent = tracked.agent.clone();
-        store.report(crate::runtime_state::Report {
-            operation: format!("runner-never-held-{session}"),
-            session: session.to_owned(),
-            agent: agent.clone(),
-            machine: machine.to_owned(),
-            state: crate::runtime_state::Reported::Stopped,
-            what: "session_unknown".to_owned(),
-            confirmation: "runner never held it".to_owned(),
-            reported_by: format!("the runner of machine {machine}"),
-            at: crate::session::now(),
-            launch: None,
+    let (pending, agent) = state
+        .runners
+        .with_pending_start(machine, session, |dispatching| {
+            crate::runtime_api::with_runtime(state, |store| {
+                let Some(tracked) = store.session(session) else {
+                    return Ok((false, None));
+                };
+                if tracked.machine != machine || tracked.stopped() {
+                    return Ok((false, None));
+                }
+                // Only an active dispatch can explain absence before the runner starts.
+                if dispatching
+                    && tracked.latest().is_some_and(|report| {
+                        report.state == crate::runtime_state::Reported::Starting
+                    })
+                {
+                    return Ok((true, None));
+                }
+                let agent = tracked.agent.clone();
+                store.report(crate::runtime_state::Report {
+                    operation: format!("runner-never-held-{session}"),
+                    session: session.to_owned(),
+                    agent: agent.clone(),
+                    machine: machine.to_owned(),
+                    state: crate::runtime_state::Reported::Stopped,
+                    what: "session_unknown".to_owned(),
+                    confirmation: "runner never held it".to_owned(),
+                    reported_by: format!("the runner of machine {machine}"),
+                    at: crate::session::now(),
+                    launch: None,
+                })?;
+                Ok((false, agent))
+            })
         })?;
-        Ok(agent)
-    })?;
+    if pending {
+        return Ok(());
+    }
     crate::agent_pass::end_session(state, session)?;
     if let Some(agent) = agent {
         crate::budgets_context::finish(state, &agent, session)?;
@@ -114,7 +161,7 @@ fn record_unknown(
     Ok(())
 }
 
-/// The runner of the seat owner holding the session `act` names, when the
+/// The runner of the seat owner holding the bound session, when the
 /// machine's runner lists one: asked as `Act::Owned`. A dialled machine's
 /// owners are not reached by a socket here, and an act naming no session,
 /// a start among them, is the machine runner's own.
@@ -122,9 +169,9 @@ async fn holder_of(
     state: &Arc<crate::routes::AppState>,
     machine: &str,
     record: &RunnerRecord,
-    act: &Act,
+    session: Option<&str>,
 ) -> Result<Option<RunnerRecord>, ServerError> {
-    let Some(session) = act.session() else {
+    let Some(session) = session else {
         return Ok(None);
     };
     if matches!(record, RunnerRecord::Dialled { .. }) {
@@ -230,6 +277,10 @@ pub(super) fn withdraw_on_leave(
         }
     })
 }
+
+#[cfg(test)]
+#[path = "pending_start_tests.rs"]
+mod pending_start_tests;
 
 #[cfg(test)]
 mod tests {

@@ -361,7 +361,7 @@ pub(crate) async fn bind_proxy(
         .await
         .map_err(|error| unavailable(&format!("account proxy key unreadable: {error}")))?;
     let path = "/_lys/account/bind";
-    let body=serde_json::to_vec(&serde_json::json!({"broker":broker.base,"run":run,"agent":agent,"provider":provider,"accounts":rotation.accounts,"proxy_key":key.trim()})).map_err(|_|unavailable("account binding encoding failed"))?;
+    let body=serde_json::to_vec(&serde_json::json!({"broker":broker.base,"run":run,"agent":agent,"provider":provider,"accounts":rotation.accounts,"proxy_key":key.trim()})).map_err(|error|unavailable(&format!("account binding encoding failed: {error}")))?;
     let [service, on_behalf_of, operation, signed_at, signature] = crate::secrets_sign::headers(
         &crate::secrets_sign::Asked {
             service: &broker.service,

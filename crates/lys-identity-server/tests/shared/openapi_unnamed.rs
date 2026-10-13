@@ -154,6 +154,10 @@ pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
         "the secrets broker's own answer, forwarded",
     ),
     (
+        "post /secrets/accounts/hold",
+        "the secrets broker's own answer, forwarded",
+    ),
+    (
         "post /secrets/add",
         "the secrets broker's own answer, forwarded",
     ),
@@ -298,6 +302,10 @@ pub(crate) const NO_BODY: &[(&str, &str)] = &[
     ),
     (
         "post /secrets/drop",
+        "forwards its bytes to the secrets broker unread",
+    ),
+    (
+        "post /secrets/accounts/hold",
         "forwards its bytes to the secrets broker unread",
     ),
     (

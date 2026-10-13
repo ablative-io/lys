@@ -40,6 +40,7 @@ async fn serve_late(
                     session,
                     control: None,
                 },
+                Act::Status { session } => status(&page, session.as_deref())?,
                 Act::Folders { .. } => Answer::Folders {
                     under: "/".to_owned(),
                     folders: Vec::new(),

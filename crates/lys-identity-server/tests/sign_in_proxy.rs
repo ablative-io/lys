@@ -64,7 +64,16 @@ async fn a_trusted_proxy_with_no_client_address_returns_its_named_refusal()
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
         .build()?;
-    for forwarded in [None, Some("not-an-address")] {
+    let direct = client
+        .post(format!("{}/sign-in", service.base))
+        .header("content-type", "application/json")
+        .body(r#"{"email":"person@example.test","password":"Correct-Password-For-Test1"}"#)
+        .send()
+        .await?;
+    assert_eq!(direct.status(), 401);
+    let direct: serde_json::Value = direct.json().await?;
+    assert_eq!(direct["refusal"], "SignInRefused", "{direct}");
+    for forwarded in [Some("not-an-address")] {
         for path in [
             "/sign-in",
             "/setup/open",
