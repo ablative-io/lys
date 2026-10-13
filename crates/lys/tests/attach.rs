@@ -224,7 +224,8 @@ fn a_seat_is_followed_from_each_pages_cursor_until_it_ends() -> TestResult {
         "cursor": 3,
         "ended": true,
     });
-    let (address, handle) = serve(vec![(200, first), (200, second)])?;
+    let seat = json!({ "name": "waffles", "session": "session-1", "transport": "managed" });
+    let (address, handle) = serve(vec![(200, seat), (200, first), (200, second)])?;
     install(root.path(), &address, Some(TOKEN))?;
     let output = lys(root.path(), &["attach", "waffles"])?;
     let requests = served(handle)?;
@@ -235,9 +236,10 @@ fn a_seat_is_followed_from_each_pages_cursor_until_it_ends() -> TestResult {
     );
     assert!(!printed(&output).contains(TOKEN));
 
-    let [opening, next] = requests.as_slice() else {
-        return Err(format!("expected two requests, read {requests:?}").into());
+    let [lookup, opening, next] = requests.as_slice() else {
+        return Err(format!("expected lookup and two frame reads, read {requests:?}").into());
     };
+    assert!(lookup.starts_with("GET /api/seats/waffles HTTP/1.1\r\n"));
     assert!(
         opening.starts_with("POST /api/seats/waffles/attach HTTP/1.1\r\n"),
         "{opening}"
@@ -257,14 +259,18 @@ fn a_seat_is_followed_from_each_pages_cursor_until_it_ends() -> TestResult {
 #[test]
 fn a_refused_attach_is_shown_by_the_servers_name() -> TestResult {
     let root = tempfile::tempdir()?;
-    let (address, handle) = serve(vec![(
-        403,
-        json!({
-            "refusal": "seat_attach_refused",
-            "reason": "only the seat's responsible person or an administrator may attach",
-            "fields": [],
-        }),
-    )])?;
+    let seat = json!({ "name": "waffles", "session": "session-1", "transport": "managed" });
+    let (address, handle) = serve(vec![
+        (200, seat),
+        (
+            403,
+            json!({
+                "refusal": "seat_attach_refused",
+                "reason": "only the seat's responsible person or an administrator may attach",
+                "fields": [],
+            }),
+        ),
+    ])?;
     install(root.path(), &address, Some(TOKEN))?;
     let output = lys(root.path(), &["attach", "waffles"])?;
     served(handle)?;
@@ -320,5 +326,60 @@ fn a_pty_session_is_followed_read_only_as_its_exact_bytes() -> TestResult {
     assert_eq!(opening, json!({ "cursor": null, "follow": true }));
     let next = body_of(next)?;
     assert_eq!(next, json!({ "cursor": 9, "follow": true }));
+    Ok(())
+}
+
+#[test]
+fn a_pty_seat_is_followed_by_name_without_a_session_id() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let seat = json!({ "name": "waffles", "session": "session-1", "transport": "pty" });
+    let bytes = json!({
+        "answer": {
+            "kind": "bytes",
+            "output": {
+                "session": "session-1", "from": 0, "cursor": 5, "oldest": 0,
+                "data": b"hello",
+                "ended": { "how": "exited", "at": 5, "status": 0, "signal": null },
+            },
+        },
+    });
+    let (address, handle) = serve(vec![(200, seat), (200, bytes)])?;
+    install(root.path(), &address, Some(TOKEN))?;
+    let output = lys(root.path(), &["attach", "waffles"])?;
+    assert!(output.status.success(), "{}", printed(&output));
+    let requests = served(handle)?;
+    assert_eq!(output.stdout, b"hello");
+    assert!(!printed(&output).contains(TOKEN));
+    let [lookup, read] = requests.as_slice() else {
+        return Err(format!("expected lookup and byte read, read {requests:?}").into());
+    };
+    assert!(lookup.starts_with("GET /api/seats/waffles HTTP/1.1\r\n"));
+    assert!(read.starts_with("POST /api/runtime/sessions/session-1/read-bytes HTTP/1.1\r\n"));
+    assert_eq!(body_of(read)?, json!({ "cursor": null, "follow": true }));
+    Ok(())
+}
+
+#[test]
+fn a_seat_without_a_session_or_known_transport_is_refused_before_a_read() -> TestResult {
+    for (seat, refusal) in [
+        (
+            json!({ "session": null, "transport": null }),
+            "seat_no_session",
+        ),
+        (
+            json!({ "session": "session-1", "transport": "other" }),
+            "attach_transport_unknown",
+        ),
+    ] {
+        let root = tempfile::tempdir()?;
+        let (address, handle) = serve(vec![(200, seat)])?;
+        install(root.path(), &address, Some(TOKEN))?;
+        let output = lys(root.path(), &["attach", "waffles"])?;
+        assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
+        assert!(printed(&output).contains(refusal), "{}", printed(&output));
+        assert!(!printed(&output).contains(TOKEN));
+        let requests = served(handle)?;
+        assert_eq!(requests.len(), 1);
+    }
     Ok(())
 }

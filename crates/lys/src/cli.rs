@@ -260,8 +260,8 @@ pub enum Command {
     },
 
     /// Seats: an agent identity's standing place on a machine, held by the
-    /// installed identity server, which starts it managed through its
-    /// machine's runner.
+    /// installed identity server, which starts it through its machine's
+    /// runner with the reviewed profile's transport.
     ///
     /// Asked of the installed server over loopback as its operator, with
     /// the `lys-operator` header read from the install's operator-token
@@ -269,8 +269,8 @@ pub enum Command {
     /// service install keeps none, and is refused `operator_token_absent`.
     Seat(SeatArgs),
 
-    /// Show a seat's live session in this terminal, following it as it
-    /// runs: user turns, assistant text, tool calls and results, and status.
+    /// Show a seat's live session in this terminal using its recorded
+    /// transport: managed frames or the pseudo-terminal's exact bytes.
     ///
     /// Read-only unless --type is given. Ctrl-C detaches, and so does the
     /// end of standard input under --type; detaching never ends the

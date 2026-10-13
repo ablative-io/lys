@@ -2,12 +2,11 @@
 //! R4), asked of the installed identity server over loopback as the
 //! operator.
 //!
-//! A seat runs managed, so what is shown is the runner's rendering of its
-//! frames: user turns, assistant text, tool calls and results, and status,
-//! one line each, followed as the session runs. It is read-only; with
-//! `--type` each line typed is sent as a user turn through the seat's
-//! input path, never as keys. A session not started managed is shown with
-//! `--session <id>`, read-only, as the exact bytes of its pseudo-terminal.
+//! The seat's recorded transport selects its reader: managed frames show
+//! user turns, assistant text, tool calls and results, and status; a PTY
+//! shows its exact bytes. It is read-only; with `--type` each line typed
+//! is sent through the seat's input path. `--session <id>` selects a PTY
+//! session directly, read-only.
 //!
 //! Detaching ends only this attach: Ctrl-C ends this process, and with
 //! `--type` so does the end of standard input. Nothing here ever asks for
@@ -59,6 +58,13 @@ struct BytesReply {
     answer: lys_runner::Answer,
 }
 
+/// The recorded session and transport select the reader without trying another one.
+#[derive(Deserialize)]
+struct SeatSession {
+    session: Option<String>,
+    transport: Option<String>,
+}
+
 /// What reaches a typing attach: a line typed, standard input's end or a
 /// failure to read it, or the follow's own end.
 enum Event {
@@ -94,6 +100,31 @@ pub fn run(args: &AttachArgs, json: bool) -> CliResult<()> {
 /// Follows the seat's session until it ends, printing each line.
 fn follow_seat(server: &Server, seat: &str, json: bool) -> CliResult<()> {
     let name = segment("seat_name_invalid", "the seat name", seat)?;
+    let route = format!("/seats/{name}");
+    let held: SeatSession = serde_json::from_value(server.get(&route)?).map_err(|error| {
+        refused(
+            "attach_answer_unreadable",
+            format!("GET {route}: the answer does not name the seat's session: {error}"),
+        )
+    })?;
+    let session = held.session.ok_or_else(|| {
+        refused(
+            "seat_no_session",
+            format!("seat {name} has no session; start it with `lys seat start {name}`"),
+        )
+    })?;
+    match held.transport.as_deref() {
+        Some("pty") => follow_bytes(server, &session, json),
+        Some("managed") => follow_frames(server, name, json),
+        transport => Err(refused(
+            "attach_transport_unknown",
+            format!("seat {name} has no supported recorded transport: {transport:?}"),
+        )),
+    }
+}
+
+/// Follow managed frames after the seat has named that transport.
+fn follow_frames(server: &Server, name: &str, json: bool) -> CliResult<()> {
     let route = format!("/seats/{name}/attach");
     let mut cursor: Option<u64> = None;
     loop {

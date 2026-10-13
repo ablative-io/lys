@@ -55,7 +55,8 @@ pub enum SeatCommand {
     /// reason.
     List,
 
-    /// Start a seat's session through the server's own start path, managed.
+    /// Start a seat's session through the server's own start path with
+    /// the reviewed profile's transport.
     Start {
         /// The seat.
         name: String,
