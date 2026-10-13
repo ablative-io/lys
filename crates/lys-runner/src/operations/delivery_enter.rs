@@ -99,7 +99,7 @@ fn run(receiver: &mpsc::Receiver<Pending>) {
             .enumerate()
             .min_by_key(|(_, held)| held.due)
             .map(|(index, _)| index);
-        let received = if let Some(index) = next {
+        let incoming = if let Some(index) = next {
             let delay = pending[index].due.saturating_duration_since(Instant::now());
             if delay.is_zero() {
                 send(&pending.swap_remove(index));
@@ -113,30 +113,26 @@ fn run(receiver: &mpsc::Receiver<Pending>) {
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => None,
             }
+        } else if let Ok(held) = receiver.recv() {
+            Some(held)
         } else {
-            match receiver.recv() {
-                Ok(held) => Some(held),
-                Err(mpsc::RecvError) => {
-                    crate::error::said("runner_stopping: the Enter scheduler queue disconnected");
-                    None
-                }
-            }
+            crate::error::said("runner_stopping: the Enter scheduler queue disconnected");
+            None
         };
-        match received {
-            Some(held) => pending.push(held),
-            None => {
-                for held in pending {
-                    super::completion::record(
-                        &held.owner,
-                        &held.operation,
-                        Err(RunnerError::refused(
-                            "runner_stopping",
-                            "the Enter scheduler ended",
-                        )),
-                    );
-                }
-                return;
+        if let Some(held) = incoming {
+            pending.push(held);
+        } else {
+            for held in pending {
+                super::completion::record(
+                    &held.owner,
+                    &held.operation,
+                    Err(RunnerError::refused(
+                        "runner_stopping",
+                        "the Enter scheduler ended",
+                    )),
+                );
             }
+            return;
         }
     }
 }

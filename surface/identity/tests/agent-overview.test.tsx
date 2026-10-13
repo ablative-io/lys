@@ -243,10 +243,10 @@ describe('An agent page explains the agent before its controls', () => {
     expect(posted).toEqual([]);
   });
 
-  it('keeps the add-computer deep link administrator-only', async () => {
+  it('opens the own-computer add row for a signed-in person from its deep link', async () => {
     const { posted } = await open({ '/network': ok({ machines: [], reports_served: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator') }, '#/network?add=computer');
     expect($('.page h1')?.textContent).toBe('Network');
-    expect($('form[aria-label="Add a computer"]')).toBeNull();
+    expect($('form[aria-label="Add a computer"]')).not.toBeNull();
     expect(posted).toEqual([]);
   });
 

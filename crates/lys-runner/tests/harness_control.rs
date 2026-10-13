@@ -149,7 +149,7 @@ fn an_expired_managed_event_cursor_names_the_coverage_gap() -> Result {
     Ok(())
 }
 #[test]
-fn an_unqualified_selected_binary_is_named_with_its_actual_reported_version() -> Result {
+fn a_known_adapter_reaches_entry_proof_instead_of_refusing_its_newer_version() -> Result {
     use lys_runner::harness_control::{ManagedLaunch, Transport};
     use std::os::unix::fs::PermissionsExt;
     with_sessions(|sessions, directory| {
@@ -157,7 +157,7 @@ fn an_unqualified_selected_binary_is_named_with_its_actual_reported_version() ->
         let marker = directory.join("executed");
         std::fs::write(
             &executable,
-            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'fixture-harness 9.8.7'; exit 0; fi\nprintf executed > executed\n",
+            "#!/bin/sh\nif [ \"$1\" = --version ]; then printf '%8192s' ''; echo 'fixture-harness 9.8.7'; exit 0; fi\nprintf executed > executed\n",
         )?;
         std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))?;
         let mut managed = launch();
@@ -178,52 +178,9 @@ fn an_unqualified_selected_binary_is_named_with_its_actual_reported_version() ->
                 None,
             )
             .err()
-            .ok_or("an unqualified harness was launched")?;
-        assert_eq!(error.name(), "control_adapter_unqualified");
-        let reason = error.to_string();
-        assert!(reason.contains("Claude"), "{reason}");
-        assert!(
-            reason.contains(executable.to_str().ok_or("fixture path was not text")?),
-            "{reason}"
-        );
-        assert!(reason.contains("9.8.7"), "{reason}");
+            .ok_or("the integration test executable supplied entry proof")?;
+        assert_eq!(error.name(), "control_frame_invalid");
         assert!(!marker.exists());
-        Ok(())
-    })
-}
-
-#[test]
-fn a_whole_version_report_is_read_before_the_unqualified_refusal() -> Result {
-    use lys_runner::harness_control::{ManagedLaunch, Transport};
-    use std::os::unix::fs::PermissionsExt;
-    with_sessions(|sessions, directory| {
-        let executable = directory.join("fixture-harness");
-        std::fs::write(
-            &executable,
-            "#!/bin/sh\nprintf '%8192s' ''\necho 'fixture-harness 9.8.7'\n",
-        )?;
-        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))?;
-        let mut managed = launch();
-        managed.directory = directory.display().to_string();
-        managed.program = executable.display().to_string();
-        managed.arguments.clear();
-        let error = sessions
-            .start_managed(
-                ManagedLaunch {
-                    resume: false,
-                    launch: managed,
-                    transport: Transport::Claude,
-                    conversation: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
-                    requires_controls: true,
-                    owner: None,
-                },
-                None,
-                None,
-            )
-            .err()
-            .ok_or("an oversized version probe was accepted")?;
-        assert_eq!(error.name(), "control_adapter_unqualified");
-        assert!(error.to_string().contains("9.8.7"));
         Ok(())
     })
 }

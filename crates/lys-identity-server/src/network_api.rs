@@ -105,6 +105,8 @@ pub(crate) struct NameBody {
     #[serde(default)]
     may_run_roles: Vec<String>,
     may_reach: Vec<String>,
+    #[serde(default)]
+    owner: Option<String>,
 }
 
 /// An ownership assignment; an explicit null clears the team.
@@ -154,10 +156,43 @@ fn required_team<'de, D: serde::Deserializer<'de>>(
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/network", get(list))
-        .route("/network/machines", post(writes::name))
+        .route("/network/machines", post(name_computer))
         .route("/network/machines/{id}/retire", post(writes::retire))
         .route("/network/machines/{id}/team", post(writes::assign_team))
         .route("/network/machines/{id}/agents", post(writes::change_agent))
+}
+
+async fn name_computer(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    given: Result<Json<NameBody>, axum::extract::rejection::JsonRejection>,
+) -> Result<Json<MachineView>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    let Json(mut body) = given.map_err(|refused| malformed(refused.body_text()))?;
+    with_directory(&state, |directory| {
+        let directory = directory.projection()?;
+        let person = crate::read_api::own_person(directory, &actor)?;
+        if body
+            .owner
+            .as_ref()
+            .is_some_and(|owner| *owner != person.to_string())
+        {
+            return Err(ServerError::NotAdmitted {
+                reason: "a person names a computer only for themselves",
+            });
+        }
+        if !state.admission.is_administrator(directory, &actor)?
+            && body.runtime.is_some()
+            && body.may_run.is_empty()
+        {
+            body.may_run = directory
+                .agents_of(person)
+                .map(|entry| entry.map(|(agent, _)| agent.to_string()))
+                .collect::<Result<_, _>>()?;
+        }
+        Ok(())
+    })?;
+    writes::name(State(state), headers, Ok(Json(body))).await
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -376,3 +411,55 @@ fn named(
 #[cfg(test)]
 #[path = "network_api/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod self_service_tests {
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn a_person_names_their_own_computer_with_all_their_agents_and_cannot_name_another_owner()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (service, seeded) = Service::start_with(|config| {
+            Ok(
+                identity_contract::lys_identity_server::dev_seed::seed_configured(
+                    config,
+                    [ADMINISTRATOR, "member"],
+                )?,
+            )
+        })
+        .await?;
+        let person = &seeded.people[1];
+        let cookie = service
+            .sign_in(identity_contract::apps::login("member"))
+            .await?;
+        let mut body = json!({"operation": lys_identity::OperationId::generate()?.to_string(),
+            "name":"Own computer", "kind":"Computer", "runtime":"lys-runner", "slots":0,
+            "may_run":[], "may_reach":[], "owner":person.id.to_string()});
+        let (status, answer) = service
+            .post("/network/machines", Some(&cookie), &body)
+            .await?;
+        assert_eq!(status, 200);
+        assert_eq!(answer["owner"], person.id.to_string());
+        let actual = answer["may_run"]
+            .as_array()
+            .ok_or("allowances missing")?
+            .iter()
+            .map(|agent| agent["id"].as_str().ok_or("id missing"))
+            .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+        let expected = person
+            .agents
+            .iter()
+            .map(|agent| agent.id.to_string())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(actual, expected.iter().map(String::as_str).collect());
+        body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+        body["owner"] = json!(seeded.people[0].id.to_string());
+        let (status, answer) = service
+            .post("/network/machines", Some(&cookie), &body)
+            .await?;
+        assert_eq!(status, 403);
+        assert_eq!(answer["refusal"], "NotAdmitted");
+        Ok(())
+    }
+}

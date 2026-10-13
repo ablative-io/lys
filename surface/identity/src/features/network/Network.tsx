@@ -177,10 +177,10 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
         words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers" empty="No computer yet. Add the one Lys runs on to start agents here."
         holds={(items) => counted(items.length, 'computers')}
         selected={selected?.machine.id ?? null} select={(computer) => setPicked(computer.machine.id)} open={(computer) => setPicked(computer.machine.id)}
-        foot={admin ? <>
+        foot={<>
           {connecting?.at === 'row' ? <ConnectRow connecting={connecting} connect={connectHere} done={done} width={columns.length} /> : null}
-          <AddComputerRow person={me.person.id} changed={changed} name={name} connect={connect} />
-        </> : null}
+          <AddComputerRow person={me.person.id} agents={admin ? [] : people.people.find((person) => person.id === me.person.id)?.agents.map((agent) => agent.id) ?? []} selfService={!admin} changed={changed} name={name} connect={connect} />
+        </>}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
           <div className="seg">{([['all', 'All'], ['attention', 'Not answering']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>

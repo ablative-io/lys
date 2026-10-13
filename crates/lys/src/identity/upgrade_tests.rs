@@ -15,6 +15,89 @@ use crate::identity::error::ErrorKind;
 use crate::identity::install::layout::{BINARIES, Layout};
 
 #[test]
+fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction() -> TestResult {
+    use crate::identity::install::layout::{client_releases, prepare_clients};
+    let scratch = Scratch::new()?;
+    let inputs = scratch.work().join("clients");
+    for platform in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
+        let folder = inputs.join(platform);
+        std::fs::create_dir_all(&folder)?;
+        for name in ["lys", "lys-containment-entry"] {
+            std::fs::write(folder.join(name), format!("{name}/{A}"))?;
+        }
+    }
+    let old = prepare_clients(Some(&inputs), &inputs, A)?;
+    old.place(&scratch.layout)?;
+    let manifest = old.manifest(&scratch.layout)?;
+    super::swap::place_file(&manifest.target, &manifest.bytes, false)?;
+    record_build(&scratch.layout, &BINARIES, &mut |_| {})?;
+    for platform in old.releases.keys() {
+        for name in ["lys", "lys-containment-entry"] {
+            std::fs::write(inputs.join(platform).join(name), format!("{name}/{B}"))?;
+        }
+    }
+    let next = prepare_clients(Some(&inputs), &inputs, B)?;
+    next.place(&scratch.layout)?;
+    let new = scratch.work().join("b");
+    build(&new, B, Behaviour::Serves)?;
+    let mut engine = Recorder::default();
+    let render = super::ClientRender {
+        base: &Fixed,
+        clients: &next,
+    };
+    let mut parts = Parts {
+        runner: None,
+        units: &scratch.units,
+        engine: &mut engine,
+        render: &render,
+    };
+    let record = upgrade(&scratch.layout, &new, None, &mut parts, &mut |_| {})?;
+    assert_eq!(record.clients, next.releases);
+    assert_eq!(client_releases(&scratch.layout)?, next.releases);
+    assert_eq!(
+        std::fs::read(scratch.layout.config_previous_dir().join("clients.json"))?,
+        manifest.bytes.as_slice()
+    );
+    let failing = scratch.work().join("c");
+    build(
+        &failing,
+        "cccccccccccccccccccccccccccccccccccccccc",
+        Behaviour::ExitsEarly,
+    )?;
+    let mut failed = next;
+    for release in failed.releases.values_mut() {
+        release.commit = "cccccccccccccccccccccccccccccccccccccccc".to_owned();
+    }
+    let render = super::ClientRender {
+        base: &Fixed,
+        clients: &failed,
+    };
+    let mut parts = Parts {
+        runner: None,
+        units: &scratch.units,
+        engine: &mut engine,
+        render: &render,
+    };
+    assert!(upgrade(&scratch.layout, &failing, None, &mut parts, &mut |_| {}).is_err());
+    for (platform, release) in client_releases(&scratch.layout)? {
+        assert_eq!(release.commit, B);
+        assert_eq!(
+            std::fs::read_to_string(
+                scratch
+                    .layout
+                    .root
+                    .join("clients")
+                    .join(platform)
+                    .join(A)
+                    .join("lys")
+            )?,
+            format!("lys/{A}")
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn an_upgrade_runs_the_new_build_and_keeps_the_previous() -> TestResult {
     let scratch = Scratch::new()?;
     assert_eq!(scratch.running()?, ready_lines(A));

@@ -130,6 +130,7 @@ pub fn document() -> Result<Value, ServerError> {
                 faults.join("; ")
             ),
         })?;
+    crate::clients_api::describe_download(&mut document);
     crate::message_edges::document_query(&mut document)?;
     crate::list_page::document_query(&mut document)?;
     let answers_to = document

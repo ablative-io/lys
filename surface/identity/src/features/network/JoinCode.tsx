@@ -3,7 +3,7 @@
  * kept in this tab's storage. A code whose answer is lost cannot be read again, so a new one is asked for instead,
  * and it replaces the old one.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Refused, operationId, request } from '../../api';
 import { isRecord } from './contract';
 import { Act } from '../../shell/Act';
@@ -51,7 +51,37 @@ export function JoinShown({ name, given, done }: { name: string; given: JoinCode
     <p className="sec">The command asks for the code: paste it there.</p>
     <p><code data-join="command">{given.command}</code> <Copy text={given.command} what="The command" /></p>
     <p><code data-join="code">{given.code}</code> <Copy text={given.code} what="The code" /></p>
+    <ClientDownload />
     <Act symbol="approve" name="Done" word="Done" onClick={done} />
+  </div>;
+}
+
+type ClientRelease = { commit: string; files: Record<string, string> };
+type Clients = { platforms: Record<string, ClientRelease> };
+
+/** A Mac's architecture can be hidden by its browser, so the person can choose it explicitly. */
+export function ClientDownload() {
+  const [platform, setPlatform] = useState(navigator.userAgent.includes('ARM64') ? 'aarch64-apple-darwin' : '');
+  const [clients, setClients] = useState<Clients | null>(null);
+  const [failure, setFailure] = useState('');
+  useEffect(() => {
+    let current = true;
+    request<Clients>('/clients').then((answer) => {
+      if (!isRecord(answer) || !isRecord(answer.platforms)) throw new Error('ClientsUnreadable: Lys did not name its held client platforms.');
+      if (current) setClients(answer);
+    }).catch((error: unknown) => { if (current) setFailure(joinFailure(error)); });
+    return () => { current = false; };
+  }, []);
+  const release = clients?.platforms[platform];
+  return <div className="client-download">
+    <label>This Mac <select aria-label="This Mac" value={platform} onChange={(event) => setPlatform(event.target.value)}>
+      <option value="">Choose its chip</option><option value="aarch64-apple-darwin">Apple silicon</option><option value="x86_64-apple-darwin">Intel</option>
+    </select></label>
+    {failure ? <p className="why-not">Lys could not read its clients. {failure}</p> : clients && platform ? release ?
+      <p><a href={'/api/clients/' + encodeURIComponent(platform) + '/lys'} download="lys">Download lys for this Mac</a>
+        {' · commit ' + release.commit} {' · '}<a href={'/api/clients/' + encodeURIComponent(platform) + '/lys-containment-entry'} download="lys-containment-entry">Download its companion</a>
+        <span className="sec"> Keep both files together.</span></p>
+      : <p>Lys holds no client for this Mac ({platform}).</p> : null}
   </div>;
 }
 

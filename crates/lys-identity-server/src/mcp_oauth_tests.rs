@@ -15,7 +15,7 @@ use sha2::{Digest, Sha256};
 const REDIRECT: &str = "https://app.example/callback";
 const VERIFIER: &str = "a-verifier-of-at-least-forty-three-characters-long";
 
-async fn service() -> Result<(Service, String), Box<dyn Error>> {
+pub(super) async fn service() -> Result<(Service, String), Box<dyn Error>> {
     use lys_identity::{
         Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance,
     };

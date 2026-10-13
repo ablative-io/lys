@@ -75,9 +75,12 @@ pub(crate) async fn register_agent(
     headers: HeaderMap,
     Json(body): Json<AgentRegistration>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
-    if !headers.contains_key(axum::http::header::AUTHORIZATION) {
+    if !headers.contains_key(axum::http::header::AUTHORIZATION)
+        || crate::mcp_oauth::native_actor(&state, &headers)?.is_some()
+        || crate::provider::personal_actor(&state, &headers)?.is_some()
+    {
         let actor = signed_in(&state, &headers)?;
-        crate::routes::administrator(&state, &actor)?;
+        let administrator = crate::routes::is_administrator(&state, &actor)?;
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
@@ -95,7 +98,7 @@ pub(crate) async fn register_agent(
                     });
                 }
             };
-            let target = registration_target(own, body.answers_to.as_deref(), true)?;
+            let target = registration_target(own, body.answers_to.as_deref(), administrator)?;
             crate::agent_policy_api::with_policies(&state, |policies| {
                 let answer =
                     directory.register_reporting_agent(actor, op, target, profile, now())?;
@@ -226,7 +229,6 @@ pub(crate) async fn transition(
     Json(body): Json<Moved>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
     let moved = match body.transition.as_str() {
         "activate" => Transition::Activate,
         "suspend" => Transition::Suspend,
@@ -235,6 +237,15 @@ pub(crate) async fn transition(
         other => return Err(malformed(format!("{other} is not a transition"))),
     };
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
+    if !crate::routes::is_administrator(&state, &actor)? {
+        if let (IdentityId::Agent(agent), Transition::Activate) = (id, moved) {
+            crate::routes::responsible_or_administrator(&state, &headers, &agent.to_string())?;
+        } else {
+            return Err(ServerError::NotAdmitted {
+                reason: "only the administrator changes this identity's state",
+            });
+        }
+    }
     with_directory(&state, |directory| {
         let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
         if matches!(moved, Transition::Suspend | Transition::Retire) {

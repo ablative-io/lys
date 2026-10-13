@@ -19,6 +19,8 @@ pub struct TrackingSpec {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "act", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Act {
+    /// Discover harness executables on this computer's login PATH.
+    Programs,
     /// Start an explicitly selected, versioned managed harness channel.
     StartManaged {
         /// Existing launch inputs and the requested channel.
@@ -307,6 +309,11 @@ impl Act {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Answer {
+    /// Harness discovery evidence from the computer asked.
+    Programs {
+        /// The executable paths, versions, adapters and any discovery reason.
+        found: crate::dial::programs::Programs,
+    },
     /// Exact bytes from a terminal, with byte cursors and observed end evidence.
     Bytes {
         /// The byte window.
@@ -314,6 +321,9 @@ pub enum Answer {
     },
     /// The session's process is up.
     Started {
+        /// A known adapter running a version that has not been qualified.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        qualification: Option<String>,
         /// The session.
         session: String,
         /// Its process id.

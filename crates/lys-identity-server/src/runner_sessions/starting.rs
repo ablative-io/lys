@@ -53,21 +53,45 @@ pub(crate) async fn run_resuming(
         controls::select_resume(act, conversation)?
     };
     let act = crate::seat_supervision::bind_owner(state, agent, machine, act)?;
+    let supervised = matches!(&act, Act::StartManaged { managed, .. } if managed.owner.is_some());
     let missing_config = matches!(
         &act,
         Act::Start { lys_mcp: None, .. } | Act::StartManaged { lys_mcp: None, .. }
     );
     let act = owned_start(state, agent, act)?;
     let asked = crate::runner_client::ask(state, machine, runner.clone(), act).await;
-    let answer = match asked {
+    let mut answer = match asked {
         Err(ServerError::Runner { refusal, .. }) if refusal == "session_exists" => {
             let act = Act::Status {
                 session: Some(driven.session.clone()),
             };
-            crate::runner_client::ask(state, machine, runner, act).await
+            crate::runner_client::ask(state, machine, runner.clone(), act).await
         }
         other => other,
     };
+    if supervised && let Ok(Answer::Started { qualification, .. }) = &mut answer {
+        // The machine started an independent owner; its own Status supplies the programme evidence.
+        let status = crate::runner_client::ask(
+            state,
+            machine,
+            runner.clone(),
+            Act::Status {
+                session: Some(session.clone()),
+            },
+        )
+        .await?;
+        if let Answer::Status { status } = status {
+            *qualification = status
+                .sessions
+                .first()
+                .and_then(|session| session.qualification.clone());
+        } else {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: "the seat owner did not answer its programme status".to_owned(),
+            });
+        }
+    }
     let ending = if answer.is_err() {
         crate::agent_pass::end_session(state, &session)
     } else {
@@ -86,6 +110,7 @@ pub(crate) async fn run_resuming(
         pid,
         started_at,
         ended,
+        qualification,
     } = record_answer(state, &driven, answer?)?;
     // A pull recorded while the runner was starting this session never asked
     // for it. The cord is read again now the session is tracked: under a
@@ -103,10 +128,12 @@ pub(crate) async fn run_resuming(
         "pid": pid,
         "started_at": started_at,
         "ended": ended,
+        "qualification": qualification,
     }))
 }
 
 struct Running {
+    qualification: Option<String>,
     pid: Option<u32>,
     started_at: u64,
     ended: Option<lys_runner::Ended>,
@@ -117,17 +144,20 @@ fn record_answer(
     driven: &Driven,
     answer: Answer,
 ) -> Result<Running, ServerError> {
-    let (pid, started_at, ended) = match answer {
+    let (pid, started_at, ended, qualification) = match answer {
         Answer::Started {
-            pid, started_at, ..
-        } => (Some(pid), started_at, None),
+            pid,
+            started_at,
+            qualification,
+            ..
+        } => (Some(pid), started_at, None, qualification),
         Answer::Status { status } => {
             let held = status
                 .sessions
                 .into_iter()
                 .next()
                 .ok_or(ServerError::RuntimeSessionUnknown)?;
-            (held.pid, held.started_at, held.ended)
+            (held.pid, held.started_at, held.ended, held.qualification)
         }
         other => {
             return Err(ServerError::Runner {
@@ -153,6 +183,7 @@ fn record_answer(
         record_end(state, driven, ended)?;
     }
     Ok(Running {
+        qualification,
         pid,
         started_at,
         ended,

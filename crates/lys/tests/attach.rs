@@ -173,12 +173,15 @@ fn attach_needs_one_target_and_type_is_for_a_seat_only() -> TestResult {
 }
 
 #[test]
-fn no_install_is_refused_by_name() -> TestResult {
+fn no_install_or_person_pass_names_the_sign_in_act() -> TestResult {
     let root = tempfile::tempdir()?;
     let output = lys(root.path(), &["attach", "waffles"])?;
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let stderr = String::from_utf8(output.stderr)?;
-    assert!(stderr.contains("not_installed"), "{stderr}");
+    assert!(
+        stderr.contains("person_pass_missing") && stderr.contains("lys sign-in"),
+        "{stderr}"
+    );
     Ok(())
 }
 

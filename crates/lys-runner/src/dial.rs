@@ -30,6 +30,7 @@ pub mod agent;
 mod dispatch;
 pub mod join;
 pub mod mcp;
+pub mod programs;
 mod transport;
 
 use std::path::PathBuf;
@@ -40,6 +41,45 @@ use lys_core::Ed25519Identity;
 use crate::error::RunnerError;
 use crate::protocol::{Answer, hex, nonce, reply_line};
 use transport::{Channel, Response};
+
+/// The existing verified transport, usable by the native CLI without another TLS dependency.
+pub struct HttpClient(Channel);
+
+/// A bounded HTTP answer; response bodies are never logged by the transport.
+pub struct HttpResponse {
+    /// The HTTP status.
+    pub status: u16,
+    /// The whole bounded response body.
+    pub body: Vec<u8>,
+}
+
+impl HttpClient {
+    /// Open verified TLS, or HTTP on loopback only.
+    ///
+    /// # Errors
+    /// Refuses an invalid or insecure server address.
+    pub fn new(server: &str) -> Result<Self, RunnerError> {
+        Channel::for_server(server, None).map(Self)
+    }
+
+    /// Send once, without retries or ambient credentials.
+    ///
+    /// # Errors
+    /// Reports malformed requests and uncertain transport outcomes by name.
+    pub fn send(
+        &self,
+        method: &str,
+        path: &str,
+        headers: &[(&str, &str)],
+        body: &[u8],
+    ) -> Result<HttpResponse, RunnerError> {
+        let response = self.0.send_response(method, path, headers, body)?;
+        Ok(HttpResponse {
+            status: response.status,
+            body: response.body,
+        })
+    }
+}
 
 /// The domain every dial signature is made under.
 pub const DIAL_DOMAIN: &str = "lys/runner-dial/v1";

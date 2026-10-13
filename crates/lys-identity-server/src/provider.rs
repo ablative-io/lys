@@ -68,10 +68,27 @@ mod machine_issue;
 mod refusal;
 mod rights_claim;
 pub(crate) use agent_issue::{AgentAppPass, agent_app_pass};
+pub(crate) use bearer::personal_actor;
 pub(crate) use bearer::{pass_holder, presented_pass};
 pub use endpoints::{api_keys, routes};
 pub(crate) use grant_binding::signed_binding;
 pub use keys::{RotateAnswer, RotateBody};
+#[cfg(test)]
+pub(crate) fn certificate_test_pass(
+    state: &crate::routes::AppState,
+    provider: &OpenIdProvider,
+    agent: lys_identity::AgentId,
+) -> Result<String, ServerError> {
+    let at = now();
+    rights_claim::pass(
+        state,
+        provider,
+        (lys_identity::IdentityId::Agent(agent), "lys"),
+        (at, at.saturating_add(3600)),
+        false,
+    )
+    .map(|pass| pass.token)
+}
 pub(crate) use machine_issue::{MachinePass, machine_pass};
 
 /// How long a code lives when the configuration says nothing, in seconds:

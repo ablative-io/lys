@@ -289,6 +289,7 @@ fn status(page: &FeedPage, only: Option<&str>) -> Result<Answer, String> {
             runner: "0123456789abcdef0123456789abcdef".to_owned(),
             protocol: lys_runner::protocol::PROTOCOL_VERSION,
             sessions: vec![lys_runner::protocol::SessionView {
+                qualification: None,
                 session: entry.session.clone(),
                 pid: Some(42),
                 started_at: entry.at,

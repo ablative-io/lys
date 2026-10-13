@@ -15,6 +15,8 @@
 //! the directory, the apps and the grants only after.
 
 use axum::http::{HeaderMap, header};
+use base64::Engine;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_identity::IdentityId;
 use lys_pass::{KeySet, VerifiedPass};
 use sha2::{Digest, Sha256};
@@ -72,4 +74,47 @@ pub(crate) fn pass_holder(
         return Err(ServerError::Provider(ProviderError::TokenUnknown));
     }
     identity_id(&verified.claims().sub)
+}
+
+/// A live person pass for Lys itself retains its issuing sign-in's actor.
+pub(crate) fn personal_actor(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<lys_identity::Actor>, ServerError> {
+    let Some(pass) = presented_pass(headers) else {
+        return Ok(None);
+    };
+    let payload = pass.split('.').nth(1).ok_or(ServerError::NotSignedIn)?;
+    let claims: serde_json::Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(payload)
+            .map_err(|_| ServerError::NotSignedIn)?,
+    )
+    .map_err(|_| ServerError::NotSignedIn)?;
+    // The audience selects the verifier; only verified claims grant authority.
+    if claims["aud"] != "lys"
+        || !claims["sub"]
+            .as_str()
+            .is_some_and(|subject| subject.starts_with("person-"))
+    {
+        return Ok(None);
+    }
+    if headers.contains_key(header::COOKIE) || headers.contains_key("lys-operator") {
+        return Err(ServerError::NotSignedIn);
+    }
+    if !matches!(pass_holder(state, pass, "lys")?, IdentityId::Person(_)) {
+        return Ok(None);
+    }
+    let provider = provider(state)?;
+    let session = held(&provider.tokens)?
+        .get(&hex(&Sha256::digest(pass.as_bytes())), now())?
+        .session_id
+        .clone();
+    state
+        .sessions
+        .live(|_| true)?
+        .into_iter()
+        .find(|entry| entry.id == session)
+        .map(|entry| Some(entry.actor))
+        .ok_or(ServerError::Provider(ProviderError::TokenUnknown))
 }

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { request } from '../../api';
 import type { ReactNode } from 'react';
-import type { Choices } from './choices';
+import type { Choices, Program } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
 import { FolderChooser } from './FolderChooser';
 import { ModeWords } from './ModeWords';
@@ -34,11 +35,14 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   agent?: string;
   render: (fields: ReactNode, settings: Record<string, unknown>, refusal: string) => ReactNode;
 }) {
-  const available = choices.programs ?? [];
+  const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
+  const preferred = runsOn || computer;
+  const [catalogue, setCatalogue] = useState<{ machine: string; programs: Program[]; reason: string } | null>(null);
+  const available = preferred ? catalogue?.machine === preferred ? catalogue.programs : [] : choices.programs ?? [];
   const workspaceMode = (entry: typeof available[number] | undefined) => entry?.modes.find((mode) => mode.id === 'workspace-only' || mode.id === 'workspace-write')?.id ?? '';
   const initialProgram = firstRun ? available.find((entry) => entry.builds.length > 0 && workspaceMode(entry)) ?? available[0] : available.length === 1 ? available[0] : undefined;
   const [programName, setProgram] = useState(profile?.harness?.name ?? initialProgram?.name ?? '');
-  const program = choices.programs?.find((entry) => entry.name === programName);
+  const program = available.find((entry) => entry.name === programName);
   const [model, setModel] = useState(profile?.model_access[0] ?? (strict && program?.models.length !== 1 ? '' : program?.models[0]?.id ?? ''));
   const firstMode = (entry: typeof program) => firstRun ? workspaceMode(entry) : strict && entry?.modes.length !== 1 ? '' : entry?.modes[0]?.id ?? '';
   const firstPrompt = (entry: typeof program) => entry?.instructions_modes?.includes('keep') ? 'keep' : entry?.instructions_modes?.includes('append') ? 'append' : '';
@@ -49,9 +53,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [promptChanged, setPromptChanged] = useState(false);
   const [folder, setFolder] = useState(profile?.working_folder ?? '');
   // The computer it runs on is a saved setting like the rest; empty leaves it to be settled when the agent starts.
-  const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
   // Where folders and plugins are read: the computer the profile is saved to run on, else the one the screen already knows.
-  const preferred = runsOn || computer;
   const machines = usable(choices.machines);
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
   // What else the agent is given: the tools its settings name, the skills Lys keeps for it, and its connected tools.
@@ -65,13 +67,29 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const heldListed = heldBuild && builds.some((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package);
   const [build, setBuild] = useState(heldBuild ? heldListed ? heldBuild.program + '\n' + heldBuild.package : 'another' : (firstRun ? builds.length > 0 : builds.length === 1) ? builds[0].program + '\n' + builds[0].package : '');
   const [programPath, setProgramPath] = useState(heldBuild?.program ?? '');
+  useEffect(() => {
+    if (!preferred) return;
+    let current = true;
+    request<{ programs: Program[]; reason?: string }>('/harnesses?machine=' + encodeURIComponent(preferred)).then((answer) => {
+      if (!current) return;
+      setCatalogue({ machine: preferred, programs: answer.programs, reason: answer.reason ?? '' });
+      const next = answer.programs.find((entry) => entry.name === programName) ?? answer.programs[0];
+      if (!programName && next) {
+        setProgram(next.name); setModel(next.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next) }); setPrompt(firstPrompt(next));
+        setBuild(next.builds.length ? next.builds[0].program + '\n' + next.builds[0].package : '');
+      }
+    }, (problem: unknown) => { if (current) setCatalogue({ machine: preferred, programs: [], reason: problem instanceof Error ? problem.message : String(problem) }); });
+    return () => { current = false; };
+  }, [preferred]);
   const supported = program?.instructions_modes ?? ['keep', 'append'];
   const selected = build === 'another' && programPath.startsWith('/') && !programPath.includes('\0')
     ? { program: programPath, package: heldBuild && heldBuild.program === programPath ? heldBuild.package : programPath }
     : builds.find((entry) => entry.program + '\n' + entry.package === build);
   let refusal = '';
-  if (choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
-  else if (!program) refusal = choices.programs.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
+  if (!preferred && choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
+  else if (preferred && catalogue?.machine !== preferred) refusal = 'Reading this computer’s programs.';
+  else if (preferred && catalogue?.reason) refusal = catalogue.reason;
+  else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
   else if (!selected) refusal = build === 'another' ? 'Enter the program’s full path, starting with /.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
@@ -81,11 +99,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (folderFirst && !folder) refusal = 'Choose the folder this agent works in.';
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
-    tools, skills, plugins, mcp_servers: servers,
+    tools, skills, ...(profile && profile.plugins === undefined && plugins.length === 0 ? {} : { plugins }), mcp_servers: servers,
     instructions: prompt === 'keep' ? !promptChanged && profile ? profile.instructions : '' : instructions.trim(), note: 'Settings saved from the settings form',
     harness: program && selected ? { name: program.name, description: program.description, program: selected.program, package: selected.package } : null,
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
-    ...(runsOn ? { runs_on: runsOn } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
+    ...(preferred ? { runs_on: preferred } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
     ...(folder ? { working_folder: folder } : {}),
     session: requiresControls
       ? { sensitive: false, ...profile?.session, requires_controls: true }
@@ -105,7 +123,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const fields = <div className="form-grid">
     {folderFirst ? where : null}
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
-      const next = choices.programs?.find((entry) => entry.name === event.target.value);
+      const next = available.find((entry) => entry.name === event.target.value);
       setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next), ...(permissions.additional_directories ? { additional_directories: permissions.additional_directories } : {}) }); setPrompt(firstRun ? firstPrompt(next) : strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
       setBuild(next && (firstRun ? next.builds.length > 0 : next.builds.length === 1) ? next.builds[0].program + '\n' + next.builds[0].package : '');
       setProgramPath('');

@@ -423,3 +423,31 @@ pub(crate) fn unsupported() -> RunnerError {
         "automatic controls require a managed pipe transport",
     )
 }
+
+impl crate::session::Sessions {
+    /// The qualification mark read from the launched programme's proved binding.
+    ///
+    /// # Errors
+    /// Refuses an unavailable session table or an unknown adapter.
+    pub fn qualification(&self, session: &str) -> Result<Option<String>, RunnerError> {
+        let table = self.lock()?;
+        let Some(held) = table.sessions.get(session) else {
+            drop(table);
+            if self
+                .owned_seats()?
+                .iter()
+                .any(|owner| owner.binding.session == session)
+            {
+                return Ok(None);
+            }
+            return Err(crate::session::unknown(session));
+        };
+        let Some(control) = held.live.as_ref().and_then(|live| live.control.as_ref()) else {
+            return Ok(None);
+        };
+        process::version_mark(
+            &control.controller.binding.adapter,
+            &control.controller.binding.harness_version,
+        )
+    }
+}

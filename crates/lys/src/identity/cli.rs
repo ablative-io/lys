@@ -53,6 +53,12 @@ pub enum IdentityCommand {
     /// rotated, and a build other than the one placed is refused: that is an
     /// upgrade.
     Install {
+        /// Built host binaries; otherwise use the installer's sibling binaries.
+        #[arg(long)]
+        from: Option<PathBuf>,
+        /// Client executable pairs, in one folder per Rust platform.
+        #[arg(long)]
+        clients: Option<PathBuf>,
         /// The local identity listener; absent, keep the installed port or use 8490.
         #[arg(long, value_parser = clap::value_parser!(u16).range(1..))]
         service_port: Option<u16>,
@@ -99,6 +105,9 @@ pub enum IdentityCommand {
     /// started, and the failure is named. Data and credentials are never
     /// touched. An install made before builds were named is adopted.
     Upgrade {
+        /// Client executable pairs, in one folder per Rust platform.
+        #[arg(long)]
+        clients: Option<PathBuf>,
         /// The folder holding the newly built lys-secrets and
         /// lys-identity-server, built with the lys that runs the upgrade.
         #[arg(long)]

@@ -63,6 +63,8 @@ use render::Render;
 /// What the operator chose.
 #[derive(Debug)]
 pub struct Options {
+    /// Built client pairs grouped by Rust target.
+    pub clients: Option<PathBuf>,
     /// The folder holding the newly built binaries.
     pub from: PathBuf,
     /// A compiled screens package to verify and place.
@@ -257,6 +259,8 @@ pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
 /// The build an install is running, as `install/build.json` records it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BuildRecord {
+    /// Downloadable client releases, also kept by the configuration rollback.
+    pub clients: BTreeMap<String, install::layout::ClientRelease>,
     /// Each binary in `bin/` by name, with the commit its `--version` names
     /// or [`adopt::UNSTAMPED`].
     pub binaries: BTreeMap<String, String>,
@@ -326,6 +330,7 @@ pub fn record_build(
     ));
     let settings = install::settings::recorded(layout)?;
     let record = BuildRecord {
+        clients: install::layout::client_releases(layout)?,
         binaries,
         surface,
         environment,
@@ -507,6 +512,12 @@ pub(super) fn verified_config(layout: &Layout) -> IdentityResult<DeploymentConfi
 
 /// Runs `lys identity upgrade` after checking the live issuer authority.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
+    let client_program = options.from.join("lys");
+    let clients = install::layout::prepare_clients(
+        options.clients.as_deref(),
+        &options.from,
+        &version(&client_program, "lys")?,
+    )?;
     let layout = match &options.root {
         Some(root) => Layout::at(root.clone()),
         None => Layout::discover()?,
@@ -532,8 +543,12 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
         runner: Some(&runner),
         units: &units,
         engine: &mut Compose,
-        render: &templates,
+        render: &ClientRender {
+            base: &templates,
+            clients: &clients,
+        },
     };
+    clients.place(&layout)?;
     let record = upgrade(
         &layout,
         &options.from,
@@ -570,6 +585,24 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     )?);
     emitter.finish();
     Ok(())
+}
+
+struct ClientRender<'a> {
+    base: &'a dyn Render,
+    clients: &'a install::layout::ClientSet,
+}
+
+impl Render for ClientRender<'_> {
+    fn render(
+        &self,
+        layout: &Layout,
+        build: &BTreeMap<String, String>,
+        screens: bool,
+    ) -> IdentityResult<Vec<render::RenderedFile>> {
+        let mut files = self.base.render(layout, build, screens)?;
+        files.push(self.clients.manifest(layout)?);
+        Ok(files)
+    }
 }
 
 #[cfg(test)]

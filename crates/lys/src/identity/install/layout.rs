@@ -233,3 +233,6 @@ pub fn render_deployment_at(admin_email: Option<&str>, service_port: u16) -> Str
 
 /// The sourced estate plan shipped with this build.
 pub const ESTATE_PLAN: &str = include_str!("../../../../../docs/estate/approval-plan.json");
+
+mod clients;
+pub use clients::{ClientRelease, ClientSet, client_releases, host_platform, prepare_clients};

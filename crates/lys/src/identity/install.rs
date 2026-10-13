@@ -94,6 +94,10 @@ impl Profile {
 /// What the operator chose.
 #[derive(Debug)]
 pub struct Options {
+    /// The host's built executable folder, or the installer's siblings.
+    pub from: Option<PathBuf>,
+    /// Built client pairs grouped by Rust target.
+    pub clients: Option<PathBuf>,
     /// The data root; the platform's application data path when absent.
     pub root: Option<PathBuf>,
     /// Which kind of install this is; absent, an earlier install's profile
@@ -351,6 +355,24 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
 }
 
 fn install(options: &Options, json: bool) -> IdentityResult<()> {
+    let sibling = |name: &str| match &options.from {
+        Some(from) => Ok(from.join(name)),
+        None => services::sibling(name),
+    };
+    let client_program = sibling("lys")?;
+    let client_folder = client_program.parent().ok_or_else(|| {
+        IdentityError::new(
+            ErrorKind::BinaryMissing,
+            "prepare clients",
+            "lys",
+            "the built client has no containing folder",
+        )
+    })?;
+    let clients = layout::prepare_clients(
+        options.clients.as_deref(),
+        client_folder,
+        &upgrade::version(&client_program, "lys")?,
+    )?;
     let layout = match &options.root {
         Some(root) => Layout::at(root.clone()),
         None => Layout::discover()?,
@@ -365,7 +387,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     swap::recover(&layout, &units, &mut Compose, &mut |line| {
         emitter.note(line);
     })?;
-    adopt::check_placed_build(&layout, &BINARIES, &services::sibling)?;
+    adopt::check_placed_build(&layout, &BINARIES, &sibling)?;
     services::require_docker(Path::new("docker"))?;
     private_files::ensure_dir(&layout.root)?;
     for dir in [
@@ -465,10 +487,29 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         setup_code::write_pending(&config.state_dir(), first_run, code.expose())?;
         Some(code)
     };
+    clients.place(&layout)?;
+    let manifest = clients.manifest(&layout)?;
+    if manifest.target.exists() {
+        let bytes = std::fs::read(&manifest.target).map_err(|error| {
+            IdentityError::new(
+                ErrorKind::PrivateFileIo,
+                "back up",
+                "clients",
+                error.to_string(),
+            )
+            .at(&manifest.target)
+        })?;
+        private_files::write(&layout.root.join("clients.json.previous"), &bytes)?;
+    }
+    swap::place_file(&manifest.target, &manifest.bytes, false)?;
+    emitter.note(&format!(
+        "clients recorded: {} platforms",
+        clients.releases.len()
+    ));
     let build = adopt::settle(
         &layout,
         &units,
-        &services::sibling,
+        &sibling,
         changed,
         options.surface.is_some(),
         &mut |line| {
@@ -486,10 +527,10 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     if emitter.is_json() {
         emitter.field("build", "build", build);
     }
-    start_runner(&layout, &key, &services::sibling("lys")?, &mut |line| {
+    start_runner(&layout, &key, &sibling("lys")?, &mut |line| {
         emitter.note(line);
     })?;
-    proxy::start(&layout, ports, &services::sibling("lys")?, &mut |line| {
+    proxy::start(&layout, ports, &sibling("lys")?, &mut |line| {
         emitter.note(line);
     })?;
     emitter.field("open", "url", ports.service_url());

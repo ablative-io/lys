@@ -101,6 +101,8 @@ pub struct SeatAttachBody {
 /// A seat as the screens and the CLI show it.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
 pub struct SeatView {
+    /// A newer or different version of a qualified adapter, named with its pin.
+    pub qualification: Option<String>,
     /// The transport of its latest session; null before a start.
     pub transport: Option<String>,
     /// Its name.
@@ -300,6 +302,7 @@ pub(crate) fn view(seat: &Seat, responsible: Option<String>, reading: &Reading<'
     };
     let added = &seat.added;
     SeatView {
+        qualification: seat.qualification.clone(),
         transport: seat.transport.clone(),
         name: added.name.clone(),
         agent: added.agent.clone(),
@@ -372,6 +375,7 @@ mod tests {
 
     fn seat(session: Option<&str>) -> Seat {
         Seat {
+            qualification: None,
             transport: None,
             added: Added {
                 operation: "op-a".to_owned(),

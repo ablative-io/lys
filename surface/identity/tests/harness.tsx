@@ -50,7 +50,8 @@ export function serve(routes: Record<string, Route>, posted: { path: string; bod
         else init?.signal?.addEventListener('abort', abort, { once: true });
       });
     }
-    const route = routes[key];
+    // Existing fixtures declare the same programmes on each of their computers; a machine-specific answer can override it.
+    const route = routes[key] ?? (method === 'GET' && path.startsWith('/harnesses?machine=') ? routes['/harnesses'] : undefined);
     // A route may hand back a promise (cast to a Route) to answer later, or never, as a service that does not answer.
     const answer = typeof route === 'function' ? await route(body) : route;
     if (!answer) return new Response('', { status: 404 });

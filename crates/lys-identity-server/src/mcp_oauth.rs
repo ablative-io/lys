@@ -34,6 +34,9 @@ use crate::session::now;
 const ACCESS_SECONDS: u64 = 3600;
 const REFRESH_SECONDS: u64 = 30 * 24 * 3600;
 const CODE_SECONDS: u64 = 120;
+#[path = "mcp_oauth_native.rs"]
+mod native;
+pub(crate) use native::actor as native_actor;
 const APPROVAL_SECONDS: u64 = 600;
 /// At most 1000 apps held, 10 registrations a minute, and a day for a
 /// person to approve an app before its registration is let go: a bound on
@@ -212,7 +215,16 @@ impl Apps {
         client_id: &str,
         spent: Option<&str>,
     ) -> Result<Response, ServerError> {
-        let access = random()?;
+        let person = if client_id == native::CLIENT {
+            Some(native::person(self, agent)?)
+        } else {
+            None
+        };
+        let access = if client_id == native::CLIENT {
+            format!("{}{}", native::PREFIX, random()?)
+        } else {
+            random()?
+        };
         let refresh = random()?;
         let at = now();
         let made = |kind, seconds| Issued {
@@ -236,6 +248,7 @@ impl Apps {
                 "token_type": "Bearer",
                 "expires_in": ACCESS_SECONDS,
                 "refresh_token": refresh,
+                "person": person,
             })),
         )
             .into_response())
@@ -344,6 +357,7 @@ async fn server(State(apps): State<Arc<Apps>>) -> Json<serde_json::Value> {
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "code_challenge_methods_supported": ["S256"],
         "token_endpoint_auth_methods_supported": ["none"],
+        "native_client_id": native::CLIENT,
     }))
 }
 

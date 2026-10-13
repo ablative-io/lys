@@ -46,6 +46,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::sign_in_providers::routes())
         .merge(crate::link_audit_api::routes())
         .merge(crate::network_api::routes())
+        .merge(crate::clients_api::routes())
         .merge(crate::provisioning_api::routes())
         .merge(crate::mcp_requests_api::routes())
         .merge(crate::harness_catalogue::routes())

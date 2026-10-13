@@ -71,7 +71,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
         ? new Refused(0, { refusal: 'RetainedComputerUnconfirmed', reason: 'The chosen computer, its local runner or its allowance route could not be confirmed. The saved request has not been sent; no replacement computer is chosen.' }) : null;
   const onePress = Boolean(walk) && !hold || !pending && !walk && runOptions.choices !== null;
   const working = useRef(false);
-  const targets = useMemo(() => reportingChoices(people), [people]);
+  const targets = useMemo(() => reportingChoices(people).filter((entry) => people.scope === 'directory' || entry.id === me.person.id), [people, me.person.id]);
   const chosen = targets.find((entry) => entry.id === person);
   const names = useMemo(() => new Map((people.people.find((entry) => entry.id === chosen?.owner)?.agents ?? []).map((agent) => [agent.display_name.trim().toLowerCase(), agent.display_name])), [people, chosen?.owner]);
   const activeTeams = useMemo(() => teams.filter((entry) => entry.state === 'active'), [teams]);
@@ -203,6 +203,6 @@ export function AddAgent() {
     return { me, people, teams, capability, grants, runOptions: await firstRunChoices(capability) };
   }, 'add-agent');
   return <div className="page"><a href="#/people">People and agents</a><h1>Add an agent</h1>
-    <Gate load={load} title="Add an agent" ok={(data) => data.people.scope === 'directory' ? <Form key={location.search} me={data.me} people={data.people} teams={data.teams} search={location.search} capability={data.capability} runOptions={data.runOptions} grants={data.grants} /> : <p className="why-not">Only the Lys administrator can add agents. Ask them to add it for you.</p>} />
+    <Gate load={load} title="Add an agent" ok={(data) => <Form key={location.search} me={data.me} people={data.people} teams={data.teams} search={location.search} capability={data.capability} runOptions={data.runOptions} grants={data.grants} />} />
   </div>;
 }

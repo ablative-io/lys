@@ -19,13 +19,18 @@ pub(crate) const PUT: Method = Method::Put;
 /// Anyone.
 pub(crate) const P: &[Auth] = &[Auth::Public];
 /// A personal session; the operator has no personal account.
-pub(crate) const C: &[Auth] = &[Auth::Session];
+pub(crate) const C: &[Auth] = &[Auth::Session, Auth::Bearer];
 /// A signed-in person or the install's operator.
-pub(crate) const S: &[Auth] = &[Auth::Session, Auth::Operator];
+pub(crate) const S: &[Auth] = &[Auth::Session, Auth::Bearer, Auth::Operator];
 /// A signed-in person, or an app or registrar through its credential.
 pub(crate) const A: &[Auth] = &[Auth::Session, Auth::Bearer, Auth::Operator];
 /// An agent's signed request, or a signed-in person.
-pub(crate) const G: &[Auth] = &[Auth::AgentSignature, Auth::Session, Auth::Operator];
+pub(crate) const G: &[Auth] = &[
+    Auth::AgentSignature,
+    Auth::Session,
+    Auth::Bearer,
+    Auth::Operator,
+];
 /// A provider-issued access token; a session or operator token cannot replace it.
 pub(crate) const B: &[Auth] = &[Auth::Bearer];
 /// An agent's signed request alone.
@@ -137,11 +142,13 @@ mod tests;
 pub(crate) const TABLE: &[E] = entries! {
     GET "/authority" "The authority this service speaks for" P [];
     GET "/health" "That this service is serving, with its name and build" P [];
+    GET "/clients" "The client platforms and commits held by this install" S [SIGNED, &["clients_unreadable"]];
+    GET "/clients/{platform}/{name}" "Download a held client executable with its commit and SHA-256" S [SIGNED, &["client_platform_unknown", "client_file_unknown", "client_digest_mismatch", "clients_unreadable"]];
     GET "/login" "Redirect to the sign-in screen" P [];
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]] scope("person", "person.create", []);
-    POST "/agents" "Register an agent" A [ADMIN_BODY, REPORTING, &["credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
+    POST "/agents" "Register an own agent, or administer registration" A [SIGNED_BODY, REPORTING, &["NotAdmitted", "credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
     POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused"]];
     GET "/drafts" "The drafts the signed-in person may decide" C [SIGNED, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/dashboard" "The caller's own agents, how each is going, and what waits on the caller" C [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
@@ -197,9 +204,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/link-audit" "Deliver a link-audit record" G [AGENT, &["NotAdmitted", "NotSignedIn", "RequestMalformed"]];
     POST "/link-audit/person" "Look up a link-audit holder" G [AGENT, &[ "LoginUnbound", "NotAdmitted", "NotSignedIn", "RequestMalformed", ]];
     GET "/network" "The machines" S [SIGNED, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable", "NoPerson"]] scope("machine", "read", []);
-    GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED, &["ProvisioningUnavailable"]] scope("harness", "read", []);
-    GET "/harnesses/plugins" "The Claude Code plugins installed in one config folder of a computer, as its runner reads them" S [ADMIN, &["RequestMalformed", "MachineUnknown", "runner_absent"], &["runner_request_unsigned", "runner_request_malformed", "runner_protocol_mismatch", "runner_request_replayed", "runner_request_misaddressed", "runner_unreachable", "runner_reply_malformed", "runner_stopping", "plugins_unreadable", "plugin_not_installed", "runner_answer_unexpected"]] scope("harness", "read", []);
-    POST "/network/machines" "Name an owned computer, or administer a machine" S [SIGNED_BODY, &["MachineReused", "NoPerson", "not_your_computer", "agent_not_yours"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.create", []);
+    GET "/harnesses" "The programmes Lys describes and their reviewed builds" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "not_your_computer", "MachineUnknown", "MachineRetired", "NetworkUnavailable", "RuntimeUnavailable", "harness_programs_unreadable", "runner_reply_malformed", "ProvisioningUnavailable"]] scope("harness", "read", []);
+    GET "/harnesses/plugins" "The Claude Code plugins installed in one config folder of a computer, as its runner reads them" S [ADMIN, &["RequestMalformed", "MachineUnknown", "runner_absent"], &["runner_request_unsigned", "runner_request_malformed", "runner_protocol_mismatch", "runner_request_replayed", "runner_request_misaddressed", "runner_unreachable", "runner_reply_malformed", "runner_stopping", "plugins_unreadable", "plugin_not_installed", "runner_reply_malformed"]] scope("harness", "read", []);
+    POST "/network/machines" "Name an owned computer, or administer a machine" S [SIGNED_BODY, &["NotAdmitted", "MachineReused", "NoPerson", "not_your_computer", "agent_not_yours"], &["IdentifierMalformed", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.create", []);
     POST "/network/machines/{id}/retire" "Retire a machine" S [ADMIN_BODY, &["MachineUnknown"]] scope("machine", "machine.retire", ["id"]);
     POST "/network/machines/{id}/team" "Assign or clear a computer's owning team" S [SIGNED_BODY, &["NotAdmitted", "NoPerson", "IdentifierMalformed", "MachineUnknown", "MachineRetired", "MachineTeamReused", "TeamUnknown", "TeamRetired", "TeamsUnavailable"]] scope("machine", "machine.team.set", ["id"]);
     POST "/network/machines/{id}/agents" "Allow an own agent on an own computer, or administer its agents" S [SIGNED_BODY, MACHINE_AGENTS, &["NoPerson", "not_your_computer", "agent_not_yours", "IdentifierMalformed", "AgentNotVisible", "MachineUnknown", "MachineRetired", "MachineWithoutRuntime", "NetworkUnavailable", "RuntimeUnavailable"]] scope("machine", "machine.agent.set", ["id"]);
@@ -207,7 +214,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/agents/{id}/mcp-requests" "An agent's MCP requests" S [SIGNED, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused"]] scope("agent", "read", ["id"]);
     POST "/agents/{id}/mcp-requests" "Ask for a declared MCP server" S [SIGNED_BODY, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "ProvisioningReused", "ProfileNotReviewed", "RequestReused", "mcp_server_unknown", "mcp_server_held"]] scope("agent", "agent.mcp-request.create", ["id"]);
     POST "/agents/{id}/mcp-requests/{request}/approve" "Approve an MCP request within remit" G [SIGNED_BODY, AGENT, &["AgentNotVisible", "NoPerson", "McpRequestsUnavailable", "ProvisioningUnavailable", "TeamsUnavailable", "ProfileNotReviewed", "ProvisioningReused", "RequestUnknown", "RequestDecided", "RequestReused", "mcp_beyond_remit", "mcp_server_held", "McpSettingUnrepresentable"]] scope("agent", "agent.mcp-request.approve", ["id"]);
-    POST "/agents/{id}/provisioning" "Set an agent's profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, &["ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]] scope("agent", "agent.provisioning.set", ["id"]);
+    POST "/agents/{id}/provisioning" "Set an own agent's profile" S [&["ProvisioningUnavailable"], SIGNED_BODY, &["NotAdmitted", "NoPerson", "MachineUnknown", "MachineRetired", "not_your_computer", "NetworkUnavailable", "RuntimeUnavailable", "harness_program_unknown", "runner_unreachable", "harness_programs_unreadable", "runner_reply_malformed", "ProvisioningChanged"], &["AgentNotVisible", "ProvisioningReused"], &["McpCredentialInline", "McpSettingUnrepresentable", "ModelUnrepresentable", "PolicyUnrepresentable", "SkillUnknown"]] scope("agent", "agent.provisioning.set", ["id"]);
     GET "/skills" "The skills Lys keeps" S [SIGNED] scope("skill", "read", []);
     POST "/skills" "Keep a skill's text" S [&["ProvisioningUnavailable"], ADMIN_BODY] scope("skill", "skill.keep", []);
     POST "/agents/{id}/provisioning/{version}/review" "Review a profile" S [&["ProvisioningUnavailable"], ADMIN_BODY, PROFILE_REVIEW] scope("agent", "agent.provisioning.review", ["id"]);
@@ -359,7 +366,7 @@ pub(crate) const TABLE: &[E] = entries! {
     PUT "/configuration" "Set the organisation zone at its current version" S [ADMIN_BODY, &["ConfigurationMalformed", "ConfigurationVersionConflict", "ConfigurationZoneRefused", "ConfigurationUnavailable", "NoPerson"]] scope("configuration", "configuration.zone.set", []);
     GET "/agents/{id}/memory" "An agent's memory" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
-    POST "/agents/{id}/certificates" "Issue a certificate" S [ADMIN_BODY, &["AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
+    POST "/agents/{id}/certificates" "Issue a certificate for an own agent, or administer issuance" S [SIGNED_BODY, &["NotAdmitted", "AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
     POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped", "LaunchUnrenderable", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("agent", "agent.start", ["id"]);
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);

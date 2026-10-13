@@ -268,6 +268,7 @@ async fn begin(
     };
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
+            qualification: start["qualification"].as_str().map(str::to_owned),
             transport,
             operation: operation.to_owned(),
             name: name.clone(),

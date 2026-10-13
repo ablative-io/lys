@@ -185,8 +185,8 @@ fn gated_fixture(
             conversation: "conversation".to_owned(),
             entry: executable.clone(),
             harness: executable,
-            harness_version: "9.8.7".to_owned(),
-            adapter: "fixture/1".to_owned(),
+            harness_version: "2.1.296".to_owned(),
+            adapter: "claude-stream-json/1".to_owned(),
         }
     };
     let (sender, frames) = mpsc::channel();

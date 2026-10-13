@@ -167,10 +167,10 @@ describe('Network', () => {
     expect(document.activeElement?.getAttribute('name')).toBe('name');
     expect(document.activeElement?.closest('tfoot')).not.toBeNull();
   });
-  it('offers no add row to a person who may not add a computer', async () => {
+  it('offers the own-computer add row to a signed-in non-administrator', async () => {
     await mount('#/network', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
-    expect($('form[aria-label="Add a computer"]')).toBeNull();
-    expect($('#screen .listing tfoot')).toBeNull();
+    expect($('form[aria-label="Add a computer"]')).not.toBeNull();
+    expect($('#screen .listing tfoot')).not.toBeNull();
   });
   it('says an empty network is empty once, in the list', async () => {
     await mount('#/network', { ...routes, '/network': ok({ machines: [], reports_served: true }) });
@@ -220,7 +220,7 @@ describe('Network', () => {
   });
   it('does not offer changes to non-administrators or when the network is unavailable', async () => {
     await mount('#/network', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
-    expect(button('Add a computer')).toBeNull(); expect(button('Retire this computer')).toBeNull();
+    expect($('form[aria-label="Add a computer"]')).not.toBeNull(); expect(button('Retire this computer')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
     await mount('#/network', { ...routes, '/network': refused(503, 'NetworkUnavailable', 'not configured') });
     expect(text()).toContain('NetworkUnavailable'); expect(button('Add a computer')).toBeNull();

@@ -37,15 +37,25 @@ async fn registration_respects_the_chosen_person_and_the_callers_authority()
         Some(&responsible),
         Some(&unknown),
         Some(&agent),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (at, requested) = requested;
         let mut body = json!({
             "operation": OperationId::generate()?.to_string(),
-            "display_name": "Not admitted",
+            "display_name": format!("Requested registration {at}"),
         });
         if let Some(id) = requested {
             body["answers_to"] = json!(id);
         }
-        refused(&service, &other, &body, 403, "NotAdmitted").await?;
+        if requested.is_none() || requested == Some(&responsible) {
+            let (status, answer) = service.post("/agents", Some(&other), &body).await?;
+            assert_eq!(status, 200);
+            assert_eq!(answer["responsible"], responsible);
+        } else {
+            refused(&service, &other, &body, 403, "NotAdmitted").await?;
+        }
     }
     let (chosen, receipt) =
         admitted_choices(&service, &administrator, &other, &own, &responsible).await?;

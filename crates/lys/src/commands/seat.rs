@@ -145,6 +145,9 @@ fn list_lines(answer: &Value) {
                     shown(seat, "session"),
                     shown(seat, "last_signal_at"),
                 );
+                if let Some(mark) = seat["qualification"].as_str() {
+                    println!("  {mark}");
+                }
             }
         }
         None => println!("seats: the server's answer holds no list: {answer}"),

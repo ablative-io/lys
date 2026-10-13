@@ -22,3 +22,18 @@ pub(super) const QUALIFIED: &[Qualification] = &[
         version: "0.161.0-alpha.3",
     },
 ];
+
+/// Mark a known adapter's unqualified version, retaining the qualification pins.
+///
+/// # Errors
+/// Refuses an adapter with no launched-binary qualification by its existing name.
+pub fn mark(adapter: &str, reported: &str) -> Result<Option<String>, crate::RunnerError> {
+    let proof = QUALIFIED.iter().find(|proof| proof.adapter == adapter).ok_or_else(|| crate::RunnerError::refused(
+        "control_adapter_unqualified", format!("adapter {adapter} reports version {reported}; qualified version none: the adapter has no launched-binary qualification")))?;
+    Ok((proof.version != reported).then(|| {
+        format!(
+            "unqualified version {reported}; qualified {}",
+            proof.version
+        )
+    }))
+}

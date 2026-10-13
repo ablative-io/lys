@@ -313,6 +313,7 @@ pub fn ended_in(answer: &Answer) -> Option<&Ended> {
 #[must_use]
 pub fn kind(answer: &Answer) -> &'static str {
     match answer {
+        Answer::Programs { .. } => "programs",
         Answer::Started { .. } => "started",
         Answer::Delivered { .. } => "delivered",
         Answer::Output { .. } => "output",

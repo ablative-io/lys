@@ -51,6 +51,7 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
                     writer,
                     "{}",
                     reply_line(Answer::Started {
+                        qualification: None,
                         session,
                         pid: 42,
                         started_at: 1
@@ -183,6 +184,7 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
                     writer,
                     "{}",
                     reply_line(Answer::Started {
+                        qualification: None,
                         session,
                         pid: 42,
                         started_at: 1

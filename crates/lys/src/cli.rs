@@ -34,6 +34,9 @@ pub use ca::CaCommand;
 #[path = "cli/seat.rs"]
 mod seat;
 pub use seat::{AttachArgs, SeatArgs, SeatCommand, SeatImportCommand};
+#[path = "cli/sign_in.rs"]
+mod sign_in;
+pub use sign_in::SignInArgs;
 
 /// `lys seat import`: what to do.
 #[derive(Debug, clap::Args)]
@@ -68,6 +71,8 @@ pub struct Cli {
 /// Top-level `lys` subcommands.
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Sign this terminal in as yourself, without installing an identity service.
+    SignIn(SignInArgs),
     /// Identity key management.
     #[command(subcommand)]
     Key(KeyCommand),

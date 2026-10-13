@@ -12,9 +12,7 @@
 //! failure (with a diagnostic on stderr), `2` for argument-parsing errors
 //! (clap's convention).
 
-mod cli;
-mod commands;
-mod identity;
+use lys::{cli, commands, identity};
 
 use std::process::ExitCode;
 
@@ -41,6 +39,7 @@ fn main() -> ExitCode {
     let cli = parse();
     let json = cli.json;
     let result = match cli.command {
+        Command::SignIn(args) => commands::sign_in::run(&args, json),
         Command::Key(key_command) => match key_command {
             KeyCommand::Generate { out } => commands::key::generate(&out, json),
             KeyCommand::Inspect {
@@ -78,6 +77,8 @@ fn main() -> ExitCode {
                 identity::stop::start(&identity::stop::StartOptions { root }, json)
             }
             identity::IdentityCommand::Install {
+                from,
+                clients,
                 service_port,
                 broker_port,
                 proxy_port,
@@ -88,6 +89,8 @@ fn main() -> ExitCode {
                 profile,
             } => identity::install::run(
                 &identity::install::Options {
+                    from,
+                    clients,
                     root,
                     profile,
                     admin_email,
@@ -100,12 +103,14 @@ fn main() -> ExitCode {
                 json,
             ),
             identity::IdentityCommand::Upgrade {
+                clients,
                 from,
                 surface,
                 root,
                 message_service,
             } => identity::upgrade::run(
                 &identity::upgrade::Options {
+                    clients,
                     from,
                     surface,
                     root,

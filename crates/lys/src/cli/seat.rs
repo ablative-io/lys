@@ -9,10 +9,9 @@ use super::SeatImportArgs;
 /// `lys seat`: what to do, and the server it is asked of.
 #[derive(Debug, clap::Args)]
 pub struct SeatArgs {
-    /// The identity server's base address, `http://<loopback>:<port>` with
-    /// `/api` after it when the server serves its screens, over the
-    /// installed service's own. The operator token is still the install's,
-    /// and is sent only to a numeric loopback address.
+    /// The identity server's HTTPS base, including /api. Without a local
+    /// install, use the person pass made by `lys sign-in`. A local install's
+    /// operator token is sent only to numeric loopback.
     #[arg(long, global = true, value_name = "BASE")]
     pub server: Option<String>,
 

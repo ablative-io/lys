@@ -96,23 +96,15 @@ pub(super) async fn authorize(
     asked: Result<Query<Asked>, axum::extract::rejection::QueryRejection>,
 ) -> Result<Response, ServerError> {
     let Query(asked) = asked.map_err(|refused| malformed(&refused.body_text()))?;
-    let name = {
-        let store = held(&apps.store)?;
-        let app = store
-            .app(&asked.client_id)
-            .ok_or(ServerError::Provider(ProviderError::RedirectUnregistered))?;
-        if !app.redirect_uris.contains(&asked.redirect_uri) {
-            return Err(ServerError::Provider(ProviderError::RedirectUnregistered));
-        }
-        app.name.clone()
-    };
+    let name = super::native::known(&apps, &asked.client_id, &asked.redirect_uri)?;
+    let native = asked.client_id == super::native::CLIENT;
     if asked.response_type != "code" {
         return Err(malformed("an app asks for a code"));
     }
     if asked
         .resource
         .as_ref()
-        .is_some_and(|resource| *resource != apps.resource)
+        .is_some_and(|resource| *resource != apps.resource && !native)
     {
         return Err(malformed("an app asks only for this install's MCP door"));
     }
@@ -155,6 +147,11 @@ pub(super) async fn authorize(
         crate::read_api::own_person(directory.projection()?, &session_actor)
     })?;
     let mut choices = String::new();
+    if native {
+        return Ok(([(header::CACHE_CONTROL, "no-store"), (header::X_FRAME_OPTIONS, "DENY"),
+            (header::CONTENT_SECURITY_POLICY, "default-src 'none'; form-action 'self'")],
+            Html(format!("<!doctype html><title>Sign in to Lys CLI</title><h1>Sign in to Lys CLI</h1><p>Your terminal will act as you in Lys. Ending this sign-in ends its authority.</p><form method=\"post\" action=\"/oauth/mcp/consent\"><input type=\"hidden\" name=\"asking\" value=\"{asking}\"><button name=\"decision\" value=\"approve\">Sign in to Lys CLI</button><button name=\"decision\" value=\"refuse\">Cancel</button></form>"))).into_response());
+    }
     for offer in crate::mcp_oauth_grants::offers(&apps.state, person)? {
         choices.push_str("<label><input type=\"checkbox\" name=\"grant\" value=\"");
         choices.push_str(&escaped(&offer.key));
@@ -259,16 +256,21 @@ pub(super) async fn consent(
     let pairs = match answer.decision.as_str() {
         "refuse" => with_state(vec![("error", "access_denied".to_owned())]),
         "approve" => {
-            let name = held(&apps.store)?
-                .app(&asking.client_id)
-                .map(|app| app.name.clone())
-                .ok_or(ServerError::Provider(ProviderError::RedirectUnregistered))?;
+            let name = super::native::known(&apps, &asking.client_id, &asking.redirect_uri)?;
             let person = crate::routes::with_directory(&apps.state, |directory| {
                 crate::read_api::own_person(directory.projection()?, &session.actor)
             })?;
-            let picked = crate::mcp_oauth_grants::chosen(&apps.state, person, &answer.grants)?;
-            let agent = apps.agent_for(&asking.client_id, &name, &session.actor)?;
-            crate::mcp_oauth_grants::pass_on(&apps.state, person, &agent, &picked)?;
+            let agent = if asking.client_id == super::native::CLIENT {
+                if !answer.grants.is_empty() {
+                    return Err(malformed("the native client uses its person's authority"));
+                }
+                format!("cli-session:{}", session.id)
+            } else {
+                let picked = crate::mcp_oauth_grants::chosen(&apps.state, person, &answer.grants)?;
+                let agent = apps.agent_for(&asking.client_id, &name, &session.actor)?;
+                crate::mcp_oauth_grants::pass_on(&apps.state, person, &agent, &picked)?;
+                agent
+            };
             let code = random()?;
             let at = now();
             {
@@ -400,3 +402,7 @@ fn refresh(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
     };
     Ok(apps.issue(&agent, &asked.client_id, Some(&spent))?)
 }
+
+#[cfg(test)]
+#[path = "mcp_oauth_native_tests.rs"]
+mod native_tests;

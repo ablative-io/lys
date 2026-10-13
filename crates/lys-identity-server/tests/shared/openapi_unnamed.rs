@@ -7,6 +7,10 @@
 /// fails, and a route that names none and is not here fails.
 pub(crate) const OPEN_ANSWERS: &[(&str, &str)] = &[
     (
+        "get /clients/{platform}/{name}",
+        "Answers an installed executable as bytes, with an octet-stream schema.",
+    ),
+    (
         "get /.well-known/openid-configuration",
         "the discovery document follows OpenID Connect, not a Lys type",
     ),

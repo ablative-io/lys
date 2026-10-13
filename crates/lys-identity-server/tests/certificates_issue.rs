@@ -159,7 +159,7 @@ async fn a_request_that_proves_nothing_for_this_agent_issues_nothing() -> TestRe
         .service
         .post(&table.route(0), Some(&table.bea), &body)
         .await?;
-    refused(&answer, 404, "AgentNotVisible");
+    refused(&answer, 403, "NotAdmitted");
 
     let (status, issued) = table.service.post(&path, Some(&table.bea), &body).await?;
     assert_eq!(status, 200, "{issued}");

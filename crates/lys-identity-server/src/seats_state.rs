@@ -51,6 +51,9 @@ pub struct Added {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Started {
+    /// The launched harness's unqualified version, absent on old starts.
+    #[serde(default)]
+    pub qualification: Option<String>,
     /// The transport the reviewed launch selected.
     #[serde(default = "legacy_transport")]
     pub transport: String,
@@ -215,6 +218,9 @@ impl Line {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Seat {
+    /// The latest start's qualification mark, absent in old snapshots.
+    #[serde(default)]
+    pub qualification: Option<String>,
     /// The transport of its latest session; absent before a start.
     #[serde(default)]
     pub transport: Option<String>,
@@ -321,6 +327,7 @@ impl Held {
                 }
                 Arc::make_mut(&mut self.index).insert(name, self.seats.len());
                 self.seats.push(Seat {
+                    qualification: None,
                     added: added.clone(),
                     transport: None,
                     session: None,
@@ -334,6 +341,7 @@ impl Held {
                 let seat = self.changed(&name)?;
                 seat.session = Some(started.session.clone());
                 seat.transport = Some(started.transport.clone());
+                seat.qualification.clone_from(&started.qualification);
                 seat.harness_session.clone_from(&started.harness_session);
                 seat.running = true;
                 seat.revision += 1;

@@ -24,6 +24,9 @@ use executable::report_version;
 
 mod qualified;
 use qualified::QUALIFIED;
+pub use qualified::mark as version_mark;
+#[cfg(test)]
+mod qualified_mark_tests;
 
 pub mod identity_cache;
 
@@ -254,9 +257,7 @@ pub(crate) fn spawn(
             ),
         )
     })?;
-    let admitted = QUALIFIED
-        .iter()
-        .any(|proof| proof.adapter == adapter && proof.version == harness_version);
+    let admitted = QUALIFIED.iter().any(|proof| proof.adapter == adapter);
     #[cfg(test)]
     let admitted = admitted || qualification::approved(adapter, &harness_version)?;
     if !admitted {

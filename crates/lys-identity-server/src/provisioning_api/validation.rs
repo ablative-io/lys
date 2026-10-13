@@ -159,6 +159,44 @@ fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
     Ok(declared)
 }
 
+pub(super) async fn on_machine(
+    state: &std::sync::Arc<crate::routes::AppState>,
+    body: &SetBody,
+) -> Result<(), ServerError> {
+    let (Some(machine), Some(harness)) = (&body.runs_on, &body.harness) else {
+        return Ok(());
+    };
+    let found = crate::runner_client::programs(state, machine).await?;
+    let adapter = match harness.description.rendering_contract.as_str() {
+        "claude-code/template-v1" => "claude-stream-json/1",
+        "codex/template-v1" => "codex-app-server/1",
+        _ => "",
+    };
+    if found
+        .programs
+        .iter()
+        .any(|program| program.program == harness.program && program.adapter == adapter)
+    {
+        return Ok(());
+    }
+    Err(ServerError::Runner {
+        refusal: "harness_program_unknown".to_owned(),
+        words: format!(
+            "computer {machine} did not report {}; it reported: {}",
+            harness.program,
+            found
+                .programs
+                .iter()
+                .map(|program| format!(
+                    "{} version {} ({})",
+                    program.program, program.version, program.adapter
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    })
+}
+
 /// The session settings, each refused by name when a runner could not use it.
 fn session(
     settings: SessionSettings,

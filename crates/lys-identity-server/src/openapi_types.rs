@@ -118,6 +118,12 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
         Some(api.schema::<crate::seats_edit::SeatRetired>()),
     ));
     entries.extend(crate::seat_import_api::types(api));
+    entries.push((
+        GET,
+        "/clients",
+        None,
+        Some(api.schema::<crate::clients_api::Clients>()),
+    ));
     entries
         .into_iter()
         .map(|(method, path, request, response)| ((method, path), (request, response)))

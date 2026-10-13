@@ -441,6 +441,34 @@ impl Runners {
 }
 
 mod pending_starts;
+/// Ask the chosen computer for its own programme evidence.
+pub(crate) async fn programs(
+    state: &Arc<crate::routes::AppState>,
+    machine: &str,
+) -> Result<lys_runner::dial::programs::Programs, ServerError> {
+    let runner = crate::runner_sessions::machine_runner(state, machine)?.ok_or_else(|| {
+        ServerError::Runner {
+            refusal: "runner_unreachable".to_owned(),
+            words: "this computer names no connected runner".to_owned(),
+        }
+    })?;
+    if matches!(runner, RunnerRecord::Dialled { .. }) && !state.runners.hub().bridged(machine)? {
+        return Err(ServerError::Runner {
+            refusal: "runner_unreachable".to_owned(),
+            words: "this computer's runner is not connected to Lys".to_owned(),
+        });
+    }
+    match ask(state, machine, runner, Act::Programs).await? {
+        Answer::Programs { found } => Ok(found),
+        other => Err(ServerError::Runner {
+            refusal: "runner_reply_malformed".to_owned(),
+            words: format!(
+                "programme discovery answered {}",
+                crate::runner_sessions::kind(&other)
+            ),
+        }),
+    }
+}
 mod session;
 pub use session::ask;
 pub(crate) use session::outcome;

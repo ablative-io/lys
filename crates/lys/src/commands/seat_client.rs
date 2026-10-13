@@ -1,21 +1,6 @@
-//! The loopback client `lys seat` and `lys attach` reach the installed
-//! identity server through, as the operator does (AGENTS-002 D5).
-//!
-//! The base is the installed service's own address: its `listen` address,
-//! under `/api` when it serves a surface, found exactly as `lys identity
-//! import` finds it; `--server` names another. Every request carries the
-//! `lys-operator` header, whose value is the install's operator token, read
-//! from the owner-only file the service configuration names. The token is
-//! held in memory that is wiped when dropped, sent only to a numeric
-//! loopback address, and never printed: no message here carries it, only
-//! the file that holds it. There is no new sign-in.
-//!
-//! An agent's own ask (`lys agent pass`, AGENTS-006 R3) reaches the same
-//! server with no operator token at all: the install's token is never read,
-//! and the request carries only the credential the agent brings.
-//!
-//! A refusal from the server is shown by its own name and words; every
-//! refusal made here is named as well.
+//! Seat and attach requests use the local install or a signed-in person pass.
+//! Operator authority remains restricted to the installed numeric loopback server.
+//! Personal authority is read from the client's owner-only file and bound to its server.
 
 use std::fs;
 use std::net::IpAddr;
@@ -49,9 +34,19 @@ fn install_failure(kind: ErrorKind, path: &Path, detail: impl Into<String>) -> C
 
 /// The installed identity server, reached over loopback as the operator.
 pub struct Server {
-    authority: Authority,
-    prefix: String,
-    token: Option<Zeroizing<String>>,
+    connection: Connection,
+}
+
+enum Connection {
+    Local {
+        authority: Authority,
+        prefix: String,
+        token: Option<Zeroizing<String>>,
+    },
+    Person {
+        client: lys_runner::dial::HttpClient,
+        pass: crate::commands::sign_in::Pass,
+    },
 }
 
 impl Server {
@@ -85,6 +80,24 @@ impl Server {
     fn open(base: Option<&str>, operator: bool) -> CliResult<Self> {
         let layout = Layout::discover()?;
         let path = layout.service_config();
+        if operator {
+            let base = base.map(crate::commands::sign_in::base).transpose()?;
+            let numeric_loopback = base.as_deref().is_none_or(|base| {
+                named_base(base).is_ok_and(|(authority, _)| {
+                    authority
+                        .host
+                        .parse::<IpAddr>()
+                        .is_ok_and(|ip| ip.is_loopback())
+                })
+            });
+            if !path.is_file() || !numeric_loopback {
+                let pass = crate::commands::sign_in::load(base.as_deref())?;
+                let client = lys_runner::dial::HttpClient::new(&pass.server)?;
+                return Ok(Self {
+                    connection: Connection::Person { client, pass },
+                });
+            }
+        }
         let bytes = match fs::read(&path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -121,9 +134,11 @@ impl Server {
             None
         };
         Ok(Self {
-            authority,
-            prefix,
-            token,
+            connection: Connection::Local {
+                authority,
+                prefix,
+                token,
+            },
         })
     }
 
@@ -172,7 +187,15 @@ impl Server {
         body: Option<&Value>,
         credential: Option<(&str, &[u8])>,
     ) -> CliResult<Value> {
-        let route = format!("{}{path}", self.prefix);
+        let Connection::Local {
+            authority,
+            prefix,
+            token,
+        } = &self.connection
+        else {
+            return self.person_send(method, path, body, credential);
+        };
+        let route = format!("{prefix}{path}");
         let bytes = match body {
             Some(body) => serde_json::to_vec(body).map_err(|source| CliError::JsonSerialize {
                 what: "request body",
@@ -181,7 +204,7 @@ impl Server {
             None => Vec::new(),
         };
         let mut headers: Vec<(&str, &[u8])> = Vec::with_capacity(3);
-        if let Some(token) = &self.token {
+        if let Some(token) = token {
             headers.push((OPERATOR_HEADER, token.as_bytes()));
         }
         headers.extend(credential);
@@ -192,12 +215,12 @@ impl Server {
             headers: &headers,
             body: &bytes,
         };
-        let answer = exchange(&self.authority, &request).map_err(|failure| match failure {
+        let answer = exchange(authority, &request).map_err(|failure| match failure {
             Failure::Unreachable(detail) => refused(
                 "identity_server_unreachable",
                 format!(
                     "{} could not be reached: {detail}; nothing was sent",
-                    self.authority
+                    authority
                 ),
             ),
             Failure::Uncertain(detail) | Failure::Malformed(detail) => refused(
@@ -228,6 +251,61 @@ impl Server {
             ),
         })
     }
+
+    fn person_send(
+        &self,
+        method: &str,
+        path: &str,
+        body: Option<&Value>,
+        credential: Option<(&str, &[u8])>,
+    ) -> CliResult<Value> {
+        let Connection::Person { client, pass } = &self.connection else {
+            return Err(refused(
+                "person_pass_unavailable",
+                "no personal connection is held",
+            ));
+        };
+        if credential.is_some() {
+            return Err(refused(
+                "credential_conflict",
+                "a personal pass cannot carry another credential",
+            ));
+        }
+        let bearer = Zeroizing::new(format!("Bearer {}", pass.access_token));
+        let bytes = body
+            .map(serde_json::to_vec)
+            .transpose()
+            .map_err(|source| CliError::JsonSerialize {
+                what: "request body",
+                source,
+            })?
+            .unwrap_or_default();
+        let response = client.send(
+            method,
+            path,
+            &[
+                ("authorization", &bearer),
+                ("content-type", "application/json"),
+            ],
+            &bytes,
+        )?;
+        if response.status == 401 {
+            return Err(refused(
+                "person_pass_expired",
+                "Lys no longer admits this pass; run `lys sign-in --server <base>`",
+            ));
+        }
+        let answer: Value = serde_json::from_slice(&response.body).map_err(|_| {
+            refused(
+                "identity_server_answer_unreadable",
+                "Lys did not answer in JSON",
+            )
+        })?;
+        if (200..300).contains(&response.status) {
+            return Ok(answer);
+        }
+        Err(server_refusal(method, path, response.status, &answer))
+    }
 }
 
 /// The server's refusal, by the name and words its body gives.
@@ -244,7 +322,7 @@ fn server_refusal(method: &str, route: &str, status: u16, body: &Value) -> CliEr
         ),
         (None, _) => refused(
             "identity_server_refused",
-            format!("{method} {route}: HTTP {status} naming no refusal: {body}"),
+            format!("{method} {route}: HTTP {status} naming no refusal"),
         ),
     }
 }

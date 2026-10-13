@@ -44,6 +44,9 @@ pub(super) fn perform(
     context: Option<&crate::legacy_input::InputContext<'_>>,
 ) -> Result<Answer, RunnerError> {
     match act {
+        Act::Programs => Ok(Answer::Programs {
+            found: crate::dial::programs::discover()?,
+        }),
         Act::ReadBytes {
             session,
             cursor,
@@ -64,6 +67,7 @@ pub(super) fn perform(
             let session = managed.launch.session.clone();
             let (pid, started_at) = sessions.start_managed(*managed, proxy, None)?;
             Ok(Answer::Started {
+                qualification: sessions.qualification(&session)?,
                 session,
                 pid,
                 started_at,
@@ -92,6 +96,7 @@ pub(super) fn perform(
                 None => sessions.begin(*launch, policy, tracking)?,
             };
             Ok(Answer::Started {
+                qualification: sessions.qualification(&session)?,
                 session,
                 pid,
                 started_at,
@@ -291,6 +296,7 @@ fn as_caller(
             let (pid, started_at) =
                 sessions.start_managed(*managed, proxy, Some(caller.to_owned()))?;
             Ok(Answer::Started {
+                qualification: sessions.qualification(&session)?,
                 session,
                 pid,
                 started_at,
@@ -321,6 +327,7 @@ fn as_caller(
                 None => sessions.begin_for(*launch, policy, tracking, caller)?,
             };
             Ok(Answer::Started {
+                qualification: sessions.qualification(&session)?,
                 session,
                 pid,
                 started_at,

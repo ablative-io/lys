@@ -340,6 +340,7 @@ mod tests {
             )))
         ));
         store.keep(Line::Started(Started {
+            qualification: None,
             transport: "managed".to_owned(),
             operation: "op-c".to_owned(),
             name: "waffles".to_owned(),
@@ -372,6 +373,7 @@ mod tests {
         let mut store = SeatStore::open(&path, Arc::clone(&key))?;
         store.keep(added("op-a", "fixture-seat"))?;
         store.keep(Line::Started(Started {
+            qualification: None,
             transport: "managed".to_owned(),
             operation: "op-b".to_owned(),
             name: "fixture-seat".to_owned(),

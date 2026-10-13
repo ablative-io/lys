@@ -165,6 +165,18 @@ impl Session {
     fn view(&self, id: &str) -> Result<SessionView, RunnerError> {
         let output = self.output.lock()?;
         Ok(SessionView {
+            qualification: self
+                .live
+                .as_ref()
+                .and_then(|live| live.control.as_ref())
+                .map(|control| {
+                    crate::harness_control::process::version_mark(
+                        &control.controller.binding.adapter,
+                        &control.controller.binding.harness_version,
+                    )
+                })
+                .transpose()?
+                .flatten(),
             session: id.to_owned(),
             control: self
                 .live

@@ -358,9 +358,15 @@ async fn set(
     body: Result<Json<SetBody>, JsonRejection>,
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    crate::routes::responsible_or_administrator(&state, &headers, &id)?;
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    if let Some(machine) = &body.runs_on
+        && body.harness.is_some()
+    {
+        crate::network_api::computer_owner(&state, &actor, machine)?;
+    }
+    validation::on_machine(&state, &body).await?;
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         if directory.record(IdentityId::Agent(agent)).is_none() {

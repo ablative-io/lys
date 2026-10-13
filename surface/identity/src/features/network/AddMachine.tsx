@@ -32,11 +32,11 @@ export async function recordComputer(initial: PendingMachine, person: string, ke
 
 export const validComputerName = (name: string): boolean => Boolean(name) && !/[\u0000-\u001f\u007f]/.test(name);
 
-type Adding = { person: string; agent?: string; changed: (message: string, machine: Machine) => void };
+type Adding = { person: string; agent?: string; agents?: string[]; changed: (message: string, machine: Machine) => void };
 type Remote = { remote?: boolean; connect?: (next: Connecting) => void };
 
 /** The addition itself, whichever form shows it: what is kept until it is confirmed, what failed, and the name to send. */
-function useAddition({ person, agent, changed, remote = false, connect }: Adding & Remote) {
+function useAddition({ person, agent, agents = [], changed, remote = false, connect }: Adding & Remote) {
   const key = 'lys.pending.machine.' + person;
   const [restored] = useState(() => {
     try { return { pending: savedMachine(key), error: '' }; }
@@ -74,7 +74,7 @@ function useAddition({ person, agent, changed, remote = false, connect }: Adding
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
     if (!validComputerName(name)) { setFailure('Give this computer a name, without control characters.'); return; }
     if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
-    void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : [], may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null, ...(remote ? { remote: true as const } : {}) });
+    void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : agents, may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null, ...(remote ? { remote: true as const } : {}) });
   };
   const blocked = busy || pending !== null || Boolean(restored.error);
   /** How the addition stands: kept and unconfirmed, with its check, or why it failed. */
@@ -102,9 +102,9 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
  * The computers table's own last row, which adds one: the name under Computer, how the addition stands under Status,
  * which computer it is in a cell of its own, the button in the last column.
  */
-export function AddComputerRow({ person, changed, name, connect, selfService = false }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean }) {
+export function AddComputerRow({ person, agents, changed, name, connect, selfService = false }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean }) {
   const [chosen, setChosen] = useState<'this' | 'another'>(selfService ? 'another' : 'this');
-  const { submit, blocked, standing, pendingRemote } = useAddition({ person, changed, remote: chosen === 'another', connect });
+  const { submit, blocked, standing, pendingRemote } = useAddition({ person, agents, changed, remote: chosen === 'another', connect });
   // A kept addition is finished as it was begun, whatever is chosen now.
   const where = pendingRemote ? 'another' : chosen;
   const id = 'add-computer-' + person.replace(/[^A-Za-z0-9_-]/g, '_');

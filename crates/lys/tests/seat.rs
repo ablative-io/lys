@@ -175,21 +175,24 @@ fn seat_send_without_text_and_add_without_its_flags_are_usage_errors() -> TestRe
 }
 
 #[test]
-fn no_install_is_refused_by_name() -> TestResult {
+fn no_install_or_person_pass_names_the_sign_in_act() -> TestResult {
     let root = tempfile::tempdir()?;
     let output = lys(root.path(), &["seat", "list"])?;
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let stderr = String::from_utf8(output.stderr)?;
-    assert!(stderr.contains("not_installed"), "{stderr}");
+    assert!(
+        stderr.contains("person_pass_missing") && stderr.contains("lys sign-in"),
+        "{stderr}"
+    );
 
     let output = lys(root.path(), &["--json", "seat", "start", "waffles"])?;
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let answer: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(answer["ok"], false, "{answer}");
     assert!(
-        answer["error"]
-            .as_str()
-            .is_some_and(|error| error.contains("not_installed")),
+        answer["error"].as_str().is_some_and(
+            |error| error.contains("person_pass_missing") && error.contains("lys sign-in")
+        ),
         "{answer}"
     );
     Ok(())
@@ -216,7 +219,7 @@ fn a_server_off_loopback_is_refused_before_anything_is_sent() -> TestResult {
     )?;
     assert_eq!(output.status.code(), Some(1), "{}", printed(&output));
     let all = printed(&output);
-    assert!(all.contains("server_not_loopback"), "{all}");
+    assert!(all.contains("cleartext http:// is spoken only"), "{all}");
     assert!(
         !all.contains(TOKEN),
         "the operator token was printed:\n{all}"

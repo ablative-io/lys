@@ -147,6 +147,9 @@ pub struct Output {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SessionView {
+    /// A known adapter's unqualified version, when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub qualification: Option<String>,
     /// The session.
     pub session: String,
     /// Its process id, while one is known.

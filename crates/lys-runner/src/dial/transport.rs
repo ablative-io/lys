@@ -266,7 +266,22 @@ impl Channel {
     }
 
     fn connect(&self) -> Result<BufReader<Stream>, RunnerError> {
-        let stream = TcpStream::connect(&self.authority)
+        let port = match self.scheme {
+            Scheme::Tls { .. } => 443,
+            Scheme::Loopback => 80,
+        };
+        let address = if self.authority.starts_with('[') {
+            if self.authority.contains("]:") {
+                self.authority.clone()
+            } else {
+                format!("{}:{port}", self.authority)
+            }
+        } else if self.authority.contains(':') {
+            self.authority.clone()
+        } else {
+            format!("{}:{port}", self.authority)
+        };
+        let stream = TcpStream::connect(&address)
             .map_err(|error| failed(format!("{} could not be reached: {error}", self.authority)))?;
         keepalive(&stream)?;
         let stream = match &self.scheme {

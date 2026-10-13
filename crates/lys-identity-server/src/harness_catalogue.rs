@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::sync::{Arc, Mutex};
 
-use axum::extract::{Extension, State};
+use axum::extract::{Extension, Query, State};
 use axum::http::HeaderMap;
 use axum::{Json, Router, routing::get};
 use lys_home::harness::description::{Description, FurtherModels};
@@ -112,6 +112,12 @@ pub struct ProgramView {
 pub struct CatalogueView {
     /// Programme choices in catalogue order.
     pub programs: Vec<ProgramView>,
+    /// The computer asked, when one was selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub machine: Option<String>,
+    /// Why the computer offered no programmes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 /// Validated descriptions kept for the service's lifetime.
@@ -231,7 +237,11 @@ impl Catalogue {
                 program.not_found = Some(reasons.join("; "));
             }
         }
-        Ok(CatalogueView { programs })
+        Ok(CatalogueView {
+            programs,
+            machine: None,
+            reason: None,
+        })
     }
 
     fn view(&self, state: &AppState) -> Result<CatalogueView, ServerError> {
@@ -246,7 +256,11 @@ impl Catalogue {
                 Ok(())
             })?;
         }
-        Ok(CatalogueView { programs })
+        Ok(CatalogueView {
+            programs,
+            machine: None,
+            reason: None,
+        })
     }
 }
 
@@ -377,8 +391,16 @@ async fn read(
     State(state): State<Shared>,
     Extension(catalogue): Extension<Arc<Catalogue>>,
     headers: HeaderMap,
+    query: Result<Query<MachineQuery>, axum::extract::rejection::QueryRejection>,
 ) -> Result<Json<CatalogueView>, ServerError> {
-    signed_in(&state, &headers)?;
+    let actor = signed_in(&state, &headers)?;
+    let Query(query) = query.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    if let Some(machine) = query.machine {
+        crate::network_api::computer_owner(&state, &actor, &machine)?;
+        return machine_view(&state, &catalogue, &machine).await.map(Json);
+    }
     let answer = tokio::task::spawn_blocking(move || catalogue.view(&state))
         .await
         .map_err(|error| {
@@ -389,3 +411,56 @@ async fn read(
         })??;
     Ok(Json(answer))
 }
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MachineQuery {
+    machine: Option<String>,
+}
+
+pub(crate) async fn machine_view(
+    state: &Arc<AppState>,
+    catalogue: &Catalogue,
+    machine: &str,
+) -> Result<CatalogueView, ServerError> {
+    let found = match crate::runner_client::programs(state, machine).await {
+        Ok(found) => found,
+        Err(ServerError::Runner { refusal, words }) if refusal == "runner_unreachable" => {
+            return Ok(CatalogueView {
+                programs: Vec::new(),
+                machine: Some(machine.to_owned()),
+                reason: Some(format!("runner_unreachable: {words}")),
+            });
+        }
+        Err(error) => return Err(error),
+    };
+    let mut programs = catalogue.programs.clone();
+    for program in &mut programs {
+        let adapter = match program.description.rendering_contract.as_str() {
+            "claude-code/template-v1" => "claude-stream-json/1",
+            "codex/template-v1" => "codex-app-server/1",
+            _ => continue,
+        };
+        program.builds = found
+            .programs
+            .iter()
+            .filter(|copy| copy.adapter == adapter)
+            .map(|copy| BuildView {
+                name: format!("{} {}", program.name, copy.version),
+                program: copy.program.clone(),
+                package: format!("{} {}", program.command, copy.version),
+                source: BuildSource::Installed,
+            })
+            .collect();
+    }
+    programs.retain(|program| !program.builds.is_empty());
+    Ok(CatalogueView {
+        programs,
+        machine: Some(machine.to_owned()),
+        reason: found.reason,
+    })
+}
+
+#[cfg(test)]
+#[path = "harness_catalogue_machine_tests.rs"]
+mod machine_tests;

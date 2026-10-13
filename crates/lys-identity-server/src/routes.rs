@@ -256,6 +256,12 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
 /// The signed-in actor, or a refusal: the administrator for a request
 /// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
+    if let Some(actor) = crate::mcp_oauth::native_actor(state, headers)? {
+        return Ok(actor);
+    }
+    if let Some(actor) = crate::provider::personal_actor(state, headers)? {
+        return Ok(actor);
+    }
     if let Some((agent, provenance)) = crate::agent_pass::verified(state, headers)? {
         return Ok(Actor::new(
             lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
@@ -324,6 +330,36 @@ pub(crate) fn is_administrator(state: &AppState, actor: &Actor) -> Result<bool, 
             .is_administrator(directory.projection()?, actor)
     })
 }
+
+/// Personal agent acts admit only that agent's responsible person or the administrator.
+pub(crate) fn responsible_or_administrator(
+    state: &AppState,
+    headers: &HeaderMap,
+    agent: &str,
+) -> Result<(), ServerError> {
+    let actor = signed_in(state, headers)?;
+    with_directory(state, |directory| {
+        let directory = directory.projection()?;
+        if state.admission.is_administrator(directory, &actor)? {
+            return Ok(());
+        }
+        let person = crate::read_api::own_person(directory, &actor)?;
+        let agent = AgentId::from_str(agent)?;
+        if directory
+            .record(IdentityId::Agent(agent))
+            .is_some_and(|record| record.responsible() == Some(person))
+        {
+            return Ok(());
+        }
+        Err(ServerError::NotAdmitted {
+            reason: "only the responsible person or administrator may do this for the agent",
+        })
+    })
+}
+
+#[cfg(test)]
+#[path = "routes/identities_self_tests.rs"]
+mod identities_self_tests;
 
 /// Run `act` on the directory, one caller at a time.
 pub(crate) fn with_directory<T>(
