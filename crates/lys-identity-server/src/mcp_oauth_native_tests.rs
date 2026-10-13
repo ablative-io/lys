@@ -130,3 +130,34 @@ async fn native_pkce_approves_the_person_refreshes_and_refuses_foreign_redirects
     assert_eq!(refusal["refusal"], "NotSignedIn");
     Ok(())
 }
+
+#[tokio::test]
+async fn malformed_person_payloads_keep_the_decoders_named_refusal()
+-> Result<(), Box<dyn std::error::Error>> {
+    let service = crate::mcp_oauth::tests::service().await?.0;
+    let client = reqwest::Client::new();
+    let encoding = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    let header = encoding.encode(serde_json::to_vec(&serde_json::json!({ "alg": "ES256" }))?);
+    let signature = encoding.encode(rand::random::<[u8; 32]>());
+    for (payload, name, cause) in [
+        ("%%".to_owned(), "person_payload_invalid", "Invalid symbol"),
+        (
+            encoding.encode(b"{"),
+            "person_claims_invalid",
+            "EOF while parsing an object",
+        ),
+    ] {
+        let response = client
+            .get(format!("{}/me", service.base))
+            .bearer_auth(format!("{header}.{payload}.{signature}"))
+            .send()
+            .await?;
+        assert_eq!(response.status(), 401);
+        let refusal: Value = response.json().await?;
+        assert_eq!(refusal["refusal"], "PassRefused");
+        let reason = refusal["reason"].as_str().ok_or("refusal reason absent")?;
+        assert!(reason.contains(name), "decoder refusal name absent");
+        assert!(reason.contains(cause), "decoder cause absent");
+    }
+    Ok(())
+}

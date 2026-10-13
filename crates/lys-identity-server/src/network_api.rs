@@ -192,7 +192,7 @@ async fn name_computer(
         }
         Ok(())
     })?;
-    writes::name(State(state), headers, Ok(Json(body))).await
+    writes::name(State(state), &headers, Ok(Json(body)))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {

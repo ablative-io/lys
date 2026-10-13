@@ -1,5 +1,7 @@
 //! Personal registration and key certification preserve the directory's audit and refusals.
 
+use sha2::Digest;
+
 use base64::Engine;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use serde_json::json;
@@ -157,7 +159,6 @@ async fn the_next_signed_agent_pass_contains_the_certified_key_thumbprint()
     let payload = pass.split('.').nth(1).ok_or("payload absent")?;
     let claims: serde_json::Value =
         serde_json::from_slice(&base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload)?)?;
-    use sha2::Digest;
     let expected = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(sha2::Sha256::digest(key.public_key_bytes()));
     assert_eq!(claims["agent_key_thumbprints"], json!([expected]));

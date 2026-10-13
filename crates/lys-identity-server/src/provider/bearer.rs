@@ -85,12 +85,17 @@ pub(crate) fn personal_actor(
         return Ok(None);
     };
     let payload = pass.split('.').nth(1).ok_or(ServerError::NotSignedIn)?;
-    let claims: serde_json::Value = serde_json::from_slice(
-        &URL_SAFE_NO_PAD
-            .decode(payload)
-            .map_err(|_| ServerError::NotSignedIn)?,
-    )
-    .map_err(|_| ServerError::NotSignedIn)?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).map_err(|error| {
+            ServerError::Provider(ProviderError::PassRefused {
+                refusal: format!("person_payload_invalid: {error}"),
+            })
+        })?)
+        .map_err(|error| {
+            ServerError::Provider(ProviderError::PassRefused {
+                refusal: format!("person_claims_invalid: {error}"),
+            })
+        })?;
     // The audience selects the verifier; only verified claims grant authority.
     if claims["aud"] != "lys"
         || !claims["sub"]

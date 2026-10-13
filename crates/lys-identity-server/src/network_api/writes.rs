@@ -23,12 +23,12 @@ use crate::session::now;
 use crate::teams_api::{team_id, with_teams};
 use crate::teams_state::Team;
 
-pub(super) async fn name(
+pub(super) fn name(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    headers: &HeaderMap,
     body: Result<Json<NameBody>, JsonRejection>,
 ) -> Result<Json<MachineView>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
+    let actor = signed_in(&state, headers)?;
     let administrator = crate::routes::is_administrator(&state, &actor)?;
     let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
     body.team = body.team.as_deref().map(team_id).transpose()?;

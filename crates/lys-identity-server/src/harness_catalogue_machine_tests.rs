@@ -8,7 +8,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[tokio::test]
 async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programmes()
 -> Result<(), Box<dyn std::error::Error>> {
-    let (service, (seeded, machine, stop, worker)) = Service::start_with(|config| {
+    let (service, (seeded, machine, unreadable, stop, worker)) = Service::start_with(|config| {
         let seeded = identity_contract::lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, "member"])?;
         let machine = lys_identity::OperationId::generate()?.to_string();
         let socket = config.log_dir.with_file_name("programs.sock");
@@ -18,6 +18,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
         network.name(crate::network_store::Machine { id: machine.clone(), name: "Chosen computer".to_owned(), kind: "Computer".to_owned(), runtime: Some("lys-runner".to_owned()),
             team: None, creation_team: None, slots: 1, may_run: Vec::new(), may_reach: Vec::new(), may_run_roles: Vec::new(), named_by: seeded.people[0].id.to_string(), named_at: 1, retired: None })?;
         network.name_runner(&machine, Some(crate::runner_client::RunnerRecord::Socket { path: socket.to_string_lossy().into_owned() }))?;
+        let (unreadable, discovery_refused) = tokio::sync::watch::channel(false);
         let (stop, mut stopped) = tokio::sync::oneshot::channel();
         let worker = tokio::spawn(async move {
             loop {
@@ -27,7 +28,9 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
                 stream.get_mut().write_all(format!("{}\n", greeting.line()).as_bytes()).await?;
                 let mut line = String::new(); stream.read_line(&mut line).await?;
                 let act = lys_runner::protocol::verify_request(&line, &key, &greeting).map_err(std::io::Error::other)?;
-                let answer = if act == Act::Programs {
+                let answer = if act == Act::Programs && *discovery_refused.borrow() {
+                    Answer::refusal(&lys_runner::RunnerError::refused("harness_programs_unreadable", "the chosen programme version report is not UTF-8"))
+                } else if act == Act::Programs {
                     Answer::Programs { found: lys_runner::dial::programs::Programs { programs: vec![
                         lys_runner::dial::programs::HarnessProgram { program: "/chosen/bin/claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
                         lys_runner::dial::programs::HarnessProgram { program: "/chosen/bin/codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
@@ -36,7 +39,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
                 stream.get_mut().write_all(format!("{}\n", lys_runner::protocol::reply_line(answer)).as_bytes()).await?;
             }
         });
-        Ok((seeded, machine, stop, worker))
+        Ok((seeded, machine, unreadable, stop, worker))
     }).await?;
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
@@ -77,6 +80,16 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     ));
     body["harness"]["program"] = json!("/chosen/bin/claude");
     body["model_access"] = json!([description["models"][0]["id"]]);
+    unreadable.send(true)?;
+    let (status, refused) = service.post(&route, Some(&cookie), &body).await?;
+    assert_eq!(status, 409);
+    assert_eq!(refused["refusal"], "harness_programs_unreadable");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("not UTF-8"))
+    );
+    unreadable.send(false)?;
     let (status, profile) = service.post(&route, Some(&cookie), &body).await?;
     stop.send(()).map_err(|()| "runner ended")?;
     worker.await??;

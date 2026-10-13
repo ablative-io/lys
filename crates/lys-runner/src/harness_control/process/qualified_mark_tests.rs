@@ -16,7 +16,7 @@ fn a_newer_claude_starts_and_its_start_answer_names_both_versions()
     let entry = dir.path().join("entry");
     std::fs::write(
         &entry,
-        r#"#!/usr/bin/env python3
+        r"#!/usr/bin/env python3
 import os, sys, json, hashlib
 spec = json.loads(sys.stdin.readline())
 os.setsid()
@@ -29,7 +29,7 @@ if permission != {'execute': True}:
     sys.exit(2)
 os.chdir(spec['directory'])
 os.execv(path, [path] + spec['arguments'])
-"#,
+",
     )?;
     std::fs::set_permissions(&entry, std::fs::Permissions::from_mode(0o755))?;
     let admission = admit(Candidate {

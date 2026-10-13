@@ -31,6 +31,26 @@ fn client_error(path: &std::path::Path, detail: impl Into<String>) -> IdentityEr
     .at(path)
 }
 
+fn client_commit<'a>(host: &std::path::Path, stamp: &'a str) -> IdentityResult<&'a str> {
+    let (commit, suffix) = stamp.split_once(';').unwrap_or((stamp, ""));
+    let refusal = if stamp == "not built from a git commit" {
+        "client_commit_untracked"
+    } else if commit.len() == 40
+        && commit
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        match suffix {
+            "" | " stated" => return Ok(commit),
+            " dirty" | " stated; dirty" => "client_commit_dirty",
+            _ => "client_commit_invalid",
+        }
+    } else {
+        "client_commit_invalid"
+    };
+    Err(client_error(host, format!("{refusal}: {stamp}")))
+}
+
 /// The Rust target of the host client that was built beside this installer.
 pub fn host_platform() -> String {
     let suffix = if cfg!(target_os = "macos") {
@@ -46,33 +66,26 @@ pub fn host_platform() -> String {
 /// Read every supplied client before making any change to the install.
 ///
 /// # Errors
-/// Refuses an invalid platform, missing executable, unreadable file or unstamped commit.
+/// Refuses an invalid platform, missing executable, unreadable file, or dirty, untracked or malformed stamp.
 pub fn prepare_clients(
     source: Option<&std::path::Path>,
     host: &std::path::Path,
     commit: &str,
 ) -> IdentityResult<ClientSet> {
     use sha2::{Digest, Sha256};
-    if commit.len() < 8
-        || !commit
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-    {
-        return Err(client_error(
-            host,
-            "client_commit_invalid: clients require a clean source commit",
-        ));
-    }
+    let commit = client_commit(host, commit)?;
     let folders = if let Some(source) = source {
         let mut folders = Vec::new();
         for entry in
             std::fs::read_dir(source).map_err(|error| client_error(source, error.to_string()))?
         {
             let entry = entry.map_err(|error| client_error(source, error.to_string()))?;
-            let name = entry
-                .file_name()
-                .into_string()
-                .map_err(|_| client_error(source, "a platform is not UTF-8"))?;
+            let name = entry.file_name().into_string().map_err(|name| {
+                client_error(
+                    source,
+                    format!("client_platform_invalid: a platform is not UTF-8: {name:?}"),
+                )
+            })?;
             if !entry
                 .file_type()
                 .map_err(|error| client_error(&entry.path(), error.to_string()))?
@@ -207,6 +220,111 @@ pub fn client_releases(
 mod client_tests {
     use super::{Layout, prepare_clients};
 
+    const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
+
+    fn host_pair() -> Result<tempfile::TempDir, Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        for name in ["lys", "lys-containment-entry"] {
+            std::fs::write(folder.path().join(name), name)?;
+        }
+        Ok(folder)
+    }
+
+    #[test]
+    fn a_stated_client_stamp_places_the_pair_under_its_leading_commit()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = host_pair()?;
+        let install = tempfile::tempdir()?;
+        let set = prepare_clients(None, source.path(), &format!("{COMMIT}; stated"))?;
+        let layout = Layout::at(install.path().to_path_buf());
+        set.place(&layout)?;
+        let platform = super::host_platform();
+        assert_eq!(set.releases[&platform].commit, COMMIT);
+        for name in ["lys", "lys-containment-entry"] {
+            assert_eq!(
+                std::fs::read_to_string(
+                    layout
+                        .root
+                        .join("clients")
+                        .join(&platform)
+                        .join(COMMIT)
+                        .join(name)
+                )?,
+                name
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dirty_client_stamps_are_refused_by_name_with_the_entire_stamp()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = host_pair()?;
+        for stamp in [
+            format!("{COMMIT}; dirty"),
+            format!("{COMMIT}; stated; dirty"),
+        ] {
+            let error = prepare_clients(None, source.path(), &stamp)
+                .err()
+                .ok_or("dirty client stamp accepted")?;
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("client_commit_dirty: {stamp}")),
+                "{error}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_bare_client_commit_is_accepted_without_changing_its_manifest()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = host_pair()?;
+        let set = prepare_clients(None, source.path(), COMMIT)?;
+        assert_eq!(set.releases[&super::host_platform()].commit, COMMIT);
+        Ok(())
+    }
+
+    #[test]
+    fn an_untracked_client_stamp_is_refused_by_name_with_the_entire_stamp()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = host_pair()?;
+        let stamp = "not built from a git commit";
+        let error = prepare_clients(None, source.path(), stamp)
+            .err()
+            .ok_or("untracked client stamp accepted")?;
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("client_commit_untracked: {stamp}")),
+            "{error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_client_stamps_name_the_entire_stamp_they_refuse()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = host_pair()?;
+        for stamp in [
+            "01234567".to_owned(),
+            COMMIT.to_uppercase(),
+            format!("{COMMIT}; unknown"),
+        ] {
+            let error = prepare_clients(None, source.path(), &stamp)
+                .err()
+                .ok_or("malformed client stamp accepted")?;
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("client_commit_invalid: {stamp}")),
+                "{error}"
+            );
+        }
+        Ok(())
+    }
+
     #[test]
     fn two_client_platforms_are_placed_with_their_pair_and_manifest_and_missing_binaries_are_named()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -220,7 +338,11 @@ mod client_tests {
                 std::fs::write(folder.join(name), format!("{platform}/{name}"))?;
             }
         }
-        let set = prepare_clients(Some(source.path()), source.path(), "0123456789abcdef")?;
+        let set = prepare_clients(
+            Some(source.path()),
+            source.path(),
+            "0123456789abcdef0123456789abcdef01234567",
+        )?;
         let layout = Layout::at(install.path().to_path_buf());
         set.place(&layout)?;
         assert_eq!(set.releases.len(), 2);
@@ -230,7 +352,7 @@ mod client_tests {
                     .root
                     .join("clients")
                     .join(platform)
-                    .join("0123456789abcdef")
+                    .join("0123456789abcdef0123456789abcdef01234567")
                     .join(name);
                 assert_eq!(std::fs::read_to_string(path)?, format!("{platform}/{name}"));
                 assert_eq!(set.releases[platform].files[name].len(), 64);
@@ -247,9 +369,13 @@ mod client_tests {
                 .join(platforms[1])
                 .join("lys-containment-entry"),
         )?;
-        let refused = prepare_clients(Some(source.path()), source.path(), "0123456789abcdef")
-            .err()
-            .ok_or("missing binary accepted")?;
+        let refused = prepare_clients(
+            Some(source.path()),
+            source.path(),
+            "0123456789abcdef0123456789abcdef01234567",
+        )
+        .err()
+        .ok_or("missing binary accepted")?;
         let words = refused.to_string();
         assert!(words.contains("client_binary_missing"));
         assert!(words.contains("lys-containment-entry"));
@@ -264,13 +390,21 @@ mod client_tests {
         for name in ["lys", "lys-containment-entry"] {
             std::fs::write(source.path().join(name), name)?;
         }
-        let first = prepare_clients(None, source.path(), "0123456789abcdef")?;
+        let first = prepare_clients(
+            None,
+            source.path(),
+            "0123456789abcdef0123456789abcdef01234567",
+        )?;
         let layout = Layout::at(install.path().to_path_buf());
         first.place(&layout)?;
         assert_eq!(first.releases.len(), 1);
         assert!(first.releases.contains_key(&super::host_platform()));
         std::fs::write(source.path().join("lys"), "changed executable")?;
-        let changed = prepare_clients(None, source.path(), "0123456789abcdef")?;
+        let changed = prepare_clients(
+            None,
+            source.path(),
+            "0123456789abcdef0123456789abcdef01234567",
+        )?;
         let error = changed
             .place(&layout)
             .err()

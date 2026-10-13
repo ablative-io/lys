@@ -48,10 +48,13 @@ fn pairs(text: &str) -> BTreeMap<String, String> {
         .collect()
 }
 
+type FixtureWorker = thread::JoinHandle<Result<(), String>>;
+type Served = Result<(String, FixtureWorker), Box<dyn Error>>;
+
 fn serve(
     count: usize,
     answer: impl Fn(&Request, &str) -> Result<(u16, Value), String> + Send + 'static,
-) -> Result<(String, thread::JoinHandle<Result<(), String>>), Box<dyn Error>> {
+) -> Served {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let base = format!("http://{}", listener.local_addr()?);
     let origin = base.clone();
@@ -110,7 +113,12 @@ fn serve(
 fn joined(worker: thread::JoinHandle<Result<(), String>>) -> Outcome {
     worker
         .join()
-        .map_err(|_| "HTTP fixture panicked")?
+        .map_err(|payload| {
+            format!(
+                "http_fixture_panicked: payload type {:?}",
+                payload.type_id()
+            )
+        })?
         .map_err(Into::into)
 }
 
@@ -157,7 +165,11 @@ fn sign_in_opens_authorize_receives_loopback_pkce_and_writes_only_an_owner_reada
         let verifier = form.get("code_verifier").ok_or("verifier absent")?;
         let actual = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .encode(Sha256::digest(verifier.as_bytes()));
-        if actual != *checked.lock().map_err(|_| "fixture lock poisoned")? {
+        if actual
+            != *checked
+                .lock()
+                .map_err(|error| format!("fixture_lock_poisoned: {error}"))?
+        {
             return Err("PKCE did not verify".to_owned());
         }
         Ok((
@@ -181,8 +193,11 @@ fn sign_in_opens_authorize_receives_loopback_pkce_and_writes_only_an_owner_reada
             .get("state")
             .ok_or_else(|| lys::commands::seat_client::refused("fixture_invalid", "no state"))?
             .clone();
-        *challenge.lock().map_err(|_| {
-            lys::commands::seat_client::refused("fixture_invalid", "lock poisoned")
+        *challenge.lock().map_err(|error| {
+            lys::commands::seat_client::refused(
+                "fixture_invalid",
+                format!("fixture lock poisoned: {error}"),
+            )
         })? = query
             .get("code_challenge")
             .ok_or_else(|| lys::commands::seat_client::refused("fixture_invalid", "no challenge"))?
@@ -216,7 +231,11 @@ fn sign_in_opens_authorize_receives_loopback_pkce_and_writes_only_an_owner_reada
     assert!(!receipt.contains(&bearer));
     let stored: Pass = serde_json::from_slice(&std::fs::read(&signed.file)?)?;
     assert_eq!(stored.server, format!("{base}/api"));
-    assert!(stored.access_token == bearer);
+    let credential_matches = stored.access_token == bearer;
+    assert!(
+        credential_matches,
+        "the stored credential differs from the approved one"
+    );
     Ok(())
 }
 
@@ -256,7 +275,11 @@ fn a_pass_is_renewed_without_opening_the_browser() -> Outcome {
         0o600
     );
     let pass = lys::commands::sign_in::load_at(dir.path(), None, true)?;
-    assert!(pass.access_token == refreshed);
+    let credential_matches = pass.access_token == refreshed;
+    assert!(
+        credential_matches,
+        "the stored credential differs from the approved one"
+    );
     Ok(())
 }
 

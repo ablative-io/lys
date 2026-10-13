@@ -44,7 +44,7 @@ enum Connection {
         token: Option<Zeroizing<String>>,
     },
     Person {
-        client: lys_runner::dial::HttpClient,
+        client: Box<lys_runner::dial::HttpClient>,
         pass: crate::commands::sign_in::Pass,
     },
 }
@@ -94,7 +94,10 @@ impl Server {
                 let pass = crate::commands::sign_in::load(base.as_deref())?;
                 let client = lys_runner::dial::HttpClient::new(&pass.server)?;
                 return Ok(Self {
-                    connection: Connection::Person { client, pass },
+                    connection: Connection::Person {
+                        client: Box::new(client),
+                        pass,
+                    },
                 });
             }
         }
@@ -218,10 +221,7 @@ impl Server {
         let answer = exchange(authority, &request).map_err(|failure| match failure {
             Failure::Unreachable(detail) => refused(
                 "identity_server_unreachable",
-                format!(
-                    "{} could not be reached: {detail}; nothing was sent",
-                    authority
-                ),
+                format!("{authority} could not be reached: {detail}; nothing was sent"),
             ),
             Failure::Uncertain(detail) | Failure::Malformed(detail) => refused(
                 "identity_server_outcome_uncertain",
@@ -295,10 +295,10 @@ impl Server {
                 "Lys no longer admits this pass; run `lys sign-in --server <base>`",
             ));
         }
-        let answer: Value = serde_json::from_slice(&response.body).map_err(|_| {
+        let answer: Value = serde_json::from_slice(&response.body).map_err(|error| {
             refused(
                 "identity_server_answer_unreadable",
-                "Lys did not answer in JSON",
+                format!("Lys did not answer in JSON: {error}"),
             )
         })?;
         if (200..300).contains(&response.status) {
