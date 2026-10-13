@@ -6,13 +6,19 @@ use super::{
     Operation, OperationOutcome, OperationRequest, OperationState, TextDigest, unavailable,
 };
 use crate::error::RunnerError;
-use crate::protocol::{Ended, Key};
+use crate::protocol::Ended;
 use crate::session::{Table, now_ms};
 use crate::tracking_store::{Body, Commit};
 use std::sync::Weak;
 
 #[path = "delivery_completion.rs"]
 mod completion;
+
+#[path = "delivery_enter.rs"]
+mod enter;
+/// Claude Code and Codex detect paste bursts by byte arrival rate; keep Enter
+/// outside their paste window after the terminal text has been flushed.
+pub(super) const ENTER_AFTER_TEXT: std::time::Duration = std::time::Duration::from_millis(300);
 
 /// Say `outcome` in the feed, naming in the log a feed that cannot take it:
 /// the record of operations still answers it.
@@ -311,20 +317,13 @@ pub(super) fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<()
         .clone();
     let operation = operation.to_owned();
     let enter_writer = writer.clone();
+    let empty = text.is_empty();
     writer.submit_after(text.into_bytes(), durable, move |result| {
         if let Err(error) = result {
             completion::record(&owner, &operation, Err(error));
             return;
         }
-        // Queue Enter only after the text write and flush complete, so the
-        // harness receives it as a key rather than part of a pasted message.
-        let enter_owner = Weak::clone(&owner);
-        let enter_operation = operation.clone();
-        if let Err(error) = enter_writer.submit(Key::Enter.bytes().to_vec(), move |result| {
-            completion::record(&enter_owner, &enter_operation, result);
-        }) {
-            completion::record(&owner, &operation, Err(error));
-        }
+        enter::after_flush(owner, operation, enter_writer, empty);
     })
 }
 
@@ -431,6 +430,14 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
                 OperationState::Refused,
                 "session_ended: the session ended before its boundary came".to_owned(),
             ),
+            (OperationState::Delivering, _)
+                if table.operations.get(&operation).is_some_and(enter::waiting) =>
+            {
+                (
+                    OperationState::Refused,
+                    "session_unknown: the session ended before Enter was submitted".to_owned(),
+                )
+            }
             (OperationState::Delivering, _) => (
                 OperationState::Uncertain,
                 "the session ended while it was typed".to_owned(),
