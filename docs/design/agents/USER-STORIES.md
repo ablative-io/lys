@@ -12,6 +12,8 @@
 
 **S419.** As the owner, I want an agent to use an app's store with its own grants, so that I can hand it work without lending it my sign-in.
 
+**S420.** As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.

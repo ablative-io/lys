@@ -104,6 +104,10 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys/src/main.rs` | the lys agent dispatch | AGENTS-006 |
 | `crates/lys/src/commands/mod.rs` | the CLI's command modules | AGENTS-006 |
 | `crates/lys/src/commands/seat_client.rs` | the loopback client, reachable without the operator token | AGENTS-006 |
+| `surface/identity/src/features/runtime/` | the operations screen: the network tree (default), the canvas and the sessions table, and the terminal pane they share | AGENTS-007 |
+| `surface/identity/src/routes.tsx` | the operations route lands on the kept view | AGENTS-007 |
+| `surface/identity/src/shell/` | the rail's and the palette's operations entries | AGENTS-007 |
+| `surface/identity/src/api.ts` | GET /network and GET /seats read for the tree | AGENTS-007 |
 
 ## Inventory
 

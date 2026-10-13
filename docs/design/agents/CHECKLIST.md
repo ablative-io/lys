@@ -43,3 +43,9 @@
 
 - [ ] **C735** — An agent asks POST /agents/{id}/pass with its run pass or a grant credential for a live grant it holds, and is answered the rights_claim pass for an approved app carrying only its own grants, with no refresh token; every other ask is refused by name and each issue is logged (AGENTS-006 R1, R2, R4).
 - [ ] **C736** — `lys agent pass` reads the grant credential from an owner-only file, asks over loopback with no operator token, and writes the pass to an owner-only file, printing neither (AGENTS-006 R3).
+
+## The operations screen's network tree
+
+- [ ] **C737** — The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1).
+- [ ] **C738** — Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2).
+- [ ] **C739** — The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3).

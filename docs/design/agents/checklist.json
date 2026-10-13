@@ -170,6 +170,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The operations screen's network tree",
+      "items": [
+        {
+          "id": "C737",
+          "text": "The operations screen has a third view, the network tree: every machine the network knows as a branch, every seat on it as a leaf carrying the agent's display name and the seat's state as the runner last reported it; a stopped or never-started seat stays on the tree greyed, with its start act in place (AGENTS-007 R1).",
+          "done": false
+        },
+        {
+          "id": "C738",
+          "text": "Selecting a running leaf opens that seat's terminal beside the tree, fed by the same session stream the canvas uses, with the seat's send and stop acts; selecting another leaf swaps the terminal; a seat whose runner cannot be read is named with its reason, never shown blank (AGENTS-007 R2).",
+          "done": false
+        },
+        {
+          "id": "C739",
+          "text": "The network tree is the default view of the operations screen; a person's chosen view is kept with their canvas arrangement by the service and restored on their next visit; the canvas and the sessions table remain one click away (AGENTS-007 R3).",
+          "done": false
+        }
+      ]
     }
   ]
 }

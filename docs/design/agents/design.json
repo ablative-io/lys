@@ -259,6 +259,26 @@
       "path": "crates/lys/src/commands/seat_client.rs",
       "note": "the loopback client, reachable without the operator token",
       "brief": "AGENTS-006"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/",
+      "note": "the operations screen: the network tree (default), the canvas and the sessions table, and the terminal pane they share",
+      "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/src/routes.tsx",
+      "note": "the operations route lands on the kept view",
+      "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/src/shell/",
+      "note": "the rail's and the palette's operations entries",
+      "brief": "AGENTS-007"
+    },
+    {
+      "path": "surface/identity/src/api.ts",
+      "note": "GET /network and GET /seats read for the tree",
+      "brief": "AGENTS-007"
     }
   ],
   "principles": [
