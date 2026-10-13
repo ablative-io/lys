@@ -17,7 +17,7 @@ pub mod verify;
 pub use membership::{GrantLog, MembershipDecision, MembershipRequest, Subject, Verdict};
 pub use refusal::Refusal;
 pub use rights::{Claims, Decision, Holder, Mode, Right, Target};
-pub use verify::{KeySet, VerifiedPass};
+pub use verify::{CLOCK_SKEW, KeySet, VerifiedPass};
 
 #[cfg(feature = "http")]
 use reqwest::Client as Http;
@@ -37,9 +37,15 @@ pub enum Error {
     /// The pass has reached its expiry.
     #[error("pass_expired")]
     Expired,
-    /// The pass starts in the future.
-    #[error("pass_not_yet_valid")]
-    NotYetValid,
+    /// The pass starts beyond the permitted future clock skew.
+    #[error(
+        "pass_not_yet_valid: clock skew {skew_ms} ms exceeds {limit_ms} ms",
+        limit_ms = crate::verify::CLOCK_SKEW * 1000
+    )]
+    NotYetValid {
+        /// The greatest future issue or not-before offset in milliseconds.
+        skew_ms: u128,
+    },
     /// No published verification key has this id.
     #[error("unpublished_key: {0}")]
     UnpublishedKey(String),
@@ -99,7 +105,7 @@ impl Error {
             Self::WrongAudience => "wrong_audience",
             Self::WrongIssuer => "wrong_issuer",
             Self::Expired => "pass_expired",
-            Self::NotYetValid => "pass_not_yet_valid",
+            Self::NotYetValid { .. } => "pass_not_yet_valid",
             Self::UnpublishedKey(_) => "unpublished_key",
             Self::Signature(_) => "signature_refused",
             Self::Encoding(_) => "pass_encoding_refused",

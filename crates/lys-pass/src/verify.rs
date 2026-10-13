@@ -10,6 +10,23 @@ use serde::Deserialize;
 use crate::Error;
 use crate::rights::{Claims, Decision, Mode, Right, audience_owns, in_prefix};
 
+/// Maximum future issue or not-before offset in Unix seconds.
+///
+/// Five seconds covers small clock differences and request latency when a
+/// caller captures its verification time before the issuer signs the pass.
+pub const CLOCK_SKEW: u64 = 5;
+
+fn check_start(claims: &Claims, now: u64) -> Result<(), Error> {
+    let starts_at = claims.iat.max(claims.nbf.unwrap_or(claims.iat));
+    let skew = starts_at.saturating_sub(now);
+    if skew > CLOCK_SKEW {
+        return Err(Error::NotYetValid {
+            skew_ms: u128::from(skew) * 1000,
+        });
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 struct Header {
     alg: String,
@@ -165,9 +182,7 @@ impl VerifiedPass {
         if claims.exp <= now {
             return Err(Error::Expired);
         }
-        if claims.iat > now || claims.nbf.is_some_and(|nbf| nbf > now) {
-            return Err(Error::NotYetValid);
-        }
+        check_start(&claims, now)?;
         if claims
             .rights_truncated
             .as_deref()
@@ -223,9 +238,7 @@ impl VerifiedPass {
         if self.claims.exp <= now {
             return Err(Error::Expired);
         }
-        if self.claims.iat > now || self.claims.nbf.is_some_and(|nbf| nbf > now) {
-            return Err(Error::NotYetValid);
-        }
+        check_start(&self.claims, now)?;
         if let Some(app) = &self.claims.rights_truncated {
             return Err(Error::Truncated(app.clone()));
         }
