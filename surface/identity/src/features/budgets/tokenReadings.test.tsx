@@ -7,7 +7,8 @@ import type { TokenComponents, TokensUsed } from './tokenReadings';
 
 const at = Math.floor(1_792_000_000_000 / 18_000_000) * 18_000_000;
 const row = (name: string, tokens: TokenComponents | undefined, period: 'day' | 'five_hour' = 'day', since = at): DashboardAgent => ({
-  agent: { id: name, display_name: name }, teams: [], sessions: [], goals: { goals: [] },
+  agent: { id: name, display_name: name, state: 'active' }, teams: [], sessions: [], goals: { goals: [] },
+  budget: { refusal: 'NotRead', reason: 'The budget is not read in this test.' },
   usage: { agent: name, used: [], receipts: [], last_reported_ms: at, figures: [{ unit: 'tokens', period,
     since_ms: since, figure: 177_540, unavailable: null, ...(tokens ? { tokens } : {}) } as TokensUsed] },
 } as DashboardAgent);

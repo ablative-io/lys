@@ -6,9 +6,9 @@
 import { Refused, request } from '../../api';
 import { readArrangement } from './canvas-marks';
 import type { Arrangement } from './canvas-marks';
-import { FIRST_OPERATIONS, fifthOf, readOperations } from './canvas-operations';
+import { FIRST_OPERATIONS, forService, readOperations } from './canvas-operations';
 import type { OperationsChoice } from './canvas-operations';
-export { FIRST_OPERATIONS, PANE_WIDTH } from './canvas-operations';
+export { FIRST_OPERATIONS, PANE_WIDTH, forService } from './canvas-operations';
 export type { OperationsChoice } from './canvas-operations';
 import { ZOOM } from './canvas-view';
 import type { View } from './canvas-view';
@@ -40,9 +40,9 @@ export async function keepOperations(choice: OperationsChoice): Promise<void> {
   const before = await request<{ arrangement: unknown }>('/canvas');
   const arrangement = before.arrangement === null ? { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [] } : readArrangement(before.arrangement);
   if (!arrangement) throw unreadable();
-  // The service keeps a width in pixels and has no way yet to say "not set": an unset width is kept as the fifth of
-  // this window the tree is drawn at, so the tree looks the same; while the page is open it follows the window.
-  const sent = { ...choice, pane_width: choice.pane_width ?? fifthOf(window.innerWidth) };
+  // An unset width is kept as the fifth of this window the tree is drawn at, so the tree looks the same; while the
+  // page is open it follows the window.
+  const sent = forService(choice);
   const answer = await request<{ arrangement: unknown }>('/canvas', { arrangement: { ...arrangement, operations: sent } }, 'PUT');
   if (!(answer.arrangement as { operations?: unknown } | null)?.operations) throw new Refused(0, { refusal: 'OperationsNotKept', reason: 'The service did not retain the operations view fields.' });
   const kept = operationsOf(answer.arrangement);

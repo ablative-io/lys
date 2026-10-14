@@ -28,7 +28,8 @@ describe("An agent's file", () => {
     expect((head[2] as HTMLElement).dataset.symbol).toBe('more');
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Added22 Sep');
     expect($('.agent-details')).toBeNull();
-    expect($('.file details')).toBeNull();
+    // No folds of its own: the only fold is a refusal's closed Error details.
+    expect($$('.file details').every((each) => each.querySelector('summary')?.textContent === 'Error details' && !each.hasAttribute('open'))).toBe(true);
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
   });
 

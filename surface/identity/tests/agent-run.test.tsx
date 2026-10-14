@@ -224,11 +224,12 @@ describe('An agent\'s run on People and agents', () => {
   it('says the service\'s own reason when it refuses the start, with Try again, and no greyed button', async () => {
     await mount('#/file/' + SCRIBE, { ...stopped, ['POST /agents/' + SCRIBE + '/start-command']: refused(409, 'SecretsUnavailable', 'the secrets store is closed') });
     await click(button('Start'));
-    expect(text()).toContain('The secrets store is closed.');
-    expect(text()).toContain('SecretsUnavailable');
+    // The sentence and its fix are said; the service's own words stay under closed Error details.
+    expect(text()).toContain('Lys could not reach or use its secret storage service. Ask the administrator to check it.');
+    expect(text()).toContain('SecretsUnavailable: the secrets store is closed');
     expect((button('Try again') as HTMLButtonElement).disabled).toBe(false);
     expect($$('button').filter((el) => (el as HTMLButtonElement).disabled && el.closest('.team-start'))).toEqual([]);
-    expect($('.team-start details')).toBeNull();
+    expect($$('.team-start details').map((each) => [each.querySelector('summary')?.textContent, each.hasAttribute('open')])).toEqual([['Error details', false]]);
   });
 
   it('sends the old start addresses to the agent\'s own page, where Start is', async () => {

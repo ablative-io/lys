@@ -8,6 +8,10 @@ export const PANE_WIDTH = { least: 200, most: 640 } as const;
 export const FIRST_OPERATIONS: OperationsChoice = { view: 'tree', selected: null, pane_width: null };
 /** A fifth of a window this wide, within the widths the service keeps. */
 export const fifthOf = (window: number): number => Math.round(Math.max(PANE_WIDTH.least, Math.min(PANE_WIDTH.most, window * 0.2)));
+/** The choice as the service keeps it: a width in pixels, with no way yet to say "not set", so an unset width is
+ *  sent as the fifth of this window the tree is drawn at. Every write of the operations view goes through here. */
+export const forService = (choice: OperationsChoice): OperationsChoice & { pane_width: number } =>
+  ({ ...choice, pane_width: choice.pane_width ?? fifthOf(window.innerWidth) });
 
 export function readOperations(value: unknown): OperationsChoice | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;

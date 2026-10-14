@@ -22,7 +22,8 @@ const components: TokenComponents = { input_tokens: { reported: 500, missing_cal
 const tokens = (period: 'day' | 'five_hour' = 'day'): TokensUsed => ({ unit: 'tokens', period, since_ms: at,
   figure: 177_540, unavailable: null, tokens: components });
 const row = (id: string, figures: Used[], accounts: unknown[] = []): DashboardAgent => ({
-  agent: { id, display_name: id }, teams: [], sessions: [], goals: { goals: [] },
+  agent: { id, display_name: id, state: 'active' }, teams: [], sessions: [], goals: { goals: [] },
+  budget: { refusal: 'NotRead', reason: 'The budget is not read in this test.' },
   usage: { agent: id, used: [], receipts: [], last_reported_ms: at, figures, accounts },
 } as DashboardAgent);
 let root: ReturnType<typeof createRoot> | undefined;

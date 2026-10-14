@@ -166,7 +166,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       {shownTargets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
       {!shownTargets.some((entry) => entry.id === person) ? <option value={person} disabled>{chosen ? chosen.display_name + ' · ' + chosen.state : 'Reporting target unavailable'}</option> : null}
     </select></label>
-    {retiredCount ? <button type="button" className="btn" aria-pressed={showRetired} disabled={locked} onClick={() => setShowRetired(!showRetired)}>{showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
+    {retiredCount ? <Act symbol="retire" name={showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'} word={showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'} aria-pressed={showRetired} disabled={locked} onClick={() => setShowRetired(!showRetired)} /> : null}
     <fieldset className="agent-grants-scope"><legend>What this agent is given access to in Lys</legend>
       {chosen?.kind === 'agent' ? <p>This form cannot pass on {chosen.display_name}’s access. Add {name.trim() || 'this agent'} without extra access; <a href={'#/file/' + encodeURIComponent(chosen.id) + '/access'}>review {chosen.display_name}’s access</a>.</p> : <>
         {grants.model && withheldFromAgents(grants.model) !== null ? <AgentGrantPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
@@ -201,7 +201,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {invalidChoice ? <p role="alert" className="why-not">{invalidChoice}</p> : null}
     {runOptions.loading && (!runOptions.runners.some((entry) => entry.state === 'asking') || runOptions.computers.length > 0) ? <p role="status">Reading the choices for running this agent…</p> : null}
     {runOptions.problem ? <p role="alert" className="why-not">{runnerProblemReason(runOptions.problem)} <a href="#/network">Open Network</a></p> : null}
-    <div aria-live="polite">{runOptions.runners.map((entry) => entry.state === 'confirmed' ? null : <p key={entry.machine.id}>{entry.machine.name}{entry.state === 'asking' ? ': asking its runner…' : ': not available: ' + entry.reason}</p>)}</div>
+    <div aria-live="polite">{runOptions.runners.map((entry) => entry.state === 'confirmed' ? null : <p key={entry.machine.id}>{entry.machine.name}{entry.state === 'unavailable' ? ': not available: ' + entry.reason : ': asking its runner…'}</p>)}</div>
     {refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><ErrorWords problem={refusal.problem} /></> : <ErrorWords problem={refusal} /> : null}
     {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. {hold ? 'Its original requests are kept.' : 'Its original requests are saved; this button continues them.'}</p> : null}
     {onePress && !walk && profileProblem ? <p className="why-not" role="alert">{profileProblem}</p> : null}

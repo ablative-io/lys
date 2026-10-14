@@ -153,7 +153,9 @@ describe('Widgets on the canvas', () => {
 
   it('opens reported session context and separate token components because their classes cannot form one scalar, and preserves every figure and look setting', async () => {
     const figures = [context(430000, { model: 'fixture-model', reported_none: 0 }), components({ input_tokens: { reported: 120000, missing_calls: 0 }, output_tokens: { reported: 3210, missing_calls: 0 }, cache_creation_tokens: { reported: 10000, missing_calls: 0 }, cache_read_tokens: { reported: 300000, missing_calls: 0 }, calls: 1 }), used('dollars', 'day', null, 'dollars have not been reported')];
-    const accounts = [{ account: 'org-main', at_ms: 1790000000000, windows: [{ duration_minutes: 300, used_percent: 28, resets_at_ms: 1790003600000 }, { duration_minutes: 10080, used_percent: 61, resets_at_ms: 1790400000000 }] }];
+    // The 5-hour window resets an hour from the real clock, so it is the current level; an expired window is proven in WidgetUsageReadings.test.tsx.
+    const resets = Date.now() + 3_600_000;
+    const accounts = [{ account: 'org-main', at_ms: 1790000000000, windows: [{ duration_minutes: 300, used_percent: 28, resets_at_ms: resets }, { duration_minutes: 10080, used_percent: 61, resets_at_ms: 1790400000000 }] }];
     start({ widgets: [{ id: 'widget:u', kind: 'usage', x: 700, y: 300, w: 340, h: 250 }], links: [{ id: 'link:u', from: 'agent:' + SCRIBE, to: 'widget:u' }] });
     await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, figures, accounts) } })) });
     const card = widget('usage') as HTMLElement;
@@ -164,7 +166,7 @@ describe('Widgets on the canvas', () => {
     await turn();
     expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['faces', '340px', '']);
     expect($$('[data-widget] [data-stat]').map((each) => [each.dataset.stat, each.querySelector('b')?.textContent, each.querySelector('.sec')?.textContent])).toEqual([
-      ['context_percent/', '43%', 'Context of Scribe, fixture-model'], ['tokens/day', undefined, 'Tokens today of Scribe'], ['window/300', '28%', '5-hour provider window of org-main, resets ' + clockMs(1790003600000)]]);
+      ['context_percent/', '43%', 'Context of Scribe, fixture-model'], ['tokens/day', undefined, 'Tokens today of Scribe'], ['window/300', '28%', '5-hour provider window of org-main, resets ' + clockMs(resets)]]);
     expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
     expect(Array.from(card.querySelectorAll('[data-token-component]')).map((row) => row.textContent)).toEqual(['New input120,000 tokens reported', 'Output3,210 tokens reported', 'Cache written10,000 tokens reported', 'Cache read300,000 tokens reported']);
     expect(card.querySelector('[data-token-counts]')?.textContent).toBe('1 call · 1 session');

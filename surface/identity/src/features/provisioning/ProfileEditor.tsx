@@ -84,7 +84,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
   const heldCopy = (copies: typeof builds) => heldBuild ? copies.find((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package)
     ?? copies.find((entry) => launchCommand(entry.program) === launchCommand(heldBuild.program)) : undefined;
-  const [build, setBuild] = useState(heldBuild ? 'another' : '');
+  const [build, setBuild] = useState(heldBuild ? 'another' : (aggregate || preferred || machines.length === 1) && (firstRun ? builds.length > 0 : builds.length === 1) ? builds[0].value : '');
   const [programPath, setProgramPath] = useState(heldBuild?.program ?? '');
   useEffect(() => {
     if (readingCopies || !catalogues.length && !aggregate) return;
@@ -97,7 +97,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     const reported = heldCopy(builds);
     if (scoped && reported && build === 'another' && programPath === heldBuild?.program) setBuild(reported.value);
     else if (scoped && !build && (firstRun ? builds.length > 0 : builds.length === 1)) setBuild(builds[0].value);
-  }, [catalogues, readingCopies, programName]);
+  }, [catalogues, readingCopies, programName, preferred]);
   const supported = program?.instructions_modes ?? ['keep', 'append'];
   const selected = build === 'another' && commandOrAbsolutePath(programPath)
     ? { program: programPath, package: heldBuild && heldBuild.program === programPath ? heldBuild.package : programPath }

@@ -47,7 +47,7 @@ describe('The app declares what an agent may hold', () => {
     try {
       act(() => root.render(<ActionPicker model={personal} resource={resource} agents={false}
         actions={['read', 'send']} value={[]} onChange={vi.fn()} />));
-      expect(container.querySelector<HTMLInputElement>('input[value="owner"]')?.disabled).toBe(false);
+      expect(container.querySelector<HTMLInputElement>('input[value="relation:owner"]')?.disabled).toBe(false);
     } finally { act(() => root.unmount()); }
   });
   it('offers declared actions, names a withheld action without claiming the app allows no agent actions, and selects only declared actions together', () => {
@@ -89,7 +89,7 @@ describe('The app declares what an agent may hold', () => {
     try {
       act(() => root.render(<ActionPicker model={combined} resource={resource}
         actions={['read', 'send']} value={[]} onChange={vi.fn()} />));
-      expect(container.querySelector<HTMLInputElement>('input[value="member"]')?.disabled).toBe(false);
+      expect(container.querySelector<HTMLInputElement>('input[value="relation:member"]')?.disabled).toBe(false);
       expect(container.textContent).not.toContain('Some actions cannot be selected');
       const source = { ...GRANTS[0], resource, relation: 'member', actions: ['read', 'send'],
         pass_on: { kind: 'to' as const, actions: ['read', 'send'], recipients: ['agent' as const] } };

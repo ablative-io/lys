@@ -10,7 +10,7 @@ const at = 1_792_000_000_000;
 const model = 'claude-opus-5-5';
 const session = 'current-session';
 const row = (name: string, figures: Used[]): DashboardAgent => ({
-  agent: { id: name, display_name: name }, teams: [], sessions: [],
+  agent: { id: name, display_name: name, state: 'active' }, teams: [], sessions: [],
   usage: { agent: name, used: [], receipts: [], last_reported_ms: at + 600_000, figures },
   budget: { holder: { kind: 'agent', id: name }, limits: [], warn_at: null, zone: 'UTC', version: 0,
     by: null, at: null, used: [], unavailable: [], within: [], unconfirmed: [] }, goals: { goals: [] },

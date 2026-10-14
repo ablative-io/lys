@@ -8,7 +8,7 @@ import { Terminal } from './Terminal';
 import type { SessionGraph } from './session-graph';
 import { GROUP, NOTE, NO_MARKS, SMALLEST_MARK, covering, markId, nearestSide, nextColour, sidePoint, standing, stood, within } from './canvas-marks';
 import type { Arrangement, Box, Marks, Side } from './canvas-marks';
-import { KEPT, hereName, keepArrangement, kept, keptName, removeLayout, renamed, said, saveLayout } from './canvas-kept';
+import { KEPT, forService, hereName, keepArrangement, kept, keptName, removeLayout, renamed, said, saveLayout } from './canvas-kept';
 import type { Keeping, Kept, SavedLayout } from './canvas-kept';
 import { CanvasDock, KindSymbol, PANELS } from './CanvasDock';
 import type { Panel, Tool } from './CanvasDock';
@@ -128,7 +128,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   const arrangement = (): Arrangement => {
     // A card that is not here may only be missing because its read was refused this visit, and an agent that is not running keeps its place for when it is. A session with no agent that has ended keeps none.
     const away = Object.fromEntries(Object.entries(moved).filter(([id]) => !(id in boxes) && !id.startsWith('session:') && hereName(graph)(id) === id));
-    return renamed({ boxes: { ...away, ...boxes }, open: [...open], ...marks, operations: keeping.operations }, keptName(graph));
+    return renamed({ boxes: { ...away, ...boxes }, open: [...open], ...marks, operations: forService(keeping.operations) }, keptName(graph));
   };
   useEffect(() => {
     if (!changes) return;

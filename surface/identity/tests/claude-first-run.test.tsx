@@ -9,7 +9,7 @@ describe('Claude first run', () => {
       description: { models: { minimum: 1, maximum: null, further_encoding: { kind: 'delimited', separator: ',' } }, permissions: { modes: ['workspace-only'], rule_forms: ['tool_specifier'] }, mcp: { transports: ['http', 'stdio'], working_directory: false, handle_variables: true, channel_policies: ['off'] }, rendering_contract: 'claude-code/template-v1' },
       instructions_modes: ['keep'], builds: [{ name: 'Installed', program: '/opt/seat/bin/claude', package: 'claude', from: 'runner' }] };
     const choices: Choices = { programs: [program], programsMissing: '', machines: [], skills: [], secrets: [] };
-    const html = renderToStaticMarkup(<ProfileFields profile={null} choices={choices} firstRun render={(fields, settings, refusal) => <form>{fields}<button disabled={Boolean(refusal)}>Add</button><output>{String((settings.permissions as { default_mode: string }).default_mode)}</output></form>} />);
+    const html = renderToStaticMarkup(<ProfileFields profile={null} choices={choices} firstRun newComputer render={(fields, settings, refusal) => <form>{fields}<button disabled={Boolean(refusal)}>Add</button><output>{String((settings.permissions as { default_mode: string }).default_mode)}</output></form>} />);
     expect(html).toContain('<output>workspace-only</output>');
     // The only controls that wait are each table's own add row, until something is typed into it.
     const rest = html.replace(/<button disabled=""[^>]*aria-label="(Add this rule|Add these tools)"[^>]*>.*?<\/button>/g, '');

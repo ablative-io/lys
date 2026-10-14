@@ -7,8 +7,6 @@ import { click, mount, serve, settle } from '../../../tests/harness';
 import { ok, refused, SCRIBE, SCRIBE_VIEW, SERVICE } from '../../../tests/fixtures';
 import { fifthOf } from './canvas-operations';
 
-// The agent's own Start is the team page's; here it is stood in for, to show which agent the terminal space offers.
-vi.mock('../team/Start', () => ({ Start: ({ entry }: { entry: { id: string; display_name: string } }) => <button type="button" data-start-agent={entry.id}>Start {entry.display_name}</button> }));
 import { keepOperations, readKeeping } from './canvas-kept';
 
 const machine = (id: string, state = 'in_use') => ({ id, name: id, kind: 'desktop', state, runtime: null, may_run: [{ id: 'agent', display_name: 'Long display name' }] });
@@ -175,8 +173,10 @@ it('C739 an explicit canvas layout or tool-panel address keeps its canvas destin
   expect(container.querySelector('.canvas-side')).not.toBeNull();
 });
 it('C737 a seatless agent that is not running is chosen by its row, and the terminal space offers its own Start', async () => {
-  const one = { ...machine('one'), may_run: [{ id: SCRIBE, display_name: 'Scribe' }] };
-  serve({ ...SERVICE, '/network': ok({ machines: [one], next: null }), '/seats': ok({ runner: 'read', seats: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }) });
+  const one = { ...machine('one'), runtime: 'lys-runner', may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] };
+  const profile = { version: 1, operation: 'op-' + 'a'.repeat(32), harness: { name: 'Claude Code', description: {}, program: '/opt/claude', package: 'claude' }, model_access: ['default'], runs_on: 'one', working_folder: '/Users/ada/work' };
+  serve({ ...SERVICE, '/network': ok({ machines: [one], next: null }), '/seats': ok({ runner: 'read', seats: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }),
+    ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile, versions: [], enforced: false }) });
   const select = vi.fn();
   let host = await render(<NetworkTree selected={null} select={select} paneWidth={null} resize={vi.fn()} />);
   await settle();
@@ -188,7 +188,9 @@ it('C737 a seatless agent that is not running is chosen by its row, and the term
   host = await render(<NetworkTree selected={'agent:' + SCRIBE} select={select} paneWidth={null} resize={vi.fn()} />);
   await settle();
   expect(host.querySelector('[data-agent-only="' + SCRIBE + '"]')?.getAttribute('data-selected')).toBe('true');
-  expect(host.querySelector('.network-pane [data-start-agent="' + SCRIBE + '"]')?.textContent).toBe('Start ' + SCRIBE_VIEW.display_name);
+  // The agent's own Start, the team page's, in the terminal space named for that agent.
+  const pane = host.querySelector('.network-pane [aria-label="Terminal of ' + SCRIBE_VIEW.display_name + '"]');
+  expect([...(pane?.querySelectorAll('.team-start button') ?? [])].map((entry) => entry.getAttribute('aria-label'))).toEqual(['Start']);
   // Still nothing but rows in the tree itself.
   expect(host.querySelector('.network-list button')).toBeNull();
 });
