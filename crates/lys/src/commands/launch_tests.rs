@@ -70,21 +70,21 @@ fn launch_preserves_controls_and_uses_the_managed_seats_starting_folder() -> Res
 }
 
 #[test]
-fn inactive_unreviewed_and_missing_folder_terminal_profiles_refuse() -> Result {
-    for (reason, change) in [
-        ("AgentNotActive", 0),
-        ("ProfileNotReviewed", 1),
-        ("WorkingFolderUnnamed", 2),
-    ] {
+fn inactive_and_unreviewed_terminal_profiles_refuse_but_the_callers_directory_supplies_a_missing_default()
+-> Result {
+    for (reason, change) in [("AgentNotActive", 0), ("ProfileNotReviewed", 1)] {
         let mut agent = agent();
-        match change {
-            0 => agent.state = "suspended".to_owned(),
-            1 => agent.reviewed = false,
-            _ => agent.working_folder = None,
+        if change == 0 {
+            agent.state = "suspended".to_owned();
+        } else {
+            agent.reviewed = false;
         }
         let error = ready(&agent).err().ok_or("ineligible profile accepted")?;
         assert!(error.to_string().contains(reason), "{error}");
     }
+    let mut active = agent();
+    active.working_folder = None;
+    ready(&active)?;
     Ok(())
 }
 
