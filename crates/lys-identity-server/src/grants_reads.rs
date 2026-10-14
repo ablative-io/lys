@@ -9,7 +9,9 @@ use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::grants::{Judged, with_grants, with_prepared_directory_grants};
 use crate::routes::AppState;
-use crate::spicedb::Relationships;
+#[path = "grants_preparation.rs"]
+mod preparation;
+use preparation::Style;
 
 pub(crate) use crate::spicedb::context::Data as Prepared;
 use crate::spicedb::context::Hold;
@@ -54,6 +56,40 @@ pub(crate) fn with_read_directory_grants<A, T>(
         A,
     ) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
+    with_directory(state, at_least, at, questions, act, apply, Style::Resource)
+}
+
+pub(crate) fn with_pass_grants<T>(
+    state: &AppState,
+    at: u64,
+    cap: Option<usize>,
+    bind: bool,
+    questions: impl Fn(&mut Judged<'_>) -> Result<Vec<ExerciseRequest>, ServerError>,
+    act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory(
+        state,
+        None,
+        at,
+        questions,
+        act,
+        |_, answer| Ok(answer),
+        Style::Pass { cap, bind },
+    )
+}
+
+fn with_directory<A, T>(
+    state: &AppState,
+    at_least: Option<u64>,
+    at: u64,
+    questions: impl Fn(&mut Judged<'_>) -> Result<Vec<ExerciseRequest>, ServerError>,
+    act: impl FnOnce(Judged<'_>) -> Result<A, ServerError>,
+    apply: impl FnOnce(
+        &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+        A,
+    ) -> Result<T, ServerError>,
+    style: Style,
+) -> Result<T, ServerError> {
     let mut apply = Some(apply);
     let mut act = Some(act);
     for attempt in 0..2 {
@@ -85,49 +121,7 @@ pub(crate) fn with_read_directory_grants<A, T>(
                 ))
             })?;
         let stamp = plan.execute(&mut engine)?;
-        let reads_started = std::time::Instant::now();
-        let mut resources_read = 0;
-        let mut prepared = Prepared {
-            resources_read: 0,
-            reads_elapsed_ms: 0,
-            revision: stamp.revision(),
-            stamp: Some(stamp.clone()),
-            validation: engine.certify(stamp.revision()),
-            readings: BTreeMap::new(),
-            checks: BTreeMap::new(),
-        };
-        for ((subject, resource, action), (request, reach)) in asked {
-            let reading = prepared
-                .readings
-                .entry((subject, resource.clone()))
-                .or_insert_with(|| {
-                    resources_read += 1;
-                    stamp.read_about(&engine, subject, &resource)
-                })
-                .clone();
-            for resource in reach {
-                prepared
-                    .readings
-                    .entry((subject, resource.clone()))
-                    .or_insert_with(|| reading.clone());
-                let check = match &engine {
-                    Relationships::SpiceDb(engine) => {
-                        engine.check_at(&resource, &action, subject, at, stamp.revision())
-                    }
-                    #[cfg(not(test))]
-                    Relationships::Memory(_) => Ok(true),
-                    #[cfg(test)]
-                    Relationships::Memory(_) | Relationships::Fixture(_) => Ok(true),
-                };
-                prepared
-                    .checks
-                    .entry((subject, resource, action.clone()))
-                    .or_insert(check);
-            }
-            drop(request);
-        }
-        prepared.resources_read = resources_read;
-        prepared.reads_elapsed_ms = reads_started.elapsed().as_millis();
+        let prepared = preparation::prepare(&engine, &stamp, asked, at, style)?;
         let guard = Hold::enter(&prepared);
         let result = with_prepared_directory_grants(
             state,

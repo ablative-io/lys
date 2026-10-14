@@ -67,6 +67,9 @@ mod issue;
 mod keys;
 mod machine_issue;
 mod refusal;
+#[cfg(test)]
+#[path = "rights_batch_tests.rs"]
+mod rights_batch_tests;
 pub(crate) mod rights_cache;
 mod rights_cached;
 mod rights_claim;

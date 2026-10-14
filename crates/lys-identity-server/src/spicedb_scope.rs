@@ -90,7 +90,7 @@ fn joined<'a>(blocks: impl Iterator<Item = &'a Block>) -> String {
 
 /// Whether the name `name` belongs to `scope`: the scope's own names for a
 /// scope, and every name but the scratch ones for the service.
-fn owns(scope: Option<&str>, name: &str) -> bool {
+pub(super) fn owns(scope: Option<&str>, name: &str) -> bool {
     match scope {
         Some(scope) => name
             .strip_prefix(scope)
@@ -212,7 +212,7 @@ fn text_of(body: &str) -> Result<String, GrantError> {
 }
 
 impl SpiceDb {
-    fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
+    pub(super) fn raw(&self, path: &str, body: &Value) -> Result<(u16, String), GrantError> {
         let answer = self
             .client
             .post_json(&self.endpoint, path, &self.key, &body.to_string())

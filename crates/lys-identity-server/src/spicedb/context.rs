@@ -5,16 +5,19 @@ use lys_identity::grants::{Action, ExerciseRequest, GrantError, ReadStamp, Readi
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) type Question = (IdentityId, Resource);
+pub(crate) type Permission = (IdentityId, Resource, Action);
 
 #[derive(Clone)]
 pub(crate) struct Data {
     pub(crate) revision: u64,
     pub(crate) resources_read: usize,
     pub(crate) reads_elapsed_ms: u128,
+    pub(crate) batch: bool,
+    pub(crate) truncated: bool,
     pub(crate) stamp: Option<ReadStamp>,
     pub(crate) validation: Result<(), GrantError>,
     pub(crate) readings: BTreeMap<Question, Result<Reading, GrantError>>,
-    pub(crate) checks: BTreeMap<(IdentityId, Resource, Action), Result<bool, GrantError>>,
+    pub(crate) checks: BTreeMap<Permission, Result<bool, GrantError>>,
 }
 
 impl Data {
@@ -128,6 +131,8 @@ mod tests {
         let action = Action::new("read")?;
         assert!(check(subject, &resource, &action).is_none());
         let data = Data {
+            batch: false,
+            truncated: false,
             revision: 1,
             resources_read: 0,
             reads_elapsed_ms: 0,

@@ -26,9 +26,11 @@ pub(super) fn read(
     app: &str,
     at: u64,
     bind: bool,
+    cap: Option<usize>,
 ) -> Result<(Holder, Read, Option<u64>, bool), ServerError> {
     // A grant credential restricts the reading to its own lineage, which is not in the cache key.
-    let cacheable = crate::agent_signature::token_grant(holder).is_none();
+    let cacheable = crate::agent_signature::token_grant(holder).is_none()
+        && (bind || cap.is_none_or(|cap| cap >= 2));
     let cached = with_grants(state, |judged| {
         judged.grants.settle_log()?;
         holder_of(judged.directory, holder)?;
@@ -57,10 +59,11 @@ pub(super) fn read(
     if let Some(cached) = cached {
         return Ok(cached);
     }
-    crate::grants_reads::with_read_grants(
+    crate::grants_reads::with_pass_grants(
         state,
-        None,
         at,
+        cap,
+        bind,
         |judged| crate::grants_reads::subject_questions(judged, holder, Some(app)),
         |mut judged| {
             let asserted = holder_of(judged.directory, holder)?;
@@ -70,7 +73,7 @@ pub(super) fn read(
             } else {
                 None
             };
-            let read = rights(&mut judged, holder, app, at, required)?;
+            let read = rights(&mut judged, holder, app, at, required, cap)?;
             if let Some(revision) = required
                 && judged.grants.revision() != revision
             {

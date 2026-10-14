@@ -83,7 +83,7 @@ pub(super) fn pass(
         None
     };
     let (asserted, read, decided, cache_hit) =
-        super::rights_cached::read(state, holder, app, at, bind)?;
+        super::rights_cached::read(state, holder, app, at, bind, provider.rights_bytes)?;
     let Read { rights, paths } = read;
     let (rights, rights_truncated) =
         bounded(rights, app, provider.rights_bytes, &provider.rights_seen)?;
@@ -215,14 +215,21 @@ pub(super) fn rights(
     app: &str,
     at: u64,
     required: Option<u64>,
+    cap: Option<usize>,
 ) -> Result<Read, ServerError> {
     if let Some(prepared) = judged.prepared {
-        tracing::info!(target: "lys_identity_server::passfast", app,
-            resources_read = prepared.resources_read, elapsed_ms = prepared.reads_elapsed_ms,
-            "pass rights SpiceDB reads");
+        if prepared.truncated {
+            prepared.validation.clone()?;
+            log_reads(judged, app, true);
+            return Ok(Read {
+                rights: Vec::new(),
+                paths: BTreeMap::new(),
+            });
+        }
     }
     let mut paths: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let Some(schema) = judged.apps.schema(app) else {
+        log_reads(judged, app, cap.is_some_and(|cap| cap < 2));
         return Ok(Read {
             rights: Vec::new(),
             paths,
@@ -297,7 +304,29 @@ pub(super) fn rights(
             grant,
         })
         .collect();
-    Ok(Read { rights, paths })
+    let read = Read { rights, paths };
+    let truncated = match cap {
+        Some(cap) => {
+            serde_json::to_vec(&read.rights)
+                .map_err(|error| {
+                    unavailable(format!("the pass's rights could not be encoded: {error}"))
+                })?
+                .len()
+                > cap
+        }
+        None => false,
+    };
+    log_reads(judged, app, truncated);
+    Ok(read)
+}
+
+fn log_reads(judged: &Judged<'_>, app: &str, truncated: bool) {
+    if let Some(prepared) = judged.prepared {
+        tracing::info!(target: "lys_identity_server::passfast", app,
+            resources_read = prepared.resources_read, elapsed_ms = prepared.reads_elapsed_ms,
+            batch = if prepared.batch { "yes" } else { "no" },
+            truncated = if truncated { "yes" } else { "no" }, "pass rights SpiceDB reads");
+    }
 }
 
 /// `rights` whole, or none and the app named as truncated when, as JSON,

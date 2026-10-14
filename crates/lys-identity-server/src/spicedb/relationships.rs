@@ -113,6 +113,43 @@ impl FaultRelationships {
 }
 
 impl Relationships {
+    pub(crate) fn read_batch(
+        &self,
+        revision: u64,
+        covered: BTreeSet<super::context::Question>,
+        questions: &BTreeSet<super::context::Permission>,
+        at: u64,
+    ) -> Result<super::batch::Batch, GrantError> {
+        if let Self::SpiceDb(engine) = self {
+            return engine.read_batch(revision, covered, questions, at);
+        }
+        let rows = self.read()?;
+        if self.revision()? != revision {
+            return Err(super::unavailable(
+                "the relationship batch moved before it was read",
+            ));
+        }
+        #[cfg(test)]
+        if let Self::Fixture(engine) = self {
+            let hook = engine
+                .hook
+                .lock()
+                .map_err(|error| unavailable(format!("fixture hook poisoned: {error}")))?
+                .clone();
+            if let (Some(hook), Some((subject, resource))) = (hook, covered.first()) {
+                (hook.0)(*subject, resource)?;
+            }
+        }
+        Ok(super::batch::Batch {
+            snapshot: super::snapshot::Snapshot::new(revision, covered, rows),
+            checks: questions
+                .iter()
+                .cloned()
+                .map(|key| (key, Ok(true)))
+                .collect(),
+        })
+    }
+
     pub(crate) fn certify(&self, revision: u64) -> Result<(), GrantError> {
         match self {
             Self::SpiceDb(engine) => engine.certify(revision).map(drop),

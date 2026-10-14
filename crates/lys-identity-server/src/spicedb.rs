@@ -32,6 +32,11 @@ use serde_json::{Value, json};
 
 use crate::spicedb_apps::definition;
 
+#[path = "spicedb/batch.rs"]
+pub(crate) mod batch;
+#[path = "spicedb/snapshot.rs"]
+pub(crate) mod snapshot;
+
 #[path = "spicedb/context.rs"]
 pub(crate) mod context;
 #[path = "spicedb/credential.rs"]
