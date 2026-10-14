@@ -121,7 +121,7 @@ describe('Tidy on the canvas', () => {
       boxes: { [node]: { x: 200, y: 200, w: 440, h: 34 } }, open: [], view: { x: 24, y: 24 },
       widgets: [pill('widget:one', 900, 900)], links: [{ id: 'link:one', from: 'agent:' + SCRIBE, to: 'widget:one' }],
     }));
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1600 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 900 });
@@ -147,7 +147,7 @@ describe('Tidy on the canvas', () => {
   });
 
   it('offers to put it back only until the person changes something else', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1600 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 900 });

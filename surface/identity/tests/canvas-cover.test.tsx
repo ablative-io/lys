@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe('A box on the canvas', () => {
   it('is drawn out round a window let go with its middle in it', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll');
     expect(rect($('[data-group="group:a"]'))).toEqual([100, 300, 400, 200]);
     // The window is dragged from (900, 100) to (200, 380): its middle (420, 397) is in the box and its right edge is past the box's.
@@ -57,7 +57,7 @@ describe('A box on the canvas', () => {
   });
 
   it('is sized one way by its right edge and its foot, and moved by its left edge', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll');
     await pointer($('[data-group="group:a"] .canvas-group-edge.right'), 'pointerdown', 500, 400);
     await pointer(surface, 'pointermove', 560, 470);

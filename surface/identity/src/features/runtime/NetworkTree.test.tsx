@@ -21,18 +21,31 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   const value = branches({ machines: [machine('one'), machine('retired', 'retired'), machine('empty')] } as never, { ...list, runner: 'unknown', reason: 'runner_unreachable: no connection' } as never);
   const host = await render(<NetworkBranches branches={value} selected={null} select={vi.fn()} change={vi.fn()} />);
   expect(host.querySelectorAll('[data-machine]')).toHaveLength(2);
+  expect(host.querySelectorAll('[data-agent]')).toHaveLength(1);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(5);
   for (const state of list.seats.map((each) => each.state)) expect(host.querySelector('[data-state="' + state + '"]')).not.toBeNull();
   expect([...host.querySelectorAll('[data-mark]')].map((leaf) => leaf.getAttribute('data-mark'))).toEqual(['●', '◉', '○', '◌', '?']);
   expect(host.textContent).toContain('no seats');
-  expect(host.querySelectorAll('[title="Long display name"]')).toHaveLength(5);
+  // The agent is named once, on its row; the seats under it carry their own names and the agent's name for a reader.
+  expect(host.querySelectorAll('[data-agent] > details > summary[title="Long display name"]')).toHaveLength(1);
+  expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, pty · offline');
   expect(host.querySelectorAll('[data-seat] .network-reason')).toHaveLength(5);
   expect(host.textContent).toContain('runner_unreachable');
+  // Computers and agents fold: the tree is the browser's own disclosure, open first.
+  expect(host.querySelectorAll('details[open]')).toHaveLength(3);
+  expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(8);
+});
+it('C737 names one unreadable agent name on the agent row, not on every seat', () => {
+  const value = branches({ machines: [{ ...machine('one'), may_run: [] }] } as never, list as never, {}, { agent: 'AgentUnreadable: no display name' });
+  expect(value[0].agents).toHaveLength(1);
+  expect(value[0].agents[0].reason).toBe('AgentUnreadable: no display name');
+  expect(value[0].agents[0].leaves).toHaveLength(5);
+  expect(value[0].leaves).toHaveLength(5);
 });
 it('C737 starts an offline seat with a fresh operation and immediately uses the answered state', async () => {
   const posted: { path: string; body: unknown }[] = [];
   serve({ '/network': ok({ machines: [machine('one')], next: null }), '/seats': ok({ runner: 'read', seats: [seat('stopped', 'offline')] }), 'POST /seats/stopped/start': ok({ seat: seat('stopped', 'online-idle'), session: 'session-stopped' }) }, posted);
-  const host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={600} resize={vi.fn()} />);
+  const host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={300} resize={vi.fn()} />);
   await act(async () => { (host.querySelector('button[aria-label="Start stopped"]') as HTMLElement).click(); });
   expect(posted.find((each) => each.path === '/seats/stopped/start')?.body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) });
   expect(host.querySelector('[data-seat="stopped"]')?.getAttribute('data-state')).toBe('online-idle');
@@ -62,7 +75,7 @@ it('C739 first visits and old layouts open the tree with canvas, sessions and pr
   expect(container.querySelector('.operations-swap a[href="#/canvas?view=proxy"]')).not.toBeNull();
 });
 it('C739 restores a service-kept canvas choice, selected leaf and pane width', async () => {
-  const operations = { view: 'canvas', selected: 'online-idle', pane_width: 720 };
+  const operations = { view: 'canvas', selected: 'online-idle', pane_width: 320 };
   const arrangement = { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [], operations };
   const routes = { ...SERVICE, '/canvas': ok({ arrangement, layouts: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }) };
   expect((await (serve(routes), readKeeping())).operations).toEqual(operations);
@@ -77,15 +90,28 @@ it('C739 keeps one change with existing canvas marks and names a server refusal 
   await click(container.querySelector('.operations-swap a[href="#/canvas?view=sessions"]'));
   const changes = posted.filter((each) => each.path === 'PUT /canvas');
   expect(changes).toHaveLength(1);
-  expect(changes[0].body).toEqual({ arrangement: { ...arrangement, operations: { view: 'sessions', selected: null, pane_width: 600 } } });
+  expect(changes[0].body).toEqual({ arrangement: { ...arrangement, operations: { view: 'sessions', selected: null, pane_width: 300 } } });
+  expect(container.textContent).toContain('The Lys service is older than this page');
   expect(container.textContent).toContain('unknown field operations');
   expect(localStorage.getItem('lys.canvas')).toBeNull();
 });
 it('C739 requires the service to return all three kept fields instead of assuming a save succeeded', async () => {
   const posted: { path: string; body: unknown }[] = [];
   serve({ '/canvas': ok({ arrangement: null }), 'PUT /canvas': ok({ arrangement: { boxes: {}, open: [] } }) }, posted);
-  await expect(keepOperations({ view: 'tree', selected: null, pane_width: 600 })).rejects.toMatchObject({ refusal: { refusal: 'OperationsNotKept' } });
+  await expect(keepOperations({ view: 'tree', selected: null, pane_width: 300 })).rejects.toMatchObject({ refusal: { refusal: 'OperationsNotKept' } });
   expect(posted).toHaveLength(1);
+});
+it('C739 the Canvas view draws the canvas with no agent running, and says why it has no windows', async () => {
+  const routes = { ...SERVICE, '/canvas': ok({ arrangement: null, layouts: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }) };
+  const { container } = await mount('#/canvas?view=canvas', routes);
+  expect(container.querySelector('.session-canvas-scroll')).not.toBeNull();
+  expect(container.querySelector('.canvas-side > .running-list')).toBeNull();
+  expect(container.textContent).toContain('No agent is running, so the canvas has no windows yet.');
+});
+it('C739 a tree width outside what the service keeps is not read as kept', async () => {
+  const arrangement = { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [], operations: { view: 'tree', selected: null, pane_width: 720 } };
+  serve({ ...SERVICE, '/canvas': ok({ arrangement, layouts: [] }) });
+  expect((await readKeeping()).where).toBe('browser');
 });
 it('C739 an explicit canvas layout or tool-panel address keeps its canvas destination', async () => {
   const routes = { ...SERVICE, '/canvas': ok({ arrangement: null, layouts: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }) };

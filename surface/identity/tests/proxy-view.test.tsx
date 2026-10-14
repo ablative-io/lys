@@ -37,14 +37,14 @@ beforeEach(() => {
 });
 
 describe('The proxy view in Operations', () => {
-  it('is the other of Operations\' two views: the head swaps between the canvas and the proxy, and the address says which', async () => {
-    await mount('#/canvas', routes);
-    expect($$('.operations-swap a').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Canvas', 'page'], ['Proxy', null]]);
+  it('is one of Operations\' four views: the head swaps between them, and the address says which', async () => {
+    await mount('#/canvas?view=canvas', routes);
+    expect($$('.operations-swap a').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Network', null], ['Canvas', 'page'], ['Sessions', null], ['Proxy', null]]);
     expect($('.proxy-view')).toBeNull();
     await click($('.operations-swap a[href="#/canvas?view=proxy"]'));
     await settle();
     expect(location.hash).toBe('#/canvas?view=proxy');
-    expect($$('.operations-swap a').map((each) => each.getAttribute('aria-current'))).toEqual([null, 'page']);
+    expect($$('.operations-swap a').map((each) => each.getAttribute('aria-current'))).toEqual([null, null, null, 'page']);
     expect($$('.proxy-view > section').map((each) => each.getAttribute('aria-label'))).toEqual(['Agents', 'Calls', 'The call']);
     // Every agent the person may see is listed, running or not; nothing is chosen yet, and each column says what to do.
     expect($('[data-agent="' + SCRIBE + '"]')?.textContent).toBe('ScribeNot running');

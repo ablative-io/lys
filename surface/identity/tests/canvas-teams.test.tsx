@@ -108,7 +108,7 @@ describe('Team boxes on the canvas', () => {
 
   it('are drawn in one press from the tools bar, the agent\'s window inside its team\'s box inside the team above, and can be put back', async () => {
     const routes: Record<string, Route> = { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }), '/teams': ok({ teams: [team('team-top', 'Iridium', null, []), team('team-low', 'Osmium', 'team-top', [SCRIBE])] }) };
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     sized();
     expect($$('[data-group]').length).toBe(0);
     expect($('[data-act="teams"]')?.closest('[role="toolbar"]')?.getAttribute('aria-label')).toBe('Canvas tools');
@@ -124,7 +124,7 @@ describe('Team boxes on the canvas', () => {
   });
 
   it('are not offered when no team has an agent running', async () => {
-    await mount('#/canvas', { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
+    await mount('#/canvas?view=canvas', { ...SERVICE, '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
     expect($('[data-act="tidy"]')).not.toBeNull();
     expect($('[data-act="teams"]')).toBeNull();
   });

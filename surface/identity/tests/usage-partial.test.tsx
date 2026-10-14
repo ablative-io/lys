@@ -35,7 +35,7 @@ describe('A period some calls reported nothing in', () => {
   it('shows on the usage widget as what was reported and how many calls reported none, and a figure nobody reported still says so', async () => {
     localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { ['session:' + session]: { x: 200, y: 200, w: 440, h: 34 } }, open: [], view: { x: 24, y: 24 },
       widgets: [{ id: 'widget:u', kind: 'usage', x: 700, y: 300, w: 340, h: 250, view: 'detail' }], links: [{ id: 'link:u', from: 'agent:' + SCRIBE, to: 'widget:u' }] }));
-    await mount('#/canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage } })) });
+    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage } })) });
     expect($$('[data-widget] tr[data-figure]').map((row) => row.textContent)).toEqual([
       'Tokens today1,180 tokens reported, 1 call reported none', 'Tokens this week5,400 tokens reported, 3 calls reported none', 'Dollars todayNot reported']);
     expect($('[data-widget] tr[data-figure="tokens"] [data-partial]')?.getAttribute('title')).toBe('Scribe: ' + gap);

@@ -47,7 +47,7 @@ async function drawBox(label: string) {
 describe('The canvas is the person\'s own', () => {
   it('draws a labelled box where the person drags, and the box takes the windows in it along when it is moved', async () => {
     localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { [node]: { x: 200, y: 200, w: 440, h: 34 } }, open: [], view: { x: 24, y: 24 } }));
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await drawBox('Iridium');
     expect($('[data-act="draw-box"]')?.getAttribute('aria-pressed')).toBe('false');
     const box = $('.canvas-group') as HTMLElement;
@@ -70,7 +70,7 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('puts a note on the canvas, keeps what is written in it, and draws a line from a window to it that goes when the note does', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('false');
     await click($('[data-act="draw-note"]'));
     expect($('[data-act="draw-note"]')?.getAttribute('aria-pressed')).toBe('true');
@@ -102,7 +102,7 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('draws a line by dragging from a dot on a thing\'s edge to another thing, and draws none when it is let go over nothing', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await placeNote();
     const [one, note, surface] = [$('.session-canvas-node.sessions'), $('.canvas-note'), $('.session-canvas-scroll')];
     expect(one?.querySelectorAll('.canvas-anchor')).toHaveLength(4);
@@ -129,7 +129,7 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('stays where it is when the page is read again and when the agent has been started again', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await drawBox('Iridium');
     const one = $('.session-canvas-node.sessions') as HTMLElement;
     await act(async () => { one.querySelector('.session-canvas-bar')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
@@ -139,7 +139,7 @@ describe('The canvas is the person\'s own', () => {
     unmountAll();
     // The agent was stopped and started: its session has another name. Its window is where the agent's was, and the box is still there.
     const again = 'op-' + '9'.repeat(32);
-    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [{ ...running, session: again }], unanswered: [] }) });
+    await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [{ ...running, session: again }], unanswered: [] }) });
     const now = $('.session-canvas-node.sessions') as HTMLElement;
     expect(now.getAttribute('data-node')).toBe('session:' + again);
     expect([now.style.left, now.style.top]).toEqual([left, top]);
@@ -147,7 +147,7 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('keeps each bar in the corner the person moved it to: dragged by its grip, or pressed for the next corner round', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const corner = (bar: string) => $('[data-move="' + bar + '"]')?.closest('.canvas-corner')?.getAttribute('data-corner');
     const corners = () => ['look', 'draw', 'find'].map(corner);
     expect(corners()).toEqual(['bottom-left', 'bottom-right', 'bottom-right']);
@@ -173,12 +173,12 @@ describe('The canvas is the person\'s own', () => {
     localStorage.setItem('lys.canvas.bars', JSON.stringify({ look: 'top-left', draw: 'middle', find: 'top-right' }));
     unmountAll();
     document.body.innerHTML = '';
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     expect(corners()).toEqual(['top-left', 'bottom-right', 'top-right']);
   });
 
   it('leaves a tool with Escape and draws nothing', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await click($('[data-act="draw-line"]'));
     await pointer($('.session-canvas-node.sessions'), 'pointerdown', 0, 0);
     await press('Escape', {}, window as unknown as Element);
@@ -190,7 +190,7 @@ describe('The canvas is the person\'s own', () => {
 
   it('keeps the arrangement and every named layout on the service, under the agent\'s name so it holds across a restart', async () => {
     const saved: { name: string; saved_at: number; arrangement: unknown }[] = [];
-    const { posted } = await mount('#/canvas', {
+    const { posted } = await mount('#/canvas?view=canvas', {
       ...routes,
       '/canvas': ok({ arrangement: { boxes: { ['agent:' + SCRIBE]: { x: 300, y: 260, w: 440, h: 34 } }, open: [], groups: [{ id: 'group:a', label: 'Haematite', x: 250, y: 200, w: 600, h: 300 }], notes: [], links: [] }, layouts: [] }),
       'PUT /canvas': ok({}),
@@ -234,7 +234,7 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('says by name when the service will not keep the canvas, and keeps it and its layouts in this browser', async () => {
-    await mount('#/canvas', { ...routes, '/canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
+    await mount('#/canvas?view=canvas', { ...routes, '/canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
     await click($('[data-act="layouts"]'));
     expect(text()).toContain('Kept in this browser only');
     expect(text()).toContain('CanvasUnavailable: the canvas store is not open');
@@ -245,20 +245,20 @@ describe('The canvas is the person\'s own', () => {
   });
 
   it('says that a change was not kept when the service that keeps the canvas refuses it, with the refusal by name', async () => {
-    await mount('#/canvas', { ...routes, '/canvas': ok({ arrangement: null, layouts: [] }), 'PUT /canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
+    await mount('#/canvas?view=canvas', { ...routes, '/canvas': ok({ arrangement: null, layouts: [] }), 'PUT /canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
     await placeNote();
     expect($('.canvas-dock [role="alert"]')?.textContent).toContain('The arrangement was not kept on the service.');
     expect($('.canvas-dock [role="alert"]')?.textContent).toContain('CanvasUnavailable: the canvas store is not open');
   });
 
   it('keeps the agents behind one button: the running ones go to their windows, the others to their own pages, and a name typed finds one', async () => {
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     // The bar is symbols only, each named for a reader; nothing is laid over the canvas until it is asked for.
     expect($$('.canvas-bar button').every((each) => !!each.getAttribute('aria-label'))).toBe(true);
     expect($('[data-act="agents"]')?.textContent).toBe('1');
     expect($('.canvas-pop')?.className).not.toContain('open');
     await click($('[data-act="agents"]'));
-    expect(location.hash).toBe('#/canvas?panel=agents');
+    expect(location.hash).toBe('#/canvas?view=canvas&panel=agents');
     expect($('.canvas-pop')?.getAttribute('aria-label')).toBe('Agents');
     expect(document.activeElement).toBe($('.canvas-find input'));
     const all = $$('.canvas-find-list a');
@@ -278,7 +278,7 @@ describe('The canvas is the person\'s own', () => {
     await press('Escape', {}, window as unknown as Element);
     expect($('.canvas-pop')?.className).not.toContain('open');
     expect($('.canvas-pop .canvas-connections')).not.toBeNull();
-    expect(location.hash).toBe('#/canvas');
+    expect(location.hash).toBe('#/canvas?view=canvas');
   });
 });
 

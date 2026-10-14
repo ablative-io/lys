@@ -41,7 +41,7 @@ describe('Running sessions', () => {
   it('lists two permitted sessions, each opening on the canvas, and stops neither process by looking', async () => {
     const second = 'op-' + '6'.repeat(32);
     const secondBase = '/runtime/sessions/' + second;
-    const { posted } = await mount('#/canvas', {
+    const { posted } = await mount('#/canvas?view=canvas', {
       ...SERVICE,
       '/runtime/live': ok({ sessions: [running, { ...running, session: second }], unanswered: [] }),
       ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }),
@@ -109,7 +109,7 @@ describe('Running sessions', () => {
   });
 
   it('lists every running session the runners answered', async () => {
-    const { requests } = await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
+    const { requests } = await mount('#/canvas?view=canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered: [] }) });
     expect(requests).toContain('/runtime/live');
     expect(text()).toContain('Dean laptop');
     expect(text()).toContain('Running');
@@ -118,13 +118,13 @@ describe('Running sessions', () => {
   });
 
   it('refuses a stopped session listed as running, by name', async () => {
-    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [{ ...running, shown: 'stopped' }], unanswered: [] }) });
+    await mount('#/canvas?view=sessions', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [{ ...running, shown: 'stopped' }], unanswered: [] }) });
     expect(text()).toContain('listed a stopped session as running');
   });
 
   it('names each session whose runner did not answer, and never shows it as running', async () => {
     const unanswered = [{ session: ID, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'runner_unreachable: the socket is gone' }];
-    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
+    await mount('#/canvas?view=canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
     expect(text()).toContain('runner_unreachable');
     expect(text()).toContain('Its runner did not answer; last reported running');
     expect($$('.running-list .running-state')).toHaveLength(1);
@@ -132,12 +132,12 @@ describe('Running sessions', () => {
   });
 
   it('refuses a list that does not say which runners answered, by name', async () => {
-    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running] }) });
+    await mount('#/canvas?view=sessions', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running] }) });
     expect(text()).toContain('did not say which runners did not answer');
   });
 
   it('names an unavailable runtime', async () => {
-    await mount('#/canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': refused(503, 'RuntimeUnavailable', 'No reports store') });
+    await mount('#/canvas?view=canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': refused(503, 'RuntimeUnavailable', 'No reports store') });
     expect(text()).toContain('RuntimeUnavailable');
     expect(text()).not.toContain('Nothing is running.');
   });

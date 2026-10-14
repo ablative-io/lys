@@ -24,7 +24,10 @@ export interface Keeping {
 }
 
 export interface OperationsChoice { view: 'tree' | 'canvas' | 'sessions'; selected: string | null; pane_width: number }
-export const FIRST_OPERATIONS: OperationsChoice = { view: 'tree', selected: null, pane_width: 600 };
+/** The width the network tree may be kept at, in pixels: the service refuses one outside it (canvas_store.rs PANE_WIDTH). */
+export const PANE_WIDTH = { least: 200, most: 640 } as const;
+/** First, the tree takes about a fifth of a screen. */
+export const FIRST_OPERATIONS: OperationsChoice = { view: 'tree', selected: null, pane_width: 300 };
 
 function operationsOf(arrangement: unknown): OperationsChoice {
   const choice = (arrangement as { operations?: unknown } | null)?.operations;
@@ -32,7 +35,7 @@ function operationsOf(arrangement: unknown): OperationsChoice {
   if (!choice || typeof choice !== 'object') throw unreadable();
   const given = choice as OperationsChoice;
   if (!['tree', 'canvas', 'sessions'].includes(given.view) || (given.selected !== null && typeof given.selected !== 'string')
-    || !Number.isFinite(given.pane_width) || given.pane_width < 280 || given.pane_width > 1200) throw unreadable();
+    || !Number.isFinite(given.pane_width) || given.pane_width < PANE_WIDTH.least || given.pane_width > PANE_WIDTH.most) throw unreadable();
   return { view: given.view, selected: given.selected, pane_width: given.pane_width };
 }
 
@@ -51,6 +54,18 @@ const LAYOUTS = 'lys.canvas.layouts';
 
 /** What went wrong, said with the refusal's name when the service named one. */
 export const said = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error);
+
+/**
+ * What went wrong keeping the view, in words a person can act on. A service that does not know the `operations`
+ * member is one older than this page, and that is said; the refusal follows, small, for whoever reads it.
+ */
+export function saidOfKeeping(error: unknown): string {
+  const words = said(error);
+  if (error instanceof Refused && error.refusal.refusal === 'RequestMalformed' && /unknown field `?operations/.test(error.refusal.reason)) {
+    return 'The Lys service is older than this page and does not keep the operations view yet: install the matching Lys. ' + words;
+  }
+  return words;
+}
 
 function layoutsOf(value: unknown): SavedLayout[] | null {
   if (!Array.isArray(value)) return null;

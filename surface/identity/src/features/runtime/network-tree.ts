@@ -8,7 +8,10 @@ import type { Machine, NetworkView } from '../network/contract';
 import { said } from './canvas-kept';
 
 export interface TreeLeaf { seat: SeatView; name: string; reason: string | null }
-export interface TreeBranch { machine: Machine; leaves: TreeLeaf[] }
+/** An agent on a computer: its seats there, in the order the service listed them. */
+export interface TreeAgent { id: string; name: string; reason: string | null; leaves: TreeLeaf[] }
+/** A computer: its agents, and every seat on it in one list for whoever wants them flat. */
+export interface TreeBranch { machine: Machine; agents: TreeAgent[]; leaves: TreeLeaf[] }
 export interface TreeRead extends SeatList { machines: Machine[]; names: Record<string, string>; nameReasons: Record<string, string> }
 
 export const online = (seat: SeatView): boolean => seat.state === 'online-idle' || seat.state === 'online-working';
@@ -47,10 +50,18 @@ export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, na
   }
   return network.machines.filter((machine) => machine.state !== 'retired').map((machine) => {
     const allowed = new Map(machine.may_run.map((agent) => [agent.id, agent.display_name]));
-    return { machine, leaves: (byMachine.get(machine.id) ?? []).map((seat) => ({ seat,
+    const leaves: TreeLeaf[] = (byMachine.get(machine.id) ?? []).map((seat) => ({ seat,
       name: names[seat.agent] ?? allowed.get(seat.agent) ?? 'Agent name unavailable (' + seat.name + ')',
       reason: [seat.reason, list.runner === 'unknown' ? list.reason ?? 'Runner unknown: no reason returned.' : null, nameReasons[seat.agent]].filter((value) => value).join('; ') || null,
-    })) };
+    }));
+    // The agents in the order their first seat was listed; the name that could not be read is said once, on the agent.
+    const agents: TreeAgent[] = [];
+    for (const leaf of leaves) {
+      const held = agents.find((agent) => agent.id === leaf.seat.agent);
+      if (held) held.leaves.push(leaf);
+      else agents.push({ id: leaf.seat.agent, name: leaf.name, reason: nameReasons[leaf.seat.agent] ?? null, leaves: [leaf] });
+    }
+    return { machine, agents, leaves };
   });
 }
 

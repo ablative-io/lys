@@ -45,7 +45,7 @@ beforeEach(() => {
 describe('Widgets on the canvas', () => {
   it('offers every kind by its symbol and name in a panel the address names, and places the one in hand where the canvas is pressed', async () => {
     start();
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await click($('[data-act="draw-widget"]'));
     expect(location.hash).toContain('panel=widgets');
     expect($$('[data-act="place-widget"]').map((each) => each.textContent)).toEqual(['Usage', 'Budget', 'Goals', 'Requests', 'Drafts', 'Formula']);
@@ -76,7 +76,7 @@ describe('Widgets on the canvas', () => {
 
   it('holds out each kind beside the agent window in front, and adds one fed by a line from that agent, each under the last', async () => {
     start();
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     expect($('[data-add-widget]')).toBeNull();
     await pointer($('.session-canvas-node.sessions h3'), 'pointerdown', 300, 240);
     expect($$('[data-add-widget]').map((each) => each.getAttribute('aria-label'))).toEqual(['Add Usage for Scribe', 'Add Budget for Scribe', 'Add Goals for Scribe', 'Add Requests for Scribe', 'Add Drafts for Scribe']);
@@ -101,7 +101,7 @@ describe('Widgets on the canvas', () => {
 
   it('counts the agents in the box it sits in until a line feeds it, and then what the lines join it to', async () => {
     start({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     await place('budget', 224, 324);
     expect(widget('budget')?.getAttribute('aria-label')).toBe('Budget of Iridium: 1 agent');
     // A line dragged from the window's dot and let go over the widget feeds it from that agent.
@@ -139,7 +139,7 @@ describe('Widgets on the canvas', () => {
     const figures = [used('context_percent', null, 43), used('tokens', 'day', 120000), used('dollars', 'day', null, 'dollars have not been reported')];
     const accounts = [{ account: 'org-main', at_ms: 1790000000000, windows: [{ duration_minutes: 300, used_percent: 28, resets_at_ms: 1790003600000 }, { duration_minutes: 10080, used_percent: 61, resets_at_ms: 1790400000000 }] }];
     start({ widgets: [{ id: 'widget:u', kind: 'usage', x: 700, y: 300, w: 340, h: 250 }], links: [{ id: 'link:u', from: 'agent:' + SCRIBE, to: 'widget:u' }] });
-    await mount('#/canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, figures, accounts) } })) });
+    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, figures, accounts) } })) });
     const card = widget('usage') as HTMLElement;
     const turn = () => click(card.querySelector('[data-act="widget-view"]'));
     const figure = () => card.querySelector('.canvas-widget-figure')?.textContent;
@@ -232,7 +232,7 @@ describe('Widgets on the canvas', () => {
         // A formula feeds another only by a line drawn from it: the second is fed by the first, and never the first by the second.
         { id: 'l5', from: 'widget:f', to: 'widget:t' }],
     });
-    await mount('#/canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('tokens', 'day', 120000)]) }, [COURIER]: { usage: usage(COURIER, [used('tokens', 'day', 30000)]) } })) });
+    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('tokens', 'day', 120000)]) }, [COURIER]: { usage: usage(COURIER, [used('tokens', 'day', 30000)]) } })) });
     const card = (id: string) => $('[data-widget="' + id + '"]') as HTMLElement;
     const figure = (id: string) => card(id).querySelector('.canvas-widget-figure')?.textContent;
     // Fed whichever way the line was drawn; it adds until the person chooses another way.
@@ -260,18 +260,18 @@ describe('Widgets on the canvas', () => {
 
   it('says by name what could not be read, and that a kind is not known', async () => {
     start({ widgets: [{ id: 'widget:b', kind: 'weather', x: 700, y: 520, w: 340, h: 180, view: 'detail' }] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     expect(widget('weather')?.textContent).toContain('This page does not know a widget of the kind “weather”.');
     document.body.innerHTML = '';
     start({ widgets: [{ id: 'widget:a', kind: 'budget', x: 700, y: 300, w: 340, h: 170 }] });
-    await mount('#/canvas', { ...routes, '/dashboard': refused(503, 'DashboardUnavailable', 'the dashboard is closed') });
+    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': refused(503, 'DashboardUnavailable', 'the dashboard is closed') });
     expect(widget('budget')?.querySelector('.canvas-widget-figure')?.textContent).toBe('DashboardUnavailable');
     expect(text()).not.toContain('No limit');
   });
 
   it('gives a box and a note the next colour each time their dot is pressed, and keeps it', async () => {
     start({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }], notes: [{ id: 'note:a', text: 'Ask', x: 900, y: 100, w: 260, h: 180, colour: 'grey' }] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const keptMarks = () => JSON.parse(localStorage.getItem('lys.canvas') ?? '{}') as { groups: { colour?: string }[]; notes: { colour?: string }[] };
     await click($('.canvas-group [data-act="colour"]'));
     expect([keptMarks().groups[0].colour, ($('.canvas-group') as HTMLElement).style.getPropertyValue('--tint')]).toEqual(['green', '#74b584']);
@@ -296,7 +296,7 @@ describe('Typing to several agents at once', () => {
       return ok({ session, answer: { kind: 'delivered', session }, receipt: { index: 7 } });
     }) });
     start();
-    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session) });
+    await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session) });
     const bar = (id: string) => $('[data-node="session:' + id + '"] .session-canvas-bar');
     const hold = (target: Element | null) => act(async () => { target?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, metaKey: true, clientX: 300, clientY: 210 })); });
     expect($('.canvas-together')).toBeNull();
@@ -319,7 +319,7 @@ describe('Typing to several agents at once', () => {
     // An agent it did not reach is said by name with why, and the words stay to be sent again by the person, never by the page.
     unmountAll();
     document.body.innerHTML = '';
-    await mount('#/canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session, refused(409, 'RuntimeSessionEnded', 'the session has ended')) });
+    await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session, refused(409, 'RuntimeSessionEnded', 'the session has ended')) });
     await hold(bar(session));
     await hold(bar(other.session));
     await write('Stop.');
@@ -336,7 +336,7 @@ describe('Typing to several agents at once', () => {
 describe('The window in front', () => {
   it('stands over a line\'s own handle, so the add button under a short line is the one pressed', async () => {
     start();
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const window = $('.session-canvas-node.sessions') as HTMLElement;
     expect(window.style.zIndex).toBe('2');
     await pointer($('.session-canvas-node.sessions h3'), 'pointerdown', 300, 240);
@@ -354,7 +354,7 @@ describe('The window in front', () => {
 describe('Looking closer', () => {
   it('brings the view in to a window when its bar is double-pressed, and goes back to the view before when it is double-pressed again', async () => {
     start();
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
@@ -378,7 +378,7 @@ describe('Looking closer', () => {
 
   it('brings a whole box into view when its bar is double-pressed, and everything on the canvas when the canvas itself is', async () => {
     start({ groups: [{ id: 'group:a', label: 'Iridium', x: 200, y: 200, w: 440, h: 100 }] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
@@ -420,7 +420,7 @@ describe('A widget under the hand', () => {
 
   it('is moved by its rows as by its bar when it is opened out, and the canvas stays where it is', async () => {
     start({ widgets: [opened] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const [surface, drawing, widget] = [$('.session-canvas-scroll'), $('.session-canvas') as HTMLElement, $('[data-widget="widget:w"]') as HTMLElement];
     const before = drawing.style.transform;
     expect([widget.style.left, widget.style.top]).toEqual(['700px', '300px']);
@@ -440,7 +440,7 @@ describe('A widget under the hand', () => {
 
   it('is marked as the one chosen when it is pressed, which stands it and its remove control in front of its neighbours', async () => {
     start({ widgets: [opened, small] });
-    await mount('#/canvas', routes);
+    await mount('#/canvas?view=canvas', routes);
     const [surface, above, below] = [$('.session-canvas-scroll'), $('[data-widget="widget:w"]') as HTMLElement, $('[data-widget="widget:s"]') as HTMLElement];
     expect([above.classList.contains('chosen'), below.classList.contains('chosen')]).toEqual([false, false]);
     await pointer($('[data-widget="widget:s"] .canvas-widget-bar'), 'pointerdown', 760, 617);

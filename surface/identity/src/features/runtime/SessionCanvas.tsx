@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import { useLive, useLoad } from '../../api';
 import type { Load } from '../../api';
@@ -15,7 +15,7 @@ import type { SessionGraph } from './session-graph';
 import { firstMessagePage } from './message-connections';
 import type { MessageRead } from './message-connections';
 import { MessageConnections } from './MessageConnections';
-import { keepOperations, readKeeping, said } from './canvas-kept';
+import { keepOperations, readKeeping, said, saidOfKeeping } from './canvas-kept';
 import type { Keeping, OperationsChoice } from './canvas-kept';
 import { Canvas } from './CanvasSurface';
 import { NetworkTree } from './NetworkTree';
@@ -50,6 +50,7 @@ function Whole({ graph, messages, keeping, board }: { graph: SessionGraph; messa
   const whole = read ? withMessages(graph, read.messages) : graph;
   return <>
     <div className="session-canvas-strip">
+      {!graph.nodes.length ? <p className="note" role="status">No agent is running, so the canvas has no windows yet. Start a seat from the Network view and its window appears here.</p> : null}
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
     </div>
@@ -70,11 +71,20 @@ function Operations({ keeping }: { keeping: Keeping }) {
   const sending = useRef<Promise<void>>(Promise.resolve());
   const asked = search.get('view');
   const proxy = asked === 'proxy';
-  const view = asked === 'canvas' || asked === 'sessions' || asked === 'tree' ? asked : agent || search.has('layout') || search.has('panel') ? 'canvas' : choice.view;
+  const explicit = asked === 'canvas' || asked === 'sessions' || asked === 'tree' ? asked : null;
+  // An address that names an agent, a layout or a panel is the canvas's. The canvas takes the name out of the address
+  // once it has acted on it, so the view is held here: the page does not fall back to the kept view when that happens.
+  const toCanvas = Boolean(agent) || search.has('layout') || search.has('panel');
+  const [held, setHeld] = useState<OperationsChoice['view']>(() => explicit ?? (toCanvas ? 'canvas' : choice.view));
+  useEffect(() => {
+    if (explicit) setHeld(explicit);
+    else if (toCanvas) setHeld('canvas');
+  }, [explicit, toCanvas]);
+  const view = explicit ?? (toCanvas ? 'canvas' : held);
   const put = (next: OperationsChoice) => {
     setChoice(next);
     // Changes are kept in order so a slower write cannot replace a newer choice.
-    sending.current = sending.current.then(() => keepOperations(next)).then(() => setFailure(null), (error: unknown) => setFailure(said(error)));
+    sending.current = sending.current.then(() => keepOperations(next)).then(() => setFailure(null), (error: unknown) => setFailure(saidOfKeeping(error)));
   };
   return <>
     <nav className="operations-swap" aria-label="Operations views">
@@ -110,13 +120,11 @@ function CanvasOperations() {
   if (latest.status === 'loading') return <p role="status">Reading your canvas arrangement…</p>;
   if (latest.status === 'refused') return <p className="why-not" role="alert">{said(latest.refused)}</p>;
   const keeping = latest.data;
+  // The Canvas view is the canvas, whether or not an agent is running: an empty board still has its layouts, marks
+  // and widgets, and says why it has no windows. The lists are the Sessions view's.
   return <div className="canvas-side">
     {load.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}
-    {(load.status === 'ok' && load.data.nodes.some((node) => node.session)) || (load.status === 'refused' && load.refused.status === 401) ? null : <><RunningList /><Seats /></>}
-    <Gate load={load} title="Agent canvas" ok={(graph) => graph.nodes.some((node) => node.session) ? <Whole graph={graph} messages={messages} keeping={keeping} board={board} /> : <>
-      {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
-      {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
-    </>} />
+    <Gate load={load} title="Agent canvas" ok={(graph) => <Whole graph={graph} messages={messages} keeping={keeping} board={board} />} />
   </div>;
 }
 
