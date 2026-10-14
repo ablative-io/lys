@@ -2,6 +2,9 @@
 use super::*;
 use lys_runner::tracking::Figures;
 
+#[path = "budgets_feed_ingestion_tests.rs"]
+mod ingestion;
+
 /// A proxy spend whose call had `context` tokens in use, under a profile
 /// that declared `window`.
 fn spend(model: Option<&str>, context: u64, window: u64) -> UsageRecord {
@@ -214,7 +217,7 @@ async fn budgets_usage_get_serves_the_context_declaration_source()
 }
 
 #[test]
-fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
+fn budgets_context_keeps_ties_and_replacement_because_gaps_preserve_the_last_reading()
 -> Result<(), Box<dyn std::error::Error>> {
     use crate::budgets_state::{Act, Held, Leaf, Usage};
     let limit = crate::budgets_limits::Limit {
@@ -226,7 +229,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
     };
     let agents = std::collections::BTreeSet::from(["agent".to_owned()]);
     let mut held = Held::default();
-    for (event, session, at, figure, source, expected, declared) in [
+    for (event, session, at, figure, source, expected, declared, read_at) in [
         (
             "first",
             "one",
@@ -235,6 +238,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
             Some("profile"),
             Some(60),
             Some("profile"),
+            1,
         ),
         (
             "tie",
@@ -244,6 +248,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
             Some("model"),
             Some(60),
             Some("profile"),
+            1,
         ),
         (
             "lower",
@@ -253,8 +258,9 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
             Some("profile"),
             Some(60),
             Some("model"),
+            2,
         ),
-        ("gap", "two", 4, None, None, None, None),
+        ("gap", "two", 4, None, None, Some(60), Some("model"), 2),
         (
             "restore",
             "two",
@@ -263,6 +269,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
             Some("model"),
             Some(40),
             Some("profile"),
+            3,
         ),
         (
             "older",
@@ -272,6 +279,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
             Some("model"),
             Some(40),
             Some("profile"),
+            3,
         ),
     ] {
         let usage: Usage = serde_json::from_value(serde_json::json!({
@@ -282,6 +290,7 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
         let answer = serde_json::to_value(held.context_availability.used(&limit, &agents, 10))?;
         assert_eq!(answer["figure"], serde_json::json!(expected), "{event}");
         assert_eq!(answer["source"], serde_json::json!(declared), "{event}");
+        assert_eq!(answer["context"]["read_at_ms"], read_at, "{event}");
         if event == "tie" {
             let historical = crate::budgets_usage::figure(&held, &limit, &agents, "UTC", 10, None)?;
             assert_eq!(serde_json::to_value(historical)?["source"], "profile");
@@ -291,6 +300,24 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
     let answer = serde_json::to_value(held.context_availability.used(&limit, &agents, 10))?;
     assert_eq!(answer["figure"], 20);
     assert_eq!(answer["source"], "model");
+    assert_eq!(answer["context"]["read_at_ms"], 5);
+    held.hold(Leaf::Used(Usage {
+        event: "never-reported".to_owned(),
+        agent: "agent".to_owned(),
+        at_ms: 6,
+        session: Some("never".to_owned()),
+        ..Usage::default()
+    }))?;
+    let answer = serde_json::to_value(held.context_availability.used(&limit, &agents, 10))?;
+    assert!(answer["figure"].is_null());
+    assert_eq!(answer["unavailable"], crate::budgets_context::NO_CONTEXT);
+    assert_eq!(answer["context"]["session"], "never");
+    assert!(answer["context"]["read_at_ms"].is_null());
+    held.context_availability.remove("agent", "never")?;
+    let answer = serde_json::to_value(held.context_availability.used(&limit, &agents, 10))?;
+    assert_eq!(answer["figure"], 20);
+    assert_eq!(answer["source"], "model");
+    assert_eq!(answer["context"]["read_at_ms"], 5);
     held.context_availability.remove("agent", "two")?;
     let answer = serde_json::to_value(held.context_availability.used(&limit, &agents, 10))?;
     assert!(answer["figure"].is_null());
@@ -299,5 +326,158 @@ fn budgets_context_keeps_the_winning_source_through_ties_replacement_and_gaps()
         r#"{"event":"old","agent":"old-agent","at_ms":1,"tokens":0,"running_ms":0,"session":"old-session","context_percent":20}"#,
     )?;
     assert_eq!(old.context_source, None);
+    Ok(())
+}
+
+#[test]
+fn every_reported_token_subset_counts_and_names_only_its_missing_components()
+-> Result<(), Box<dyn std::error::Error>> {
+    let names = [
+        "input_tokens",
+        "output_tokens",
+        "cache_creation_tokens",
+        "cache_read_tokens",
+    ];
+    for adapter in ["lys-proxy-usage/1", lys_runner::tracking::CODEX_ADAPTER] {
+        for supplied in [[2_u64, 3, 5, 7], [0; 4]] {
+            for mask in 0_u8..16 {
+                let values: [Option<u64>; 4] = std::array::from_fn(|index| {
+                    (mask & (1 << index) != 0).then_some(supplied[index])
+                });
+                let mut record = spend(Some("main"), 50, 100);
+                record.adapter = adapter.to_owned();
+                record.run = Some(record.runner.clone());
+                record.figures.input_tokens = values[0];
+                record.figures.output_tokens = values[1];
+                record.figures.cache_creation_tokens = values[2];
+                record.figures.cache_read_tokens = values[3];
+                let usage = convert(
+                    "machine",
+                    "agent",
+                    &record,
+                    &Default::default(),
+                    &Windows::new(),
+                )?;
+                assert_eq!(usage.tokens, values.into_iter().flatten().sum::<u64>());
+                let gaps: Vec<_> = usage
+                    .unavailable
+                    .iter()
+                    .filter(|gap| gap.figure == "tokens")
+                    .map(|gap| gap.reason.clone())
+                    .collect();
+                let expected: Vec<_> = names
+                    .iter()
+                    .zip(values)
+                    .filter(|(_, value)| value.is_none())
+                    .map(|(name, _)| format!("native response does not report {name}"))
+                    .collect();
+                assert_eq!(gaps, expected, "adapter={adapter} mask={mask}");
+                let call = usage.call.ok_or("converted spend has no call")?;
+                assert_eq!(
+                    [
+                        call.input_tokens,
+                        call.output_tokens,
+                        call.cache_creation_tokens,
+                        call.cache_read_tokens
+                    ],
+                    values,
+                    "adapter={adapter} mask={mask}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn reported_token_components_refuse_checked_overflow_even_when_other_components_are_missing()
+-> Result<(), Box<dyn std::error::Error>> {
+    for values in [
+        [Some(u64::MAX), Some(1), None, None],
+        [None, Some(u64::MAX), Some(1), None],
+        [None, None, Some(u64::MAX), Some(1)],
+    ] {
+        let mut record = spend(Some("main"), 50, 100);
+        record.figures.input_tokens = values[0];
+        record.figures.output_tokens = values[1];
+        record.figures.cache_creation_tokens = values[2];
+        record.figures.cache_read_tokens = values[3];
+        let error = convert(
+            "machine",
+            "agent",
+            &record,
+            &Default::default(),
+            &Windows::new(),
+        )
+        .err()
+        .ok_or("reported token component sum did not overflow")?;
+        assert!(error.to_string().contains("native token spend overflows"));
+    }
+    Ok(())
+}
+
+#[test]
+fn partial_calls_keep_their_independent_components_and_gaps_through_a_budget_snapshot()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crate::budgets_state::{Act, Held, Leaf, Length};
+    let mut held = Held::default();
+    for (id, values) in [
+        ("first", [Some(11), None, Some(0), Some(7)]),
+        ("second", [None, Some(3), None, Some(5)]),
+    ] {
+        let mut record = spend(Some("main"), 50, 100);
+        record.id = id.to_owned();
+        record.run = Some(record.runner.clone());
+        record.figures.input_tokens = values[0];
+        record.figures.output_tokens = values[1];
+        record.figures.cache_creation_tokens = values[2];
+        record.figures.cache_read_tokens = values[3];
+        let usage = convert("machine", "agent", &record, &held, &Windows::new())?;
+        held.hold(Leaf::Used(usage.clone()))?;
+        held.hold(Leaf::Used(usage))?;
+    }
+    let held = Held::decode(&held.encode()?)?;
+    assert_eq!(held.uses.len(), 2);
+    assert_eq!(held.reported_calls("agent")?, 2);
+    assert_eq!(held.uses.iter().map(|usage| usage.tokens).sum::<u64>(), 26);
+    assert_eq!(
+        held.uses[0].unavailable[0].reason,
+        "native response does not report output_tokens"
+    );
+    assert_eq!(
+        held.uses[1]
+            .unavailable
+            .iter()
+            .map(|gap| gap.reason.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "native response does not report input_tokens",
+            "native response does not report cache_creation_tokens"
+        ]
+    );
+    let limit = crate::budgets_limits::Limit {
+        unit: crate::budgets_state::Measure::Tokens,
+        amount: 100.into(),
+        period: Some(Length::Day),
+        act: Act::Tell,
+        zone: None,
+    };
+    let parts = held.token_components(
+        &limit,
+        &std::collections::BTreeSet::from(["agent".to_owned()]),
+        "UTC",
+        5,
+    )?;
+    assert_eq!(parts.calls, 2);
+    assert_eq!(parts.sessions, 1);
+    for (part, reported, missing) in [
+        (parts.input_tokens, Some(11), 1),
+        (parts.output_tokens, Some(3), 1),
+        (parts.cache_creation_tokens, Some(0), 1),
+        (parts.cache_read_tokens, Some(12), 0),
+    ] {
+        assert_eq!(part.reported, reported);
+        assert_eq!(part.missing_calls, missing);
+    }
     Ok(())
 }

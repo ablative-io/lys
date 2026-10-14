@@ -292,12 +292,13 @@ macro_rules! budgets_feed_entries {
         }
 
         #[tokio::test]
-        async fn budgets_feed_attributes_a_foreign_entry_to_its_live_machine() -> TestResult {
+        async fn budgets_feed_refuses_foreign_attribution_because_the_writers_machine_owns_the_feed() -> TestResult {
             let table = fixture().await?;
             table.track("other-session", "foreign")?;
             let feed = page(vec![entry(2, "other-session")], "cursor-2");
             let result = super::keep_page(&table.state, "machine", feed.clone()).await;
-            assert!(result.is_ok(), "the live session machine was refused: {result:?}");
+            assert!(result.is_ok(), "the foreign entry's refusal ended the page: {result:?}");
+            super::keep_page(&table.state, "foreign", feed.clone()).await?;
             super::keep_page(&table.state, "foreign", feed).await?;
             $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 1, "a second machine follow did not charge again");
@@ -306,12 +307,18 @@ macro_rules! budgets_feed_entries {
                 assert_eq!(usage.agent, table.agent);
                 assert_eq!(usage.session.as_deref(), Some("other-session"));
                 assert_eq!(usage.tokens, 2);
-                assert!(store.held().refusals.records.is_empty());
+                assert_eq!(store.held().refusals.records.len(), 1);
+                let skipped = &store.held().refusals.records[0];
+                assert_eq!(skipped.check, "feed_entry_skipped");
+                assert_eq!(skipped.session, "other-session");
+                assert_eq!(skipped.source, "identity-feed:machine");
+                assert!(skipped.words.contains("writer_machine=machine"));
+                assert!(skipped.words.contains("session_machine=foreign"));
                 Ok(())
             })?;
             {
                 let messages = table.messages.lock().map_err(|error| error.to_string())?;
-                assert!(messages.iter().any(|line| line.contains("seq=2 session=other-session followed_machine=machine attributed as native:foreign:entry-2")), "the foreign attribution was not named: {messages:?}");
+                assert!(messages.iter().any(|line| line.contains("feed_entry_skipped") && line.contains("seq=2") && line.contains("session=other-session") && line.contains("followed_machine=machine")), "the foreign entry's refusal was not named: {messages:?}");
             }
             table.finish().await
         }

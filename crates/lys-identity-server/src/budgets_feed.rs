@@ -4,7 +4,7 @@ use crate::error_agents::AgentsError;
 use std::sync::Arc;
 
 use lys_runner::tracking::{Measure, RECORD_VERSION, Unavailable, UsageRecord};
-use lys_runner::tracking_store::{Body, FEED_FORMAT, FeedPage};
+use lys_runner::tracking_store::{Body, FEED_FORMAT, FeedEntry, FeedPage};
 
 use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_state::Usage;
@@ -27,9 +27,10 @@ fn refused(reason: impl Into<String>) -> ServerError {
 /// Keep each charge durably, then keep the refusals and cursor together.
 ///
 /// # Errors
-/// Refuses an invalid feed format or cursor, malformed or unexpected feed
-/// entries, unavailable organisation and folded stores, or durable charge,
-/// outcome, refusal and cursor writes and change signals that fail.
+/// Refuses an invalid feed format, cursor or machine binding, unavailable
+/// organisation and folded stores, or durable charge, outcome, refusal and
+/// cursor writes and change signals that fail. Invalid entries are named
+/// in durable refusals, and the remaining page is kept.
 pub async fn keep_page(
     state: &Arc<AppState>,
     machine: &str,
@@ -38,33 +39,46 @@ pub async fn keep_page(
     if page.format != FEED_FORMAT || page.cursor.is_empty() {
         return Err(refused("runner feed format or cursor is invalid"));
     }
+    let runner = crate::refusals_follow::bound_runner(state, machine)?;
     let mut refusals = Vec::new();
     let mut kept = false;
     // Read once for the page, before any use is kept.
     let windows = crate::configuration_api::organisation(state)?.model_windows;
     for entry in page.entries {
-        match entry.body {
+        if crate::refusals_follow::bound_runner(state, machine)? != runner {
+            return Err(refused("runner feed binding changed during its page"));
+        }
+        if let Some(reason) = entry_problem(state, machine, &runner, &entry)? {
+            refusals.push(skipped_entry(state, machine, &entry, &reason)?);
+            kept = true;
+            continue;
+        }
+        match &entry.body {
             Body::Usage(record) => {
-                if let Some(skipped) = usage_entries::keep(
+                let result = usage_entries::keep(
                     state,
                     machine,
                     (entry.seq, entry.at, &entry.session),
-                    &record,
+                    record,
                     &windows,
                 )
-                .await?
-                {
-                    refusals.push(skipped);
+                .await;
+                match result {
+                    Ok(Some(skipped)) => refusals.push(skipped),
+                    Ok(None) => {}
+                    Err(
+                        error @ (ServerError::RuntimeSessionUnknown
+                        | ServerError::AgentNotVisible
+                        | ServerError::RequestMalformed { .. }),
+                    ) => {
+                        refusals.push(skipped_entry(state, machine, &entry, &error.to_string())?);
+                    }
+                    Err(error) => return Err(error),
                 }
                 kept = true;
             }
-            Body::Refusal(record) => refusals.push(record),
+            Body::Refusal(record) => refusals.push(record.clone()),
             Body::Operation(outcome) => {
-                if outcome.session != entry.session {
-                    return Err(refused(
-                        "runner feed operation and entry name different sessions",
-                    ));
-                }
                 let crossing = with_budgets(state, |store| {
                     Ok(store.held().crossings.holds(&outcome.operation))
                 })?;
@@ -72,7 +86,7 @@ pub async fn keep_page(
                     let observed = i64::try_from(outcome.at)
                         .map_err(|error| refused(format!("runner outcome instant: {error}")))?;
                     with_budgets_mut(state, |store| {
-                        let acted = crate::budgets_crossing::Acted::from_runner(&outcome, observed);
+                        let acted = crate::budgets_crossing::Acted::from_runner(outcome, observed);
                         if store
                             .held()
                             .crossings
@@ -86,11 +100,11 @@ pub async fn keep_page(
                     })?;
                 }
                 if let Some(goals) = &state.goals {
-                    let holders = if crate::goals_store::actual_compaction(&outcome) {
+                    let holders = if crate::goals_store::actual_compaction(outcome) {
                         let agent = crate::runtime_api::with_runtime(state, |store| {
-                            source_agent(store, machine, &outcome)
+                            source_agent(store, machine, outcome)
                         })?;
-                        if goals.with(|store| Ok(store.compaction_kept(&outcome)))? {
+                        if goals.with(|store| Ok(store.compaction_kept(outcome)))? {
                             Vec::new()
                         } else {
                             compaction_holders(state, &agent)?
@@ -100,7 +114,7 @@ pub async fn keep_page(
                     };
                     let changed = goals.with(|store| {
                         store.control_answer(crate::goals_store::ControlAnswer {
-                            outcome: &outcome,
+                            outcome,
                             holders: &holders,
                             at: crate::session::now(),
                         })
@@ -112,18 +126,11 @@ pub async fn keep_page(
                 }
             }
             Body::Managed(record) if record.event == "control_boundary" => {
-                if record.binding.session != entry.session {
-                    return Err(refused(
-                        "managed boundary and feed entry name different sessions",
-                    ));
-                }
                 crate::budgets_act::review(state, &entry.session, &format!("feed-{}", entry.seq))
                     .await?;
             }
             Body::Coverage(_) | Body::Boundary(_) | Body::Injection(_) | Body::Managed(_) => {}
-            Body::Commit(_) => {
-                return Err(refused("a runner feed page unexpectedly contains a commit"));
-            }
+            Body::Commit(_) => return Err(refused("runner feed commit passed entry validation")),
         }
     }
     with_budgets_mut(state, |store| {
@@ -135,6 +142,123 @@ pub async fn keep_page(
         state.changes.signal()?;
     }
     Ok(())
+}
+
+fn entry_problem(
+    state: &AppState,
+    machine: &str,
+    runner: &crate::runner_client::RunnerRecord,
+    entry: &FeedEntry,
+) -> Result<Option<String>, ServerError> {
+    use crate::runner_client::RunnerRecord;
+    use lys_runner::refusals::REFUSAL_VERSION;
+    let reason = match &entry.body {
+        Body::Usage(record) => match runner {
+            RunnerRecord::Dialled {
+                runner: Some(writer),
+                ..
+            } if writer != &record.runner => Some(format!(
+                "runner feed usage writer {} differs from bound runner {writer}",
+                record.runner
+            )),
+            _ => None,
+        },
+        Body::Operation(outcome) if outcome.session != entry.session => {
+            Some("runner feed operation and entry name different sessions".to_owned())
+        }
+        Body::Operation(outcome) if i64::try_from(outcome.at).is_err() => {
+            Some("runner outcome instant exceeds the supported Unix milliseconds".to_owned())
+        }
+        Body::Refusal(record)
+            if record.session != entry.session || record.version != REFUSAL_VERSION =>
+        {
+            Some("runner refusal version or session differs from its feed entry".to_owned())
+        }
+        Body::Managed(record)
+            if record.event == "control_boundary" && record.binding.session != entry.session =>
+        {
+            Some("managed boundary and feed entry name different sessions".to_owned())
+        }
+        Body::Commit(_) => Some("a runner feed page unexpectedly contains a commit".to_owned()),
+        _ => None,
+    };
+    let attributed = matches!(&entry.body, Body::Usage(_) | Body::Operation(_))
+        || matches!(&entry.body, Body::Managed(record) if record.event == "control_boundary");
+    if reason.is_some() || !attributed {
+        return Ok(reason);
+    }
+    let tracked = crate::runtime_api::with_runtime(state, |store| {
+        Ok(store
+            .session(&entry.session)
+            .map(|tracked| (tracked.machine.clone(), tracked.agent.clone())))
+    })?;
+    if let Some((owner, _)) = &tracked
+        && owner != machine
+    {
+        let standing = crate::network_api::with_network(state, |store| {
+            Ok(match store.machine(owner) {
+                Some(machine) if machine.retired.is_some() => "retired",
+                Some(_) => "active",
+                None => "missing",
+            })
+        })?;
+        return Ok(Some(format!(
+            "runner feed entry names a session on another machine: writer_machine={machine}; session_machine={owner}; {standing}"
+        )));
+    }
+    if (matches!(&entry.body, Body::Managed(record) if record.event == "control_boundary")
+        || (state.goals.is_some()
+            && matches!(&entry.body, Body::Operation(outcome) if crate::goals_store::actual_compaction(outcome))))
+        && tracked.as_ref().is_none_or(|(_, agent)| agent.is_none())
+    {
+        return Ok(Some(
+            "runner control has no tracked session and agent".to_owned(),
+        ));
+    }
+    Ok(None)
+}
+
+fn skipped_entry(
+    state: &AppState,
+    machine: &str,
+    entry: &FeedEntry,
+    reason: &str,
+) -> Result<lys_runner::refusals::RefusalRecord, ServerError> {
+    use lys_runner::refusals::{REFUSAL_VERSION, RefusalRecord};
+    let agent = crate::runtime_api::with_runtime(state, |store| {
+        Ok(store
+            .session(&entry.session)
+            .and_then(|tracked| tracked.agent.clone()))
+    })?;
+    let (agent, attribution) = match agent {
+        Some(agent) => (agent, "tracked agent"),
+        // The refusal schema uses an empty agent for an unattributed entry; name the absence.
+        None => (String::new(), "no tracked agent"),
+    };
+    let coordinate = format!(
+        "seq={}; session={}; followed_machine={machine}",
+        entry.seq, entry.session
+    );
+    (state.say)(&format!(
+        "budgets: feed_entry_skipped {coordinate}: {reason}; {attribution}"
+    ));
+    Ok(RefusalRecord {
+        version: REFUSAL_VERSION,
+        source: format!("identity-feed:{machine}"),
+        attempt: format!("feed-{}", entry.seq),
+        session: entry.session.clone(),
+        agent,
+        at: entry.at,
+        tool: "feed".to_owned(),
+        target: coordinate.clone(),
+        policy_version: 0,
+        rule: None,
+        check: "feed_entry_skipped".to_owned(),
+        grantable: false,
+        permission: None,
+        grantor: None,
+        words: format!("{coordinate}: {reason}; {attribution}"),
+    })
 }
 
 /// The context windows a person declared, by model: a window in tokens, or
@@ -202,10 +326,8 @@ pub fn context_figure(
         .map_err(|error| refused(format!("native context percentage: {error}")))
 }
 
-/// Convert cumulative time only once; native snapshots never charge their token totals.
-///
-/// # Errors
-/// Names an invalid usage identity, instant, token total or declared context window.
+/// Convert spend and cumulative time once; snapshots never charge their token totals.
+/// Refuses invalid usage identities, instants, totals or declared context windows.
 pub fn convert(
     machine: &str,
     agent: &str,
@@ -300,27 +422,27 @@ pub fn convert(
 
 fn tokens(record: &UsageRecord, unavailable: &mut Vec<Unavailable>) -> Result<u64, ServerError> {
     let fields = [
-        record.figures.input_tokens,
-        record.figures.output_tokens,
-        record.figures.cache_creation_tokens,
-        record.figures.cache_read_tokens,
+        ("input_tokens", record.figures.input_tokens),
+        ("output_tokens", record.figures.output_tokens),
+        (
+            "cache_creation_tokens",
+            record.figures.cache_creation_tokens,
+        ),
+        ("cache_read_tokens", record.figures.cache_read_tokens),
     ];
     let mut total = 0_u64;
-    for (index, field) in fields.into_iter().enumerate() {
+    for (name, field) in fields {
         match field {
             Some(count) => {
                 total = total
                     .checked_add(count)
                     .ok_or_else(|| refused("native token spend overflows"))?;
             }
-            None if index == 2 && record.adapter == lys_runner::tracking::CODEX_ADAPTER => {}
             None => {
                 unavailable.push(Unavailable {
                     figure: "tokens".to_owned(),
-                    reason: "native response does not report every token spend component"
-                        .to_owned(),
+                    reason: format!("native response does not report {name}"),
                 });
-                return Ok(0);
             }
         }
     }
