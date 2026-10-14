@@ -27,6 +27,8 @@
 .usage-amount { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .usage-amount > * { flex: 1 0 12ch; min-width: 12ch; }
 .table-scroll .usage-list, .table-scroll .teams-table { table-layout: auto; }
+.table-scroll .usage-table { table-layout: auto; }
+.table-scroll .usage-table td input:not([type=checkbox]):not([type=radio]), .table-scroll .usage-table td select, .table-scroll .usage-table td textarea { min-width: max-content; }
 .usage-list select, .teams-table select { min-width: 20ch; }
 .usage-budgets { margin-top: 12px; }
 .agent-team { display: inline-flex; align-items: center; gap: 8px; margin-right: 12px; }

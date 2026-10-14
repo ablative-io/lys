@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import type { McpServer } from './Provisioning';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
 
 export type ServerKind = 'address' | 'program';
 export type BuiltServer = { server: McpServer } | { problem: string };
@@ -96,7 +97,7 @@ export function kindsFor(transports: string[] | undefined): ServerKind[] {
 export function McpServers({ program, transports, value, change }: { program: string; transports: string[] | undefined; value: McpServer[]; change: (next: McpServer[]) => void }) {
   const kinds = kindsFor(transports);
   return <section className="mcp-servers wide" aria-label="Connected tools">
-    <table className="usage-table">
+    <TableScroll label="Connected tools"><table className="usage-table">
       <colgroup><col style={{ width: '22%' }} /><col style={{ width: '64%' }} /><col style={{ width: '14%' }} /></colgroup>
       <thead><tr><th>Connected tools {program || 'this agent'} can use</th><th>How they are reached</th><th>Change</th></tr></thead>
       <tbody>
@@ -108,7 +109,7 @@ export function McpServers({ program, transports, value, change }: { program: st
         {value.length ? null : <tr><td colSpan={3} className="dim">None.</td></tr>}
       </tbody>
       {kinds.length ? <tfoot><AddServer kinds={kinds} taken={value.map((server) => server.name)} add={(server) => change([...value, server])} /></tfoot> : null}
-    </table>
+    </table></TableScroll>
     {kinds.length === 0 ? <p className="dim">{program ? program + ' does not say how connected tools reach it, so none can be added here.' : 'Choose a program first.'}</p> : null}
     {others(program) ? <p className="dim">{others(program)}</p> : null}
   </section>;
