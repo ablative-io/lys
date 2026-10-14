@@ -18,8 +18,8 @@ const MARKS = { 'online-idle': '●', 'online-working': '◉', offline: '○', '
 const detail = (seat: SeatView): string => (seat.transport ?? 'not started') + ' · ' + seat.state;
 
 /** The one seat row: the state dot, the name, and everything else in the title. */
-function Leaf({ seat, name, reason, label, selected, select }: { seat: SeatView; name: string; reason: string | null; label: string; selected: string | null; select: (seat: string) => void }) {
-  return <li className="network-leaf" data-seat={seat.name} data-state={seat.state} data-selected={selected === seat.name} role="none">
+function Leaf({ seat, name, reason, label, selected, select, agent }: { seat: SeatView; name: string; reason: string | null; label: string; selected: string | null; select: (seat: string) => void; agent?: string }) {
+  return <li className="network-leaf" data-agent={agent} data-seat={seat.name} data-state={seat.state} data-selected={selected === seat.name} role="none">
     <a href={'#/canvas?seat=' + encodeURIComponent(seat.name)} role="treeitem" title={name + ' · seat ' + seat.name + ' · ' + detail(seat) + (reason ? ' · ' + reason : '')} className="network-name" data-mark={MARKS[seat.state]} aria-label={name + ', seat ' + seat.name + ', ' + detail(seat)} aria-current={selected === seat.name ? 'true' : undefined} aria-selected={selected === seat.name} onClick={(event) => { event.preventDefault(); select(seat.name); }}>{label}</a>
   </li>;
 }
@@ -34,25 +34,25 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
   const title = agent.reason ? agent.name + ' · ' + agent.reason : agent.name;
   if (agent.leaves.length === 1) {
     const [leaf] = agent.leaves;
-    return <ul role="group"><Leaf {...leaf} label={agent.name} selected={selected} select={select} /></ul>;
+    return <Leaf {...leaf} agent={agent.id} label={agent.name} selected={selected} select={select} />;
   }
   if (!agent.leaves.length) {
     const [session] = agent.running;
     if (session) {
       const choice = SESSION_CHOICE + session.session;
-      return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-session={session.session} data-state="online-working" data-selected={selected === choice} role="none">
+      return <li className="network-leaf network-seatless" data-agent={agent.id} data-agent-only={agent.id} data-session={session.session} data-state="online-working" data-selected={selected === choice} role="none">
         <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['online-working']} title={title + ' · running outside a seat · session ' + session.session + (agent.running.length > 1 ? ' and ' + (agent.running.length - 1) + ' more' : '')} aria-label={agent.name + ', running, session ' + session.session} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
-      </li></ul>;
+      </li>;
     }
     const choice = AGENT_CHOICE + agent.id;
-    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state="not-seen" data-selected={selected === choice} role="none">
+    return <li className="network-leaf network-seatless" data-agent={agent.id} data-agent-only={agent.id} data-state="not-seen" data-selected={selected === choice} role="none">
       <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · live sessions not read: ' + unsurveyed : '')} aria-label={agent.name + ', not running'} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
-    </li></ul>;
+    </li>;
   }
   const choice = AGENT_CHOICE + agent.id;
-  return <details open><summary role="treeitem" className="network-fold network-agent" title={title + ' · ' + agent.leaves.length + ' seats'} data-selected={selected === choice} aria-selected={selected === choice} onClick={() => select(choice)}><span className="network-fold-name">{agent.name}</span></summary>
+  return <li data-agent={agent.id} role="none"><details open><summary role="treeitem" className="network-fold network-agent" title={title + ' · ' + agent.leaves.length + ' seats'} data-selected={selected === choice} aria-selected={selected === choice} onClick={() => select(choice)}><span className="network-fold-name">{agent.name}</span></summary>
     <ul role="group">{agent.leaves.map((leaf) => <Leaf key={leaf.seat.name} {...leaf} label={leaf.seat.name} selected={selected} select={select} />)}</ul>
-  </details>;
+  </details></li>;
 }
 
 /**
@@ -65,7 +65,7 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
 export function NetworkBranches({ branches: all, selected, select, unsurveyed = null }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void; unsurveyed?: string | null }) {
   return <ul className="network-branches" role="tree" aria-label="Network machines" onKeyDown={walk}>{all.map(({ machine, agents }) => <li key={machine.id} data-machine={machine.id} role="none">
     <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span></summary>
-      <ul role="group">{agents.length ? agents.map((agent) => <li key={agent.id} data-agent={agent.id} role="none"><AgentRow agent={agent} selected={selected} select={select} unsurveyed={unsurveyed} /></li>) : <li className="dim network-empty" role="none">no agents</li>}</ul>
+      <ul role="group">{agents.length ? agents.map((agent) => <AgentRow key={agent.id} agent={agent} selected={selected} select={select} unsurveyed={unsurveyed} />) : <li className="dim network-empty" role="none">no agents</li>}</ul>
     </details>
   </li>)}</ul>;
 }
