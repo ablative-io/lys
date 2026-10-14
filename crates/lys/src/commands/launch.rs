@@ -153,6 +153,18 @@ fn launch(context: &Context, command: &str, args: &HarnessArgs, json: bool) -> C
         "starting {} on this computer through Lys; session {session}",
         selected.name
     );
+    let directory = std::env::current_dir().map_err(|error| {
+        refused(
+            "launch_directory_unreadable",
+            format!("cannot read this terminal's working folder: {error}"),
+        )
+    })?;
+    let directory = directory.to_str().ok_or_else(|| {
+        refused(
+            "launch_directory_unreadable",
+            "this terminal's working folder is not UTF-8",
+        )
+    })?;
     let (route, body) = match seat {
         Some(seat) => (
             format!(
@@ -163,7 +175,7 @@ fn launch(context: &Context, command: &str, args: &HarnessArgs, json: bool) -> C
         ),
         None => (
             format!("/agents/{agent}/start-command"),
-            json!({"machine":machine,"operation":session}),
+            json!({"machine":machine,"operation":session,"directory":directory}),
         ),
     };
     let answer = context.server.post(&route, &body);
@@ -252,12 +264,6 @@ fn ready(agent: &Agent) -> CliResult<()> {
         ));
     }
     family::of(agent)?;
-    if !agent.controlled && agent.working_folder.is_none() {
-        return Err(refused(
-            "WorkingFolderUnnamed",
-            "the agent's profile names no working folder",
-        ));
-    }
     Ok(())
 }
 

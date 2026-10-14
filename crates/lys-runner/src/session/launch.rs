@@ -125,6 +125,19 @@ impl Sessions {
             attach: crate::attach::Ring::new(self.scrollback),
             last_signal: None,
         };
+        if let Some(note) = session
+            .launch
+            .as_ref()
+            .and_then(|launch| launch.environment.get("LYS_PTY_STATUS_NOTE"))
+            && !session
+                .output
+                .push(0, format!("\r\nLys: {note}\r\n").as_bytes())?
+        {
+            return Err(RunnerError::refused(
+                "pty_status_note_unavailable",
+                "the fresh terminal status note could not be retained",
+            ));
+        }
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;
         let pid = session.pid.ok_or_else(|| {

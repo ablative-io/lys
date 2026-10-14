@@ -123,14 +123,15 @@ fn a_first_or_explicitly_fresh_codex_start_keeps_its_unreported_native_id_unavai
 }
 
 #[test]
-fn a_legacy_terminal_without_its_native_id_names_start_again_instead_of_starting_fresh() -> Result {
+fn a_legacy_terminal_starts_fresh_because_there_is_no_remembered_native_conversation() -> Result {
     let held = seat(Some(PRIOR_OPERATION), None);
     for harness in [Harness::ClaudeCode, Harness::Codex] {
-        let error = pty(&held, OPERATION, None, false, Some(harness))
-            .err()
-            .ok_or("the existing terminal silently began a new conversation")?;
-        assert_eq!(error.name(), "pty_resume_unavailable");
-        assert!(error.to_string().contains("Start again"));
+        let plan = pty(&held, OPERATION, None, false, Some(harness))?;
+        assert_eq!(plan.resume, None);
+        assert_eq!(
+            plan.expected,
+            (harness == Harness::ClaudeCode).then(|| NEW_UUID.to_owned())
+        );
         assert_eq!(
             pty(&held, OPERATION, Some(SELECTED_UUID), false, Some(harness))?,
             resumed(SELECTED_UUID)

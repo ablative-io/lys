@@ -18,6 +18,10 @@ use crate::error::ServerError;
 use crate::network_store::{Machine, NetworkStore};
 use crate::provisioning_store::{McpServer, Setting, Settings, Version};
 
+#[cfg(test)]
+#[path = "start_proxy_tests.rs"]
+mod proxy_tests;
+
 /// The machine `id`, when it takes `agent`: known, in use, with a runtime,
 /// and listing the agent among those that may run on it.
 pub(crate) fn placed<'a>(
@@ -187,6 +191,12 @@ pub fn fields(
         harness.description.rendering_contract.as_str(),
         "claude-code/template-v1" | "codex/template-v1"
     );
+    if supports_proxy && start.model_proxy.is_none() {
+        return Err(lys_runner::RunnerError::refused(
+            "model_proxy_unset",
+            "the server has no model proxy setting; configure its model proxy before starting Claude Code or Codex",
+        ).into());
+    }
     let model_proxy = start
         .model_proxy
         .filter(|_| supports_proxy)

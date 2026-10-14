@@ -77,13 +77,20 @@ impl Sessions {
                 "the runner stopped before the session could restart",
             ));
         }
+        let native = table
+            .feed
+            .source(id)
+            .and_then(|source| source.native_conversation.clone());
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
-        let launch = session.launch.as_ref().ok_or_else(|| {
+        let launch = session.launch.as_mut().ok_or_else(|| {
             RunnerError::refused(
                 "session_launch_missing",
                 format!("session {id} has no held launch"),
             )
         })?;
+        if session.managed.is_none() {
+            crate::pty_conversation::prepare_restart(launch, native.as_deref())?;
+        }
         session.rotation = launch
             .rotation
             .clone()

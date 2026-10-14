@@ -198,3 +198,16 @@ pub(super) fn preflight(launch: &Launch) -> Result<(), RunnerError> {
     verify(&found[0], &directory, conversation)?;
     version::prove(launch)
 }
+
+/// A fresh start remains available even when native resume has no reviewed proof.
+pub(super) fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
+    preflight(launch)?;
+    if requested(&launch.arguments)?.is_none()
+        && let Some(note) = version::fresh_note(launch)?
+    {
+        launch
+            .environment
+            .insert("LYS_PTY_STATUS_NOTE".to_owned(), note);
+    }
+    Ok(())
+}

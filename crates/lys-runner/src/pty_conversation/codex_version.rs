@@ -14,7 +14,7 @@ fn unsupported(reason: impl std::fmt::Display) -> RunnerError {
     )
 }
 
-pub(super) fn prove(launch: &Launch) -> Result<(), RunnerError> {
+fn reported(launch: &Launch) -> Result<String, RunnerError> {
     let selected =
         crate::program_path::selected(&launch.program, &launch.environment).map_err(|error| {
             unsupported(format!(
@@ -41,8 +41,22 @@ pub(super) fn prove(launch: &Launch) -> Result<(), RunnerError> {
     })?;
     let version = crate::tracking::version_in(&report)
         .ok_or_else(|| unsupported("the native Codex command reported no semantic version"))?;
-    // Older builds can start a fresh thread when an explicit resume UUID is absent.
-    if !matches!(version.as_str(), "0.161.0-alpha.3" | "0.161.0-channels.6") {
+    Ok(version)
+}
+
+fn reviewed(version: &str) -> bool {
+    matches!(version, "0.161.0-alpha.3" | "0.161.0-channels.6")
+}
+
+pub(super) fn fresh_note(launch: &Launch) -> Result<Option<String>, RunnerError> {
+    let version = reported(launch)?;
+    Ok((!reviewed(&version))
+        .then(|| format!("resume not proven for codex {version}, started fresh")))
+}
+
+pub(super) fn prove(launch: &Launch) -> Result<(), RunnerError> {
+    let version = reported(launch)?;
+    if !reviewed(&version) {
         return Err(unsupported(format!(
             "Codex {version} has no reviewed proof that native resume refuses a missing UUID"
         )));

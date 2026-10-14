@@ -82,12 +82,10 @@ fn end_record(
     if held.transport.as_deref() != Some("pty") {
         return Ok(record);
     }
-    for conversation in [held.harness_session.as_deref(), observed]
-        .into_iter()
-        .flatten()
+    if let Some(conversation) = observed.or(held.harness_session.as_deref())
+        && let Err(error) = Transport::Codex.validate_resume(conversation)
     {
-        if let Err(error) = Transport::Codex.validate_resume(conversation) {
-            record.refusal = Some(
+        record.refusal = Some(
                 RunnerError::refused(
                     &error.name(),
                     format!(
@@ -96,37 +94,26 @@ fn end_record(
                 )
                 .into(),
             );
-            return Ok(record);
-        }
+        return Ok(record);
     }
-    match (held.harness_session.as_deref(), observed) {
-        (Some(kept), Some(observed)) if kept != observed => {
-            record.refusal = Some(
-                RunnerError::refused(
-                    "pty_conversation_mismatch",
-                    "the runner reported another native conversation for the ended terminal; its stopped state was kept and its known identity retained; choose Start again",
-                )
-                .into(),
-            );
-        }
-        (None, Some(observed)) => {
-            // Started restates the same Lys session to retain its newly observed
-            // native identity; Stopped closes that session in the same batch.
-            record.lines.insert(
-                0,
-                Line::Started(Started {
-                    qualification: held.qualification.clone(),
-                    transport: "pty".to_owned(),
-                    operation: super::part(operation, "native-conversation"),
-                    name: held.added.name.clone(),
-                    session: session.clone(),
-                    harness_session: Some(observed.to_owned()),
-                    by: caller.to_owned(),
-                    at,
-                }),
-            );
-        }
-        (Some(_), Some(_) | None) | (None, None) => {}
+    if let Some(observed) = observed
+        && held.harness_session.as_deref() != Some(observed)
+    {
+        // Started restates the same Lys session to retain its newly observed
+        // native identity; Stopped closes that session in the same batch.
+        record.lines.insert(
+            0,
+            Line::Started(Started {
+                qualification: held.qualification.clone(),
+                transport: "pty".to_owned(),
+                operation: super::part(operation, "native-conversation"),
+                name: held.added.name.clone(),
+                session: session.clone(),
+                harness_session: Some(observed.to_owned()),
+                by: caller.to_owned(),
+                at,
+            }),
+        );
     }
     Ok(record)
 }

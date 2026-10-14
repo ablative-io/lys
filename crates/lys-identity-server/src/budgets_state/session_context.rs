@@ -42,6 +42,7 @@ pub struct SessionReading {
 }
 
 struct Session {
+    started_ms: i64,
     reading: SessionReading,
     source: Option<String>,
     saw_call: bool,
@@ -49,8 +50,9 @@ struct Session {
 }
 
 impl Session {
-    fn new(id: &str) -> Self {
+    fn new(id: &str, started_ms: i64) -> Self {
         Self {
+            started_ms,
             reading: SessionReading {
                 session: id.to_owned(),
                 read_at_ms: None,
@@ -240,7 +242,15 @@ impl Held {
                         "live context session {session} starts after the observation time"
                     ));
                 }
-                sessions.insert(session.as_str(), Session::new(session));
+                sessions.insert(
+                    session.as_str(),
+                    Session::new(
+                        session,
+                        i64::try_from(started_ms).map_err(|error| {
+                            format!("live context start cannot be represented: {error}")
+                        })?,
+                    ),
+                );
             }
             self.read_context_calls(agent, &mut sessions, windows, at_ms)?;
             for (session, reading) in sessions {
@@ -302,7 +312,14 @@ impl Held {
                     .uses
                     .get(position)
                     .ok_or_else(|| format!("context call index names missing record {position}"))?;
-                validate_call(usage, agent, position)?;
+                let earliest = sessions
+                    .values()
+                    .filter(|session| !session.complete)
+                    .map(|session| session.started_ms)
+                    .min();
+                if earliest.is_none_or(|started| usage.at_ms < started) {
+                    return Ok(());
+                }
                 let coordinate = (usage.at_ms, position);
                 if usage.at_ms > at_ms || before.is_some_and(|before| coordinate >= before) {
                     return Err(format!(
@@ -316,6 +333,7 @@ impl Held {
                     .and_then(|session| sessions.get_mut(session))
                     && !session.complete
                 {
+                    validate_call(usage, agent, position)?;
                     session.observe(usage, windows)?;
                 }
             }

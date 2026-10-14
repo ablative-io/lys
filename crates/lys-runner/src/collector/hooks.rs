@@ -89,6 +89,10 @@ impl Sessions {
         input: &Value,
     ) -> Result<Option<String>, RunnerError> {
         let mut table = self.lock()?;
+        let seen_native = table
+            .feed
+            .source(id)
+            .is_some_and(|source| source.native_conversation.is_some());
         let session = table
             .sessions
             .get(id)
@@ -127,7 +131,8 @@ impl Sessions {
                     "SessionStart differs from the managed Claude conversation",
                 ));
             }
-        } else if let Some(launch) = &session.launch
+        } else if !seen_native
+            && let Some(launch) = &session.launch
             && let Some(expected) = declared_claude_identity(&launch.arguments)?
             && expected != claude
         {
@@ -148,7 +153,13 @@ impl Sessions {
                 "the proxied Claude session's source no longer names its proxy run",
             ));
         }
-        source.check_native_conversation(claude)?;
+        if source
+            .native_conversation
+            .as_deref()
+            .is_some_and(|previous| previous != claude)
+        {
+            tracing::info!(session = id, previous = ?source.native_conversation, native = claude, "terminal native conversation changed");
+        }
         source.native_conversation = Some(claude.to_owned());
         append(
             &mut table,

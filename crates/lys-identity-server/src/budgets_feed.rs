@@ -408,7 +408,9 @@ pub fn convert(
                 model: record.model.clone(),
                 input_tokens: record.figures.input_tokens,
                 output_tokens: record.figures.output_tokens,
-                cache_creation_tokens: record.figures.cache_creation_tokens,
+                cache_creation_tokens: record.figures.cache_creation_tokens.or_else(|| {
+                    (record.adapter == lys_runner::tracking::CODEX_ADAPTER).then_some(0)
+                }),
                 cache_read_tokens: record.figures.cache_read_tokens,
                 run: run.clone(),
                 record: record.record.clone(),
@@ -427,7 +429,10 @@ fn tokens(record: &UsageRecord, unavailable: &mut Vec<Unavailable>) -> Result<u6
         ("output_tokens", record.figures.output_tokens),
         (
             "cache_creation_tokens",
-            record.figures.cache_creation_tokens,
+            record
+                .figures
+                .cache_creation_tokens
+                .or_else(|| (record.adapter == lys_runner::tracking::CODEX_ADAPTER).then_some(0)),
         ),
         ("cache_read_tokens", record.figures.cache_read_tokens),
     ];
@@ -470,6 +475,10 @@ fn later_control_outcome(
 #[cfg(test)]
 #[path = "budgets_feed_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "budgets_codex_tests.rs"]
+mod codex_tests;
 
 #[cfg(test)]
 #[macro_use]

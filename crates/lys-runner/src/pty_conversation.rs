@@ -11,6 +11,8 @@ use crate::error::RunnerError;
 use crate::protocol::Launch;
 
 mod codex;
+mod restart;
+pub(crate) use restart::prepare_restart;
 
 #[cfg(test)]
 #[path = "pty_conversation_tests.rs"]
@@ -389,6 +391,9 @@ pub fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
         return Ok(());
     }
     let harness = launch.config.as_ref().and_then(|config| config.harness);
+    if harness == Some(crate::tracking::Harness::Codex) {
+        return codex::prepare(launch);
+    }
     if harness != Some(crate::tracking::Harness::ClaudeCode) {
         return preflight(launch);
     }

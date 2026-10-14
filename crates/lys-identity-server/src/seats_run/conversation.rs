@@ -64,13 +64,6 @@ pub(super) fn pty(
             expected: Some(conversation.to_owned()),
         });
     }
-    if !fresh && held.session.is_some() {
-        return Err(RunnerError::refused(
-            "pty_resume_unavailable",
-            "the previous terminal session has no remembered native conversation; choose Start again to begin a new conversation",
-        )
-        .into());
-    }
     let expected = match harness {
         Some(Harness::ClaudeCode) => {
             Some(lys_runner::pty_conversation::conversation_uuid(operation)?)

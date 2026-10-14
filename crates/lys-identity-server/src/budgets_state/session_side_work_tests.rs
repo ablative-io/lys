@@ -60,3 +60,28 @@ fn only_side_work_keeps_a_named_gap_and_call_count_without_creating_an_agent_con
     assert_eq!(context.live_sessions[0].figure, None);
     Ok(())
 }
+
+#[test]
+fn calls_before_a_live_session_start_cannot_supply_or_poison_its_context() -> Result<(), String> {
+    let mut held = Held::default();
+    for number in 0..300 {
+        let mut old = call(
+            &format!("old-{number}"),
+            "old-session",
+            number,
+            Some(50_000),
+        );
+        old.context_source = Some("obsolete".to_owned());
+        held.hold(Leaf::Used(old))?;
+    }
+    let used = held.session_context(&limit(), &live(&[("session", 10)]), &windows(), 20_000)?;
+    assert_eq!(used.figure, None);
+    assert_eq!(used.context.ok_or("context omitted")?.reported_none, 0);
+    let mut foreign = call("foreign", "another-session", 11_000, Some(50_000));
+    foreign.context_source = Some("obsolete".to_owned());
+    held.hold(Leaf::Used(foreign))?;
+    let used = held.session_context(&limit(), &live(&[("session", 10)]), &windows(), 20_000)?;
+    assert_eq!(used.figure, None);
+    assert_eq!(used.context.ok_or("context omitted")?.reported_none, 0);
+    Ok(())
+}

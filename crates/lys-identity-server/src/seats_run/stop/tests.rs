@@ -108,24 +108,20 @@ fn a_known_native_uuid_is_retained_when_the_ended_runner_reports_it_or_reports_n
 }
 
 #[test]
-fn a_differing_native_uuid_refuses_capture_but_keeps_the_real_stop_and_prior_identity() -> TestResult
-{
+fn a_changed_native_uuid_replaces_the_prior_identity_in_the_same_batch_as_the_real_stop()
+-> TestResult {
     let held = seat(Some(NATIVE), "pty");
     let record = end_record(&held, Some(OTHER), ("stopper", STOP, false, 10))?;
-    assert_eq!(
-        record
-            .refusal
-            .as_ref()
-            .map(crate::error::ServerError::name)
-            .as_deref(),
-        Some("pty_conversation_mismatch")
-    );
-    assert!(matches!(record.lines.as_slice(), [Line::Stopped(_)]));
+    assert!(record.refusal.is_none());
+    assert!(matches!(
+        record.lines.as_slice(),
+        [Line::Started(_), Line::Stopped(_)]
+    ));
     let folded = fold(&held, &record)?;
     let ended = folded.seat("terminal").ok_or("seat absent")?;
     assert!(!ended.running);
     assert_eq!(ended.session.as_deref(), Some(SESSION));
-    assert_eq!(ended.harness_session.as_deref(), Some(NATIVE));
+    assert_eq!(ended.harness_session.as_deref(), Some(OTHER));
     assert!(matches!(folded.operation(STOP), Some(Line::Stopped(_))));
     Ok(())
 }

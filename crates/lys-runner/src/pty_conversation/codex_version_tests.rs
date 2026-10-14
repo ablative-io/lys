@@ -146,3 +146,18 @@ fn the_version_proof_executes_the_launch_selected_command_and_uses_its_environme
     prove(&fixture.launch)?;
     Ok(())
 }
+
+#[test]
+fn an_unreviewed_codex_can_start_fresh_with_a_named_status_note_but_cannot_resume() -> TestResult {
+    let fixture = Fixture::new()?;
+    fixture.script("printf 'codex-cli 0.36.0\\n'")?;
+    assert_eq!(
+        super::fresh_note(&fixture.launch)?,
+        Some("resume not proven for codex 0.36.0, started fresh".to_owned())
+    );
+    assert_eq!(
+        prove(&fixture.launch).unwrap_err().name(),
+        "pty_resume_unsupported"
+    );
+    Ok(())
+}
