@@ -32,6 +32,7 @@ pub struct Kept {
 impl Kept {
     /// Whether `other` asks for the same decision: the same grant, by the
     /// same person, in the same words, whenever it was asked.
+    #[must_use]
     pub fn same_words(&self, other: &Self) -> bool {
         self.operation == other.operation
             && self.grant == other.grant
@@ -94,6 +95,7 @@ struct Sealed {
 
 impl Held {
     /// The decision recorded under `operation`.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Kept> {
         self.index.operations.get(operation).and_then(|position| {
             #[cfg(test)]
@@ -103,6 +105,7 @@ impl Held {
     }
 
     /// The latest decision to keep `grant`.
+    #[must_use]
     pub fn last_for(&self, grant: &str) -> Option<&Kept> {
         self.index.grants.get(grant).and_then(|position| {
             #[cfg(test)]
@@ -112,6 +115,9 @@ impl Held {
     }
 
     /// Fold one decision, refusing an operation already recorded.
+    ///
+    /// # Errors
+    /// Refuses an operation that already names a retained review decision.
     pub fn hold(&mut self, kept: Kept) -> Result<(), String> {
         if self.index.operations.contains_key(&kept.operation) {
             return Err(format!(
@@ -129,6 +135,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a malformed review decision or a reused decision operation,
+    /// naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let kept = serde_json::from_slice(bytes)
@@ -140,6 +150,10 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the review decisions snapshot
+    /// cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -150,6 +164,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole review decisions snapshot in
+    /// the review decisions state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed = serde_json::from_slice(bytes)
             .map_err(|error| format!("review decisions state: {error}"))?;

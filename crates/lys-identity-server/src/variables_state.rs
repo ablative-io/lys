@@ -52,6 +52,7 @@ impl VariablesError {
     }
 
     /// The stable refusal name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Unavailable { .. } => "variables_unavailable",
@@ -82,6 +83,7 @@ pub enum Scope {
 
 impl Scope {
     /// Its name, for refusals and receipts.
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
             Self::Agent { id } => format!("agent {id}"),
@@ -91,6 +93,7 @@ impl Scope {
 
     /// Its key in the fold: `agent:<id>` or `session:<id>`, a string so the
     /// fold serialises as JSON.
+    #[must_use]
     pub fn key(&self) -> String {
         match self {
             Self::Agent { id } => format!("agent:{id}"),
@@ -243,11 +246,13 @@ pub struct Read {
 
 impl Variables {
     /// The map of `scope`, empty at revision 0 when never patched.
+    #[must_use]
     pub fn map(&self, scope: &Scope) -> Map {
         self.scopes.get(&scope.key()).cloned().unwrap_or_default()
     }
 
     /// `scope`'s variables as read at `now`.
+    #[must_use]
     pub fn read(&self, scope: &Scope, now: u64) -> Read {
         let map = self.map(scope);
         let (live, expired): (Vec<_>, Vec<_>) = map
@@ -265,6 +270,11 @@ impl Variables {
 
 /// Refuse a variable name that is not lowercase letters, digits or `_`,
 /// starting with a letter, 1 to 64 long.
+///
+/// # Errors
+/// Refuses names outside 1 to 64 bytes, a first character other than a
+/// lowercase ASCII letter, or later characters other than lowercase ASCII
+/// letters, digits or `_`.
 pub fn checked_name(name: &str) -> Result<(), VariablesError> {
     let ok = !name.is_empty()
         && name.len() <= 64

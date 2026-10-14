@@ -161,6 +161,7 @@ pub enum Line {
 
 impl Line {
     /// The operation id the line was asked under.
+    #[must_use]
     pub fn operation(&self) -> &str {
         match self {
             Self::Added(line) => &line.operation,
@@ -173,6 +174,7 @@ impl Line {
     }
 
     /// The seat the line is about.
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             Self::Added(line) => &line.name,
@@ -185,6 +187,7 @@ impl Line {
     }
 
     /// Whether `other` asks the same thing, whenever and by whom each was kept.
+    #[must_use]
     pub fn same_words(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Added(kept), Self::Added(asked)) => {
@@ -299,6 +302,7 @@ struct Sealed {
 
 impl Held {
     /// The seat named `name`.
+    #[must_use]
     pub fn seat(&self, name: &str) -> Option<&Seat> {
         self.index
             .get(name)
@@ -306,12 +310,17 @@ impl Held {
     }
 
     /// The line kept under `operation`.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Line> {
         self.operations.get(operation)
     }
 
     /// Fold one line, refused by reason when its operation is spent or its
     /// seat does not stand as the line needs.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, an already added or unknown seat, or a
+    /// change its running, held or retired state does not allow.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         if self.operations.contains_key(line.operation()) {
             return Err(format!(
@@ -399,6 +408,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses malformed seat leaves or changes the preceding seat history
+    /// does not allow, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -410,6 +423,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the seats snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -420,6 +436,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole seats snapshot in the seats
+    /// state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("seats state: {error}"))?;

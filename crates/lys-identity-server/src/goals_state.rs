@@ -76,6 +76,10 @@ pub struct Goal {
 
 impl Goal {
     /// Refuse an item that cannot support its reminders or deliverable evidence.
+    ///
+    /// # Errors
+    /// Refuses a deadline reminder without a deadline or a deliverable without
+    /// the evidence it requires.
     pub fn check(&self) -> Result<(), GoalError> {
         if self.deadline.is_none()
             && self
@@ -134,6 +138,7 @@ pub enum Delivery {
 
 impl Delivery {
     /// Whether it is still asked of the runner.
+    #[must_use]
     pub fn unsettled(self) -> bool {
         matches!(self, Self::Pending | Self::Accepted)
     }
@@ -198,6 +203,7 @@ pub struct Answered {
 
 impl Answered {
     /// The delivery as the runner's `outcome` says it stands, kept at `at`.
+    #[must_use]
     pub fn from_runner(outcome: &OperationOutcome, at: u64) -> Self {
         let state = match outcome.state {
             OperationState::Accepted | OperationState::Delivering => Delivery::Accepted,
@@ -296,6 +302,7 @@ pub struct Item {
 
 impl Item {
     /// Whether this aim currently sends reminders.
+    #[must_use]
     pub fn active(&self) -> bool {
         self.changes
             .iter()
@@ -308,6 +315,7 @@ impl Item {
     }
 
     /// The current words, retaining the original set for idempotent retries.
+    #[must_use]
     pub fn words(&self) -> &str {
         self.changes
             .iter()
@@ -413,6 +421,7 @@ impl Held {
     }
 
     /// Every reminder of an open item due at `now`.
+    #[must_use]
     pub fn due(&self, now: u64) -> Vec<Due> {
         let mut due = Vec::new();
         for item in self
@@ -434,6 +443,7 @@ impl Held {
     }
 
     /// The earliest instant any timer falls due.
+    #[must_use]
     pub fn next_due(&self) -> Option<u64> {
         self.items
             .iter()
@@ -484,6 +494,7 @@ impl Held {
     }
 
     /// The delivery asked under `operation`.
+    #[must_use]
     pub fn sent(&self, operation: &str) -> Option<&Sent> {
         let (item, firing, delivery) = self.index.sent.get(operation)?;
         self.items
@@ -495,6 +506,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a malformed goal line or an act the preceding goal history
+    /// cannot accept, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -506,6 +521,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the goals snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -516,6 +534,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses malformed goals snapshots or an absent or unrecognised goals
+    /// state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let value: serde_json::Value =
             serde_json::from_slice(bytes).map_err(|error| format!("goals state: {error}"))?;

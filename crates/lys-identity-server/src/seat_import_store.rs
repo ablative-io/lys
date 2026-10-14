@@ -57,6 +57,9 @@ pub struct SeatImports {
 impl SeatImports {
     /// The journal kept in the directory `dir`, created when it does not
     /// exist, its snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the import leaf store cannot be opened, verified or folded.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         Ok(Self::over(RecordLog::open(dir, ORIGIN, key, &unavailable)?))
     }
@@ -70,6 +73,10 @@ impl SeatImports {
     }
 
     /// How the journal started and what it holds, said once at start.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot settle an uncertain append or
+    /// its lock is poisoned.
     pub fn started(&self) -> Result<String, ServerError> {
         self.journal.with(|log, _| {
             Ok(format!(
@@ -81,6 +88,9 @@ impl SeatImports {
     }
 
     /// How many leaves the journal holds: a rerun that writes nothing leaves it.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn leaves(&self) -> Result<u64, ServerError> {
         self.journal.with(|log, _| Ok(log.len()))
     }
@@ -96,23 +106,35 @@ impl SeatImports {
     }
 
     /// Keep `preview` as `seat`'s latest dry run.
+    ///
+    /// # Errors
+    /// Refuses when the latest dry runs' lock is poisoned.
     pub fn remember(&self, seat: &str, preview: Preview) -> Result<(), ServerError> {
         self.previews()?.insert(seat.to_owned(), preview);
         Ok(())
     }
 
     /// `seat`'s latest dry run.
+    ///
+    /// # Errors
+    /// Refuses when the latest dry runs' lock is poisoned.
     pub fn preview(&self, seat: &str) -> Result<Option<Preview>, ServerError> {
         Ok(self.previews()?.get(seat).cloned())
     }
 
     /// The import `operation`.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn operation(&self, operation: &str) -> Result<Option<Operation>, ServerError> {
         self.journal
             .with(|log, _| Ok(log.held().operation(operation).cloned()))
     }
 
     /// The completed import reserved under `key`, when there is one.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn completed(&self, key: &str) -> Result<Option<Operation>, ServerError> {
         self.journal.with(|log, _| {
             Ok(log
@@ -124,6 +146,9 @@ impl SeatImports {
     }
 
     /// Every import of `seat`, oldest first.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn of_seat(&self, seat: &str) -> Result<Vec<Operation>, ServerError> {
         self.journal.with(|log, _| {
             Ok(log
@@ -137,18 +162,28 @@ impl SeatImports {
     }
 
     /// `seat`'s selected import: its latest completed one.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn selected(&self, seat: &str) -> Result<Option<Operation>, ServerError> {
         self.journal
             .with(|log, _| Ok(log.held().selected(seat).cloned()))
     }
 
     /// Every import neither completed nor stopped.
+    ///
+    /// # Errors
+    /// Refuses when the import journal cannot be settled or its lock is poisoned.
     pub fn open_operations(&self) -> Result<Vec<String>, ServerError> {
         self.journal.with(|log, _| Ok(log.held().open()))
     }
 
     /// Refuse `import_incomplete` while `seat`'s latest import is in
     /// progress or stopped: no incomplete import is selected by a launch.
+    ///
+    /// # Errors
+    /// Refuses `import_incomplete` while the latest import is unfinished.
+    /// Propagates an unsettled journal or poisoned journal lock.
     pub fn require_selectable(&self, seat: &str) -> Result<(), ServerError> {
         self.journal.with(|log, _| match log.held().latest(seat) {
             Some(latest) if latest.completed.is_none() => Err(SeatImportError::Incomplete {
@@ -166,6 +201,10 @@ impl SeatImports {
     /// in progress resumes it; the operation id naming another key is
     /// refused `import_operation_reused`; another import of the seat in
     /// progress is refused `import_in_progress`.
+    ///
+    /// # Errors
+    /// Refuses an operation naming another key or another import of the seat
+    /// still in progress. Propagates journal settlement and durable append failures.
     pub fn reserve(&self, reserved: Reserved) -> Result<Reservation, ServerError> {
         self.journal.with(|log, unavailable| {
             let held = log.held();
@@ -198,6 +237,10 @@ impl SeatImports {
     }
 
     /// Keep one line of an import already reserved.
+    ///
+    /// # Errors
+    /// Refuses a line the reserved import cannot accept, a journal that cannot
+    /// be settled, a poisoned journal lock or a failed durable append.
     pub fn record(&self, line: Line) -> Result<(), ServerError> {
         self.journal
             .with(|log, unavailable| log.append(line, unavailable))

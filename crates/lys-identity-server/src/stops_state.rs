@@ -52,6 +52,7 @@ fn done() -> bool {
 impl Stop {
     /// Whether `other` is the same stop in the same words, whenever each was
     /// sent and whatever each found to do.
+    #[must_use]
     pub fn same_words(&self, other: &Self) -> bool {
         self.operation == other.operation
             && self.agent == other.agent
@@ -118,6 +119,7 @@ struct Sealed {
 
 impl Held {
     /// The stop kept under `operation`.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Stop> {
         self.index.operations.get(operation).and_then(|position| {
             #[cfg(test)]
@@ -141,6 +143,10 @@ impl Held {
     }
 
     /// Fold one stop. Only an unfinished stop in the same words can be completed.
+    ///
+    /// # Errors
+    /// Refuses an operation already kept unless it completes an unfinished
+    /// stop in the same words.
     pub fn hold(&mut self, stop: Stop) -> Result<(), String> {
         if let Some(position) = self.index.operations.get(&stop.operation) {
             let asked = &mut self.stops[*position];
@@ -167,6 +173,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a malformed stop or an operation already kept in different
+    /// words or completed, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let stop = serde_json::from_slice(bytes)
@@ -178,6 +188,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the stops snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -188,6 +201,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole stops snapshot in the stops
+    /// state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("stops state: {error}"))?;

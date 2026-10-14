@@ -59,6 +59,7 @@ impl WordsError {
     }
 
     /// The stable refusal name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Unavailable { .. } => "words_unavailable",
@@ -99,6 +100,7 @@ impl Slot {
     ];
 
     /// Its name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::ContextWarning => "context_warning",
@@ -110,6 +112,9 @@ impl Slot {
     }
 
     /// The slot named `name`.
+    ///
+    /// # Errors
+    /// Refuses a name that is not one of the declared words slots.
     pub fn named(name: &str) -> Result<Self, WordsError> {
         Self::ALL
             .into_iter()
@@ -124,6 +129,7 @@ impl Slot {
     /// The built-in wording in code, the last layer a slot resolves to;
     /// none for the compaction command, which the profile names when no
     /// layer sets it.
+    #[must_use]
     pub fn built_in(self) -> Option<&'static str> {
         match self {
             Self::ContextWarning => Some(
@@ -162,6 +168,7 @@ pub enum Layer {
 
 impl Layer {
     /// Its name, for refusals and receipts.
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
             Self::Workspace => "workspace".to_owned(),
@@ -172,6 +179,7 @@ impl Layer {
 
     /// Its key in the fold: `workspace`, `agent:<id>` or `session:<id>`, a
     /// string so the fold serialises as JSON.
+    #[must_use]
     pub fn key(&self) -> String {
         match self {
             Self::Workspace => "workspace".to_owned(),
@@ -370,6 +378,7 @@ impl Folded for Words {
 
 impl Words {
     /// The revision of `slot` at `layer`: 0 when never saved.
+    #[must_use]
     pub fn revision(&self, layer: &Layer, slot: Slot) -> u64 {
         self.layers
             .get(&layer.key())
@@ -378,6 +387,7 @@ impl Words {
     }
 
     /// The revision of the template `name`: 0 when never saved.
+    #[must_use]
     pub fn template_revision(&self, name: &str) -> u64 {
         self.templates.get(name).map_or(0, |held| held.revision)
     }
@@ -385,6 +395,7 @@ impl Words {
     /// Resolve `slot` for `session` of `agent`, most specific layer first;
     /// a layer that inherits is passed over, and a link is followed to its
     /// template, both revisions kept.
+    #[must_use]
     pub fn resolve(&self, slot: Slot, agent: Option<&str>, session: Option<&str>) -> Resolved {
         let mut contributed = Vec::new();
         let layers = session
@@ -462,6 +473,9 @@ fn source_name(layer: &Layer) -> String {
 /// Refuse text that cannot be typed as words: empty, or holding a control
 /// character other than a newline (a managed session takes a message of
 /// several lines; a terminal session is given one line by its runner).
+///
+/// # Errors
+/// Refuses empty text or any control character other than a newline.
 pub fn checked_text(text: &str) -> Result<String, WordsError> {
     let text = text.trim();
     if text.is_empty() {
@@ -482,6 +496,10 @@ pub fn checked_text(text: &str) -> Result<String, WordsError> {
 
 /// Refuse a template name that is not lowercase letters, digits, `-` or
 /// `_`, 1 to 64 long.
+///
+/// # Errors
+/// Refuses names outside 1 to 64 bytes or containing anything other than
+/// lowercase ASCII letters, digits, `-` or `_`.
 pub fn checked_name(name: &str) -> Result<String, WordsError> {
     let ok = !name.is_empty()
         && name.len() <= 64

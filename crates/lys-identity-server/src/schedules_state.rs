@@ -63,6 +63,7 @@ impl SchedulesError {
     }
 
     /// The stable refusal name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Unavailable { .. } => "schedules_unavailable",
@@ -138,6 +139,11 @@ pub struct Schedule {
 
 impl Schedule {
     /// Refuse a schedule that cannot be kept as asked.
+    ///
+    /// # Errors
+    /// Refuses a start at or before now, an end at or before the start,
+    /// an interval outside the kept bounds, no occurrences or recipients,
+    /// or text the words store cannot keep.
     pub fn check(&self, now: u64) -> Result<(), SchedulesError> {
         let refuse = |reason: String| Err(SchedulesError::Malformed { reason });
         if self.at <= now {
@@ -191,6 +197,7 @@ pub enum Delivery {
 
 impl Delivery {
     /// Whether it is still asked of the runner.
+    #[must_use]
     pub fn unsettled(self) -> bool {
         matches!(self, Self::Pending | Self::Accepted)
     }
@@ -362,6 +369,7 @@ pub struct Item {
 
 impl Item {
     /// Whether reminders are paused.
+    #[must_use]
     pub fn paused(&self) -> bool {
         self.changes
             .iter()
@@ -374,6 +382,7 @@ impl Item {
     }
 
     /// The current recipients.
+    #[must_use]
     pub fn recipients(&self) -> &[Recipient] {
         self.changes
             .iter()
@@ -386,6 +395,7 @@ impl Item {
     }
 
     /// The current source.
+    #[must_use]
     pub fn source(&self) -> &Source {
         self.changes
             .iter()
@@ -398,6 +408,7 @@ impl Item {
     }
 
     /// The current end.
+    #[must_use]
     pub fn until(&self) -> Option<u64> {
         self.changes
             .iter()
@@ -410,6 +421,7 @@ impl Item {
     }
 
     /// The current limit.
+    #[must_use]
     pub fn max_occurrences(&self) -> Option<u64> {
         self.changes
             .iter()
@@ -449,6 +461,7 @@ impl Item {
     }
 
     /// Whether every delivery of every occurrence is settled.
+    #[must_use]
     pub fn settled(&self) -> bool {
         self.fired
             .iter()
@@ -525,6 +538,7 @@ impl Folded for Schedules {
 
 impl Schedules {
     /// The schedule `id`.
+    #[must_use]
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.items.iter().find(|item| item.schedule.id == id)
     }
@@ -537,6 +551,7 @@ impl Schedules {
     }
 
     /// The occurrence asked under `operation`.
+    #[must_use]
     pub fn firing(&self, operation: &str) -> Option<&Fired> {
         self.items
             .iter()
@@ -545,6 +560,7 @@ impl Schedules {
     }
 
     /// The delivery asked under `operation`, and its schedule.
+    #[must_use]
     pub fn sent(&self, operation: &str) -> Option<(&Item, &Sent)> {
         self.items.iter().find_map(|item| {
             item.fired
@@ -565,6 +581,7 @@ impl Schedules {
 
     /// Every schedule due at `now`, with the due instant and how many due
     /// instants coalesce into it.
+    #[must_use]
     pub fn due(&self, now: u64) -> Vec<(String, u64, u64)> {
         self.items
             .iter()
@@ -587,11 +604,13 @@ impl Schedules {
     }
 
     /// The earliest instant any schedule falls due.
+    #[must_use]
     pub fn next_due(&self) -> Option<u64> {
         self.items.iter().filter_map(|item| item.next_due).min()
     }
 
     /// Every delivery still asked of a runner.
+    #[must_use]
     pub fn pending(&self) -> Vec<(String, Sent)> {
         self.items
             .iter()

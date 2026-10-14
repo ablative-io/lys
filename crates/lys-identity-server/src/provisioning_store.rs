@@ -184,6 +184,10 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 impl ProvisioningStore {
     /// The profiles kept in the file `path`, none when it does not exist.
+    ///
+    /// # Errors
+    /// Refuses an unreadable provisioning file, malformed snapshot or journal,
+    /// or a retained edit that cannot be folded into its profile.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let (kept, journal, since_snapshot, stall_upgrades) = journal::read(path)?;
         let indexes = Arc::new(index::Indexes::rebuild(&kept));
@@ -199,6 +203,10 @@ impl ProvisioningStore {
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
+    ///
+    /// # Errors
+    /// Refuses when the provisioning file cannot be read back and folded after
+    /// an uncertain write.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (kept, journal, since_snapshot, stall_upgrades) = journal::settle(&self.path)?;
@@ -269,6 +277,10 @@ impl ProvisioningStore {
     }
 
     /// Replace the change log with a durable snapshot during maintenance.
+    ///
+    /// # Errors
+    /// Refuses an unsettled write, an unencodable snapshot, or a snapshot that
+    /// cannot be durably written and read back.
     pub fn checkpoint(&mut self) -> Result<(), ServerError> {
         self.settle()?;
         let bytes = serde_json::to_vec(&self.kept)
@@ -286,6 +298,7 @@ impl ProvisioningStore {
     }
 
     /// Every profile, in the order first set.
+    #[must_use]
     pub fn profiles(&self) -> &[Profile] {
         #[cfg(test)]
         HISTORY_READS.with(|reads| reads.set(reads.get() + 1));
@@ -305,11 +318,13 @@ impl ProvisioningStore {
     }
 
     /// The profile of `agent`, none while nothing was set for it.
+    #[must_use]
     pub fn profile(&self, agent: &str) -> Option<&Profile> {
         self.kept.profiles.get(*self.indexes.profiles.get(agent)?)
     }
 
     /// The numbered version of the named agent's profile.
+    #[must_use]
     pub fn version(&self, agent: &str, number: u32) -> Option<&Version> {
         let (profile, version) = self.indexes.location(agent, number)?;
         self.kept.profiles.get(profile)?.versions.get(version)
@@ -345,6 +360,11 @@ impl ProvisioningStore {
     /// Keep `settings` as the version of `agent` after `from`, under
     /// `operation`, and answer its number. `from` is the latest version the
     /// setter saw, 0 for none.
+    ///
+    /// # Errors
+    /// Refuses a stall interval that is zero or cannot fit milliseconds,
+    /// a reused operation or a changed latest version. Propagates settlement
+    /// and durable journal failures.
     pub fn set(&mut self, agent: &str, from: u32, version: Version) -> Result<u32, ServerError> {
         if version.settings.session.as_ref().is_some_and(|session| {
             session.stall_after == 0 || session.stall_after.checked_mul(1000).is_none()
@@ -388,6 +408,11 @@ impl ProvisioningStore {
     /// Keep `review` of version `number` of `agent`'s profile. Sent again in
     /// the same words it is kept once; the operation naming any other act is
     /// refused, and a version reviewed already answers its review unchanged.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, an unknown profile version or an index
+    /// outside the retained profile. Propagates settlement and durable journal
+    /// failures.
     pub fn review(&mut self, agent: &str, number: u32, review: Review) -> Result<(), ServerError> {
         self.settle()?;
         let reused = self
@@ -419,6 +444,10 @@ impl ProvisioningStore {
     }
 
     /// Keep `skill`; kept already with the same text, it is kept once.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain provisioning write cannot be settled or the
+    /// skill cannot be durably kept in the journal.
     pub fn keep_skill(&mut self, skill: SkillText) -> Result<(), ServerError> {
         self.settle()?;
         if self.skill(&skill.name, &skill.sha256).is_some() {
@@ -428,11 +457,13 @@ impl ProvisioningStore {
     }
 
     /// Every kept skill text, in the order kept.
+    #[must_use]
     pub fn skills(&self) -> &[SkillText] {
         &self.kept.skills
     }
 
     /// The text of `name` whose hash is `sha256`.
+    #[must_use]
     pub fn skill(&self, name: &str, sha256: &str) -> Option<&SkillText> {
         let position = *self.indexes.skills.get(name)?.get(sha256)?;
         self.kept.skills.get(position)
@@ -440,6 +471,7 @@ impl ProvisioningStore {
 
     /// The skill pins the version set under `operation` was recorded with,
     /// so a request sent again is compared as it was first recorded.
+    #[must_use]
     pub fn pins_for(&self, operation: &str) -> Option<Vec<SkillPin>> {
         self.named(operation)
             .map(|(_, version)| version.settings.skill_pins.clone())
@@ -447,6 +479,9 @@ impl ProvisioningStore {
 
     /// Each of `names` pinned to its latest kept text, refusing a name Lys
     /// keeps no text for.
+    ///
+    /// # Errors
+    /// Refuses each skill name for which the provisioning store keeps no text.
     pub fn pins(&self, names: &[String]) -> Result<Vec<SkillPin>, ServerError> {
         names
             .iter()

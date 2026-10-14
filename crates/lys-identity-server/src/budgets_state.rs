@@ -72,6 +72,7 @@ pub enum Measure {
 
 impl Measure {
     /// Its wire name.
+    #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::ContextPercent => "context_percent",
@@ -113,6 +114,7 @@ pub enum Length {
 
 impl Length {
     /// Its wire name.
+    #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Day => "day",
@@ -286,6 +288,10 @@ impl Budget {
     /// The budget, refused by name when its shape is wrong: a measure over
     /// a period without one, a period without its zone, a zone that is not
     /// known, or a context budget over 100 percent.
+    ///
+    /// # Errors
+    /// Refuses a missing holder, a measure with the wrong period or amount,
+    /// a missing or unknown time zone, or context above 100 percent.
     pub fn checked(self) -> Result<Self, Refused> {
         if self.holder.id.is_empty() {
             return Err(refused("budget_invalid", "a budget names its holder"));
@@ -338,6 +344,10 @@ impl Budget {
 impl Period {
     /// The start of the period `at_ms` falls in, in milliseconds since the
     /// Unix epoch, counted in the period's zone.
+    ///
+    /// # Errors
+    /// Refuses an unknown zone, an instant or calendar boundary outside the
+    /// time library's range, or a five-hour boundary that overflows milliseconds.
     pub fn start_of(&self, at_ms: i64) -> Result<i64, String> {
         let zone = TimeZone::get(&self.zone).map_err(|error| error.to_string())?;
         let instant = Timestamp::from_millisecond(at_ms).map_err(|error| error.to_string())?;
@@ -368,6 +378,7 @@ impl Period {
 
 impl Held {
     /// The budget held on `holder` for `measure`.
+    #[must_use]
     pub fn budget(&self, holder: &Holder, measure: Measure) -> Option<&Budget> {
         self.budgets
             .iter()
@@ -376,6 +387,11 @@ impl Held {
 
     /// Fold one leaf. A budget whose version does not follow the one held
     /// is refused, since every kept version was checked before it was kept.
+    ///
+    /// # Errors
+    /// Refuses an exhausted or out-of-order version, invalid limits or a
+    /// crossing, conflicting operation words, or usage that cannot be indexed
+    /// or kept as a context observation.
     pub fn hold(&mut self, leaf: Leaf) -> Result<(), String> {
         let confirmed = matches!(&leaf, Leaf::Confirmed(_));
         match leaf {
@@ -458,6 +474,7 @@ impl Held {
     /// The budget that applies to `standing` for `measure`: the strictest of
     /// its agent's, its teams' and its person's, so no holder's budget can
     /// loosen a tighter one set on another.
+    #[must_use]
     pub fn applying(&self, standing: &Standing, measure: Measure) -> Option<&Budget> {
         self.budgets
             .iter()
@@ -475,6 +492,10 @@ impl Held {
 
     /// What `agents` have used of `budget`'s measure in the period `at_ms`
     /// falls in.
+    ///
+    /// # Errors
+    /// Refuses a period whose start cannot be computed, a legacy money or plan
+    /// measure without its collection, or spend that overflows its unit.
     pub fn spent(
         &self,
         budget: &Budget,
@@ -508,6 +529,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses malformed budget leaves or versions, crossings and usage the
+    /// preceding leaves cannot accept, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let leaf = serde_json::from_slice(bytes)
@@ -519,6 +544,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the budgets snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -529,6 +557,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses malformed or differently formatted budgets snapshots, invalid
+    /// usage or crossings, or legacy budgets that cannot be merged into limits.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("budgets state: {error}"))?;
@@ -575,6 +607,7 @@ pub fn covered<'a>(
 }
 
 /// The budgets by holder, for reads that group them.
+#[must_use]
 pub fn by_holder(budgets: &[Budget]) -> BTreeMap<Holder, Vec<Budget>> {
     let mut out: BTreeMap<Holder, Vec<Budget>> = BTreeMap::new();
     for budget in budgets {

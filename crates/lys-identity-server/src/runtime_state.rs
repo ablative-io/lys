@@ -43,6 +43,7 @@ pub enum Reported {
 
 impl Reported {
     /// The state's name, as an answer carries it.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Starting => "starting",
@@ -97,11 +98,13 @@ pub struct Tracked {
 
 impl Tracked {
     /// The latest report.
+    #[must_use]
     pub fn latest(&self) -> Option<&Report> {
         self.reports.last()
     }
 
     /// The first report.
+    #[must_use]
     pub fn first(&self) -> Option<&Report> {
         self.reports.first()
     }
@@ -110,6 +113,7 @@ impl Tracked {
     /// the stop, `unconfirmed` for an agent's session whose runtime has
     /// reported nothing since `starting`, and `running` otherwise. Nothing is
     /// inferred from the clock.
+    #[must_use]
     pub fn shown(&self) -> &'static str {
         match self.latest().map(|report| report.state) {
             Some(Reported::Stopped) => "stopped",
@@ -120,6 +124,7 @@ impl Tracked {
 
     /// When this service last asked the runtime to end the session, null
     /// when it never did.
+    #[must_use]
     pub fn stop_asked_at(&self) -> Option<u64> {
         self.reports
             .iter()
@@ -129,6 +134,7 @@ impl Tracked {
     }
 
     /// Whether the runtime has confirmed the session stopped.
+    #[must_use]
     pub fn stopped(&self) -> bool {
         self.latest()
             .is_some_and(|report| report.state == Reported::Stopped)
@@ -228,6 +234,7 @@ struct Sealed {
 
 impl Held {
     /// The session named `session`.
+    #[must_use]
     pub fn session(&self, session: &str) -> Option<&Tracked> {
         self.index
             .positions
@@ -249,16 +256,19 @@ impl Held {
     }
 
     /// The maintained number of live agent sessions.
+    #[must_use]
     pub fn live_count(&self) -> usize {
         self.index.live.len()
     }
 
     /// Latest report times by machine, shared without copying session history.
+    #[must_use]
     pub fn last_reports(&self) -> Arc<BTreeMap<String, u64>> {
         Arc::clone(&self.index.last_reports)
     }
 
     /// The report kept under `operation`, with its session.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Report> {
         let (session, report) = self.index.operations.get(operation)?;
         self.sessions.get(*session)?.reports.get(*report)
@@ -266,6 +276,10 @@ impl Held {
 
     /// Fold one report. A report on a session never begun is refused by
     /// reason, since every kept report was checked against what came before.
+    ///
+    /// # Errors
+    /// Refuses a first report that does not begin the session: an agent's
+    /// session starts with `starting`, and a found session with `running`.
     pub fn hold(&mut self, report: Report) -> Result<(), String> {
         if let Some(position) = self.index.positions.get(&report.session).copied() {
             let tracked = &mut self.sessions[position];
@@ -334,6 +348,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a leaf that is not a runtime report or does not begin its
+    /// session, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let report = serde_json::from_slice(bytes)
@@ -345,6 +363,10 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the runtime snapshot cannot
+    /// be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -355,6 +377,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole runtime snapshot in the
+    /// runtime state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("runtime state: {error}"))?;

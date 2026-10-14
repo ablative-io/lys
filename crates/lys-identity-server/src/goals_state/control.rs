@@ -7,6 +7,7 @@ use super::{
 
 impl Held {
     /// Only current compaction holders can be visited for one source agent.
+    #[must_use]
     pub fn compaction_holders(&self, agent: &str) -> Vec<super::Holder> {
         let agent = self
             .index
@@ -50,6 +51,11 @@ impl Held {
     }
 
     /// Validate every resend input before a leaf or folded state is changed.
+    ///
+    /// # Errors
+    /// Refuses an unknown or settled prior, a caller other than the responsible
+    /// person, a closed or inactive goal, a changed occurrence, a prior already
+    /// resent, or a missing, reused or non-pending delivery identity.
     pub fn check_resent(&self, resent: &Resent) -> Result<(), String> {
         let location = self
             .index
@@ -102,6 +108,7 @@ impl Held {
     }
 
     /// The first distinct occurrence already kept for an uncertain prior.
+    #[must_use]
     pub fn resent_occurrence(&self, prior: &str) -> Option<&str> {
         self.resent_firing(prior)
             .map(|fired| fired.operation.as_str())
@@ -114,12 +121,18 @@ impl Held {
     }
 
     /// The firing under one stable identity, without walking goal history.
+    #[must_use]
     pub fn firing(&self, operation: &str) -> Option<&Fired> {
         let (item, firing) = self.index.firings.get(operation)?;
         self.items.get(*item)?.fired.get(*firing)
     }
 
     /// Every delivery still asked of a runner, with the text it types.
+    ///
+    /// # Errors
+    /// Refuses when a queued reminder's derived location names an absent goal,
+    /// occurrence, delivery or words revision, or a revision changes activity
+    /// instead of words.
     pub fn unsettled(&self) -> Result<Vec<(Sent, String)>, String> {
         let mut unsettled = Vec::with_capacity(self.index.pending.len());
         for location in self.index.pending.keys() {
@@ -139,6 +152,10 @@ impl Held {
     }
 
     /// Pending occurrences in record order, without visiting settled history.
+    ///
+    /// # Errors
+    /// Refuses a pending location that names an absent goal, occurrence,
+    /// delivery or words revision, or a revision that changes activity.
     pub fn pending(&self) -> Result<Vec<PendingReminder<'_>>, String> {
         self.index
             .pending
@@ -148,6 +165,10 @@ impl Held {
     }
 
     /// Pending deliveries for one session, borrowing their current aim and words.
+    ///
+    /// # Errors
+    /// Refuses a queued location for this session that names an absent goal,
+    /// occurrence, delivery or words revision, or a revision that changes activity.
     pub fn pending_for_session(&self, session: &str) -> Result<Vec<PendingReminder<'_>>, String> {
         self.index
             .pending_by_session
@@ -159,6 +180,10 @@ impl Held {
     }
 
     /// Pending deliveries for one aim, including those awaiting a named refusal.
+    ///
+    /// # Errors
+    /// Refuses a queued location for this goal that names an absent occurrence,
+    /// delivery or words revision, or a revision that changes activity.
     pub fn pending_for_goal(&self, goal: &str) -> Result<Vec<PendingReminder<'_>>, String> {
         self.index
             .items
@@ -179,6 +204,10 @@ impl Held {
     }
 
     /// The current queued delivery under one stable operation identity.
+    ///
+    /// # Errors
+    /// Refuses a queued operation's location that names an absent goal,
+    /// occurrence, delivery or words revision, or a revision that changes activity.
     pub fn pending_operation(
         &self,
         operation: &str,
@@ -253,6 +282,7 @@ impl Held {
 
 impl Held {
     /// The item `id`.
+    #[must_use]
     pub fn item(&self, id: &str) -> Option<&Item> {
         self.index
             .items
@@ -276,6 +306,7 @@ impl Held {
     }
 
     /// The judgement kept under `operation`.
+    #[must_use]
     pub fn marked(&self, operation: &str) -> Option<&Marked> {
         self.items
             .get(*self.index.marked.get(operation)?)?
@@ -284,12 +315,14 @@ impl Held {
     }
 
     /// The change kept under an operation id.
+    #[must_use]
     pub fn changed(&self, operation: &str) -> Option<&Changed> {
         let (item, change) = self.index.changed.get(operation)?;
         self.items.get(*item)?.changes.get(*change)
     }
 
     /// Whether `operation` names a firing, event or aim change already kept.
+    #[must_use]
     pub fn kept(&self, operation: &str) -> bool {
         self.index.kept.contains(operation)
     }

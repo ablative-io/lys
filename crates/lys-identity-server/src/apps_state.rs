@@ -317,6 +317,7 @@ pub enum Line {
 
 impl Line {
     /// The operation id the line was kept under.
+    #[must_use]
     pub fn operation(&self) -> &str {
         match self {
             Self::Lys(line) => &line.operation,
@@ -339,6 +340,7 @@ impl Line {
     }
 
     /// The app the line is about; a registrar line is about none.
+    #[must_use]
     pub fn app(&self) -> Option<&str> {
         match self {
             Self::Lys(_) => Some(lys_identity::grants::LYS_APP),
@@ -424,6 +426,7 @@ impl App {
     /// model file, stands approved without an approval; every other app
     /// stands approved only once an administrator's approval is kept, whoever
     /// its registration says made it.
+    #[must_use]
     pub fn standing(&self) -> Standing {
         let recorded_at_start =
             self.registered.app == lys_identity::grants::LYS_APP && self.registered.by == By::Start;
@@ -439,11 +442,13 @@ impl App {
     }
 
     /// The current schema version, once the app has one.
+    #[must_use]
     pub fn current(&self) -> Option<&Version> {
         self.versions.last()
     }
 
     /// The schema version numbered `version`.
+    #[must_use]
     pub fn version(&self, version: u64) -> Option<&Version> {
         self.versions.iter().find(|held| held.version == version)
     }
@@ -539,17 +544,20 @@ struct Sealed {
 
 impl Held {
     /// The app named `id`.
+    #[must_use]
     pub fn app(&self, id: &str) -> Option<&App> {
         self.apps.get(*self.index.apps.get(id)?)
     }
 
     /// The parent a resource of `kind` and `id` is placed in.
+    #[must_use]
     pub fn parent(&self, kind: &str, id: &str) -> Option<&Placed> {
         self.placements.get(self.index.parent(kind, id)?)
     }
 
     /// The position among the placements of the one that places the
     /// resource of `kind` and `id` in its parent, read from the index.
+    #[must_use]
     pub fn parent_position(&self, kind: &str, id: &str) -> Option<usize> {
         self.index.parent(kind, id)
     }
@@ -568,6 +576,7 @@ impl Held {
     }
 
     /// The line kept under `operation`, whichever kind it is.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<Line> {
         let location = *self.index.operations.get(operation)?;
         #[cfg(test)]
@@ -588,6 +597,10 @@ impl Held {
     }
 
     /// Whether `line` may be kept on the apps as they stand, by reason.
+    ///
+    /// # Errors
+    /// Refuses a registration of an existing app, an act on an unknown
+    /// app, or an act its current approval, schema or credentials do not allow.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
         let app = line.app().and_then(|id| self.app(id));
         match line {
@@ -605,6 +618,10 @@ impl Held {
 
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
+    ///
+    /// # Errors
+    /// Refuses a line with no app, unreadable connector identities, a reused
+    /// operation, or an act the app's preceding lines do not allow.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         if line.app() == Some("") {
             return Err("this line names no app".to_owned());
@@ -683,6 +700,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a leaf that is not an apps line or is not allowed by the
+    /// preceding leaves, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -694,6 +715,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the apps snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -704,6 +728,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole apps snapshot in the apps
+    /// state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("apps state: {error}"))?;

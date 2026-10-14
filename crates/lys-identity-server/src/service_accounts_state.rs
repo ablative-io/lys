@@ -95,6 +95,7 @@ pub struct Account {
 
 impl Account {
     /// Whether the account is retired.
+    #[must_use]
     pub fn is_retired(&self) -> bool {
         self.retired.is_some()
     }
@@ -183,6 +184,7 @@ impl Held {
     }
 
     /// The service account named `id`.
+    #[must_use]
     pub fn account(&self, id: &str) -> Option<&Account> {
         self.index.accounts.get(id).and_then(|position| {
             #[cfg(test)]
@@ -205,6 +207,7 @@ impl Held {
     }
 
     /// The first refusal for this account, operation and named outcome.
+    #[must_use]
     pub fn import_refusal(
         &self,
         account: &str,
@@ -224,6 +227,10 @@ impl Held {
 
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
+    ///
+    /// # Errors
+    /// Refuses a repeated import refusal, a refusal on an unknown account,
+    /// a reused operation, or retirement of an unknown or already retired account.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         if let Line::ImportRefused(refused) = line {
             let position = self
@@ -301,6 +308,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses malformed service account leaves or acts the preceding account
+    /// history does not allow, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -312,6 +323,10 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the service accounts snapshot
+    /// cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -322,6 +337,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole service accounts snapshot in
+    /// the service accounts state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed = serde_json::from_slice(bytes)
             .map_err(|error| format!("service accounts state: {error}"))?;
