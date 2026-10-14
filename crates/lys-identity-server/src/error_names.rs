@@ -10,8 +10,71 @@ use crate::error_budget::BudgetError;
 use crate::error_team::TeamError;
 use crate::goals_types::GoalError;
 
+macro_rules! operational_refusals {
+    () => {
+        ServerError::NetworkUnavailable { .. }
+            | ServerError::LoginUnbound
+            | ServerError::MachineUnknown
+            | ServerError::SessionsUnavailable { .. }
+            | ServerError::MemoryUnavailable { .. }
+            | ServerError::ProvisioningUnavailable { .. }
+            | ServerError::ProvisioningChanged { .. }
+            | ServerError::ProvisioningReused { .. }
+            | ServerError::ProfileVersionUnknown { .. }
+            | ServerError::ProfileVersionReplaced { .. }
+            | ServerError::ProfileNotReviewed { .. }
+            | ServerError::CertificatesUnavailable { .. }
+            | ServerError::CertificateUnknown { .. }
+            | ServerError::CertificateReused { .. }
+            | ServerError::CertificateWithdrawn { .. }
+            | ServerError::RolesUnavailable { .. }
+            | ServerError::MembershipUnavailable { .. }
+            | ServerError::RoleUnknown
+            | ServerError::RoleVersionUnknown
+            | ServerError::HolderUnknown
+            | ServerError::RoleReused { .. }
+            | ServerError::RoleHeld { .. }
+            | ServerError::HoldingOver { .. }
+            | ServerError::HoldingChanged
+            | ServerError::LaunchRecordMissing
+            | ServerError::OperatorRefused { .. }
+            | ServerError::AgentPassRefused { .. }
+            | ServerError::AgentSignatureRefused { .. }
+            | ServerError::AgentNotActive { .. }
+            | ServerError::MachineCannotReach { .. }
+            | ServerError::MachineRetired
+            | ServerError::MachineNotForAgent
+            | ServerError::MachineWithoutRuntime
+            | ServerError::WorkingFolderUnnamed
+            | ServerError::MachineWithoutRunner
+            | ServerError::SkillUnknown { .. }
+            | ServerError::PolicyUnrepresentable { .. }
+            | ServerError::ModelUnrepresentable { .. }
+            | ServerError::HarnessUndeclared { .. }
+            | ServerError::LaunchUnrenderable { .. }
+            | ServerError::McpCredentialInline { .. }
+            | ServerError::McpSettingUnrepresentable { .. }
+            | ServerError::McpHandleUnsupported { .. }
+            | ServerError::RuntimeUnavailable { .. }
+            | ServerError::RuntimeSessionUnknown
+            | ServerError::RuntimeSessionStarted { .. }
+            | ServerError::RuntimeSessionStopped { .. }
+            | ServerError::RuntimeReportReused { .. }
+            | ServerError::ServiceAccountsUnavailable { .. }
+            | ServerError::ServiceAccountUnknown
+            | ServerError::ServiceAccountReused { .. }
+            | ServerError::ServiceAccountRetired { .. }
+            | ServerError::ServiceAccountOwnerRetired { .. }
+            | ServerError::PolicyUnavailable { .. }
+            | ServerError::AgentHasNoPolicy { .. }
+            | ServerError::PolicyVersionConflict { .. }
+            | ServerError::PolicyRefused { .. }
+    };
+}
+
 impl ServerError {
     /// The stable refusal name, preserving any name supplied by an authority.
+    #[must_use]
     pub fn name(&self) -> String {
         server(self).to_owned()
     }
@@ -72,63 +135,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::RequestDecided { .. } => "RequestDecided",
         ServerError::RequestHeld { .. } => "RequestHeld",
         ServerError::RequestReused { .. } => "RequestReused",
-        ServerError::NetworkUnavailable { .. } => "NetworkUnavailable",
-        ServerError::LoginUnbound => "LoginUnbound",
-        ServerError::MachineUnknown => "MachineUnknown",
-        ServerError::SessionsUnavailable { .. } => "SessionsUnavailable",
-        ServerError::MemoryUnavailable { .. } => "MemoryUnavailable",
-        ServerError::ProvisioningUnavailable { .. } => "ProvisioningUnavailable",
-        ServerError::ProvisioningChanged { .. } => "ProvisioningChanged",
-        ServerError::ProvisioningReused { .. } => "ProvisioningReused",
-        ServerError::ProfileVersionUnknown { .. } => "ProfileVersionUnknown",
-        ServerError::ProfileVersionReplaced { .. } => "ProfileVersionReplaced",
-        ServerError::ProfileNotReviewed { .. } => "ProfileNotReviewed",
-        ServerError::CertificatesUnavailable { .. } => "CertificatesUnavailable",
-        ServerError::CertificateUnknown { .. } => "CertificateUnknown",
-        ServerError::CertificateReused { .. } => "CertificateReused",
-        ServerError::CertificateWithdrawn { .. } => "CertificateWithdrawn",
-        ServerError::RolesUnavailable { .. } => "RolesUnavailable",
-        ServerError::MembershipUnavailable { .. } => "MembershipUnavailable",
-        ServerError::RoleUnknown => "RoleUnknown",
-        ServerError::RoleVersionUnknown => "RoleVersionUnknown",
-        ServerError::HolderUnknown => "HolderUnknown",
-        ServerError::RoleReused { .. } => "RoleReused",
-        ServerError::RoleHeld { .. } => "RoleHeld",
-        ServerError::HoldingOver { .. } => "HoldingOver",
-        ServerError::HoldingChanged => "HoldingChanged",
-        ServerError::LaunchRecordMissing => "LaunchRecordMissing",
-        ServerError::OperatorRefused { .. } => "OperatorRefused",
-        ServerError::AgentPassRefused { .. } => "AgentPassRefused",
-        ServerError::AgentSignatureRefused { .. } => "AgentSignatureRefused",
-        ServerError::AgentNotActive { .. } => "AgentNotActive",
-        ServerError::MachineCannotReach { .. } => "MachineCannotReach",
-        ServerError::MachineRetired => "MachineRetired",
-        ServerError::MachineNotForAgent => "MachineNotForAgent",
-        ServerError::MachineWithoutRuntime => "MachineWithoutRuntime",
-        ServerError::WorkingFolderUnnamed => "WorkingFolderUnnamed",
-        ServerError::MachineWithoutRunner => "MachineWithoutRunner",
-        ServerError::SkillUnknown { .. } => "SkillUnknown",
-        ServerError::PolicyUnrepresentable { .. } => "PolicyUnrepresentable",
-        ServerError::ModelUnrepresentable { .. } => "ModelUnrepresentable",
-        ServerError::HarnessUndeclared { .. } => "HarnessUndeclared",
-        ServerError::LaunchUnrenderable { .. } => "LaunchUnrenderable",
-        ServerError::McpCredentialInline { .. } => "McpCredentialInline",
-        ServerError::McpSettingUnrepresentable { .. } => "McpSettingUnrepresentable",
-        ServerError::McpHandleUnsupported { .. } => "McpHandleUnsupported",
-        ServerError::RuntimeUnavailable { .. } => "RuntimeUnavailable",
-        ServerError::RuntimeSessionUnknown => "RuntimeSessionUnknown",
-        ServerError::RuntimeSessionStarted { .. } => "RuntimeSessionStarted",
-        ServerError::RuntimeSessionStopped { .. } => "RuntimeSessionStopped",
-        ServerError::RuntimeReportReused { .. } => "RuntimeReportReused",
-        ServerError::ServiceAccountsUnavailable { .. } => "ServiceAccountsUnavailable",
-        ServerError::ServiceAccountUnknown => "ServiceAccountUnknown",
-        ServerError::ServiceAccountReused { .. } => "ServiceAccountReused",
-        ServerError::ServiceAccountRetired { .. } => "ServiceAccountRetired",
-        ServerError::ServiceAccountOwnerRetired { .. } => "ServiceAccountOwnerRetired",
-        ServerError::PolicyUnavailable { .. } => "PolicyUnavailable",
-        ServerError::AgentHasNoPolicy { .. } => "AgentHasNoPolicy",
-        ServerError::PolicyVersionConflict { .. } => "PolicyVersionConflict",
-        ServerError::PolicyRefused { refusal, .. } => refusal,
+        operational_refusals!() => operational_name(error),
         ServerError::StopsUnavailable { .. } => "StopsUnavailable",
         ServerError::StopReused { .. } => "StopReused",
         ServerError::ReviewsUnavailable { .. } => "ReviewsUnavailable",
@@ -328,5 +335,68 @@ fn agents(error: &AgentsError) -> &str {
         AgentsError::Seat(error) => error.name(),
         AgentsError::SeatImport(error) => error.name(),
         AgentsError::AppPass(error) => error.name(),
+    }
+}
+
+fn operational_name(error: &ServerError) -> &str {
+    match error {
+        ServerError::NetworkUnavailable { .. } => "NetworkUnavailable",
+        ServerError::LoginUnbound => "LoginUnbound",
+        ServerError::MachineUnknown => "MachineUnknown",
+        ServerError::SessionsUnavailable { .. } => "SessionsUnavailable",
+        ServerError::MemoryUnavailable { .. } => "MemoryUnavailable",
+        ServerError::ProvisioningUnavailable { .. } => "ProvisioningUnavailable",
+        ServerError::ProvisioningChanged { .. } => "ProvisioningChanged",
+        ServerError::ProvisioningReused { .. } => "ProvisioningReused",
+        ServerError::ProfileVersionUnknown { .. } => "ProfileVersionUnknown",
+        ServerError::ProfileVersionReplaced { .. } => "ProfileVersionReplaced",
+        ServerError::ProfileNotReviewed { .. } => "ProfileNotReviewed",
+        ServerError::CertificatesUnavailable { .. } => "CertificatesUnavailable",
+        ServerError::CertificateUnknown { .. } => "CertificateUnknown",
+        ServerError::CertificateReused { .. } => "CertificateReused",
+        ServerError::CertificateWithdrawn { .. } => "CertificateWithdrawn",
+        ServerError::RolesUnavailable { .. } => "RolesUnavailable",
+        ServerError::MembershipUnavailable { .. } => "MembershipUnavailable",
+        ServerError::RoleUnknown => "RoleUnknown",
+        ServerError::RoleVersionUnknown => "RoleVersionUnknown",
+        ServerError::HolderUnknown => "HolderUnknown",
+        ServerError::RoleReused { .. } => "RoleReused",
+        ServerError::RoleHeld { .. } => "RoleHeld",
+        ServerError::HoldingOver { .. } => "HoldingOver",
+        ServerError::HoldingChanged => "HoldingChanged",
+        ServerError::LaunchRecordMissing => "LaunchRecordMissing",
+        ServerError::OperatorRefused { .. } => "OperatorRefused",
+        ServerError::AgentPassRefused { .. } => "AgentPassRefused",
+        ServerError::AgentSignatureRefused { .. } => "AgentSignatureRefused",
+        ServerError::AgentNotActive { .. } => "AgentNotActive",
+        ServerError::MachineCannotReach { .. } => "MachineCannotReach",
+        ServerError::MachineRetired => "MachineRetired",
+        ServerError::MachineNotForAgent => "MachineNotForAgent",
+        ServerError::MachineWithoutRuntime => "MachineWithoutRuntime",
+        ServerError::WorkingFolderUnnamed => "WorkingFolderUnnamed",
+        ServerError::MachineWithoutRunner => "MachineWithoutRunner",
+        ServerError::SkillUnknown { .. } => "SkillUnknown",
+        ServerError::PolicyUnrepresentable { .. } => "PolicyUnrepresentable",
+        ServerError::ModelUnrepresentable { .. } => "ModelUnrepresentable",
+        ServerError::HarnessUndeclared { .. } => "HarnessUndeclared",
+        ServerError::LaunchUnrenderable { .. } => "LaunchUnrenderable",
+        ServerError::McpCredentialInline { .. } => "McpCredentialInline",
+        ServerError::McpSettingUnrepresentable { .. } => "McpSettingUnrepresentable",
+        ServerError::McpHandleUnsupported { .. } => "McpHandleUnsupported",
+        ServerError::RuntimeUnavailable { .. } => "RuntimeUnavailable",
+        ServerError::RuntimeSessionUnknown => "RuntimeSessionUnknown",
+        ServerError::RuntimeSessionStarted { .. } => "RuntimeSessionStarted",
+        ServerError::RuntimeSessionStopped { .. } => "RuntimeSessionStopped",
+        ServerError::RuntimeReportReused { .. } => "RuntimeReportReused",
+        ServerError::ServiceAccountsUnavailable { .. } => "ServiceAccountsUnavailable",
+        ServerError::ServiceAccountUnknown => "ServiceAccountUnknown",
+        ServerError::ServiceAccountReused { .. } => "ServiceAccountReused",
+        ServerError::ServiceAccountRetired { .. } => "ServiceAccountRetired",
+        ServerError::ServiceAccountOwnerRetired { .. } => "ServiceAccountOwnerRetired",
+        ServerError::PolicyUnavailable { .. } => "PolicyUnavailable",
+        ServerError::AgentHasNoPolicy { .. } => "AgentHasNoPolicy",
+        ServerError::PolicyVersionConflict { .. } => "PolicyVersionConflict",
+        ServerError::PolicyRefused { refusal, .. } => refusal,
+        other => server(other),
     }
 }

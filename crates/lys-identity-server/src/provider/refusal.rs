@@ -11,6 +11,135 @@ use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 
+macro_rules! server_refusals {
+    () => {
+        ServerError::Team(..)
+            | ServerError::HarnessCatalogueUnreadable { .. }
+            | ServerError::Identity(..)
+            | ServerError::Grant(..)
+            | ServerError::App(..)
+            | ServerError::Inactive { .. }
+            | ServerError::NotSignedIn
+            | ServerError::NotAdmitted { .. }
+            | ServerError::NoPerson
+            | ServerError::ProductPassPersonRequired
+            | ServerError::SetupRequired
+            | ServerError::AgentNotVisible
+            | ServerError::Call(..)
+            | ServerError::GrantNotVisible
+            | ServerError::Withheld { .. }
+            | ServerError::SessionUnknown
+            | ServerError::SignInStateUnknown
+            | ServerError::SignInRefused
+            | ServerError::SignInThrottled
+            | ServerError::RegistrationThrottled
+            | ServerError::SecondFactorUnsupported
+            | ServerError::SetupClosed
+            | ServerError::SetupCodeRefused
+            | ServerError::SetupUnavailable { .. }
+            | ServerError::AccountRefused { .. }
+            | ServerError::SignInFailed { .. }
+            | ServerError::ConfigInvalid { .. }
+            | ServerError::BootstrapInterrupted { .. }
+            | ServerError::SecretsUnavailable { .. }
+            | ServerError::SecretsRefused { .. }
+            | ServerError::RequestsUnavailable { .. }
+            | ServerError::McpRequestsUnavailable { .. }
+            | ServerError::McpServerUnknown { .. }
+            | ServerError::McpServerHeld { .. }
+            | ServerError::McpBeyondRemit { .. }
+            | ServerError::RequestUnknown
+            | ServerError::RequestDecided { .. }
+            | ServerError::RequestHeld { .. }
+            | ServerError::RequestReused { .. }
+            | ServerError::NetworkUnavailable { .. }
+            | ServerError::LoginUnbound
+            | ServerError::MachineUnknown
+            | ServerError::Machine(..)
+            | ServerError::Cord(..)
+            | ServerError::Canvas(..)
+            | ServerError::ProductDraft(..)
+            | ServerError::SessionsUnavailable { .. }
+            | ServerError::ClockUnavailable { .. }
+            | ServerError::MemoryUnavailable { .. }
+            | ServerError::ProvisioningUnavailable { .. }
+            | ServerError::ProvisioningChanged { .. }
+            | ServerError::ProvisioningReused { .. }
+            | ServerError::ProfileVersionUnknown { .. }
+            | ServerError::ProfileVersionReplaced { .. }
+            | ServerError::ProfileNotReviewed { .. }
+            | ServerError::CertificatesUnavailable { .. }
+            | ServerError::CertificateUnknown { .. }
+            | ServerError::CertificateReused { .. }
+            | ServerError::CertificateWithdrawn { .. }
+            | ServerError::RolesUnavailable { .. }
+            | ServerError::MembershipUnavailable { .. }
+            | ServerError::RoleUnknown
+            | ServerError::RoleVersionUnknown
+            | ServerError::HolderUnknown
+            | ServerError::RoleReused { .. }
+            | ServerError::RoleHeld { .. }
+            | ServerError::HoldingOver { .. }
+            | ServerError::HoldingChanged
+            | ServerError::LaunchRecordMissing
+            | ServerError::OperatorRefused { .. }
+            | ServerError::AgentPassRefused { .. }
+            | ServerError::AgentSignatureRefused { .. }
+            | ServerError::AgentNotActive { .. }
+            | ServerError::MachineCannotReach { .. }
+            | ServerError::MachineRetired
+            | ServerError::MachineNotForAgent
+            | ServerError::MachineWithoutRuntime
+            | ServerError::MachineWithoutRunner
+            | ServerError::SkillUnknown { .. }
+            | ServerError::PolicyUnrepresentable { .. }
+            | ServerError::ModelUnrepresentable { .. }
+            | ServerError::HarnessUndeclared { .. }
+            | ServerError::LaunchUnrenderable { .. }
+            | ServerError::WorkingFolderUnnamed
+            | ServerError::McpCredentialInline { .. }
+            | ServerError::McpSettingUnrepresentable { .. }
+            | ServerError::McpHandleUnsupported { .. }
+            | ServerError::RuntimeUnavailable { .. }
+            | ServerError::RuntimeSessionUnknown
+            | ServerError::RuntimeSessionStarted { .. }
+            | ServerError::RuntimeSessionStopped { .. }
+            | ServerError::RuntimeReportReused { .. }
+            | ServerError::ServiceAccountsUnavailable { .. }
+            | ServerError::ServiceAccountUnknown
+            | ServerError::ServiceAccountReused { .. }
+            | ServerError::ServiceAccountRetired { .. }
+            | ServerError::ServiceAccountOwnerRetired { .. }
+            | ServerError::PolicyUnavailable { .. }
+            | ServerError::AgentHasNoPolicy { .. }
+            | ServerError::PolicyVersionConflict { .. }
+            | ServerError::PolicyRefused { .. }
+            | ServerError::StopsUnavailable { .. }
+            | ServerError::StopReused { .. }
+            | ServerError::ReviewsUnavailable { .. }
+            | ServerError::ReviewerOnly
+            | ServerError::GrantNotDue { .. }
+            | ServerError::ReviewReused { .. }
+            | ServerError::DirectoryUnavailable { .. }
+            | ServerError::SignInProvidersUnavailable { .. }
+            | ServerError::Provider(
+                ProviderError::Unavailable { .. }
+                    | ProviderError::TokenUnknown
+                    | ProviderError::PassRefused { .. },
+            )
+            | ServerError::ProviderRefused { .. }
+            | ServerError::GrantStream(..)
+            | ServerError::SignInProvidersRefused { .. }
+            | ServerError::NotPermitted { .. }
+            | ServerError::NoLiveSession { .. }
+            | ServerError::RunnerAbsent { .. }
+            | ServerError::IssuerChallengeExpired
+            | ServerError::IssuerRefused { .. }
+            | ServerError::Runner { .. }
+            | ServerError::Agents(..)
+    };
+}
+
 /// The OAuth error code a refusal is answered with.
 fn oauth_code(error: &ServerError) -> &'static str {
     match error {
@@ -39,130 +168,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::GrantStream(GrantStreamError::BindingUnsupported { .. })
         | ServerError::Holding(..) => "invalid_request",
         ServerError::AuthorityUnavailable { .. } => "temporarily_unavailable",
-        ServerError::Team(..)
-        | ServerError::HarnessCatalogueUnreadable { .. }
-        | ServerError::Identity(..)
-        | ServerError::Grant(..)
-        | ServerError::App(..)
-        | ServerError::Inactive { .. }
-        | ServerError::NotSignedIn
-        | ServerError::NotAdmitted { .. }
-        | ServerError::NoPerson
-        | ServerError::ProductPassPersonRequired
-        | ServerError::SetupRequired
-        | ServerError::AgentNotVisible
-        | ServerError::Call(..)
-        | ServerError::GrantNotVisible
-        | ServerError::Withheld { .. }
-        | ServerError::SessionUnknown
-        | ServerError::SignInStateUnknown
-        | ServerError::SignInRefused
-        | ServerError::SignInThrottled
-        | ServerError::RegistrationThrottled
-        | ServerError::SecondFactorUnsupported
-        | ServerError::SetupClosed
-        | ServerError::SetupCodeRefused
-        | ServerError::SetupUnavailable { .. }
-        | ServerError::AccountRefused { .. }
-        | ServerError::SignInFailed { .. }
-        | ServerError::ConfigInvalid { .. }
-        | ServerError::BootstrapInterrupted { .. }
-        | ServerError::SecretsUnavailable { .. }
-        | ServerError::SecretsRefused { .. }
-        | ServerError::RequestsUnavailable { .. }
-        | ServerError::McpRequestsUnavailable { .. }
-        | ServerError::McpServerUnknown { .. }
-        | ServerError::McpServerHeld { .. }
-        | ServerError::McpBeyondRemit { .. }
-        | ServerError::RequestUnknown
-        | ServerError::RequestDecided { .. }
-        | ServerError::RequestHeld { .. }
-        | ServerError::RequestReused { .. }
-        | ServerError::NetworkUnavailable { .. }
-        | ServerError::LoginUnbound
-        | ServerError::MachineUnknown
-        | ServerError::Machine(..)
-        | ServerError::Cord(..)
-        | ServerError::Canvas(..)
-        | ServerError::ProductDraft(..)
-        | ServerError::SessionsUnavailable { .. }
-        | ServerError::ClockUnavailable { .. }
-        | ServerError::MemoryUnavailable { .. }
-        | ServerError::ProvisioningUnavailable { .. }
-        | ServerError::ProvisioningChanged { .. }
-        | ServerError::ProvisioningReused { .. }
-        | ServerError::ProfileVersionUnknown { .. }
-        | ServerError::ProfileVersionReplaced { .. }
-        | ServerError::ProfileNotReviewed { .. }
-        | ServerError::CertificatesUnavailable { .. }
-        | ServerError::CertificateUnknown { .. }
-        | ServerError::CertificateReused { .. }
-        | ServerError::CertificateWithdrawn { .. }
-        | ServerError::RolesUnavailable { .. }
-        | ServerError::MembershipUnavailable { .. }
-        | ServerError::RoleUnknown
-        | ServerError::RoleVersionUnknown
-        | ServerError::HolderUnknown
-        | ServerError::RoleReused { .. }
-        | ServerError::RoleHeld { .. }
-        | ServerError::HoldingOver { .. }
-        | ServerError::HoldingChanged
-        | ServerError::LaunchRecordMissing
-        | ServerError::OperatorRefused { .. }
-        | ServerError::AgentPassRefused { .. }
-        | ServerError::AgentSignatureRefused { .. }
-        | ServerError::AgentNotActive { .. }
-        | ServerError::MachineCannotReach { .. }
-        | ServerError::MachineRetired
-        | ServerError::MachineNotForAgent
-        | ServerError::MachineWithoutRuntime
-        | ServerError::MachineWithoutRunner
-        | ServerError::SkillUnknown { .. }
-        | ServerError::PolicyUnrepresentable { .. }
-        | ServerError::ModelUnrepresentable { .. }
-        | ServerError::HarnessUndeclared { .. }
-        | ServerError::LaunchUnrenderable { .. }
-        | ServerError::WorkingFolderUnnamed
-        | ServerError::McpCredentialInline { .. }
-        | ServerError::McpSettingUnrepresentable { .. }
-        | ServerError::McpHandleUnsupported { .. }
-        | ServerError::RuntimeUnavailable { .. }
-        | ServerError::RuntimeSessionUnknown
-        | ServerError::RuntimeSessionStarted { .. }
-        | ServerError::RuntimeSessionStopped { .. }
-        | ServerError::RuntimeReportReused { .. }
-        | ServerError::ServiceAccountsUnavailable { .. }
-        | ServerError::ServiceAccountUnknown
-        | ServerError::ServiceAccountReused { .. }
-        | ServerError::ServiceAccountRetired { .. }
-        | ServerError::ServiceAccountOwnerRetired { .. }
-        | ServerError::PolicyUnavailable { .. }
-        | ServerError::AgentHasNoPolicy { .. }
-        | ServerError::PolicyVersionConflict { .. }
-        | ServerError::PolicyRefused { .. }
-        | ServerError::StopsUnavailable { .. }
-        | ServerError::StopReused { .. }
-        | ServerError::ReviewsUnavailable { .. }
-        | ServerError::ReviewerOnly
-        | ServerError::GrantNotDue { .. }
-        | ServerError::ReviewReused { .. }
-        | ServerError::DirectoryUnavailable { .. }
-        | ServerError::SignInProvidersUnavailable { .. }
-        | ServerError::Provider(
-            ProviderError::Unavailable { .. }
-            | ProviderError::TokenUnknown
-            | ProviderError::PassRefused { .. },
-        )
-        | ServerError::ProviderRefused { .. }
-        | ServerError::GrantStream(..)
-        | ServerError::SignInProvidersRefused { .. }
-        | ServerError::NotPermitted { .. }
-        | ServerError::NoLiveSession { .. }
-        | ServerError::RunnerAbsent { .. }
-        | ServerError::IssuerChallengeExpired
-        | ServerError::IssuerRefused { .. }
-        | ServerError::Runner { .. }
-        | ServerError::Agents(..) => "server_error",
+        server_refusals!() => "server_error",
     }
 }
 

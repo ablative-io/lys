@@ -8,6 +8,75 @@ use lys_identity::grants::GrantError;
 
 use crate::error::ServerError;
 
+macro_rules! unavailable_refusals {
+    () => {
+        ServerError::IssuerChallengeExpired
+            | ServerError::ConfigInvalid { .. }
+            | ServerError::HarnessCatalogueUnreadable { .. }
+            | ServerError::DirectoryUnavailable { .. }
+            | ServerError::RequestsUnavailable { .. }
+            | ServerError::McpRequestsUnavailable { .. }
+            | ServerError::NetworkUnavailable { .. }
+            | ServerError::RolesUnavailable { .. }
+            | ServerError::MembershipUnavailable { .. }
+            | ServerError::SessionsUnavailable { .. }
+            | ServerError::ClockUnavailable { .. }
+            | ServerError::MemoryUnavailable { .. }
+            | ServerError::ProvisioningUnavailable { .. }
+            | ServerError::CertificatesUnavailable { .. }
+            | ServerError::RuntimeUnavailable { .. }
+            | ServerError::ServiceAccountsUnavailable { .. }
+            | ServerError::StopsUnavailable { .. }
+            | ServerError::PolicyUnavailable { .. }
+            | ServerError::SignInProvidersUnavailable { .. }
+            | ServerError::SetupUnavailable { .. }
+            | ServerError::ReviewsUnavailable { .. }
+    };
+}
+
+macro_rules! conflicting_refusals {
+    () => {
+        ServerError::RequestDecided { .. }
+            | ServerError::RequestHeld { .. }
+            | ServerError::RequestReused { .. }
+            | ServerError::McpServerHeld { .. }
+            | ServerError::RoleReused { .. }
+            | ServerError::RoleHeld { .. }
+            | ServerError::HoldingOver { .. }
+            | ServerError::HoldingChanged
+            | ServerError::ProvisioningChanged { .. }
+            | ServerError::ProfileVersionReplaced { .. }
+            | ServerError::ProvisioningReused { .. }
+            | ServerError::CertificateReused { .. }
+            | ServerError::CertificateWithdrawn { .. }
+            | ServerError::MachineRetired
+            | ServerError::AgentNotActive { .. }
+            | ServerError::ProfileNotReviewed { .. }
+            | ServerError::MachineCannotReach { .. }
+            | ServerError::MachineWithoutRuntime
+            | ServerError::MachineWithoutRunner
+            | ServerError::WorkingFolderUnnamed
+            | ServerError::LaunchUnrenderable { .. }
+            | ServerError::HarnessUndeclared { .. }
+            | ServerError::McpHandleUnsupported { .. }
+            | ServerError::RuntimeSessionStarted { .. }
+            | ServerError::RuntimeSessionStopped { .. }
+            | ServerError::RuntimeReportReused { .. }
+            | ServerError::ServiceAccountReused { .. }
+            | ServerError::ServiceAccountRetired { .. }
+            | ServerError::ServiceAccountOwnerRetired { .. }
+            | ServerError::StopReused { .. }
+            | ServerError::PolicyVersionConflict { .. }
+            | ServerError::GrantNotDue { .. }
+            | ServerError::NoLiveSession { .. }
+            | ServerError::RunnerAbsent { .. }
+            | ServerError::AuthorityUnavailable { .. }
+            | ServerError::SetupClosed
+            | ServerError::ReviewReused { .. }
+            | ServerError::BootstrapInterrupted { .. }
+    };
+}
+
 pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
     match error {
         IdentityError::IdentityUnknown { .. }
@@ -141,6 +210,7 @@ impl IntoResponse for ServerError {
 impl ServerError {
     /// The fields at fault, as JSON pointers into the request body; none
     /// when the refusal is not about a field.
+    #[must_use]
     pub fn fields(&self) -> Vec<crate::apps_error::Field> {
         match self {
             Self::App(error) => error.fields(),
@@ -185,44 +255,7 @@ impl ServerError {
             | Self::HolderUnknown
             | Self::ServiceAccountUnknown
             | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
-            Self::RequestDecided { .. }
-            | Self::RequestHeld { .. }
-            | Self::RequestReused { .. }
-            | Self::McpServerHeld { .. }
-            | Self::RoleReused { .. }
-            | Self::RoleHeld { .. }
-            | Self::HoldingOver { .. }
-            | Self::HoldingChanged
-            | Self::ProvisioningChanged { .. }
-            | Self::ProfileVersionReplaced { .. }
-            | Self::ProvisioningReused { .. }
-            | Self::CertificateReused { .. }
-            | Self::CertificateWithdrawn { .. }
-            | Self::MachineRetired
-            | Self::AgentNotActive { .. }
-            | Self::ProfileNotReviewed { .. }
-            | Self::MachineCannotReach { .. }
-            | Self::MachineWithoutRuntime
-            | Self::MachineWithoutRunner
-            | Self::WorkingFolderUnnamed
-            | Self::LaunchUnrenderable { .. }
-            | Self::HarnessUndeclared { .. }
-            | Self::McpHandleUnsupported { .. }
-            | Self::RuntimeSessionStarted { .. }
-            | Self::RuntimeSessionStopped { .. }
-            | Self::RuntimeReportReused { .. }
-            | Self::ServiceAccountReused { .. }
-            | Self::ServiceAccountRetired { .. }
-            | Self::ServiceAccountOwnerRetired { .. }
-            | Self::StopReused { .. }
-            | Self::PolicyVersionConflict { .. }
-            | Self::GrantNotDue { .. }
-            | Self::NoLiveSession { .. }
-            | Self::RunnerAbsent { .. }
-            | Self::AuthorityUnavailable { .. }
-            | Self::SetupClosed
-            | Self::ReviewReused { .. }
-            | Self::BootstrapInterrupted { .. } => StatusCode::CONFLICT,
+            conflicting_refusals!() => StatusCode::CONFLICT,
             Self::SignInStateUnknown
             | Self::RequestMalformed { .. }
             | Self::AccountRefused { .. }
@@ -237,27 +270,7 @@ impl ServerError {
             | Self::IssuerRefused { .. }
             | Self::SecretsUnavailable { .. }
             | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
-            Self::IssuerChallengeExpired
-            | Self::ConfigInvalid { .. }
-            | Self::HarnessCatalogueUnreadable { .. }
-            | Self::DirectoryUnavailable { .. }
-            | Self::RequestsUnavailable { .. }
-            | Self::McpRequestsUnavailable { .. }
-            | Self::NetworkUnavailable { .. }
-            | Self::RolesUnavailable { .. }
-            | Self::MembershipUnavailable { .. }
-            | Self::SessionsUnavailable { .. }
-            | Self::ClockUnavailable { .. }
-            | Self::MemoryUnavailable { .. }
-            | Self::ProvisioningUnavailable { .. }
-            | Self::CertificatesUnavailable { .. }
-            | Self::RuntimeUnavailable { .. }
-            | Self::ServiceAccountsUnavailable { .. }
-            | Self::StopsUnavailable { .. }
-            | Self::PolicyUnavailable { .. }
-            | Self::SignInProvidersUnavailable { .. }
-            | Self::SetupUnavailable { .. }
-            | Self::ReviewsUnavailable { .. } => StatusCode::SERVICE_UNAVAILABLE,
+            unavailable_refusals!() => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Runner { refusal, .. } => runner_status(refusal),
             Self::Identity(error) => identity_status(error),
