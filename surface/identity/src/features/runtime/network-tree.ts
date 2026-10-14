@@ -143,14 +143,14 @@ export function useSeatAction(seat: SeatView, change: (seat: SeatView) => void) 
   const [failure, setFailure] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [stopEnded, setStopEnded] = useState(false);
-  const run = async (act: 'start' | 'stop' | 'send', text?: string): Promise<boolean> => {
+  const run = async (act: 'start' | 'restart' | 'stop' | 'send', text?: string): Promise<boolean> => {
     if (working.current) return false;
     if (!held.current || held.current.act !== act || held.current.text !== text) held.current = { act, text, operation: operationId() };
     working.current = true; setBusy(true); setFailure(null); setDone(null);
     try {
       const operation = held.current.operation;
-      if (act === 'start') {
-        const answer = await seats.start(seat.name, operation);
+      if (act === 'start' || act === 'restart') {
+        const answer = act === 'restart' ? await seats.restart(seat.name, operation, false) : await seats.start(seat.name, operation);
         change(answer.seat); setDone('Started as session ' + answer.session + '.');
       } else if (act === 'stop') {
         const answer = await seats.stop(seat.name, operation, false);

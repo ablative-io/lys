@@ -140,7 +140,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).not.toContain('model-one');
     expect($('[aria-label="Read problems"]')?.textContent).toContain('HarnessesUnavailable');
     const problem = $('[aria-label="Read problems"] .why-not[role="alert"]');
-    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys refused: The program list could not be read');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys could not answer: The program list could not be read');
     expect(problem?.querySelector(':scope > p')?.closest('details')).toBeNull();
     expect(problem?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(problem?.getAttribute('title')).toBe('HarnessesUnavailable: The program list could not be read');

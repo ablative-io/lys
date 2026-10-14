@@ -40,7 +40,7 @@ function ManagedTerminal({ seat, end, failure }: { seat: SeatView; end: () => vo
 
 export function SeatStart({ seat, change }: { seat: SeatView; change: (seat: SeatView) => void }) {
   const action = useSeatAction(seat, change);
-  return <><Act symbol="start" name={'Start ' + seat.name} word="Start" className="small" disabled={action.busy} onClick={() => void action.run('start')} />
+  return <>{action.failure?.includes('Start again') ? <Act symbol="start" name="Start again" word="Start again" className="small" disabled={action.busy} onClick={() => void action.run('restart')} /> : null}<Act symbol="start" name={action.failure ? 'Try again' : 'Start ' + seat.name} word={action.failure ? 'Try again' : 'Start'} className="small" disabled={action.busy} onClick={() => void action.run('start')} />
     {action.failure ? <p className="network-reason" role="alert">{action.failure}</p> : null}
     {action.done ? <p role="status">{action.done}</p> : null}</>;
 }

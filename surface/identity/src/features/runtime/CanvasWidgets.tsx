@@ -100,7 +100,11 @@ type Chosen = Pick<Widget, 'shows' | 'faces' | 'look'> & SessionSelection;
  */
 function usagePart(scope: Scope, { shows, faces, look, selected, select }: Chosen): Held {
   const [allLines, accounts] = [summed(scope.rows), accountsOf(scope.rows)];
-  const lines = allLines.filter((line) => line.unit !== 'context_percent' && line.unit !== 'tokens'
+  const componentPeriods = new Set<string>(scope.rows.flatMap((row) => refusedPart(row.usage) ? [] : (row.usage.figures ?? [])
+    .filter((used) => used.unit === 'tokens' && 'tokens' in used && used.period !== null).map((used) => used.period!)));
+  const legacyPartial = (key: string) => !componentPeriods.has(key.slice(7)) && allLines.some((line) => line.unit === 'tokens' && 'tokens/' + line.period === key && line.partial);
+  const supports = (key: string) => supportsUsageReading(key) && !legacyPartial(key);
+  const lines = allLines.filter((line) => line.unit !== 'context_percent' && (line.unit !== 'tokens' || legacyPartial('tokens/' + line.period))
     && !(line.unit === 'plan_percent' && line.period === 'five_hour'));
   const unread = scope.rows.filter((row) => refusedPart(row.usage));
   const silent = scope.rows.filter((row) => !refusedPart(row.usage) && !tracking(row.usage).complete);
@@ -125,7 +129,7 @@ function usagePart(scope: Scope, { shows, faces, look, selected, select }: Chose
   const provider = accounts.some((account) => account.windows.some((window) => window.duration_minutes === 300));
   const periods = [...new Set(scope.rows.flatMap((row) => refusedPart(row.usage) ? [] : (row.usage.figures ?? [])
     .filter((used) => used.unit === 'tokens' && used.period !== null).map((used) => used.period!)))];
-  const details = scope.rows.length ? ['context_percent/', ...periods.filter((period) => period !== 'five_hour' || provider)
+  const details = scope.rows.length ? ['context_percent/', ...periods.filter((period) => !legacyPartial('tokens/' + period) && (period !== 'five_hour' || provider))
     .map((period) => 'tokens/' + period), 'window/300'] : [];
   // The usage of one agent opens on its model calls, each of which can be read whole; of several, on the list to choose from.
   return { label: 'Usage', href: '#/canvas?view=proxy' + (several ? '' : '&agent=' + encodeURIComponent(scope.rows[0].agent.id)), count,
@@ -135,7 +139,7 @@ function usagePart(scope: Scope, { shows, faces, look, selected, select }: Chose
     levelled: medium.some((each) => each.key === 'context_percent/' ? current?.percent !== undefined : each.held.some((held) => held.percent !== null)),
     faces: !scope.rows.length ? <p className="dim canvas-stat-none">No agent is counted here.</p>
       : !medium.length ? <p className="dim canvas-stat-none">No figure is chosen for this face.</p>
-      : <div className="canvas-faces">{medium.flatMap(({ key, held }) => supportsUsageReading(key)
+      : <div className="canvas-faces">{medium.flatMap(({ key, held }) => supports(key)
         ? [<div className={'canvas-stat ' + face + (look && (key === 'context_percent/' || key === 'window/300') ? ' ' + look : '')} key={key} data-stat={key}>{readings([key])}</div>]
         : held.length ? held.map((each) => stat(each, look, face))
         : [<div className={'canvas-stat none ' + face} key={key} data-stat={key} title={why(key)}><b>{partly(lineOf(key))?.reported ?? 'Not reported'}</b><span className="sec">{names[key] ?? key}{partly(lineOf(key)) ? ', ' + partly(lineOf(key))!.rest : ''}</span></div>])}</div>,

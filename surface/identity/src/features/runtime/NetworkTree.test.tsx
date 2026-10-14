@@ -116,6 +116,7 @@ it('C737 renders ten machines and two hundred seats within 50 ms of React render
   let duration = 0;
   const host = await render(<Profiler id="tree" onRender={(_id, _phase, elapsed) => { duration = elapsed; }}><NetworkBranches branches={branches({ machines } as never, { runner: 'read', seats } as never)} selected={null} select={vi.fn()} /></Profiler>);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(200);
+  console.info('C737 React render ms=' + duration);
   expect(duration).toBeLessThan(50);
 });
 it('C739 first visits and old layouts open the tree with canvas, sessions and proxy one click away', async () => {

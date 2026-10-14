@@ -108,3 +108,17 @@ it('C738 keeps the terminal while stop is unconfirmed and never invents a missin
   expect(document.querySelector('.terminal-screen')).toBeNull();
   expect(document.querySelector('[role="log"]')).toBeNull();
 });
+
+it('offers Start again beside Try again when a known conversation is missing and sends a fresh restart', async () => {
+  const posted: { path: string; body: unknown }[] = [];
+  serve({
+    'POST /seats/first/start': refused(409, 'pty_resume_missing', 'the earlier conversation transcript is gone; choose Start again'),
+    'POST /seats/first/restart': ok({ seat: seat('first'), session: 'session-first' }),
+  }, posted);
+  await render('first', 'offline');
+  await act(async () => { (document.querySelector('button[aria-label="Start first"]') as HTMLElement).click(); });
+  expect(document.querySelector('button[aria-label="Start again"]')).not.toBeNull();
+  expect(document.querySelector('button[aria-label="Try again"]')).not.toBeNull();
+  await act(async () => { (document.querySelector('button[aria-label="Start again"]') as HTMLElement).click(); });
+  expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toMatchObject([{ path: '/seats/first/restart', body: { force: false, operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
+});

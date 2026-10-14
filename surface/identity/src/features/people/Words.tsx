@@ -190,6 +190,7 @@ export function problemWords(problem: unknown): string {
   const name = typeof problem === 'object' && problem !== null && 'name' in problem ? String(problem.name) : '';
   if (name === 'AbortError' || name === 'TimeoutError' || code === 'AbortError' || code === 'TimeoutError') return STOPPED;
   if (code && Object.hasOwn(REFUSALS, code)) return REFUSALS[code];
+  if (problem instanceof Refused && problem.status >= 500) return reason.trim() ? 'Lys could not answer: ' + reason : 'Lys could not answer. Ask the administrator to check the service.';
   if (code && BROWSER_FAILURES.has(code)) return UNEXPLAINED;
   if (code) return reason.trim() ? 'Lys refused: ' + reason : 'Lys refused without explaining why.';
   // Never an empty sentence: callers read the words as the sign that something failed.

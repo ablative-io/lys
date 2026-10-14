@@ -58,9 +58,9 @@ describe('agent page refusal wording', () => {
     expect(document.querySelector('details')?.textContent).toContain('FutureAgentRule: this computer is reserved for a different agent');
   });
 
-  it('keeps an unfamiliar unavailable refusal’s actual reason instead of inventing a service explanation', async () => {
+  it('keeps an unfamiliar service failure’s actual reason and names it as a failure', async () => {
     await show(<ErrorWords problem={new Refused(503, { refusal: 'FutureUnavailable', reason: 'the selected account has been removed' })} />);
-    expect(headline()).toBe('Lys refused: the selected account has been removed');
+    expect(headline()).toBe('Lys could not answer: the selected account has been removed');
   });
 
   it.each([
