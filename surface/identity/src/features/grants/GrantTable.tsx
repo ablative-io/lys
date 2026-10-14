@@ -3,6 +3,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Grant } from '../../generated/grants';
 import type { Column } from '../../shell/Listing';
+import { TableScroll } from '../../shell/Listing';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
 import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
@@ -79,7 +80,7 @@ export function GrantTable({ w, grants, done, give = true, empty = 'No grants.',
   const [open, setOpen] = useState<Open | null>(null);
   const columns = grantColumns(w).filter((column) => !omit.includes(column.head));
   const close = () => setOpen(null);
-  return <table className="usage-table grant-table grant-cols" aria-label="Grants">
+  return <TableScroll label="Grants"><table className="usage-table grant-table grant-cols" aria-label="Grants">
     <thead><tr>{columns.map((column) => <th key={column.head}>{column.head}</th>)}<th>Change</th></tr></thead>
     <tbody>
       {grants.map((g) => {
@@ -94,5 +95,5 @@ export function GrantTable({ w, grants, done, give = true, empty = 'No grants.',
       })}
       {grants.length ? null : <tr><td colSpan={columns.length + 1} className="dim">{empty}</td></tr>}
     </tbody>
-  </table>;
+  </table></TableScroll>;
 }

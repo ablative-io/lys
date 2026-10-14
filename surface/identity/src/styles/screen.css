@@ -1,7 +1,7 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
 /* No page scrolls as a whole (Tom, 4 Oct 2026). The screen never scrolls; every page fills the window, and only a component inside it (a table, a list, a form's pane, a terminal) scrolls on its own. */
 .screen { flex: 1; min-width: 0; overflow: hidden; overscroll-behavior: none; position: relative; }
-.page { height: 100%; box-sizing: border-box; padding: 10px 32px 18px; display: flex; flex-direction: column; overflow: hidden; }
+.page { height: 100%; box-sizing: border-box; padding: 10px 32px 18px; display: flex; flex-direction: column; overflow: hidden; container: surface / inline-size; }
 .page > .head, .page > .eyebrow, .page > h1, .page > .sub, .page > .tabs, .page > .stat-strip, .page > .tools, .page > a { flex: none; }
 /* One order for every page head (Tom, 4 Oct 2026): the title first, level with the rail's logo, and a page's tabs under it.
    A page that writes its tabs before its head still shows them in this order. */
@@ -16,7 +16,9 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.2
 h1[tabindex="-1"]:focus { outline: none; }
 h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
 .sub { color: var(--text-secondary); margin: 0 0 18px; }
-.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.head > div { min-width: 0; flex: 1 1 200px; }
+.head > button, .head > a { flex: none; }
 .seg { display: inline-flex; background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
 .seg button, .seg a { padding: 3px 10px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 12px; text-decoration: none; }
 .seg .on { background: var(--surface-hover); color: var(--text-primary); }
@@ -56,7 +58,11 @@ button.act > svg { width: 16px; height: 16px; flex: none; stroke: currentColor; 
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; font-weight: 500; color: var(--text-secondary); font-size: 12.5px; padding: 8px 10px; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
 /* A cell wraps onto a second line rather than being cut; the head stays in view while its table scrolls. */
-td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-space: normal; overflow-wrap: normal; vertical-align: top; }
+.table-scroll { min-width: 0; min-height: 0; max-width: 100%; overflow: auto; overscroll-behavior: contain; }
+.table-scroll > table { width: max-content; min-width: 100%; }
+.table-scroll td { max-width: 42ch; }
+.listing > .table-scroll { flex: 1; }
 thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-base); }
 tbody tr[data-href] { cursor: pointer; }
 tbody tr:hover td { background: rgba(255,255,255,.02); }
@@ -130,7 +136,7 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .review-row > td { background: var(--surface-2, transparent); }
 /* Where the pane beside the list is where the work is done, it gets the larger share. */
 .fill > .body.work { grid-template-columns: minmax(0, 2fr) minmax(360px, 3fr); }
-.fill .listing { display: flex; flex-direction: column; min-height: 0; }
+.fill .listing { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .fill .pane, .fill .detail { overflow: auto; min-height: 0; overscroll-behavior: contain; }
 .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
 .tools .search { width: 280px; }
@@ -140,7 +146,12 @@ tr.group th { position: sticky; top: 34px; z-index: 1; background: var(--surface
 tr.group .group-name { font-weight: 600; color: var(--text-primary); margin-right: 10px; }
 .btn.under { min-height: 0; padding: 0 8px; margin-left: 10px; font-size: 11.5px; }
 tr.more td { border-bottom: 0; }
-@media (max-width: 900px) { .fill > .body { grid-template-columns: minmax(0, 1fr); } }
+@container surface (max-width: 850px) {
+  .fill > .body, .fill > .body.work, .fill > .body.halves { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(180px, 1fr); overflow: auto; }
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .facts dd { margin-bottom: 8px; }
+}
+@media (max-width: 600px) { .page { padding: 10px 16px 18px; } .tools .search { width: 100%; } }
 .fill > .file { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .fill > .file > .pane { flex: 1; min-height: 0; }
 .fill > .pane { flex: 1; min-height: 0; }

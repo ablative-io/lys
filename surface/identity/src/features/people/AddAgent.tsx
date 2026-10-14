@@ -70,6 +70,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       : walk?.placement.kind === 'existing' && (capability.machineAdmission !== true || !runOptions.computers.some((entry) => entry.id === placementComputer(walk.placement).id))
         ? new Refused(0, { refusal: 'RetainedComputerUnconfirmed', reason: 'The chosen computer, its local runner or its allowance route could not be confirmed. The saved request has not been sent; no replacement computer is chosen.' }) : null;
   const onePress = Boolean(walk) && !hold || !pending && !walk && runOptions.choices !== null;
+  const runUnavailable = onePress && Boolean(runOptions.problem);
   const working = useRef(false);
   const targets = useMemo(() => reportingChoices(people).filter((entry) => people.scope === 'directory' || entry.id === me.person.id), [people, me.person.id]);
   const chosen = targets.find((entry) => entry.id === person);
@@ -111,7 +112,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const keepWalk = (next: AddAndRun) => { retain(runKey, next); setWalk(next); };
   const submit = async (event: FormEvent<HTMLFormElement>, settings?: Record<string, unknown>, profileProblem = '') => {
     event.preventDefault();
-    if (working.current || saved.error || hold || unavailable || !name.trim() || (!pending && !walk && (invalidChoice || taken))) return;
+    if (working.current || saved.error || hold || runUnavailable || unavailable || !name.trim() || (!pending && !walk && (invalidChoice || taken))) return;
     if (onePress && !walk && (!settings || profileProblem || !computerReady)) return;
     working.current = true; setSending(true); setRefusal(null);
     try {
@@ -183,7 +184,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {capability.problem ? <><p>The service’s registration choices could not be read. You can add an agent under You only.</p><ErrorWords problem={capability.problem} /></> : !capability.answersTo ? <p>This service can register an agent under You only.</p> : null}
     {unsupported ? <p role="alert" className="why-not">{unsupported}</p> : null}
     {invalidChoice ? <p role="alert" className="why-not">{invalidChoice}</p> : null}
-    {runOptions.problem ? <><p>Lys could not read the choices for adding and running this agent.</p><ErrorWords problem={runOptions.problem} /></> : null}
+    {runOptions.problem ? <p role="alert" className="why-not">Lys could not confirm the choices for running this agent. Ask the administrator to check the computer’s runner in <a href="#/network">Network</a>, then open this form again.{!onePress ? ' You can add the agent now and start it from its page once the runner is confirmed.' : ''}</p> : null}
     {refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><ErrorWords problem={refusal.problem} /></> : <ErrorWords problem={refusal} /> : null}
     {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. {hold ? 'Its original requests are kept.' : 'Its original requests are saved; this button continues them.'}</p> : null}
     {onePress && !walk && profileProblem ? <p className="why-not" role="alert">{profileProblem}</p> : null}
@@ -191,7 +192,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {/* The button is never greyed without its reason beside it: the reasons not already said above are said here. */}
     {!sending && !hold && !unavailable && !saved.error && !name.trim() ? <p className="why-not" role="alert">Give this agent a name.</p>
       : !sending && !hold && !unavailable && !saved.error && onePress && !walk && !profileProblem && !computerReady ? <p className="why-not" role="alert">{inUse.length ? 'Choose the computer this agent runs on.' : 'Give this computer a name.'}</p> : null}
-    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
+    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''} render={renderForm} /> : renderForm(null);
 }

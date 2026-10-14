@@ -43,6 +43,10 @@ export interface ListingProps<T> {
 
 const PAGE = 25;
 
+export function TableScroll({ children, label, className = '' }: { children: ReactNode; label: string; className?: string }) {
+  return <div className={'table-scroll ' + className} role="region" aria-label={label} tabIndex={0}>{children}</div>;
+}
+
 export function Listing<T>(props: ListingProps<T>) {
   const { groups, columns, id, href, words, noun, empty, holds, under, underNoun, underHead, selected, select, open, tools, foot, shown } = props;
   const [query, setQuery] = useState('');
@@ -102,13 +106,13 @@ export function Listing<T>(props: ListingProps<T>) {
       {/* An empty list says so once, in the table body; the count says nothing then. */}
       {distinct.size ? <span className="note count">{needle ? count(found.size) + ' of ' + count(distinct.size) + ' match' : counted(distinct.size, noun) + (groups.length > 1 ? ' in ' + counted(groups.length, 'groups') : '')}</span> : null}
     </div>
-    <div className="pane">
+    <TableScroll className="pane" label={noun}>
       <table>
         <thead><tr>{columns.map((column, index) => [<th key={column.head}>{column.head}</th>, index === 0 && under ? <th key="under">{underHead ?? ''}</th> : null])}</tr></thead>
         {body}
         {(needle ? matching.length : distinct.size) ? null : <tbody><tr className="empty"><td colSpan={width} className="dim">{needle ? 'Nothing matches “' + query.trim() + '”.' : empty ?? 'Nothing here yet.'}</td></tr></tbody>}
         {foot ? <tfoot>{foot}</tfoot> : null}
       </table>
-    </div>
+    </TableScroll>
   </div>;
 }

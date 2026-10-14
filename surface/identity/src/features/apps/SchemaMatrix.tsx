@@ -10,6 +10,7 @@
  * action they carry instead, so the matrix fits the width and loses nothing.
  */
 import './schema-matrix.css';
+import { TableScroll } from '../../shell/Listing';
 
 /** A kind of a schema; `roles` are its named bundles of actions (ACCESS-004 R1), listed under its matrix. */
 export interface MatrixKind { actions?: string[]; relations?: Record<string, string[]>; parents?: string[]; roles?: Record<string, string[]> }
@@ -31,7 +32,7 @@ export function SchemaMatrix({ kinds, label, sentence }: { kinds: [string, Matri
       const alone = fold ? relations.filter(([, may]) => may.length === 1) : [];
       const columns = fold ? relations.filter(([, may]) => may.length !== 1) : relations;
       const width = 1 + columns.length + (alone.length ? 1 : 0);
-      return <table className="schema-table schema-matrix" key={kind} aria-label={'Relations of ' + kind}>
+      return <TableScroll key={kind} label={'Relations of ' + kind}><table className="schema-table schema-matrix" aria-label={'Relations of ' + kind}>
         <thead><tr>
           <th scope="col">{kind}</th>
           {columns.map(([relation]) => <th scope="col" key={relation}>{relation}</th>)}
@@ -51,7 +52,7 @@ export function SchemaMatrix({ kinds, label, sentence }: { kinds: [string, Matri
           {body.parents?.length ? <tr><td colSpan={width} className="note">What is held on {body.parents.join(' or ')} reaches it.</td></tr> : null}
           {Object.entries(body.roles ?? {}).map(([role, may]) => <tr key={'role:' + role} className="role"><td colSpan={width} className="note" aria-label={'Role ' + role}>The role <b>{role}</b> carries {may.map(say).join(', ')}.</td></tr>)}
         </tfoot> : null}
-      </table>;
+      </table></TableScroll>;
     })}
     {kinds.length ? null : <p className="dim">It declares no kind.</p>}
   </div>;

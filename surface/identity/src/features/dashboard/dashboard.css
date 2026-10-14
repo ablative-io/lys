@@ -1,9 +1,24 @@
 /* The Dashboard fills the screen: the agents in the wide left panel, what waits and what runs stacked on the right, each scrolling inside itself; the picture sits over the bottom right corner. */
-.dash-page { position: relative; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; }
+.dash-page { position: relative; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 26px; container-type: inline-size; }
 .dash-page > .head { flex: none; margin-bottom: 8px; }
-.dash-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(0, 3fr) minmax(0, 2fr); gap: 20px 24px; }
+.dash-body { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(260px, 1fr) auto; gap: 20px 24px; }
 /* The widgets: one row of cards under the agents, each scrolling inside itself. */
-.dash-widgets { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.dash-widgets { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
+.dash-widget { min-width: 0; max-height: 300px; }
+.dash-widget td { overflow-wrap: normal; }
+.dash-widget .section-h { flex-wrap: wrap; }
+.dash-body > * { min-width: 0; }
+.you-tree td:nth-child(1), .you-tree td:nth-child(2), .you-tree td:nth-child(4) { white-space: nowrap; }
+.you-tree { min-width: max-content; }
+@container surface (max-width: 850px) {
+  .dash-body { display: flex; flex-direction: column; }
+  .dash-agents { flex: 0 0 300px; }
+  .dash-side { flex: none; }
+  .dash-side .you-scroll { max-height: 240px; }
+  .dash-widgets { flex: none; }
+  .dash-watching .dash-widgets { padding-right: 0; padding-bottom: min(360px, 48vh); }
+  .dash-picture { width: calc(100% - 32px); right: 16px; }
+}
 .dash-widget { min-height: 0; display: flex; flex-direction: column; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
 .dash-widget > .section-h { flex: none; display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; }
 .dash-widget > .section-h a { margin-left: auto; font: inherit; letter-spacing: 0; text-transform: none; color: var(--text-secondary); }

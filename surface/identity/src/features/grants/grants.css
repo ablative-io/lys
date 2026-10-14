@@ -35,7 +35,8 @@
 .issue-root .recorded-form .expires { display: flex; align-items: center; gap: 8px; }
 .issue-root .recorded-form .expires input[type="datetime-local"] { flex: 1; min-width: 0; }
 .issue-root .recorded-form button[type="submit"] { margin-top: 0; }
-.grant-acts > :not(.btn) { flex-basis: 100%; }
+.grant-acts > form { flex: none; }
+.grant-acts > p { flex-basis: 100%; }
 /* Each field of the question carries its visible name above it; the words of the sentence stay on the line. */
 .ask-line { align-items: flex-end; }
 .ask-field { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
