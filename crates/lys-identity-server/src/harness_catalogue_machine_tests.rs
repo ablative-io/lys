@@ -97,10 +97,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     stop.send(()).map_err(|()| "runner ended")?;
     worker.await??;
     assert_eq!(status, 200);
-    assert_eq!(
-        profile["profile"]["harness"]["program"],
-        "claude"
-    );
+    assert_eq!(profile["profile"]["harness"]["program"], "claude");
     Ok(())
 }
 
