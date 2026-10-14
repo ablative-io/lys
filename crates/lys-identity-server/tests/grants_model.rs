@@ -18,10 +18,10 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
     let pending = "fixture_waiting";
     let pending_kind = format!("{pending}.channel");
     let notes = json!({"kinds": {&channel: {
-        "actions": ["grant.delegate", "read", "send"],
+        "actions": ["grant_delegate", "read", "send"],
         "agents": ["read", "send"],
         "relations": {
-            "custodian": ["grant.delegate", "read", "send"],
+            "custodian": ["grant_delegate", "read", "send"],
             "participant": ["read", "send"]
         },
         "parents": []
@@ -67,7 +67,7 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
             &channel: {
                 "agents": ["read", "send"],
                 "relations": {
-                    "custodian": ["grant.delegate", "read", "send"],
+                    "custodian": ["grant_delegate", "read", "send"],
                     "participant": ["read", "send"]
                 }
             },
@@ -126,7 +126,7 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
         json!({
             "agents": ["read"],
             "relations": {
-                "custodian": ["grant.delegate", "read", "send"],
+                "custodian": ["grant_delegate", "read", "send"],
                 "participant": ["read", "send"], "reader": ["read"]
             }
         }),
