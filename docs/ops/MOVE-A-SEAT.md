@@ -9,84 +9,94 @@ message reaches it as a user turn, never as typed keys (ADR-130).
 
 In the steps below, `<seat>` is the seat's name in Lys: lowercase letters, digits and `-`, from 1 to 64 characters,
 for example `waffles`. `<agent>` is the Lys agent identity the seat runs as. `<machine>` is the Lys machine record
-whose runner is this install's own (kind `lys`). Every value comes from your own install. None is written here.
+whose joined runner holds the session, on this computer or another one. Every value comes from the
+Lys server you signed into. None is written here.
 
 ## Join a second Mac
 
-The second Mac needs the device clients, its own machine key and its own harness installation and account.
-The identity service stays on its existing host. A runner is the process that holds sessions; a computer record
-names where an agent may run; joining makes a machine identity from the device's public key. A seat names an
-agent, a reviewed profile version and the computer whose runner starts it.
+The Lys identity server stays on its existing host. Each device has its own joined runner, which
+holds sessions on that device. A seat names an agent, a reviewed profile version and that computer.
+Sign-in authorizes the person; joining identifies the computer. Neither replaces the other.
 
-The following client commands are a source-derived procedure, not a completed device proof. Authenticate Git
-for this private repository and its private dependencies first. Run them in a new directory you own. The
-checkout uses the toolchain pinned in `rust-toolchain.toml`; an existing Rust 1.94.1 does not satisfy that pin.
-Check `sysctl -n hw.logicalcpu` before building: four build jobs leave two slots free only on a device with at
-least six logical CPUs. Keep the default Cargo target directory in this checkout.
+Follow [the crash course](CRASH-COURSE.md#1-install-the-two-device-clients) to download and install
+`lys` and `lys-containment-entry` together from the signed-in Network Connect row. Choose the
+client for this Mac's chip. A person can add and connect their own computer; an administrator is
+not required for that step. If Lys holds no release for the platform, ask its operator to supply it.
+
+Install the required Claude Code or Codex build on this Mac and use this device's own account.
+Never copy another device's credentials or harness configuration. The reviewed agent profile must
+name the build and command this runner will use. A plain command is resolved on this device at
+start; an absolute path is used exactly. The catalogue asks the chosen computer's runner, so a
+service-host executable path does not establish that an executable exists on this device.
+
+Sign in from the device terminal:
 
 ```sh
-caffeinate -i nice -n 19 git clone https://github.com/ablative-io/lys.git lys-device
-cd lys-device
-git rev-parse HEAD
-export CARGO_NET_GIT_FETCH_WITH_CLI=true CARGO_BUILD_JOBS=4 NEXTEST_TEST_THREADS=4
-caffeinate -i nice -n 19 rustup toolchain install 1.98.1 --component rustfmt --component clippy
-caffeinate -i nice -n 9 sh -c 'nice -n 10 cargo build --locked --release -p lys'
-caffeinate -i nice -n 9 sh -c 'nice -n 10 cargo build --locked --release -p lys-runner'
-mkdir bin
-install -m 755 target/release/lys target/release/lys-containment-entry bin/
-export PATH="$PWD/bin:$PATH"
-export LYS_IDENTITY_HOME="$PWD/device-state"
-lys --version
-lys runner join --help
+lys sign-in --server https://lys.ablative.com.au/api
 ```
 
-The outer nice increment of nine and Cargo's increment of ten give Cargo an effective niceness of nineteen.
-`lys-runner` provides the `lys-containment-entry` executable; its serve and dial commands are subcommands of
-`lys`. Keep both executables together. Record the harness's absolute executable path and version on this Mac
-with `command -v claude` / `claude --version` or `command -v codex` / `codex --version`. Sign in to the harness
-on this Mac with its own account. Never copy another device's credentials or harness configuration.
+For another estate, use its exact API base. Complete the browser's sign-in and approval yourself.
+The client saves that server address with the person pass. No operator token is handed to the device.
 
-In the browser, the person opens the issuer's `/#/sign-in`, enters their own **Email** and **Password** and
-clicks **Sign in**, or clicks the offered provider sign-in link and completes it themselves. In **Network**,
-an administrator uses **Computer**, enters the computer's **Name**, chooses **Another computer**, and clicks
-**Add**. The **Connect** row shows a command and a one-time code with separate **Copy** buttons. The form is
-currently displayed only to administrators; a new person needs that administrator's assistance even though
-the server serves an own-computer join-code route. Do not describe an operator token as a personal login.
-
-Run the command the browser gave on the second Mac, under `caffeinate -i nice -n 19`. Preserve its full server
+In **Network**, add the named computer with **Another computer**. Its **Connect** row shows
+one command and a one-use code. Run the shown command on this Mac, preserving the full server
 address, including `/api` when present:
 
 ```sh
-caffeinate -i nice -n 19 lys runner join --server <server-from-the-command> --machine <computer-id>
+lys runner join --server <server-from-the-command> --machine <computer-id>
 ```
 
-It prompts `Paste the connection code Lys gave for this computer, then press Return:`. Paste the code into
-stdin, never into an argument or shell history. Successful join prints `This computer joined Lys at ... as
-computer ...`, then `listening ... as runner ...`. Leave this command running. Control-C stops it and ends
-the sessions it holds. A later `join` needs a new one-time code; the device keeps its private key locally.
+It prompts `Paste the connection code Lys gave for this computer, then press Return:`.
+Paste the code into stdin, never into an argument or shell history. Successful join names the
+computer, then says the runner is listening. Leave this terminal running. Control-C stops the
+runner and ends every session it holds. A later join needs **New code** from that computer's page;
+the device keeps its own private key locally.
 
-Have the administrator allow the agent on this computer and review a profile that names the executable's
-absolute path on this Mac, the intended model, a working folder on this Mac and managed controls. The
-catalogue's installed builds are read on the service host, so a path shown there is not proof of a path on
-this device. Record and start the seat from the service host with `lys seat add` and `lys seat start`, as in
-steps 2 and 6 below, using the joined computer's id. The fresh device's `lys seat` and `lys attach` commands
-require a local identity-service configuration and operator token; they cannot log in to the remote issuer.
-Use the browser's Operations screen to send a turn, read its answer and stop the seat, or use the service
-host's CLI as in steps 7 and 8. Only the runner's answer and a completed turn prove device execution.
+Allow the agent on this computer and review settings that name its program build, model, a
+working folder on this device and managed controls. An administrator changes an existing
+computer's agent permissions. Check that the reviewed version has the intended working folder:
+it currently belongs to the profile, so selecting another computer does not supply another folder.
 
-At source revision `307f6a6e`, managed starts accept only the launched-binary qualifications in
-`crates/lys-runner/src/harness_control/process/qualified.rs`: Claude Code `2.1.296` and Codex
-`0.161.0-alpha.3`. A different device build is refused `control_adapter_unqualified`; installing a harness
-without checking its version does not qualify a seat. Managed seats use `lys runner managed-entry`.
+Run the `lys seat` and `lys attach` steps below from the signed-in device. They reach the saved
+server as the person; they do not require an identity-service install on the device. To name the
+server explicitly, use `lys seat --server <api-base> ...` and `lys attach --server <api-base> <seat>`.
+On a host that also has a local server install, explicitly name the remote server for personal
+operation rather than selecting the local operator connection.
 
-For a disposable proof, stop and retire its seat, retire its agent and computer, stop the owned runner and
-remove only the checkout and device-state directory you made. Remove a newly installed Rust toolchain only
-when it was absent before this proof and no other work uses it. Preserve existing installations and caches.
+For an ordinary interactive launch after joining, `lys agents` lists your agents on this computer;
+`lys claude`, `lys codex` or `lys run --agent <name> <command>` starts one through the server and
+attaches your terminal. A managed profile keeps its controls and selects one existing seat on
+this computer pinned to its latest reviewed settings. If none exists, `launch_managed_seat_missing`
+prints the exact `lys seat --server ... add ...` command; run it once, supplying a required working
+folder if the command names one as missing, then launch again. Several matching seats refuse
+`launch_managed_seat_ambiguous`; choose the intended one in Operations → Network. An already
+running seat refuses `seat_already_running` with the command to attach to it. Keep controls enabled.
+
+The wrapper's managed terminal submits complete lines to the exact run it started and shows
+managed frames. `input admitted to session …` confirms input admission only; it does not confirm
+that the managed turn finished. Control-C ends its attachment and asks to end that run.
+`lys attach <seat> --type` instead reaches an existing named seat and leaves it running when its
+attachment ends. The migration below uses named, managed seats: moving their supervision still
+requires the old-pane guard and both proof lines in step 9. A wrapper launch is not evidence that
+supervision was moved.
+
+The operator must configure the model proxy before allowing starts. The wrapper validates it in
+the returned template after the server starts the process and asks to end the session if it is
+missing. A call may precede that check. Installed proof of proxy routing remains unrun.
+
+The runner refuses an unqualified managed build as `control_adapter_unqualified`. Read its
+named required build rather than assuming any locally installed version is qualified. Managed
+seats use `lys runner managed-entry`; only a runner answer and a completed turn prove execution
+on this device.
+
+For a disposable proof, stop and retire its seat, retire its agent and computer, then stop only the
+runner you started. Preserve the installed clients, other devices' state and existing caches.
 
 ## Before you start
 
-- Lys is installed and running on this computer, and `lys` reaches it (the CLI reads the operator token itself and
-  never prints it).
+- The Lys server is running, the chosen computer's runner is connected, and this terminal has signed in to
+  that server. A service-host operator may instead use its local CLI connection; its token stays on numeric
+  loopback and is never copied to a device.
 - Argus is still running, so the old state can be checked against the new state. Its base is in `ARGUS_URL`
   (`http://127.0.0.1:4100` on this estate). The identity server makes its own check, refusing a start with
   `seat_online_in_monitor`, at the base its `LYS_MONITOR_URL` names: set it to the same base in the service's
@@ -166,7 +176,8 @@ when it was absent before this proof and no other work uses it. Preserve existin
 
    The start answers with the Lys session id and, once the harness reports it, the harness session id. Write down
    the harness session id as `<session-uuid>`. `lys seat list` shows `<seat>` as `online-idle` or `online-working`,
-   with its last signal time. The Sessions screen in Lys shows the same: under **Operations**, the **Seats** table is on the page when nothing is running, and in the **Agents** panel otherwise.
+   with its last signal time. In Lys, **Operations → Sessions** shows the **Seats** table.
+   **Operations → Network** shows the selected seat's terminal beside the tree.
 
    If Lys refuses the start, the refusal is named; `seat_online_in_monitor` means step 4 or 5 has not finished.
 

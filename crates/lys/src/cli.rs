@@ -38,6 +38,10 @@ pub use seat::{AttachArgs, SeatArgs, SeatCommand, SeatImportCommand};
 mod sign_in;
 pub use sign_in::SignInArgs;
 
+#[path = "cli/launch.rs"]
+mod launch;
+pub use launch::{AgentsArgs, HarnessArgs, LaunchOptions, RunArgs};
+
 /// `lys seat import`: what to do.
 #[derive(Debug, clap::Args)]
 pub struct SeatImportArgs {
@@ -73,6 +77,14 @@ pub struct Cli {
 pub enum Command {
     /// Sign this terminal in as yourself, without installing an identity service.
     SignIn(SignInArgs),
+    /// Start your Claude agent on this machine through Lys and attach its terminal.
+    Claude(HarnessArgs),
+    /// Start your Codex agent on this machine through Lys and attach its terminal.
+    Codex(HarnessArgs),
+    /// Start your agent's reviewed command on this machine through Lys.
+    Run(RunArgs),
+    /// Show your agents on this machine with their state and harness defaults.
+    Agents(AgentsArgs),
     /// Identity key management.
     #[command(subcommand)]
     Key(KeyCommand),
@@ -268,10 +280,9 @@ pub enum Command {
     /// installed identity server, which starts it through its machine's
     /// runner with the reviewed profile's transport.
     ///
-    /// Asked of the installed server over loopback as its operator, with
-    /// the `lys-operator` header read from the install's operator-token
-    /// file, which is never printed. A development install keeps one; a
-    /// service install keeps none, and is refused `operator_token_absent`.
+    /// A signed-in device uses its personal pass and recorded server.
+    /// An installed numeric loopback server uses its operator token;
+    /// name the remote server explicitly on a host with a local install.
     Seat(SeatArgs),
 
     /// Show a seat's live session in this terminal using its recorded

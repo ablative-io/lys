@@ -28,7 +28,7 @@ mod errors;
 use errors::{json_refused, source_refused};
 
 /// The native client's stored credential. Secrets have no Debug implementation.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Pass {
     /// The exact server base this credential belongs to.

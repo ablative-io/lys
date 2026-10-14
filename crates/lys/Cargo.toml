@@ -55,7 +55,7 @@ zeroize.workspace = true
 # inotify, and its exit through the release of the lock it holds.
 [target.'cfg(unix)'.dependencies]
 mio.workspace = true
-rustix.workspace = true
+rustix = { workspace = true, features = ["termios"] }
 
 [dev-dependencies]
 tempfile.workspace = true

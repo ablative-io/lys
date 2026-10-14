@@ -120,10 +120,9 @@ pub struct AttachArgs {
     #[arg(long, value_name = "ID")]
     pub session: Option<String>,
 
-    /// The identity server's base address, `http://<loopback>:<port>` with
-    /// `/api` after it when the server serves its screens, over the
-    /// installed service's own. The operator token is still the install's,
-    /// and is sent only to a numeric loopback address.
+    /// The server's exact API base; a remote server uses your sign-in pass.
+    /// Without a local install, use its recorded server. An installed
+    /// numeric loopback server uses the install's operator token.
     #[arg(long, value_name = "BASE")]
     pub server: Option<String>,
 }

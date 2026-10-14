@@ -35,6 +35,12 @@ pub mod seat_import;
 // `lys agent pass` (AGENTS-006).
 pub mod agent_pass;
 
+pub mod launch;
+pub mod launch_catalog;
+pub mod launch_context;
+pub mod launch_defaults;
+pub mod launch_device;
+pub mod launch_terminal;
 // `lys mcp`: an agent's own signed MCP connection to Lys.
 pub mod mcp_bridge;
 pub mod sign_in;

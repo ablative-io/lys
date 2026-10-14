@@ -40,6 +40,17 @@ fn main() -> ExitCode {
     let json = cli.json;
     let result = match cli.command {
         Command::SignIn(args) => commands::sign_in::run(&args, json),
+        Command::Claude(args) => commands::launch::run("claude", &args, json),
+        Command::Codex(args) => commands::launch::run("codex", &args, json),
+        Command::Run(args) => commands::launch::run(
+            &args.command,
+            &cli::HarnessArgs {
+                options: args.options,
+                arguments: args.arguments,
+            },
+            json,
+        ),
+        Command::Agents(args) => commands::launch::agents(&args, json),
         Command::Key(key_command) => match key_command {
             KeyCommand::Generate { out } => commands::key::generate(&out, json),
             KeyCommand::Inspect {

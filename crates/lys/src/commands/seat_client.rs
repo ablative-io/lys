@@ -49,6 +49,9 @@ enum Connection {
     },
 }
 
+#[path = "seat_client/personal.rs"]
+mod personal;
+
 impl Server {
     /// The installed server, or the one `base` names over it. The operator
     /// token is always the install's.
@@ -289,12 +292,6 @@ impl Server {
             ],
             &bytes,
         )?;
-        if response.status == 401 {
-            return Err(refused(
-                "person_pass_expired",
-                "Lys no longer admits this pass; run `lys sign-in --server <base>`",
-            ));
-        }
         let answer: Value = serde_json::from_slice(&response.body).map_err(|error| {
             refused(
                 "identity_server_answer_unreadable",
@@ -304,7 +301,18 @@ impl Server {
         if (200..300).contains(&response.status) {
             return Ok(answer);
         }
-        Err(server_refusal(method, path, response.status, &answer))
+        let error = server_refusal(method, path, response.status, &answer);
+        if response.status == 401 {
+            let name = answer
+                .get("refusal")
+                .and_then(Value::as_str)
+                .unwrap_or("identity_server_refused");
+            return Err(refused(
+                name,
+                format!("{error}; run `lys sign-in --server {}`", pass.server),
+            ));
+        }
+        Err(error)
     }
 }
 
