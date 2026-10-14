@@ -308,6 +308,10 @@ pub struct DiffView {
     pub actions_added: Vec<NamedView>,
     /// Actions removed.
     pub actions_removed: Vec<NamedView>,
+    /// Actions agents may now hold, by kind.
+    pub agents_added: Vec<NamedView>,
+    /// Actions agents may no longer hold, by kind.
+    pub agents_removed: Vec<NamedView>,
     /// Parents added.
     pub parents_added: Vec<NamedView>,
     /// Parents removed.
@@ -346,6 +350,8 @@ impl From<&SchemaDiff> for DiffView {
             relations_removed: named(&diff.relations_removed),
             actions_added: named(&diff.actions_added),
             actions_removed: named(&diff.actions_removed),
+            agents_added: named(&diff.agents_added),
+            agents_removed: named(&diff.agents_removed),
             parents_added: named(&diff.parents_added),
             parents_removed: named(&diff.parents_removed),
             roles_added: named(&diff.roles_added),

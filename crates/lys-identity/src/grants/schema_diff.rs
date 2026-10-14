@@ -41,6 +41,10 @@ pub struct SchemaDiff {
     pub actions_added: Vec<Named>,
     /// Actions removed from a kind both declare.
     pub actions_removed: Vec<Named>,
+    /// Actions an agent gains on a kind both schemas declare.
+    pub agents_added: Vec<Named>,
+    /// Actions an agent loses on a kind both schemas declare.
+    pub agents_removed: Vec<Named>,
     /// Parents added to a kind both declare.
     pub parents_added: Vec<Named>,
     /// Parents removed from a kind both declare.
@@ -175,6 +179,11 @@ pub fn diff(old: &AppSchema, new: &AppSchema) -> SchemaDiff {
         change.roles_added.extend(added);
         change.roles_removed.extend(removed);
         change.roles_changed.extend(roles_changed(name, was, now));
+        let before = was.agents.iter().map(Action::as_str).collect();
+        let after = now.agents.iter().map(Action::as_str).collect();
+        let (added, removed) = both_ways(name, &before, &after);
+        change.agents_added.extend(added);
+        change.agents_removed.extend(removed);
     }
     change
 }

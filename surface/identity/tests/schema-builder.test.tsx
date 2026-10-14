@@ -72,6 +72,21 @@ beforeEach(() => sessionStorage.clear());
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
 
 describe('the permission template builder', () => {
+  it('shows agent actions added and removed by kind in the schema check', async () => {
+    stub({ ['POST /apps/' + APP + '/schema/check']: () => ok({
+      current: 1, next: 2, applies: true, stranded: [], diff: { ...noDiff,
+        agents_added: [{ kind: APP + '.doc', name: 'write' }],
+        agents_removed: [{ kind: APP + '.doc', name: 'read' }],
+      },
+    }) });
+    await render(<SchemaBuilder app={APP} version={1} initial={documents} />);
+    await click(button('Check the change'));
+    expect(text()).toContain('Agent actions added');
+    expect(text()).toContain('Agent actions removed');
+    expect(text()).toContain(APP + '.doc');
+    expect(text()).toContain('write');
+    expect(text()).toContain('read');
+  });
   it('names an operator registration as the install operator, never a sign-in or service start', async () => {
     const app = { id: APP, name: 'Notes', state: 'pending', redirects: [], schema: documents, version: 0, versions: [], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: { kind: 'operator', login: { provider: 'https://issuer.test', subject: 'administrator' } }, registered_at: 1 };
     stub({ 'GET /apps': () => ok({ apps: [app] }) });

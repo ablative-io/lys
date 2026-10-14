@@ -36,6 +36,7 @@ export interface Strand { kind: string; relation: string; count: number }
 export interface SchemaCheck {
   current: number; next: number; applies: boolean; stranded: Strand[];
   diff: { kinds_added: string[]; kinds_removed: string[]; relations_added: Named[]; relations_removed: Named[]; actions_added: Named[]; actions_removed: Named[]; parents_added: Named[]; parents_removed: Named[];
+    agents_added?: Named[]; agents_removed?: Named[];
     roles_added?: Named[]; roles_removed?: Named[]; roles_changed?: { kind: string; role: string; words: string[] }[] };
 }
 
@@ -208,6 +209,7 @@ function CheckAnswer({ check }: { check: SchemaCheck }) {
       {listed('Kinds added', diff.kinds_added)}{listed('Kinds removed', diff.kinds_removed)}
       {listed('Relations added', named(diff.relations_added))}{listed('Relations removed', named(diff.relations_removed))}
       {listed('Actions added', named(diff.actions_added))}{listed('Actions removed', named(diff.actions_removed))}
+      {listed('Agent actions added', named(diff.agents_added ?? []))}{listed('Agent actions removed', named(diff.agents_removed ?? []))}
       {listed('Parents added', named(diff.parents_added))}{listed('Parents removed', named(diff.parents_removed))}
       {listed('Roles added', named(diff.roles_added ?? []))}{listed('Roles removed', named(diff.roles_removed ?? []))}
       {listed('Roles changed', (diff.roles_changed ?? []).flatMap((change) => change.words))}
