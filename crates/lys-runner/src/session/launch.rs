@@ -60,6 +60,17 @@ impl Sessions {
             id: launch.session.clone(),
         };
         drop(table);
+        if !launch.program.starts_with('/') && !launch.environment.contains_key("PATH") {
+            let path = crate::program_path::login_path()
+                .map_err(|reason| RunnerError::refused("spawn_failed", reason))?;
+            let path = path.into_string().map_err(|path| {
+                RunnerError::refused(
+                    "spawn_failed",
+                    format!("the login PATH is not text: {path:?}"),
+                )
+            })?;
+            launch.environment.insert("PATH".to_owned(), path);
+        }
         let launched = tracking
             .as_ref()
             .map(|tracking| lifecycle::launched(&launch, tracking))

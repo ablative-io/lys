@@ -13,6 +13,7 @@ import { pendingStartOf, profileRequest, startRequest } from '../runtime/start-r
 import type { Pending } from '../runtime/start-requests';
 import { sendKept, releaseRecord } from '../../kept';
 import { Act } from '../../shell/Act';
+import { launchCommand, commandOrAbsolutePath, PROGRAM_RULE } from '../provisioning/harness-program';
 
 /** A refusal as the service named it; a failure the screen found itself keeps the name it was thrown with. */
 function refusalOf(error: unknown): StartRefusal {
@@ -27,23 +28,26 @@ interface MachineCatalogue {
   programs: { name: string; builds: { program: string; from: string }[]; not_found?: string }[];
 }
 
-/** The computer the person chose must report an installed copy of the program by name; which copy runs is resolved there at every start, so an update never strands the agent. */
+/** Commands must be reported by the chosen computer. An explicit absolute file is checked there at spawn. */
 export async function readMachineHarness(
   computer: string, harness: { name: string; program: string },
   read: (path: string) => Promise<MachineCatalogue> = request,
 ): Promise<StartRefusal | null> {
+  if (!commandOrAbsolutePath(harness.program)) return { refusal: 'harness_program_invalid', reason: PROGRAM_RULE };
+  const program = launchCommand(harness.program);
   const catalogue = await read('/harnesses?machine=' + encodeURIComponent(computer));
   if (catalogue.machine !== computer) return {
     refusal: 'harness_catalogue_wrong_machine',
     reason: 'The harness catalogue did not name the chosen computer ' + computer + '.',
   };
-  if (catalogue.programs.some((choice) => choice.name === harness.name && choice.builds.some((copy) =>
-    copy.from === 'installed' || copy.from === 'runner',
+  if (program.startsWith('/')) return null;
+  if (catalogue.programs.some((choice) => choice.builds.some((copy) =>
+    launchCommand(copy.program) === program && (copy.from === 'installed' || copy.from === 'runner'),
   ))) return null;
   const reasons = catalogue.programs.flatMap((choice) => choice.not_found ? [choice.not_found] : []);
   return {
     refusal: 'harness_absent_on_machine',
-    reason: 'Computer ' + computer + ' does not have ' + harness.name + ' installed.'
+    reason: 'Computer ' + computer + ' did not report ' + program + '. ' + PROGRAM_RULE
       + (reasons.length ? ' ' + reasons.join('; ') : ''),
   };
 }

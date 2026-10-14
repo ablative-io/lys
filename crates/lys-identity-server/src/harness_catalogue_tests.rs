@@ -141,3 +141,27 @@ fn removing_a_command_removes_its_cached_metadata() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_legacy_profile_pin_is_not_offered_as_an_installed_version() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("profiles.json");
+    let source: Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({"profiles":[{"agent":"agent", "versions":[{
+            "number":1,"operation":"profile","set_by":"person","set_at":1,
+            "reviewed":{"operation":"review","by":"person","at":2},
+            "settings":{"model_access":["model"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"",
+                "harness":{"name":"Claude Code","program":"/Users/tom/.local/share/claude/versions/2.1.288/claude",
+                    "package":"claude 2.1.288","description":source["description"]}}
+        }]}]}))?,
+    )?;
+    let store = ProvisioningStore::open(&path)?;
+    let mut programs = Catalogue::embedded()?.programs;
+    profile_builds(&mut programs, &store);
+    assert!(programs.iter().all(|program| program.builds.is_empty()));
+    Ok(())
+}

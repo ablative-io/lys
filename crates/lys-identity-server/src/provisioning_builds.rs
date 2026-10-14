@@ -27,6 +27,9 @@ pub(super) fn visit() {
 pub(super) fn entry(version: &Version) -> Entry {
     version.reviewed.as_ref()?;
     let harness = version.settings.harness.as_ref()?;
+    if crate::launch_template::launch_command(&harness.program) != harness.program {
+        return None;
+    }
     Some((
         harness.description.rendering_contract.clone(),
         BuildView {

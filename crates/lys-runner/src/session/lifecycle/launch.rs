@@ -2,8 +2,6 @@
 //! executable and version checked before it runs, that start said in the
 //! feed, and the leader a full plan window stops.
 
-use std::path::Path;
-
 use super::super::{Table, now_ms};
 use super::append;
 use crate::error::RunnerError;
@@ -30,21 +28,8 @@ pub(crate) fn bound_directory(directory: &str) -> String {
 /// The executable the launch names, without replacing a missing input.
 fn executable(launch: &Launch) -> Result<String, RunnerError> {
     let unsupported = |words: String| RunnerError::refused("tracking_contract_unsupported", words);
-    let program = Path::new(&launch.program);
-    let found = if launch.program.contains('/') {
-        program.to_owned()
-    } else {
-        let path = launch
-            .environment
-            .get("PATH")
-            .map(std::ffi::OsString::from)
-            .or_else(|| std::env::var_os("PATH"))
-            .ok_or_else(|| unsupported("the launch and runner name no PATH".to_owned()))?;
-        std::env::split_paths(&path)
-            .map(|dir| dir.join(program))
-            .find(|candidate| candidate.is_file())
-            .ok_or_else(|| unsupported(format!("{} is not found in PATH", launch.program)))?
-    };
+    let found =
+        crate::program_path::selected(&launch.program, &launch.environment).map_err(unsupported)?;
     let canonical = std::fs::canonicalize(&found)
         .map_err(|error| unsupported(format!("{} does not resolve: {error}", found.display())))?;
     canonical
@@ -206,4 +191,51 @@ pub(crate) fn window_limit(table: &mut Table, id: &str, bodies: &[Body]) -> Opti
         return session.guard.leader.clone();
     }
     None
+}
+
+#[cfg(test)]
+mod executable_tests {
+    use super::executable;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
+
+    #[test]
+    fn tracking_uses_the_same_executable_search_as_the_spawn()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let blocked = directory.path().join("blocked");
+        let installed = directory.path().join("installed");
+        std::fs::create_dir(&blocked)?;
+        std::fs::create_dir(&installed)?;
+        for (folder, mode) in [(&blocked, 0o600), (&installed, 0o700)] {
+            let program = folder.join("claude");
+            std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
+            std::fs::set_permissions(program, std::fs::Permissions::from_mode(mode))?;
+        }
+        let path = std::env::join_paths([Path::new("."), &blocked, &installed])?;
+        let launch = crate::protocol::Launch {
+            session: "fixture".to_owned(),
+            program: "claude".to_owned(),
+            arguments: Vec::new(),
+            directory: directory.path().display().to_string(),
+            environment: std::collections::BTreeMap::from([(
+                "PATH".to_owned(),
+                path.to_str().ok_or("path is not text")?.to_owned(),
+            )]),
+            config: None,
+            columns: 80,
+            rows: 24,
+            rotation: None,
+            policy: None,
+        };
+        assert_eq!(
+            executable(&launch)?,
+            installed
+                .join("claude")
+                .canonicalize()?
+                .display()
+                .to_string()
+        );
+        Ok(())
+    }
 }

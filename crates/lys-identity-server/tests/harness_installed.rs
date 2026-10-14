@@ -44,12 +44,7 @@ fn a_command_on_an_injected_path_is_offered_without_any_profile() -> TestResult 
     let answer = discovery_catalogue()?.installed_in(directory.path().as_os_str())?;
     let value = serde_json::to_value(answer)?;
     assert_eq!(value["programs"][0]["builds"][0]["from"], "installed");
-    assert_eq!(
-        value["programs"][0]["builds"][0]["program"],
-        std::fs::canonicalize(directory.path().join("claude"))?
-            .to_str()
-            .ok_or("path is not UTF-8")?
-    );
+    assert_eq!(value["programs"][0]["builds"][0]["program"], "claude");
     assert_eq!(
         value["programs"][0]["builds"][0]["package"],
         "fake-claude 1.2.3"

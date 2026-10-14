@@ -141,15 +141,19 @@ pub(crate) fn folder(name: &str, given: String) -> Result<String, ServerError> {
     Ok(given)
 }
 
+fn checked_program(program: &str) -> Result<(), ServerError> {
+    if lys_home::harness::rendering_launch::command_or_absolute_path(program) {
+        Ok(())
+    } else {
+        Err(malformed(lys_home::harness::rendering_launch::PROGRAM_RULE))
+    }
+}
+
 /// The declared build, refused when its program is neither a plain command
 /// the computer resolves at every start (`claude`, `codex`, `cdx`) nor an
 /// absolute path, or it names no package to verify the program against.
 fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
-    if !lys_home::harness::rendering_launch::command_or_absolute_path(&declared.program) {
-        return Err(malformed(
-            "harness.program is not a plain command name or an absolute path",
-        ));
-    }
+    checked_program(&declared.program)?;
     if declared.name.trim().is_empty() {
         return Err(malformed("harness.name is empty"));
     }
@@ -169,24 +173,28 @@ pub(super) async fn on_machine(
     let (Some(machine), Some(harness)) = (&body.runs_on, &body.harness) else {
         return Ok(());
     };
+    checked_program(&harness.program)?;
+    let command = crate::launch_template::launch_command(&harness.program);
+    if std::path::Path::new(&command).is_absolute() {
+        return Ok(());
+    }
     let found = crate::runner_client::programs(state, machine).await?;
     let adapter = match harness.description.rendering_contract.as_str() {
         "claude-code/template-v1" => "claude-stream-json/1",
         "codex/template-v1" => "codex-app-server/1",
         _ => "",
     };
-    if found
-        .programs
-        .iter()
-        .any(|program| program.program == harness.program && program.adapter == adapter)
-    {
+    if found.programs.iter().any(|program| {
+        crate::launch_template::launch_command(&program.program) == command
+            && program.adapter == adapter
+    }) {
         return Ok(());
     }
     Err(ServerError::Runner {
         refusal: "harness_program_unknown".to_owned(),
         words: format!(
-            "computer {machine} did not report {}; it reported: {}",
-            harness.program,
+            "computer {machine} did not report {command}; {} It reported: {}",
+            lys_home::harness::rendering_launch::PROGRAM_RULE,
             found
                 .programs
                 .iter()

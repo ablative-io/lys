@@ -133,9 +133,16 @@ pub(crate) fn enforced(
                 .map_err(|error| ServerError::LaunchUnrenderable {
                     reason: error.to_string(),
                 })?;
-            if view.get("command").and_then(Value::as_str)
-                == Some(crate::launch_template::command(&native, digest, &handles).as_str())
-            {
+            if let (Some(kept), Some(harness)) = (
+                view.get("command").and_then(Value::as_str),
+                version.settings.harness.as_ref(),
+            ) && crate::launch_template::matches_command(
+                &native,
+                digest,
+                &handles,
+                &harness.program,
+                kept,
+            ) {
                 return Ok(true);
             }
         }

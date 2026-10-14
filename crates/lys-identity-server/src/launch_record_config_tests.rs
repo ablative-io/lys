@@ -16,7 +16,7 @@ use std::sync::Arc;
 #[test]
 fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
-    let program = dir.path().join("seat");
+    let program = dir.path().join("seat with spaces");
     std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
     std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
     let agent = AgentId::from_bytes([1; 16]);
@@ -271,5 +271,59 @@ fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result
             assert!(!launch.environment.contains_key("LYS_MANAGED_CONTROLS"));
         }
     }
+    Ok(())
+}
+
+#[test]
+fn a_start_again_record_with_a_legacy_pin_uses_the_current_command() -> Result<(), Box<dyn Error>> {
+    let directory = tempfile::tempdir()?;
+    let pin = "/Users/tom/.local/share/claude/versions/2.1.288/claude";
+    let mut harness = harness_description::declared();
+    harness["program"] = json!(pin);
+    let version: Version = serde_json::from_value(json!({
+        "number":1, "operation":"profile-original", "settings":{
+            "model_access":["fixture-model"], "tools":[], "skills":[], "mcp_servers":[],
+            "permissions":{"default_mode":"plan"}, "instructions":"", "note":"", "harness":harness
+        }, "set_by":"person", "set_at":1,
+        "reviewed":{"operation":"review-original", "by":"person", "at":1}
+    }))?;
+    let rendered = render(
+        &Start {
+            agent: "agent",
+            session: "session",
+            machine: "machine",
+            runtime: "sh",
+            version: &version,
+            skills: &[],
+            policy: None,
+            model_proxy: None,
+        },
+        &[],
+    )?;
+    let native = from_template(&version, &rendered.template, &rendered.template_sha256)?;
+    let mut record = LaunchRecord {
+        id: "launch-again".to_owned(),
+        agent: "agent".to_owned(),
+        machine: "machine".to_owned(),
+        executable: pin.to_owned(),
+        arguments: native.arguments,
+        working_directory: "/".to_owned(),
+        profile_version: version.operation.clone(),
+        credential_ids: Vec::new(),
+        given_by: "person".to_owned(),
+        given_at: 2,
+        copied_from: Some("launch-original".to_owned()),
+    };
+    let mut store = ProvisioningStore::open(&directory.path().join("profiles.json"))?;
+    store.set("agent", 0, version)?;
+    assert_eq!(
+        build(&store, &record, "session".to_owned(), "sh", None, None)?.program,
+        "claude"
+    );
+    record.executable = "/opt/forks/claude-fork".to_owned();
+    assert!(matches!(
+        build(&store, &record, "session".to_owned(), "sh", None, None),
+        Err(crate::error::ServerError::LaunchUnrenderable { .. })
+    ));
     Ok(())
 }

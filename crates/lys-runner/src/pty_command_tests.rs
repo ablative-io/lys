@@ -55,3 +55,26 @@ fn removed_working_directory_never_runs_the_requested_program() -> Result<(), Bo
     assert!(output.contains(directory.to_str().ok_or("non UTF-8 fixture")?));
     Ok(())
 }
+
+#[test]
+fn relative_and_empty_path_entries_cannot_select_a_working_folder_program()
+-> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir()?;
+    std::fs::create_dir(directory.path().join("bin"))?;
+    for relative in ["claude", "bin/claude"] {
+        let program = directory.path().join(relative);
+        std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
+        std::fs::set_permissions(program, std::fs::Permissions::from_mode(0o700))?;
+    }
+    for path in ["", ".", "bin", ":.:bin:"] {
+        let mut command = CommandBuilder::new("claude");
+        command.env("PATH", path);
+        let refusal = crate::pty_command::set_directory(&mut command, "claude", directory.path())
+            .err()
+            .ok_or("working-folder executable was selected")?;
+        assert_eq!(refusal.name(), "spawn_failed");
+        assert!(refusal.to_string().contains("claude"));
+    }
+    Ok(())
+}

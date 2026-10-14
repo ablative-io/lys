@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { isCommandOrPath } from '../src/features/provisioning/ProfileEditor';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { choose, click, mount, text, type, unmountAll } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
@@ -23,6 +24,54 @@ beforeEach(() => sessionStorage.clear());
 
 /** The settings form saves what it shows as one request and never approves or starts; starting is the front page's. */
 describe('The settings form', () => {
+  it('defaults to a reported command while retaining uninstalled program descriptions', async () => {
+    const codex = { ...program, name: 'Codex', description: { ...description, rendering_contract: 'codex/template-v1' }, builds: [{ name: 'Installed cdx', program: 'cdx', package: 'cdx 1', from: 'runner' }] };
+    const descriptions = [{ ...program, builds: [] }, codex];
+    await open({ ...routes(), '/harnesses': ok({ programs: descriptions }), ['/harnesses?machine=' + machine.id]: ok({ programs: descriptions }) });
+    await choose(field('runs_on'), machine.id);
+    expect(field('program')?.value).toBe('Codex');
+    expect(field('build')?.value).toBe('cdx\ncdx 1');
+  });
+
+  it('preselects the reported command for a saved legacy pin and saves that command', async () => {
+    const command = { ...program, builds: [{ name: 'Installed claude', program: 'claude', package: 'claude 2.1.300', from: 'runner' }] };
+    const kept = { ...profile, runs_on: machine.id, harness: { ...harness, program: '/Users/tom/.local/share/claude/versions/2.1.288/claude', package: 'claude 2.1.288' } };
+    const { posted } = await open({ ...routes(kept), ['/harnesses?machine=' + machine.id]: ok({ programs: [command] }) });
+    expect(field('build')?.value).toBe('claude\nclaude 2.1.300');
+    expect(document.querySelector('input[name="program-path"]')).toBeNull();
+    await choose(field('model'), 'opus');
+    await click(button());
+    expect(posted[0].body).toMatchObject({ harness: { program: 'claude', package: 'claude 2.1.300' }, runs_on: machine.id });
+  });
+
+  it('accepts a typed absolute fork on a chosen computer without a catalogue entry', async () => {
+    const { posted } = await open({ ...routes({ ...profile, runs_on: machine.id }), ['/harnesses?machine=' + machine.id]: ok({ programs: [program] }) });
+    await choose(field('build'), 'another');
+    await type(document.querySelector('input[name="program-path"]'), '/opt/forks/claude-fork');
+    await click(button());
+    expect(posted[0].body).toMatchObject({ harness: { program: '/opt/forks/claude-fork' }, runs_on: machine.id });
+  });
+
+  it('keeps spaces in an explicitly chosen absolute program path', async () => {
+    const { posted } = await open({ ...routes({ ...profile, runs_on: machine.id }), ['/harnesses?machine=' + machine.id]: ok({ programs: [program] }) });
+    await choose(field('build'), 'another');
+    await type(document.querySelector('input[name="program-path"]'), '/opt/forks/Claude fork');
+    await click(button());
+    expect(posted[0]?.body).toMatchObject({ harness: { program: '/opt/forks/Claude fork' }, runs_on: machine.id });
+  });
+
+  it('saves an absolute fork even when discovery reports no installed copy', async () => {
+    const { posted } = await open({ ...routes({ ...profile, runs_on: machine.id }), ['/harnesses?machine=' + machine.id]: ok({ programs: [{ ...program, builds: [] }], reason: 'No harness commands found' }) });
+    await choose(field('build'), 'another');
+    await type(document.querySelector('input[name="program-path"]'), '/opt/forks/claude-fork');
+    await click(button());
+    expect(posted[0]?.body).toMatchObject({ harness: { program: '/opt/forks/claude-fork' }, runs_on: machine.id });
+  });
+
+  it.each(['', 'two words', 'claude\n', 'claude\u007f', '/bin/claude\u009f', 'claude=x', '..', '.', '-rf', 'C:\\bin\\claude', 'bin/claude', '/bin/../claude', '/bin/claude/', '/', '/bin/claude=x'])('refuses malformed command or path %j', (value) => {
+    expect(isCommandOrPath(value)).toBe(false);
+  });
+
   it('offers a typed path last, saves it and reads the chosen path back', async () => {
     const service = routes();
     const { posted } = await open(service);

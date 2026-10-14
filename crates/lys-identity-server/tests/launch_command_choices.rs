@@ -60,10 +60,7 @@ fn both_installed_codex_commands_are_choices_in_standard_order() -> TestResult {
         assert_eq!(copy.name, format!("Installed {name}"));
         assert_eq!(copy.source, BuildSource::Installed);
         assert_eq!(copy.package, format!("{name} fixture"));
-        assert_eq!(
-            Path::new(&copy.program),
-            std::fs::canonicalize(directory.path().join(name))?
-        );
+        assert_eq!(copy.program, name);
     }
     Ok(())
 }
@@ -117,6 +114,7 @@ fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult
     assert_eq!(launch.arguments, expected);
     let output = Command::new(&launch.program)
         .args(&launch.arguments)
+        .env("PATH", directory.path())
         .output()?;
     assert!(output.status.success(), "{}", output.status);
     assert_eq!(

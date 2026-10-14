@@ -13,11 +13,8 @@ import { McpServers } from './McpServers';
 import { Skills, ToolsNamed, PluginsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 
-/** A program is a bare command the chosen computer resolves on its login PATH at every start (`claude`, `cdx`), or an absolute path; nothing else. */
-export function isCommandOrPath(program: string): boolean {
-  if (program.startsWith('/')) return !/[\u0000-\u001f]/.test(program);
-  return program.length > 0 && !program.includes('/') && !/[\s=\u0000-\u001f]/.test(program);
-}
+import { commandOrAbsolutePath, launchCommand, PROGRAM_RULE } from './harness-program';
+export { commandOrAbsolutePath as isCommandOrPath } from './harness-program';
 
 export function ProfileEditor({ id, profile, choices, people, readOnly = false, saved }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
@@ -70,8 +67,10 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [requiresControls, setRequiresControls] = useState(profile?.session?.requires_controls ?? false);
   const builds = program?.builds ?? [];
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
-  const heldListed = heldBuild && builds.some((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package);
-  const [build, setBuild] = useState(heldBuild ? heldListed ? heldBuild.program + '\n' + heldBuild.package : 'another' : (firstRun ? builds.length > 0 : builds.length === 1) ? builds[0].program + '\n' + builds[0].package : '');
+  const heldCopy = (copies: typeof builds) => heldBuild ? copies.find((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package)
+    ?? (launchCommand(heldBuild.program) !== heldBuild.program ? copies.find((entry) => launchCommand(entry.program) === launchCommand(heldBuild.program)) : undefined) : undefined;
+  const heldListed = heldCopy(builds);
+  const [build, setBuild] = useState(heldBuild ? heldListed ? heldListed.program + '\n' + heldListed.package : 'another' : (firstRun ? builds.length > 0 : builds.length === 1) ? builds[0].program + '\n' + builds[0].package : '');
   const [programPath, setProgramPath] = useState(heldBuild?.program ?? '');
   useEffect(() => {
     if (!preferred) return;
@@ -79,7 +78,9 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     request<{ programs: Program[]; reason?: string }>('/harnesses?machine=' + encodeURIComponent(preferred)).then((answer) => {
       if (!current) return;
       setCatalogue({ machine: preferred, programs: answer.programs, reason: answer.reason ?? '' });
-      const next = answer.programs.find((entry) => entry.name === programName) ?? answer.programs[0];
+      const next = answer.programs.find((entry) => entry.name === programName) ?? answer.programs.find((entry) => entry.builds.length > 0) ?? answer.programs[0];
+      const reported = next?.name === heldBuild?.name ? heldCopy(next.builds) : undefined;
+      if (reported && build === 'another' && programPath === heldBuild?.program) setBuild(reported.program + '\n' + reported.package);
       if (!programName && next) {
         setProgram(next.name); setModel(next.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next) }); setPrompt(firstPrompt(next));
         setBuild(next.builds.length ? next.builds[0].program + '\n' + next.builds[0].package : '');
@@ -88,15 +89,17 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     return () => { current = false; };
   }, [preferred]);
   const supported = program?.instructions_modes ?? ['keep', 'append'];
-  const selected = build === 'another' && isCommandOrPath(programPath)
+  const selected = build === 'another' && commandOrAbsolutePath(programPath)
     ? { program: programPath, package: heldBuild && heldBuild.program === programPath ? heldBuild.package : programPath }
     : builds.find((entry) => entry.program + '\n' + entry.package === build);
+  const selectedProgram = selected && launchCommand(selected.program);
   let refusal = '';
   if (!preferred && choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
   else if (preferred && catalogue?.machine !== preferred) refusal = 'Reading this computer’s programs.';
-  else if (preferred && catalogue?.reason) refusal = catalogue.reason;
+  else if (preferred && catalogue?.reason && !selectedProgram?.startsWith('/')) refusal = catalogue.reason;
   else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
-  else if (!selected) refusal = build === 'another' ? 'Enter the command this computer runs (for instance cdx), or the program’s full path starting with /.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
+  else if (!selected) refusal = build === 'another' ? PROGRAM_RULE : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
+  else if (preferred && !selectedProgram?.startsWith('/') && !builds.some((entry) => launchCommand(entry.program) === selectedProgram)) refusal = 'This computer did not report ' + launchCommand(selected.program) + '. ' + PROGRAM_RULE;
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';

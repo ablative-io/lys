@@ -153,13 +153,9 @@ fn reviewed_view(mut answer: Value) -> Result<Value, Box<dyn Error>> {
                     installed_names.insert(name),
                     "installed command {name} is repeated"
                 );
-                assert!(
-                    std::path::Path::new(
-                        build["program"]
-                            .as_str()
-                            .ok_or("program path is not text")?
-                    )
-                    .is_absolute()
+                assert_eq!(
+                    build["program"].as_str().ok_or("program is not text")?,
+                    name.strip_prefix("Installed ").ok_or("command is absent")?
                 );
                 assert!(
                     !build["package"]
@@ -182,11 +178,11 @@ fn installed_command_review_rejects_duplicates_and_undeclared_names() -> TestRes
     let mut answer = expected()?;
     answer["programs"][1]["builds"] = json!([
         {
-            "name": "Installed codex", "program": "/opt/codex",
+            "name": "Installed codex", "program": "codex",
             "package": "codex fixture", "from": "installed"
         },
         {
-            "name": "Installed cdx", "program": "/opt/cdx",
+            "name": "Installed cdx", "program": "cdx",
             "package": "cdx fixture", "from": "installed"
         }
     ]);

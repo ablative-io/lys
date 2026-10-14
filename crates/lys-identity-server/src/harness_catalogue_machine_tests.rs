@@ -8,6 +8,16 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 #[tokio::test]
 async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programmes()
 -> Result<(), Box<dyn std::error::Error>> {
+    profile_on_machine("/Users/tom/.local/share/claude/versions/2.1.288/claude").await
+}
+
+#[tokio::test]
+async fn an_absolute_fork_is_saved_on_a_computer_that_does_not_report_it()
+-> Result<(), Box<dyn std::error::Error>> {
+    profile_on_machine("/opt/forks/claude-fork").await
+}
+
+async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Error>> {
     let (service, (seeded, machine, unreadable, stop, worker)) = Service::start_with(|config| {
         let seeded = identity_contract::lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, "member"])?;
         let machine = lys_identity::OperationId::generate()?.to_string();
@@ -72,6 +82,36 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     let mut body = json!({"operation":lys_identity::OperationId::generate()?.to_string(),"from_version":0,"model_access":["default"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"", "runs_on":machine,
         "harness":{"name":"Claude Code", "program":"missing", "package":"claude 2.1.300", "description":description["description"]}});
     let route = format!("/agents/{agent}/provisioning");
+    for (name, invalid) in [
+        ("empty", ""),
+        ("spaces", "two words"),
+        ("control", "claude\n"),
+        ("delete control", "claude\u{7f}"),
+        ("c1 control", "claude\u{9f}"),
+        ("equals", "claude=x"),
+        ("parent", ".."),
+        ("current", "."),
+        ("leading dash", "-rf"),
+        ("backslash", "C:\\bin\\claude"),
+        ("relative", "bin/claude"),
+        ("parent component", "/bin/../claude"),
+        ("trailing slash", "/bin/claude/"),
+    ] {
+        body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+        body["harness"]["program"] = json!(invalid);
+        let (status, refusal) = service.post(&route, Some(&cookie), &body).await?;
+        assert_eq!(status, 400, "{name}: {refusal}");
+        assert_eq!(refusal["refusal"], "RequestMalformed", "{name}: {refusal}");
+        assert_eq!(
+            refusal["reason"],
+            format!(
+                "RequestMalformed: {}",
+                lys_home::harness::rendering_launch::PROGRAM_RULE
+            )
+        );
+    }
+    body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+    body["harness"]["program"] = json!("missing");
     let (status, refusal) = service.post(&route, Some(&cookie), &body).await?;
     assert_eq!(status, 409);
     assert_eq!(refusal["refusal"], "harness_program_unknown");
@@ -93,11 +133,31 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
             .is_some_and(|words| words.contains("not UTF-8"))
     );
     unreadable.send(false)?;
+    body["harness"]["program"] = json!(program);
     let (status, profile) = service.post(&route, Some(&cookie), &body).await?;
+    assert_eq!(status, 200, "profile save for {program}: {profile}");
+    assert_eq!(
+        profile["profile"]["harness"]["program"],
+        body["harness"]["program"]
+    );
+    unreadable.send(true)?;
+    for (index, program) in [
+        "/opt/forks/claude-fork",
+        "/missing/bin/claude-fork",
+        "/opt/forks/Claude fork",
+    ]
+    .iter()
+    .enumerate()
+    {
+        body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+        body["from_version"] = json!(index + 1);
+        body["harness"]["program"] = json!(program);
+        let (status, profile) = service.post(&route, Some(&cookie), &body).await?;
+        assert_eq!(status, 200, "absolute profile save: {profile}");
+        assert_eq!(profile["profile"]["harness"]["program"], *program);
+    }
     stop.send(()).map_err(|()| "runner ended")?;
     worker.await??;
-    assert_eq!(status, 200);
-    assert_eq!(profile["profile"]["harness"]["program"], "claude");
     Ok(())
 }
 
@@ -107,7 +167,13 @@ async fn a_disconnected_machine_returns_words_and_no_service_host_programmes()
     let table = crate::budgets_feed::entry_tests::fixture().await?;
     let answer =
         super::machine_view(&table.state, &super::Catalogue::embedded()?, "disconnected").await?;
-    assert!(answer.programs.is_empty());
+    assert!(!answer.programs.is_empty());
+    assert!(
+        answer
+            .programs
+            .iter()
+            .all(|program| program.builds.is_empty())
+    );
     assert!(
         answer
             .reason

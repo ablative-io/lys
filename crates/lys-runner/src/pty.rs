@@ -138,6 +138,11 @@ fn spawn_with_environment(spawn: &Spawn<'_>, isolated: bool) -> Result<Spawned, 
         command.env_clear();
         command.env("SHELL", ISOLATED_SHELL);
     }
+    if !isolated && !spawn.program.starts_with('/') && !spawn.environment.contains_key("PATH") {
+        let path =
+            crate::program_path::login_path().map_err(|reason| failed(spawn.program, &reason))?;
+        command.env("PATH", path);
+    }
     command.args(spawn.arguments);
     if !spawn.environment.contains_key("TERM") {
         command.env("TERM", TERM);

@@ -18,11 +18,7 @@ pub(super) struct Executable {
 }
 
 pub(super) fn command_name(command: &str) -> bool {
-    !command.is_empty()
-        && !matches!(command, "." | "..")
-        && command
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    !command.contains('/') && lys_home::harness::rendering_launch::command_or_absolute_path(command)
 }
 
 pub(super) fn resolve(command: &str, path: &OsStr) -> Result<Executable, String> {
@@ -113,12 +109,9 @@ pub(super) fn version(
             "the version is not one nonempty line",
         ));
     }
-    let program = executable
-        .to_str()
-        .ok_or_else(|| refused("ProgramPathUnreadable", "the executable path is not UTF-8"))?;
     Ok(BuildView {
         name: format!("Installed {command}"),
-        program: program.to_owned(),
+        program: command.to_owned(),
         package: version.to_owned(),
         source: BuildSource::Installed,
     })

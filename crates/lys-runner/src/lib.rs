@@ -63,6 +63,7 @@ pub mod legacy_input;
 pub mod notify_line;
 pub mod operations;
 pub mod peer;
+mod program_path;
 pub mod protocol;
 mod protocol_key;
 mod protocol_request;

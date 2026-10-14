@@ -1,8 +1,6 @@
 //! Programme discovery belongs to the computer that will execute the harness.
 
 use std::ffi::OsStr;
-use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
@@ -41,26 +39,8 @@ fn failed(detail: impl Into<String>) -> RunnerError {
 /// # Errors
 /// Reports an unreadable login PATH or a failed discovery operation by name.
 pub fn discover() -> Result<Programs, RunnerError> {
-    let shell =
-        std::env::var_os("SHELL").ok_or_else(|| failed("the runner login names no SHELL"))?;
-    if !Path::new(&shell).is_absolute() {
-        return Err(failed("the runner login's SHELL is not absolute"));
-    }
-    let output = Command::new(shell)
-        .args(["-l", "-c", "printf '%s' \"$PATH\""])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .map_err(|error| failed(format!("the login PATH could not be read: {error}")))?;
-    if !output.status.success() {
-        return Err(failed(format!(
-            "the login PATH command exited {}",
-            output.status
-        )));
-    }
-    let path = String::from_utf8(output.stdout)
-        .map_err(|error| failed(format!("the login PATH is not text: {error}")))?;
-    discover_in(OsStr::new(&path))
+    let path = crate::program_path::login_path().map_err(failed)?;
+    discover_in(&path)
 }
 
 /// Discover from an explicit PATH, also used by the real executable fixtures.
@@ -69,40 +49,15 @@ pub fn discover() -> Result<Programs, RunnerError> {
 /// Returns an unreadable filesystem entry or a failed executable resolution.
 pub fn discover_in(path: &OsStr) -> Result<Programs, RunnerError> {
     let mut programs = Vec::<HarnessProgram>::new();
-    let mut resolved = Vec::<std::path::PathBuf>::new();
     let mut reasons = Vec::new();
     for (command, adapter) in [
         ("claude", "claude-stream-json/1"),
         ("codex", "codex-app-server/1"),
         ("cdx", "codex-app-server/1"),
     ] {
-        let mut selected = None;
-        for directory in std::env::split_paths(path) {
-            if !directory.is_absolute() {
-                continue;
-            }
-            let candidate = directory.join(command);
-            match std::fs::metadata(&candidate) {
-                Ok(meta) if meta.is_file() && meta.permissions().mode() & 0o111 != 0 => {
-                    selected = Some(candidate.canonicalize().map_err(|error| {
-                        failed(format!("{command} cannot be resolved: {error}"))
-                    })?);
-                    break;
-                }
-                Ok(_) => {}
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => {
-                    return Err(failed(format!("{command} cannot be inspected: {error}")));
-                }
-            }
-        }
-        let Some(selected) = selected else {
+        let Some(selected) = crate::program_path::resolve_in(command, path).map_err(failed)? else {
             continue;
         };
-        if resolved.contains(&selected) {
-            continue;
-        }
-        resolved.push(selected.clone());
         let program = command.to_owned();
         let output = Command::new(&selected)
             .arg("--version")
@@ -188,6 +143,43 @@ mod tests {
             .err()
             .ok_or("invalid version accepted")?;
         assert_eq!(error.name(), "harness_programs_unreadable");
+        Ok(())
+    }
+    #[test]
+    fn codex_and_cdx_aliases_are_both_reported() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let codex = directory.path().join("codex");
+        std::fs::write(&codex, "#!/bin/sh\nprintf 'codex-cli 0.161.0\\n'\n")?;
+        std::fs::set_permissions(&codex, std::fs::Permissions::from_mode(0o755))?;
+        std::os::unix::fs::symlink(&codex, directory.path().join("cdx"))?;
+        let answer = discover_in(directory.path().as_os_str())?;
+        assert_eq!(
+            answer
+                .programs
+                .iter()
+                .map(|program| program.program.as_str())
+                .collect::<Vec<_>>(),
+            ["codex", "cdx"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_version_probe_uses_the_path_that_selected_the_command()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        for (name, script) in [
+            ("claude", "#!/bin/sh\nexec harness-helper\n"),
+            ("harness-helper", "#!/bin/sh\nprintf 'claude 2.1.300\\n'\n"),
+        ] {
+            let path = directory.path().join(name);
+            std::fs::write(&path, script)?;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))?;
+        }
+        let answer = discover_in(directory.path().as_os_str())?;
+        assert_eq!(answer.programs.len(), 1, "{:?}", answer.reason);
+        assert_eq!(answer.programs[0].program, "claude");
+        assert_eq!(answer.programs[0].version, "2.1.300");
         Ok(())
     }
 }

@@ -71,8 +71,8 @@ pub enum BuildSource {
 pub struct BuildView {
     /// The name given to this build.
     pub name: String,
-    /// The command the machine resolves on its login PATH at every start
-    /// (`claude`, `codex`, `cdx`), so an update never strands an agent.
+    /// A command resolved on the machine's login PATH, or a reviewed
+    /// absolute fork path kept exactly as declared.
     pub program: String,
     /// Its package or build identity.
     pub package: String,
@@ -428,7 +428,7 @@ pub(crate) async fn machine_view(
         Ok(found) => found,
         Err(ServerError::Runner { refusal, words }) if refusal == "runner_unreachable" => {
             return Ok(CatalogueView {
-                programs: Vec::new(),
+                programs: catalogue.programs.clone(),
                 machine: Some(machine.to_owned()),
                 reason: Some(format!("runner_unreachable: {words}")),
             });
@@ -454,7 +454,16 @@ pub(crate) async fn machine_view(
             })
             .collect();
     }
-    programs.retain(|program| !program.builds.is_empty());
+    for program in &mut programs {
+        if program.builds.is_empty() {
+            program.not_found = Some(found.reason.clone().unwrap_or_else(|| {
+                format!(
+                    "this computer did not report {}",
+                    program.commands.join(" or ")
+                )
+            }));
+        }
+    }
     Ok(CatalogueView {
         programs,
         machine: Some(machine.to_owned()),

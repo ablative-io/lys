@@ -65,19 +65,28 @@ fn file(path: &str, text: String) -> File {
     }
 }
 
-/// A program is either a bare command the running computer resolves on its
-/// login PATH at every start (`claude`, `codex`, `cdx`), or an absolute path.
-/// A relative path and control characters are refused.
+/// The form and launch boundary use this rule for a declared program.
+pub const PROGRAM_RULE: &str = "Enter a plain command name (for instance cdx), or the program’s full path starting with / and ending in a file name.";
+
+/// A bare command or an absolute file path. Control characters,
+/// assignments, backslashes and relative path components are refused.
 #[must_use]
 pub fn command_or_absolute_path(program: &str) -> bool {
-    if program.starts_with('/') {
-        return !program.chars().any(char::is_control);
-    }
-    !program.is_empty()
-        && !program.contains('/')
-        && !program
+    if program.is_empty()
+        || program
             .chars()
-            .any(|c| c.is_control() || c.is_whitespace() || c == '=')
+            .any(|c| c.is_control() || matches!(c, '=' | '\\'))
+    {
+        return false;
+    }
+    if let Some(path) = program.strip_prefix('/') {
+        return path.split('/').all(|part| !matches!(part, "" | "." | ".."));
+    }
+    !matches!(program, "." | "..")
+        && !program.starts_with('-')
+        && program
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 /// Rebuild a fresh launch without inspecting any machine settings.
@@ -97,9 +106,7 @@ pub fn render(
         return Err(format!("unknown rendering contract `{contract}`"));
     }
     if !command_or_absolute_path(program) {
-        return Err(
-            "the declared program is not a plain command name or an absolute plain path".to_owned(),
-        );
+        return Err(PROGRAM_RULE.to_owned());
     }
     if contract == "codex/template-v1" {
         return super::codex::launch::render(program, text, instructions_mode);
@@ -195,4 +202,45 @@ pub fn render(
         argument_files,
         environment_paths: BTreeMap::new(),
     })
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::command_or_absolute_path;
+
+    #[test]
+    fn commands_and_absolute_paths_refuse_invalid_shapes_by_name() {
+        for (name, program) in [
+            ("empty", ""),
+            ("spaces", "two words"),
+            ("control", "claude\n"),
+            ("delete control", "claude\u{7f}"),
+            ("c1 control", "/bin/claude\u{9f}"),
+            ("equals", "claude=x"),
+            ("parent", ".."),
+            ("current", "."),
+            ("leading dash", "-rf"),
+            ("backslash", "C:\\bin\\claude"),
+            ("relative", "bin/claude"),
+            ("parent component", "/bin/../claude"),
+            ("trailing slash", "/bin/claude/"),
+            ("root", "/"),
+            ("path equals", "/bin/claude=x"),
+        ] {
+            assert!(
+                !command_or_absolute_path(program),
+                "accepted {name}: {program:?}"
+            );
+        }
+        for program in [
+            "claude",
+            "codex",
+            "cdx",
+            "my-fork_1.2",
+            "/opt/forks/claude-fork",
+            "/opt/forks/Claude fork",
+        ] {
+            assert!(command_or_absolute_path(program), "refused {program:?}");
+        }
+    }
 }

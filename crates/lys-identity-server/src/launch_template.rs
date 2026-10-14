@@ -165,39 +165,49 @@ pub fn from_template(
     }
     lys_home::harness::rendering_launch::render(
         &harness.description.rendering_contract,
-        &launch_command(harness),
+        &launch_command(&harness.program),
         template,
         version.settings.instructions_mode,
     )
     .map_err(|reason| ServerError::LaunchUnrenderable { reason })
 }
 
-/// The command a launch runs: the profile's command as declared, or, for a
-/// profile written when Lys pinned the absolute path of one installed build,
-/// the command that build was found by. The computer resolves the command on
-/// its login PATH at every start, so the copy installed now is the one that
-/// runs, and a program that updated itself since the profile was reviewed
-/// starts instead of being refused.
+/// Legacy updater-owned Claude installs follow the login PATH command.
+/// Every other declared command or absolute path is kept exactly as written.
 #[must_use]
-pub fn launch_command(harness: &lys_home::harness::launch_fields::DeclaredHarness) -> String {
-    if !harness.program.contains('/') {
-        return harness.program.clone();
+pub fn launch_command(program: &str) -> String {
+    if !program.starts_with('/') {
+        return program.to_owned();
     }
-    let file_name = std::path::Path::new(&harness.program)
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default();
-    match harness.description.rendering_contract.as_str() {
-        "claude-code/template-v1" => "claude".to_owned(),
-        "codex/template-v1" if file_name == "cdx" => "cdx".to_owned(),
-        "codex/template-v1" => "codex".to_owned(),
-        _ => harness.program.clone(),
+    let parts: Vec<_> = program.split('/').collect();
+    let versioned = parts.windows(3).any(|parts| {
+        parts[0] == "claude"
+            && parts[1] == "versions"
+            && parts[2].starts_with(|c: char| c.is_ascii_digit())
+    });
+    let local = parts
+        .windows(3)
+        .any(|parts| parts == [".local", "share", "claude"]);
+    let file = parts.iter().rev().find(|part| !part.is_empty()).copied();
+    if versioned || local && matches!(file, Some("claude" | "claude-code")) {
+        "claude".to_owned()
+    } else {
+        program.to_owned()
     }
 }
 
 /// Display the deterministic process inputs before the runner binds locations.
 pub fn command(
     launch: &lys_home::harness::rendering_launch::Launch,
+    sha256: &str,
+    handles: &[HandleName],
+) -> String {
+    command_for_program(launch, &launch.program, sha256, handles)
+}
+
+fn command_for_program(
+    launch: &lys_home::harness::rendering_launch::Launch,
+    program: &str,
     sha256: &str,
     handles: &[HandleName],
 ) -> String {
@@ -217,13 +227,31 @@ pub fn command(
             .iter()
             .map(|(key, value)| format!("{key}={value}")),
     );
-    words.push(launch.program.clone());
+    words.push(program.to_owned());
     words.extend(launch.arguments.clone());
     words
         .iter()
         .map(|word| shell_word(word))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Keep both spellings of a legacy executable comparable while requiring
+/// the same reviewed arguments, environment, digest and handles.
+#[must_use]
+pub(crate) fn matches_command(
+    launch: &lys_home::harness::rendering_launch::Launch,
+    sha256: &str,
+    handles: &[HandleName],
+    program: &str,
+    kept: &str,
+) -> bool {
+    let normalized = launch_command(program);
+    if launch_command(&launch.program) != normalized {
+        return false;
+    }
+    kept == command_for_program(launch, &normalized, sha256, handles)
+        || normalized != program && kept == command_for_program(launch, program, sha256, handles)
 }
 
 /// The runner's name for `declared`, by its rendering contract: the harness
@@ -270,34 +298,75 @@ mod launch_command_tests {
     }
 
     #[test]
-    fn a_command_is_launched_as_declared_and_a_pinned_path_by_its_command()
-    -> Result<(), serde_json::Error> {
-        assert_eq!(
-            launch_command(&declared("claude-code/template-v1", "claude")?),
-            "claude"
-        );
-        assert_eq!(
-            launch_command(&declared("codex/template-v1", "cdx")?),
-            "cdx"
-        );
-        assert_eq!(
-            launch_command(&declared(
-                "claude-code/template-v1",
-                "/Users/tom/.local/share/claude/versions/2.1.288"
-            )?),
-            "claude"
-        );
-        assert_eq!(
-            launch_command(&declared("codex/template-v1", "/Users/tom/.local/bin/cdx")?),
-            "cdx"
-        );
-        assert_eq!(
-            launch_command(&declared(
-                "codex/template-v1",
-                "/u/lib/node_modules/@openai/codex/bin/codex.js"
-            )?),
-            "codex"
-        );
+    fn only_legacy_claude_pins_are_mapped() -> Result<(), serde_json::Error> {
+        for (program, expected) in [
+            ("claude", "claude"),
+            ("cdx", "cdx"),
+            (
+                "/Users/tom/.local/share/claude/versions/2.1.288/claude",
+                "claude",
+            ),
+            ("/Users/tom/.local/share/claude/versions/2.1.288", "claude"),
+            ("/Users/tom/.local/share/claude/claude-code", "claude"),
+            ("/opt/claude/versions/2.1.288/claude", "claude"),
+            ("/opt/forks/claude-fork", "/opt/forks/claude-fork"),
+            (
+                "/opt/codex-fork/bin/codex-fork",
+                "/opt/codex-fork/bin/codex-fork",
+            ),
+            ("/usr/local/bin/cdx", "/usr/local/bin/cdx"),
+            ("/usr/local/bin/cdx/", "/usr/local/bin/cdx/"),
+            ("/opt/codex/claude", "/opt/codex/claude"),
+            ("/opt/forks/claude-code", "/opt/forks/claude-code"),
+            (
+                "/u/lib/node_modules/@openai/codex/bin/codex.js",
+                "/u/lib/node_modules/@openai/codex/bin/codex.js",
+            ),
+        ] {
+            for contract in ["claude-code/template-v1", "codex/template-v1"] {
+                assert_eq!(
+                    launch_command(&declared(contract, program)?.program),
+                    expected,
+                    "{contract}: {program}"
+                );
+            }
+        }
         Ok(())
+    }
+    #[test]
+    fn a_running_legacy_command_still_matches_its_reviewed_profile() {
+        let pin = "/Users/tom/.local/share/claude/versions/2.1.288/claude";
+        let mut native = lys_home::harness::rendering_launch::Launch {
+            program: "claude".to_owned(),
+            arguments: vec!["--fixture".to_owned()],
+            environment: std::collections::BTreeMap::new(),
+            argument_files: std::collections::BTreeMap::new(),
+            environment_paths: std::collections::BTreeMap::new(),
+            files: Vec::new(),
+        };
+        native.program = pin.to_owned();
+        let kept = super::command(&native, "digest", &[]);
+        native.program = "claude".to_owned();
+        let current = super::command(&native, "digest", &[]);
+        assert!(super::matches_command(
+            &native,
+            "digest",
+            &[],
+            pin,
+            &current
+        ));
+        assert!(super::matches_command(&native, "digest", &[], pin, &kept));
+        native.arguments.push("--changed".to_owned());
+        assert!(!super::matches_command(&native, "digest", &[], pin, &kept));
+        assert_eq!(native.arguments.pop().as_deref(), Some("--changed"));
+        native.program = "/opt/forks/claude-fork".to_owned();
+        let altered = super::command(&native, "digest", &[]);
+        assert!(!super::matches_command(
+            &native,
+            "digest",
+            &[],
+            pin,
+            &altered
+        ));
     }
 }

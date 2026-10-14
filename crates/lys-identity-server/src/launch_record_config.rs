@@ -57,7 +57,10 @@ pub(crate) fn build(
         &rendered.template,
         &rendered.template_sha256,
     )?;
-    if native.program != record.executable || native.arguments != record.arguments {
+    if crate::launch_template::launch_command(&native.program)
+        != crate::launch_template::launch_command(&record.executable)
+        || native.arguments != record.arguments
+    {
         return Err(ServerError::LaunchUnrenderable {
             reason: "the signed command differs from its exact reviewed provisioning operation"
                 .to_owned(),

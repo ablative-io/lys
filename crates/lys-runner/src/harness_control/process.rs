@@ -111,7 +111,8 @@ pub fn entry() -> Result<(), RunnerError> {
         .map_err(|error| failed("control_entry_failed", error))?;
     execute_permission(&mut input)?;
     drop(input);
-    let error = Command::new(selected.path)
+    // The invocation spelling can select a fork's native entry point.
+    let error = Command::new(&entry.program)
         .args(entry.arguments)
         .current_dir(entry.directory)
         .exec();
@@ -168,27 +169,8 @@ pub(crate) struct Spawned {
 
 /// Resolve the selected executable using the launch's effective PATH.
 fn selected(program: &str, environment: &BTreeMap<String, String>) -> Result<PathBuf, RunnerError> {
-    let found = if program.contains('/') {
-        PathBuf::from(program)
-    } else {
-        let path = environment
-            .get("PATH")
-            .cloned()
-            .or_else(|| std::env::var("PATH").ok())
-            .ok_or_else(|| failed("control_executable_unproved", "launch has no PATH"))?;
-        std::env::split_paths(&path)
-            .map(|directory| directory.join(program))
-            .find(|path| path.is_file())
-            .ok_or_else(|| {
-                failed(
-                    "control_executable_unproved",
-                    "selected harness was not found",
-                )
-            })?
-    };
-    found
-        .canonicalize()
-        .map_err(|error| failed("control_executable_unproved", error))
+    crate::program_path::selected(program, environment)
+        .map_err(|reason| failed("control_executable_unproved", reason))
 }
 
 pub(crate) fn spawn(
@@ -316,7 +298,7 @@ pub(crate) fn spawn(
                 .ok_or_else(|| failed("control_spawn_failed", "child has no output pipe"))?,
         );
         let entry = Entry {
-            program: PathBuf::from(&harness.path),
+            program: selected,
             arguments,
             directory: PathBuf::from(&launch.directory),
         };
@@ -483,3 +465,7 @@ pub(crate) fn validate_start(
 
 #[cfg(test)]
 mod startup_tests;
+
+#[cfg(test)]
+#[path = "process_path_tests.rs"]
+mod path_tests;
