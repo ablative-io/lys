@@ -1,7 +1,7 @@
 /** An agent's recorded provisioning is versioned explicitly; a saved profile is not a runtime application receipt. */
 import { api, request, useLoad } from '../../api';
 import { readChoices } from './choices';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate } from '../people/Words';
 import { ProfileEditor } from './ProfileEditor';
 
 export type Setting = string | number | boolean | { handle: string };

@@ -1,6 +1,6 @@
 /** The settings form's one button: it saves what the form shows as the next version of the agent's settings, and nothing else. Approving and starting belong to Start in the run panel. The request is kept until its answer is confirmed, and the button is never greyed without its reason beside it. On the Overview (`brief`) it reads Save and is shown only once something is changed, or a save is outstanding. */
 import { useRef, useState } from 'react';
-import { Refused, api, operationId, useLoad } from '../../api';
+import { api, operationId, useLoad } from '../../api';
 import { answeredNo, sendKept } from '../../kept';
 import type { PeopleView } from '../../generated';
 import { ComputerAdmission } from '../network/ComputerAdmission';
@@ -9,7 +9,7 @@ import { entries } from '../people/directory';
 import { readRoles } from '../roles/AssignedRoles';
 import type { Role } from '../roles/contract';
 import { changedFrom, profileRequest } from '../runtime/start-requests';
-import { Gate } from '../signin/Gate';
+import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
 import type { ProvisioningProfile } from './Provisioning';
 import { Act } from '../../shell/Act';
 
@@ -75,7 +75,7 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
   const [pending, setPending] = useState<KeptSave | null>(initial.pending);
   // What is saved now: the profile the page read, then each version this form saved after it.
   const [base, setBase] = useState(profile);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<Error | string | null>(null);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
@@ -94,7 +94,7 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
     : '';
   const run = async () => {
     if (working.current || why) return;
-    working.current = true; setBusy(true); setFailure(''); setSaved(false);
+    working.current = true; setBusy(true); setFailure(null); setSaved(false);
     const version = base?.version ?? 0;
     const current: KeptSave = pending ?? { path, body: { ...settings, operation: operationId(), from_version: version }, version };
     try {
@@ -108,19 +108,22 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
     } catch (error) {
       // The service answered no: nothing of this request is outstanding. Anything else may have been carried out, so the request stays kept.
       if (answeredNo(error)) setPending(null);
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      setFailure(error instanceof Error ? error : String(error));
     } finally { working.current = false; setBusy(false); }
   };
   // On the Overview nothing is offered until something is changed, a save is outstanding, or there is something to say.
   if (brief && !changed && !pending && !failure && !saved && !initial.error) return null;
   return <form className="save-settings" onSubmit={(event) => { event.preventDefault(); void run(); }}>
     {pending ? <p role="status">The last save has no confirmed answer. Press {label} to send that same request again.</p> : null}
-    {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><p><small className="refusal-name">{failure}</small></p></> : null}
-    {saved && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
+    {failure ? <><p role="alert" className="why-not">Lys could not confirm these settings were saved.</p><ErrorWords problem={failure} /></> : null}
+    {saved && !changed && !failure ? <p role="status">Saved. {name} uses these settings the next time it starts. <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
     {brief && !changed && !pending ? null : <>
     <Act symbol="save" name={busy ? 'Saving…' : label} word={busy ? 'Saving…' : 'Save'} tone="primary" type="submit" disabled={busy || Boolean(why)} />
-    {why ? <p className="why-not">{why}{starting && !pending && !initial.error ? <> <a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></> : null}</p> : null}
+    {why && !(saved && !changed && why === 'Nothing has changed.') ? <>
+      <ErrorWords problem={why} />
+      {starting && !pending && !initial.error ? <p><a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
+    </> : null}
     </>}
-    {initial.error ? <p><small className="refusal-name">{initial.error}</small></p> : null}
+    {initial.error ? <ErrorWords problem={initial.error} /> : null}
   </form>;
 }

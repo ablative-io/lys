@@ -226,11 +226,25 @@ describe('Running sessions', () => {
     });
     await click($('button[data-key="ctrl_c"]'));
     expect(text()).toContain('NotAdmitted: keys are not granted');
+    expect($('.terminal [role="alert"] p')?.textContent).toBe('You do not have permission to do this. Ask the directory administrator to make the change.');
     await click($('button[data-act="restart"]'));
     await click($('button[data-act="confirm-restart"]'));
     expect(text()).toContain('conversation_held: another run holds it');
+    expect($('.terminal [role="alert"] p')?.textContent).not.toContain('conversation_held');
     expect($('[role="alertdialog"]')).not.toBeNull();
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toHaveLength(1);
+  });
+
+  it('gives an unrecognised terminal refusal its server reason and keeps the code in details', async () => {
+    await mount('#/canvas/' + SCRIBE, {
+      ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }),
+      '/runtime/live': ok({ sessions: [running], unanswered: [] }),
+      ['POST ' + base + '/read-bytes']: readOnce('$ '),
+      ['POST ' + base + '/keys']: refused(409, 'NewTerminalRefusal', 'the terminal cannot accept this key'),
+    });
+    await click($('button[data-key="ctrl_c"]'));
+    expect($('.terminal [role="alert"] p')?.textContent).toBe('Lys refused: the terminal cannot accept this key');
+    expect($('.terminal [role="alert"]')?.textContent).toContain('NewTerminalRefusal');
   });
 
   it('asks before Stop by naming the agent, then ends the session', async () => {

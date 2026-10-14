@@ -36,12 +36,33 @@ beforeEach(() => sessionStorage.clear());
 
 /** The settings form saves what it shows as one request and never approves or starts; starting is the front page's. */
 describe('The settings form', () => {
-  it('refuses a profile save until its working folder is named', async () => {
+  it('explains how to choose a working folder and keeps its refusal code in details', async () => {
     const { posted } = await open(routes(), false);
     expect(button()?.disabled).toBe(true);
-    expect(text()).toContain("WorkingFolderUnnamed: the launch names no working folder and the agent's profile has no working_folder; name one on the launch or set the agent's default");
+    expect(text()).toContain('Choose the folder this agent works in before it can start.');
+    const warning = document.querySelector('.save-settings [role="alert"]');
+    expect(warning?.querySelector('p')?.textContent).not.toContain('WorkingFolderUnnamed');
+    expect(warning?.textContent).toContain('WorkingFolderUnnamed');
     await click(button());
     expect(posted).toEqual([]);
+  });
+  it.each([
+    ['WorkingFolderUnnamed', 'no default folder is saved', 'Choose the folder this agent works in before it can start.'],
+    ['NewSettingsRefusal', 'the saved settings are being reviewed', 'Lys refused: the saved settings are being reviewed'],
+  ])('explains the settings read refusal %s without making its code the headline', async (code, reason, words) => {
+    await open({ ...routes(), [path]: refused(409, code, reason) }, false);
+    const warning = [...document.querySelectorAll('[role="alert"]')].find((entry) => entry.textContent?.includes(code));
+    expect(warning?.querySelector('p')?.textContent).toBe(words);
+    expect(warning?.querySelector('details')?.textContent).toContain(code + ': ' + reason);
+  });
+  it('explains a refused save and retains its server code without claiming success', async () => {
+    const { posted } = await open({ ...routes(), ['POST ' + path]: refused(409, 'WorkingFolderUnnamed', 'the saved folder is missing') });
+    await click(button());
+    const warnings = [...document.querySelectorAll('.save-settings [role="alert"]')];
+    expect(warnings.some((entry) => entry.querySelector('p')?.textContent === 'Choose the folder this agent works in before it can start.')).toBe(true);
+    expect(text()).toContain('WorkingFolderUnnamed: the saved folder is missing');
+    expect(text()).not.toContain('Saved.');
+    expect(posted.map((entry) => entry.path)).toEqual([path]);
   });
   it('defaults to a reported command while retaining uninstalled program descriptions', async () => {
     const codex = { ...program, name: 'Codex', description: { ...description, rendering_contract: 'codex/template-v1' }, builds: [{ name: 'Installed cdx', program: 'cdx', package: 'cdx 1', from: 'runner' }] };
@@ -161,7 +182,18 @@ describe('The settings form', () => {
     expect(posted.map((entry) => entry.path)).toEqual([path]);
     expect(posted[0].body).toMatchObject({ working_folder: '/srv', from_version: 0, model_access: ['default'], permissions: { default_mode: 'default' }, harness, instructions: '', tools: [], skills: [], mcp_servers: [] });
     expect(text()).toContain('Saved.');
+    expect(text()).not.toContain('Nothing has changed.');
+    expect(button()?.disabled).toBe(true);
     expect(document.querySelector('section[aria-label="Settings of this agent"] a[href="#/file/' + SCRIBE + '"]')).not.toBeNull();
+  });
+  it('stops calling the displayed settings saved when another change is made', async () => {
+    await open(routes());
+    await click(button());
+    expect(text()).toContain('Saved.');
+    await choose(field('model'), 'opus');
+    expect(text()).not.toContain('Saved.');
+    expect(text()).not.toContain('Nothing has changed.');
+    expect(button()?.disabled).toBe(false);
   });
   it('saves a second change from the version it just saved', async () => {
     const { posted } = await open(routes());

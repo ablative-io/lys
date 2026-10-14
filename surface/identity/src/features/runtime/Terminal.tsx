@@ -6,6 +6,7 @@ import { GpuTerminal } from './GpuTerminal';
 import { Act } from '../../shell/Act';
 import { answeredNo } from '../../kept';
 import { refreshLive } from '../../live';
+import { ErrorWords } from '../people/Words';
 
 export interface SessionEnd { how: 'exited' | 'ended_by_runner_restart' | 'accounts_exhausted'; at: number; status: number | null; signal: string | null }
 interface EndAnswer { answer?: { kind?: string; ended?: SessionEnd } }
@@ -95,6 +96,6 @@ export function Terminal({ session, agent, machine, bare = false }: { session: s
       {terminalKeys.map(([label, key]) => <Act key={key} symbol="enter" name={label} word={label} data-key={key} disabled={busy || Boolean(ended)} onClick={() => void send(base + '/keys', { keys: [key] })} />)}
     </div>
     <GpuTerminal session={session} onEnd={setEnded} onFailure={(error) => setRefused(asRefused(error))} />
-    {refused ? <p className="why-not" role="alert">{refused.refusal.refusal}: {refused.refusal.reason}</p> : null}
+    {refused ? <ErrorWords problem={refused} /> : null}
   </section>;
 }
