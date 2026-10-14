@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
@@ -7,10 +8,12 @@ use axum::http::{StatusCode, Uri};
 use axum::{Json, Router};
 use serde_json::{Value, json};
 
-#[derive(Default)]
 struct Held {
     schema: String,
     relationships: Vec<Value>,
+    snapshot: u64,
+    broken: Arc<AtomicBool>,
+    refusing: Arc<AtomicBool>,
 }
 
 pub struct Engine {
@@ -20,7 +23,7 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub fn start() -> io::Result<Self> {
+    pub fn start(broken: Arc<AtomicBool>, refusing: Arc<AtomicBool>) -> io::Result<Self> {
         let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
         let endpoint = listener.local_addr()?.to_string();
         listener.set_nonblocking(true)?;
@@ -37,6 +40,9 @@ impl Engine {
                     .with_state(Arc::new(Mutex::new(Held {
                         schema: lys_identity::grants::SCHEMA.to_owned(),
                         relationships: Vec::new(),
+                        snapshot: 0,
+                        broken,
+                        refusing,
                     })));
                 ready.send(()).map_err(io::Error::other)?;
                 axum::serve(listener, app)
@@ -63,16 +69,23 @@ impl Engine {
     }
 
     pub fn stop(&mut self) -> io::Result<()> {
-        if let Some(shutdown) = self.shutdown.take() {
-            match shutdown.send(()) {
-                Ok(()) | Err(()) => {}
+        let mut failures = Vec::new();
+        if let Some(shutdown) = self.shutdown.take()
+            && shutdown.send(()).is_err()
+        {
+            failures.push("grant_engine_shutdown_signal_failed".to_owned());
+        }
+        if let Some(worker) = self.worker.take() {
+            match worker.join() {
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => failures.push(format!("grant_engine_worker_failed: {error}")),
+                Err(error) => failures.push(format!("grant_engine_panicked: {error:?}")),
             }
         }
-        match self.worker.take() {
-            Some(worker) => worker
-                .join()
-                .map_err(|error| io::Error::other(format!("grant_engine_panicked: {error:?}")))?,
-            None => Ok(()),
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(io::Error::other(failures.join("; ")))
         }
     }
 }
@@ -116,32 +129,74 @@ fn matches(relationship: &Value, filter: &Value) -> bool {
         && filter["optionalResourceId"]
             .as_str()
             .is_none_or(|id| relationship["resource"]["objectId"] == id)
+        && filter["optionalRelation"]
+            .as_str()
+            .is_none_or(|relation| relationship["relation"] == relation)
+        && filter["optionalSubjectFilter"]
+            .as_object()
+            .is_none_or(|subject| {
+                subject.get("subjectType") == relationship.pointer("/subject/object/objectType")
+                    && subject
+                        .get("optionalSubjectId")
+                        .and_then(Value::as_str)
+                        .is_none_or(|id| relationship["subject"]["object"]["objectId"] == id)
+            })
 }
 
-fn permitted(held: &Held, request: &Value) -> bool {
-    let permission = request["permission"].as_str().unwrap_or_default();
-    let Some(kind) = request["resource"]["objectType"].as_str() else {
-        return false;
-    };
+fn permitted(held: &Held, request: &Value) -> Result<bool, &'static str> {
+    let permission = request["permission"]
+        .as_str()
+        .filter(|permission| !permission.is_empty())
+        .ok_or("fixture_permission_missing")?;
+    let kind = request["resource"]["objectType"]
+        .as_str()
+        .ok_or("fixture_resource_kind_missing")?;
+    for member in [
+        "/resource/objectId",
+        "/subject/object/objectType",
+        "/subject/object/objectId",
+    ] {
+        if request
+            .pointer(member)
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err("fixture_permission_object_missing");
+        }
+    }
+    if let Some(relation) = request.pointer("/subject/optionalRelation")
+        && relation.as_str() != Some("")
+    {
+        return Err("fixture_permission_subject_relation_unsupported");
+    }
     let kinds = definitions(&held.schema);
-    let Some(body) = kinds.get(kind) else {
-        return false;
-    };
+    let body = kinds.get(kind).ok_or("fixture_resource_kind_unknown")?;
     let prefix = format!("permission {permission} = ");
     let relations = body
         .lines()
         .find_map(|line| line.trim().strip_prefix(&prefix))
-        .map(|terms| terms.split(" + ").collect::<Vec<_>>())
-        .unwrap_or_default();
-    held.relationships.iter().any(|resource| {
+        .ok_or("fixture_permission_unknown")?
+        .split(" + ")
+        .collect::<Vec<_>>();
+    Ok(held.relationships.iter().any(|resource| {
         resource["resource"] == request["resource"]
-            && relations.contains(&resource["relation"].as_str().unwrap_or_default())
+            && resource["relation"]
+                .as_str()
+                .is_some_and(|relation| relations.contains(&relation))
             && held.relationships.iter().any(|holder| {
                 holder["resource"] == resource["subject"]["object"]
                     && holder["relation"] == "holder"
                     && holder["subject"]["object"] == request["subject"]["object"]
             })
-    })
+    }))
+}
+
+fn permissionship(allowed: bool) -> &'static str {
+    if allowed {
+        "PERMISSIONSHIP_HAS_PERMISSION"
+    } else {
+        "PERMISSIONSHIP_NO_PERMISSION"
+    }
 }
 
 async fn exchange(
@@ -164,13 +219,41 @@ async fn exchange(
             schema.clone_into(&mut held.schema);
             "{}".to_owned()
         }
+        "/v1/relationships/read"
+            if request["relationshipFilter"]["resourceType"] != "lys_mirror"
+                && held.broken.load(Ordering::SeqCst) =>
+        {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                json!({"message": "the engine is down"}).to_string(),
+            );
+        }
         "/v1/relationships/read" => held
             .relationships
             .iter()
             .filter(|relationship| matches(relationship, &request["relationshipFilter"]))
-            .map(|relationship| json!({"result": {"relationship": relationship}}).to_string())
+            .map(|relationship| {
+                json!({"result": {"relationship": relationship,
+                    "readAt": {"token": format!("fixture-snapshot-{}", held.snapshot)}}})
+                .to_string()
+            })
             .collect::<Vec<_>>()
             .join("\n"),
+        "/v1/relationships/exportbulk" if held.broken.load(Ordering::SeqCst) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                json!({"message": "the engine is down"}).to_string(),
+            );
+        }
+        "/v1/relationships/exportbulk" => {
+            json!({"result": {"relationships": held.relationships}}).to_string()
+        }
+        "/v1/relationships/write" if held.refusing.load(Ordering::SeqCst) => {
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                json!({"message": "the engine takes no writes"}).to_string(),
+            );
+        }
         "/v1/relationships/write" => {
             let Some(updates) = request["updates"].as_array() else {
                 return (
@@ -178,6 +261,35 @@ async fn exchange(
                     "fixture_updates_missing".to_owned(),
                 );
             };
+            let preconditions: &[Value] = match request.get("optionalPreconditions") {
+                None => &[],
+                Some(Value::Array(preconditions)) => preconditions,
+                Some(_) => {
+                    return (
+                        StatusCode::BAD_REQUEST,
+                        "fixture_preconditions_not_an_array".to_owned(),
+                    );
+                }
+            };
+            for precondition in preconditions {
+                let found = held
+                    .relationships
+                    .iter()
+                    .any(|row| matches(row, &precondition["filter"]));
+                let satisfied = match precondition["operation"].as_str() {
+                    Some("OPERATION_MUST_MATCH") => found,
+                    Some("OPERATION_MUST_NOT_MATCH") => !found,
+                    _ => {
+                        return (
+                            StatusCode::BAD_REQUEST,
+                            "fixture_precondition_unknown".to_owned(),
+                        );
+                    }
+                };
+                if !satisfied {
+                    return (StatusCode::BAD_REQUEST, "PRECONDITION_FAILED".to_owned());
+                }
+            }
             for update in updates {
                 if !valid(&held, &update["relationship"]) {
                     return (
@@ -185,7 +297,19 @@ async fn exchange(
                         json!({"message": "resource relation absent from schema", "relationship": update["relationship"]}).to_string(),
                     );
                 }
+                if !matches!(
+                    update["operation"].as_str(),
+                    Some("OPERATION_TOUCH" | "OPERATION_DELETE")
+                ) {
+                    return (StatusCode::BAD_REQUEST, "fixture_update_unknown".to_owned());
+                }
             }
+            let Some(snapshot) = held.snapshot.checked_add(1) else {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "fixture_snapshot_exhausted".to_owned(),
+                );
+            };
             for update in updates {
                 let relationship = &update["relationship"];
                 held.relationships.retain(|kept| kept != relationship);
@@ -193,16 +317,32 @@ async fn exchange(
                     held.relationships.push(relationship.clone());
                 }
             }
-            "{}".to_owned()
+            held.snapshot = snapshot;
+            json!({"writtenAt": {"token": format!("fixture-snapshot-{snapshot}")}}).to_string()
         }
-        "/v1/permissions/check" => json!({
-            "permissionship": if permitted(&held, &request) {
-                "PERMISSIONSHIP_HAS_PERMISSION"
-            } else {
-                "PERMISSIONSHIP_NO_PERMISSION"
+        "/v1/permissions/check" => match permitted(&held, &request) {
+            Ok(allowed) => json!({"permissionship": permissionship(allowed)}).to_string(),
+            Err(reason) => return (StatusCode::BAD_REQUEST, reason.to_owned()),
+        },
+        "/v1/permissions/checkbulk" => {
+            let Some(items) = request["items"].as_array() else {
+                return (StatusCode::BAD_REQUEST, "fixture_items_missing".to_owned());
+            };
+            let mut pairs = Vec::with_capacity(items.len());
+            for item in items {
+                let allowed = match permitted(&held, item) {
+                    Ok(allowed) => allowed,
+                    Err(reason) => return (StatusCode::BAD_REQUEST, reason.to_owned()),
+                };
+                let mut echoed = item.clone();
+                echoed["subject"]["optionalRelation"] = json!("");
+                pairs.push(json!({"request": echoed,
+                    "item": {"permissionship": permissionship(allowed)}}));
             }
-        })
-        .to_string(),
+            json!({"checkedAt": {"token": format!("fixture-snapshot-{}", held.snapshot)},
+                "pairs": pairs})
+            .to_string()
+        }
         _ => return (StatusCode::NOT_FOUND, "fixture_route_unknown".to_owned()),
     };
     (StatusCode::OK, answer)

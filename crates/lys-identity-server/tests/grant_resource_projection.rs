@@ -3,6 +3,8 @@
 
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
@@ -86,7 +88,10 @@ fn old_grant(config: &lys_identity_server::Config, person: PersonId) -> Outcome 
 async fn started(
     preexisting: bool,
 ) -> Result<(grant_resource_engine::Engine, Service, PersonId, String), Box<dyn Error>> {
-    let engine = grant_resource_engine::Engine::start()?;
+    let engine = grant_resource_engine::Engine::start(
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    )?;
     let key = tempfile::NamedTempFile::new()?;
     std::fs::write(key.path(), "fixture-only")?;
     let (service, person) = Service::start_adjusted(
@@ -153,6 +158,8 @@ async fn restart_grant(kind: &str) -> Outcome {
     let (mut engine, mut service, person, cookie) = started(false).await?;
     let body = root(person, kind)?;
     let issued = service.post("/grants/roots", Some(&cookie), &body).await?;
+    assert_eq!(issued.0, 200, "{kind}: {}", issued.1);
+    let grant = issued.1["grant"].as_str().ok_or("issued grant missing")?;
     service.restart().await?;
     let (status, answer) = service
         .post(
@@ -164,7 +171,7 @@ async fn restart_grant(kind: &str) -> Outcome {
         )
         .await?;
     assert_eq!(status, 200, "{kind} after restart: {answer}");
-    assert_eq!(issued.0, 200, "{kind}: {}", issued.1);
+    assert_eq!(answer["grant"], grant, "{kind} after restart: {answer}");
     service.close()?;
     engine.stop()?;
     Ok(())
