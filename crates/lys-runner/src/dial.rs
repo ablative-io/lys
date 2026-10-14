@@ -24,7 +24,8 @@
 //! Any other `http://` server is refused by name.
 //!
 //! The bridge is a process of its own, so a server that cannot be reached
-//! ends the bridge, by name, and never the runner or a session it holds.
+//! is retried without replaying a request; an admission refusal ends the bridge,
+//! by name, and never the runner or a session it holds.
 
 pub mod agent;
 mod dispatch;
@@ -39,7 +40,7 @@ use std::sync::Arc;
 use lys_core::Ed25519Identity;
 
 use crate::error::RunnerError;
-use crate::protocol::{Answer, hex, nonce, reply_line};
+use crate::protocol::{hex, nonce};
 use transport::{Channel, Response};
 
 /// The existing verified transport, usable by the native CLI without another TLS dependency.
@@ -155,6 +156,7 @@ pub(crate) fn failed(what: impl std::fmt::Display) -> RunnerError {
     }
 }
 
+mod bridge;
 mod reconnect;
 
 /// The signed side of a bridge, shared by the threads that post replies.
@@ -168,55 +170,7 @@ impl Dial {
     /// Relay requests until the local runner ends or the server refuses this machine.
     /// A lost server connection reads a fresh epoch and reconnects without replaying a request.
     pub fn bridge(&self) -> Result<(), RunnerError> {
-        let signer = Arc::new(self.signer()?);
-        let mut disconnected = false;
-        let mut epoch = reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
-        let mut dispatch = dispatch::Dispatch::new();
-        loop {
-            let mut connection = crate::client::connect(&self.socket)?;
-            let greeting = connection.greeting_line()?;
-            let (ticket, line) = match signer.next(&epoch, &greeting) {
-                Err(RunnerError::DialStale { reason }) => {
-                    crate::error::said(&format!("{STALE}: {reason}: reading the new epoch"));
-                    epoch =
-                        reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
-                    continue;
-                }
-                Err(RunnerError::Unreachable { .. }) => {
-                    if !disconnected {
-                        crate::error::said(
-                            "runner_dial_disconnected: the server connection was lost; reconnecting",
-                        );
-                    }
-                    disconnected = true;
-                    reconnect::pause();
-                    epoch =
-                        reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
-                    continue;
-                }
-                taken => taken?,
-            };
-            if disconnected {
-                crate::error::said(
-                    "runner_dial_reconnected: the server accepted this runner again",
-                );
-                disconnected = false;
-            }
-            let control = control_request(&line);
-            let posted = Arc::clone(&signer);
-            let posting_epoch = epoch.clone();
-            let posting_ticket = ticket.clone();
-            if let Err(error) = dispatch.submit(control, move || {
-                let reply = connection
-                    .exchange(&line)
-                    .unwrap_or_else(|error| reply_line(Answer::refusal(&error)));
-                if let Err(error) = posted.reply(&posting_epoch, &posting_ticket, &reply) {
-                    crate::error::said(&format!("a reply was not delivered: {error}"));
-                }
-            }) {
-                signer.reply(&epoch, &ticket, &reply_line(Answer::refusal(&error)))?;
-            }
-        }
+        bridge::run(self)
     }
 
     /// The next request for this machine and its ticket, asked with the
@@ -274,12 +228,12 @@ impl Signer {
     }
 
     fn reply(&self, epoch: &str, ticket: &str, reply: &str) -> Result<(), RunnerError> {
-        self.post(
-            &reply_route(&self.machine, ticket),
-            epoch,
-            reply.trim_end().as_bytes(),
-        )
-        .map(drop)
+        let route = reply_route(&self.machine, ticket);
+        let body = reply.trim_end().as_bytes();
+        match self.post(&route, epoch, body) {
+            Err(RunnerError::DialStale { .. }) => self.post(&route, &self.epoch()?, body).map(drop),
+            answer => answer.map(drop),
+        }
     }
 
     fn post(&self, route: &str, epoch: &str, body: &[u8]) -> Result<Response, RunnerError> {

@@ -1,21 +1,25 @@
 //! A broken server connection is replaced without replaying the failed request.
 
 use crate::error::RunnerError;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+pub(super) fn disconnected(state: &AtomicBool) {
+    if !state.swap(true, Ordering::AcqRel) {
+        crate::error::said(
+            "runner_dial_disconnected: the server connection was lost; reconnecting",
+        );
+    }
+}
 
 pub(super) fn ready<T>(
     mut take: impl FnMut() -> Result<T, RunnerError>,
-    disconnected: &mut bool,
+    state: &AtomicBool,
     mut wait: impl FnMut(),
 ) -> Result<T, RunnerError> {
     loop {
         match take() {
             Err(RunnerError::Unreachable { .. }) => {
-                if !*disconnected {
-                    crate::error::said(
-                        "runner_dial_disconnected: the server connection was lost; reconnecting",
-                    );
-                }
-                *disconnected = true;
+                disconnected(state);
                 wait();
             }
             answer => return answer,
@@ -34,7 +38,7 @@ mod tests {
     -> Result<(), crate::RunnerError> {
         let mut reads = 0;
         let mut waits = 0;
-        let mut disconnected = false;
+        let disconnected = super::AtomicBool::new(false);
         let value = super::ready(
             || {
                 reads += 1;
@@ -46,20 +50,20 @@ mod tests {
                     Ok(42)
                 }
             },
-            &mut disconnected,
+            &disconnected,
             || waits += 1,
         )?;
         assert_eq!(value, 42);
         assert_eq!(reads, 2);
         assert_eq!(waits, 1);
-        assert!(disconnected);
+        assert!(disconnected.load(super::Ordering::Acquire));
         let refused = super::ready(
             || {
                 Err::<(), _>(crate::RunnerError::Dial {
                     reason: "admission refused".to_owned(),
                 })
             },
-            &mut disconnected,
+            &disconnected,
             || waits += 1,
         );
         assert!(refused.is_err());

@@ -5,6 +5,7 @@
 use std::io::{BufReader, Read, Write};
 use std::net::{IpAddr, TcpStream};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -73,6 +74,8 @@ pub(super) struct Channel {
     prefix: String,
     poll: Mutex<Option<BufReader<Stream>>>,
     control: Mutex<Option<BufReader<Stream>>>,
+    closing: [Mutex<Option<TcpStream>>; 2],
+    closed: AtomicBool,
 }
 
 /// A response: its status, its headers and its body.
@@ -180,7 +183,36 @@ impl Channel {
             prefix: prefix.trim_end_matches('/').to_owned(),
             poll: Mutex::new(None),
             control: Mutex::new(None),
+            closing: [Mutex::new(None), Mutex::new(None)],
+            closed: AtomicBool::new(false),
         })
+    }
+
+    pub(super) fn close(&self) -> Result<(), RunnerError> {
+        self.closed.store(true, Ordering::Release);
+        let mut failures = Vec::new();
+        for closing in &self.closing {
+            match closing.lock() {
+                Ok(mut closing) => {
+                    if let Some(stream) = closing.take() {
+                        match stream.shutdown(std::net::Shutdown::Both) {
+                            Ok(()) => {}
+                            Err(error) if error.kind() == std::io::ErrorKind::NotConnected => {}
+                            Err(error) => failures.push(error.to_string()),
+                        }
+                    }
+                }
+                Err(error) => failures.push(error.to_string()),
+            }
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failed(format!(
+                "the dial connections did not close: {}",
+                failures.join("; ")
+            )))
+        }
     }
 
     /// Send one request and read its whole response, refused by name when
@@ -252,7 +284,8 @@ impl Channel {
             head.push_str("\r\n");
         }
         head.push_str("\r\n");
-        let lane = if route.starts_with("/runner/dial/") && route.ends_with("/next") {
+        let index = usize::from(!(route.starts_with("/runner/dial/") && route.ends_with("/next")));
+        let lane = if index == 0 {
             &self.poll
         } else {
             &self.control
@@ -262,7 +295,7 @@ impl Channel {
             .map_err(|error| failed(format!("the connection lock is poisoned: {error}")))?;
         let mut stream = match connection_guard.take() {
             Some(stream) => stream,
-            None => self.connect()?,
+            None => self.connect(index)?,
         };
         // A failed exchange is never replayed: a POST may already be applied.
         let (response, reusable) = exchange(&mut stream, head.as_bytes(), body)?;
@@ -273,7 +306,7 @@ impl Channel {
         Ok(response)
     }
 
-    fn connect(&self) -> Result<BufReader<Stream>, RunnerError> {
+    fn connect(&self, index: usize) -> Result<BufReader<Stream>, RunnerError> {
         let port = match self.scheme {
             Scheme::Tls { .. } => 443,
             Scheme::Loopback => 80,
@@ -293,6 +326,19 @@ impl Channel {
             network_error(&format!("{} could not be reached", self.authority), &error)
         })?;
         keepalive(&stream)?;
+        let closer = stream
+            .try_clone()
+            .map_err(|error| network_error("the connection cannot be closed", &error))?;
+        *self.closing[index]
+            .lock()
+            .map_err(|error| failed(format!("the closing lock is unavailable: {error}")))? =
+            Some(closer);
+        if self.closed.load(Ordering::Acquire) {
+            stream.shutdown(std::net::Shutdown::Both).map_err(|error| {
+                network_error("the ended bridge could not close its connection", &error)
+            })?;
+            return Err(failed("the dial bridge has ended"));
+        }
         let stream = match &self.scheme {
             Scheme::Loopback => Stream::Plain(stream),
             Scheme::Tls { config, name } => {

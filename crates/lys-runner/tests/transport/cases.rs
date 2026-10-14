@@ -218,7 +218,7 @@ fn blocked_long_poll_and_control_share_exactly_two_connections() -> TestResult {
 fn reused_connections_have_kernel_keepalive_configured() -> TestResult {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let channel = Channel::for_server(&format!("http://{}", listener.local_addr()?), None)?;
-    let connected = channel.connect()?;
+    let connected = channel.connect(0)?;
     let Stream::Plain(stream) = connected.get_ref() else {
         return Err("expected loopback stream".into());
     };

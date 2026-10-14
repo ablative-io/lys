@@ -1,0 +1,109 @@
+//! Both polling lanes must arrive before either server request is answered.
+
+use std::error::Error;
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::TcpListener;
+use std::os::unix::net::UnixListener;
+use std::sync::{Arc, Barrier, mpsc};
+
+#[test]
+fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let socket = dir.path().join("runner.sock");
+    let local = UnixListener::bind(&socket)?;
+    let native = std::thread::spawn(move || -> Result<(), String> {
+        let mut workers = Vec::new();
+        for _ in 0..2 {
+            let (mut stream, _) = local.accept().map_err(|error| error.to_string())?;
+            workers.push(std::thread::spawn(move || -> Result<(), String> {
+                let greeting = crate::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
+                writeln!(stream, "{}", greeting.line()).map_err(|error| error.to_string())?;
+                let mut rest = Vec::new();
+                stream
+                    .read_to_end(&mut rest)
+                    .map_err(|error| error.to_string())?;
+                if !rest.is_empty() {
+                    return Err("an unaccepted poll sent a native request".to_owned());
+                }
+                Ok(())
+            }));
+        }
+        for worker in workers {
+            worker
+                .join()
+                .map_err(|_| "native fixture panicked".to_owned())??;
+        }
+        Ok(())
+    });
+    let tcp = TcpListener::bind("127.0.0.1:0")?;
+    let server = format!("http://{}", tcp.local_addr()?);
+    let (entered, arrivals) = mpsc::channel();
+    let release = Arc::new(Barrier::new(3));
+    let released = Arc::clone(&release);
+    let remote = std::thread::spawn(move || -> Result<(), String> {
+        let mut workers = Vec::new();
+        for _ in 0..4 {
+            let (stream, _) = tcp.accept().map_err(|error| error.to_string())?;
+            let entered = entered.clone();
+            let released = Arc::clone(&released);
+            workers.push(std::thread::spawn(move || -> Result<(), String> {
+                let mut stream = BufReader::new(stream);
+                let mut first = String::new();
+                stream.read_line(&mut first).map_err(|error| error.to_string())?;
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    stream.read_line(&mut line).map_err(|error| error.to_string())?;
+                    if line == "\r\n" { break; }
+                    if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse::<usize>().map_err(|error| error.to_string())?;
+                    }
+                    if line.is_empty() { return Err("fixture request ended before its head".to_owned()); }
+                }
+                let mut body = vec![0; length];
+                stream.read_exact(&mut body).map_err(|error| error.to_string())?;
+                let (status, body) = if first.starts_with("GET ") {
+                    (200, "test-epoch")
+                } else {
+                    if !first.contains("/next ") { return Err("the fixture expected a next poll".to_owned()); }
+                    entered.send(()).map_err(|error| error.to_string())?;
+                    released.wait();
+                    (403, "{\"refusal\":\"fixture_finished\"}")
+                };
+                write!(stream.get_mut(), "HTTP/1.1 {status} Fixture\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len())
+                    .map_err(|error| error.to_string())?;
+                stream.get_mut().flush().map_err(|error| error.to_string())
+            }));
+        }
+        for worker in workers {
+            worker
+                .join()
+                .map_err(|_| "remote fixture panicked".to_owned())??;
+        }
+        Ok(())
+    });
+    let dial = super::Dial {
+        server,
+        machine: "machine".to_owned(),
+        socket,
+        key: Arc::new(lys_core::Ed25519Identity::ephemeral()),
+        authority: None,
+    };
+    let bridge = std::thread::spawn(move || dial.bridge());
+    arrivals.recv()?;
+    arrivals.recv()?;
+    release.wait();
+    let refusal = bridge
+        .join()
+        .map_err(|_| "bridge panicked")?
+        .err()
+        .ok_or("an admission refusal did not end the bridge")?;
+    assert!(
+        matches!(refusal, crate::RunnerError::Dial { .. }),
+        "{refusal}"
+    );
+    remote.join().map_err(|_| "remote fixture panicked")??;
+    native.join().map_err(|_| "native fixture panicked")??;
+    dir.close()?;
+    Ok(())
+}
