@@ -72,10 +72,10 @@ fn saved_native(view: &Value, harness: Harness) -> Result<Option<String>, Server
     Ok(None)
 }
 
-fn known_native(harness: Harness, native: Option<String>) -> Result<String, ServerError> {
-    let native = native
-        .ok_or_else(|| refused("the latest previous session has no known native conversation"))?;
-    validate_native(harness, &native)?;
+fn known_native(harness: Harness, native: Option<String>) -> Result<Option<String>, ServerError> {
+    if let Some(native) = &native {
+        validate_native(harness, native)?;
+    }
     Ok(native)
 }
 
@@ -94,7 +94,7 @@ fn latest<'a>(
 
 struct Prior {
     session: String,
-    directory: String,
+    directory: Option<String>,
     native: Option<String>,
 }
 
@@ -103,23 +103,31 @@ fn prior(
     harness: Harness,
     requested: Option<&str>,
 ) -> Result<Prior, ServerError> {
-    let view = tracked
-        .first()
-        .and_then(|first| first.launch.as_ref())
-        .ok_or_else(|| refused("the latest previous session has no recorded launch"))?;
-    let expected = match harness {
-        Harness::ClaudeCode => "claude-code",
-        Harness::Codex => "codex",
+    let view = tracked.first().and_then(|first| first.launch.as_ref());
+    let native = view
+        .map(|view| saved_native(view, harness))
+        .transpose()?
+        .flatten();
+    let directory = if native.is_some() {
+        let view =
+            view.ok_or_else(|| refused("the previous conversation has no recorded launch"))?;
+        let expected = match harness {
+            Harness::ClaudeCode => "claude-code",
+            Harness::Codex => "codex",
+        };
+        if view.get("harness").and_then(Value::as_str) != Some(expected) {
+            return Err(refused(
+                "the selected profile uses a different native harness from the previous session",
+            ));
+        }
+        Some(recorded_directory(view, requested)?)
+    } else {
+        None
     };
-    if view.get("harness").and_then(Value::as_str) != Some(expected) {
-        return Err(refused(
-            "the selected profile uses a different native harness from the previous session",
-        ));
-    }
     Ok(Prior {
         session: tracked.session.clone(),
-        directory: recorded_directory(view, requested)?,
-        native: saved_native(view, harness)?,
+        directory,
+        native,
     })
 }
 
@@ -149,6 +157,7 @@ pub(super) async fn chosen(
     machine: &str,
     operation: &str,
     requested_directory: Option<String>,
+    fresh: bool,
 ) -> Result<Chosen, ServerError> {
     let operation = OperationId::from_str(operation)?.to_string();
     let requested = requested_directory
@@ -183,6 +192,13 @@ pub(super) async fn chosen(
             conversation: None,
         });
     };
+    if fresh {
+        return Ok(Chosen {
+            profile: None,
+            directory: requested,
+            conversation: None,
+        });
+    }
     let prior = with_runtime(state, |store| {
         latest(store.sessions(), agent, machine, &operation)
             .map(|tracked| prior(tracked, harness, requested.as_deref()))
@@ -202,10 +218,22 @@ pub(super) async fn chosen(
             .and_then(|live| live.harness_session),
     };
     let native = known_native(harness, native)?;
+    let directory = if native.is_some() {
+        match prior.directory {
+            Some(directory) => Some(directory),
+            None => {
+                let view = super::admitted(state, &prior.session, agent)?
+                    .ok_or_else(|| refused("the known conversation has no recorded launch"))?;
+                Some(recorded_directory(&view, requested.as_deref())?)
+            }
+        }
+    } else {
+        requested
+    };
     Ok(Chosen {
         profile: None,
-        directory: Some(prior.directory),
-        conversation: Some(native),
+        directory,
+        conversation: native,
     })
 }
 

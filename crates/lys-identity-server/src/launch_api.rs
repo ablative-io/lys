@@ -119,6 +119,9 @@ pub struct StartCommandView {
 pub(crate) struct Launch {
     machine: String,
     operation: String,
+    /// Explicitly begin a new conversation instead of resuming a known one.
+    #[serde(default)]
+    fresh: bool,
     /// The folder the harness starts in for this run; absent, the profile's
     /// own default, and with neither the start is refused by name.
     #[serde(default)]
@@ -142,6 +145,7 @@ async fn start_command(
         machine,
         operation,
         directory,
+        fresh,
     }) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
@@ -157,13 +161,21 @@ async fn start_command(
         &machine,
         &operation,
         directory.as_deref(),
+        fresh,
     )
     .await?
     {
         return Ok(Json(start));
     }
-    let chosen =
-        ordinary::chosen(&state, &agent.to_string(), &machine, &operation, directory).await?;
+    let chosen = ordinary::chosen(
+        &state,
+        &agent.to_string(),
+        &machine,
+        &operation,
+        directory,
+        fresh,
+    )
+    .await?;
     start_profile(
         &state, &headers, &actor, agent, &machine, &operation, chosen,
     )

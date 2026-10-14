@@ -159,6 +159,7 @@ pub(crate) async fn start_from_agent(
     machine: &str,
     operation: &str,
     directory: Option<&str>,
+    fresh: bool,
 ) -> Result<Option<Value>, ServerError> {
     let Some(held) = terminal_seat(state, agent, machine)? else {
         return Ok(None);
@@ -176,7 +177,7 @@ pub(crate) async fn start_from_agent(
         (&held, &standing),
         &admission.caller,
         operation,
-        (None, false, directory.map(str::to_owned)),
+        (None, fresh, directory.map(str::to_owned)),
     ))
     .await?;
     Ok(Some(begun.start))

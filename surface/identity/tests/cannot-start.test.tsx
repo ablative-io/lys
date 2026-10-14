@@ -26,14 +26,14 @@ const notActive = (state: string): StartRefusal => ({ refusal: 'AgentNotActive',
 async function shown(refusal: StartRefusal, routes: Record<string, Route> = {}) {
   const posted: { path: string; body: unknown }[] = [];
   serve({ ...SERVICE, ...routes }, posted);
-  const calls = { again: 0 };
+  const calls = { again: 0, fresh: 0 };
   const shownIn = document.createElement('div');
   document.body.append(shownIn);
   host = shownIn;
   root = createRoot(shownIn);
   // The computers come from the start that was refused, which read them; here that read is made once, as Start makes it.
   const { machines } = await request<NetworkView>('/network').catch(() => ({ machines: [] as NetworkView['machines'] }));
-  await act(async () => { root?.render(<CannotStart agent={SCRIBE} name="Scribe" refusal={refusal} machines={machines} again={() => { calls.again += 1; }} />); });
+  await act(async () => { root?.render(<CannotStart agent={SCRIBE} name="Scribe" refusal={refusal} machines={machines} again={() => { calls.again += 1; }} startAgain={() => { calls.fresh += 1; }} />); });
   await settle();
   return { host: shownIn, posted, calls };
 }
@@ -342,4 +342,12 @@ describe('an agent with no folder to work in', () => {
     const own = ['version', 'operation', 'note', 'set_by', 'set_at'];
     expect(kept).toEqual(Object.fromEntries(Object.entries(full).filter(([member]) => !own.includes(member))));
   });
+});
+
+it('offers Start again beside Try again for a known conversation that cannot be resumed', async () => {
+  const { host, calls } = await shown({ refusal: 'pty_resume_missing', reason: 'The known session file is gone; choose Start again' });
+  expect(buttons(host)).toEqual(['Start again', 'Try again']);
+  await click(host.querySelector('button'));
+  expect(calls.fresh).toBe(1);
+  expect(calls.again).toBe(0);
 });

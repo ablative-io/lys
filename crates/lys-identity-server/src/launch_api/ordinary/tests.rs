@@ -89,7 +89,8 @@ fn no_prior_on_the_selected_machine_keeps_the_first_start_without_a_resume_sourc
 }
 
 #[test]
-fn a_newer_session_without_launch_metadata_refuses_instead_of_resuming_an_older_launch() -> Result {
+fn a_newer_session_without_launch_metadata_starts_fresh_instead_of_resuming_an_older_launch()
+-> Result {
     let sessions = [
         tracked("older", Some(AGENT), MACHINE, Some(view("claude-code"))),
         tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, None),
@@ -97,25 +98,21 @@ fn a_newer_session_without_launch_metadata_refuses_instead_of_resuming_an_older_
     let selected = latest(&sessions, AGENT, MACHINE, OPERATION)
         .ok_or("the newest prior session was skipped")?;
     assert_eq!(selected.session, PRIOR_OPERATION);
-    let error = prior(selected, Harness::ClaudeCode, None)
-        .err()
-        .ok_or("the newest session silently used an older recorded launch")?;
-    assert_eq!(error.name(), "pty_resume_unavailable");
-    assert!(error.to_string().contains("recorded launch"));
-    assert!(error.to_string().contains("Start again"));
+    let chosen = prior(selected, Harness::ClaudeCode, None)?;
+    assert_eq!(chosen.native, None);
+    assert_eq!(chosen.directory, None);
     Ok(())
 }
 
 #[test]
-fn only_the_first_report_supplies_the_kept_launch_metadata() -> Result {
+fn missing_first_launch_metadata_starts_fresh_even_if_a_later_report_names_a_launch() -> Result {
     let mut held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, None);
     let mut later = held.reports[0].clone();
     later.launch = Some(view("claude-code"));
     held.reports.push(later);
-    let error = prior(&held, Harness::ClaudeCode, None)
-        .err()
-        .ok_or("a later report supplied missing first-launch metadata")?;
-    assert_eq!(error.name(), "pty_resume_unavailable");
+    let chosen = prior(&held, Harness::ClaudeCode, None)?;
+    assert_eq!(chosen.native, None);
+    assert_eq!(chosen.directory, None);
     Ok(())
 }
 
@@ -130,7 +127,7 @@ fn a_matching_claude_or_codex_prior_keeps_its_exact_recorded_folder_and_session(
         let held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(launch));
         let selected = prior(&held, harness, Some(PRIOR_FOLDER))?;
         assert_eq!(selected.session, PRIOR_OPERATION);
-        assert_eq!(selected.directory, PRIOR_FOLDER);
+        assert_eq!(selected.directory.as_deref(), Some(PRIOR_FOLDER));
         assert_eq!(selected.native.as_deref(), Some(UUID));
     }
     Ok(())
@@ -142,7 +139,9 @@ fn a_changed_native_harness_or_explicit_folder_refuses_and_names_start_again() -
         ("claude-code", Harness::Codex),
         ("codex", Harness::ClaudeCode),
     ] {
-        let held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(view(recorded)));
+        let mut launch = view(recorded);
+        launch["native_conversation"] = json!(UUID);
+        let held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(launch));
         let error = prior(&held, current, None)
             .err()
             .ok_or("a changed harness resumed the prior native conversation")?;
@@ -221,17 +220,13 @@ fn an_old_launch_without_saved_native_identity_requires_runner_recovery_without_
 }
 
 #[test]
-fn runner_recovery_requires_a_real_native_id_and_never_substitutes_a_fresh_conversation() -> Result
-{
+fn no_remembered_or_recovered_native_id_starts_fresh_but_an_invalid_known_id_still_refuses()
+-> Result {
     for harness in [Harness::ClaudeCode, Harness::Codex] {
-        let error = known_native(harness, None)
-            .err()
-            .ok_or("a missing runner conversation became a fresh identity")?;
-        assert_eq!(error.name(), "pty_resume_unavailable");
-        assert!(error.to_string().contains("Start again"));
+        assert_eq!(known_native(harness, None)?, None);
         assert_eq!(
-            known_native(harness, Some(OTHER_UUID.to_owned()))?,
-            OTHER_UUID
+            known_native(harness, Some(OTHER_UUID.to_owned()))?.as_deref(),
+            Some(OTHER_UUID)
         );
         let error = known_native(harness, Some("not-a-uuid".to_owned()))
             .err()
@@ -300,5 +295,19 @@ fn replay_refuses_a_different_machine_folder_or_malformed_kept_conversation() ->
         .err()
         .ok_or("a malformed kept conversation became a fresh replay")?;
     assert_eq!(error.name(), "pty_resume_unavailable");
+    Ok(())
+}
+
+#[test]
+fn no_known_conversation_uses_the_new_folder_instead_of_refusing_an_old_folder_change() -> Result {
+    let held = tracked(
+        PRIOR_OPERATION,
+        Some(AGENT),
+        MACHINE,
+        Some(view("claude-code")),
+    );
+    let chosen = prior(&held, Harness::ClaudeCode, Some(CURRENT_FOLDER))?;
+    assert_eq!(chosen.native, None);
+    assert_eq!(chosen.directory, None);
     Ok(())
 }

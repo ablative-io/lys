@@ -52,9 +52,9 @@ export function whyNot(name: string, refusal: StartRefusal): { sentence: string;
   return { sentence: problemWords(new Refused(0, refusal)), fix: { kind: 'try-again' } };
 }
 
-export function CannotStart({ agent, name, refusal, machines, again }: {
+export function CannotStart({ agent, name, refusal, machines, again, startAgain }: {
   /** The computers as the start that was refused read them, so this explanation and that start never disagree. */
-  agent: string; name: string; refusal: StartRefusal; machines: Machine[]; again: () => void;
+  agent: string; name: string; refusal: StartRefusal; machines: Machine[]; again: () => void; startAgain?: () => void;
 }) {
   const { sentence, fix } = whyNot(name, refusal);
   const detail = refusal.refusal + ': ' + refusal.reason;
@@ -64,6 +64,7 @@ export function CannotStart({ agent, name, refusal, machines, again }: {
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
     {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} machines={machines} again={again} /> : null}
     {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} machines={machines} again={again} /> : null}
+    {startAgain && refusal.reason.includes('Start again') ? <Act symbol="start" name="Start again" word="Start again" tone="primary" onClick={startAgain} /> : null}
     {fix.kind === 'try-again' ? <Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={again} /> : null}
   </div>;
 }

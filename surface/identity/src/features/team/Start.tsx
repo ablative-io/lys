@@ -88,6 +88,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const wanted = useRef(straightAway);
+  const fresh = useRef(false);
 
   const data = load.status === 'ok' ? load.data : null;
   const profile = data?.profile ?? null;
@@ -111,7 +112,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     working.current = true; setBusy(true); setRefusal(null); setEnded('');
     try {
       const review = (version: number, machine: string): Pending => ({ stage: 'review', path: prefix + '/provisioning/' + version + '/review', body: { operation: operationId() }, machine, version });
-      const start = (version: number, machine: string): Pending => ({ stage: 'start', path: prefix + '/start-command', body: { machine, operation: operationId() }, machine, version });
+      const start = (version: number, machine: string): Pending => ({ stage: 'start', path: prefix + '/start-command', body: { machine, operation: operationId(), ...(fresh.current ? { fresh: true } : {}) }, machine, version });
       // A request this tab already sent and never saw answered is sent again, the same one, before anything new.
       const raw = sessionStorage.getItem(key);
       let current: Pending = raw === null
@@ -122,6 +123,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
         const sent = current;
         if (sent.stage === 'start') {
           const receipt = await sendKept(key, sent, () => startRequest(agent, sent), true);
+          fresh.current = false;
           if (receipt.runner?.state === 'running') changed(); else setEnded(receipt.session);
           return;
         }
@@ -156,7 +158,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   const stopped = refusal ?? known;
   return <div className="team-start">
     <p className="team-start-line">{name} is not running.</p>
-    {stopped && data ? <CannotStart agent={agent} name={name} refusal={stopped} machines={data.machines} again={again} /> : null}
+    {stopped && data ? <CannotStart agent={agent} name={name} refusal={stopped} machines={data.machines} again={again} startAgain={() => { fresh.current = true; again(); }} /> : null}
     {!stopped && noProgram ? <div role="alert" className="cannot-start">
       <p>{name} has no program chosen yet.</p>
       <Act symbol="open" name="Choose its program" word="Choose" tone="primary" onClick={settings} />

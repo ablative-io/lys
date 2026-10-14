@@ -42,6 +42,10 @@ fn a_first_fresh_claude_terminal_keeps_configuration_arguments_and_binds_the_com
 -> Result {
     let mut launch = launch("claude_code", false)?;
     let mut expected = launch.clone();
+    expected.environment.insert(
+        "LYS_PTY_STATUS_NOTE".to_owned(),
+        "no earlier conversation to resume; started a new one".to_owned(),
+    );
     expected.arguments = [
         "--settings",
         "/chosen/settings.json",
@@ -113,7 +117,11 @@ fn a_managed_claude_launch_keeps_its_existing_conversation_selection_boundary() 
 #[test]
 fn a_fresh_codex_terminal_keeps_its_launch_without_guessing_a_native_thread_id() -> Result {
     let mut launch = launch("codex", false)?;
-    let before = launch.clone();
+    let mut before = launch.clone();
+    before.environment.insert(
+        "LYS_PTY_STATUS_NOTE".to_owned(),
+        "no earlier conversation to resume; started a new one".to_owned(),
+    );
     fresh_terminal_conversation(&mut launch, None)?;
     assert_eq!(launch, before);
     Ok(())

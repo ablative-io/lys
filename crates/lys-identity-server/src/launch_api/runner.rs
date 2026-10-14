@@ -93,6 +93,17 @@ fn fresh_terminal_conversation(
     resume: Option<&str>,
 ) -> Result<(), ServerError> {
     if resume.is_none()
+        && launch
+            .config
+            .as_ref()
+            .is_some_and(|config| !config.requires_controls && config.harness.is_some())
+    {
+        launch.environment.insert(
+            "LYS_PTY_STATUS_NOTE".to_owned(),
+            "no earlier conversation to resume; started a new one".to_owned(),
+        );
+    }
+    if resume.is_none()
         && launch.config.as_ref().is_some_and(|config| {
             !config.requires_controls
                 && config.harness == Some(lys_runner::tracking::Harness::ClaudeCode)
