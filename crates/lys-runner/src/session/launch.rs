@@ -125,21 +125,20 @@ impl Sessions {
             attach: crate::attach::Ring::new(self.scrollback),
             last_signal: None,
         };
+        let prepared = self.run(&lifecycle::plan(&session, false)?)?;
+        let pending = Self::install(&mut session, prepared)?;
         if let Some(note) = session
             .launch
             .as_ref()
             .and_then(|launch| launch.environment.get("LYS_PTY_STATUS_NOTE"))
-            && !session
-                .output
-                .push(0, format!("\r\nLys: {note}\r\n").as_bytes())?
+            && let Err(error) = session.output.push(
+                session.generation,
+                format!("\r\nLys: {note}\r\n").as_bytes(),
+            )
         {
-            return Err(RunnerError::refused(
-                "pty_status_note_unavailable",
-                "the fresh terminal status note could not be retained",
-            ));
+            pending.cancel()?;
+            return Err(error);
         }
-        let prepared = self.run(&lifecycle::plan(&session, false)?)?;
-        let pending = Self::install(&mut session, prepared)?;
         let pid = session.pid.ok_or_else(|| {
             RunnerError::refused(
                 "spawn_install_failed",
@@ -235,6 +234,42 @@ mod tests {
                 assert!(!valid_id(&character.to_string()), "accepted {character:?}");
             }
         }
+    }
+
+    #[test]
+    fn a_fresh_status_note_is_retained_without_refusing_the_installed_child()
+    -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let sessions = Sessions::open(dir.path(), 4096)?;
+        let note = "no earlier conversation to resume; started a new one";
+        let (pid, _) = sessions.start(Launch {
+            session: "fresh-status-note".to_owned(),
+            program: "/usr/bin/true".to_owned(),
+            arguments: Vec::new(),
+            directory: dir.path().display().to_string(),
+            environment: BTreeMap::from([("LYS_PTY_STATUS_NOTE".to_owned(), note.to_owned())]),
+            config: None,
+            columns: 80,
+            rows: 24,
+            rotation: None,
+            policy: None,
+        })?;
+        assert!(pid > 0);
+        let output = {
+            let table = sessions.read_lock()?;
+            let session = table
+                .sessions
+                .get("fresh-status-note")
+                .ok_or("started session not installed")?;
+            assert!(session.generation > 0);
+            session.output.lock()?.scrollback().from(0)?
+        };
+        assert!(String::from_utf8(output)?.contains(note));
+        sessions.end(
+            "fresh-status-note",
+            &std::sync::atomic::AtomicBool::new(false),
+        )?;
+        Ok(())
     }
 
     #[test]
