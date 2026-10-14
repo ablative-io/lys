@@ -83,6 +83,17 @@ describe('An agent\'s run on People and agents', () => {
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
   });
 
+  it('keeps suspension in the named menu action and gives Stop only to the live run', async () => {
+    await mount('#/file/' + SCRIBE, routes);
+    expect($('.file .head [data-act="stop"]')).toBeNull();
+    expect($('section[aria-label="Run"] [data-act="stop"]')?.getAttribute('aria-label')).toBe('Stop');
+    await click($('.file .head [aria-label="More actions"]'));
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend access');
+    await click($('.file .head [data-act="suspend"]'));
+    expect($('form[aria-label="Confirm suspension"]')?.textContent).toContain('withdraws its certificates');
+    expect($('form[aria-label="Confirm suspension"] button[type="submit"]')?.getAttribute('aria-label')).toBe('Suspend this agent’s access');
+  });
+
   it('starts a stopped agent from its row on the front page with one press', async () => {
     let live = false;
     const start = started(SCRIBE);

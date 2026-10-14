@@ -71,12 +71,12 @@ describe('An agent page explains the agent before its controls', () => {
     expect($$('.file nav.tabs a').map((entry) => entry.getAttribute('href'))).toEqual(expect.arrayContaining(['#/file/' + SCRIBE + '/budgets', '#/file/' + SCRIBE + '/access']));
     expect($('[data-act="start"]')).toBeNull();
     expect(run()?.textContent).not.toContain('is not running');
-    // The head is the name, the stop, the state and one menu; the name is edited from the Overview.
+    // The head keeps the state and menu; the live run has Stop.
     expect($('.file .head')?.textContent).not.toContain('Edit name');
     expect($('.file [data-act="rename"]')?.getAttribute('aria-label')).toBe('Edit name');
-    expect($('.file .head [data-act="stop"]')?.getAttribute('aria-label')).toBe('Emergency stop');
+    expect($('.file .head [data-act="stop"]')).toBeNull();
     await click($('.file .head [aria-label="More actions"]'));
-    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend');
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend access');
     expect($('.file .head [data-act="retire"]')?.textContent).toBe('Retire');
     expect(requests).not.toContain('/receipts/4');
     expect($('.agent-details')).toBeNull();
@@ -265,9 +265,9 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('.agent-details')).toBeNull();
     expect(requests).not.toContain('/receipts/4');
     expect(requests).not.toContain('/receipts/5');
-    const stop = $('.file .head [data-act="stop"]');
-    expect(stop).not.toBeNull();
-    expect(stop?.closest('details')).toBeNull();
+    expect($('.file .head [data-act="stop"]')).toBeNull();
+    await click($('.file .head [aria-label="More actions"]'));
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend access');
     expect(posted).toEqual([]);
   });
 });

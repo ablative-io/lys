@@ -232,7 +232,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/runtime/message-edges" "Caller-visible message addresses from the message service, mapped to Lys identities" S [PERSON, &["MessageEdgesUnavailable"]] scope("runtime-session", "read", []);
     POST "/runtime/found/{session}/reports" "Report a found session" S [ADMIN_BODY, &["MachineUnknown"], &["RuntimeSessionStopped", "RuntimeSessionUnknown"]] scope("runtime-session", "runtime-session.found.report", ["session"]);
     GET "/runtime/found" "The sessions found" S [ADMIN] scope("runtime-session", "read", []);
-    POST "/agents/{id}/stop" "Stop an agent" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]] scope("agent", "agent.stop", ["id"]);
+    POST "/agents/{id}/stop" "Suspend an agent's access, withdraw certificates and end its sessions; ordinary Stop uses the runtime session end route" S [SIGNED_BODY, &["AgentNotVisible", "StopReused"]] scope("agent", "agent.stop", ["id"]);
     GET "/agents/{id}/stops" "An agent's stops" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/runtime/stop-everything" "Whether everything is stopped, by whom, when and why" S [SIGNED, &["cord_unavailable"]] scope("runtime-session", "read", []);
     POST "/runtime/stop-everything" "Stop every session on every computer and refuse every start" S [ADMIN_BODY, &["IdentifierMalformed", "cord_reused", "cord_unavailable", "RuntimeUnavailable"]] scope("runtime-session", "runtime.stop-everything", []);

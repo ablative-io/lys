@@ -21,54 +21,54 @@ describe("An agent's file", () => {
     expect($('.file .head')?.textContent).not.toContain(SCRIBE);
     expect($('#state')?.textContent).toBe('Active');
     expect($('[aria-label="About this agent"] .pill.human')?.getAttribute('href')).toBe('#/file/' + ADA);
-    // The day it was added is a line of its Overview; the head is the name, the stop, the state and one menu.
-    // The head, in order: the name, the stop (a symbol, so it has no words), the state and the one menu.
+    // The head keeps identity and state together; suspension is named in its menu.
     expect($('.file .head')?.textContent).toBe('ScribeActive');
     const head = [...($('.file .head')?.querySelectorAll('h1, button, .state') ?? [])];
-    expect(head.map((each) => each.getAttribute('aria-label') ?? each.textContent)).toEqual(['Scribe', 'Emergency stop', 'Active', 'More actions']);
-    expect((head[3] as HTMLElement).dataset.symbol).toBe('more');
-    expect((head[1] as HTMLElement).dataset.symbol).toBe('stop');
+    expect(head.map((each) => each.getAttribute('aria-label') ?? each.textContent)).toEqual(['Scribe', 'Active', 'More actions']);
+    expect((head[2] as HTMLElement).dataset.symbol).toBe('more');
     expect($('[aria-label="About this agent"]')?.textContent).toContain('Added22 Sep');
     expect($('.agent-details')).toBeNull();
     expect($('.file details')).toBeNull();
     expect($$('.tabs a').map((a) => a.textContent)).toEqual(['Overview', 'Settings', 'Access1', 'Limits and goals', 'Sessions', 'Credentials', 'Record2']);
   });
 
-  it('starts from its own Overview, keeps lifecycle controls in the head, in view, and preserves Emergency stop', async () => {
+  it('starts from its own Overview, keeps suspension under its named menu action', async () => {
     await mount('#/file/' + SCRIBE, { ...SERVICE, ...RUN });
     expect($('nav[aria-label="Next steps"]')).toBeNull();
     expect($('section[aria-label="Run"]')?.textContent).toContain('Scribe is not running.');
     expect($('a[href^="#/team"]')).toBeNull();
-    expect($('.file .head button[data-act="stop"]')?.getAttribute('aria-label')).toBe('Emergency stop');
+    expect($('.file .head button[data-act="stop"]')).toBeNull();
     await click($('.file .head [aria-label="More actions"]'));
     expect($('.file .head [data-act="suspend"]')).not.toBeNull();
-    expect($$('.file [data-act="stop"]').length).toBe(1);
+    expect($$('.file [data-act="stop"]').length).toBe(0);
   });
 
-  it('stops an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
+  it('suspends an agent only after a reason is given, under one operation, and never claims a session ended', async () => {
     const { posted } = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST /agents/' + SCRIBE + '/stop']: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: ['op-' + 'a'.repeat(32)], credentials_ended: null, credentials_refused: 'SecretsUnavailable: no secrets broker is configured', sessions_asked: ['op-' + 'b'.repeat(32)], reason: 'leaked its key' }) });
-    await click($('.file .head button[data-act="stop"]'));
+    await click($('.file .head [aria-label="More actions"]'));
+    await click($('.file .head [data-act="suspend"]'));
     expect(posted).toEqual([]);
-    const reason = $('form[aria-label="Confirm emergency stop"] input');
+    const reason = $('form[aria-label="Confirm suspension"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Stop this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Suspend this agent’s access') ?? null);
     expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
     expect(text()).toContain('The agent’s access is suspended.');
     expect(text()).toContain('The credential service did not confirm that credentials ended.');
     expect(text()).toContain('Other sessions remain unconfirmed');
-    expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
+    expect($('[aria-label="Agent suspension recorded"]')).not.toBeNull();
   });
 
   it('recovers an unanswered stop after the next read shows the agent suspended', async () => {
     sessionStorage.clear();
     const path = '/agents/' + SCRIBE + '/stop';
     const first = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST ' + path]: refused(503, 'StopsUnavailable', 'Outcome unknown') });
-    await click($('[data-act="stop"]'));
-    const reason = $('form[aria-label="Confirm emergency stop"] input');
+    await click($('.file .head [aria-label="More actions"]'));
+    await click($('.file .head [data-act="suspend"]'));
+    const reason = $('form[aria-label="Confirm suspension"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'Key exposed'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Stop this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Suspend this agent’s access') ?? null);
     expect(first.posted).toHaveLength(1);
     unmountAll(); document.body.innerHTML = '';
     const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
@@ -76,7 +76,7 @@ describe("An agent's file", () => {
     await click([...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Check whether Lys saved it') ?? null);
     expect(later.posted).toEqual(first.posted);
     expect(text()).toContain('Broker unavailable');
-    expect($('[aria-label="Emergency stop recorded"]')).not.toBeNull();
+    expect($('[aria-label="Agent suspension recorded"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.stop.' + SCRIBE)).toBeNull();
   });
 
@@ -151,9 +151,9 @@ describe("An agent's file", () => {
     await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
     expect(location.hash).toBe('#/file/' + SCRIBE);
-    const form = $('.file form[aria-label="Record lifecycle change"]');
+    const form = $('.file form[aria-label="Confirm suspension"]');
     expect(form).not.toBeNull();
-    expect(form?.querySelector('input[name="reason"]')).not.toBeNull();
+    expect(form?.querySelector('input')).not.toBeNull();
     expect(form?.querySelector('[name="identity"]')).toBeNull();
     expect($('#state')?.textContent).toBe('Active');
     expect(posted).toHaveLength(0);

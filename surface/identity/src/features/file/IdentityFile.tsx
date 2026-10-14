@@ -92,14 +92,10 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
               : person ? <p className="sec">Answers to <Pill x={person} /></p> : null}
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* The head holds the name, the stop, the state and one menu, and nothing else (Tom, 5 October 2026). */}
             {ACTIONS[x.state].includes('activate') ? <Act symbol="start" name={ACTION.activate} word={ACTION_SHORT.activate} tone="primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')} /> : null}
-            {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? (
-              <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} />
-            ) : null}
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             <HeadMenu chosen={changing} choose={(act) => setChanging(changing === act ? null : act)}
-              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
+              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: agent && a === 'suspend' ? 'Suspend access' : ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
           </div>
         </div>
         {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}
@@ -107,7 +103,8 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/profile', body: { display_name: String(form.get('display_name') ?? '').trim() } })}>
           <label className="field">Display name<input name="display_name" required defaultValue={x.display_name} /></label>
         </RecordedForm> : null}
-        {changing && changing !== 'name' ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} drawn={{ symbol: changing === 'retire' ? 'retire' : changing === 'suspend' ? 'suspend' : 'start', word: ACTION_SHORT[changing], tone: changing === 'retire' || changing === 'suspend' ? 'danger' : 'primary' }} done={reload}
+        {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} open={changing === 'suspend'} cancel={() => setChanging(null)} /> : null}
+        {changing && changing !== 'name' && !(agent && changing === 'suspend') ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} drawn={{ symbol: changing === 'retire' ? 'retire' : changing === 'suspend' ? 'suspend' : 'start', word: ACTION_SHORT[changing], tone: changing === 'retire' || changing === 'suspend' ? 'danger' : 'primary' }} done={reload}
           success={(asked) => { const now: Record<string, string> = { activate: 'active', suspend: 'suspended', retire: 'retired', reinstate: 'active', resume: 'active' }; const words = x.display_name + ' is now ' + (now[String(asked.body.transition)] ?? 'updated') + '.'; note(words); return words; }}
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/transitions', body: { transition: changing, reason: String(form.get('reason') ?? '').trim() } })}>
           <label className="field">Reason<input name="reason" required /></label>
