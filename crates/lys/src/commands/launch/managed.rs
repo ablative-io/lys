@@ -88,10 +88,15 @@ pub(super) fn start(
     machine: &str,
     session: &str,
 ) -> CliResult<Value> {
-    let answer: Started = serde_json::from_value(answer).map_err(|_| {
+    let answer: Started = serde_json::from_value(answer).map_err(|error| {
         refused(
             "launch_answer_unreadable",
-            "Lys did not answer in its recorded managed seat start shape",
+            format!(
+                "Lys did not answer in its recorded managed seat start shape; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
         )
     })?;
     if answer.session != session

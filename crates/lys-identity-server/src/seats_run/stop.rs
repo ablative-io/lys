@@ -89,7 +89,7 @@ fn end_record(
         if let Err(error) = Transport::Codex.validate_resume(conversation) {
             record.refusal = Some(
                 RunnerError::refused(
-                    error.name(),
+                    &error.name(),
                     format!(
                         "the ended terminal's native conversation is not a UUID: {error}; its stopped state was kept; choose Start again"
                     ),

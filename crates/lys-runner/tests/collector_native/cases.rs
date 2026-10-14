@@ -26,10 +26,12 @@ fn old_source(bound: &str) -> Value {
 }
 
 fn old_index(sources: Value) -> Value {
-    json!({
+    let mut index = json!({
         "format": FEED_FORMAT, "feed": RUN, "committed": 0,
-        "next_seq": 0, "sources": sources, "attempts": {}
-    })
+        "next_seq": 0, "attempts": {}
+    });
+    index["sources"] = sources;
+    index
 }
 
 fn assert_old_source(source: &SourceState, bound: &str) {

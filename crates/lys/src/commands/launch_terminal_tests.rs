@@ -9,16 +9,18 @@ use crate::commands::error::CliResult;
 use crate::commands::seat_client::refused;
 
 fn window(from: u64, data: &[u8], ended: Value) -> Value {
-    json!({
+    let mut view = json!({
         "answer": {
             "kind": "bytes",
             "output": {
                 "session": "session-1", "from": from,
                 "cursor": from + u64::try_from(data.len()).expect("test data length"),
-                "oldest": 0, "data": data, "ended": ended,
+                "oldest": 0, "data": data,
             },
         },
-    })
+    });
+    view["answer"]["output"]["ended"] = ended;
+    view
 }
 
 fn ended() -> Value {

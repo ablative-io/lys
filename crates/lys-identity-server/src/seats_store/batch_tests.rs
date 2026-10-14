@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use identity_contract::harness::{Fault, Harness};
 use lys_core::Ed25519Identity;
-use lys_log_store::{FileLeafStore, Start, flush_count};
+use lys_log_store::{Start, flush_count};
 
 use super::SeatStore;
 use crate::seats_state::{Added, Line, Moved, Started, Stopped};

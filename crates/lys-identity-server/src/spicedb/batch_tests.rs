@@ -131,7 +131,12 @@ async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error
         (subject, resource.clone(), write.clone()),
     ]);
     let result = tokio::task::spawn_blocking(move || {
-        engine.read_batch(9, BTreeSet::from([(subject, requested)]), &checks, 100)
+        super::super::Relationships::SpiceDb(engine).read_batch(
+            9,
+            BTreeSet::from([(subject, requested)]),
+            &checks,
+            100,
+        )
     })
     .await;
     stop.send(())

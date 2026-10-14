@@ -125,7 +125,7 @@ fn managed_start_validates_outer_seat_identity_before_using_its_native_launch() 
 }
 
 #[test]
-fn a_managed_start_with_no_current_seat_session_refuses_before_input() -> Result {
+fn a_managed_start_with_no_current_seat_session_refuses_before_input() {
     let agent = agent();
     let seat = &agent.seats[0];
     for current in [None, Some(serde_json::Value::Null)] {
@@ -135,7 +135,6 @@ fn a_managed_start_with_no_current_seat_session_refuses_before_input() -> Result
         }
         assert!(start(reply, &agent, seat, "machine-a", "op-own").is_err());
     }
-    Ok(())
 }
 
 #[test]

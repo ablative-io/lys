@@ -157,7 +157,7 @@ fn generic_start_again_stops_moves_and_starts_the_exact_reviewed_profile_in_orde
         qualification: None,
         transport: "pty".to_owned(),
         operation: PRIOR_OPERATION.to_owned(),
-        name: original.added.name.clone(),
+        name: original.added.name,
         session: PRIOR_OPERATION.to_owned(),
         harness_session: Some(PRIOR_UUID.to_owned()),
         by: "person".to_owned(),

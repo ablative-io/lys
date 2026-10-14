@@ -100,7 +100,7 @@ pub fn entry() -> Result<(), RunnerError> {
     rustix::process::setsid().map_err(|error| failed("control_process_unproved", error))?;
     let ready = Ready {
         pid: std::process::id(),
-        executable: selected.clone(),
+        executable: selected,
     };
     let mut stdout = std::io::stdout();
     serde_json::to_writer(&mut stdout, &ready)

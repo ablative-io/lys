@@ -5,7 +5,7 @@ use std::io::{IsTerminal, Write};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
-use rustix::termios::{Action, Termios, tcgetattr, tcgetpgrp, tcgetwinsize, tcsetattr};
+use rustix::termios::{OptionalActions, Termios, tcgetattr, tcgetpgrp, tcgetwinsize, tcsetattr};
 use serde_json::{Value, json};
 use tokio::io::unix::AsyncFd;
 use tokio::signal::unix::{Signal, SignalKind, signal};
@@ -36,7 +36,7 @@ impl Terminal {
     fn activate(&mut self) -> CliResult<()> {
         let mut raw = self.original.clone();
         raw.make_raw();
-        tcsetattr(self.input.get_ref(), Action::Now, &raw)
+        tcsetattr(self.input.get_ref(), OptionalActions::Now, &raw)
             .map_err(|error| terminal("set raw mode", error))?;
         self.raw = true;
         Ok(())
@@ -44,7 +44,7 @@ impl Terminal {
 
     pub(super) fn restore(&mut self) -> CliResult<()> {
         if self.raw {
-            tcsetattr(self.input.get_ref(), Action::Now, &self.original)
+            tcsetattr(self.input.get_ref(), OptionalActions::Now, &self.original)
                 .map_err(|error| terminal("restore terminal attributes", error))?;
             self.raw = false;
         }
@@ -118,7 +118,7 @@ pub fn prepare() -> CliResult<Terminal> {
         .read(true)
         .write(true)
         .open("/dev/tty")
-        .map_err(|error| terminal_error("open the controlling terminal", error))?;
+        .map_err(|error| terminal_error("open the controlling terminal", &error))?;
     let held = tcgetpgrp(&file)
         .map_err(|error| terminal("identify the terminal's foreground group", error))?;
     if held != rustix::process::getpgrp() {
@@ -147,11 +147,11 @@ pub fn prepare() -> CliResult<Terminal> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .map_err(|error| terminal_error("create the terminal event runtime", error))?;
+        .map_err(|error| terminal_error("create the terminal event runtime", &error))?;
     let (input, signals) = runtime.block_on(async {
         let signals = Signals::new()?;
         let input =
-            AsyncFd::new(file).map_err(|error| terminal_error("watch terminal input", error))?;
+            AsyncFd::new(file).map_err(|error| terminal_error("watch terminal input", &error))?;
         Ok::<_, CliError>((input, signals))
     })?;
     Ok(Terminal {
@@ -239,7 +239,7 @@ fn follow<T: Transport>(transport: Arc<T>, session: &str) -> CliResult<(Pages, J
                 }
             }
         })
-        .map_err(|error| terminal_error("start the terminal reader", error))?;
+        .map_err(|error| terminal_error("start the terminal reader", &error))?;
     Ok((pages, handle))
 }
 
@@ -257,7 +257,7 @@ pub(super) struct Stops {
 impl Signals {
     pub(super) fn new() -> CliResult<Self> {
         let watch =
-            |kind| signal(kind).map_err(|error| terminal_error("watch terminal signals", error));
+            |kind| signal(kind).map_err(|error| terminal_error("watch terminal signals", &error));
         Ok(Self {
             stop: Stops {
                 interrupt: watch(SignalKind::interrupt())?,
@@ -375,7 +375,7 @@ fn print_bytes(data: &[u8]) -> CliResult<()> {
     let mut out = std::io::stdout().lock();
     out.write_all(data)
         .and_then(|()| out.flush())
-        .map_err(|error| terminal_error("write agent terminal output", error))
+        .map_err(|error| terminal_error("write agent terminal output", &error))
 }
 
 async fn input_bytes(input: &AsyncFd<File>) -> CliResult<Vec<u8>> {
@@ -383,14 +383,14 @@ async fn input_bytes(input: &AsyncFd<File>) -> CliResult<Vec<u8>> {
         let mut ready = input
             .readable()
             .await
-            .map_err(|error| terminal_error("wait for terminal input", error))?;
+            .map_err(|error| terminal_error("wait for terminal input", &error))?;
         let mut buffer = [0_u8; 4096];
         match ready.try_io(|input| {
             rustix::io::read(input.get_ref(), &mut buffer).map_err(std::io::Error::from)
         }) {
             Ok(Ok(length)) => return Ok(buffer[..length].to_vec()),
             Ok(Err(error)) if error.kind() == std::io::ErrorKind::Interrupted => {}
-            Ok(Err(error)) => return Err(terminal_error("read terminal input", error)),
+            Ok(Err(error)) => return Err(terminal_error("read terminal input", &error)),
             Err(_) => {}
         }
     }
@@ -423,21 +423,19 @@ pub(super) fn request<T: Transport>(
     thread::Builder::new()
         .name("lys-terminal-control".to_owned())
         .spawn(move || {
-            if let Err(answer) = sent.send(transport.post(&route, &body)) {
-                if let Err(error) = answer {
-                    eprintln!("{error}");
-                }
+            if let Err(Err(error)) = sent.send(transport.post(&route, &body)) {
+                eprintln!("{error}");
             }
         })
-        .map_err(|error| terminal_error("start the terminal control request", error))?;
+        .map_err(|error| terminal_error("start the terminal control request", &error))?;
     Ok(received)
 }
 
 fn terminal(operation: &str, error: rustix::io::Errno) -> CliError {
-    terminal_error(operation, error.into())
+    terminal_error(operation, &error.into())
 }
 
-pub(super) fn terminal_error(operation: &str, error: std::io::Error) -> CliError {
+pub(super) fn terminal_error(operation: &str, error: &std::io::Error) -> CliError {
     refused(
         "launch_terminal_io_failed",
         format!("cannot {operation}: {error}"),

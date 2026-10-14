@@ -224,7 +224,7 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_value(&reading(&figures, Measure::Dollars, Some(Length::Day))?.figure)?,
-            serde_json::json!(0.991276)
+            serde_json::json!(0.991_276)
         );
         Ok(())
     }

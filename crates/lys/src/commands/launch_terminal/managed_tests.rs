@@ -10,7 +10,9 @@ use crate::commands::error::CliResult;
 use crate::commands::launch_terminal::end_session;
 
 fn frames(session: &str, cursor: u64, ended: bool, lines: Value) -> Value {
-    json!({"session": session, "cursor": cursor, "ended": ended, "lines": lines})
+    let mut view = json!({"session": session, "cursor": cursor, "ended": ended});
+    view["lines"] = lines;
+    view
 }
 
 fn line(kind: &str, text: &str) -> Value {

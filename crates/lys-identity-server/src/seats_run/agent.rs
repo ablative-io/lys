@@ -306,7 +306,7 @@ fn native_conversation(
     let resume = selected_conversation(view, "conversation")?;
     for native in [retained, resume, observed].into_iter().flatten() {
         transport.validate_resume(native).map_err(|error| {
-            RunnerError::refused(error.name(), format!("{error}; choose Start again"))
+            RunnerError::refused(&error.name(), format!("{error}; choose Start again"))
         })?;
     }
     if retained

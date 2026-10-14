@@ -49,10 +49,10 @@ fn load(root: &Path) -> CliResult<Defaults> {
             choices: Vec::new(),
         });
     };
-    let kept: Defaults = serde_json::from_slice(&bytes).map_err(|_| {
+    let kept: Defaults = serde_json::from_slice(&bytes).map_err(|error| {
         refused(
             "launch_defaults_unreadable",
-            "the recorded harness choices do not match their stored shape; no default was selected",
+            format!("the recorded harness choices do not match their stored shape; no default was selected; JSON {:?} at {}:{}", error.classify(), error.line(), error.column()),
         )
     })?;
     let mut unique = BTreeSet::new();
@@ -126,10 +126,15 @@ pub fn set(root: &Path, scope: &Scope<'_>, harness: &str, agent: &str) -> CliRes
         harness: harness.to_owned(),
         agent: agent.to_owned(),
     });
-    let bytes = serde_json::to_vec(&kept).map_err(|_| {
+    let bytes = serde_json::to_vec(&kept).map_err(|error| {
         refused(
             "launch_defaults_unwritable",
-            "the harness choices could not be encoded",
+            format!(
+                "the harness choices could not be encoded; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
         )
     })?;
     private_files::ensure_dir(&root.join("client"))?;

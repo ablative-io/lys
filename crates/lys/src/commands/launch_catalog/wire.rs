@@ -13,8 +13,17 @@ pub(super) fn invalid(path: &str, reason: &str) -> CliError {
 }
 
 pub(super) fn decode<T: DeserializeOwned>(value: Value, path: &str) -> CliResult<T> {
-    serde_json::from_value(value)
-        .map_err(|_| invalid(path, "the public view is malformed or incomplete"))
+    serde_json::from_value(value).map_err(|error| {
+        invalid(
+            path,
+            &format!(
+                "the public view is malformed or incomplete; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
+        )
+    })
 }
 
 #[derive(Deserialize)]
@@ -36,8 +45,15 @@ pub(super) struct Summary {
 
 impl Summary {
     pub fn validate(&self, path: &str) -> CliResult<()> {
-        segment("launch_catalog_invalid", "agent identity", &self.id)
-            .map_err(|_| invalid(path, "an agent identity is malformed"))?;
+        segment("launch_catalog_invalid", "agent identity", &self.id).map_err(
+            |error| match error {
+                CliError::Runner(error) => invalid(
+                    path,
+                    &format!("an agent identity is malformed: {}", error.name()),
+                ),
+                other => other,
+            },
+        )?;
         if self.display_name.trim().is_empty() || self.state.trim().is_empty() {
             return Err(invalid(path, "an agent has no name or lifecycle state"));
         }
@@ -69,8 +85,15 @@ impl Machine {
             allowed.validate("/network")?;
         }
         for role in &self.may_run_roles {
-            segment("launch_catalog_invalid", "admitted role identity", role)
-                .map_err(|_| invalid("/network", "an admitted role identity is malformed"))?;
+            segment("launch_catalog_invalid", "admitted role identity", role).map_err(|error| {
+                match error {
+                    CliError::Runner(error) => invalid(
+                        "/network",
+                        &format!("an admitted role identity is malformed: {}", error.name()),
+                    ),
+                    other => other,
+                }
+            })?;
         }
         Ok(())
     }
@@ -201,7 +224,7 @@ impl Runtime {
 }
 
 #[derive(Deserialize)]
-pub(super) struct Seats {
+pub(super) struct SeatViews {
     pub seats: Vec<Seat>,
     pub runner: String,
     pub reason: Option<String>,
@@ -219,7 +242,7 @@ pub(super) struct Seat {
     pub session: Option<String>,
 }
 
-impl Seats {
+impl SeatViews {
     pub fn validate(&self) -> CliResult<()> {
         if !matches!(self.runner.as_str(), "read" | "unknown")
             || (self.runner == "unknown"

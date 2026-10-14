@@ -10,7 +10,7 @@ type Result = std::result::Result<(), Box<dyn std::error::Error>>;
 fn a_personal_401_preserves_the_servers_name_and_prints_its_exact_sign_in_command() -> Result {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let base = format!("http://{}/api", listener.local_addr()?);
-    let served = std::thread::spawn(move || -> std::result::Result<String, std::io::Error> {
+    let response = std::thread::spawn(move || -> std::result::Result<String, std::io::Error> {
         let (mut stream, _) = listener.accept()?;
         let mut request = Vec::new();
         let mut buffer = [0u8; 1024];
@@ -47,7 +47,9 @@ fn a_personal_401_preserves_the_servers_name_and_prints_its_exact_sign_in_comman
     assert!(error.contains(&format!("lys sign-in --server {base}")));
     assert!(!error.contains("fixture-person-access"));
     assert!(!error.contains("fixture-person-refresh"));
-    let request = served.join().map_err(|_| "fixture thread panicked")??;
+    let request = response
+        .join()
+        .map_err(|panic| format!("fixture thread panicked: {panic:?}"))??;
     assert!(request.starts_with("GET /api/me HTTP/1.1"));
     assert!(
         request

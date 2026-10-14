@@ -321,7 +321,7 @@ fn an_exact_identity_still_selects_when_another_agents_name_is_that_identity() -
 }
 
 #[test]
-fn incomplete_public_views_refuse_without_copying_response_values() -> TestResult {
+fn incomplete_public_views_refuse_without_copying_response_values() {
     for path in [
         "/people",
         "/network",
@@ -343,7 +343,6 @@ fn incomplete_public_views_refuse_without_copying_response_values() -> TestResul
     let mut fixtures = fixture();
     view(&mut fixtures, "/agents/agent-1/provisioning")["agent"] = json!("agent-foreign");
     refusal(read(&fixtures), "launch_catalog_invalid");
-    Ok(())
 }
 
 #[test]

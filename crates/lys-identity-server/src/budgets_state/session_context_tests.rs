@@ -434,7 +434,7 @@ fn absent_live_sessions_have_no_reading_or_invented_call_count_and_invalid_attri
 }
 
 #[test]
-fn live_session_starts_cannot_overflow_or_be_ahead_of_the_observation() -> Result<(), String> {
+fn live_session_starts_cannot_overflow_or_be_ahead_of_the_observation() {
     let held = Held::default();
     assert_eq!(
         held.session_context(
@@ -453,5 +453,4 @@ fn live_session_starts_cannot_overflow_or_be_ahead_of_the_observation() -> Resul
             .as_deref(),
         Some("live context session session starts after the observation time")
     );
-    Ok(())
 }

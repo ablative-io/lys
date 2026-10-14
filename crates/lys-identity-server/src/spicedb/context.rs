@@ -39,6 +39,14 @@ thread_local! {
 pub(crate) struct Hold(Option<Data>);
 impl Hold {
     pub(crate) fn enter(prepared: &Data) -> Self {
+        tracing::debug!(
+            revision = prepared.revision,
+            resources_read = prepared.resources_read,
+            reads_elapsed_ms = prepared.reads_elapsed_ms,
+            batch = prepared.batch,
+            truncated = prepared.truncated,
+            "enter prepared relationship reading"
+        );
         Self(READING.with(|held| held.replace(Some(prepared.clone()))))
     }
 }

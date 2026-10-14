@@ -25,7 +25,7 @@ struct Machine {
 }
 
 #[derive(Deserialize)]
-struct Runner {
+struct RunnerView {
     machine: String,
     runner: Option<Record>,
     answers: Option<bool>,
@@ -40,10 +40,15 @@ struct Record {
 }
 
 fn decode<T: serde::de::DeserializeOwned>(value: Value) -> CliResult<T> {
-    serde_json::from_value(value).map_err(|_| {
+    serde_json::from_value(value).map_err(|error| {
         refused(
             "machine_answer_unreadable",
-            "Lys did not answer in its recorded machine shape",
+            format!(
+                "Lys did not answer in its recorded machine shape; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
         )
     })
 }
@@ -52,10 +57,10 @@ fn key_at(path: &Path) -> CliResult<Option<String>> {
     let Some(bytes) = private_files::read(path)? else {
         return Ok(None);
     };
-    let seed = Zeroizing::new(<[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| {
+    let seed = Zeroizing::new(<[u8; 32]>::try_from(bytes.as_slice()).map_err(|error| {
         refused(
             "runner_key_invalid",
-            "this device's private runner key is not 32 bytes; use Network > Computer > Connect",
+            format!("this device's private runner key is not 32 bytes: {error}; use Network > Computer > Connect"),
         )
     })?);
     Ok(Some(lys_runner::protocol::hex(
@@ -145,7 +150,7 @@ fn select(
                 "the machine answer has no recognized lifecycle state",
             ));
         }
-        let record: Runner = decode(get(&format!("/network/machines/{}/runner", machine.id))?)?;
+        let record: RunnerView = decode(get(&format!("/network/machines/{}/runner", machine.id))?)?;
         if record.machine != machine.id {
             return Err(refused(
                 "machine_answer_unreadable",

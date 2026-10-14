@@ -355,7 +355,7 @@ fn every_reported_token_subset_counts_and_names_only_its_missing_components()
                     "machine",
                     "agent",
                     &record,
-                    &Default::default(),
+                    &crate::budgets_state::Held::default(),
                     &Windows::new(),
                 )?;
                 assert_eq!(usage.tokens, values.into_iter().flatten().sum::<u64>());
@@ -406,7 +406,7 @@ fn reported_token_components_refuse_checked_overflow_even_when_other_components_
             "machine",
             "agent",
             &record,
-            &Default::default(),
+            &crate::budgets_state::Held::default(),
             &Windows::new(),
         )
         .err()

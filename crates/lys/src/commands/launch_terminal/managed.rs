@@ -73,7 +73,7 @@ fn follow<T: Transport>(
     seat: &str,
     session: &str,
 ) -> CliResult<(Pages, JoinHandle<()>)> {
-    let (sent, pages) = mpsc::channel(1);
+    let (output, pages) = mpsc::channel(1);
     let route = format!("/seats/{seat}/attach");
     let session = session.to_owned();
     let handle = thread::Builder::new()
@@ -91,7 +91,7 @@ fn follow<T: Transport>(
                 if let Ok(page) = &page {
                     cursor = Some(page.cursor);
                 }
-                if let Err(abandoned) = sent.blocking_send(page) {
+                if let Err(abandoned) = output.blocking_send(page) {
                     if let Err(error) = abandoned.0 {
                         eprintln!("{error}");
                     }
@@ -102,7 +102,7 @@ fn follow<T: Transport>(
                 }
             }
         })
-        .map_err(|error| terminal_error("start the managed terminal reader", error))?;
+        .map_err(|error| terminal_error("start the managed terminal reader", &error))?;
     Ok((pages, handle))
 }
 
@@ -170,10 +170,13 @@ impl Lines {
             }
             // The canonical delimiter is not part of the notice given to the harness.
             let complete: Vec<_> = self.pending.drain(..=end).take(end).collect();
-            let text = String::from_utf8(complete).map_err(|_| {
+            let text = String::from_utf8(complete).map_err(|error| {
                 refused(
                     "launch_managed_input_not_utf8",
-                    "managed input must be a complete UTF-8 line",
+                    format!(
+                        "managed input must be a complete UTF-8 line: {}",
+                        error.utf8_error()
+                    ),
                 )
             })?;
             if let Some(control) = text
@@ -255,7 +258,7 @@ async fn type_line<T: Transport>(
     let mut out = std::io::stdout().lock();
     writeln!(out, "input admitted to session {session}")
         .and_then(|()| out.flush())
-        .map_err(|error| terminal_error("write the managed input admission", error))
+        .map_err(|error| terminal_error("write the managed input admission", &error))
 }
 
 async fn wait_for_admission<T, F>(
@@ -323,10 +326,10 @@ fn render(lines: &[AttachLine], out: &mut impl Write) -> CliResult<()> {
         } else {
             writeln!(out, "{}: {text}", line.kind)
         };
-        written.map_err(|error| terminal_error("write managed terminal frames", error))?;
+        written.map_err(|error| terminal_error("write managed terminal frames", &error))?;
     }
     out.flush()
-        .map_err(|error| terminal_error("flush managed terminal frames", error))
+        .map_err(|error| terminal_error("flush managed terminal frames", &error))
 }
 
 fn unreadable(verb: &str, error: &serde_json::Error) -> CliError {

@@ -267,34 +267,6 @@ fn live_control_authority(authority: ControlLifecycle) -> bool {
         && authority.person == Some(lys_identity::LifecycleState::Active)
 }
 
-#[cfg(test)]
-mod authority_tests {
-    use super::{ControlLifecycle, live_control_authority};
-    use lys_identity::LifecycleState;
-    #[test]
-    fn pending_words_are_refused_when_the_responsible_person_is_no_longer_active() {
-        assert!(live_control_authority(ControlLifecycle {
-            agent: LifecycleState::Active,
-            person: Some(LifecycleState::Active)
-        }));
-        for person in [
-            Some(LifecycleState::Suspended),
-            Some(LifecycleState::Retired),
-            Some(LifecycleState::Registered),
-            None,
-        ] {
-            assert!(!live_control_authority(ControlLifecycle {
-                agent: LifecycleState::Active,
-                person
-            }));
-        }
-        assert!(!live_control_authority(ControlLifecycle {
-            agent: LifecycleState::Suspended,
-            person: Some(LifecycleState::Active)
-        }));
-    }
-}
-
 async fn admit_resend(
     state: &std::sync::Arc<AppState>,
     session: &str,
@@ -371,4 +343,32 @@ fn resend_choice(
         ));
     }
     Ok(choice)
+}
+
+#[cfg(test)]
+mod authority_tests {
+    use super::{ControlLifecycle, live_control_authority};
+    use lys_identity::LifecycleState;
+    #[test]
+    fn pending_words_are_refused_when_the_responsible_person_is_no_longer_active() {
+        assert!(live_control_authority(ControlLifecycle {
+            agent: LifecycleState::Active,
+            person: Some(LifecycleState::Active)
+        }));
+        for person in [
+            Some(LifecycleState::Suspended),
+            Some(LifecycleState::Retired),
+            Some(LifecycleState::Registered),
+            None,
+        ] {
+            assert!(!live_control_authority(ControlLifecycle {
+                agent: LifecycleState::Active,
+                person
+            }));
+        }
+        assert!(!live_control_authority(ControlLifecycle {
+            agent: LifecycleState::Suspended,
+            person: Some(LifecycleState::Active)
+        }));
+    }
 }

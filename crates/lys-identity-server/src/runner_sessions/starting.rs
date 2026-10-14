@@ -1,8 +1,9 @@
 //! Account binding and admitted runner starts share one entry point.
+mod bindings;
 use super::{
     Act, AgentId, Answer, AppState, Arc, Digest, Driven, FromStr, Launch, RunnerAct, ServerError,
-    Sha256, Value, controls, json, keep_act, kind, machine_runner, now, owned_start, record_end,
-    record_refused, record_running, refused_before, started_nothing,
+    Sha256, Value, controls, hex, json, keep_act, kind, machine_runner, now, owned_start,
+    record_end, record_refused, record_running, refused_before, started_nothing,
 };
 
 pub(crate) async fn run_resuming(
@@ -21,7 +22,7 @@ pub(crate) async fn run_resuming(
     if let Some(refused) = refused_before(state, &launch.session)? {
         return Err(refused);
     }
-    restore_record_bindings(state, (agent, machine), &mut launch)?;
+    bindings::restore_record_bindings(state, (agent, machine), &mut launch)?;
     crate::model_account_start::bind(state, agent, caller, &mut launch).await?;
     let runner = machine_runner(state, machine)?.ok_or(ServerError::MachineWithoutRunner)?;
     let driven = Driven {
@@ -284,27 +285,26 @@ pub(super) async fn launch_given(
     };
     Some(
         async {
-            let view = match super::retained_record(state, record, &driven.session)? {
-                Some(view) => view,
-                None => {
-                    let policy = crate::agent_policy_api::launch_policy(state, &record.agent)?;
-                    let runtime = crate::network_api::with_network(state, |store| {
-                        store
-                            .machine(&record.machine)
-                            .and_then(|machine| machine.runtime.clone())
-                            .ok_or(ServerError::MachineWithoutRuntime)
-                    })?;
-                    crate::provisioning_api::with_provisioning(state, |store| {
-                        prepare_record(
-                            store,
-                            record,
-                            &driven.session,
-                            &runtime,
-                            policy,
-                            state.model_proxy.as_deref(),
-                        )
-                    })?
-                }
+            let view = if let Some(view) = super::retained_record(state, record, &driven.session)? {
+                view
+            } else {
+                let policy = crate::agent_policy_api::launch_policy(state, &record.agent)?;
+                let runtime = crate::network_api::with_network(state, |store| {
+                    store
+                        .machine(&record.machine)
+                        .and_then(|machine| machine.runtime.clone())
+                        .ok_or(ServerError::MachineWithoutRuntime)
+                })?;
+                crate::provisioning_api::with_provisioning(state, |store| {
+                    prepare_record(
+                        store,
+                        record,
+                        &driven.session,
+                        &runtime,
+                        policy,
+                        state.model_proxy.as_deref(),
+                    )
+                })?
             };
             let pending = state
                 .runners
@@ -437,58 +437,6 @@ pub(super) fn prepare_record(
         }
     }
     Ok(view)
-}
-
-fn restore_record_bindings(
-    state: &AppState,
-    (agent, machine): (&str, &str),
-    launch: &mut Launch,
-) -> Result<(), ServerError> {
-    if state.runtime.is_none() && !launch.environment.contains_key("LYS_LAUNCH_RECORD") {
-        return Ok(());
-    }
-    let view = super::with_runtime(state, |store| {
-        Ok(store
-            .session(&launch.session)
-            .and_then(|tracked| tracked.first())
-            .and_then(|first| first.launch.clone()))
-    })?;
-    let Some(view) = view else {
-        if launch.environment.contains_key("LYS_LAUNCH_RECORD") {
-            return Err(record_unproved(
-                "the directory launch has no retained binding metadata",
-            ));
-        }
-        return Ok(());
-    };
-    let Some(record) = view.get("launch_record") else {
-        return Ok(());
-    };
-    let id = record
-        .get("id")
-        .and_then(Value::as_str)
-        .filter(|id| lys_identity::start::is_launch_record_id(id))
-        .ok_or_else(|| record_unproved("the retained launch record id is invalid"))?;
-    if super::launch_session(id) != launch.session
-        || view["agent"].as_str() != Some(agent)
-        || view["machine"].as_str() != Some(machine)
-    {
-        return Err(record_unproved(
-            "the retained record belongs to another launch",
-        ));
-    }
-    let ids: Vec<String> =
-        serde_json::from_value(record.get("credential_ids").cloned().ok_or_else(|| {
-            record_unproved("the retained record names no frozen credential ids")
-        })?)
-        .map_err(|_| record_unproved("the retained credential ids are not a list of strings"))?;
-    launch
-        .environment
-        .insert("LYS_LAUNCH_RECORD".to_owned(), id.to_owned());
-    launch
-        .environment
-        .insert("LYS_HANDLES".to_owned(), ids.join(","));
-    Ok(())
 }
 
 #[cfg(test)]

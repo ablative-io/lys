@@ -262,10 +262,15 @@ fn ready(agent: &Agent) -> CliResult<()> {
 }
 
 fn started(answer: Value, selected: &Agent, machine: &str, session: &str) -> CliResult<()> {
-    let reply: Started = serde_json::from_value(answer).map_err(|_| {
+    let reply: Started = serde_json::from_value(answer).map_err(|error| {
         refused(
             "launch_answer_unreadable",
-            "Lys did not answer in its recorded start shape",
+            format!(
+                "Lys did not answer in its recorded start shape; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
         )
     })?;
     if reply.agent != selected.id
@@ -290,10 +295,15 @@ fn started(answer: Value, selected: &Agent, machine: &str, session: &str) -> Cli
             "Lys did not confirm the runner started or ended the requested process",
         ));
     }
-    let template: Value = serde_json::from_str(&reply.template).map_err(|_| {
+    let template: Value = serde_json::from_str(&reply.template).map_err(|error| {
         refused(
             "launch_answer_unreadable",
-            "the kept launch template does not read",
+            format!(
+                "the kept launch template does not read; JSON {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
         )
     })?;
     if lys_home::record::blocks::Hash::of(reply.template.as_bytes()).as_str()

@@ -29,12 +29,12 @@ fn reply() -> serde_json::Value {
         "runner":{"session":"op-start","state":"running"}});
     template(
         &mut reply,
-        json!({"harness":"claude-code","slots":{"env":{"ANTHROPIC_BASE_URL":"https://proxy.example/run","LYS_RUN":"0123456789abcdef0123456789abcdef"}}}),
+        &json!({"harness":"claude-code","slots":{"env":{"ANTHROPIC_BASE_URL":"https://proxy.example/run","LYS_RUN":"0123456789abcdef0123456789abcdef"}}}),
     );
     reply
 }
 
-fn template(reply: &mut serde_json::Value, native: serde_json::Value) {
+fn template(reply: &mut serde_json::Value, native: &serde_json::Value) {
     let text = native.to_string();
     reply["harness"] = native["harness"].clone();
     reply["template_sha256"] = json!(lys_home::record::blocks::Hash::of(text.as_bytes()).as_str());
@@ -115,7 +115,7 @@ fn launch_refuses_a_missing_proxy_instead_of_reporting_direct_provider_use_as_su
     let mut reply = reply();
     template(
         &mut reply,
-        json!({"harness":"claude-code","slots":{"env":{"LYS_RUN":"0123456789abcdef0123456789abcdef"}}}),
+        &json!({"harness":"claude-code","slots":{"env":{"LYS_RUN":"0123456789abcdef0123456789abcdef"}}}),
     );
     let error = started(reply, &agent(), "machine-a", "op-start")
         .err()
@@ -129,7 +129,7 @@ fn codex_native_template_preserves_the_servers_proxy_base() -> Result {
     let mut reply = reply();
     template(
         &mut reply,
-        json!({"harness":"codex","fields":{"model_proxy":"https://proxy.example/run","run":"0123456789abcdef0123456789abcdef"}}),
+        &json!({"harness":"codex","fields":{"model_proxy":"https://proxy.example/run","run":"0123456789abcdef0123456789abcdef"}}),
     );
     let mut agent = agent();
     agent.harness = Some("codex".to_owned());
@@ -158,7 +158,7 @@ fn template_hash_harness_and_per_run_identity_are_required() -> Result {
     let mut reply = reply();
     template(
         &mut reply,
-        json!({"harness":"claude-code","slots":{"env":{"ANTHROPIC_BASE_URL":"https://proxy.example/run"}}}),
+        &json!({"harness":"claude-code","slots":{"env":{"ANTHROPIC_BASE_URL":"https://proxy.example/run"}}}),
     );
     let error = started(reply, &agent(), "machine-a", "op-start")
         .err()
@@ -172,7 +172,7 @@ fn an_unused_other_harness_proxy_field_cannot_replace_the_native_proxy() -> Resu
     let mut reply = reply();
     template(
         &mut reply,
-        json!({"harness":"claude-code","slots":{"env":{"LYS_RUN":"0123456789abcdef0123456789abcdef"}},"fields":{"model_proxy":"https://unused.example"}}),
+        &json!({"harness":"claude-code","slots":{"env":{"LYS_RUN":"0123456789abcdef0123456789abcdef"}},"fields":{"model_proxy":"https://unused.example"}}),
     );
     let error = started(reply, &agent(), "machine-a", "op-start")
         .err()

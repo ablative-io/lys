@@ -33,7 +33,7 @@ fn transport(harness: Harness) -> Transport {
 
 fn validate_native(harness: Harness, native: &str) -> Result<(), ServerError> {
     transport(harness).validate_resume(native).map_err(|error| {
-        RunnerError::refused(error.name(), format!("{error}; choose Start again")).into()
+        RunnerError::refused(&error.name(), format!("{error}; choose Start again")).into()
     })
 }
 

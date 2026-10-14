@@ -33,8 +33,8 @@ struct Gateway {
     captured: Arc<Mutex<Captured>>,
 }
 
-fn gateway_error(reason: impl ToString) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, reason.to_string())
+fn gateway_error(reason: impl Into<String>) -> (StatusCode, String) {
+    (StatusCode::INTERNAL_SERVER_ERROR, reason.into())
 }
 
 async fn answer(
@@ -42,7 +42,10 @@ async fn answer(
     uri: Uri,
     Json(body): Json<Value>,
 ) -> Result<String, (StatusCode, String)> {
-    let mut captured = gateway.captured.lock().map_err(gateway_error)?;
+    let mut captured = gateway
+        .captured
+        .lock()
+        .map_err(|error| gateway_error(error.to_string()))?;
     captured.calls.push((uri.path().to_owned(), body.clone()));
     let marker = json!({
         "resource":{"objectType":"lys_mirror","objectId":"reach_fixture"},
@@ -284,9 +287,10 @@ async fn gateway_read(
     let worker = tokio::spawn(async move {
         axum::serve(listener, router)
             .with_graceful_shutdown(async move {
-                if stopped.await.is_err() {
-                    panic!("reach gateway shutdown signal was dropped");
-                }
+                assert!(
+                    stopped.await.is_ok(),
+                    "reach gateway shutdown signal was dropped"
+                );
             })
             .await
     });

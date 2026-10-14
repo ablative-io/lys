@@ -471,7 +471,9 @@ mod binding_tests {
             })?;
             reply
                 .send(page(vec![entry(1, "session")], "stale-cursor"))
-                .map_err(|_| "the pending page was dropped before its signal")?;
+                .map_err(|abandoned| {
+                    format!("the pending page was dropped before its signal: {abandoned:?}")
+                })?;
             assert!(follow.as_mut().poll(&mut context).is_ready());
             drop(follow);
             assert_eq!(

@@ -156,7 +156,7 @@ fn read_with(
             "the joined computer has been retired",
         ));
     }
-    let seats: wire::Seats = wire::decode(get("/seats")?, "/seats")?;
+    let seats: wire::SeatViews = wire::decode(get("/seats")?, "/seats")?;
     seats.validate()?;
     let runtime: wire::Runtime = wire::decode(get("/runtime/live")?, "/runtime/live")?;
     runtime.validate()?;

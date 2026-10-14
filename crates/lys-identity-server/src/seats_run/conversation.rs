@@ -57,7 +57,7 @@ pub(super) fn pty(
     };
     if !fresh && let Some(conversation) = explicit.or(held.harness_session.as_deref()) {
         transport.validate_resume(conversation).map_err(|error| {
-            RunnerError::refused(error.name(), format!("{error}; choose Start again"))
+            RunnerError::refused(&error.name(), format!("{error}; choose Start again"))
         })?;
         return Ok(Plan {
             resume: Some(conversation.to_owned()),

@@ -56,12 +56,14 @@ pub fn read_at(root: &Path, named: Option<&str>) -> CliResult<Context> {
     let pass = load_at(root, None, false)
         .map_err(|error| refused("person_sign_in_unavailable", format!("{error}; {action}")))?;
     base(&pass.server)?;
-    pass.person.parse::<lys_identity::PersonId>().map_err(|_| {
-        refused(
-            "person_pass_unreadable",
-            format!("the sign-in does not identify a person; {action}"),
-        )
-    })?;
+    pass.person
+        .parse::<lys_identity::PersonId>()
+        .map_err(|error| {
+            refused(
+                "person_pass_unreadable",
+                format!("the sign-in does not identify a person: {error}; {action}"),
+            )
+        })?;
     let action = format!("run `lys sign-in --server {}`", pass.server);
     if let Some(named) = &named
         && *named != pass.server

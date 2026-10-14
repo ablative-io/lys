@@ -113,7 +113,11 @@ fn a_differing_native_uuid_refuses_capture_but_keeps_the_real_stop_and_prior_ide
     let held = seat(Some(NATIVE), "pty");
     let record = end_record(&held, Some(OTHER), ("stopper", STOP, false, 10))?;
     assert_eq!(
-        record.refusal.as_ref().map(|error| error.name()),
+        record
+            .refusal
+            .as_ref()
+            .map(crate::error::ServerError::name)
+            .as_deref(),
         Some("pty_conversation_mismatch")
     );
     assert!(matches!(record.lines.as_slice(), [Line::Stopped(_)]));
@@ -147,7 +151,11 @@ fn an_invalid_terminal_native_id_refuses_capture_without_losing_the_confirmed_st
         let held = seat(known, "pty");
         let record = end_record(&held, observed, ("stopper", STOP, false, 10))?;
         assert_eq!(
-            record.refusal.as_ref().map(|error| error.name()),
+            record
+                .refusal
+                .as_ref()
+                .map(crate::error::ServerError::name)
+                .as_deref(),
             Some("control_binding_invalid")
         );
         assert!(matches!(record.lines.as_slice(), [Line::Stopped(_)]));

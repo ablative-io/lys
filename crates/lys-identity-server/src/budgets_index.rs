@@ -75,23 +75,6 @@ impl Index {
             .map(|((at, _), _)| *at)
     }
 
-    /// The position of each account's latest report of its windows for
-    /// `agent`, by the account's name: one lookup for each account, never a
-    /// walk of the uses.
-    pub(crate) fn account_reports(&self, agent: &str) -> Vec<(&str, usize)> {
-        self.agents.get(agent).map_or_else(Vec::new, |agent| {
-            agent
-                .accounts
-                .iter()
-                .filter_map(|(account, timeline)| {
-                    timeline
-                        .last_key_value()
-                        .map(|(_, position)| (account.as_str(), *position))
-                })
-                .collect()
-        })
-    }
-
     /// The positions of up to `count` of `agent`'s calls made before
     /// `before`, newest first, and whether older ones remain: a walk of that
     /// many index rows, never of the uses.

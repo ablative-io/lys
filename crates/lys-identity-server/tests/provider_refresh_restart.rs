@@ -120,7 +120,7 @@ async fn a_refresh_issued_before_restart_renews_without_signing_in_again() -> Te
         &[("grant_type", "refresh_token"), ("refresh_token", refresh)],
     )
     .await?;
-    assert!(renewed["refresh_token"].as_str() == Some(refresh));
+    assert_eq!(renewed["refresh_token"].as_str(), Some(refresh));
     assert!(renewed["access_token"].is_string());
     Ok(())
 }
