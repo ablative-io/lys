@@ -14,7 +14,8 @@ export function withheldFromAgents(model: GrantModel | null): string[] | null {
 
 const carriers = new WeakMap<GrantModel, Map<string, string>>();
 /** Only a relation carrying exactly one act can represent a single tick. */
-export function singleActionCarriers(model: GrantModel): Map<string, string> {
+export function singleActionCarriers(model: GrantModel, kind?: string): Map<string, string> {
+  if (kind?.includes('.')) return carriersOf(model.kinds?.[kind]?.relations ?? {});
   let index = carriers.get(model);
   if (!index) {
     index = new Map();
@@ -26,6 +27,29 @@ export function singleActionCarriers(model: GrantModel): Map<string, string> {
     carriers.set(model, index);
   }
   return index;
+}
+
+function carriersOf(relations: Record<string, string[]>): Map<string, string> {
+  const index = new Map<string, string>();
+  for (const [relation, actions] of Object.entries(relations).sort(([a], [b]) => a.localeCompare(b))) {
+    if (actions.length === 1 && (!index.has(actions[0]) || relation === 'only.' + actions[0])) index.set(actions[0], relation);
+  }
+  return index;
+}
+
+export function agentMayHold(model: GrantModel, kind: string, actions: string[]): boolean {
+  if (kind.includes('.')) {
+    const agents = model.kinds?.[kind]?.agents;
+    return Array.isArray(agents) && agents.every((action) => typeof action === 'string') && actions.every((action) => agents.includes(action));
+  }
+  const withheld = withheldFromAgents(model);
+  return withheld !== null && actions.every((action) => !withheld.includes(action));
+}
+
+/** App relations are offered only with every action they actually carry. */
+export function appAgentCarriers(model: GrantModel, kind: string, actions: string[], agents = true): [string, string[]][] {
+  return Object.entries(model.kinds?.[kind]?.relations ?? {}).filter(([, carried]) =>
+    carried.length > 0 && carried.every((action) => actions.includes(action)) && (!agents || agentMayHold(model, kind, carried)));
 }
 
 /** Selecting everything selects the offered acts, never a broader agent relation. */
@@ -44,7 +68,11 @@ function GroupedActionPicker({ model, groups, selected, change, disabled = false
   };
   return <>{groups.map((group) => {
     const choices = group.choices.filter((choice) => !agents || choice.resource.kind.includes('.') || choice.actions.every((action) => !excluded.has(action)))
-      .map((choice) => agents && choice.resource.kind.includes('.') ? { ...choice, reason: appAgentRefusal } : choice);
+      .map((choice) => {
+        if (!agents || !choice.resource.kind.includes('.')) return choice;
+        return { ...choice, reason: agentMayHold(model, choice.resource.kind, choice.actions)
+          ? choice.reason === appAgentRefusal ? '' : choice.reason : appAgentRefusal };
+      });
     if (!choices.length) return null;
     const available = choices.filter((choice) => !choice.reason);
     const everything = agents ? undefined : group.everything;
@@ -81,12 +109,18 @@ type SingleProps = { model: GrantModel; resource: ResourceRef; actions: string[]
 /** A single resource uses action names as its value; grouped callers retain their source keys. */
 export function ActionPicker(props: SingleProps | GroupedProps) {
   if ('groups' in props) return <GroupedActionPicker {...props} />;
-  const relations = singleActionCarriers(props.model);
+  const relations = singleActionCarriers(props.model, props.resource.kind);
   const choices = props.actions.flatMap((action) => {
-    if (props.agents !== false && props.resource.kind.includes('.')) return [{ id: action, resource: props.resource, relation: '', actions: [action], reason: appAgentRefusal }];
+    if (props.agents !== false && props.resource.kind.includes('.') && !agentMayHold(props.model, props.resource.kind, [action])) return [{ id: action, resource: props.resource, relation: '', actions: [action], reason: appAgentRefusal }];
     const relation = relations.get(action);
     return relation ? [{ id: action, resource: props.resource, relation, actions: [action], reason: '' }] : [];
   });
+  if (props.resource.kind.includes('.')) {
+    for (const [relation, actions] of appAgentCarriers(props.model, props.resource.kind, props.actions, props.agents !== false)) {
+      if (actions.every((action) => choices.some((choice) => !choice.reason && choice.actions.includes(action)))) continue;
+      choices.push({ id: relation, resource: props.resource, relation, actions, reason: '' });
+    }
+  }
   return <><GroupedActionPicker model={props.model} groups={[{ id: JSON.stringify(props.resource), title: props.title ?? 'Actions', choices }]}
     selected={props.value} change={props.onChange} disabled={props.disabled} agents={props.agents} />
     {choices.length < props.actions.length ? <p>Some actions cannot be selected because the model has no relation carrying that action alone.</p> : null}</>;

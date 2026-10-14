@@ -57,7 +57,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const [refusal, setRefusal] = useState<unknown>(saved.error);
   const [pending, setPending] = useState(saved.pending);
   const [walk, setWalk] = useState(saved.walk);
-  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation) ?? []);
+  const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation + (entry.resource.kind.includes('.') ? ':' + entry.actions[0] : '')) ?? []);
   const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : '');
   const [computer, setComputer] = useState(saved.walk?.placement.kind === 'existing' ? saved.walk.placement.computer.id : runOptions.computers.length === 1 ? runOptions.computers[0].id : '');
   const selectedComputer = runOptions.computers.find((entry) => entry.id === computer);

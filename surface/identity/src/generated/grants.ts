@@ -170,6 +170,8 @@ export interface GrantModel {
   relations: Record<string, string[]>;
   /** The acts no agent may be given; a screen never offers them. */
   withheld_from_agents: string[];
+  /** Each app kind's declared agent actions and relation carriers. */
+  kinds?: Record<string, { agents: string[]; relations: Record<string, string[]> }>;
 }
 
 /** POST /grants/who answers one page of holders, each with its permit. */
