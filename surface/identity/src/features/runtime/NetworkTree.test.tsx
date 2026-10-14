@@ -39,35 +39,45 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   expect(host.querySelectorAll('details[open]')).toHaveLength(3);
   expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(9);
 });
-it('C737 draws the tree before the runners are surveyed, and keeps a survey refusal in the seatless row title, never on the page', async () => {
+it('C737 draws the tree before the live sessions are read, marks a seatless agent running by its session, and keeps a refusal in the row title', async () => {
   const two = { ...machine('one'), may_run: [{ id: 'agent', display_name: 'Long display name' }, { id: 'other', display_name: 'Seatless' }] };
   const routes = { '/network': ok({ machines: [two], next: null }), '/seats': ok({ runner: 'read', seats: [seat('held', 'offline')] }) };
-  const tree = () => render(<NetworkTree selected={null} select={vi.fn()} paneWidth={300} resize={vi.fn()} />);
+  const select = vi.fn();
+  const tree = () => render(<NetworkTree selected={null} select={select} paneWidth={300} resize={vi.fn()} />);
   const row = (host: HTMLElement) => host.querySelector('[data-agent-only="other"]');
-  // The survey is refused: the refusal is in the row's title and nowhere in the page's text.
-  serve({ ...routes, '/seats/unregistered': refused(503, 'RunnerUnavailable', 'the runner closed the connection') });
+  // The live read is refused: the refusal is in the row's title and nowhere in the page's text.
+  serve({ ...routes, '/runtime/live': refused(503, 'RuntimeUnavailable', 'the runtime store is closed') });
   let host = await tree();
   await settle();
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(1);
-  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('RunnerUnavailable: the runner closed the connection');
-  expect(host.querySelector('.network-list')?.textContent).not.toContain('RunnerUnavailable');
+  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('RuntimeUnavailable: the runtime store is closed');
+  expect(host.querySelector('.network-list')?.textContent).not.toContain('RuntimeUnavailable');
   expect(host.querySelectorAll('.network-list p')).toHaveLength(0);
   await act(async () => { root.unmount(); });
-  // The survey answers: a session held for the seatless agent marks it running; a runner that did not answer is named in the title.
-  serve({ ...routes, '/seats/unregistered': ok({ sessions: [{ session: 'op-1', machine: 'one', agent: 'other', pid: 42, started_at: 1 }], unanswered: [{ machine: 'two', name: 'Dean laptop', refusal: 'runner_unreachable', reason: 'not dialled in' }] }) });
+  // The live sessions answer: the seatless agent's session marks it running and its row chooses that session; a seat's own session marks nothing twice.
+  const live = (session: string, agent: string) => ({ session, agent, machine: 'one', machine_name: 'one', runtime: 'lys-runner', shown: 'running', last_reported: 'running', first_report_at: 1, last_report_at: 1, what: 'started', stopped: null, reported_by: 'person' });
+  serve({ ...routes, '/runtime/live': ok({ sessions: [live('op-1', 'other'), live('session-held', 'agent')], unanswered: [] }) });
   host = await tree();
   await settle();
   expect(row(host)?.getAttribute('data-state')).toBe('online-working');
-  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('pid 42');
+  expect(row(host)?.getAttribute('data-session')).toBe('op-1');
+  expect(host.querySelectorAll('[data-session]')).toHaveLength(1);
+  await act(async () => { (row(host)?.querySelector('a') as HTMLElement).click(); });
+  expect(select).toHaveBeenCalledWith('session:op-1');
   await act(async () => { root.unmount(); });
-  // The survey never answers (last, since a read in flight is shared): the tree is drawn all the same, the row unmarked and saying why.
-  serve({ ...routes, '/seats/unregistered': (() => new Promise(() => undefined)) as never });
+  // The live read has not answered: the tree is drawn all the same, the row unmarked and saying why. It is answered at
+  // the end, since a read in flight is shared by every later read of the same path.
+  let answer: (value: unknown) => void = () => undefined;
+  serve({ ...routes, '/runtime/live': (() => new Promise((resolve) => { answer = resolve; })) as never });
   host = await tree();
   await settle();
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(1);
   expect(row(host)?.getAttribute('data-state')).toBe('not-seen');
   expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('has not answered yet');
   expect(host.querySelectorAll('.network-list p')).toHaveLength(0);
+  answer(ok({ sessions: [], unanswered: [] }));
+  await settle();
+  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).not.toContain('has not answered yet');
 });
 it('C737 names one unreadable agent name on the agent row, not on every seat', () => {
   const value = branches({ machines: [{ ...machine('one'), may_run: [] }] } as never, list as never, {}, { agent: 'AgentUnreadable: no display name' });

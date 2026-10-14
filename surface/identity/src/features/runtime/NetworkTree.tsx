@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useLive } from '../../api';
 import type { SeatView } from '../../api';
 import { Gate } from '../signin/Gate';
-import { branches, readNetworkTree, readRunning } from './network-tree';
+import { branches, readNetworkTree, readRunning, SESSION_CHOICE } from './network-tree';
+import { Terminal } from './Terminal';
 import { said } from './canvas-kept';
 import type { TreeAgent, TreeBranch } from './network-tree';
 import { NetworkTreePane } from './NetworkTreePane';
@@ -23,8 +24,9 @@ function Leaf({ seat, name, reason, label, selected, select }: { seat: SeatView;
 
 /**
  * An agent's row. One seat: the agent is the row, pressed to choose that seat. Several: a fold named for the agent
- * with a row per seat. None: the agent's name alone, running if a runner holds a session for it outside any seat;
- * while the runners' survey has not answered, or where a runner did not, the row says so in its title.
+ * with a row per seat. None: the agent's name alone; running when it has a live session on the computer outside any
+ * seat, and then pressed to watch that session. While the live sessions have not been read, or where a runner did
+ * not answer, the row says so in its title.
  */
 function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; selected: string | null; select: (seat: string) => void; unsurveyed: string | null }) {
   const title = agent.reason ? agent.name + ' · ' + agent.reason : agent.name;
@@ -33,9 +35,15 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
     return <ul role="group"><Leaf {...leaf} label={agent.name} selected={selected} select={select} /></ul>;
   }
   if (!agent.leaves.length) {
-    const running = agent.running.length > 0;
-    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state={running ? 'online-working' : 'not-seen'} role="none">
-      <span role="treeitem" tabIndex={-1} className="network-name" data-mark={running ? MARKS['online-working'] : MARKS['not-seen']} title={title + (running ? ' · running outside a seat: ' + agent.running.map((session) => session.session + ' (pid ' + session.pid + ')').join(', ') : ' · no seat on this computer' + (unsurveyed ? ' · sessions outside seats not read: ' + unsurveyed : ''))}>{agent.name}</span>
+    const [session] = agent.running;
+    if (session) {
+      const choice = SESSION_CHOICE + session.session;
+      return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-session={session.session} data-state="online-working" data-selected={selected === choice} role="none">
+        <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['online-working']} title={title + ' · running outside a seat · session ' + session.session + (agent.running.length > 1 ? ' and ' + (agent.running.length - 1) + ' more' : '')} aria-label={agent.name + ', running, session ' + session.session} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
+      </li></ul>;
+    }
+    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state="not-seen" role="none">
+      <span role="treeitem" tabIndex={-1} className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · live sessions not read: ' + unsurveyed : '')}>{agent.name}</span>
     </li></ul>;
   }
   return <details open><summary role="treeitem" className="network-fold network-agent" title={title}><span className="network-fold-name">{agent.name}</span><span className="network-count">{agent.leaves.length}</span></summary>
@@ -84,9 +92,9 @@ const within = (width: number): number => Math.round(Math.max(PANE_WIDTH.least, 
  */
 export function NetworkTree({ selected, select, paneWidth, resize, agent }: { selected: string | null; select: (seat: string) => void; paneWidth: number; resize: (width: number) => void; agent?: string }) {
   const load = useLive(readNetworkTree, 'operations-network-tree');
-  // The runners' survey of sessions outside seats arrives on its own; the tree never waits for it.
+  // The live sessions arrive on their own; the tree never waits for them.
   const running = useLive(readRunning, 'operations-network-running');
-  const unsurveyed = running.status === 'ok' ? running.data.unanswered : running.status === 'refused' ? said(running.refused) : 'the survey of the runners has not answered yet';
+  const unsurveyed = running.status === 'ok' ? running.data.unanswered : running.status === 'refused' ? said(running.refused) : 'the live session list has not answered yet';
   const [changes, setChanges] = useState<Record<string, SeatView>>({});
   const [width, setWidth] = useState<number | null>(null);
   const drag = useRef<number | null>(null);
@@ -95,10 +103,12 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
     return changed && (seat.revision === undefined || changed.revision > seat.revision) ? changed : seat;
   }) }, load.data.names, load.data.nameReasons, running.status === 'ok' ? running.data.sessions : []) : [], [load, changes, running]);
   const chosen = all.flatMap((branch) => branch.leaves).find((leaf) => selected ? leaf.seat.name === selected : agent && leaf.seat.agent === agent);
+  // A seatless agent's live session, chosen by its row: watched through the session's own terminal.
+  const session = selected?.startsWith(SESSION_CHOICE) ? all.flatMap((branch) => branch.agents.flatMap((each) => each.running.map((live) => ({ live, agent: each, machine: branch.machine })))).find((each) => SESSION_CHOICE + each.live.session === selected) ?? null : null;
   const change = (seat: SeatView) => setChanges((before) => ({ ...before, [seat.name]: seat }));
   const shown = within(width ?? paneWidth);
   return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': shown + 'px' } as React.CSSProperties}>
-    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={chosen?.seat.name ?? null} select={select} unsurveyed={unsurveyed} />
+    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={session ? selected : chosen?.seat.name ?? null} select={select} unsurveyed={unsurveyed} />
       {!all.length ? <p className="note">No active machine was returned.</p> : null}
     </aside>
     <div className="network-divider" role="separator" aria-label="Network tree width" aria-orientation="vertical" tabIndex={0} aria-valuenow={shown} aria-valuemin={PANE_WIDTH.least} aria-valuemax={PANE_WIDTH.most}
@@ -106,6 +116,8 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
       onPointerDown={(event) => { drag.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }}
       onPointerMove={(event) => { if (drag.current !== null) setWidth(within(paneWidth + event.clientX - drag.current)); }}
       onPointerUp={() => { if (drag.current !== null && width !== null) resize(within(width)); drag.current = null; setWidth(null); }} onPointerCancel={() => { drag.current = null; setWidth(null); }} />
-    <div className="network-pane">{chosen ? <NetworkTreePane key={chosen.seat.name + ':' + (chosen.seat.session ?? '')} {...chosen} change={change} /> : <p className="note" role="status">{selected ? 'The selected seat was not returned on an active machine.' : 'Choose a seat in the tree to watch its terminal.'}</p>}</div>
+    <div className="network-pane">{session ? <section className="terminal network-terminal" aria-label={'Terminal of ' + session.agent.name}><Terminal key={session.live.session} session={session.live.session} agent={session.agent.id} machine={session.machine.name} /></section>
+      : chosen ? <NetworkTreePane key={chosen.seat.name + ':' + (chosen.seat.session ?? '')} {...chosen} change={change} />
+      : <p className="note" role="status">{selected?.startsWith(SESSION_CHOICE) ? running.status === 'ok' ? 'The selected session is not running on an active machine.' : 'Reading the live sessions for the selected session…' : selected ? 'The selected seat was not returned on an active machine.' : 'Choose a seat in the tree to watch its terminal.'}</p>}</div>
   </div>} />;
 }

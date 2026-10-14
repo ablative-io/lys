@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
-import { api, operationId, Refused, seats } from '../../api';
-import type { SeatList, SeatView, UnregisteredSession } from '../../api';
+import { api, operationId, Refused, request, seats } from '../../api';
+import type { SeatList, SeatView } from '../../api';
+import type { RuntimeSession } from './RuntimeSessions';
+import type { Unanswered } from './Sessions';
 import { readBounded, readEveryPage } from '../../reads';
 import type { Paged } from '../../reads';
 import { readableMachine } from '../network/contract';
@@ -10,14 +12,17 @@ import { said } from './canvas-kept';
 export interface TreeLeaf { seat: SeatView; name: string; reason: string | null }
 /**
  * An agent on a computer: every agent the computer may run and every agent holding a seat there, once each, with its
- * seats in the order the service listed them. `running` names the sessions a runner holds for it outside any seat.
+ * seats in the order the service listed them. `running` names its live sessions on that computer outside any seat.
  */
-export interface TreeAgent { id: string; name: string; reason: string | null; leaves: TreeLeaf[]; running: UnregisteredSession[] }
+export interface TreeAgent { id: string; name: string; reason: string | null; leaves: TreeLeaf[]; running: RuntimeSession[] }
 /** A computer: its agents, and every seat on it in one list for whoever wants them flat. */
 export interface TreeBranch { machine: Machine; agents: TreeAgent[]; leaves: TreeLeaf[] }
 export interface TreeRead extends SeatList { machines: Machine[]; names: Record<string, string>; nameReasons: Record<string, string> }
-/** The sessions runners hold for no seat, and which runners did not answer the survey, as one line, or null when all did. */
-export interface RunningRead { sessions: UnregisteredSession[]; unanswered: string | null }
+/** The live sessions, and which sessions' runners did not answer, as one line, or null when all did. */
+export interface RunningRead { sessions: RuntimeSession[]; unanswered: string | null }
+
+/** What a seatless agent's row selects: its live session, told from a seat's name by this prefix. */
+export const SESSION_CHOICE = 'session:';
 
 export const online = (seat: SeatView): boolean => seat.state === 'online-idle' || seat.state === 'online-working';
 
@@ -31,13 +36,17 @@ function networkPage(value: NetworkView & Paged): NetworkView & Paged {
 }
 
 /**
- * The sessions runners hold for no seat. Read on its own, never as part of the tree: the tree is drawn from the
- * network and the seats the moment they answer, and this survey of every runner only adds the running marks when
- * it arrives. A runner that did not answer is named in `unanswered`, for the rows it leaves unmarked.
+ * The live sessions, as the runtime keeps them. Read on its own, never as part of the tree: the tree is drawn from
+ * the network and the seats the moment they answer, and this read only adds the running marks when it arrives. A
+ * session whose runner did not answer is named in `unanswered`, for the rows it leaves unmarked.
  */
 export async function readRunning(): Promise<RunningRead> {
-  const answer = await seats.unregistered();
-  const unanswered = (answer.unanswered ?? []).map((runner) => runner.name + ': ' + runner.reason).join('; ');
+  const answer = await request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live');
+  if (!answer || !Array.isArray(answer.sessions) || !Array.isArray(answer.unanswered)
+    || answer.sessions.some((session) => typeof session.session !== 'string' || typeof session.machine !== 'string' || session.shown === 'stopped')) {
+    throw new Error('RuntimeLiveUnreadable: the service did not answer a readable live session list.');
+  }
+  const unanswered = answer.unanswered.map((each) => each.session + ': ' + each.refusal + ': ' + each.reason).join('; ');
   return { sessions: answer.sessions, unanswered: unanswered || null };
 }
 
@@ -63,7 +72,7 @@ export async function readNetworkTree(): Promise<TreeRead> {
  * however many times the service listed it) and every agent holding a seat there, each with its seats and with the
  * sessions a runner holds for it outside any seat.
  */
-export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, names: Record<string, string> = {}, nameReasons: Record<string, string> = {}, unregistered: UnregisteredSession[] = []): TreeBranch[] {
+export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, names: Record<string, string> = {}, nameReasons: Record<string, string> = {}, running: RuntimeSession[] = []): TreeBranch[] {
   const byMachine = new Map<string, SeatView[]>();
   for (const seat of list.seats) {
     const held = byMachine.get(seat.machine);
@@ -79,7 +88,8 @@ export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, na
     const agent = (id: string, name: string): TreeAgent => {
       const held = agents.find((each) => each.id === id);
       if (held) return held;
-      const made = { id, name, reason: nameReasons[id] ?? null, leaves: [], running: unregistered.filter((session) => session.machine === machine.id && session.agent === id) };
+      const seated = new Set(leaves.map((leaf) => leaf.seat.session).filter((session) => session));
+      const made = { id, name, reason: nameReasons[id] ?? null, leaves: [], running: running.filter((session) => session.machine === machine.id && session.agent === id && !seated.has(session.session)) };
       agents.push(made);
       return made;
     };
