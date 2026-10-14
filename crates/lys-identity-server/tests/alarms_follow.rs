@@ -39,6 +39,7 @@ macro_rules! alarms_follow {
                 let live = Arc::new(Mutex::new(LivenessView {
                     session: "alarm-session".to_owned(), pid: Some(1), alive: true,
                     managed: false, harness_session: None, turn_active: false,
+                    started_fresh: false,
                     last_signal_at: Some(1_000), started_at: 1_000, ended: false,
                 }));
                 let evidence = Arc::clone(&live);

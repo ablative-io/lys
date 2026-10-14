@@ -406,6 +406,7 @@ mod tests {
             alive,
             managed: true,
             harness_session: Some("uuid".to_owned()),
+            started_fresh: false,
             turn_active,
             last_signal_at: Some(9),
             started_at: 1,
