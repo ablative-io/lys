@@ -118,7 +118,10 @@ export function contextPresentation(rows: DashboardAgent[], selectedSession?: st
   const windowTokens = reading?.window_tokens ?? null;
   if (used.figure !== null && (!Number.isFinite(used.figure) || used.figure < 0 || used.figure > 100)) return unreadable('the context percentage is invalid');
   if (used.figure !== null && contextTokens !== null && windowTokens !== null && contextTokens > windowTokens) return unreadable('the reported context is larger than the declared window');
-  const figure = used.figure !== null && session !== null && contextTokens !== null && windowTokens !== null ? contextTokens * 100 / windowTokens : null;
+  // The tokens over the declared window when both are reported; an older reading carries neither, and its service figure stands.
+  const figure = used.figure === null ? null
+    : contextTokens !== null && windowTokens !== null ? (session !== null ? contextTokens * 100 / windowTokens : null)
+      : used.figure;
   const readAt = reading?.read_at_ms ?? null;
   const missing = missingDisplay(used);
   const missingWindow = missing === 'Not reported' && windowTokens === null && (contextTokens !== null || used.figure !== null);

@@ -65,13 +65,22 @@ const tokenPeriod = (key: string): Length | null => {
 };
 export const supportsUsageReading = (key: string): boolean => key === 'context_percent/' || tokenPeriod(key) !== null || key === 'window/300';
 
+/** The service writes a reset as `reset at <milliseconds>`; a person reads it as a time, never a count of milliseconds. */
+export const readableResets = (text: string): string =>
+  text.replace(/\breset at (\d{10,})\b/g, (_, ms: string) => 'reset at ' + clockMs(Number(ms)));
+
+/** A provider window whose reset has passed is no longer its current level: what is left is when it was last read. */
+const expired = (window: { resets_at_ms: number }, now: number): boolean => window.resets_at_ms <= now;
+const notReadSince = (at_ms: number, resets_at_ms: number): string =>
+  'not read since ' + clockMs(at_ms) + '; it reset ' + clockMs(resets_at_ms) + ', and the next call through this account reads it again';
+
 function providerGaps(rows: DashboardAgent[]): string[] {
   return rows.flatMap((row) => {
     if (refusedPart(row.usage)) return [];
     const figures = row.usage.figures ?? [];
     if (!Array.isArray(figures) || figures.some((used) => !used || typeof used !== 'object')) return [row.agent.display_name + ': ProviderWindowUnreadable: the reported figures are not a list of usage records'];
     return figures.filter((used) => used?.unit === 'plan_percent' && used.period === 'five_hour' && used.figure === null)
-      .map((used) => row.agent.display_name + ': ' + (used.unavailable ?? 'ProviderWindowUnreadable: the reason was not reported'));
+      .map((used) => row.agent.display_name + ': ' + (used.unavailable ? readableResets(used.unavailable) : 'ProviderWindowUnreadable: the reason was not reported'));
   });
 }
 
@@ -102,7 +111,13 @@ export function WidgetUsageReadings({ rows, keys, selected, select, renderLevel 
           }
         }
       }
-      return <div key={key}>{windows.size ? [...windows.values()].map((each) => <section className="canvas-stat" key={each.account} data-provider-window={each.account}>
+      const now = Date.now();
+      return <div key={key}>{windows.size ? [...windows.values()].map((each) => expired(each, now)
+        ? <section className="canvas-stat none" key={each.account} data-provider-window={each.account} data-provider-window-expired>
+          <b>Not read since {clockMs(each.at_ms)}</b>
+          <span className="sec">5-hour provider window of {each.account}: {notReadSince(each.at_ms, each.resets_at_ms)}.</span>
+        </section>
+        : <section className="canvas-stat" key={each.account} data-provider-window={each.account}>
         {renderLevel ? renderLevel(each.used_percent, amount('plan_percent', each.used_percent)) : <b>{amount('plan_percent', each.used_percent)}</b>}
         <span className="sec">5-hour provider window of {each.account}, resets {clockMs(each.resets_at_ms)}</span>
       </section>) : <><p className="dim" data-provider-window-unavailable>5-hour provider window not reported</p><TokenReadings rows={rows} period="five_hour" /></>}
@@ -125,9 +140,11 @@ export function usageSummary(rows: DashboardAgent[], key = 'context_percent/', s
   const period = tokenPeriod(key);
   if (period) return { figure: tokenSummary(rows, period) };
   if (key === 'window/300' && providerGaps(rows).length) {
+    const now = Date.now();
     const levels = rows.flatMap((row) => refusedPart(row.usage) || !Array.isArray(row.usage.accounts) ? [] : row.usage.accounts
       .flatMap((account) => (Array.isArray(account?.windows) ? account.windows : []).filter((window) => window?.duration_minutes === 300)
-        .map((window) => account.account + ': ' + amount('plan_percent', window.used_percent) + ' reported')));
+        .map((window) => account.account + ': ' + (expired(window, now) ? notReadSince(account.at_ms, window.resets_at_ms)
+          : amount('plan_percent', window.used_percent) + ' reported'))));
     return { figure: (levels.length ? levels.join(' · ') : '5-hour provider window not reported') + ' · ' + providerGaps(rows).join('; ') };
   }
   if (key === 'window/300' && !rows.some((row) => !refusedPart(row.usage)

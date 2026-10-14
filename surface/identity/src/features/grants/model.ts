@@ -32,10 +32,19 @@ export function requireGrantKinds(model: GrantModel): GrantModel['kinds'] {
   return model.kinds;
 }
 
+/**
+ * Why an app kind's grants cannot be read from the model, as a sentence with its one fix, or null when the kind is
+ * declared. A standing grant may name a retired app, or an app approved after this model was read: the grant is still
+ * shown, with this sentence beside it, and the rest of the page renders.
+ */
+export function appKindProblem(model: GrantModel, kind: string): string | null {
+  if (grantKindsProblem(model) !== null) return 'Lys has not declared its app kinds, so the access of ' + kind + ' cannot be shown; reload the page to ask Lys again.';
+  return Object.hasOwn(model.kinds, kind) ? null : 'Lys has not declared the app kind ' + kind + '; an administrator approves the app under Apps.';
+}
+
+/** An app kind as declared, or a declaration that offers nothing when it is not: read during render, so it never throws. */
 export function appKind(model: GrantModel, kind: string): GrantModel['kinds'][string] {
-  const declared = requireGrantKinds(model)[kind];
-  if (declared === undefined) throw new Refused(200, { refusal: 'GrantModelUnreadable', reason: 'the service did not answer the app kind ' + kind });
-  return declared;
+  return appKindProblem(model, kind) === null ? model.kinds[kind] : { agents: [], relations: {} };
 }
 
 export async function readGrantWorld(knownMe?: MeView): Promise<GrantWorld> {

@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { grantOptionKey, grantOptions, newAgentGrants } from '../src/features/people/agent-grants';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { grantOptionKey, grantOptions, newAgentGrants, readGrantChoices } from '../src/features/people/agent-grants';
 import type { GrantChoices } from '../src/features/people/agent-grants';
 import { appAgentRefusal } from '../src/features/grants/ActionPicker';
-import { ADA, GRANTS, MODEL } from './fixtures';
+import { ADA, GRANTS, MODEL, ok } from './fixtures';
+import { serve } from './harness';
+
+afterEach(() => vi.unstubAllGlobals());
 
 const source = GRANTS[0];
 const model = { ...MODEL, relations: { ...MODEL.relations, 'only.edit': ['edit'], 'only.view': ['view'], 'only.grant': ['grant'] }, withheld_from_agents: ['grant'] };
@@ -19,9 +22,25 @@ describe('Access an agent may be given', () => {
     expect(grantOptions(choices([wide], unsaid), ADA, ADA, 'Ada')).toEqual([]);
   });
   it('names why an app kind cannot be given, and never sends it', () => {
-    const options = grantOptions(choices([{ ...wide, resource: { kind: 'notes.page', id: 'one' } }]), ADA, ADA, 'Ada');
+    const options = grantOptions(choices([{ ...wide, resource: { kind: 'fixture.doc', id: 'one' } }]), ADA, ADA, 'Ada');
+    expect(options.length).toBeGreaterThan(0);
     expect(options.every((option) => option.reason === appAgentRefusal)).toBe(true);
     expect(() => newAgentGrants(options, options.map(grantOptionKey))).toThrow('can no longer be passed on');
+  });
+  it('names an app kind Lys has not declared beside its grant, without throwing, and never sends it', () => {
+    const options = grantOptions(choices([{ ...wide, resource: { kind: 'notes.page', id: 'one' } }]), ADA, ADA, 'Ada');
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.every((option) => option.reason === 'Lys has not declared the app kind notes.page; an administrator approves the app under Apps.')).toBe(true);
+    expect(() => newAgentGrants(options, options.map(grantOptionKey))).toThrow('can no longer be passed on');
+  });
+  it('requires the app kinds when reading choices, and says so in a sentence instead of throwing while the form renders', async () => {
+    const missing = Object.fromEntries(Object.entries(model).filter(([key]) => key !== 'kinds'));
+    serve({ '/grants': ok({ grants: [wide], revision: 7 }), '/grants/model': ok(missing) });
+    const read = await readGrantChoices();
+    expect(read.model).toBeNull();
+    expect(read.problem).toMatchObject({ refusal: { refusal: 'GrantModelUnreadable',
+      reason: 'Lys did not say which app actions an agent may hold (the service did not answer the app kinds), so no access is offered. Reload the page to ask Lys again.' } });
+    expect(grantOptions(read, ADA, ADA, 'Ada')).toEqual([]);
   });
   it('makes one grant per chosen action, each with its own operation', () => {
     const options = grantOptions(choices(), ADA, ADA, 'Ada');

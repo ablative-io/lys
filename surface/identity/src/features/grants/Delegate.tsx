@@ -1,4 +1,4 @@
-import { ActionPicker, agentMayHold, appAgentCarriers, appAgentRefusal, singleActionCarriers, withheldFromAgents } from './ActionPicker';
+import { ActionPicker, RELATION_CHOICE, agentMayHold, appAgentCarriers, appAgentRefusal, singleActionCarriers, withheldFromAgents } from './ActionPicker';
 import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
@@ -10,7 +10,7 @@ import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { appKind, givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
+import { appKind, appKindProblem, givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
@@ -42,6 +42,8 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
   const people = [...w.who.entries()].filter(([id, x]) => x.kind === 'person' && id !== me && x.state !== 'retired');
   const app = source.resource.kind.includes('.');
+  // An app kind the model does not declare (retired, or approved after this read) offers nothing and says why, beside the grant.
+  const kindProblem = app ? appKindProblem(w.model, source.resource.kind) : null;
   const declared = app ? appKind(w.model, source.resource.kind) : null;
   const relations = declared ? Object.entries(declared.relations) : relationsOf(w);
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
@@ -66,18 +68,18 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const carriers = singleActionCarriers(w.model, source.resource.kind);
   const appChoices = app ? appAgentCarriers(w.model, source.resource.kind, offered) : [];
   const carried = offered.filter((action) => carriers.has(action) || appChoices.some(([, actions]) => actions.includes(action)));
-  // App choices retain every action their registered relation carries.
+  // App choices retain every action their registered relation carries; relation keys are prefixed so none overwrites an action's.
   const choices = new Map<string, { relation: string; actions: string[] }>();
   for (const action of carried) {
     const carrier = carriers.get(action);
     if (carrier !== undefined) choices.set(action, { relation: carrier, actions: [action] });
   }
   for (const [relation, actions] of appChoices) {
-    if (!actions.every((action) => choices.has(action))) choices.set(relation, { relation, actions });
+    if (!actions.every((action) => choices.has(action))) choices.set(RELATION_CHOICE + relation, { relation, actions });
   }
-  const noActions = declared !== null && declared.agents.length === 0 ? appAgentRefusal
+  const noActions = kindProblem ?? (declared !== null && declared.agents.length === 0 ? appAgentRefusal
     : offered.length > 0 ? app ? 'The app has no relation carrying only the agent actions you may pass on.' : 'The permission model has no relation carrying these actions alone.'
-      : 'You hold nothing on this resource that an agent could be given';
+      : 'You hold nothing on this resource that an agent could be given');
   const heldWords = source.actions.length ? 'You hold: ' + actionWords(w.model, source.resource, source.actions) + '.' : '';
   const actions = relations.find(([r]) => r === relation)?.[1] ?? [];
   const onward = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent');
@@ -172,7 +174,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
         for (const choice of picked) {
           const carrier = choices.get(choice);
           if (carrier === undefined) {
-            setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'GrantChoiceUnavailable', reason: `The permission model does not carry the selected choice ${choice}; nothing was sent.` }) });
+            setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'GrantChoiceUnavailable', reason: `The permission model no longer carries the selected choice ${choice.replace(RELATION_CHOICE, '')}, so nothing was sent; choose the actions again.` }) });
             return;
           }
           bodies.push(bodyFor(carrier.relation, carrier.actions));
@@ -270,7 +272,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
             ),
           )}
         </div>
-        <div className="note">Greyed: more than you hold.</div>
+        <div className="note">{kindProblem ?? 'Greyed: more than you hold.'}</div>
       </div>}
       <div className="field">
         <label htmlFor="dLease">Lasts</label>

@@ -1,7 +1,8 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardAgent } from '../dashboard/contract';
+import { clockMs } from '../file/time';
 import type { Used } from '../usage/contract';
 import { ContextReadings, TokenReadings, WidgetUsageReadings, usageSummary } from './WidgetUsageReadings';
 import type { ContextUsed, SessionContext } from './widgetReadings';
@@ -75,6 +76,10 @@ describe('Context session choices on the canvas usage widget', () => {
 });
 
 describe('Token classes and provider windows on the canvas usage widget', () => {
+  // Every window here is judged against a fixed now, the reading's own time, so a reset in the fixture is never passed by the wall clock.
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(at); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
   it('renders four token classes and call/session counts per agent without displaying the unrelated combined scalar', async () => {
     const host = await render(<TokenReadings rows={[row('One', [tokens()]), row('Other', [tokens()])]} />);
     expect(host.querySelectorAll('[data-token-agent]')).toHaveLength(2);
@@ -123,10 +128,26 @@ describe('Token classes and provider windows on the canvas usage widget', () => 
     const reason = 'the plan window reset at ' + at + '; no report since';
     const gap: Used = { unit: 'plan_percent', period: 'five_hour', since_ms: at, figure: null, unavailable: reason };
     const host = await render(<WidgetUsageReadings rows={[row('Agent', [gap, tokens('five_hour')])]} keys={['window/300']} />);
-    expect(host.querySelector('[data-provider-window-gaps]')?.textContent).toBe('Agent: ' + reason);
+    expect(host.querySelector('[data-provider-window-gaps]')?.textContent).toBe('Agent: the plan window reset at ' + clockMs(at) + '; no report since');
+    expect(host.textContent).not.toContain(String(at));
     expect(host.querySelector('[data-provider-window-unavailable]')?.textContent).toBe('5-hour provider window not reported');
     expect(host.querySelectorAll('[data-token-component]')).toHaveLength(4);
     expect(host.textContent).not.toContain('177,540');
+  });
+
+  it('says when an expired provider window was last read instead of showing its old level as current', async () => {
+    const account = { account: 'org', at_ms: at - 18_000_000, windows: [{ duration_minutes: 300, used_percent: 30, resets_at_ms: at }] };
+    const level = vi.fn(() => null);
+    const host = await render(<WidgetUsageReadings rows={[row('Agent', [], [account])]} keys={['window/300']} renderLevel={level} />);
+    const section = host.querySelector('[data-provider-window-expired]');
+    expect(section?.textContent).toContain('Not read since ' + clockMs(at - 18_000_000));
+    expect(section?.textContent).toContain('it reset ' + clockMs(at));
+    expect(host.textContent).not.toContain('30%');
+    expect(level).not.toHaveBeenCalled();
+    const gap: Used = { unit: 'plan_percent', period: 'five_hour', since_ms: null, figure: null, unavailable: 'plan window unreported for agent other' };
+    const summary = usageSummary([row('Agent', [gap], [account])], 'window/300')?.figure;
+    expect(summary).toContain('org: not read since ' + clockMs(at - 18_000_000));
+    expect(summary).not.toContain('30%');
   });
 
   it('supplies scalar formula input for the selected session because context is never a cross-session maximum or component token total', () => {

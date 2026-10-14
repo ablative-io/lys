@@ -1,19 +1,22 @@
 import { useId } from 'react';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { actionWords } from './action-words';
-import { appKind, requireGrantKinds } from './model';
+import { grantKindsProblem } from '../../generated/grants';
+import { appKind, appKindProblem } from './model';
 
 export interface ActionChoice { id: string; resource: ResourceRef; relation: string; actions: string[]; reason: string }
 export interface ActionGroup { id: string; title: string; href?: string; choices: ActionChoice[]; everything?: ActionChoice }
+/** An app relation's choice id: kept apart from action ids, so a relation named like an action never stands for that action. */
+export const RELATION_CHOICE = 'relation:';
 export const appAgentRefusal = "Lys can't give an agent this app's actions until the app allows it.";
 
 export function appAgentReason(model: GrantModel, kind: string): string {
-  return appKind(model, kind).agents.length === 0 ? appAgentRefusal : 'The app does not allow an agent to hold these actions.';
+  return appKindProblem(model, kind) ?? (appKind(model, kind).agents.length === 0 ? appAgentRefusal : 'The app does not allow an agent to hold these actions.');
 }
 
 export function withheldFromAgents(model: GrantModel | null): string[] | null {
-  if (model) requireGrantKinds(model);
-  if (!model || !('withheld_from_agents' in model) || !Array.isArray(model.withheld_from_agents)
+  // An undeclared model offers nothing to agents, said by the picker; never a throw while a page renders.
+  if (!model || grantKindsProblem(model) !== null || !('withheld_from_agents' in model) || !Array.isArray(model.withheld_from_agents)
     || model.withheld_from_agents.some((action) => typeof action !== 'string')) return null;
   return model.withheld_from_agents as string[];
 }
@@ -21,7 +24,6 @@ export function withheldFromAgents(model: GrantModel | null): string[] | null {
 const carriers = new WeakMap<GrantModel, Map<string, string>>();
 /** Only a relation carrying exactly one act can represent a single tick. */
 export function singleActionCarriers(model: GrantModel, kind?: string): Map<string, string> {
-  requireGrantKinds(model);
   if (kind?.includes('.')) return carriersOf(appKind(model, kind).relations);
   let index = carriers.get(model);
   if (!index) {
@@ -125,7 +127,7 @@ export function ActionPicker(props: SingleProps | GroupedProps) {
   if (props.resource.kind.includes('.')) {
     for (const [relation, actions] of appAgentCarriers(props.model, props.resource.kind, props.actions, props.agents !== false)) {
       if (actions.every((action) => choices.some((choice) => !choice.reason && choice.actions.includes(action)))) continue;
-      choices.push({ id: relation, resource: props.resource, relation, actions, reason: '' });
+      choices.push({ id: RELATION_CHOICE + relation, resource: props.resource, relation, actions, reason: '' });
     }
   }
   const represented = new Set(choices.flatMap((choice) => choice.actions));

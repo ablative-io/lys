@@ -144,13 +144,13 @@ describe('The Dashboard is the front page', () => {
     expect(cells('Scribe')[2]).not.toContain('40% now');
   });
 
-  it('names missing window provenance for a scalar context percentage instead of showing it as a current reading', async () => {
+  it("shows an older scalar context percentage as the service's figure, since the reading carries no tokens or window to recompute it", async () => {
     await mount('#/', { ...routes, '/dashboard': ok(dashboard({
       [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used,
         figures: [{ unit: 'context_percent', period: null, since_ms: null, figure: 23, unavailable: null }] } },
     })) });
-    expect(cells('Scribe')[2]).toBe('compacts at 40% · declared context window not reported');
-    expect(cells('Scribe')[2]).not.toContain('23% now');
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · 23% now');
+    expect(cells('Scribe')[2]).not.toContain('not reported');
   });
 
   it('shows the widgets: waiting requests and drafts item by item, budgets nearest the limit first, goals missed first, and a part that could not be read by its refusal name', async () => {

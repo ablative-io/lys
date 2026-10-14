@@ -77,9 +77,9 @@ describe('Current live-session context readings', () => {
     expect(reading?.display).not.toContain('%');
   });
 
-  it('shows the missing declaration without guessing a default denominator when an old record has tokens but no window', () => {
+  it("shows the service's own figure, never a guessed denominator, and names the missing declaration when an old record has tokens but no window", () => {
     const reading = contextPresentation([row('Agent', [context(5, { context: { ...current, window_tokens: null } })])]);
-    expect(reading).toMatchObject({ figure: null, display: 'Declared context window not reported', context_tokens: 58_795, window_tokens: null });
+    expect(reading).toMatchObject({ figure: 5, display: '5%', context_tokens: 58_795, window_tokens: null });
     expect(reading?.words).toContain('declared context window not reported');
     expect(rendered(reading).textContent).toBe(reading?.words);
   });
@@ -107,10 +107,10 @@ describe('Current live-session context readings', () => {
     expect(rendered(reading).querySelector('time')).toBeNull();
   });
 
-  it('names absent provenance in scalar-only answers without inventing a session, denominator, reading time or empty-call count', () => {
+  it("shows an older scalar-only answer's own figure and names absent provenance without inventing a session, denominator, reading time or empty-call count", () => {
     const scalar: Used = { unit: 'context_percent', period: null, since_ms: null, figure: 5, unavailable: null };
     const reading = contextPresentation([row('Agent', [scalar])]);
-    expect(reading).toMatchObject({ figure: null, display: 'Declared context window not reported', read_at_ms: null, reported_none: null,
+    expect(reading).toMatchObject({ figure: 5, display: '5%', read_at_ms: null, reported_none: null, context_tokens: null, window_tokens: null,
       words: 'current session not reported · read time not reported · count of calls that reported none not reported · context tokens not reported · declared context window not reported' });
     expect(rendered(reading).textContent).toBe(reading?.words);
     expect(contextPresentation([])).toBeNull();

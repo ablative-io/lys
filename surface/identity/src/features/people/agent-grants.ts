@@ -1,7 +1,9 @@
 import { operationId, Refused, request } from '../../api';
+import { grantKindsProblem } from '../../generated/grants';
 import type { DelegateBody, Grant, GrantModel } from '../../generated/grants';
 import { isRecord, strings } from '../network/contract';
 import { agentMayHold, appAgentCarriers, appAgentRefusal, singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
+import { appKindProblem } from '../grants/model';
 import { actionWords } from '../grants/action-words';
 import { resourceWords } from './agent-resource-names';
 
@@ -25,10 +27,12 @@ export async function readGrantChoices(): Promise<GrantChoices> {
     const [answer, model] = await Promise.all([request<unknown>('/grants'), request<unknown>('/grants/model')]);
     if (!isRecord(answer) || !Array.isArray(answer.grants) || !answer.grants.every(readableGrant)
       || !isRecord(model) || !isRecord(model.action_sentences) || !Object.values(model.action_sentences).every((sentence) => typeof sentence === 'string' && Boolean(sentence.trim())) || !second(model.version) || !isRecord(model.relations) || !Object.values(model.relations).every(strings)
-      || model.kinds !== undefined && (!isRecord(model.kinds) || !Object.values(model.kinds).every((kind) => isRecord(kind)
-        && strings(kind.agents) && isRecord(kind.relations) && Object.values(kind.relations).every(strings)))) {
+      ) {
       throw new Refused(200, { refusal: 'GrantsUnreadable', reason: 'Lys did not return readable grants and their actions. No access is selected.' });
     }
+    // The app kinds are required here as the grant screens require them: a model without them is a sentence, never a throw while the form renders.
+    const kinds = grantKindsProblem(model);
+    if (kinds !== null) throw new Refused(200, { refusal: 'GrantModelUnreadable', reason: 'Lys did not say which app actions an agent may hold (' + kinds + '), so no access is offered. Reload the page to ask Lys again.' });
     return { grants: answer.grants, model: model as unknown as GrantModel, problem: null };
   } catch (problem) { return { grants: [], model: null, problem }; }
 }
@@ -56,7 +60,7 @@ export function grantOptions(choices: GrantChoices, boss: string, caller: string
       }
       for (const action of grant.actions.filter((action) => !agentMayHold(model, grant.resource.kind, [action]))) {
         const key = JSON.stringify([grant.resource.kind, grant.resource.id, action]);
-        options.set(key, { grant, relation: grant.relation, actions: [action], reason: appAgentRefusal });
+        options.set(key, { grant, relation: grant.relation, actions: [action], reason: appKindProblem(model, grant.resource.kind) ?? appAgentRefusal });
       }
       continue;
     }

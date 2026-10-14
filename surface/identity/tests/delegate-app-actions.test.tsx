@@ -56,7 +56,7 @@ describe('Delegating approved app actions', () => {
     const combined = { ...model, kinds: { 'cambium.channel': { agents: ['read', 'send'], relations: { participant: ['read', 'send'] } } } };
     const { container, posted } = await open(source, combined);
     const offered = [...container.querySelectorAll<HTMLInputElement>('input[name="action"]')];
-    expect(offered.map((input) => input.value)).toEqual(['participant']);
+    expect(offered.map((input) => input.value)).toEqual(['relation:participant']);
     expect(offered[0].closest('tr')?.querySelector('label')?.textContent).toBe('read; send');
     expect(offered[0].disabled).toBe(false);
     expect(container.textContent).not.toContain('Some actions cannot be selected');
@@ -88,6 +88,26 @@ describe('Delegating approved app actions', () => {
     const { container } = await open(source, disallowed);
     expect(container.textContent).toContain("Lys can't give an agent this app's actions until the app allows it.");
     expect(container.querySelector('input[name="action"]')).toBeNull();
+  });
+
+  it('names an app kind Lys has not declared beside the grant and renders the rest of the form', async () => {
+    const { container, posted } = await open({ ...source, resource: { kind: 'retired.app', id: 'room' } });
+    expect(container.textContent).toContain('Lys has not declared the app kind retired.app; an administrator approves the app under Apps.');
+    expect(container.textContent).toContain('Where it comes from');
+    expect(container.querySelector('input[name="action"]')).toBeNull();
+    expect(container.querySelector<HTMLButtonElement>('[data-act="delegatedo"]')?.disabled).toBe(true);
+    expect(posted).toEqual([]);
+  });
+
+  it('keeps an app relation named like an action apart from that action, so ticking the action sends its single carrier', async () => {
+    const clash = { ...model, kinds: { 'cambium.channel': { agents: ['read', 'send'], relations: { read: ['read', 'send'], reader: ['read'] } } } };
+    const { container, posted } = await open(source, clash);
+    const offered = [...container.querySelectorAll<HTMLInputElement>('input[name="action"]')];
+    expect(offered.map((input) => input.value)).toEqual(['read', 'relation:read']);
+    await act(async () => { offered[0].click(); });
+    await act(async () => { container.querySelector<HTMLButtonElement>('[data-act="delegatedo"]')?.click(); });
+    expect(posted).toHaveLength(1);
+    expect(posted[0].body).toMatchObject({ resource, relation: 'reader' });
   });
 
   it('names the unavailable carrier when only part of a combined app relation may be passed on', async () => {

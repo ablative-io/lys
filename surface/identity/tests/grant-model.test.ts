@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { grantKindsProblem } from '../src/generated/grants';
 import { agentMayHold, appAgentCarriers, singleActionCarriers } from '../src/features/grants/ActionPicker';
-import { readGrantWorld, requireGrantKinds } from '../src/features/grants/model';
+import { appKind, appKindProblem, readGrantWorld, requireGrantKinds } from '../src/features/grants/model';
 import { DIRECTORY, GRANTS, ME, MODEL, ok } from './fixtures';
 import { serve } from './harness';
 
@@ -16,12 +16,12 @@ describe('Required grant model kinds', () => {
     await expect(readGrantWorld(ME)).rejects.toMatchObject({
       refusal: { refusal: 'GrantModelUnreadable', reason: 'the service did not answer the app kinds' },
     });
-    for (const read of [
-      () => requireGrantKinds(missing),
-      () => agentMayHold(missing, 'cambium.channel', ['read']),
-      () => appAgentCarriers(missing, 'cambium.channel', ['read']),
-      () => singleActionCarriers(missing, 'cambium.channel'),
-    ]) expect(read).toThrow('the service did not answer the app kinds');
+    expect(() => requireGrantKinds(missing)).toThrow('the service did not answer the app kinds');
+    // The readers a page calls while it renders never throw: they offer nothing and the sentence says why.
+    expect(agentMayHold(missing, 'cambium.channel', ['read'])).toBe(false);
+    expect(appAgentCarriers(missing, 'cambium.channel', ['read'])).toEqual([]);
+    expect(singleActionCarriers(missing, 'cambium.channel').size).toBe(0);
+    expect(appKindProblem(missing, 'cambium.channel')).toBe('Lys has not declared its app kinds, so the access of cambium.channel cannot be shown; reload the page to ask Lys again.');
   });
 
   it.each([null, [], 'unreadable', 6])('refuses a non-object kinds member %j without manufacturing a declaration', (kinds) => {
@@ -39,7 +39,10 @@ describe('Required grant model kinds', () => {
     expect(grantKindsProblem({ ...MODEL, kinds: {} })).toBeNull();
     expect(agentMayHold(MODEL, 'fixture.doc', ['read'])).toBe(false);
     expect(appAgentCarriers(MODEL, 'fixture.doc', ['read'])).toEqual([]);
-    expect(() => agentMayHold({ ...MODEL, kinds: {} }, 'fixture.doc', ['read']))
-      .toThrow('the service did not answer the app kind fixture.doc');
+    expect(appKindProblem(MODEL, 'fixture.doc')).toBeNull();
+    expect(agentMayHold({ ...MODEL, kinds: {} }, 'fixture.doc', ['read'])).toBe(false);
+    expect(appKind({ ...MODEL, kinds: {} }, 'fixture.doc')).toEqual({ agents: [], relations: {} });
+    expect(appKindProblem({ ...MODEL, kinds: {} }, 'fixture.doc'))
+      .toBe('Lys has not declared the app kind fixture.doc; an administrator approves the app under Apps.');
   });
 });
