@@ -97,6 +97,11 @@ pub struct Target {
 
 impl Target {
     /// Validate the boundary without adding a length limit or default.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the kind, resource id or action is
+    /// empty or contains control characters.
     pub fn new(kind: &str, id: &str, action: &str) -> Result<Self, Error> {
         if [kind, id, action]
             .iter()

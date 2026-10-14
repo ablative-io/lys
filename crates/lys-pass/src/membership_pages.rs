@@ -177,6 +177,11 @@ pub struct MembershipPage {
 /// Refuse `bounds` asking for more than the provider's `ceiling`, a bound
 /// at a time; [`validate_resources`] and [`validate_recipients`] have
 /// already refused a zero bound.
+///
+/// # Errors
+///
+/// Refuses [`PAGE_OVER_CEILING`] when the requested row count or byte
+/// budget exceeds the provider's corresponding ceiling.
 pub fn within_ceiling(bounds: PageBounds, ceiling: PageBounds) -> Result<(), Refused> {
     if bounds.rows > ceiling.rows || bounds.bytes > ceiling.bytes {
         return Err(Refused {
@@ -201,6 +206,13 @@ fn bounded(bounds: PageBounds) -> Result<(), Refused> {
 }
 
 /// Refuse a resource page request this contract cannot ask.
+///
+/// # Errors
+///
+/// Refuses another contract version or grant log, then an empty or
+/// control-bearing log identity, workspace, subject, kind, action or
+/// supplied cursor. A zero row count or byte budget is [`BOUND_INVALID`].
+/// The provider checks its ceiling and the cursor's authority separately.
 pub fn validate_resources(request: &ResourcePageRequest, served: &GrantLog) -> Result<(), Refused> {
     let mut members = vec![
         ("workspace kind", request.workspace.kind.as_str()),
@@ -218,6 +230,13 @@ pub fn validate_resources(request: &ResourcePageRequest, served: &GrantLog) -> R
 }
 
 /// Refuse a recipient page request this contract cannot ask.
+///
+/// # Errors
+///
+/// Refuses another contract version or grant log, then an empty or
+/// control-bearing log identity, workspace, resource, action or supplied
+/// cursor. A zero row count or byte budget is [`BOUND_INVALID`]. The
+/// provider checks its ceiling and the cursor's authority separately.
 pub fn validate_recipients(
     request: &RecipientPageRequest,
     served: &GrantLog,

@@ -149,6 +149,12 @@ pub struct Client {
 impl Client {
     /// Use the product's configured transport and trusted Lys origin.
     /// Provider routes live at its root; product API routes live under `/api`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] unless the issuer is HTTP or HTTPS with
+    /// a host and no credentials, query or fragment. A path other than the
+    /// root is [`Error::LysOriginRequired`].
     pub fn new(http: Http, issuer: Url) -> Result<Self, Error> {
         if !matches!(issuer.scheme(), "http" | "https")
             || issuer.host_str().is_none()
@@ -174,6 +180,12 @@ impl Client {
     }
 
     /// Fetch the issuer's current keyset explicitly; offline checks never fetch.
+    ///
+    /// # Errors
+    ///
+    /// Preserves endpoint, transport, refusal-status and response-reading
+    /// failures. A fetched keyset that does not satisfy [`KeySet::from_json`]
+    /// is refused before a replacement cache is returned.
     pub async fn fetch_keys(&self) -> Result<KeySet, Error> {
         let response = self
             .http
@@ -191,6 +203,14 @@ impl Client {
     }
 
     /// Exchange an authorization code using credentials owned by the caller.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a missing client id, secret, code, redirect URI or PKCE
+    /// verifier before sending. Preserves endpoint and transport failures
+    /// and the issuer's named token refusal. An unreadable or invalid token
+    /// answer, or a failure status outside the refusal contract, is returned
+    /// as Lys could not be asked.
     pub async fn fetch_token(&self, request: &TokenRequest<'_>) -> Result<TokenResponse, Error> {
         self.token(&code_form(request)?).await
     }
@@ -198,6 +218,11 @@ impl Client {
     /// [`Client::fetch_token`], asking Lys for the pass's grant binding
     /// beside it (DIRECTORY-089 R2). An answer without one is refused
     /// `grant_binding_required`, never taken as a pass at revision zero.
+    ///
+    /// # Errors
+    ///
+    /// Returns the exchange refusals of [`Self::fetch_token`], and
+    /// `grant_binding_required` when the answer has no nonempty binding.
     pub async fn fetch_bound_token(
         &self,
         request: &TokenRequest<'_>,
@@ -208,6 +233,11 @@ impl Client {
     }
 
     /// [`Client::refresh_token`], asking for the new pass's grant binding.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refresh refusals of [`Self::refresh_token`], and
+    /// `grant_binding_required` when the new answer has no nonempty binding.
     pub async fn refresh_bound_token(
         &self,
         client_id: &str,
@@ -230,6 +260,14 @@ impl Client {
     }
 
     /// Ask Lys to refresh from live grants; no timer or cached authority is used.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a missing client id, secret or refresh token before sending.
+    /// Preserves endpoint and transport failures and the issuer's named
+    /// token refusal, including withdrawn live authority. An unreadable or
+    /// invalid token answer, or a failure status outside the refusal
+    /// contract, is returned as Lys could not be asked.
     pub async fn refresh_token(
         &self,
         client_id: &str,

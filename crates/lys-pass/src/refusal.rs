@@ -43,6 +43,13 @@ pub struct Refusal {
 
 impl Refusal {
     /// Name an exact needed grant and the issuer's existing request screen.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an empty or control-bearing target, a missing application
+    /// or a kind that application does not own. The issuer must parse as
+    /// an HTTP or HTTPS address with a host and no credentials, query or
+    /// fragment; an invalid address is refused before a link is returned.
     pub fn new(app: &str, kind: &str, id: &str, action: &str, issuer: &str) -> Result<Self, Error> {
         let target = Target::new(kind, id, action)?;
         if app.is_empty() || !crate::rights::audience_owns(kind, app) {

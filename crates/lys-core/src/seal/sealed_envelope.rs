@@ -111,6 +111,7 @@ impl SealedEnvelope {
     /// signature to this exact byte sequence means an adversary cannot
     /// substitute a different ciphertext, ephemeral key, or nonce without
     /// invalidating the signature.
+    #[must_use]
     pub fn attestation_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(
             self.ephemeral_public_key.len() + self.ciphertext.len() + self.nonce.len(),

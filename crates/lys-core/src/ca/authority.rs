@@ -84,6 +84,7 @@ impl CertificateAuthority {
     }
 
     /// Returns the authority's 32-byte Ed25519 public key.
+    #[must_use]
     pub fn public_key_bytes(&self) -> [u8; 32] {
         self.identity.public_key_bytes()
     }

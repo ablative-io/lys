@@ -97,9 +97,19 @@ pub trait Executor {
     /// A product storage or execution failure.
     type Error: std::error::Error + Send + Sync + 'static;
     /// Read the committed outcome before attempting execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns the product's storage error when its committed ledger cannot
+    /// be read. An id with no committed outcome returns `Ok(None)`.
     fn receipt(&self, draft: &str) -> Result<Option<Execution>, Self::Error>;
     /// Atomically apply and record once per draft id; concurrent calls return the same receipt.
     /// A stored id with another digest must be refused without applying anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns the product's execution or storage error when the atomic
+    /// act and its durable receipt cannot be completed or read back.
     fn execute_and_record(&mut self, draft: &ApprovedDraft) -> Result<Execution, Self::Error>;
 }
 
@@ -173,6 +183,14 @@ pub fn request_digest(words: &str) -> String {
 }
 
 /// Return a matching durable receipt before ever invoking a product again.
+///
+/// # Errors
+///
+/// Returns [`ExecuteError::Contract`] for an invalid target, missing grant
+/// or draft id, words that do not match their digest, another application's
+/// target or a malformed executed receipt digest. A ledger read or atomic
+/// execution failure is [`ExecuteError::Product`]; a returned receipt for
+/// different words is [`ExecuteError::DigestMismatch`].
 pub fn execute_once<E: Executor>(
     draft: &ApprovedDraft,
     executor: &mut E,
@@ -220,6 +238,13 @@ fn validate(grant: &str, target: &Target, digest: &str, words: &str) -> Result<(
 #[cfg(feature = "http")]
 impl Client {
     /// Pull one approved page, invoke the durable executor once per draft, and close each outcome.
+    ///
+    /// # Errors
+    ///
+    /// Stops at [`RunError::Pull`] if the approved page cannot be read or
+    /// validated, or [`RunError::Execution`] if a draft cannot produce a
+    /// valid durable receipt. [`RunError::Record`] retains the committed
+    /// receipt when Lys fails to acknowledge it, so a retry can reuse it.
     pub async fn run_approved<E: Executor + Send>(
         &self,
         connector_pass: &str,
@@ -253,6 +278,14 @@ impl Client {
     }
 
     /// Record a held act using its caller's pass; an ordinary refusal is never a draft.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a judgment that is not held by this grant, an invalid target,
+    /// missing grant, caller pass or operation, or words that do not match
+    /// their digest. Sending, refusal-status and response-decoding errors
+    /// are preserved as transport failures; an answer without a draft id
+    /// is [`Error::CannotAsk`].
     pub async fn create_draft(
         &self,
         pass: &str,
@@ -299,6 +332,15 @@ impl Client {
     }
 
     /// Pull one page with the product connector, without a timer or background loop.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a missing connector pass or app and propagates transport,
+    /// refusal-status and response-decoding failures. A page with an
+    /// inconsistent total or repeated continuation is refused, as is a
+    /// draft with a missing grant, words whose digest differs, an invalid
+    /// target, another app, a missing or repeated id, or a resource kind
+    /// that app does not own.
     pub async fn approved_drafts(
         &self,
         connector_pass: &str,
@@ -353,6 +395,14 @@ impl Client {
     }
 
     /// Acknowledge the product's durable outcome; failure leaves its local receipt intact.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a missing connector pass or draft id, a receipt naming
+    /// different words, a malformed executed receipt digest or an execution
+    /// refusal without a name and reason. Endpoint construction, transport
+    /// and refusal-status failures are returned without changing the
+    /// product's committed receipt.
     pub async fn record_execution(
         &self,
         connector_pass: &str,

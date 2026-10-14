@@ -137,6 +137,7 @@ impl NoteVerifierKey {
     }
 
     /// Emits the text form with a lowercase-hex key ID (Go emits `%08x`).
+    #[must_use]
     pub fn to_spec(&self) -> String {
         let mut key_bytes = Vec::with_capacity(33);
         key_bytes.push(0x01);
@@ -150,16 +151,19 @@ impl NoteVerifierKey {
     }
 
     /// The key name (equal to the checkpoint origin this key verifies).
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// The 4-byte key ID.
+    #[must_use]
     pub fn key_id(&self) -> [u8; 4] {
         self.key_id
     }
 
     /// The 32-byte Ed25519 public key.
+    #[must_use]
     pub fn public_key(&self) -> [u8; 32] {
         self.public_key
     }

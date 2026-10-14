@@ -127,6 +127,7 @@ pub(crate) fn serialize_leaf<L: Serialize>(leaf: &L) -> TrustResult<SerializedLe
 /// tree ([`RawLeaf`](super::tree::RawLeaf)) computes for a leaf, and it is
 /// reproducible by any stranger with standard tooling:
 /// `(printf '\x00'; cat leaf-file) | shasum -a 256`.
+#[must_use]
 pub fn raw_leaf_hash(leaf_bytes: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update([0x00]);

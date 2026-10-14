@@ -100,6 +100,10 @@ pub fn pass_digest(token: &str) -> String {
 }
 
 /// The binding a revocation-enabled product requires, or its absence by name.
+///
+/// # Errors
+///
+/// Refuses an absent or empty binding with [`BINDING_REQUIRED`].
 pub fn required(binding: Option<&str>) -> Result<&str, Error> {
     binding
         .filter(|binding| !binding.is_empty())
@@ -137,6 +141,13 @@ pub struct VerifiedBinding {
 impl VerifiedBinding {
     /// Verify `binding` as the binding of the pass `token`, already verified
     /// as `pass`, on the grant log `log` the product's stream reads.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a binding whose encoding, header, signing key or signature
+    /// does not verify, or whose claims do not match this pass, grant log
+    /// and grants. An unsupported version or malformed dependency ancestry
+    /// is refused by the same checks as [`Self::verify_bound`].
     pub fn verify(
         binding: &str,
         token: &str,
@@ -170,6 +181,16 @@ impl VerifiedBinding {
     /// Verify `binding` as the binding of a pass `bound` describes: one a
     /// registry-owned producer issued and verified by its own contract,
     /// whose binding Lys judged (`POST /grants/bindings`).
+    ///
+    /// # Errors
+    ///
+    /// Refuses unreadable token encoding or claims, an unsupported header,
+    /// an unpublished signing key or an invalid signature. Binding refusals
+    /// name an unsupported version, a different pass or its issuer, holder,
+    /// audience or lifetime, or another grant log or epoch. Ancestry is
+    /// refused when a path does not begin at its grant, contains an empty
+    /// or repeated grant, repeats a dependency, or does not cover exactly
+    /// the grants `bound` names.
     pub fn verify_bound(
         binding: &str,
         bound: &Bound<'_>,

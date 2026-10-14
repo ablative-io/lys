@@ -91,6 +91,13 @@ pub struct BatchAnswer {
 #[cfg(feature = "http")]
 impl Client {
     /// Ask the live batch route using the caller's pass; never try offline rights on failure.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an empty pass, holder or batch, or an invalid target.
+    /// Transport and response-decoding failures are preserved. A refusal
+    /// status, the wrong result count, a revision below `at_least` or an
+    /// inconsistent permission answer returns [`Error::CannotAsk`].
     pub async fn check_batch(
         &self,
         pass: &str,

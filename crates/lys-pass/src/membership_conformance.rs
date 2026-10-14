@@ -138,11 +138,21 @@ pub struct Case {
 }
 
 /// The world, refusing any member the contract does not name.
+///
+/// # Errors
+///
+/// Returns the JSON error if [`WORLD`] cannot be read as the shared world,
+/// including missing, unknown or wrongly typed members of its records.
 pub fn world() -> Result<World, serde_json::Error> {
     serde_json::from_str(WORLD)
 }
 
 /// Every vector, in order.
+///
+/// # Errors
+///
+/// Returns the JSON error if [`CASES`] is not a list of membership vectors
+/// with the required request and expected-answer members and types.
 pub fn cases() -> Result<Vec<Case>, serde_json::Error> {
     serde_json::from_str(CASES)
 }
@@ -259,6 +269,11 @@ pub struct Report {
 
 impl Report {
     /// Refuse the consumer gate unless every shipped vector matched.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Nonconformant`] if the run count is not [`CASE_COUNT`],
+    /// any vector did not pass or any consumer failure was retained.
     pub fn require_conformant(&self) -> Result<(), Nonconformant> {
         if self.passed == self.run && self.run == CASE_COUNT && self.failures.is_empty() {
             Ok(())
@@ -283,6 +298,12 @@ pub struct Nonconformant {
 
 /// Ask every vector through the consumer's real adapter, keeping every
 /// failure. Fails only when the shipped vectors themselves cannot be read.
+///
+/// # Errors
+///
+/// Returns the JSON error if the shipped world or vector list cannot be
+/// decoded by [`world`] or [`cases`]. Consumer errors and mismatched
+/// answers are retained in the report's failures instead.
 pub fn run<E: std::fmt::Display>(
     mut observe: impl FnMut(&Case) -> Result<MembershipDecision, E>,
 ) -> Result<Report, serde_json::Error> {

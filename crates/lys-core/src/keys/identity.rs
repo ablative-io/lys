@@ -82,6 +82,7 @@ impl Ed25519Identity {
     }
 
     /// Returns the 32-byte Ed25519 verifying (public) key.
+    #[must_use]
     pub fn public_key_bytes(&self) -> [u8; 32] {
         self.verifying_key.to_bytes()
     }
@@ -90,6 +91,7 @@ impl Ed25519Identity {
     ///
     /// Returns the 64-byte detached signature. Ed25519 deterministic signing
     /// is infallible in dalek 2.
+    #[must_use]
     pub fn sign(&self, message: &[u8]) -> [u8; 64] {
         self.signing_key.sign(message).to_bytes()
     }
@@ -180,6 +182,7 @@ impl Ed25519Identity {
     /// that outlives the process — core dumps, swap, hibernation images —
     /// where a stale stack page can persist long after the structured secret
     /// is gone.
+    #[must_use]
     pub fn x25519_static_secret(&self) -> x25519_dalek::StaticSecret {
         let scalar = Zeroizing::new(self.signing_key.to_scalar_bytes());
         x25519_dalek::StaticSecret::from(*scalar)
@@ -187,6 +190,7 @@ impl Ed25519Identity {
 
     /// Returns the Montgomery-form X25519 public key derived from this
     /// identity, matching the public key of [`Self::x25519_static_secret`].
+    #[must_use]
     pub fn x25519_public_key(&self) -> [u8; 32] {
         x25519_dalek::PublicKey::from(&self.x25519_static_secret()).to_bytes()
     }
@@ -294,6 +298,7 @@ impl Ed25519Identity {
     /// constructor accepting private key material is exposed to consumers.
     ///
     /// [`SigningKey`]: ed25519_dalek::SigningKey
+    #[must_use]
     pub fn from_seed(seed: &Zeroizing<[u8; 32]>) -> Self {
         let signing_key = ed25519_dalek::SigningKey::from_bytes(seed);
         let verifying_key = signing_key.verifying_key();

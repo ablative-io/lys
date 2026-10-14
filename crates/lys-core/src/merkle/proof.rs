@@ -62,6 +62,7 @@ impl RootHash {
     /// opaque commitment. Supplying bytes or a leaf count that do not match
     /// the tree that produced the proofs causes verification to fail, which
     /// is exercised by this module's tests.
+    #[must_use]
     pub fn from_parts(root_hash: [u8; 32], num_leaves: u64) -> Self {
         let digest = sha2::digest::Output::<Sha256>::from(root_hash);
         Self {
@@ -75,17 +76,20 @@ impl RootHash {
     /// The returned pair is exactly what [`Self::from_parts`] accepts, so a
     /// log operator publishes these two values and an external verifier
     /// reconstructs an equal `RootHash` from them.
+    #[must_use]
     pub fn to_parts(&self) -> ([u8; 32], u64) {
         ((*self.inner.as_bytes()).into(), self.inner.num_leaves())
     }
 
     /// Returns the 32-byte SHA-256 Merkle Tree Hash.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.inner.as_bytes().as_slice()
     }
 
     /// Returns the number of leaves in the tree at the time this root was
     /// computed.
+    #[must_use]
     pub fn num_leaves(&self) -> u64 {
         self.inner.num_leaves()
     }
@@ -118,6 +122,7 @@ impl InclusionProof {
     }
 
     /// Returns the RFC 6962 `PATH(m, D[n])` byte encoding of the proof.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.inner.as_bytes()
     }
@@ -160,6 +165,7 @@ impl ConsistencyProof {
     }
 
     /// Returns the RFC 6962 `PROOF(m, D[n])` byte encoding of the proof.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.inner.as_bytes()
     }

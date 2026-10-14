@@ -148,6 +148,13 @@ fn malformed(value: &str) -> bool {
 /// Refuse a request this contract cannot ask, in the order a provider
 /// checks: the contract version, the grant log `served`, then every member's
 /// shape. Identity, kind and placement are the provider's to judge after.
+///
+/// # Errors
+///
+/// Refuses [`CONTRACT_UNSUPPORTED`] for another contract version,
+/// [`LOG_MISMATCH`] for another log or epoch, then [`REQUEST_MALFORMED`]
+/// for an empty or control-bearing log identity, workspace, subject,
+/// resource or action member, in that order.
 pub fn validate(request: &MembershipRequest, served: &GrantLog) -> Result<(), Refused> {
     check(
         request.contract,

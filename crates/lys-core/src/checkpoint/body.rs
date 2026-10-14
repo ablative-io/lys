@@ -69,6 +69,7 @@ impl CheckpointBody {
 
     /// Encodes the body as exactly
     /// `"{origin}\n{tree_size}\n{base64_std_padded(root_hash)}\n"`.
+    #[must_use]
     pub fn encode(&self) -> String {
         format!(
             "{}\n{}\n{}\n",
@@ -127,22 +128,26 @@ impl CheckpointBody {
     }
 
     /// The log's origin (its unique identity, and the note key name).
+    #[must_use]
     pub fn origin(&self) -> &str {
         &self.origin
     }
 
     /// The tree size this checkpoint commits to.
+    #[must_use]
     pub fn tree_size(&self) -> u64 {
         self.tree_size
     }
 
     /// The 32-byte RFC 6962 root hash this checkpoint commits to.
+    #[must_use]
     pub fn root_hash(&self) -> [u8; 32] {
         self.root_hash
     }
 
     /// Bridges into the existing merkle verification helpers:
     /// `RootHash::from_parts(self.root_hash, self.tree_size)`.
+    #[must_use]
     pub fn to_root(&self) -> RootHash {
         RootHash::from_parts(self.root_hash, self.tree_size)
     }

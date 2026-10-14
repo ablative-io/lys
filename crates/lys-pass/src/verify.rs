@@ -61,6 +61,12 @@ pub struct KeySet {
 
 impl KeySet {
     /// Replace the cache only after the whole published keyset validates.
+    ///
+    /// # Errors
+    ///
+    /// Refuses unreadable JSON or key encoding, a key with the wrong type,
+    /// algorithm, use or operations, an empty or control-bearing key id,
+    /// an invalid or weak Ed25519 point, or a repeated key id.
     pub fn from_json(json: &str) -> Result<Self, Error> {
         let published: Jwks = serde_json::from_str(json)?;
         let mut keys = BTreeMap::new();
@@ -144,6 +150,16 @@ pub struct VerifiedPass {
 
 impl VerifiedPass {
     /// Verify the complete signed token before trusting any permission claim.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a malformed token, unsupported header, unpublished key or
+    /// invalid signature. The trusted issuer and audience must be present
+    /// and match; the holder and responsibility must be complete, the
+    /// lifetime nonempty and unexpired, and the start no more than
+    /// [`CLOCK_SKEW`] ahead of `now`. Rights or a truncation marker naming
+    /// another audience, incomplete rights and empty or control-bearing
+    /// targets or actions are refused before an index is returned.
     pub fn verify(
         token: &str,
         keys: &KeySet,
@@ -228,6 +244,12 @@ impl VerifiedPass {
     }
 
     /// Decide an exact target from the index; reach is never recomputed locally.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an expired pass, a start more than [`CLOCK_SKEW`] ahead of `now`,
+    /// truncated rights or an inconsistent right index. No matching right
+    /// is a successful [`Decision::Refused`], not an error.
     pub fn evaluate(
         &self,
         kind: &str,
@@ -273,6 +295,12 @@ impl VerifiedPass {
     }
 
     /// Hot routes accept only an outright, unexpired and complete grant.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an expired or not-yet-valid pass, truncated rights or an
+    /// inconsistent right index, as [`Self::evaluate`] does. A held or
+    /// missing right returns `false`.
     pub fn hot_allowed(&self, kind: &str, id: &str, action: &str, now: u64) -> Result<bool, Error> {
         Ok(matches!(
             self.evaluate(kind, id, action, now)?,

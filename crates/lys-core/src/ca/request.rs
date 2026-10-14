@@ -131,11 +131,13 @@ pub struct VerifiedRequest {
 
 impl VerifiedRequest {
     /// The 32-byte Ed25519 public key the requester proved possession of.
+    #[must_use]
     pub fn subject_public_key(&self) -> &[u8; ED25519_KEY_LEN] {
         &self.subject_public_key
     }
 
     /// The single common name the request asked to be certified under.
+    #[must_use]
     pub fn common_name(&self) -> &str {
         &self.common_name
     }

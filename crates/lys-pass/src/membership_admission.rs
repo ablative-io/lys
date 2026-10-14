@@ -52,6 +52,14 @@ pub struct AdmissionDecision {
 }
 
 /// Refuse an admission request this contract cannot ask.
+///
+/// # Errors
+///
+/// Refuses `membership_contract_unsupported` for another contract version,
+/// `membership_log_mismatch` for another log or epoch, then
+/// `membership_request_malformed` for an empty or control-bearing log
+/// identity, workspace or subject member. Whether the subject holds a
+/// current grant is left to the provider.
 pub fn validate(request: &AdmissionRequest, served: &GrantLog) -> Result<(), Refused> {
     check(
         request.contract,

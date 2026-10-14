@@ -75,6 +75,7 @@ impl Attestation {
     /// Infallible: the artifact shape is fixed and the hand encoder is
     /// total over the field types. The emitted bytes verify with any
     /// off-the-shelf COSE library.
+    #[must_use]
     pub fn to_cose_bytes(&self) -> Vec<u8> {
         encoding::artifact_bytes(
             &self.signer_public_key,

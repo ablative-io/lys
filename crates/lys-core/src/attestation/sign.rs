@@ -73,6 +73,7 @@ use crate::keys::identity::Ed25519Identity;
 /// total over the representable date range, the hand encoder is total over
 /// the field types, and Ed25519 deterministic signing has no failure mode
 /// in dalek 2.
+#[must_use]
 pub fn sign_attestation(payload: &[u8], signing_key: &Ed25519Identity) -> Attestation {
     let payload_hash = sha256_digest(payload);
     let timestamp = Utc::now().timestamp_millis();

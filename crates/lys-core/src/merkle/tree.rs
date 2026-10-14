@@ -40,6 +40,10 @@ use crate::error::{TrustError, TrustResult};
 use crate::merkle::leaf::{SerializedLeaf, serialize_leaf};
 use crate::merkle::proof::{ConsistencyProof, InclusionProof, RootHash};
 
+mod validation;
+
+use validation::{check_consistency_sizes, check_inclusion_index};
+
 /// Append-only Merkle transparency log over any `L: Serialize` leaf.
 ///
 /// Each [`Self::append`] serializes the leaf with `postcard` and pushes the
@@ -81,6 +85,7 @@ impl<L> AppendOnlyTree<L> {
     /// The empty tree's [`Self::root`] is the deterministic zero-leaf root
     /// (`SHA-256("")` with `num_leaves = 0`) defined by RFC 6962 and
     /// implemented by ct-merkle.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: MemoryBackedTree::new(),
@@ -89,17 +94,20 @@ impl<L> AppendOnlyTree<L> {
     }
 
     /// Returns the number of leaves in the tree.
+    #[must_use]
     pub fn len(&self) -> u64 {
         self.inner.len()
     }
 
     /// Returns `true` if no leaves have been appended.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
     /// Returns the current root hash, capturing both the SHA-256 Merkle Tree
     /// Hash and the current leaf count.
+    #[must_use]
     pub fn root(&self) -> RootHash {
         RootHash::from_inner(self.inner.root())
     }
@@ -247,46 +255,6 @@ impl<L> fmt::Debug for AppendOnlyTree<L> {
     }
 }
 
-/// Refuses an inclusion proof for an index outside a tree of `len` leaves.
-fn check_inclusion_index(len: u64, leaf_index: u64) -> TrustResult<()> {
-    if leaf_index >= len {
-        return Err(TrustError::MerkleTree {
-            reason: format!(
-                "inclusion proof requested for leaf index {leaf_index} but tree has {len} leaves"
-            ),
-        });
-    }
-    Ok(())
-}
-
-/// Refuses a consistency proof unless `0 < old_size <= new_size == len`.
-fn check_consistency_sizes(len: u64, old_size: u64, new_size: u64) -> TrustResult<()> {
-    if new_size != len {
-        return Err(TrustError::MerkleTree {
-            reason: format!(
-                "consistency proof requires new_size to equal current tree length: \
-                 new_size={new_size}, current_len={len}"
-            ),
-        });
-    }
-    if old_size == 0 {
-        return Err(TrustError::MerkleTree {
-            reason: "consistency proof requires old_size > 0; \
-                     RFC 6962 has no consistency proof from an empty tree"
-                .to_string(),
-        });
-    }
-    if old_size > new_size {
-        return Err(TrustError::MerkleTree {
-            reason: format!(
-                "consistency proof old_size must be <= new_size: \
-                 old_size={old_size}, new_size={new_size}"
-            ),
-        });
-    }
-    Ok(())
-}
-
 /// RFC 6962 interior-node domain byte.
 const NODE_PREFIX: u8 = 0x01;
 
@@ -331,6 +299,7 @@ pub struct HashTree {
 
 impl HashTree {
     /// Builds a new empty tree.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -339,6 +308,7 @@ impl HashTree {
     /// hashes, so a tree streamed to a known size allocates once per level and
     /// holds no spare capacity. A size beyond this target's address space
     /// reserves nothing and the tree grows as it is fed.
+    #[must_use]
     pub fn with_capacity(leaves: u64) -> Self {
         let mut levels = Vec::new();
         let mut width = leaves;
@@ -352,11 +322,13 @@ impl HashTree {
     }
 
     /// Returns the number of leaves in the tree.
+    #[must_use]
     pub fn len(&self) -> u64 {
         self.size
     }
 
     /// Returns `true` if no leaf has been appended.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
@@ -364,6 +336,7 @@ impl HashTree {
     /// The bytes of hash storage the tree holds, spare capacity included.
     /// Never more than two 32-byte hashes per leaf for a tree built by
     /// [`Self::with_capacity`] to its size.
+    #[must_use]
     pub fn retained_bytes(&self) -> usize {
         self.levels
             .iter()

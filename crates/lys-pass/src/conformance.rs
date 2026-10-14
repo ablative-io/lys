@@ -155,6 +155,11 @@ pub struct Report {
 
 impl Report {
     /// Refuse the consumer gate unless every shipped vector matched completely.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Nonconformant`] if any vector did not pass, the run count
+    /// differs from the shipped vector count, or any failure was retained.
     pub fn require_conformant(&self) -> Result<(), Nonconformant> {
         if self.passed == self.run && self.run == cases().len() && self.failures.is_empty() {
             Ok(())
@@ -202,6 +207,11 @@ pub fn run<E: std::fmt::Display>(mut observe: impl FnMut(&Case) -> Result<Outcom
 }
 
 /// Decode the shared refusal without silently accepting extra members.
+///
+/// # Errors
+///
+/// Returns the JSON error if the shipped refusal is malformed, omits a
+/// required member or contains a member the refusal contract does not name.
 pub fn refusal_fixture() -> Result<Refusal, serde_json::Error> {
     serde_json::from_str(REFUSAL)
 }
