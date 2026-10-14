@@ -294,11 +294,20 @@ pub struct Availability {
 }
 
 impl Availability {
-    pub(crate) fn reading(&self, agent: &str, session: &str) -> Option<(i64, Option<u64>)> {
+    pub(crate) fn control_reading(&self, agent: &str, session: &str) -> Option<(i64, Option<u64>)> {
         self.agents
             .get(agent)
             .and_then(|agent| agent.sessions.get(session))
-            .map(|reading| (reading.at_ms, reading.figure))
+            .map(|reading| {
+                (
+                    reading.latest_at_ms,
+                    if reading.latest_at_ms == reading.at_ms {
+                        reading.figure
+                    } else {
+                        None
+                    },
+                )
+            })
     }
 
     /// Update the current reading when a usage leaf is folded.

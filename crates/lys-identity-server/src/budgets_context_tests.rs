@@ -47,7 +47,12 @@ fn a_report_without_context_keeps_the_sessions_last_reading_and_only_a_never_rea
     let kept = held.used(&limit(), &agents(), i64::MAX);
     assert_eq!(kept.figure, Some(90.into()));
     assert_eq!(kept.unavailable, None);
-    assert_eq!(held.reading("agent", "first"), Some((1, Some(90))));
+    assert_eq!(
+        kept.context
+            .ok_or("retained display reading has no context")?
+            .read_at_ms,
+        Some(1)
+    );
     held.keep(&usage("four", Some("first"), Some(40), 4))?;
     assert_eq!(
         held.used(&limit(), &agents(), i64::MAX).figure,

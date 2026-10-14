@@ -81,7 +81,7 @@ fn budget_put_and_get_describe_one_versioned_collection_and_the_used_invariant()
     let keys = used["properties"]
         .as_object()
         .ok_or("no used row properties")?;
-    assert_eq!(keys.len(), 7, "{used}");
+    assert_eq!(keys.len(), 9, "{used}");
     for field in [
         "unit",
         "period",
@@ -90,8 +90,21 @@ fn budget_put_and_get_describe_one_versioned_collection_and_the_used_invariant()
         "unavailable",
         "reported",
         "source",
+        "context",
+        "tokens",
     ] {
         assert!(keys.contains_key(field), "{used}");
+    }
+    for (field, target) in [("context", "ContextReading"), ("tokens", "TokenComponents")] {
+        let choices = keys[field]["oneOf"]
+            .as_array()
+            .ok_or("nullable reading has no choices")?;
+        assert!(choices.iter().any(|choice| choice["type"] == "null"));
+        assert!(
+            choices
+                .iter()
+                .any(|choice| choice["$ref"] == format!("#/components/schemas/{target}"))
+        );
     }
     Ok(())
 }

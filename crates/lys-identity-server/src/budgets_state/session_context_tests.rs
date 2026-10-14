@@ -319,7 +319,8 @@ fn context_counter_overflow_and_zero_windows_refuse_with_their_reason() -> Resul
 }
 
 #[test]
-fn indexed_missing_records_and_empty_session_attribution_refuse_in_words() -> Result<(), String> {
+fn missing_indexed_records_refuse_but_unattributed_history_does_not_poison_live_context()
+-> Result<(), String> {
     let mut held = Held::default();
     let usage = call("read", "session", 10_000, Some(50_000));
     held.index = Arc::new(crate::budgets_index::Index::from_uses(&[usage])?);
@@ -331,12 +332,9 @@ fn indexed_missing_records_and_empty_session_attribution_refuse_in_words() -> Re
     );
     let mut held = Held::default();
     held.hold(Leaf::Used(call("read", "", 10_000, Some(50_000))))?;
-    assert_eq!(
-        held.session_context(&limit(), &live(&[("session", 1)]), &windows(), 20_000)
-            .err()
-            .as_deref(),
-        Some("context call index record 0 names no session")
-    );
+    let used = held.session_context(&limit(), &live(&[("session", 1)]), &windows(), 20_000)?;
+    assert_eq!(used.figure, None);
+    assert_eq!(used.unavailable.as_deref(), Some(super::NO_CONTEXT));
     Ok(())
 }
 

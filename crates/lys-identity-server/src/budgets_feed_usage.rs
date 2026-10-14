@@ -46,8 +46,42 @@ pub(super) async fn keep(
         }
     };
     let attribution = usage.event.clone();
+    let agent = usage.agent.clone();
     crate::budgets_enforce::keep(state, usage).await?;
-    crate::budgets_act::review(state, &record.session, &format!("feed-{seq}")).await?;
+    if let Err(error) =
+        crate::budgets_act::review(state, &record.session, &format!("feed-{seq}")).await
+    {
+        match error {
+            error @ (ServerError::Runner { .. }
+            | ServerError::RuntimeSessionUnknown
+            | ServerError::AgentNotVisible
+            | ServerError::RequestMalformed { .. }) => {
+                let coordinate =
+                    format!("seq={seq}; session={session}; followed_machine={machine}");
+                let words =
+                    format!("{coordinate}: usage retained; control review refused: {error}");
+                (state.say)(&format!("budgets: feed_control_refused {words}"));
+                return Ok(Some(RefusalRecord {
+                    version: REFUSAL_VERSION,
+                    source: format!("identity-feed:{machine}"),
+                    attempt: format!("feed-{seq}"),
+                    session: session.to_owned(),
+                    agent,
+                    at,
+                    tool: "usage".to_owned(),
+                    target: coordinate,
+                    policy_version: 0,
+                    rule: None,
+                    check: "feed_control_refused".to_owned(),
+                    grantable: false,
+                    permission: None,
+                    grantor: None,
+                    words,
+                }));
+            }
+            error => return Err(error),
+        }
+    }
     if attribution != format!("native:{machine}:{}", record.id) {
         (state.say)(&format!(
             "budgets: feed entry seq={seq} session={session} followed_machine={machine} attributed as {attribution}"

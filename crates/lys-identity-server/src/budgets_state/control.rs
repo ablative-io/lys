@@ -44,8 +44,9 @@ impl Held {
         let Some((threshold, action)) = threshold else {
             return Ok(ContextDecision::Released);
         };
-        let Some((observed, Some(figure))) =
-            self.context_availability.reading(&standing.agent, session)
+        let Some((observed, Some(figure))) = self
+            .context_availability
+            .control_reading(&standing.agent, session)
         else {
             return Ok(held(
                 "context_measurement_unavailable: the next turn has no current valid measurement",

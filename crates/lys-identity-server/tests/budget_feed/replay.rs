@@ -3,7 +3,7 @@
 use super::*;
 
 #[tokio::test]
-async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult {
+async fn native_spend_and_unavailable_current_context_survive_replay_and_restart() -> TestResult {
     let (said, mut ended) = tokio::sync::watch::channel(None::<String>);
     let say: lys_identity_server::Say = Arc::new(move |line| {
         if line.starts_with("refusals: the feed of machine") {
@@ -50,13 +50,15 @@ async fn native_figures_and_refusals_survive_replay_and_restart() -> TestResult 
             .map(|row| json!([row["unit"], row["period"], row["figure"]]))
             .collect::<Vec<_>>(),
         vec![
-            json!(["context_percent", null, 35]),
+            json!(["context_percent", null, null]),
             json!(["tokens", "day", 100]),
             json!(["tokens", "week", 100]),
             json!(["dollars", "day", 500]),
             json!(["dollars", "week", 500]),
             json!(["running_ms", "day", 150]),
             json!(["running_ms", "week", 150]),
+            json!(["plan_percent", "five_hour", null]),
+            json!(["tokens", "five_hour", 100]),
         ]
     );
     let accounts = usage["accounts"].as_array().ok_or("no accounts")?;

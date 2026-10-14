@@ -189,7 +189,7 @@ async fn reconcile_phantoms(evidence: Evidence, starting_only: bool) -> Result<(
                 store
                     .held()
                     .context_availability
-                    .reading(&table.agent, phantoms[0]),
+                    .control_reading(&table.agent, phantoms[0]),
                 Some((5, Some(90)))
             );
             Ok(())
@@ -238,7 +238,8 @@ async fn reconcile_phantoms(evidence: Evidence, starting_only: bool) -> Result<(
             let held = store.held();
             assert_eq!(held.uses.len(), 3, "replayed figures must be kept once");
             assert_eq!(
-                held.context_availability.reading(&table.agent, phantoms[0]),
+                held.context_availability
+                    .control_reading(&table.agent, phantoms[0]),
                 None
             );
             for (session, figure) in [("other-good", 25), ("another-good", 60)] {
@@ -249,7 +250,8 @@ async fn reconcile_phantoms(evidence: Evidence, starting_only: bool) -> Result<(
                     .ok_or(crate::error::ServerError::RuntimeSessionUnknown)?;
                 assert_eq!(usage.context_percent, Some(figure));
                 assert_eq!(
-                    held.context_availability.reading(&table.agent, session),
+                    held.context_availability
+                        .control_reading(&table.agent, session),
                     Some((5, Some(figure)))
                 );
             }

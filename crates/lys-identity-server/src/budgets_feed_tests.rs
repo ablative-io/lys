@@ -156,7 +156,7 @@ fn budgets_feed_preserves_the_context_declaration_source() -> Result<(), Box<dyn
 }
 
 #[tokio::test]
-async fn budgets_usage_get_serves_the_context_declaration_source()
+async fn legacy_spend_never_supplies_context_for_a_live_session_without_completed_calls()
 -> Result<(), Box<dyn std::error::Error>> {
     use std::sync::Arc;
     let fixture = super::entry_tests::fixture().await?;
@@ -175,7 +175,7 @@ async fn budgets_usage_get_serves_the_context_declaration_source()
     let result = async {
         let windows = Windows::from([("main".to_owned(), Some(200))]);
         let client = reqwest::Client::new();
-        for (index, window, source, percent) in [(1, 1000, "profile", 5), (2, 0, "model", 25)] {
+        for (index, window) in [(1, 1000), (2, 0)] {
             let mut record = spend(Some("main"), 50, window);
             record.id = format!("source-{index}");
             record.observed_at = index;
@@ -200,8 +200,9 @@ async fn budgets_usage_get_serves_the_context_declaration_source()
                 .iter()
                 .find(|figure| figure["unit"] == "context_percent")
                 .ok_or("missing context")?;
-            assert_eq!(context["figure"], percent);
-            assert_eq!(context["source"], source);
+            assert!(context["figure"].is_null());
+            assert!(context["source"].is_null());
+            assert_eq!(context["unavailable"], crate::budgets_context::NO_CONTEXT);
         }
         Ok::<(), Box<dyn std::error::Error>>(())
     }
@@ -330,7 +331,7 @@ fn budgets_context_keeps_ties_and_replacement_because_gaps_preserve_the_last_rea
 }
 
 #[test]
-fn every_reported_token_subset_counts_and_names_only_its_missing_components()
+fn every_reported_subset_keeps_gaps_except_codexs_defined_zero_cache_creation()
 -> Result<(), Box<dyn std::error::Error>> {
     let names = [
         "input_tokens",
@@ -368,7 +369,11 @@ fn every_reported_token_subset_counts_and_names_only_its_missing_components()
                 let expected: Vec<_> = names
                     .iter()
                     .zip(values)
-                    .filter(|(_, value)| value.is_none())
+                    .filter(|(name, value)| {
+                        value.is_none()
+                            && !(adapter == lys_runner::tracking::CODEX_ADAPTER
+                                && **name == "cache_creation_tokens")
+                    })
                     .map(|(name, _)| format!("native response does not report {name}"))
                     .collect();
                 assert_eq!(gaps, expected, "adapter={adapter} mask={mask}");
@@ -380,7 +385,13 @@ fn every_reported_token_subset_counts_and_names_only_its_missing_components()
                         call.cache_creation_tokens,
                         call.cache_read_tokens
                     ],
-                    values,
+                    {
+                        let mut expected = values;
+                        if adapter == lys_runner::tracking::CODEX_ADAPTER {
+                            expected[2] = expected[2].or(Some(0));
+                        }
+                        expected
+                    },
                     "adapter={adapter} mask={mask}"
                 );
             }

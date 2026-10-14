@@ -475,7 +475,8 @@ async fn a_known_context_above_the_limit_still_asks_stop() -> TestResult {
 }
 
 #[tokio::test]
-async fn tell_names_a_missing_figure_after_a_known_one_without_asking_an_act() -> TestResult {
+async fn tell_retains_the_measured_figure_and_its_original_time_after_an_empty_report_without_asking_an_act()
+-> TestResult {
     let table = Table::fresh(Act::Tell).await?;
     table
         .report(report(
@@ -494,12 +495,10 @@ async fn tell_names_a_missing_figure_after_a_known_one_without_asking_an_act() -
     assert!(operations.is_empty(), "{operations:?}");
     assert_eq!(answer["receipts"], json!([]), "{answer}");
     assert_eq!(before["used"][0]["figure"], 60, "{before}");
-    assert!(after["used"][0]["figure"].is_null(), "{after}");
-    let reason = after["used"][0]["unavailable"]
-        .as_str()
-        .ok_or("no unavailable reason")?;
-    assert!(
-        reason.contains("context_percent") && reason.contains("not reported"),
+    assert_eq!(after["used"][0]["figure"], 60, "{after}");
+    assert_eq!(after["used"][0]["context"]["read_at_ms"], 1, "{after}");
+    assert_eq!(
+        after["used"][0]["context"]["session"], table.sessions[0],
         "{after}"
     );
     Ok(())
