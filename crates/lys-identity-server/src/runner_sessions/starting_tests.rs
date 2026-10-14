@@ -29,7 +29,7 @@ fn fixture(
             version: &version,
             skills: &[],
             policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
         },
         &[],
     )?;
@@ -58,7 +58,14 @@ fn a_record_keeps_its_signed_folder_and_bindings_in_the_shared_launch_view()
     let directory = tempfile::tempdir()?;
     let (store, record) = fixture(directory.path())?;
     let session = launch_session(&record.id);
-    let view = prepare_record(&store, &record, &session, "sh", None, None)?;
+    let view = prepare_record(
+        &store,
+        &record,
+        &session,
+        "sh",
+        None,
+        Some("http://127.0.0.1:18484"),
+    )?;
     assert!(matches_record(&view, &record));
     assert_eq!(view["directory"], record.working_directory);
     assert_eq!(
@@ -104,10 +111,27 @@ fn a_record_cannot_substitute_another_profile_agent_executable_or_arguments()
     changes[2].executable = "/bin/false".to_owned();
     changes[3].arguments.push("--another-argument".to_owned());
     for changed in changes {
-        assert!(prepare_record(&store, &changed, &session, "sh", None, None).is_err());
+        assert!(
+            prepare_record(
+                &store,
+                &changed,
+                &session,
+                "sh",
+                None,
+                Some("http://127.0.0.1:18484")
+            )
+            .is_err()
+        );
     }
     assert!(matches!(
-        prepare_record(&store, &record, &session, "", None, None),
+        prepare_record(
+            &store,
+            &record,
+            &session,
+            "",
+            None,
+            Some("http://127.0.0.1:18484")
+        ),
         Err(ServerError::MachineWithoutRuntime)
     ));
     Ok(())

@@ -13,6 +13,17 @@ const CONVERSATION: &str = "019c6e27-e55b-73d1-87d8-4e01f1f75043";
 
 async fn profiled() -> Result<(Table, String), Box<dyn Error>> {
     let table = Table::unprofiled().await?;
+    let cwd = table.dir.path().canonicalize()?;
+    let project = table.dir.path().join("config-home/projects").join(
+        lys_home::harness::claude_code::projects_slug(
+            cwd.to_str().ok_or("fixture folder is not UTF-8")?,
+        ),
+    );
+    std::fs::create_dir_all(&project)?;
+    std::fs::write(
+        project.join(format!("{CONVERSATION}.jsonl")),
+        format!("{}\n", json!({"sessionId":CONVERSATION,"cwd":cwd})),
+    )?;
     let version = operation()?;
     let path = format!("/agents/{}/provisioning", table.agent());
     table

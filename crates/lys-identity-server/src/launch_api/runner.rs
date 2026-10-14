@@ -113,29 +113,34 @@ fn fresh_terminal_conversation(
     launch: &mut lys_runner::Launch,
     resume: Option<&str>,
 ) -> Result<(), ServerError> {
-    if resume.is_none()
+    let terminal = resume.is_none()
         && launch
             .config
             .as_ref()
-            .is_some_and(|config| !config.requires_controls && config.harness.is_some())
+            .is_some_and(|config| !config.requires_controls && config.harness.is_some());
+    let arguments = if terminal
+        && launch
+            .config
+            .as_ref()
+            .is_some_and(|config| config.harness == Some(lys_runner::tracking::Harness::ClaudeCode))
     {
+        let conversation = lys_runner::pty_conversation::conversation_uuid(&launch.session)?;
+        Some(lys_runner::pty_conversation::claude_arguments(
+            &launch.arguments,
+            &conversation,
+            false,
+        )?)
+    } else {
+        None
+    };
+    if let Some(arguments) = arguments {
+        launch.arguments = arguments;
+    }
+    if terminal {
         launch.environment.insert(
             "LYS_PTY_STATUS_NOTE".to_owned(),
             "no earlier conversation to resume; started a new one".to_owned(),
         );
-    }
-    if resume.is_none()
-        && launch.config.as_ref().is_some_and(|config| {
-            !config.requires_controls
-                && config.harness == Some(lys_runner::tracking::Harness::ClaudeCode)
-        })
-    {
-        let conversation = lys_runner::pty_conversation::conversation_uuid(&launch.session)?;
-        launch.arguments = lys_runner::pty_conversation::claude_arguments(
-            &launch.arguments,
-            &conversation,
-            false,
-        )?;
     }
     Ok(())
 }

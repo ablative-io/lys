@@ -360,10 +360,18 @@ pub(super) fn prepare_record(
         .harness
         .as_ref()
         .and_then(crate::launch_template::runner_harness);
+    let conversation = version
+        .settings
+        .seat_fields()
+        .map_err(|reason| ServerError::LaunchUnrenderable { reason })?
+        .resume;
     let native_conversation = if !crate::launch_template::requires_controls(version)
         && harness == Some(lys_runner::tracking::Harness::ClaudeCode)
     {
-        Some(lys_runner::pty_conversation::conversation_uuid(session)?)
+        Some(match &conversation {
+            Some(conversation) => conversation.clone(),
+            None => lys_runner::pty_conversation::conversation_uuid(session)?,
+        })
     } else {
         None
     };
@@ -381,7 +389,7 @@ pub(super) fn prepare_record(
         directory,
         left_out: Vec::new(),
         executed: false,
-        conversation: None,
+        conversation,
         native_conversation,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {

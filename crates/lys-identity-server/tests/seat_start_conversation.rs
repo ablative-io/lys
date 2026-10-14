@@ -9,7 +9,7 @@ use std::error::Error;
 use support::{Table, operation};
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_starting()
+async fn optional_native_ids_validate_and_missing_transcripts_start_fresh_before_recording()
 -> Result<(), Box<dyn Error>> {
     let table = Table::set().await?;
     let machine = table.lys_machine("Fixture").await?;
@@ -38,7 +38,14 @@ async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_st
         assert_eq!(status, 200, "{reply}");
         assert_eq!(reply["admission"]["by"], "administrator");
         assert_eq!(reply["admission"]["action"], "seat.start");
-        assert_eq!(reply["start"]["conversation"], json!(conversation));
+        assert!(reply["start"]["conversation"].is_null());
+        let native = reply["start"]["native_conversation"]
+            .as_str()
+            .ok_or("the fresh conversation was not recorded")?;
+        if let Some(conversation) = conversation {
+            assert_ne!(native, conversation);
+            assert_eq!(reply["start"]["runner"]["started_fresh"], true);
+        }
         assert_eq!(reply["seat"]["transport"], "pty");
         let session = reply["session"].as_str().ok_or("no admitted session")?;
         let live = table
@@ -48,6 +55,7 @@ async fn a_seat_start_accepts_optional_harness_ids_and_refuses_bad_ids_before_st
             .sessions()
             .liveness(Some(session))?;
         assert_eq!(live.len(), 1);
+        assert_eq!(live[0].harness_session.as_deref(), Some(native));
         assert!(live[0].alive && !live[0].managed && !live[0].ended);
         let (status, repeated) = table.service.post(path, Some(&table.ada), &request).await?;
         assert_eq!(status, 200, "{repeated}");
