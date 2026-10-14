@@ -204,6 +204,10 @@ export const BUILD = '0123456789abcdef0123456789abcdef01234567';
 
 /** Every route the screens read, answered as the service answers them. */
 export const SERVICE: Record<string, Route> = {
+  '/surface-contract': ok({ openapi: '3.1.0', paths: { '/network/machines/{id}/agents': { post: {
+    requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { operation: { type: 'string' }, agent: { type: 'string' }, allow: { type: 'boolean' } }, required: ['operation', 'agent', 'allow'] } } } },
+    responses: { '200': { content: { 'application/json': { schema: { type: 'object', properties: { machine: { type: 'object' }, recorded: { type: 'object' } }, required: ['machine', 'recorded'] } } } } },
+  } } } }),
   '/directory/people': ok(DIRECTORY),
   '/people': ok(OWN),
   ['/directory/agents/' + SCRIBE]: ok(SCRIBE_VIEW),

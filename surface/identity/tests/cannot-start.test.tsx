@@ -147,7 +147,7 @@ describe('why an agent cannot start', () => {
 describe('an agent with no folder to work in', () => {
   const folders = 'POST /network/machines/' + computer + '/folders';
   const provisioning = '/agents/' + SCRIBE + '/provisioning';
-  const profile = { version: 2, operation: 'op-' + 'a'.repeat(32), model_access: ['model-one'], tools: [], skills: [], mcp_servers: [], instructions: '', note: 'Start this agent', set_by: ADA, set_at: 1, runs_on: computer, permissions: { default_mode: 'default' } };
+  const profile = { version: 2, operation: 'op-' + 'a'.repeat(32), model_access: ['model-one'], tools: [], skills: [], mcp_servers: [], plugins: [], instructions: '', note: 'Start this agent', set_by: ADA, set_at: 1, runs_on: computer, permissions: { default_mode: 'default' } };
   const held = (under: string, names: string[]) => ok({ machine: computer, under, folders: names });
   const looked: Route = (body) => {
     const under = (body as { under?: string }).under;

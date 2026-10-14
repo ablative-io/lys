@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { request, Refused } from '../../api';
+import { Act } from '../../shell/Act';
 import { refusedPart, validAlarm } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
 
@@ -52,7 +53,7 @@ export function Alarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
     : rows.filter((alarm) => alarm.cleared_at === null).length;
   return <section className="dash-widget" aria-label="Alarms">
     <div className="section-h"><span>Alarms</span><b className="dash-count">{count}</b>
-      {!refusedPart(summary) && all === null ? <button type="button" className="btn" onClick={() => void readAll()}>Show all</button> : null}</div>
+      {!refusedPart(summary) && all === null ? <Act symbol="more" name="Show all" word="Show all" onClick={() => void readAll()} /> : null}</div>
     <div className="you-scroll">
       {refusedPart(summary) ? <p className="why-not" role="alert" title={summary.reason}>{summary.refusal}</p>
         : <table className="dash-table"><tbody>{rows.map((alarm) => {
@@ -61,7 +62,7 @@ export function Alarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
               <div className="sec">{alarm.kind === 'seat_stalled' ? 'Seat stopped signalling' : 'Session has no proxy usage'}</div>
               <div className="note">{alarm.detail}</div></td>
             <td className="you-act">{alarm.cleared_at !== null ? 'Cleared' : alarm.acknowledged_by ? <span title={alarm.acknowledged_by}>Acknowledged</span>
-              : <button type="button" className="btn" disabled={busy !== null} onClick={() => void acknowledge(alarm)}>Acknowledge</button>}</td>
+              : <Act symbol="approve" name="Acknowledge" word="Acknowledge" disabled={busy !== null} onClick={() => void acknowledge(alarm)} />}</td>
           </tr>;
         })}{rows.length ? null : <tr className="empty"><td>No open alarms.</td></tr>}</tbody></table>}
       {failure ? <p className="why-not" role="alert" title={failure.reason}>{failure.refusal}: {failure.reason}</p> : null}

@@ -92,7 +92,7 @@ export function Terminal({ session, agent, machine, bare = false }: { session: s
     </div> : null}
     {bare && agent ? <Act symbol="retry" name="Restart" word="Restart" data-act="restart" disabled={busy} onClick={() => setConfirming('restart')} /> : null}
     <div className="terminal-keys" role="group" aria-label="Terminal keys">
-      {terminalKeys.map(([label, key]) => <button key={key} type="button" data-key={key} disabled={busy || Boolean(ended)} onClick={() => void send(base + '/keys', { keys: [key] })}>{label}</button>)}
+      {terminalKeys.map(([label, key]) => <Act key={key} symbol="enter" name={label} word={label} data-key={key} disabled={busy || Boolean(ended)} onClick={() => void send(base + '/keys', { keys: [key] })} />)}
     </div>
     <GpuTerminal session={session} onEnd={setEnded} onFailure={(error) => setRefused(asRefused(error))} />
     {refused ? <p className="why-not" role="alert">{refused.refusal.refusal}: {refused.refusal.reason}</p> : null}

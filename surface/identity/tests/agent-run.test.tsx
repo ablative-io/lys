@@ -99,6 +99,22 @@ describe('An agent\'s run on People and agents', () => {
     expect($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="stop"]')).not.toBeNull();
   });
 
+  it('starts through the start route when capability reads are refused, and says the refusal beside Start', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE, {
+      ...stopped,
+      '/surface-contract': refused(503, 'CapabilityUnavailable', 'the permission schema is unavailable'),
+      ['/harnesses?machine=' + LAB]: refused(503, 'runner_unreachable', 'the catalogue read was refused'),
+      ['POST /agents/' + SCRIBE + '/start-command']: started(SCRIBE),
+    });
+    expect(text()).toContain('On Lab: the catalogue read was refused');
+    expect(text()).toContain('runner_unreachable');
+    expect(text()).toContain('CapabilityUnavailable');
+    expect((button('Start') as HTMLButtonElement).disabled).toBe(false);
+    await click(button('Start'));
+    expect(posted.filter((entry) => entry.path.endsWith('/start-command'))).toHaveLength(1);
+    expect(posted.some((entry) => entry.path.endsWith('/transitions'))).toBe(false);
+  });
+
   it('restarts a running agent in place, after asking, with one request', async () => {
     const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
     await click($('section[aria-label="Run"] [data-act="restart"]'));
