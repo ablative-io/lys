@@ -19,7 +19,7 @@ async function render(element: React.ReactNode) {
 }
 it('C737 draws every state and empty branch, excludes retired machines and names runner reasons', async () => {
   const value = branches({ machines: [machine('one'), machine('retired', 'retired'), machine('empty')] } as never, { ...list, runner: 'unknown', reason: 'runner_unreachable: no connection' } as never);
-  const host = await render(<NetworkBranches branches={value} selected={null} select={vi.fn()} change={vi.fn()} />);
+  const host = await render(<NetworkBranches branches={value} selected={null} select={vi.fn()} />);
   expect(host.querySelectorAll('[data-machine]')).toHaveLength(2);
   expect(host.querySelectorAll('[data-agent]')).toHaveLength(1);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(5);
@@ -29,8 +29,10 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   // The agent is named once, on its row; the seats under it carry their own names and the agent's name for a reader.
   expect(host.querySelectorAll('[data-agent] > details > summary[title="Long display name"]')).toHaveLength(1);
   expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, pty · offline');
-  expect(host.querySelectorAll('[data-seat] .network-reason')).toHaveLength(5);
-  expect(host.textContent).toContain('runner_unreachable');
+  // A tree like an editor's: names, chevrons and a dot, and nothing else in it. Reasons and Start are the terminal space's; a reason is in the row's title.
+  expect(host.querySelectorAll('button, .network-reason, p')).toHaveLength(0);
+  expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('title')).toContain('runner_unreachable');
+  expect(host.textContent).not.toContain('runner_unreachable');
   // Computers and agents fold: the tree is the browser's own disclosure, open first.
   expect(host.querySelectorAll('details[open]')).toHaveLength(3);
   expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(8);
@@ -42,11 +44,12 @@ it('C737 names one unreadable agent name on the agent row, not on every seat', (
   expect(value[0].agents[0].leaves).toHaveLength(5);
   expect(value[0].leaves).toHaveLength(5);
 });
-it('C737 starts an offline seat with a fresh operation and immediately uses the answered state', async () => {
+it('C737 starts a chosen offline seat from the terminal space with a fresh operation and immediately uses the answered state', async () => {
   const posted: { path: string; body: unknown }[] = [];
   serve({ '/network': ok({ machines: [machine('one')], next: null }), '/seats': ok({ runner: 'read', seats: [seat('stopped', 'offline')] }), 'POST /seats/stopped/start': ok({ seat: seat('stopped', 'online-idle'), session: 'session-stopped' }) }, posted);
-  const host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={300} resize={vi.fn()} />);
-  await act(async () => { (host.querySelector('button[aria-label="Start stopped"]') as HTMLElement).click(); });
+  const host = await render(<NetworkTree selected="stopped" select={vi.fn()} paneWidth={300} resize={vi.fn()} />);
+  expect(host.querySelector('.network-list button')).toBeNull();
+  await act(async () => { (host.querySelector('.network-pane button[aria-label="Start stopped"]') as HTMLElement).click(); });
   expect(posted.find((each) => each.path === '/seats/stopped/start')?.body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) });
   expect(host.querySelector('[data-seat="stopped"]')?.getAttribute('data-state')).toBe('online-idle');
 });
@@ -62,7 +65,7 @@ it('C737 renders ten machines and two hundred seats within 50 ms of React render
   const machines = Array.from({ length: 10 }, (_, index) => machine(String(index)));
   const seats = Array.from({ length: 200 }, (_, index) => ({ ...seat(String(index), 'online-idle'), machine: String(index % 10) }));
   let duration = 0;
-  const host = await render(<Profiler id="tree" onRender={(_id, _phase, elapsed) => { duration = elapsed; }}><NetworkBranches branches={branches({ machines } as never, { runner: 'read', seats } as never)} selected={null} select={vi.fn()} change={vi.fn()} /></Profiler>);
+  const host = await render(<Profiler id="tree" onRender={(_id, _phase, elapsed) => { duration = elapsed; }}><NetworkBranches branches={branches({ machines } as never, { runner: 'read', seats } as never)} selected={null} select={vi.fn()} /></Profiler>);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(200);
   expect(duration).toBeLessThan(50);
 });

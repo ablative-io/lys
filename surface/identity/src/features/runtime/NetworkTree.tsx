@@ -4,7 +4,7 @@ import type { SeatView } from '../../api';
 import { Gate } from '../signin/Gate';
 import { branches, readNetworkTree } from './network-tree';
 import type { TreeBranch } from './network-tree';
-import { NetworkTreePane, SeatStart } from './NetworkTreePane';
+import { NetworkTreePane } from './NetworkTreePane';
 import { PANE_WIDTH } from './canvas-kept';
 import './network-tree.css';
 
@@ -14,20 +14,19 @@ const MARKS = { 'online-idle': '●', 'online-working': '◉', offline: '○', '
 const detail = (seat: SeatView): string => (seat.transport ?? 'not started') + ' · ' + seat.state;
 
 /**
- * The network as a tree: each computer, under it each agent that has a seat there, under that the seats. A computer
- * and an agent fold; a seat is chosen. The folds are the browser's own disclosure, so Enter and Space work on them
- * as they do everywhere, and the arrow keys walk the rows (see `walk`).
+ * The network as a tree, the way an editor shows files: each computer, under it each agent that has a seat there,
+ * under that the seats. Names, a chevron and a state dot, nothing else in it: a seat is chosen by pressing it, and
+ * everything about it (its standing, its reasons, Start when it is not running) is in the terminal space beside the
+ * tree. The folds are the browser's own disclosure, so Enter and Space work on them as everywhere, and the arrow
+ * keys walk the rows (see `walk`). What a row cannot show is in its title, for hovering and for a screen reader.
  */
-export function NetworkBranches({ branches: all, selected, select, change }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void; change: (seat: SeatView) => void }) {
+export function NetworkBranches({ branches: all, selected, select }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void }) {
   return <ul className="network-branches" role="tree" aria-label="Network machines" onKeyDown={walk}>{all.map(({ machine, agents }) => <li key={machine.id} data-machine={machine.id} role="none">
-    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span><small>{machine.kind}</small></summary>
+    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span></summary>
       <ul role="group">{agents.length ? agents.map((agent) => <li key={agent.id} data-agent={agent.id} role="none">
-        <details open><summary role="treeitem" className="network-fold network-agent" title={agent.name}><span className="network-fold-name">{agent.name}</span><small>{agent.leaves.length === 1 ? '1 seat' : agent.leaves.length + ' seats'}</small></summary>
-          {agent.reason ? <p className="network-reason">{agent.reason}</p> : null}
+        <details open><summary role="treeitem" className="network-fold network-agent" title={agent.reason ? agent.name + ' · ' + agent.reason : agent.name}><span className="network-fold-name">{agent.name}</span></summary>
           <ul role="group">{agent.leaves.map(({ seat, name, reason }) => <li className="network-leaf" key={seat.name} data-seat={seat.name} data-state={seat.state} data-selected={selected === seat.name} role="none">
-            <a href={'#/canvas?seat=' + encodeURIComponent(seat.name)} role="treeitem" title={name + ' · ' + detail(seat)} className="network-name" data-mark={MARKS[seat.state]} aria-label={name + ', seat ' + seat.name + ', ' + detail(seat)} aria-current={selected === seat.name ? 'true' : undefined} aria-selected={selected === seat.name} onClick={(event) => { event.preventDefault(); select(seat.name); }}>{seat.name}</a>
-            {seat.state === 'offline' || seat.state === 'not-seen' ? <SeatStart seat={seat} change={change} /> : null}
-            {reason && reason !== agent.reason ? <p className="network-reason">{reason}</p> : null}
+            <a href={'#/canvas?seat=' + encodeURIComponent(seat.name)} role="treeitem" title={name + ' · ' + detail(seat) + (reason ? ' · ' + reason : '')} className="network-name" data-mark={MARKS[seat.state]} aria-label={name + ', seat ' + seat.name + ', ' + detail(seat)} aria-current={selected === seat.name ? 'true' : undefined} aria-selected={selected === seat.name} onClick={(event) => { event.preventDefault(); select(seat.name); }}>{seat.name}</a>
           </li>)}</ul>
         </details>
       </li>) : <li className="dim" role="none">no seats</li>}</ul>
@@ -72,7 +71,7 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const change = (seat: SeatView) => setChanges((before) => ({ ...before, [seat.name]: seat }));
   const shown = within(width ?? paneWidth);
   return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': shown + 'px' } as React.CSSProperties}>
-    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={chosen?.seat.name ?? null} select={select} change={change} />
+    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={chosen?.seat.name ?? null} select={select} />
       {!all.length ? <p className="note">No active machine was returned.</p> : null}
     </aside>
     <div className="network-divider" role="separator" aria-label="Network tree width" aria-orientation="vertical" tabIndex={0} aria-valuenow={shown} aria-valuemin={PANE_WIDTH.least} aria-valuemax={PANE_WIDTH.most}

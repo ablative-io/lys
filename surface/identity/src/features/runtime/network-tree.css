@@ -1,30 +1,26 @@
 /* The Network view: the tree down the left, about a fifth of the page, and the chosen seat's terminal filling the rest. */
 .network-tree { display: flex; flex: 1; min-height: 0; padding-top: 48px; }
-.network-list { width: var(--network-pane-width); flex: none; min-width: 200px; max-width: 640px; overflow: auto; padding: 8px 10px 12px; border-right: 1px solid var(--border-default); }
+.network-list { width: var(--network-pane-width); flex: none; min-width: 200px; max-width: 640px; overflow: auto; padding: 6px 4px 12px; border-right: 1px solid var(--border-default); }
 .network-branches, .network-branches ul { list-style: none; margin: 0; padding: 0; }
-.network-branches > li { margin-bottom: 10px; }
 .network-branches summary { list-style: none; cursor: pointer; }
 .network-branches summary::-webkit-details-marker { display: none; }
-.network-fold { display: flex; align-items: baseline; gap: 8px; min-height: 28px; padding: 3px 6px 3px 20px; position: relative; border-radius: var(--radius-sm); }
-.network-fold::before { content: '▾'; position: absolute; left: 4px; color: var(--text-secondary); font-size: 11px; }
+.network-fold { display: flex; align-items: center; min-height: 22px; line-height: 22px; padding: 0 6px 0 18px; position: relative; border-radius: var(--radius-sm); font-size: 13px; }
+.network-fold::before { content: '▾'; position: absolute; left: 4px; color: var(--text-secondary); font-size: 10px; }
 details:not([open]) > .network-fold::before { content: '▸'; }
 .network-fold:hover, .network-fold:focus-visible { background: var(--surface-hover); }
 .network-fold-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.network-machine .network-fold-name { font-size: 14px; font-weight: 600; }
-.network-agent .network-fold-name { font-size: 13px; }
-.network-fold small { color: var(--text-secondary); font-weight: 400; font-size: 11px; white-space: nowrap; }
-.network-branches ul { border-left: 1px solid var(--border-default); margin-left: 12px; padding-left: 6px; }
+.network-machine .network-fold-name { font-weight: 600; }
+.network-branches ul { margin-left: 10px; padding-left: 6px; border-left: 1px solid var(--border-default); }
 .network-leaf { border-radius: var(--radius-sm); }
 .network-leaf:hover { background: var(--surface-hover); }
-.network-leaf[data-selected="true"] { background: var(--accent-wash); outline: 1px solid var(--accent); }
-.network-name { display: block; position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 26px; line-height: 26px; padding: 0 6px 0 22px; font-size: 13px; text-decoration: none; }
-.network-name::before { content: attr(data-mark); position: absolute; left: 6px; color: var(--ok); width: 14px; }
+.network-leaf[data-selected="true"] { background: var(--accent-wash); }
+.network-name { display: block; position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 22px; line-height: 22px; padding: 0 6px 0 20px; font-size: 13px; text-decoration: none; color: inherit; }
+.network-name::before { content: attr(data-mark); position: absolute; left: 6px; color: var(--ok); width: 12px; font-size: 11px; }
 [data-state="online-working"] .network-name::before { color: var(--accent); }
 [data-state="offline"] .network-name, [data-state="not-seen"] .network-name { color: var(--text-secondary); }
 [data-state="offline"] .network-name::before, [data-state="not-seen"] .network-name::before { color: var(--muted-dot); }
 [data-state="unknown"] .network-name::before { color: var(--warn); }
-.network-reason { color: var(--warn); font-size: 12px; margin: 2px 6px 4px 22px; overflow-wrap: anywhere; }
-.network-leaf > .act { margin: 0 0 4px 22px; }
+.network-reason { color: var(--warn); font-size: 12px; margin: 4px 0; overflow-wrap: anywhere; }
 .network-divider { width: 6px; flex: none; cursor: col-resize; background: var(--border-default); touch-action: none; }
 .network-divider:hover, .network-divider:focus-visible { background: var(--accent); }
 .network-pane { flex: 1; min-width: 0; display: flex; padding: 12px; }
