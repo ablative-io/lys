@@ -341,6 +341,10 @@ export interface SeatView {
 export interface SeatList { seats: SeatView[]; runner: 'read' | 'unknown'; reason?: string }
 /** A session a runner holds for no seat: seen but unregistered. `started_at` is milliseconds since the epoch. */
 export interface UnregisteredSession { session: string; machine: string; agent?: string | null; pid: number; started_at: number }
+/** A runner that did not answer, with its computer's display name. */
+export interface SeatRunnerUnread { machine: string; name: string; refusal: string; reason: string }
+/** The sessions read and the runners left unknown; an absent report remains unknown. */
+export interface SeatUnregistered { sessions: UnregisteredSession[]; unanswered?: SeatRunnerUnread[] }
 
 function seatsUnreadable(reason: string): never { throw new Refused(0, { refusal: 'SeatsUnreadable', reason }); }
 const seatPath = (name: string, act: string) => '/seats/' + encodeURIComponent(name) + '/' + act;
@@ -361,10 +365,15 @@ export const seats = {
       || (seat.reason !== undefined && typeof seat.reason !== 'string'))) seatsUnreadable('A seat has no name, an unknown state or an unreadable transport or reason; its state is not assumed.');
     return answer;
   },
-  unregistered: async (): Promise<UnregisteredSession[]> => {
-    const answer = await request<{ sessions: UnregisteredSession[] }>('/seats/unregistered');
-    if (!Array.isArray(answer.sessions)) seatsUnreadable('The service did not answer the sessions held for no seat.');
-    return answer.sessions;
+  unregistered: async (): Promise<SeatUnregistered> => {
+    const answer = await request<SeatUnregistered>('/seats/unregistered');
+    if (!answer || !Array.isArray(answer.sessions)) seatsUnreadable('The service did not answer the sessions held for no seat.');
+    if (answer.unanswered !== undefined && (!Array.isArray(answer.unanswered) || answer.unanswered.some((runner) => !runner
+      || typeof runner.machine !== 'string' || !runner.machine || typeof runner.name !== 'string' || !runner.name.trim()
+      || typeof runner.refusal !== 'string' || !runner.refusal || typeof runner.reason !== 'string' || !runner.reason))) {
+      seatsUnreadable('The service did not name the runners it could not read and their reasons. Their sessions remain unknown.');
+    }
+    return answer;
   },
   start: async (name: string, operation: string) =>
     seatAnswer(await request<{ seat: SeatView; session: string; harness_session?: string | null }>(seatPath(name, 'start'), { operation }), name),

@@ -34,6 +34,15 @@ async function shown(routes: Record<string, Route>) {
 }
 
 describe('Seats', () => {
+  it('names each unanswered runner beside the unregistered sessions that were read', async () => {
+    await shown({ '/seats': ok(read([])), '/seats/unregistered': ok({ sessions: [stray], unanswered: [
+      { machine: 'machine-absent', name: 'Dean laptop', refusal: 'runner_deadline', reason: 'The runner did not answer within two seconds.' },
+    ] }) });
+    expect(text()).toContain('Dean laptop');
+    expect(text()).toContain('The runner did not answer within two seconds.');
+    expect($('tr[data-unregistered="session-stray"]')?.textContent).toContain('4242');
+    expect(text()).not.toContain('No runner holds a session for no seat');
+  });
   it('names every state with its last signal, and lists a session held for no seat as seen but unregistered', async () => {
     await shown({
       '/seats': ok(read([

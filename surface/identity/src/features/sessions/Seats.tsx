@@ -6,7 +6,7 @@
  */
 import { useRef, useState } from 'react';
 import { Refused, operationId, seats, useLive } from '../../api';
-import type { SeatList, SeatState, SeatView, UnregisteredSession } from '../../api';
+import type { SeatList, SeatState, SeatUnregistered, SeatView } from '../../api';
 import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
@@ -49,7 +49,7 @@ export function Seats() {
     <h3>Owners</h3>
     <OwnedList />
     <h3>Seen but unregistered</h3>
-    <Gate load={unregistered} title="the sessions held for no seat" renderError={(refused) => <Unread refused={refused} what="The sessions held for no seat" />} ok={(sessions) => <Unregistered sessions={sessions} />} />
+    <Gate load={unregistered} title="the sessions held for no seat" renderError={(refused) => <Unread refused={refused} what="The sessions held for no seat" />} ok={(answer) => <Unregistered answer={answer} />} />
   </section>;
 }
 
@@ -155,10 +155,10 @@ function SendBox({ seat }: { seat: SeatView }) {
   </form>;
 }
 
-function Unregistered({ sessions }: { sessions: UnregisteredSession[] }) {
+function Unregistered({ answer: { sessions, unanswered } }: { answer: SeatUnregistered }) {
   const names = useRecordNames();
   const name = (id: string) => names.status === 'ok' ? names.data.get(id) : undefined;
-  return sessions.length ? <TableScroll label="Seen but unregistered"><table aria-label="Seen but unregistered">
+  return <>{sessions.length ? <TableScroll label="Seen but unregistered"><table aria-label="Seen but unregistered">
     <thead><tr><th>Session</th><th>Computer</th><th>Agent</th><th>Process</th><th>Started</th></tr></thead>
     <tbody>{sessions.map((entry) => <tr key={entry.session} data-unregistered={entry.session}>
       <td><RecordName id={entry.session} /></td>
@@ -167,5 +167,9 @@ function Unregistered({ sessions }: { sessions: UnregisteredSession[] }) {
       <td className="mono">{entry.pid}</td>
       <td>{clockMs(entry.started_at)}</td>
     </tr>)}</tbody>
-  </table></TableScroll> : <p className="note">No runner holds a session for no seat.</p>;
+  </table></TableScroll> : <p className="note">The runners that answered reported no unregistered sessions.</p>}
+  {unanswered === undefined ? <p className="why-not">The service did not report which runners answered. The other runners' sessions remain unknown.</p>
+    : unanswered.length ? <section aria-label="Runners that did not answer"><ul>{unanswered.map((runner) =>
+      <li key={runner.machine}><RecordName id={runner.machine} name={runner.name} />: {runner.reason}</li>)}</ul></section> : null}
+  </>;
 }

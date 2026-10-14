@@ -39,11 +39,11 @@ use crate::routes::{AppState, signed_in, with_directory};
 use crate::seats_acts::{Live, liveness};
 use crate::seats_state::{Added, Line, Seat};
 use crate::seats_store::SeatStore;
-use crate::seats_views::{
-    Reading, SeatAddBody, SeatList, SeatRunnerUnread, SeatUnregistered, SeatView,
-    UnregisteredSession, view,
-};
+use crate::seats_views::{Reading, SeatAddBody, SeatList, SeatUnregistered, SeatView, view};
 use crate::session::now;
+
+#[path = "seats_unregistered.rs"]
+mod unregistered;
 
 /// The longest seat name.
 const NAME_MAX: usize = 64;
@@ -52,7 +52,7 @@ const NAME_MAX: usize = 64;
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/seats", get(list).post(add))
-        .route("/seats/unregistered", get(unregistered))
+        .route("/seats/unregistered", get(unregistered::list))
         .route("/seats/owned", get(crate::seat_supervision::owned))
         .route("/seats/{name}", get(one))
         .route("/seats/{name}/version", post(crate::seats_edit::version))
@@ -382,65 +382,6 @@ fn reading_of<'a>(
         (None, Some(Err(reason))) => Reading::Unread(reason),
         (None, None) => Reading::Read(None),
     }
-}
-
-/// The sessions every machine's runner holds that no seat's latest session
-/// is: each runner asked once, and one that cannot be read named beside them.
-async fn unregistered(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<SeatUnregistered>, ServerError> {
-    signed_in(&state, &headers)?;
-    let held: BTreeSet<String> = with_seats(&state, |store| {
-        Ok(store
-            .seats()
-            .iter()
-            .filter_map(|seat| seat.session.clone())
-            .collect())
-    })?;
-    let machines: Vec<String> = if state.network.is_none() {
-        Vec::new()
-    } else {
-        with_network(&state, |store| {
-            Ok(store
-                .machines()
-                .iter()
-                .filter(|machine| machine.retired.is_none())
-                .filter(|machine| store.runner(&machine.id).is_some())
-                .map(|machine| machine.id.clone())
-                .collect())
-        })?
-    };
-    let mut sessions = Vec::new();
-    let mut unanswered = Vec::new();
-    for machine in machines {
-        match liveness(&state, &machine, None).await {
-            Ok(live) => {
-                for live in live
-                    .into_iter()
-                    .filter(|live| live.alive && !live.ended && !held.contains(&live.session))
-                {
-                    let agent = session_agent(&state, &live.session)?;
-                    sessions.push(UnregisteredSession {
-                        session: live.session,
-                        machine: machine.clone(),
-                        agent,
-                        pid: live.pid,
-                        started_at: live.started_at,
-                    });
-                }
-            }
-            Err(refused) => unanswered.push(SeatRunnerUnread {
-                machine,
-                refusal: refused.name(),
-                reason: refused.to_string(),
-            }),
-        }
-    }
-    Ok(Json(SeatUnregistered {
-        sessions,
-        unanswered,
-    }))
 }
 
 /// The agent the runtime reports keep `session` under; none when they keep

@@ -255,6 +255,8 @@ pub struct UnregisteredSession {
 pub struct SeatRunnerUnread {
     /// The machine.
     pub machine: String,
+    /// The machine's display name.
+    pub name: String,
     /// The refusal's name.
     pub refusal: String,
     /// Why, in words.
