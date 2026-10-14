@@ -266,10 +266,9 @@ fn a_claude_proxy_session_start_keeps_native_identity_with_one_boundary_and_pres
 }
 
 #[test]
-fn invalid_missing_or_changed_claude_proxy_ids_refuse_before_any_feed_append()
--> Result<(), Box<dyn Error>> {
+fn invalid_or_missing_claude_proxy_ids_refuse_before_any_feed_append() -> Result<(), Box<dyn Error>>
+{
     let conversation = "019bcd60-1a27-7000-8000-123456789abc";
-    let other = "019bcd60-1a27-7000-8000-abcdef123456";
     for native in [None, Some(Harness::ClaudeCode)] {
         let held = Held::new(native)?;
         held.sessions.collect(
@@ -296,7 +295,6 @@ fn invalid_missing_or_changed_claude_proxy_ids_refuse_before_any_feed_append()
             (json!({"session_id":""}), "hook_malformed"),
             (json!({"session_id":super::RUN}), "hook_malformed"),
             (json!({"session_id":"../thread"}), "hook_malformed"),
-            (json!({"session_id":other}), "native_conversation_changed"),
         ] {
             let error = held
                 .sessions
@@ -366,6 +364,50 @@ fn a_claude_proxy_hook_must_match_the_native_uuid_declared_by_fresh_or_resumed_l
                 input: json!({"session_id":conversation}),
             },
         )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn a_new_valid_claude_uuid_after_clear_replaces_the_known_id_and_keeps_proxy_accounting()
+-> Result<(), Box<dyn Error>> {
+    for native in [None, Some(Harness::ClaudeCode)] {
+        let held = Held::new(native)?;
+        held.sessions.collect(
+            "session",
+            &Collected::Hook {
+                event: "SessionStart".to_owned(),
+                input: json!({"session_id":"019bcd60-1a27-7000-8000-123456789abc"}),
+            },
+        )?;
+        let (before, mut expected) = {
+            let table = held.sessions.lock()?;
+            (
+                table.feed.end(),
+                table
+                    .feed
+                    .source("session")
+                    .cloned()
+                    .ok_or("source absent")?,
+            )
+        };
+        let next = "019bcd60-1a27-7000-8000-abcdef123456";
+        held.sessions.collect(
+            "session",
+            &Collected::Hook {
+                event: "SessionStart".to_owned(),
+                input: json!({"session_id":next}),
+            },
+        )?;
+        expected.native_conversation = Some(next.to_owned());
+        let table = held.sessions.lock()?;
+        assert_eq!(table.feed.source("session"), Some(&expected));
+        let appended = table.feed.page(Some(&before))?;
+        assert_ne!(appended.cursor, before);
+        assert_eq!(appended.entries.len(), 1);
+        assert!(matches!(appended.entries[0].body, Body::Boundary(_)));
+        drop(table);
+        held.sessions.stop_all()?;
     }
     Ok(())
 }

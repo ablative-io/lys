@@ -12,6 +12,7 @@ use crate::tracking_store::Body;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+const NATIVE: &str = "019bcd60-1a27-7000-8000-123456789abc";
 
 struct Wire {
     sessions: Arc<Sessions>,
@@ -69,7 +70,7 @@ impl Wire {
             "wire",
             &Collected::Hook {
                 event: "SessionStart".to_owned(),
-                input: json!({"session_id":"native", "transcript_path":path}),
+                input: json!({"session_id":NATIVE, "transcript_path":path}),
             },
         )
     }
@@ -103,13 +104,14 @@ impl Drop for Wire {
 }
 
 #[test]
-fn a_wire_start_binds_only_the_spec_transcript_on_each_start_path() -> TestResult {
+fn wire_starts_bind_spec_transcripts_without_proxy_and_keep_proxy_accounting_with_native_hooks()
+-> TestResult {
     for caller in [false, true] {
         for proxy in [false, true] {
             let wire = Wire::new()?;
             let home = wire.directory.path().join("spec");
             let other = wire.directory.path().join("environment");
-            let path = home.join("projects/-/native.jsonl");
+            let path = home.join(format!("projects/-/{NATIVE}.jsonl"));
             std::fs::create_dir_all(path.parent().ok_or("transcript parent absent")?)?;
             std::fs::write(&path, b"")?;
             wire.start(
@@ -118,7 +120,24 @@ fn a_wire_start_binds_only_the_spec_transcript_on_each_start_path() -> TestResul
                 caller,
                 proxy,
             )?;
-            let wrong = other.join("projects/-/native.jsonl");
+            let wrong = other.join(format!("projects/-/{NATIVE}.jsonl"));
+            if proxy {
+                let before = wire
+                    .sessions
+                    .lock()?
+                    .feed
+                    .source("wire")
+                    .cloned()
+                    .ok_or("source absent")?;
+                wire.hook(&wrong)?;
+                let mut expected = before.clone();
+                expected.native_conversation = Some(NATIVE.to_owned());
+                assert_eq!(wire.sessions.lock()?.feed.source("wire"), Some(&expected));
+                assert_ne!(expected.path, path.display().to_string());
+                assert_ne!(expected.path, wrong.display().to_string());
+                assert_eq!(wire.start_record()?["config_home_source"], "spec");
+                continue;
+            }
             assert_eq!(
                 wire.hook(&wrong)
                     .err()
