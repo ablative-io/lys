@@ -182,6 +182,10 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
 
 impl IntoResponse for ServerError {
     fn into_response(self) -> Response {
+        if self.status().is_server_error() {
+            tracing::error!(refusal = %self.name(), status = self.status().as_u16(),
+                "service_dependency_unavailable: a service request failed; the service remains running and runner sessions are left alive");
+        }
         let mut body = serde_json::json!({
             "refusal": self.name(),
             "reason": self.to_string(),
@@ -305,5 +309,40 @@ fn runner_status(refusal: &str) -> StatusCode {
         "pattern_invalid" | "size_invalid" | "cursor_ahead" | "session_invalid"
         | "folder_invalid" => StatusCode::BAD_REQUEST,
         _ => StatusCode::CONFLICT,
+    }
+}
+
+#[cfg(test)]
+mod dependency_tests {
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn a_dependency_failure_is_loud_and_does_not_end_the_service()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let kept = Arc::clone(&heard);
+        let say: crate::routes::Say = Arc::new(move |line| {
+            if let Ok(mut lines) = kept.lock() {
+                lines.push(line.to_owned());
+            }
+        });
+        tracing::subscriber::with_default(crate::warn_lines::WarnLines::new(say), || {
+            let response = ServerError::SignInFailed {
+                reason: "the sign-in dependency is unreachable".into(),
+            }
+            .into_response();
+            assert!(response.status().is_server_error());
+        });
+        assert!(
+            heard
+                .lock()
+                .map_err(|error| error.to_string())?
+                .iter()
+                .any(|line| line.contains("service_dependency_unavailable")
+                    && line.contains("remains running")),
+            "a lost compose dependency was not named in the service log"
+        );
+        Ok(())
     }
 }

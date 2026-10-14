@@ -118,3 +118,43 @@ fn an_address_another_computer_cannot_reach_is_refused_before_anything_is_sent()
         reachable(server).expect(server);
     }
 }
+
+#[test]
+fn a_dependency_disconnect_keeps_the_runner_and_its_sessions_alive()
+-> Result<(), Box<dyn std::error::Error>> {
+    let root = tempfile::tempdir()?;
+    let sessions = lys_runner::Sessions::open(root.path(), 4096)?;
+    let launch = lys_runner::Launch {
+        session: "dependency-outage".into(),
+        program: "/bin/cat".into(),
+        arguments: Vec::new(),
+        directory: root.path().display().to_string(),
+        environment: std::collections::BTreeMap::new(),
+        config: None,
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    };
+    let (pid, _) = sessions.start(launch)?;
+    let held = Mutex::new(None);
+    dial_ended(
+        &held,
+        RunnerError::Unreachable {
+            reason: "sign-in and permission services unavailable".into(),
+        },
+    );
+    let status = sessions.status(Some("dependency-outage"))?;
+    assert!(
+        status
+            .sessions
+            .iter()
+            .any(|session| session.pid == Some(pid) && session.ended.is_none())
+    );
+    assert!(held.lock().is_ok_and(|error| error.is_some()));
+    sessions.end(
+        "dependency-outage",
+        &std::sync::atomic::AtomicBool::new(false),
+    )?;
+    Ok(())
+}

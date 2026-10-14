@@ -120,8 +120,8 @@ pub fn read_code(input: &mut impl BufRead, asking: bool) -> CliResult<Zeroizing<
 
 /// Serve as `lys runner serve` does, and once the runner listens, dial as
 /// `lys runner dial` does on a thread of its own. When the dial ends, the
-/// runner is asked to stop as a stop signal asks it, ending every session
-/// it holds, and the dial's refusal is answered.
+/// runner keeps its sessions. Only an explicit console stop ends them; a
+/// dependency or admission failure is recorded for the next console read.
 fn serve_and_dial(options: &Options, dial: Dial) -> CliResult<()> {
     let runner = Runner::open(options)?;
     let id = runner.sessions().runner().to_owned();
@@ -146,18 +146,9 @@ fn serve_and_dial(options: &Options, dial: Dial) -> CliResult<()> {
                 Err(error) => error,
             };
             lys_runner::error::said(&format!(
-                "the connection to Lys ended: {error}: stopping the runner"
+                "runner_dependency_unavailable: the connection to Lys ended: {error}; the runner and its sessions remain alive; restore the dependency or reconnect this computer"
             ));
-            match kept.lock() {
-                Ok(mut held) => *held = Some(error),
-                Err(poisoned) => *poisoned.into_inner() = Some(error),
-            }
-            if let Err(error) = rustix::process::kill_process(
-                rustix::process::getpid(),
-                rustix::process::Signal::TERM,
-            ) {
-                lys_runner::error::said(&format!("the runner could not be asked to stop: {error}"));
-            }
+            dial_ended(&kept, error);
         });
     })?;
     said.map_err(io("writing that the runner listens".to_owned()))?;
@@ -168,6 +159,13 @@ fn serve_and_dial(options: &Options, dial: Dial) -> CliResult<()> {
     match ended {
         Some(error) => Err(error.into()),
         None => Ok(()),
+    }
+}
+
+fn dial_ended(held: &Mutex<Option<RunnerError>>, error: RunnerError) {
+    match held.lock() {
+        Ok(mut held) => *held = Some(error),
+        Err(poisoned) => *poisoned.into_inner() = Some(error),
     }
 }
 

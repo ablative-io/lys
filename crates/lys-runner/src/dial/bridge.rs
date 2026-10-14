@@ -128,7 +128,7 @@ fn poll(
         let mut connection = crate::client::connect(&dial.socket)?;
         let registration = Held::new(&lane.local, connection.closer()?)?;
         let greeting = connection.greeting_line()?;
-        let (ticket, line) = loop {
+        let (ticket, request_line) = loop {
             if stopping.load(Ordering::Acquire) {
                 return Err(stopped());
             }
@@ -138,7 +138,7 @@ fn poll(
             }
             match answer {
                 Err(RunnerError::DialStale { .. }) => {
-                    current = reconnect::ready(epoch, disconnected, reconnect::pause)?
+                    current = reconnect::ready(epoch, disconnected, reconnect::pause)?;
                 }
                 Err(RunnerError::Unreachable { .. }) => {
                     reconnect::disconnected(disconnected);
@@ -151,7 +151,7 @@ fn poll(
         if disconnected.swap(false, Ordering::AcqRel) {
             crate::error::said("runner_dial_reconnected: the server accepted this runner again");
         }
-        let control = control_request(&line);
+        let control = control_request(&request_line);
         let posted = Arc::clone(signer);
         let posting_epoch = current.clone();
         let posting_ticket = ticket.clone();
@@ -160,7 +160,7 @@ fn poll(
         })?;
         if let Err(error) = dispatch.submit(control, move || {
             let reply = connection
-                .exchange(&line)
+                .exchange(&request_line)
                 .unwrap_or_else(|error| reply_line(Answer::refusal(&error)));
             if let Err(error) = posted.reply(&posting_epoch, &posting_ticket, &reply) {
                 crate::error::said(&format!("a reply was not delivered: {error}"));
