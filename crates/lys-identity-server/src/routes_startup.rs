@@ -23,13 +23,73 @@ pub(crate) async fn service_saying_with_clock(
     say: Say,
     clock: lys_core::clock::ClockSource,
 ) -> Result<Router, ServerError> {
+    let primary = open_primary(config, &say)?;
+    let catalogue = Arc::clone(&primary.catalogue);
+    let auxiliary = open_auxiliary(config, &primary.key, &say)?;
+    let state = Box::pin(make_state(config, say, clock, primary, auxiliary)).await?;
+    recover(&state)?;
+    served_routes(config, state, catalogue)
+}
+
+/// The start route's service over the directory `state` holds. The route
+/// reads the handle record through the door's client, [`door_handles::DoorHandles`],
+/// as its `HandleRecords`. No configuration field names the door yet, so the
+/// client is built without an address and answers that no handle record
+/// exists, naming SECRETS-002, until one does. Launch records are kept in
+/// `launch-records` beside the directory log.
+fn start_service(config: &Config, state: &Shared) -> Result<Arc<start::StartService>, ServerError> {
+    let handles = door_handles::DoorHandles::unconfigured();
+    let dir = config.log_dir.with_file_name("launch-records");
+    start::directory_service(
+        state,
+        Box::new(handles),
+        door_handles::credential_id,
+        &dir,
+        load_service_key(&config.event_key_file)?,
+    )
+}
+
+struct Primary {
+    kept_responsibilities: crate::kept_responsibilities::Kept,
+    catalogue: Arc<crate::harness_catalogue::Catalogue>,
+    operator_token: Option<zeroize::Zeroizing<String>>,
+    directory: lys_identity::Directory<lys_log_store::FileLeafStore>,
+    key: Arc<lys_core::Ed25519Identity>,
+    configuration: Box<crate::configuration_store::ConfigurationStore>,
+    requests: Option<crate::requests_store::RequestStore>,
+    mcp_requests: Option<Box<Mutex<crate::mcp_requests_store::McpRequestStore>>>,
+    certificates: Option<crate::certificates_store::CertificateStore>,
+    network: Option<crate::network_store::NetworkStore>,
+    roles: Option<crate::roles_store::RolesStore>,
+    provisioning: Option<crate::provisioning_store::ProvisioningStore>,
+    runtime: Option<crate::runtime_store::RuntimeStore>,
+    service_accounts: Option<ServiceAccountStore>,
+    reviews: Option<ReviewStore>,
+    teams: Option<crate::teams_store::TeamStore>,
+    stops: Option<crate::stops_store::StopStore>,
+    budgets: Option<crate::budgets_store::BudgetStore>,
+    policies: Option<crate::agent_policy_store::PolicyStore>,
+}
+struct Auxiliary {
+    goals: Option<crate::goals_store::GoalStore>,
+    words: Option<crate::words_store::WordsKept>,
+    variables: Option<crate::variables_store::VariablesKept>,
+    schedules: Option<crate::schedules_store::SchedulesKept>,
+    cord: crate::cord_store::CordStore,
+    acts: crate::runner_acts::ActStore,
+    seats: crate::seats_store::SeatStore,
+    seat_imports: crate::seat_import_store::SeatImports,
+    apps: crate::apps_store::AppStore,
+}
+
+fn open_primary(config: &Config, say: &Say) -> Result<Primary, ServerError> {
     let kept_responsibilities = crate::kept_responsibilities::Kept::load(
         &config.log_dir.with_file_name("kept-responsibilities.json"),
     )?;
     crate::openapi::prepare()?;
     crate::openapi::surface::prepare()?;
     let catalogue = Arc::new(crate::harness_catalogue::Catalogue::embedded()?);
-    let operator_token = crate::operator::token(config, &*say)?;
+    let operator_token = crate::operator::token(config, &**say)?;
     let mut directory = open_directory(config)?;
     say(&format!("directory log {}", directory.log()?.start()));
     let key = Arc::new(load_service_key(&config.event_key_file)?);
@@ -41,32 +101,31 @@ pub(crate) async fn service_saying_with_clock(
         "organisation configuration log {}",
         configuration.start()
     ));
-    let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &*say)?;
+    let requests = crate::requests_store::RequestStore::opened(config, Arc::clone(&key), &**say)?;
     let mcp_requests =
-        crate::mcp_requests_store::McpRequestStore::configured(config, Arc::clone(&key), &say)?
+        crate::mcp_requests_store::McpRequestStore::configured(config, Arc::clone(&key), say)?
             .map(|store| Box::new(Mutex::new(store)));
     let certificates = config
         .certificates_dir
         .as_deref()
         .map(|dir| {
-            crate::certificates_store::CertificateStore::opened(dir, Arc::clone(&key), &*say)
+            crate::certificates_store::CertificateStore::opened(dir, Arc::clone(&key), &**say)
         })
         .transpose()?;
-    let (network, roles, provisioning) = crate::file_stores::opened(config, &*say)?;
-    let mut runtime = crate::runtime_store::RuntimeStore::configured(config, &say)?;
-    let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), &say)?;
-    let reviews = ReviewStore::configured(config, Arc::clone(&key), &*say)?;
-    let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), &say)?;
-    let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), &say)?;
-    let mut budgets =
-        crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), &say)?;
+    let (network, roles, provisioning) = crate::file_stores::opened(config, &**say)?;
+    let mut runtime = crate::runtime_store::RuntimeStore::configured(config, say)?;
+    let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), say)?;
+    let reviews = ReviewStore::configured(config, Arc::clone(&key), &**say)?;
+    let teams = crate::teams_store::TeamStore::configured(config, Arc::clone(&key), say)?;
+    let stops = crate::stops_store::StopStore::configured(config, Arc::clone(&key), say)?;
+    let mut budgets = crate::budgets_store::BudgetStore::configured(config, Arc::clone(&key), say)?;
     if let (Some(runtime), Some(budgets)) = (runtime.as_mut(), budgets.as_mut()) {
         let agents = budgets.held().context_availability.agents();
         let sessions = runtime.agents_with_sessions(&agents)?;
         budgets.reconcile_context(Some(&sessions))?;
     }
     let mut policies =
-        crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), &say)?;
+        crate::agent_policy_store::PolicyStore::configured(config, Arc::clone(&key), say)?;
     if let Some(store) = policies.as_mut() {
         for (id, _) in directory.projection()?.records() {
             if let lys_identity::IdentityId::Agent(agent) = id {
@@ -74,18 +133,46 @@ pub(crate) async fn service_saying_with_clock(
             }
         }
     }
-    let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(&key), &say)?;
-    let words = crate::words_store::configured(config, Arc::clone(&key), &say)?;
-    let variables = crate::variables_store::configured(config, Arc::clone(&key), &say)?;
-    let schedules = crate::schedules_store::configured(config, Arc::clone(&key), &say)?;
+    Ok(Primary {
+        kept_responsibilities,
+        catalogue,
+        operator_token,
+        directory,
+        key,
+        configuration,
+        requests,
+        mcp_requests,
+        certificates,
+        network,
+        roles,
+        provisioning,
+        runtime,
+        service_accounts,
+        reviews,
+        teams,
+        stops,
+        budgets,
+        policies,
+    })
+}
+
+fn open_auxiliary(
+    config: &Config,
+    key: &Arc<lys_core::Ed25519Identity>,
+    say: &Say,
+) -> Result<Auxiliary, ServerError> {
+    let goals = crate::goals_store::GoalStore::configured(config, Arc::clone(key), say)?;
+    let words = crate::words_store::configured(config, Arc::clone(key), say)?;
+    let variables = crate::variables_store::configured(config, Arc::clone(key), say)?;
+    let schedules = crate::schedules_store::configured(config, Arc::clone(key), say)?;
     let cord = crate::cord_store::CordStore::open(
         &config.log_dir.with_file_name("cord"),
-        Arc::clone(&key),
+        Arc::clone(key),
     )?;
     say(&format!("cord log {}", cord.start()));
     let acts = crate::runner_acts::ActStore::open(
         &config.log_dir.with_file_name("runner-acts"),
-        Arc::clone(&key),
+        Arc::clone(key),
     )?;
     say(&format!(
         "runner-acts log {}, holding {} acts",
@@ -94,7 +181,7 @@ pub(crate) async fn service_saying_with_clock(
     ));
     let seats = crate::seats_store::SeatStore::open(
         &config.log_dir.with_file_name("seats"),
-        Arc::clone(&key),
+        Arc::clone(key),
     )?;
     say(&format!(
         "seats log {}, holding {} seats",
@@ -103,142 +190,194 @@ pub(crate) async fn service_saying_with_clock(
     ));
     let seat_imports = crate::seat_import_store::SeatImports::open(
         &config.log_dir.with_file_name("seat-imports"),
-        Arc::clone(&key),
+        Arc::clone(key),
     )?;
     say(&seat_imports.started()?);
-    let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
-    let model = apps.model()?;
+    let apps = crate::apps_api::opened(config, Arc::clone(key), &**say)?;
+    Ok(Auxiliary {
+        goals,
+        words,
+        variables,
+        schedules,
+        cord,
+        acts,
+        seats,
+        seat_imports,
+        apps,
+    })
+}
+
+async fn make_state(
+    config: &Config,
+    say: Say,
+    clock: lys_core::clock::ClockSource,
+    primary: Primary,
+    auxiliary: Auxiliary,
+) -> Result<Shared, ServerError> {
+    let model = auxiliary.apps.model()?;
     let spicedb = config
         .spicedb
         .clone()
         .map(crate::spicedb::SpiceDbEngine::new);
-    let state = Arc::new(AppState {
+    Ok(Arc::new(AppState {
         changes: crate::changes::Changes::new()?,
-        kept_responsibilities,
+        kept_responsibilities: primary.kept_responsibilities,
         import_credential_file: config.import_credential_file.clone(),
         estate_plan_file: config.log_dir.with_file_name("estate-approval.json"),
-        identity_upstream: format!(
-            "http://{}:{}{}",
-            if config.listen.is_ipv6() {
-                "[::1]"
-            } else {
-                "127.0.0.1"
-            },
-            config.listen.port(),
-            if config.surface_dir.is_some() {
-                "/api"
-            } else {
-                ""
-            }
-        ),
-        directory: Mutex::new(directory),
+        identity_upstream: identity_upstream(config),
+        directory: Mutex::new(primary.directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
-        provider: config
-            .provider
-            .as_ref()
-            .map(|settings| {
-                crate::provider::OpenIdProvider::open(settings, crate::sign_in::lys_origin(config)?)
-            })
-            .transpose()?,
+        provider: provider(config)?,
         setup: config.setup.clone(),
         password_policy: config.password_policy.clone(),
         model_proxy: config.model_proxy.clone(),
         proxy_dir: config.proxy_dir.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
-        sessions: match &config.sessions_file {
-            Some(file) => Sessions::open_with_clock(
-                file.clone(),
-                config.session_seconds,
-                config.secure_cookie,
-                clock,
-            )?,
-            None => Sessions::new_with_clock(config.session_seconds, config.secure_cookie, clock),
-        },
+        sessions: sessions(config, clock)?,
         admission: Admission::new(
             crate::setup::administrator(config)?,
             config.link_audit_binding()?,
         ),
         grants: Mutex::new(None),
         rights_cache: Mutex::default(),
-        grant_setup: GrantSetup {
-            log_dir: config.grant_log_dir.clone(),
-            log_origin: config.grant_log_origin.clone(),
-            key_file: config.event_key_file.clone(),
-            model: std::sync::RwLock::new(model),
-            model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
-            refresh: Mutex::new(()),
-            changes: crate::grant_changes::GrantChanges::default(),
-            spicedb,
-        },
+        grant_setup: grant_setup(config, &auxiliary.apps, model, spicedb),
         secrets: config
             .secrets
             .as_ref()
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
-        requests: requests.map(Mutex::new),
-        mcp_requests,
-        network: network.map(Mutex::new),
+        requests: primary.requests.map(Mutex::new),
+        mcp_requests: primary.mcp_requests,
+        network: primary.network.map(Mutex::new),
         joins: crate::network_join::JoinStore::configured(config)?.map(Mutex::new),
-        roles: roles.map(Mutex::new),
-        provisioning: provisioning.map(Mutex::new),
-        certificates: certificates.map(Mutex::new),
-        runtime: runtime.map(Mutex::new),
-        service_accounts: service_accounts.map(Mutex::new),
-        reviews: reviews.map(Mutex::new),
-        teams: teams.map(Mutex::new),
-        stops: stops.map(Mutex::new),
-        cord: Mutex::new(cord),
+        roles: primary.roles.map(Mutex::new),
+        provisioning: primary.provisioning.map(Mutex::new),
+        certificates: primary.certificates.map(Mutex::new),
+        runtime: primary.runtime.map(Mutex::new),
+        service_accounts: primary.service_accounts.map(Mutex::new),
+        reviews: primary.reviews.map(Mutex::new),
+        teams: primary.teams.map(Mutex::new),
+        stops: primary.stops.map(Mutex::new),
+        cord: Mutex::new(auxiliary.cord),
         canvas: crate::canvas_store::CanvasStore::beside(&config.log_dir),
-        budgets: budgets.map(Mutex::new),
-        configuration: Mutex::new(configuration),
-        policies: policies.map(Mutex::new),
-        goals: goals.map(crate::goals_store::Goals::new),
-        words,
-        variables,
-        schedules,
+        budgets: primary.budgets.map(Mutex::new),
+        configuration: Mutex::new(primary.configuration),
+        policies: primary.policies.map(Mutex::new),
+        goals: auxiliary.goals.map(crate::goals_store::Goals::new),
+        words: auxiliary.words,
+        variables: auxiliary.variables,
+        schedules: auxiliary.schedules,
         agent_passes: Arc::new(Mutex::new(crate::agent_pass_store::Passes::open(
             config.log_dir.with_file_name("agent-passes.json"),
         )?)),
-        grant_tokens: Mutex::new(
-            crate::grant_token_store::Tokens::open(
-                config.log_dir.with_file_name("grant-tokens.json"),
-            )
-            .map_err(|error| ServerError::ConfigInvalid {
-                reason: error.to_string(),
-            })?,
-        ),
-        apps: Mutex::new(apps),
+        grant_tokens: grant_tokens(config)?,
+        apps: Mutex::new(auxiliary.apps),
         benches: crate::apps_bench::Benches::new(
             config.apps_dir().with_file_name("benches"),
             &*say,
         )?,
-        sign_in_providers: config
-            .sign_in_providers
-            .as_ref()
-            .map(|settings| {
-                crate::sign_in_providers::SignInProviders::open(
-                    settings,
-                    config.provider_origins.clone(),
-                )
-            })
-            .transpose()?,
+        sign_in_providers: sign_in_providers(config)?,
         agent_nonces: Mutex::default(),
-        operator_token,
+        operator_token: primary.operator_token,
         operator_upgrade_file: config.operator_upgrade_file.clone(),
-        runners: crate::runner_client::Runners::new(key, config.runner_socket.clone()),
-        acts: Mutex::new(acts),
+        runners: crate::runner_client::Runners::new(primary.key, config.runner_socket.clone()),
+        acts: Mutex::new(auxiliary.acts),
         say,
         membership: crate::channel_membership_counts::Membership::new(config.membership),
-        seats: Mutex::new(seats),
-        seat_imports,
-    });
-    crate::teams_migration::at_start(&state)?;
-    crate::budgets_migration::advance(&state)?;
+        seats: Mutex::new(auxiliary.seats),
+        seat_imports: auxiliary.seat_imports,
+    }))
+}
+
+fn identity_upstream(config: &Config) -> String {
+    format!(
+        "http://{}:{}{}",
+        if config.listen.is_ipv6() {
+            "[::1]"
+        } else {
+            "127.0.0.1"
+        },
+        config.listen.port(),
+        if config.surface_dir.is_some() {
+            "/api"
+        } else {
+            ""
+        }
+    )
+}
+
+fn provider(config: &Config) -> Result<Option<crate::provider::OpenIdProvider>, ServerError> {
+    config
+        .provider
+        .as_ref()
+        .map(|settings| {
+            crate::provider::OpenIdProvider::open(settings, crate::sign_in::lys_origin(config)?)
+        })
+        .transpose()
+}
+
+fn sessions(config: &Config, clock: lys_core::clock::ClockSource) -> Result<Sessions, ServerError> {
+    Ok(match &config.sessions_file {
+        Some(file) => Sessions::open_with_clock(
+            file.clone(),
+            config.session_seconds,
+            config.secure_cookie,
+            clock,
+        )?,
+        None => Sessions::new_with_clock(config.session_seconds, config.secure_cookie, clock),
+    })
+}
+
+fn grant_setup(
+    config: &Config,
+    apps: &crate::apps_store::AppStore,
+    model: lys_identity::grants::Model,
+    spicedb: Option<crate::spicedb::SpiceDbEngine>,
+) -> GrantSetup {
+    GrantSetup {
+        log_dir: config.grant_log_dir.clone(),
+        log_origin: config.grant_log_origin.clone(),
+        key_file: config.event_key_file.clone(),
+        model: std::sync::RwLock::new(model),
+        model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
+        refresh: Mutex::new(()),
+        changes: crate::grant_changes::GrantChanges::default(),
+        spicedb,
+    }
+}
+
+fn grant_tokens(config: &Config) -> Result<Mutex<crate::grant_token_store::Tokens>, ServerError> {
+    Ok(Mutex::new(
+        crate::grant_token_store::Tokens::open(config.log_dir.with_file_name("grant-tokens.json"))
+            .map_err(|error| ServerError::ConfigInvalid {
+                reason: error.to_string(),
+            })?,
+    ))
+}
+
+fn sign_in_providers(
+    config: &Config,
+) -> Result<Option<crate::sign_in_providers::SignInProviders>, ServerError> {
+    config
+        .sign_in_providers
+        .as_ref()
+        .map(|settings| {
+            crate::sign_in_providers::SignInProviders::open(
+                settings,
+                config.provider_origins.clone(),
+            )
+        })
+        .transpose()
+}
+
+fn recover(state: &Shared) -> Result<(), ServerError> {
+    crate::teams_migration::at_start(state)?;
+    crate::budgets_migration::advance(state)?;
     // A refused grant checkpoint holds the grants until the operator resets
     // them (ACCESS-006 R5); the rest of the service still starts and answers,
     // and the loader's grants are brought forward at a later start.
-    match crate::import_bootstrap::ensure(&state) {
+    match crate::import_bootstrap::ensure(state) {
         Err(ServerError::Grant(lys_identity::grants::GrantError::CheckpointRefused {
             refusal,
         })) => (state.say)(&format!(
@@ -248,12 +387,20 @@ pub(crate) async fn service_saying_with_clock(
     }
     // Imports resume before any schedule timer runs, so a schedule an
     // interrupted import set is paused before it could fire.
-    crate::seat_import_apply::resume_at_start(&state);
-    crate::goals_api::remind_from(&state);
-    crate::schedules_api::fire_from(&state);
-    crate::budgets_act::settle_at_start(&state);
-    crate::refusals_follow::follow_at_start(&state);
-    crate::grants_refusals::hold_at_start(&state);
+    crate::seat_import_apply::resume_at_start(state);
+    crate::goals_api::remind_from(state);
+    crate::schedules_api::fire_from(state);
+    crate::budgets_act::settle_at_start(state);
+    crate::refusals_follow::follow_at_start(state);
+    crate::grants_refusals::hold_at_start(state);
+    Ok(())
+}
+
+fn served_routes(
+    config: &Config,
+    state: Shared,
+    catalogue: Arc<crate::harness_catalogue::Catalogue>,
+) -> Result<Router, ServerError> {
     let configured = crate::configuration_api::routes(config)
         .merge(crate::message_edges::routes(config)?)
         .merge(crate::memory_api::routes(config))
@@ -324,22 +471,4 @@ pub(crate) async fn service_saying_with_clock(
             state,
             crate::operator::guard,
         )))
-}
-
-/// The start route's service over the directory `state` holds. The route
-/// reads the handle record through the door's client, [`door_handles::DoorHandles`],
-/// as its `HandleRecords`. No configuration field names the door yet, so the
-/// client is built without an address and answers that no handle record
-/// exists, naming SECRETS-002, until one does. Launch records are kept in
-/// `launch-records` beside the directory log.
-fn start_service(config: &Config, state: &Shared) -> Result<Arc<start::StartService>, ServerError> {
-    let handles = door_handles::DoorHandles::unconfigured();
-    let dir = config.log_dir.with_file_name("launch-records");
-    start::directory_service(
-        state,
-        Box::new(handles),
-        door_handles::credential_id,
-        &dir,
-        load_service_key(&config.event_key_file)?,
-    )
 }

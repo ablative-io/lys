@@ -165,46 +165,7 @@ fn exchange(
         return Err(malformed());
     }
     if chunked {
-        loop {
-            let mut line = Vec::new();
-            if stream.read_until(b'\n', &mut line).map_err(io)? == 0 {
-                return Err(malformed());
-            }
-            let size = std::str::from_utf8(&line)
-                .map_err(|error| malformed_by(&error))?
-                .trim()
-                .split(';')
-                .next()
-                .ok_or_else(malformed)?;
-            let size = usize::from_str_radix(size, 16).map_err(|error| malformed_by(&error))?;
-            raw.extend_from_slice(&line);
-            if size == 0 {
-                loop {
-                    let mut trailer = Vec::new();
-                    if stream.read_until(b'\n', &mut trailer).map_err(io)? == 0 {
-                        return Err(malformed());
-                    }
-                    raw.extend_from_slice(&trailer);
-                    if trailer == b"\r\n" {
-                        break;
-                    }
-                }
-                break;
-            }
-            let before = raw.len();
-            let after = before
-                .checked_add(size)
-                .and_then(|n| n.checked_add(2))
-                .ok_or_else(malformed)?;
-            if after > 64 * 1024 * 1024 {
-                return Err(malformed());
-            }
-            raw.resize(after, 0);
-            stream.read_exact(&mut raw[before..]).map_err(io)?;
-            if !raw.ends_with(b"\r\n") {
-                return Err(malformed());
-            }
-        }
+        read_chunks(stream, &mut raw, &io, &malformed, &malformed_by)?;
     } else if let Some(length) = length {
         if length > 64 * 1024 * 1024 {
             return Err(malformed());
@@ -300,3 +261,54 @@ mod tests {
 #[cfg(test)]
 #[path = "spicedb_http_kept_tests.rs"]
 mod kept_tests;
+
+fn read_chunks(
+    stream: &mut std::io::BufReader<TcpStream>,
+    raw: &mut Vec<u8>,
+    io: &impl Fn(std::io::Error) -> Failure,
+    malformed: &impl Fn() -> Failure,
+    malformed_by: &impl Fn(&dyn std::fmt::Display) -> Failure,
+) -> Result<(), Failure> {
+    use std::io::BufRead;
+    loop {
+        let mut line = Vec::new();
+        if stream.read_until(b'\n', &mut line).map_err(io)? == 0 {
+            return Err(malformed());
+        }
+        let size = std::str::from_utf8(&line)
+            .map_err(|error| malformed_by(&error))?
+            .trim()
+            .split(';')
+            .next()
+            .ok_or_else(malformed)?;
+        let size = usize::from_str_radix(size, 16).map_err(|error| malformed_by(&error))?;
+        raw.extend_from_slice(&line);
+        if size == 0 {
+            loop {
+                let mut trailer = Vec::new();
+                if stream.read_until(b'\n', &mut trailer).map_err(io)? == 0 {
+                    return Err(malformed());
+                }
+                raw.extend_from_slice(&trailer);
+                if trailer == b"\r\n" {
+                    break;
+                }
+            }
+            break;
+        }
+        let before = raw.len();
+        let after = before
+            .checked_add(size)
+            .and_then(|n| n.checked_add(2))
+            .ok_or_else(malformed)?;
+        if after > 64 * 1024 * 1024 {
+            return Err(malformed());
+        }
+        raw.resize(after, 0);
+        stream.read_exact(&mut raw[before..]).map_err(io)?;
+        if !raw.ends_with(b"\r\n") {
+            return Err(malformed());
+        }
+    }
+    Ok(())
+}

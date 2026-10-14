@@ -52,6 +52,9 @@ pub enum Standing {
 
 /// The instant `text` names, ISO 8601 with an offset, in nanoseconds since
 /// the Unix epoch.
+///
+/// # Errors
+/// Refuses text that is not an ISO 8601 instant with an offset.
 pub fn instant(text: &str) -> Result<i128, String> {
     text.parse::<jiff::Timestamp>()
         .map(jiff::Timestamp::as_nanosecond)
@@ -60,6 +63,9 @@ pub fn instant(text: &str) -> Result<i128, String> {
 
 /// How `schedule` stands at `captured_at`, decided once: finished first,
 /// then expired when its `until` is at or before `captured_at`.
+///
+/// # Errors
+/// Refuses an `until` value that is not a readable instant with an offset.
 pub fn standing(schedule: &Value, captured_at: u64) -> Result<Standing, String> {
     if schedule.get("state").and_then(Value::as_str) == Some("finished") {
         return Ok(Standing::Finished);
@@ -80,6 +86,7 @@ pub fn standing(schedule: &Value, captured_at: u64) -> Result<Standing, String> 
 /// Count and classify every schedule in `schedules` at `captured_at`, and
 /// map the live ones whose recipients `recipient_map` sends to `seat`, for
 /// a seat whose Lys agent is named as the seat is.
+#[must_use]
 pub fn classify(
     schedules: &[Value],
     captured_at: u64,
@@ -236,6 +243,79 @@ fn live(
     (recipient_map, seat, agent): (&BTreeMap<String, String>, &str, &str),
 ) -> Result<(DestinationEntry, Vec<String>), Vec<Refusal>> {
     let member = |field: &str| format!("schedule {id}.{field}");
+    let (bound_seats, bindings) = bindings(schedule, id, recipients, recipient_map, seat)?;
+    let mut refused = Vec::new();
+    let Timing {
+        at,
+        until,
+        next_due,
+        interval,
+        max_occurrences,
+        completed,
+    } = timing(schedule, id)?;
+    if interval.is_some_and(|interval| !(INTERVAL_MIN..=INTERVAL_MAX).contains(&interval)) {
+        let detail = format!("Lys keeps intervals of {INTERVAL_MIN} to {INTERVAL_MAX} seconds");
+        let at = member("interval_seconds");
+        refused.push(refusal(MEMBER_UNSUPPORTED, &at, detail));
+    }
+    let (author, source, stopped) = source_and_standing(schedule, id, &mut refused)?;
+    let lys = Schedule {
+        id: id.to_owned(),
+        at,
+        until,
+        interval,
+        max_occurrences,
+        recipients: vec![Recipient::Agent {
+            id: agent.to_owned(),
+        }],
+        source,
+        author: author.to_owned(),
+        set_at: captured_at,
+    };
+    let prerequisites = bound_seats
+        .iter()
+        .map(|bound| {
+            if bound == seat {
+                format!("schedule {id}: seat {bound}'s binding is enabled only after this seat's move proof (AGENTS-002 R5)")
+            } else {
+                format!("schedule {id}: seat {bound}'s binding is confirmed by that seat's own import and enabled only after its move proof")
+            }
+        })
+        .collect();
+    let entry = DestinationEntry {
+        record_kind: "schedule".to_owned(),
+        record_id: format!("schedule:{id}"),
+        expected_revision: None,
+        change: json!({
+            "schedule": lys,
+            "state": if stopped.is_some() { "stopped" } else { "active" },
+            "stopped_reason": stopped,
+            "resume": stopped.map(|_| "a separate deliberate resume that accounts for the original outcome"),
+            "next_due": next_due,
+            "occurrences_completed": completed,
+            "template": schedule.get("template"),
+            "spent": {
+                "last_finished_at": schedule.get("last_finished_at"),
+                "last_request_id": schedule.get("last_request_id"),
+                "last_outcome": schedule.get("last_outcome"),
+                "delivery_counts": schedule.get("delivery_counts"),
+            },
+            "bindings": bindings,
+            "source_revision": schedule.get("revision"),
+        }),
+        source_entry_ids: Vec::new(),
+    };
+    Ok((entry, prerequisites))
+}
+
+fn bindings(
+    schedule: &Value,
+    id: &str,
+    recipients: &[Value],
+    recipient_map: &BTreeMap<String, String>,
+    seat: &str,
+) -> Result<(BTreeSet<String>, Vec<Value>), Vec<Refusal>> {
+    let member = |field: &str| format!("schedule {id}.{field}");
     let mut refused = Vec::new();
     if let Some(path) = secret_shaped(&member("definition"), schedule) {
         let detail = "a secret-shaped member; its value is not shown";
@@ -289,6 +369,21 @@ fn live(
     if !refused.is_empty() {
         return Err(refused);
     }
+    Ok((bound_seats, bindings))
+}
+
+struct Timing {
+    at: u64,
+    until: Option<u64>,
+    next_due: Option<u64>,
+    interval: Option<u64>,
+    max_occurrences: Option<u64>,
+    completed: u64,
+}
+
+fn timing(schedule: &Value, id: &str) -> Result<Timing, Vec<Refusal>> {
+    let member = |field: &str| format!("schedule {id}.{field}");
+    let mut refused = Vec::new();
     let read = (
         seconds(schedule, "at", id),
         seconds(schedule, "until", id),
@@ -325,11 +420,22 @@ fn live(
         refused.push(refusal(MEMBER_UNSUPPORTED, &at, detail));
         return Err(refused);
     };
-    if interval.is_some_and(|interval| !(INTERVAL_MIN..=INTERVAL_MAX).contains(&interval)) {
-        let detail = format!("Lys keeps intervals of {INTERVAL_MIN} to {INTERVAL_MAX} seconds");
-        let at = member("interval_seconds");
-        refused.push(refusal(MEMBER_UNSUPPORTED, &at, detail));
-    }
+    Ok(Timing {
+        at,
+        until,
+        next_due,
+        interval,
+        max_occurrences,
+        completed,
+    })
+}
+
+fn source_and_standing<'a>(
+    schedule: &'a Value,
+    id: &str,
+    refused: &mut Vec<Refusal>,
+) -> Result<(&'a str, Source, Option<&'static str>), Vec<Refusal>> {
+    let member = |field: &str| format!("schedule {id}.{field}");
     let stopped = match schedule.get("state").and_then(Value::as_str) {
         Some("active") => None,
         Some("paused") => Some("paused"),
@@ -364,56 +470,10 @@ fn live(
         refused.push(refusal(MEMBER_UNSUPPORTED, &member("author"), "absent"));
     }
     let (Some(author), Some(source)) = (author, source) else {
-        return Err(refused);
+        return Err(std::mem::take(refused));
     };
     if !refused.is_empty() {
-        return Err(refused);
+        return Err(std::mem::take(refused));
     }
-    let lys = Schedule {
-        id: id.to_owned(),
-        at,
-        until,
-        interval,
-        max_occurrences,
-        recipients: vec![Recipient::Agent {
-            id: agent.to_owned(),
-        }],
-        source,
-        author: author.to_owned(),
-        set_at: captured_at,
-    };
-    let prerequisites = bound_seats
-        .iter()
-        .map(|bound| {
-            if bound == seat {
-                format!("schedule {id}: seat {bound}'s binding is enabled only after this seat's move proof (AGENTS-002 R5)")
-            } else {
-                format!("schedule {id}: seat {bound}'s binding is confirmed by that seat's own import and enabled only after its move proof")
-            }
-        })
-        .collect();
-    let entry = DestinationEntry {
-        record_kind: "schedule".to_owned(),
-        record_id: format!("schedule:{id}"),
-        expected_revision: None,
-        change: json!({
-            "schedule": lys,
-            "state": if stopped.is_some() { "stopped" } else { "active" },
-            "stopped_reason": stopped,
-            "resume": stopped.map(|_| "a separate deliberate resume that accounts for the original outcome"),
-            "next_due": next_due,
-            "occurrences_completed": completed,
-            "template": schedule.get("template"),
-            "spent": {
-                "last_finished_at": schedule.get("last_finished_at"),
-                "last_request_id": schedule.get("last_request_id"),
-                "last_outcome": schedule.get("last_outcome"),
-                "delivery_counts": schedule.get("delivery_counts"),
-            },
-            "bindings": bindings,
-            "source_revision": schedule.get("revision"),
-        }),
-        source_entry_ids: Vec::new(),
-    };
-    Ok((entry, prerequisites))
+    Ok((author, source, stopped))
 }

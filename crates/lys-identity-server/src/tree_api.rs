@@ -80,87 +80,7 @@ async fn read(
     };
     let standings = held.standings()?;
     held.goals = goals(&state, &standings)?;
-    let mut built = BTreeMap::new();
-    let mut pending: Vec<_> = held
-        .teams
-        .iter()
-        .filter(|team| reachable.contains(&team.created.id))
-        .collect();
-    // Build children first so the walk itself does not recurse on request depth.
-    while !pending.is_empty() {
-        let before = pending.len();
-        let mut remaining = Vec::new();
-        for team in pending {
-            let children: Vec<_> = held
-                .teams
-                .iter()
-                .filter(|child| {
-                    child.parent.as_deref() == Some(team.created.id.as_str())
-                        && reachable.contains(&child.created.id)
-                })
-                .collect();
-            if children
-                .iter()
-                .any(|child| !built.contains_key(&child.created.id))
-            {
-                remaining.push(team);
-                continue;
-            }
-            let members = team
-                .members
-                .iter()
-                .filter(|member| !team.held.iter().any(|hold| hold.member == **member))
-                .map(|member| held.agent(member, &standings))
-                .collect::<Result<Vec<_>, _>>()?
-                .into_iter()
-                .flatten()
-                .collect();
-            let lead = team
-                .lead
-                .as_deref()
-                .map(|lead| held.agent(lead, &standings))
-                .transpose()?
-                .flatten();
-            let teams = children
-                .iter()
-                .map(|child| {
-                    built.remove(&child.created.id).ok_or_else(|| {
-                        unavailable("a child vanished while rendering the held tree")
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?;
-            built.insert(
-                team.created.id.clone(),
-                TreeTeam {
-                    id: team.created.id.clone(),
-                    name: team.created.name.clone(),
-                    lead,
-                    members,
-                    teams,
-                },
-            );
-        }
-        if remaining.len() == before {
-            return Err(unavailable("the stored parent links contain a cycle"));
-        }
-        pending = remaining;
-    }
-    let teams = held
-        .teams
-        .iter()
-        .filter(|team| {
-            reachable.contains(&team.created.id)
-                && !team
-                    .parent
-                    .as_ref()
-                    .is_some_and(|parent| reachable.contains(parent))
-        })
-        .map(|team| {
-            built
-                .remove(&team.created.id)
-                .ok_or_else(|| unavailable("a reachable root was not rendered"))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+    let teams = render(&held, &reachable, &standings)?;
     Ok(Json(TreeView { root, teams }))
 }
 
@@ -226,4 +146,93 @@ fn goals(
         }
         Ok(answers)
     })
+}
+
+fn render(
+    held: &TreeState,
+    reachable: &std::collections::BTreeSet<String>,
+    standings: &[crate::budgets_state::Standing],
+) -> Result<Vec<TreeTeam>, ServerError> {
+    let mut built = BTreeMap::new();
+    let mut pending: Vec<_> = held
+        .teams
+        .iter()
+        .filter(|team| reachable.contains(&team.created.id))
+        .collect();
+    // Build children first so the walk itself does not recurse on request depth.
+    while !pending.is_empty() {
+        let before = pending.len();
+        let mut remaining = Vec::new();
+        for team in pending {
+            let children: Vec<_> = held
+                .teams
+                .iter()
+                .filter(|child| {
+                    child.parent.as_deref() == Some(team.created.id.as_str())
+                        && reachable.contains(&child.created.id)
+                })
+                .collect();
+            if children
+                .iter()
+                .any(|child| !built.contains_key(&child.created.id))
+            {
+                remaining.push(team);
+                continue;
+            }
+            let members = team
+                .members
+                .iter()
+                .filter(|member| !team.held.iter().any(|hold| hold.member == **member))
+                .map(|member| held.agent(member, standings))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                .flatten()
+                .collect();
+            let lead = team
+                .lead
+                .as_deref()
+                .map(|lead| held.agent(lead, standings))
+                .transpose()?
+                .flatten();
+            let teams = children
+                .iter()
+                .map(|child| {
+                    built.remove(&child.created.id).ok_or_else(|| {
+                        unavailable("a child vanished while rendering the held tree")
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            built.insert(
+                team.created.id.clone(),
+                TreeTeam {
+                    id: team.created.id.clone(),
+                    name: team.created.name.clone(),
+                    lead,
+                    members,
+                    teams,
+                },
+            );
+        }
+        if remaining.len() == before {
+            return Err(unavailable("the stored parent links contain a cycle"));
+        }
+        pending = remaining;
+    }
+    let teams = held
+        .teams
+        .iter()
+        .filter(|team| {
+            reachable.contains(&team.created.id)
+                && !team
+                    .parent
+                    .as_ref()
+                    .is_some_and(|parent| reachable.contains(parent))
+        })
+        .map(|team| {
+            built
+                .remove(&team.created.id)
+                .ok_or_else(|| unavailable("a reachable root was not rendered"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(teams)
 }

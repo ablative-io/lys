@@ -177,36 +177,7 @@ async fn begin(
         .into());
     }
     state.seat_imports.require_selectable(&name)?;
-    let runner = crate::runner_sessions::machine_runner(state, &held.added.machine)?
-        .ok_or(ServerError::MachineWithoutRunner)?;
-    match crate::runner_client::ask(
-        state,
-        &held.added.machine,
-        runner,
-        Act::Status { session: None },
-    )
-    .await?
-    {
-        Answer::Status { .. } => {}
-        other => {
-            return Err(ServerError::Runner {
-                refusal: "runner_reply_malformed".to_owned(),
-                words: format!("seat start readiness answered {}", kind(&other)),
-            });
-        }
-    }
-    if let Some(session) = &held.session
-        && session != operation
-        && live_session(state, &held.added.machine, session)
-            .await?
-            .is_some_and(|live| live.alive && !live.ended)
-    {
-        return Err(SeatError::Running {
-            name,
-            session: session.clone(),
-        }
-        .into());
-    }
+    ready_start(state, held, operation).await?;
     let number = held.added.profile_version;
     let version = crate::provisioning_api::with_provisioning(state, |store| {
         store
@@ -242,30 +213,7 @@ async fn begin(
         .ok_or_else(|| ServerError::LaunchUnrenderable {
             reason: "the kept start names no session".to_owned(),
         })?;
-    let harness_session = match live_session(state, &held.added.machine, &session).await {
-        Ok(Some(live)) => {
-            notes.push(format!(
-                "the runner reports transport={} for session {session}",
-                if live.managed { "managed" } else { "pty" }
-            ));
-            if live.harness_session.is_none() {
-                notes.push(format!(
-                    "the runner has not yet seen the harness name its own session for {session}"
-                ));
-            }
-            live.harness_session
-        }
-        Ok(None) => {
-            notes.push(format!("the runner holds no session {session} to read"));
-            None
-        }
-        Err(refused) => {
-            notes.push(format!(
-                "the harness's own session id for {session} is not known: {refused}"
-            ));
-            None
-        }
-    };
+    let harness_session = harness_session(state, &held.added.machine, &session, &mut notes).await;
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
             qualification: start["qualification"].as_str().map(str::to_owned),
@@ -323,45 +271,13 @@ async fn end(
     if force {
         notes.push("force was named: going straight to Act::End".to_owned());
     } else {
-        let live = live_session(state, &driven.machine, &session).await?;
-        match &live {
-            Some(live) if live.alive && !live.ended => {
-                if live.turn_active {
-                    return Err(SeatError::TurnInProgress { name, session }.into());
-                }
-                if live.managed {
-                    let stop = Act::Operate {
-                        operation: Operation {
-                            operation: operation.to_owned(),
-                            session: session.clone(),
-                            request: OperationRequest::Stop,
-                        },
-                    };
-                    let (answer, _) =
-                        act(state, (&driven, caller, "seat_stop"), None, stop).await?;
-                    if let Answer::Operation { outcome } = &answer
-                        && outcome.ended.is_some()
-                    {
-                        ended = true;
-                        notes.push("the harness's own end request ended the session".to_owned());
-                    } else {
-                        notes.push(format!(
-                            "the harness was asked to end the session ({})",
-                            kind(&answer)
-                        ));
-                    }
-                } else {
-                    let (exited, receipt) =
-                        crate::seats_monitor::stop_pty(state, &driven, caller, operation).await?;
-                    ended = exited;
-                    notes.extend(receipt);
-                }
-            }
-            Some(_) | None => {
-                ended = true;
-                notes.push("the runner already holds the session ended".to_owned());
-            }
-        }
+        ended = request_end(
+            state,
+            &driven,
+            (&name, &session, caller, operation),
+            &mut notes,
+        )
+        .await?;
     }
     if !ended {
         let finish = Act::End {
@@ -467,3 +383,125 @@ mod tests {
 #[cfg(test)]
 #[path = "seats_run_tests.rs"]
 mod owner_tests;
+
+async fn ready_start(
+    state: &Arc<AppState>,
+    held: &Seat,
+    operation: &str,
+) -> Result<(), ServerError> {
+    let runner = crate::runner_sessions::machine_runner(state, &held.added.machine)?
+        .ok_or(ServerError::MachineWithoutRunner)?;
+    match crate::runner_client::ask(
+        state,
+        &held.added.machine,
+        runner,
+        Act::Status { session: None },
+    )
+    .await?
+    {
+        Answer::Status { .. } => {}
+        other => {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: format!("seat start readiness answered {}", kind(&other)),
+            });
+        }
+    }
+    if let Some(session) = &held.session
+        && session != operation
+        && live_session(state, &held.added.machine, session)
+            .await?
+            .is_some_and(|live| live.alive && !live.ended)
+    {
+        return Err(SeatError::Running {
+            name: held.added.name.clone(),
+            session: session.clone(),
+        }
+        .into());
+    }
+    Ok(())
+}
+
+async fn request_end(
+    state: &Arc<AppState>,
+    driven: &crate::runner_sessions::Driven,
+    (name, session, caller, operation): (&str, &str, &str, &str),
+    notes: &mut Vec<String>,
+) -> Result<bool, ServerError> {
+    let mut ended = false;
+    let live = live_session(state, &driven.machine, session).await?;
+    match &live {
+        Some(live) if live.alive && !live.ended => {
+            if live.turn_active {
+                return Err(SeatError::TurnInProgress {
+                    name: name.to_owned(),
+                    session: session.to_owned(),
+                }
+                .into());
+            }
+            if live.managed {
+                let stop = Act::Operate {
+                    operation: Operation {
+                        operation: operation.to_owned(),
+                        session: session.to_owned(),
+                        request: OperationRequest::Stop,
+                    },
+                };
+                let (answer, _) = act(state, (driven, caller, "seat_stop"), None, stop).await?;
+                if let Answer::Operation { outcome } = &answer
+                    && outcome.ended.is_some()
+                {
+                    ended = true;
+                    notes.push("the harness's own end request ended the session".to_owned());
+                } else {
+                    notes.push(format!(
+                        "the harness was asked to end the session ({})",
+                        kind(&answer)
+                    ));
+                }
+            } else {
+                let (exited, receipt) =
+                    crate::seats_monitor::stop_pty(state, driven, caller, operation).await?;
+                ended = exited;
+                notes.extend(receipt);
+            }
+        }
+        Some(_) | None => {
+            ended = true;
+            notes.push("the runner already holds the session ended".to_owned());
+        }
+    }
+    Ok(ended)
+}
+
+async fn harness_session(
+    state: &Arc<AppState>,
+    machine: &str,
+    session: &str,
+    notes: &mut Vec<String>,
+) -> Option<String> {
+    match live_session(state, machine, session).await {
+        Ok(Some(live)) => {
+            notes.push(format!(
+                "the runner reports transport={} for session {session}",
+                if live.managed { "managed" } else { "pty" }
+            ));
+            if live.harness_session.is_none() {
+                notes.push(format!(
+                    "the runner has not yet seen the harness name its own session for {session}"
+                ));
+            }
+            live.harness_session
+        }
+        Ok(None) => {
+            notes.push(format!("the runner holds no session {session} to read"));
+            None
+        }
+        Err(refused) => {
+            notes.push(format!(
+                "the harness's own session id for {session} is not known: {refused}"
+            ));
+            None
+        }
+    }
+}

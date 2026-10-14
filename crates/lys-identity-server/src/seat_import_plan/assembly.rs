@@ -58,49 +58,7 @@ pub fn assemble(
         .map(|source| source.id.as_str())
         .collect();
     let mut destinations = merged.destinations;
-    destinations.sort_by(|left, right| {
-        (kind_rank(&left.record_kind), &left.record_id)
-            .cmp(&(kind_rank(&right.record_kind), &right.record_id))
-    });
-    let mut seen = BTreeSet::new();
-    let mut next: BTreeMap<String, u64> = BTreeMap::new();
-    for destination in &mut destinations {
-        let member = format!("{} {}", destination.record_kind, destination.record_id);
-        if !seen.insert((
-            destination.record_kind.clone(),
-            destination.record_id.clone(),
-        )) {
-            refusals.push(refused(
-                "import_destination_ambiguous",
-                &member,
-                "named twice",
-            ));
-        }
-        for source in &destination.source_entry_ids {
-            if !ids.contains(source.as_str()) {
-                let detail = format!("names source {source}, which the plan did not read");
-                refusals.push(refused("import_destination_unsourced", &member, detail));
-            }
-        }
-        if let Err(refusal) = crate::seat_import_changes::checked(destination, &facts.agent) {
-            refusals.push(refusal);
-            continue;
-        }
-        let key = crate::seat_import_changes::revision_key(destination);
-        let held = match next.get(&key) {
-            Some(held) => Ok(*held),
-            None => bind(destination),
-        };
-        match held {
-            Ok(held) => {
-                destination.expected_revision = Some(held);
-                next.insert(key, held + 1);
-            }
-            Err(refusal) => {
-                refusals.push(refused(&refusal.name(), &member, refusal.to_string()));
-            }
-        }
-    }
+    bind_destinations(&mut destinations, &ids, &facts.agent, bind, &mut refusals);
     let live = destinations
         .iter()
         .filter(|destination| destination.record_kind == record::SCHEDULE)
@@ -161,6 +119,7 @@ pub fn assemble(
 /// The plan's revision: the SHA-256 of the canonical JSON of everything it
 /// reads and would write, never its instant or its id. A credential is
 /// named by its reference alone, so no credential byte is ever hashed.
+#[must_use]
 pub fn revision(plan: &Plan) -> String {
     let bound = serde_json::json!({
         "version": plan.version,
@@ -184,6 +143,7 @@ pub fn revision(plan: &Plan) -> String {
 
 /// The key one confirmed import is reserved under: the seat, every source's
 /// kind, locator, scope and revision, and the plan revision.
+#[must_use]
 pub fn vector_key(plan: &Plan) -> String {
     let mut vector: Vec<[&str; 5]> = plan
         .sources
@@ -207,4 +167,56 @@ pub fn vector_key(plan: &Plan) -> String {
     let mut text = String::new();
     canonical(&bound, &mut text);
     sha256(&text)
+}
+
+fn bind_destinations(
+    destinations: &mut [super::DestinationEntry],
+    ids: &BTreeSet<&str>,
+    agent: &str,
+    bind: Binder<'_>,
+    refusals: &mut Vec<Refusal>,
+) {
+    destinations.sort_by(|left, right| {
+        (kind_rank(&left.record_kind), &left.record_id)
+            .cmp(&(kind_rank(&right.record_kind), &right.record_id))
+    });
+    let mut seen = BTreeSet::new();
+    let mut next: BTreeMap<String, u64> = BTreeMap::new();
+    for destination in destinations {
+        let member = format!("{} {}", destination.record_kind, destination.record_id);
+        if !seen.insert((
+            destination.record_kind.clone(),
+            destination.record_id.clone(),
+        )) {
+            refusals.push(refused(
+                "import_destination_ambiguous",
+                &member,
+                "named twice",
+            ));
+        }
+        for source in &destination.source_entry_ids {
+            if !ids.contains(source.as_str()) {
+                let detail = format!("names source {source}, which the plan did not read");
+                refusals.push(refused("import_destination_unsourced", &member, detail));
+            }
+        }
+        if let Err(refusal) = crate::seat_import_changes::checked(destination, agent) {
+            refusals.push(refusal);
+            continue;
+        }
+        let key = crate::seat_import_changes::revision_key(destination);
+        let held = match next.get(&key) {
+            Some(held) => Ok(*held),
+            None => bind(destination),
+        };
+        match held {
+            Ok(held) => {
+                destination.expected_revision = Some(held);
+                next.insert(key, held + 1);
+            }
+            Err(refusal) => {
+                refusals.push(refused(&refusal.name(), &member, refusal.to_string()));
+            }
+        }
+    }
 }

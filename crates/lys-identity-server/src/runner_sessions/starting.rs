@@ -69,28 +69,8 @@ pub(crate) async fn run_resuming(
         }
         other => other,
     };
-    if supervised && let Ok(Answer::Started { qualification, .. }) = &mut answer {
-        // The machine started an independent owner; its own Status supplies the programme evidence.
-        let status = crate::runner_client::ask(
-            state,
-            machine,
-            runner.clone(),
-            Act::Status {
-                session: Some(session.clone()),
-            },
-        )
-        .await?;
-        if let Answer::Status { status } = status {
-            *qualification = status
-                .sessions
-                .first()
-                .and_then(|session| session.qualification.clone());
-        } else {
-            return Err(ServerError::Runner {
-                refusal: "runner_reply_malformed".to_owned(),
-                words: "the seat owner did not answer its programme status".to_owned(),
-            });
-        }
+    if supervised {
+        qualify_started(state, &driven, &mut answer).await?;
     }
     let ending = if answer.is_err() {
         crate::agent_pass::end_session(state, &session)
@@ -223,4 +203,35 @@ fn record_start_answer(
         )
     })
     .map(drop)
+}
+
+async fn qualify_started(
+    state: &Arc<AppState>,
+    driven: &Driven,
+    answer: &mut Result<Answer, ServerError>,
+) -> Result<(), ServerError> {
+    if let Ok(Answer::Started { qualification, .. }) = answer {
+        // The machine started an independent owner; its own Status supplies the programme evidence.
+        let status = crate::runner_client::ask(
+            state,
+            &driven.machine,
+            driven.runner.clone(),
+            Act::Status {
+                session: Some(driven.session.clone()),
+            },
+        )
+        .await?;
+        if let Answer::Status { status } = status {
+            *qualification = status
+                .sessions
+                .first()
+                .and_then(|session| session.qualification.clone());
+        } else {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: "the seat owner did not answer its programme status".to_owned(),
+            });
+        }
+    }
+    Ok(())
 }
