@@ -176,6 +176,7 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 /// The file the connection codes are kept in, beside the machines' file
 /// `network`.
+#[must_use]
 pub fn beside(network: &Path) -> PathBuf {
     network.with_extension("joins.json")
 }
@@ -183,6 +184,10 @@ pub fn beside(network: &Path) -> PathBuf {
 impl JoinStore {
     /// The connection codes kept beside the machines' file `config` names;
     /// none when it names none, since then no computer is kept either.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed connection codes beside the configured
+    /// machines file.
     pub fn configured(config: &Config) -> Result<Option<Self>, ServerError> {
         config
             .network_file
@@ -193,6 +198,10 @@ impl JoinStore {
 
     /// The connection codes kept in the file `path`, none when it does not
     /// exist.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed connection code records or invalid
+    /// retained record format and identities.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let kept = match fs::read(path) {
             Ok(bytes) => {
@@ -221,11 +230,13 @@ impl JoinStore {
     }
 
     /// Every connection code ever given, in the order given.
+    #[must_use]
     pub fn records(&self) -> &[JoinRecord] {
         &self.kept.codes
     }
 
     /// Whether a code for `machine` waits to be used.
+    #[must_use]
     pub fn waiting(&self, machine: &str) -> bool {
         self.kept.codes.iter().any(|record| {
             record.machine == machine && matches!(record.standing, JoinStanding::Waiting { .. })
@@ -235,6 +246,10 @@ impl JoinStore {
     /// A new connection code for `machine`, asked for under `operation` by
     /// `by` at `at`, replacing any code for it still waiting. Only its
     /// digest is kept; the code itself is answered here once.
+    ///
+    /// # Errors
+    /// Refuses a reused connection operation, a failed secure random source
+    /// or a failed durable code record write.
     pub fn issue(
         &mut self,
         operation: &str,
@@ -289,6 +304,10 @@ impl JoinStore {
     /// identity made, in the same write, for that key. A code that is wrong,
     /// used or replaced is refused `RunnerJoinRefused`, and which of these is
     /// never said.
+    ///
+    /// # Errors
+    /// Refuses an incorrect, used or replaced code, invalid computer key,
+    /// identity generation failure or a failed durable redemption write.
     pub fn redeem(
         &mut self,
         machine: &str,

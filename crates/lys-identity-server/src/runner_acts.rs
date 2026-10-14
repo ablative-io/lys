@@ -46,11 +46,13 @@ pub struct Digested {
 
 impl Digested {
     /// `text`'s length and digest.
+    #[must_use]
     pub fn of(text: &str) -> Self {
         Self::bytes(text.as_bytes())
     }
 
     /// Exact terminal input's length and digest, without lossy decoding or payload logging.
+    #[must_use]
     pub fn bytes(data: &[u8]) -> Self {
         Self {
             length: data.len(),
@@ -126,6 +128,10 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 impl ActStore<FileLeafStore> {
     /// The acts kept in `dir`, created when it does not exist, their
     /// snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses runner acts store creation, reopening or signed log verification
+    /// failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -137,6 +143,9 @@ impl ActStore<FileLeafStore> {
 
 impl<S: LeafStore> ActStore<S> {
     /// The acts kept in the leaf store `reopen` opens.
+    ///
+    /// # Errors
+    /// Refuses runner acts store reopening or signed log verification failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, started) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -197,6 +206,10 @@ impl<S: LeafStore> ActStore<S> {
     /// Keep `act` as one leaf, answering its receipt. A failed append is
     /// settled by opening the store again: the act is kept only if the
     /// store holds exactly it.
+    ///
+    /// # Errors
+    /// Refuses act encoding or receipt reads that fail, or a failed append
+    /// unless reopening proves the exact act was durably kept at its position.
     pub fn keep(&mut self, act: RunnerAct) -> Result<ActReceipt, ServerError> {
         let bytes = serde_json::to_vec(&act).map_err(unavailable)?;
         let index = self.log.len();
@@ -227,6 +240,10 @@ impl<S: LeafStore> ActStore<S> {
     }
 
     /// The receipt of the act at `index`, none when the log holds none there.
+    ///
+    /// # Errors
+    /// Refuses leaf reads or an act that cannot be decoded at the requested
+    /// position.
     pub fn receipt(&self, index: u64) -> Result<Option<ActReceipt>, ServerError> {
         let Some(bytes) = self.log.leaf_bytes(index).map_err(unavailable)? else {
             return Ok(None);

@@ -78,6 +78,10 @@ use directory::Directory;
 /// Who is asking, as the records a start keeps name them.
 pub trait Callers: Send + Sync {
     /// Refuse unavailable admission state before a start reads authority.
+    ///
+    /// # Errors
+    /// Implementations refuse unavailable admission state before authority is read.
+    /// The default has no admission store to read and returns success.
     fn check_admission(&self) -> Result<(), ServerError> {
         Ok(())
     }
@@ -115,6 +119,7 @@ pub struct StartOwners {
 
 impl StartOwners {
     /// The owners as the library reads them.
+    #[must_use]
     pub fn owners(&self) -> Owners<'_> {
         Owners {
             agents: &*self.agents,
@@ -198,6 +203,7 @@ impl StartService {
     }
 
     /// The owners as the library reads them.
+    #[must_use]
     pub fn owners(&self) -> Owners<'_> {
         self.owners.owners()
     }
@@ -213,6 +219,9 @@ impl StartService {
     }
 
     /// The launch records, one caller at a time.
+    ///
+    /// # Errors
+    /// Refuses a poisoned launch records lock.
     pub fn launches(&self) -> Result<MutexGuard<'_, LaunchRecords>, StartError> {
         self.launches
             .lock()
@@ -581,6 +590,9 @@ fn agent_id(text: &str) -> bool {
 /// Reviews, profile versions, what each needs, the machines each role may
 /// run on, egress lists and session reports are read from the stores
 /// `state` keeps.
+///
+/// # Errors
+/// Refuses launch records that cannot be opened and verified.
 pub fn directory_service(
     state: &Arc<AppState>,
     handles: Box<dyn HandleRecords + Send + Sync>,

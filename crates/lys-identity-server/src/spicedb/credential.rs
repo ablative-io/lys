@@ -45,6 +45,10 @@ impl std::fmt::Debug for SpiceDbConnection {
 impl SpiceDbConnection {
     /// Read the configured credential once. Load a new connection to reload it;
     /// existing engines retain the credential they were opened with.
+    ///
+    /// # Errors
+    /// Refuses an unreadable or empty permission credential file or an invalid
+    /// mirror name.
     pub fn load(settings: &SpiceDbSettings) -> Result<Self, GrantError> {
         let text = std::fs::read_to_string(&settings.key_file).map_err(|error| {
             unavailable(format!(
@@ -82,6 +86,7 @@ pub struct SpiceDbEngine {
 
 impl SpiceDbEngine {
     /// The engine `settings` names, its credential not read yet.
+    #[must_use]
     pub fn new(settings: SpiceDbSettings) -> Self {
         Self {
             settings,
@@ -94,6 +99,10 @@ impl SpiceDbEngine {
     }
 
     /// The connection, reading the credential the first time it is asked for.
+    ///
+    /// # Errors
+    /// Refuses a poisoned connection cache lock or configured credential
+    /// loading failure.
     pub fn connection(&self) -> Result<SpiceDbConnection, GrantError> {
         let mut loaded = self.loaded.lock().map_err(|error| {
             unavailable(format!(

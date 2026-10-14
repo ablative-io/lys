@@ -189,6 +189,10 @@ fn leading_zero_bits(hash: &[u8]) -> u32 {
 /// bits as the challenge's difficulty. The challenge is
 /// `version:difficulty:expires:salt:challenge:`, version 1 and the
 /// difficulty two digits.
+///
+/// # Errors
+/// Refuses a malformed or unsupported challenge, invalid difficulty or
+/// a proof counter that cannot be found within its range.
 pub fn solve(challenge: &str) -> Result<String, ServerError> {
     let counter = solve_counter(challenge)?;
     Ok(format!("{challenge}{counter}"))
@@ -245,6 +249,9 @@ fn query_value(url: &reqwest::Url, name: &str) -> Option<String> {
 pub const PROVIDER_CALLBACK_PATH: &str = "/auth/v1/providers/callback";
 
 /// Lys's own origin: the origin of the service's `redirect_url`.
+///
+/// # Errors
+/// Refuses a redirect address that cannot be parsed as a URL.
 pub fn lys_origin(config: &Config) -> Result<String, ServerError> {
     let url = reqwest::Url::parse(&config.redirect_url)
         .map_err(|error| failed(format!("the redirect address is not one: {error}")))?;
@@ -254,6 +261,9 @@ pub fn lys_origin(config: &Config) -> Result<String, ServerError> {
 /// The address a sign-in provider sends a person back to: Lys's own origin,
 /// the origin of the service's `redirect_url`, with the issuer's provider
 /// callback path. It is the address a provider is registered with.
+///
+/// # Errors
+/// Refuses a redirect address that cannot be parsed as a URL.
 pub fn provider_callback(redirect_url: &str) -> Result<String, ServerError> {
     let url = reqwest::Url::parse(redirect_url)
         .map_err(|error| failed(format!("the redirect address is not one: {error}")))?;
@@ -382,6 +392,9 @@ fn challenge_expiry(challenge: &str) -> Result<u64, ServerError> {
 impl IssuerSignIn {
     /// The issuer's sign-in API at `api`, its base without a trailing
     /// slash, sending people back from a sign-in provider to `callback`.
+    ///
+    /// # Errors
+    /// Refuses when the issuer's HTTP client cannot be constructed.
     pub fn new(api: String, callback: String) -> Result<Self, ServerError> {
         // The issuer refuses a sign-in that names no User-Agent; the service
         // names itself.
@@ -402,6 +415,10 @@ impl IssuerSignIn {
     }
 
     /// The issuer's sign-in API as `config` names it.
+    ///
+    /// # Errors
+    /// Refuses an invalid provider callback address or issuer HTTP client
+    /// construction failure.
     pub fn configured(config: &Config) -> Result<Self, ServerError> {
         let mut service = Self::new(
             config.sign_in_api(),
@@ -426,6 +443,11 @@ impl IssuerSignIn {
 
     /// Sign `attempt` in through the issuer for this service's own client,
     /// answering the actor its validated ID token names.
+    ///
+    /// # Errors
+    /// Refuses an over-capacity attempt pool, invalid or missing sign-in state,
+    /// issuer password or token exchange failures, or an ID token that cannot
+    /// be validated.
     pub async fn password(&self, oidc: &Oidc, attempt: &Attempt<'_>) -> Result<Actor, ServerError> {
         self.attempts.admit(attempt.address, 10)?;
         let begun = reqwest::Url::parse(&oidc.begin(attempt.address)?)
@@ -545,6 +567,9 @@ impl IssuerSignIn {
 }
 
 /// The person's own address, as the connection to this service names it.
+///
+/// # Errors
+/// Refuses a request without a connected peer address.
 pub fn person_address(extensions: &Extensions) -> Result<IpAddr, ServerError> {
     extensions
         .get::<ConnectInfo<SocketAddr>>()

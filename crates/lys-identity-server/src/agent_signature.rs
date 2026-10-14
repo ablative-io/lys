@@ -46,12 +46,18 @@ fn refused(reason: &'static str) -> ServerError {
 }
 
 /// The bytes an agent signs for a request.
+#[must_use]
 pub fn payload(method: &str, path: &str, body: &[u8], signed_at_ms: u64, nonce: &str) -> Vec<u8> {
     let digest = hex(&Sha256::digest(body));
     format!("{DOMAIN}\n{method}\n{path}\n{digest}\n{signed_at_ms}\n{nonce}").into_bytes()
 }
 
 /// The agent a signed request is from; none when it carries no signature.
+///
+/// # Errors
+/// Refuses malformed, stale, replayed or unverifiable signatures, a second
+/// credential on a relayed call, an inactive or unknown agent or responsible
+/// person, or unavailable time, certificates and nonce storage.
 pub fn signed_agent(
     state: &AppState,
     directory: &Projection,
@@ -286,6 +292,7 @@ pub struct TokenPrincipal {
 
 impl TokenPrincipal {
     /// The grant whose declared scope admitted this in-process request.
+    #[must_use]
     pub fn grant(&self) -> lys_identity::grants::GrantId {
         self.grant
     }

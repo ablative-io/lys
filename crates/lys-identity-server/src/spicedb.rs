@@ -117,11 +117,19 @@ pub(super) static SCHEMA_WRITE: Mutex<()> = Mutex::new(());
 impl SpiceDb {
     /// Reach the engine `settings` names and write the schema `model` gives,
     /// keeping every resource kind the engine already holds.
+    ///
+    /// # Errors
+    /// Refuses credential loading, model schema construction or permission
+    /// engine connection and schema write failures.
     pub fn open(settings: &SpiceDbSettings, model: &Model) -> Result<Self, GrantError> {
         Self::open_connected(&SpiceDbConnection::load(settings)?, model)
     }
 
     /// Open the live engine with an already loaded connection.
+    ///
+    /// # Errors
+    /// Refuses model schema construction or permission engine connection,
+    /// schema read and schema write failures.
     pub fn open_connected(
         connection: &SpiceDbConnection,
         model: &Model,
@@ -190,6 +198,10 @@ impl SpiceDb {
 
     /// Place `child` in `parent`, so the permissions on the parent flow to
     /// the child. It moves no revision: a placement is no grant event.
+    ///
+    /// # Errors
+    /// Refuses permission engine transport or placement refusal, or a revision
+    /// and written-token read that fail.
     pub fn place(&self, child: &Resource, parent: &Resource) -> Result<(), GrantError> {
         let update = json!({
             "operation": "OPERATION_TOUCH",

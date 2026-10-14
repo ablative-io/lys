@@ -36,6 +36,7 @@ const VALID: &str = "active";
 
 /// Whether `text` is a credential id this client admits onto a command line:
 /// one or more ASCII letters, digits, `-`, `_` and `.`.
+#[must_use]
 pub fn credential_id(text: &str) -> bool {
     !text.is_empty()
         && text
@@ -51,6 +52,9 @@ pub struct DoorHandles {
 
 impl DoorHandles {
     /// A client of the door at `address`, `http://host:port` or `host:port`.
+    ///
+    /// # Errors
+    /// Refuses a door address without a readable port or host.
     pub fn at(address: &str) -> Result<Self, String> {
         let authority = address
             .strip_prefix("http://")
@@ -73,6 +77,7 @@ impl DoorHandles {
 
     /// A client no door address is configured for: every agent is answered
     /// as having no handle record, because none can be read here.
+    #[must_use]
     pub fn unconfigured() -> Self {
         Self { door: None }
     }

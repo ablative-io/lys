@@ -31,6 +31,7 @@ use crate::error::ServerError;
 pub const COOKIE: &str = "lys_directory_session";
 
 /// Seconds since the Unix epoch, now.
+#[must_use]
 pub fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -105,6 +106,7 @@ fn cookie_secret(cookie_header: Option<&str>) -> Result<&str, ServerError> {
 
 impl Sessions {
     /// No sessions, each to live `seconds`, kept in memory alone.
+    #[must_use]
     pub fn new(seconds: u64, secure: bool) -> Self {
         Self::new_with_clock(seconds, secure, ClockSource::System)
     }
@@ -209,6 +211,10 @@ impl Sessions {
     }
 
     /// Begin a session for `actor`, answering the Set-Cookie header value.
+    ///
+    /// # Errors
+    /// Refuses operator actors, unavailable time or random source, an unreadable
+    /// or poisoned sessions store, or a failed durable session write.
     pub fn begin(&self, actor: Actor) -> Result<String, ServerError> {
         if matches!(
             actor.provenance().method(),
@@ -258,21 +264,37 @@ impl Sessions {
     }
 
     /// The live session named by a Cookie header, when and until when it lasts.
+    ///
+    /// # Errors
+    /// Refuses a missing, unknown or expired cookie session or sessions store
+    /// pruning, clock and lock failures.
     pub fn session(&self, cookie_header: Option<&str>) -> Result<SessionEntry, ServerError> {
         self.entry(cookie_header)
     }
 
     /// The actor of the session named by a Cookie header, if it is live.
+    ///
+    /// # Errors
+    /// Refuses a missing, unknown or expired cookie session or sessions store
+    /// pruning, clock and lock failures.
     pub fn actor(&self, cookie_header: Option<&str>) -> Result<Actor, ServerError> {
         self.entry(cookie_header).map(|entry| entry.actor)
     }
 
     /// The public id of the live session named by a Cookie header.
+    ///
+    /// # Errors
+    /// Refuses a missing, unknown or expired cookie session or sessions store
+    /// pruning, clock and lock failures.
     pub fn current(&self, cookie_header: Option<&str>) -> Result<String, ServerError> {
         self.entry(cookie_header).map(|entry| entry.id)
     }
 
     /// Whether the session named by its public id is still live.
+    ///
+    /// # Errors
+    /// Refuses a poisoned sessions lock or an unavailable clock for a retained
+    /// session.
     pub fn is_live(&self, id: &str) -> Result<bool, ServerError> {
         let live = self
             .live
@@ -287,6 +309,9 @@ impl Sessions {
     }
 
     /// Every live session whose actor `belongs` admits.
+    ///
+    /// # Errors
+    /// Refuses sessions pruning, clock or lock failures.
     pub fn live(&self, belongs: impl Fn(&Actor) -> bool) -> Result<Vec<SessionEntry>, ServerError> {
         Ok(self
             .pruned()?
@@ -299,6 +324,10 @@ impl Sessions {
 
     /// Revoke matching sessions before saving, so a failed durable write never
     /// restores a credential already refused by an account disable.
+    ///
+    /// # Errors
+    /// Refuses a poisoned sessions lock or a durable revocation write that
+    /// fails; matching credentials remain revoked in memory.
     pub fn revoke_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
         let mut live = self
             .live
@@ -325,6 +354,10 @@ impl Sessions {
 
     /// End every matching session in one durable write. A failed write leaves
     /// the previous in-memory set intact; lifecycle admission still refuses it.
+    ///
+    /// # Errors
+    /// Refuses sessions pruning, clock or lock failures, or a durable ending
+    /// write that fails.
     pub fn end_matching(&self, belongs: impl Fn(&Actor) -> bool) -> Result<usize, ServerError> {
         let mut live = self.pruned()?;
         let mut remaining = live.entries.clone();
@@ -342,6 +375,10 @@ impl Sessions {
     /// actor, answering the ended session. A session that is not live, or
     /// whose actor `belongs` does not admit, is refused `SessionUnknown`
     /// alike, and stays as it was.
+    ///
+    /// # Errors
+    /// Refuses an unknown, expired or unadmitted session, sessions pruning,
+    /// clock or lock failures, or a failed durable ending write.
     pub fn end(
         &self,
         id: &str,

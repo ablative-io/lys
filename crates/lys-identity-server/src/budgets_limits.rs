@@ -52,6 +52,10 @@ pub(crate) fn refused(name: &'static str, words: impl Into<String>) -> Refused {
 
 impl Limit {
     /// A checked integer for comparisons: monetary and percentage units use micros.
+    ///
+    /// # Errors
+    /// Refuses an amount that cannot be represented in its integer or micro
+    /// unit.
     pub fn scaled(&self) -> Result<u64, Refused> {
         let amount = match self.unit {
             Measure::Tokens | Measure::RunningMs => {
@@ -74,6 +78,10 @@ impl Limit {
     }
 
     /// Validate units, levels and zones before any version is stored.
+    ///
+    /// # Errors
+    /// Refuses an unrepresentable amount, invalid holder, unit or level,
+    /// or an absent or unknown named IANA time zone.
     pub fn checked(&self, holder: &Holder) -> Result<(), Refused> {
         self.scaled()?;
         if matches!(self.unit, Measure::ContextPercent | Measure::PlanPercent)
@@ -134,6 +142,7 @@ impl Limit {
     }
 
     /// Convert an old restriction without changing its action, amount or zone.
+    #[must_use]
     pub fn from_budget(budget: &Budget) -> Self {
         Self {
             unit: budget.measure,
@@ -145,6 +154,7 @@ impl Limit {
     }
 
     /// The explicit migrated zone wins; otherwise the organisation setting applies.
+    #[must_use]
     pub fn zone<'a>(&'a self, organisation: &'a str) -> &'a str {
         self.zone.as_deref().unwrap_or(organisation)
     }
@@ -152,6 +162,10 @@ impl Limit {
 
 impl Limits {
     /// Refuse malformed collections as a whole, before writing any leaf.
+    ///
+    /// # Errors
+    /// Refuses an unnamed holder, any invalid member limit, duplicate limit
+    /// identity or an invalid retained legacy restriction.
     pub fn checked(self) -> Result<Self, Refused> {
         if self.holder.id.is_empty() {
             return Err(refused("BudgetLimitsRefused", "a holder is named"));
@@ -182,6 +196,7 @@ impl Limits {
 
 impl Held {
     /// The current, whole-holder collection, including migrated restrictions.
+    #[must_use]
     pub fn limit_set(&self, holder: &Holder) -> Option<&Limits> {
         self.limit_sets
             .iter()
@@ -235,6 +250,7 @@ impl Held {
     }
 
     /// Preserve an earlier personal restriction until an administrator confirms it.
+    #[must_use]
     pub fn effective_limits(&self, limits: &Limits) -> Vec<Limit> {
         limits
             .limits

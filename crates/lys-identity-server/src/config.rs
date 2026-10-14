@@ -280,6 +280,9 @@ pub struct MembershipSettings {
 
 impl MembershipSettings {
     /// Refuse a setting of zero, by its member's name.
+    ///
+    /// # Errors
+    /// Refuses a zero membership setting, naming the setting.
     pub fn validate(&self) -> Result<(), ServerError> {
         for (name, value) in [
             ("page_rows_max", u64::from(self.page_rows_max)),
@@ -312,6 +315,10 @@ fn invalid(reason: impl Into<String>) -> ServerError {
 
 impl Config {
     /// Read and validate the configuration at `path`.
+    ///
+    /// # Errors
+    /// Refuses an unreadable file, retired configuration fields, malformed
+    /// configuration bytes or settings the service cannot run under.
     pub fn load(path: &Path) -> Result<Self, ServerError> {
         let text = std::fs::read_to_string(path)
             .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
@@ -337,6 +344,11 @@ impl Config {
     }
 
     /// Refuse a configuration the service cannot run under.
+    ///
+    /// # Errors
+    /// Refuses invalid message connection or membership settings, malformed
+    /// administrator or link-audit logins, an invalid password policy, zero
+    /// session lifetime or an empty client id.
     pub fn validate(&self) -> Result<(), ServerError> {
         if let Some(settings) = &self.message_service {
             crate::message_edges::validate(settings)?;
@@ -366,6 +378,9 @@ impl Config {
     }
 
     /// The configured administrator's login, when one is configured.
+    ///
+    /// # Errors
+    /// Refuses a configured administrator login with an invalid issuer or subject.
     pub fn configured_administrator(&self) -> Result<Option<LoginBinding>, ServerError> {
         self.administrator
             .as_ref()
@@ -378,6 +393,10 @@ impl Config {
 
     /// The configured administrator's login, refused by name when the
     /// configuration names none.
+    ///
+    /// # Errors
+    /// Refuses an invalid administrator login or a configuration naming no
+    /// administrator.
     pub fn administrator_binding(&self) -> Result<LoginBinding, ServerError> {
         self.configured_administrator()?
             .ok_or_else(|| invalid("no administrator is configured"))
@@ -386,6 +405,7 @@ impl Config {
     /// Where the issuer's own sign-in steps answer, the ones a password is
     /// carried to from this service: `sign_in_api` when it is configured, the
     /// issuer's address otherwise.
+    #[must_use]
     pub fn sign_in_api(&self) -> String {
         self.sign_in_api
             .as_deref()
@@ -395,6 +415,9 @@ impl Config {
     }
 
     /// The configured link-audit source's login.
+    ///
+    /// # Errors
+    /// Refuses a link-audit source login with an invalid issuer or subject.
     pub fn link_audit_binding(&self) -> Result<LoginBinding, ServerError> {
         LoginBinding::new(
             &self.link_audit_source.issuer,
@@ -406,6 +429,7 @@ impl Config {
     /// The directory the apps are kept in: `apps`, beside the grant log.
     /// The apps log is always kept, since it holds Lys's own model as the
     /// schema of the app `lys`.
+    #[must_use]
     pub fn apps_dir(&self) -> PathBuf {
         self.grant_log_dir.with_file_name("apps")
     }
@@ -413,6 +437,10 @@ impl Config {
     /// The permission model, read from its file and checked. It is read only
     /// when the apps log does not yet hold the app `lys`, to record it there
     /// once; afterwards the log is the only source and the file is not read.
+    ///
+    /// # Errors
+    /// Refuses an unreadable model file, malformed model bytes or relations
+    /// and app kinds the identity model cannot accept.
     pub fn grant_model(&self) -> Result<Model, ServerError> {
         let path = &self.grant_model_file;
         let text = std::fs::read_to_string(path)
@@ -435,6 +463,9 @@ impl Config {
     }
 
     /// The client secret, read from its file. The value is never part of an error.
+    ///
+    /// # Errors
+    /// Refuses an unreadable or empty client secret file, naming no secret value.
     pub fn client_secret(&self) -> Result<openidconnect::ClientSecret, ServerError> {
         let text = std::fs::read_to_string(&self.client_secret_file).map_err(|error| {
             invalid(format!(

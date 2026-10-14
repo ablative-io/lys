@@ -103,6 +103,7 @@ fn malformed(refused: &JsonRejection) -> ServerError {
 }
 
 /// The digest a setup code is kept by: lowercase hex SHA-256 of its text.
+#[must_use]
 pub fn digest(code: &str) -> String {
     hex(&Sha256::digest(code.as_bytes()))
 }
@@ -119,6 +120,9 @@ fn same(a: &str, b: &str) -> bool {
 
 /// The administrator the service starts with: the configured one, or else
 /// the one first-run setup recorded, or none yet.
+///
+/// # Errors
+/// Refuses a malformed configured administrator or unreadable setup records.
 pub fn administrator(config: &Config) -> Result<Option<LoginBinding>, ServerError> {
     if let Some(configured) = config.configured_administrator()? {
         return Ok(Some(configured));
@@ -467,6 +471,11 @@ pub struct SetupRequest {
 ///
 /// The caller is admitted before the body is read, so a body the route does
 /// not take is refused `RequestMalformed` only to the administrator.
+///
+/// # Errors
+/// Refuses a caller outside the configured administrator login, malformed
+/// setup body, operation or profile, directory setup failure, or import
+/// bootstrap and administrator root grant failures.
 pub async fn finish(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

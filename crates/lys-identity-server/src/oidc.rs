@@ -62,6 +62,11 @@ impl Oidc {
     /// on the `sign_in_api` origin instead. The document is otherwise taken
     /// as the issuer wrote it, and every token is still checked against the
     /// issuer's name and keys.
+    ///
+    /// # Errors
+    /// Refuses issuer discovery transport or document failures, an issuer name
+    /// that differs from configuration, invalid endpoint origins, an unreadable
+    /// client secret or an invalid client redirect address.
     pub async fn discover(config: &Config) -> Result<Self, ServerError> {
         let http = reqwest::ClientBuilder::new()
             .redirect(reqwest::redirect::Policy::none())
@@ -135,12 +140,20 @@ impl Oidc {
     }
 
     /// Begin a sign-in, answering the issuer URL to send the browser to.
+    ///
+    /// # Errors
+    /// Refuses an unavailable sign-in flight pool, an exhausted per-address or
+    /// global pool, or a failure to create the sign-in state.
     pub fn begin(&self, address: IpAddr) -> Result<String, ServerError> {
         self.begin_in(address, &self.in_flight)
     }
 
     /// Begin provider consent in a separate pool. Abandoned provider flows
     /// cannot spend any of the password sign-in pool's capacity.
+    ///
+    /// # Errors
+    /// Refuses an unavailable provider flight pool, an exhausted per-address
+    /// or global pool, or a failure to create the provider sign-in state.
     pub fn begin_provider(&self, address: IpAddr) -> Result<String, ServerError> {
         self.begin_in(address, &self.provider_flights)
     }
@@ -178,6 +191,9 @@ impl Oidc {
     }
 
     /// Forget the sign-in in flight under `state`, which will not be finished.
+    ///
+    /// # Errors
+    /// Refuses a poisoned password or provider sign-in flight lock.
     pub fn abandon(&self, state: &str) -> Result<(), ServerError> {
         self.in_flight
             .lock()
@@ -191,6 +207,11 @@ impl Oidc {
     }
 
     /// Finish a sign-in from the issuer's answer, validating its ID token.
+    ///
+    /// # Errors
+    /// Refuses unknown or expired state, unavailable flight pools, a refused
+    /// code exchange, a missing or invalid ID token, authentication before the
+    /// epoch or an invalid issuer and subject binding.
     pub async fn finish(&self, code: String, state: &str) -> Result<Actor, ServerError> {
         let password = self
             .in_flight

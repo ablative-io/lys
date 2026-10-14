@@ -82,6 +82,7 @@ pub enum Acting {
 
 impl Acting {
     /// The app the caller acts for, when it acts for one.
+    #[must_use]
     pub fn app(&self) -> Option<&str> {
         match self {
             Self::App { app, .. } => Some(app),
@@ -90,11 +91,13 @@ impl Acting {
     }
 
     /// Whether the caller is the administrator.
+    #[must_use]
     pub fn is_administrator(&self) -> bool {
         matches!(self, Self::Administrator(_))
     }
 
     /// How the apps' log records the caller.
+    #[must_use]
     pub fn by(&self) -> By {
         match self {
             Self::Administrator(actor) | Self::Person(actor) => {
@@ -118,6 +121,9 @@ impl Acting {
     }
 
     /// The administrator's actor, or `NotAdmitted`.
+    ///
+    /// # Errors
+    /// Refuses a caller whose acting identity is not the administrator.
     pub fn administrator(&self) -> Result<&Actor, ServerError> {
         match self {
             Self::Administrator(actor) => Ok(actor),
@@ -129,6 +135,9 @@ impl Acting {
 }
 
 /// A new secret, 32 bytes from the secure random source as hex, and its SHA-256.
+///
+/// # Errors
+/// Refuses a failed secure random source.
 pub fn new_secret() -> Result<(String, String), ServerError> {
     let mut bytes = [0u8; 32];
     OsRng
@@ -142,6 +151,7 @@ pub fn new_secret() -> Result<(String, String), ServerError> {
 }
 
 /// The SHA-256 of `text`, in hex.
+#[must_use]
 pub fn sha256_hex(text: &str) -> String {
     hex(&Sha256::digest(text.as_bytes()))
 }
@@ -184,6 +194,10 @@ fn bearer(headers: &HeaderMap) -> Result<Option<(String, String, String)>, AppEr
 /// request carries, or else the signed-in person. A credential that is
 /// carried and does not verify is refused by name, never passed over for
 /// the session.
+///
+/// # Errors
+/// Refuses malformed or invalid credentials, inactive account bindings,
+/// an unsigned-in or unadmitted person, or administrator store failures.
 pub fn acting(
     state: &AppState,
     held: &Held,
@@ -289,6 +303,10 @@ fn active_account(state: &AppState, id: &str) -> Result<(), ServerError> {
 /// holds or a secret that does not verify `credential_refused`, and an
 /// address the registration does not list `redirect_invalid`. The secret is
 /// compared by its SHA-256 and named in no refusal.
+///
+/// # Errors
+/// Refuses an unknown or unapproved client, a retired app, a mismatching
+/// secret or a redirect absent from the app's sign-in addresses.
 pub fn sign_in_client<'a>(
     held: &'a Held,
     client_id: &str,
@@ -303,6 +321,10 @@ pub fn sign_in_client<'a>(
 /// The approved app whose sign-in client is `client_id` and holds `secret`,
 /// judged before any return address is read: the token exchange's client
 /// authentication. The refusals are `sign_in_client`'s, without the address's.
+///
+/// # Errors
+/// Refuses an unknown or unapproved client, a retired app or a secret
+/// whose digest does not match the approved client.
 pub fn sign_in_secret<'a>(
     held: &'a Held,
     client_id: &str,
@@ -320,6 +342,9 @@ pub fn sign_in_secret<'a>(
 /// The approved app whose sign-in client is `client_id`, judged before any
 /// secret or address is read: where the token exchange starts on a virtual
 /// client credential, which only the secrets broker can confirm.
+///
+/// # Errors
+/// Refuses an unknown or unapproved client or a retired app.
 pub fn sign_in_app<'a>(held: &'a Held, client_id: &str) -> Result<&'a App, AppError> {
     approved_client(held, client_id).map(|(app, _approved)| app)
 }
@@ -328,6 +353,10 @@ pub fn sign_in_app<'a>(held: &'a Held, client_id: &str) -> Result<&'a App, AppEr
 /// its registration lists: the lookup Lys's provider makes at authorize, where
 /// a product presents no secret. The refusals are `sign_in_client`'s, without
 /// the secret's.
+///
+/// # Errors
+/// Refuses an unknown or unapproved client, a retired app or a redirect
+/// absent from the app's sign-in addresses.
 pub fn sign_in_redirect<'a>(
     held: &'a Held,
     client_id: &str,

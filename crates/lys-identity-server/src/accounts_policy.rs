@@ -67,6 +67,10 @@ fn kinds(policy: &PasswordPolicy, password: &str) -> [(Option<u16>, &'static str
 impl PasswordPolicy {
     /// The bounds the configuration's policy must keep, the ones the issuer
     /// holds, each refusal naming its field.
+    ///
+    /// # Errors
+    /// Refuses length bounds outside the issuer's limits or a required
+    /// character count outside its permitted range, naming the field.
     pub fn validate(&self) -> Result<(), String> {
         if !(8..=128).contains(&self.length_min) {
             return Err("length_min is not 8 to 128".to_owned());
@@ -91,6 +95,7 @@ impl PasswordPolicy {
     }
 
     /// The policy in the words the screens show before a password is sent.
+    #[must_use]
     pub fn words(&self) -> String {
         let mut words = format!(
             "At least {} and at most {} characters",
@@ -119,6 +124,7 @@ impl PasswordPolicy {
     }
 
     /// The policy as the setup and account screens read it.
+    #[must_use]
     pub fn view(&self) -> Value {
         json!({
             "length_min": self.length_min,
@@ -133,6 +139,9 @@ impl PasswordPolicy {
     }
 
     /// Refuse `password` when this policy does not take it, in Lys's words.
+    ///
+    /// # Errors
+    /// Refuses password length or character counts outside this policy's bounds.
     pub fn check(&self, password: &str) -> Result<(), ServerError> {
         let lengths = usize::from(self.length_min)..=usize::from(self.length_max);
         if !lengths.contains(&password.len()) {
@@ -157,6 +166,10 @@ impl PasswordPolicy {
 /// Refuse a password `policy` does not take, in Lys's words. With no policy
 /// configured only an empty password is refused here, and the issuer checks
 /// the rest.
+///
+/// # Errors
+/// Refuses a password the configured policy does not take, or an empty
+/// password when no policy is configured.
 pub fn check_password(policy: Option<&PasswordPolicy>, password: &str) -> Result<(), ServerError> {
     match policy {
         Some(policy) => policy.check(password),
@@ -170,6 +183,10 @@ pub fn check_password(policy: Option<&PasswordPolicy>, password: &str) -> Result
 /// address carries in its path or query. The 254-octet ceiling is RFC 5321's
 /// (4.5.3.1.3: a path of 256 octets, less its angle brackets), which the
 /// issuer's own email validation also holds to.
+///
+/// # Errors
+/// Refuses addresses over 254 octets, missing a single `@` or domain dot,
+/// or carrying space, control or path and query characters.
 pub fn check_email(email: &str) -> Result<&str, ServerError> {
     let email = email.trim();
     let shaped = email.split_once('@').is_some_and(|(local, domain)| {

@@ -86,6 +86,9 @@ fn account_refusal(error: ServerError) -> ServerError {
 }
 
 /// The account held under `email`, if one is.
+///
+/// # Errors
+/// Propagates sign-in service transport and non-404 refusals.
 pub async fn find_by_email(
     api: &SignInProviders,
     email: &str,
@@ -98,6 +101,9 @@ pub async fn find_by_email(
 }
 
 /// The account `id`.
+///
+/// # Errors
+/// Propagates sign-in service transport failures and its named account refusal.
 pub async fn read(api: &SignInProviders, id: &str) -> Result<Value, ServerError> {
     api.call(reqwest::Method::GET, &format!("/users/{id}"), None)
         .await
@@ -106,6 +112,10 @@ pub async fn read(api: &SignInProviders, id: &str) -> Result<Value, ServerError>
 /// Make an account for `email`, answering its id and `true`, or answer the
 /// id of the account already held under `email` and `false`, so a setup that
 /// is retried after the account was made finds it again.
+///
+/// # Errors
+/// Refuses sign-in service lookup or account creation failures, or an
+/// account answer without a readable user id.
 pub async fn make(
     api: &SignInProviders,
     email: &str,
@@ -174,6 +184,10 @@ fn update_of(user: &Value) -> Result<Value, ServerError> {
 }
 
 /// Read account `id`, let `change` change its update, and write it back.
+///
+/// # Errors
+/// Refuses an unavailable account lock, an unreadable account update,
+/// or sign-in service read and update failures.
 pub async fn change(
     api: &SignInProviders,
     id: &str,
@@ -194,6 +208,10 @@ pub async fn change(
 
 /// Set account `id`'s password, enabled and its email taken as verified,
 /// after `policy` has taken it.
+///
+/// # Errors
+/// Refuses a password the configured policy does not take or sign-in
+/// service account update failures.
 pub async fn set_password(
     api: &SignInProviders,
     policy: Option<&PasswordPolicy>,
@@ -210,6 +228,10 @@ pub async fn set_password(
 }
 
 /// The email account `id` signs in with.
+///
+/// # Errors
+/// Refuses sign-in service account read failures or an account answer
+/// naming no email.
 pub async fn email_of(api: &SignInProviders, id: &str) -> Result<String, ServerError> {
     read(api, id)
         .await?

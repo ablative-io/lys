@@ -9,6 +9,9 @@ use std::sync::{Arc, Mutex};
 
 impl SpiceDb {
     /// The schema for the resource kinds `kinds`.
+    ///
+    /// # Errors
+    /// Refuses a poisoned approved app kinds lock.
     pub fn schema(&self, kinds: &BTreeSet<String>) -> Result<String, GrantError> {
         let mut carried: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
         for (relation, actions) in &self.relations {
@@ -93,6 +96,10 @@ impl SpiceDb {
 
     /// Hold `kinds` as the approved apps' kinds from now on and write the
     /// schema they give, keeping every kind of Lys's own the engine holds.
+    ///
+    /// # Errors
+    /// Refuses poisoned app kinds or schema writer locks, invalid resource
+    /// kind names, or permission engine schema reads and writes that fail.
     pub fn set_app_kinds(&self, kinds: &BTreeMap<String, KindModel>) -> Result<(), GrantError> {
         *self
             .app_kinds
@@ -121,6 +128,9 @@ impl SpiceDb {
     }
 
     /// The resource kinds the engine's schema holds.
+    ///
+    /// # Errors
+    /// Refuses permission engine schema transport failures or a refused schema read.
     pub fn kinds(&self) -> Result<BTreeSet<String>, GrantError> {
         let text = self.schema_text()?.unwrap_or_default();
         Ok(text

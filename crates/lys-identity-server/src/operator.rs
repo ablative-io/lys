@@ -27,6 +27,10 @@ const TOKEN_MIN: usize = 32;
 /// The token the configuration names, read once at start; none when it
 /// names no file. A service install that names one is refused: it keeps no
 /// standing credential.
+///
+/// # Errors
+/// Refuses a standing operator token on a managed service install or an
+/// unreadable or empty configured token file.
 pub fn token(
     config: &Config,
     say: &dyn Fn(&str),
@@ -148,6 +152,9 @@ pub async fn guard(
 /// Whether the managed install is still in its reversible upgrade window.
 /// Every writer of a form an older build cannot read must defer on `true`
 /// and refuse on an I/O error. An unmanaged service has no intent path.
+///
+/// # Errors
+/// Returns the I/O failure when the managed upgrade intent cannot be inspected.
 pub fn upgrade_pending(state: &AppState) -> std::io::Result<bool> {
     state
         .operator_upgrade_file
@@ -158,6 +165,11 @@ pub fn upgrade_pending(state: &AppState) -> std::io::Result<bool> {
 /// The administrator, for a request carrying the operator token; none for
 /// a request that carries no `lys-operator` header. A header that does not
 /// match, or a service with no token or no administrator yet, is refused.
+///
+/// # Errors
+/// Refuses an operator credential on a managed install, an absent configured
+/// token, unreadable or mismatching header bytes, or an absent or unavailable
+/// administrator login.
 pub fn actor(state: &AppState, headers: &HeaderMap) -> Result<Option<Actor>, ServerError> {
     let Some(value) = headers.get(HEADER) else {
         return Ok(None);

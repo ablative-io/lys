@@ -159,6 +159,9 @@ fn operation(text: &str) -> Result<OperationId, ServerError> {
 }
 
 /// A grant id as a path or body gives it.
+///
+/// # Errors
+/// Refuses an invalid grant identifier.
 pub fn grant_id(text: &str) -> Result<GrantId, ServerError> {
     Ok(GrantId::from_str(text)?)
 }
@@ -187,6 +190,10 @@ impl RootBody {
     }
 
     /// The request, made by `caller`.
+    ///
+    /// # Errors
+    /// Refuses malformed operation or holder ids, resource, relation,
+    /// pass-on terms or time window.
     pub fn request(&self, caller: IdentityId) -> Result<RootRequest, ServerError> {
         Ok(RootRequest {
             operation: operation(&self.operation)?,
@@ -218,6 +225,10 @@ pub struct DelegateBody {
 
 impl DelegateBody {
     /// The request, made by `caller`.
+    ///
+    /// # Errors
+    /// Refuses malformed operation, source, recipient or responsible ids,
+    /// resource, relation, pass-on terms or time window.
     pub fn request(&self, caller: IdentityId) -> Result<DelegateRequest, ServerError> {
         Ok(DelegateRequest {
             operation: operation(&self.operation)?,
@@ -245,6 +256,9 @@ pub struct RevokeBody {
 
 impl RevokeBody {
     /// The request to revoke `grant`, made by `caller`.
+    ///
+    /// # Errors
+    /// Refuses a malformed revocation operation identifier.
     pub fn request(
         &self,
         caller: IdentityId,
@@ -272,6 +286,9 @@ pub struct ActionBody {
 
 impl ActionBody {
     /// The route, resource and action asked about.
+    ///
+    /// # Errors
+    /// Refuses a malformed route, resource or action.
     pub fn parts(&self) -> Result<(Route, Resource, Action), ServerError> {
         Ok((
             self.route.into(),
@@ -308,6 +325,9 @@ pub struct CannotGiveBody {
 
 impl CannotGiveBody {
     /// The question, asked by `caller`.
+    ///
+    /// # Errors
+    /// Refuses a malformed source grant or recipient identity identifier.
     pub fn request(&self, caller: IdentityId) -> Result<CannotGiveRequest, ServerError> {
         Ok(CannotGiveRequest {
             caller,

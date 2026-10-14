@@ -47,6 +47,7 @@ pub struct Admission {
 impl Admission {
     /// Admission for the administrator, when one is known yet, and the
     /// configured link-audit source.
+    #[must_use]
     pub fn new(administrator: Option<LoginBinding>, link_audit_source: LoginBinding) -> Self {
         Self {
             administrator: RwLock::new(administrator),
@@ -55,6 +56,9 @@ impl Admission {
     }
 
     /// The administrator's login, when there is an administrator yet.
+    ///
+    /// # Errors
+    /// Refuses a poisoned administrator store lock.
     pub fn administrator_login(&self) -> Result<Option<LoginBinding>, ServerError> {
         Ok(self
             .administrator
@@ -78,6 +82,10 @@ impl Admission {
 
     /// Record `login` as the administrator. Recording the login already
     /// recorded changes nothing; recording another is refused by name.
+    ///
+    /// # Errors
+    /// Refuses a poisoned administrator store lock or setup already closed
+    /// under another administrator login.
     pub fn set_administrator(&self, login: LoginBinding) -> Result<(), ServerError> {
         let mut held =
             self.administrator
@@ -96,6 +104,11 @@ impl Admission {
     }
 
     /// Admit `actor` as the administrator, or refuse by name.
+    ///
+    /// # Errors
+    /// Refuses a caller outside the configured administrator login, an absent
+    /// person or an inactive administrator. Propagates administrator store
+    /// failures.
     pub fn administrator(&self, directory: &Projection, actor: &Actor) -> Result<(), ServerError> {
         self.configured_administrator(actor)?;
         let Some(person) = directory.person_for(actor.binding()) else {
@@ -114,6 +127,10 @@ impl Admission {
     }
 
     /// Whether the caller is an active administrator, preserving operational refusals.
+    ///
+    /// # Errors
+    /// Propagates administrator store, absent-person and inactive-person
+    /// refusals while answering a caller outside the administrator login as false.
     pub fn is_administrator(
         &self,
         directory: &Projection,
@@ -151,6 +168,9 @@ impl Admission {
     }
 
     /// Admit `actor` as the link-audit source, or refuse by name.
+    ///
+    /// # Errors
+    /// Refuses an actor other than the configured link-audit source login.
     pub fn link_audit_source(&self, actor: &Actor) -> Result<(), ServerError> {
         if actor.binding() == &self.link_audit_source {
             Ok(())
@@ -164,6 +184,10 @@ impl Admission {
     /// Admit `agent`, whose signed request the service verified, as the
     /// link-audit source, answering the login of the person responsible for
     /// it that the request is recorded under, or refuse by name.
+    ///
+    /// # Errors
+    /// Refuses an unknown or inactive agent, an absent responsible person,
+    /// a login different from the configured source, or an inactive source holder.
     pub fn link_audit_agent(
         &self,
         directory: &Projection,
@@ -201,6 +225,10 @@ impl Admission {
     /// link-audit service login and keeps its authority, as an unbound
     /// configured administrator login does; a person who holds it must be
     /// active.
+    ///
+    /// # Errors
+    /// Refuses a person holding the configured source login who is registered,
+    /// suspended or retired.
     pub fn link_audit_holder(&self, directory: &Projection) -> Result<(), ServerError> {
         let state = directory
             .person_for(&self.link_audit_source)
