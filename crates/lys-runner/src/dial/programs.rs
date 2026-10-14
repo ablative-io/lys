@@ -165,21 +165,37 @@ mod tests {
     }
 
     #[test]
-    fn the_version_probe_uses_the_path_that_selected_the_command()
+    fn the_version_probe_extracts_semver_and_keeps_the_selected_symlinked_path()
     -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
+        let installed = directory.path().join("installed");
+        std::fs::create_dir(&installed)?;
+        let chosen = directory.path().join("chosen-path");
+        std::os::unix::fs::symlink(&installed, &chosen)?;
         for (name, script) in [
-            ("claude", "#!/bin/sh\nexec harness-helper\n"),
+            (
+                "claude",
+                "#!/bin/sh\nprintf '%s\\n' \"$0\" > \"$0.invoked\"\nprintf '%s\\n' \"$PATH\" > \"$0.path\"\nexec harness-helper\n",
+            ),
             ("harness-helper", "#!/bin/sh\nprintf 'claude 2.1.300\\n'\n"),
         ] {
-            let path = directory.path().join(name);
+            let path = installed.join(name);
             std::fs::write(&path, script)?;
             std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755))?;
         }
-        let answer = discover_in(directory.path().as_os_str())?;
+        let answer = discover_in(chosen.as_os_str())?;
         assert_eq!(answer.programs.len(), 1, "{:?}", answer.reason);
         assert_eq!(answer.programs[0].program, "claude");
         assert_eq!(answer.programs[0].version, "2.1.300");
+        assert!(answer.reason.is_none(), "{:?}", answer.reason);
+        assert_eq!(
+            std::fs::read_to_string(chosen.join("claude.invoked"))?,
+            format!("{}\n", chosen.join("claude").display())
+        );
+        assert_eq!(
+            std::fs::read_to_string(chosen.join("claude.path"))?,
+            format!("{}\n", chosen.display())
+        );
         Ok(())
     }
 }

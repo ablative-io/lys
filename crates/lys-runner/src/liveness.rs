@@ -50,6 +50,22 @@ struct Seen {
     held: bool,
 }
 
+pub(crate) fn recorded_conversation(
+    source: &crate::tracking_store::SourceState,
+    proxy: Option<&crate::tracking_proxy::ProxyTracking>,
+) -> Option<String> {
+    source
+        .native_conversation
+        .clone()
+        .or_else(|| {
+            (!source.bound.is_empty()
+                && proxy.is_none()
+                && !lys_home::proxy::usage::is_run_key(&source.bound))
+            .then(|| source.bound.clone())
+        })
+        .filter(|conversation| !conversation.is_empty())
+}
+
 fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError> {
     let control = session.live.as_ref().and_then(|live| live.control.as_ref());
     let turn_active = match control {
@@ -69,15 +85,7 @@ fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError>
         None => table
             .feed
             .source(id)
-            .filter(|source| {
-                !source.bound.is_empty()
-                    && session
-                        .guard
-                        .proxy
-                        .as_ref()
-                        .is_none_or(|proxy| proxy.run != source.bound)
-            })
-            .map(|source| source.bound.clone()),
+            .and_then(|source| recorded_conversation(source, session.guard.proxy.as_ref())),
     };
     let output = session.output.lock()?.last_at();
     let held = session.ended.is_none() && session.live.is_some();

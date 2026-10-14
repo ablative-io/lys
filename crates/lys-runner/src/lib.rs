@@ -72,6 +72,7 @@ pub mod pty;
 mod pty_command;
 #[cfg(test)]
 mod pty_command_tests;
+pub mod pty_conversation;
 pub mod published;
 pub mod refusal_log;
 pub mod refusals;

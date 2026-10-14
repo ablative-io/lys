@@ -8,6 +8,10 @@ use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported, Tracked};
 use std::sync::Mutex;
 
+#[cfg(test)]
+#[path = "terminal_tests.rs"]
+mod terminal_tests;
+
 pub(super) fn keep_start(state: &AppState, report: Report) -> Result<Tracked, ServerError> {
     let network = state
         .network
@@ -45,6 +49,7 @@ pub(super) async fn run(
     state: &Arc<AppState>,
     view: Value,
     admitted_by: &str,
+    record_seat: bool,
 ) -> Result<Json<Value>, ServerError> {
     let member = |name: &str| {
         view.get(name)
@@ -59,7 +64,15 @@ pub(super) async fn run(
         .ok_or(ServerError::MachineWithoutRunner)?;
     let mut launch = with_provisioning(state, |store| kept_launch(store, &view))?;
     launch.policy = crate::agent_policy_api::launch_policy(state, &agent)?;
+    let terminal = launch
+        .config
+        .as_ref()
+        .is_some_and(|config| !config.requires_controls && config.harness.is_some());
     let conversation = view.get("conversation").and_then(Value::as_str);
+    fresh_terminal_conversation(&mut launch, conversation)?;
+    if terminal && record_seat {
+        crate::seats_run::check_terminal_seat(state, &agent, &machine, &launch.session).await?;
+    }
     let ran = crate::runner_sessions::run_resuming(
         state,
         (&agent, &machine, admitted_by),
@@ -69,7 +82,30 @@ pub(super) async fn run(
     .await?;
     let mut view = view;
     view["runner"] = ran;
+    if terminal && record_seat {
+        crate::seats_run::remember_started(state, &view, admitted_by).await?;
+    }
     Ok(Json(view))
+}
+
+fn fresh_terminal_conversation(
+    launch: &mut lys_runner::Launch,
+    resume: Option<&str>,
+) -> Result<(), ServerError> {
+    if resume.is_none()
+        && launch.config.as_ref().is_some_and(|config| {
+            !config.requires_controls
+                && config.harness == Some(lys_runner::tracking::Harness::ClaudeCode)
+        })
+    {
+        let conversation = lys_runner::pty_conversation::conversation_uuid(&launch.session)?;
+        launch.arguments = lys_runner::pty_conversation::claude_arguments(
+            &launch.arguments,
+            &conversation,
+            false,
+        )?;
+    }
+    Ok(())
 }
 
 /// A latest reviewed profile is applied only after its whole native launch ran.

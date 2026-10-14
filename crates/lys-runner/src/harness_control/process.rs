@@ -20,7 +20,7 @@ mod qualification;
 
 mod executable;
 pub use executable::executable;
-use executable::report_version;
+pub(crate) use executable::report_version;
 
 mod qualified;
 use qualified::QUALIFIED;

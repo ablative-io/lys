@@ -11,16 +11,21 @@ use serde_json::Value;
 use crate::error::RunnerError;
 use crate::peer::Collected;
 use crate::session::{Sessions, Table, accounts, append, now_ms};
-use crate::tracking::{Harness, Reading};
+use crate::tracking::Reading;
 use crate::tracking_store::{Body, Boundary, Coverage, SourceState};
 
 mod hooks;
+mod notify;
 pub(crate) mod status;
 mod stop;
 
 #[cfg(test)]
 #[path = "../tests/collector_tracking.rs"]
 mod tracking_tests;
+
+#[cfg(test)]
+#[path = "../tests/collector_native/cases.rs"]
+mod native_tests;
 
 #[cfg(test)]
 #[path = "../tests/collector_wire.rs"]
@@ -153,9 +158,12 @@ impl Sessions {
         };
         let source = SourceState {
             path: path.to_owned(),
-            generation: held.map_or(0, |held| held.generation + 1),
+            generation: held.as_ref().map_or(0, |held| held.generation + 1),
             offset,
             bound: bound.to_owned(),
+            native_conversation: held
+                .filter(|held| held.bound == bound)
+                .and_then(|held| held.native_conversation),
             ..SourceState::default()
         };
         let words = format!(
@@ -174,108 +182,6 @@ impl Sessions {
         self.follow(table, id)?;
         Ok(words)
     }
-
-    /// Keep a Codex after-turn notification: bind its thread's rollout the
-    /// first time, read it, then keep the turn's end.
-    fn notified(self: &Arc<Self>, id: &str, notification: &Value) -> Result<String, RunnerError> {
-        if text(notification, "type") != Some("agent-turn-complete") {
-            return Ok("not a turn's end: nothing is kept".to_owned());
-        }
-        let thread = text(notification, "thread-id")
-            .filter(|thread| plain(thread))
-            .ok_or_else(|| {
-                RunnerError::refused("notify_malformed", "the notification names no thread")
-            })?;
-        let turn = text(notification, "turn-id").map(str::to_owned);
-        let lookup = {
-            let table = self.lock()?;
-            let source = table
-                .feed
-                .source(id)
-                .map(|source| (source.generation, source.bound.clone()));
-            let session = table
-                .sessions
-                .get(id)
-                .ok_or_else(|| crate::session::unknown(id))?;
-            let proxied = table
-                .feed
-                .source(id)
-                .is_some_and(|source| session.guard.proxy_source(source).is_some());
-            if proxied || source.as_ref().is_some_and(|(_, bound)| bound == thread) {
-                None
-            } else {
-                let tracking = session
-                    .guard
-                    .tracking
-                    .as_ref()
-                    .filter(|tracking| tracking.harness == Harness::Codex)
-                    .ok_or_else(|| {
-                        RunnerError::refused(
-                            "transcript_unbound",
-                            format!("session {id} is not a tracked Codex session"),
-                        )
-                    })?;
-                Some((
-                    tracking.config_home.clone(),
-                    session.started_at,
-                    session.guard.leader.clone(),
-                    source,
-                ))
-            }
-        };
-        if let Some((home, launched, leader, before)) = lookup {
-            let path = rollout_since(Path::new(&home), thread, launched, now_ms())?
-                .display()
-                .to_string();
-            let mut table = self.lock()?;
-            let session = table
-                .sessions
-                .get(id)
-                .ok_or_else(|| crate::session::unknown(id))?;
-            if session.started_at != launched
-                || session.guard.leader != leader
-                || session
-                    .guard
-                    .tracking
-                    .as_ref()
-                    .is_none_or(|tracking| tracking.config_home != home)
-            {
-                return Err(RunnerError::refused(
-                    "rollout_session_changed",
-                    "the launch changed while locating its rollout",
-                ));
-            }
-            let current = table
-                .feed
-                .source(id)
-                .map(|source| (source.generation, source.bound.clone()));
-            if current.as_ref().is_none_or(|(_, bound)| bound != thread) {
-                if current != before {
-                    return Err(RunnerError::refused(
-                        "source_changed",
-                        "the bound source changed while locating its rollout",
-                    ));
-                }
-                self.bind(&mut table, id, (&path, thread), true)?;
-            }
-        }
-        self.read_source(id, None);
-        let mut table = self.lock()?;
-        flushed_at(&mut table, self.runner(), id, "turn_end", turn)?;
-        if table
-            .sessions
-            .get(id)
-            .is_none_or(|session| session.managed.is_none())
-        {
-            if let Some(session) = table.sessions.get_mut(id) {
-                session.guard.idle = true;
-            }
-            crate::operations::deliver(&mut table, id);
-        }
-        drop(table);
-        self.wake();
-        Ok("the turn's end kept".to_owned())
-    }
 }
 
 /// Keep boundary `name` for session `id`, with the response its stream
@@ -286,7 +192,7 @@ pub(crate) fn flushed(
     id: &str,
     name: &str,
 ) -> Result<(), RunnerError> {
-    flushed_at(table, runner, id, name, None)
+    flushed_at(table, runner, id, name, None, None)
 }
 
 fn flushed_at(
@@ -295,8 +201,21 @@ fn flushed_at(
     id: &str,
     name: &str,
     turn: Option<String>,
+    native_conversation: Option<&str>,
 ) -> Result<(), RunnerError> {
     let mut source = table.feed.source(id).cloned();
+    let mut native_changed = false;
+    if let Some(conversation) = native_conversation {
+        let source = source.as_mut().ok_or_else(|| {
+            RunnerError::refused(
+                "transcript_unbound",
+                "the native conversation has no bound source to keep its identity",
+            )
+        })?;
+        source.check_native_conversation(conversation)?;
+        native_changed = source.native_conversation.as_deref() != Some(conversation);
+        source.native_conversation = Some(conversation.to_owned());
+    }
     let mut bodies = Vec::new();
     if let Some(source) = &mut source {
         if let Some(body) = status::pending(table, id, source)? {
@@ -319,7 +238,11 @@ fn flushed_at(
             }
         }
     }
-    let commit = if bodies.is_empty() { None } else { source };
+    let commit = if bodies.is_empty() && !native_changed {
+        None
+    } else {
+        source
+    };
     bodies.push(boundary(name, turn));
     append(table, id, bodies, commit)?;
     status::clear(table, id);

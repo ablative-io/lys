@@ -209,7 +209,7 @@ mod command_tests {
     use super::command_or_absolute_path;
 
     #[test]
-    fn commands_and_absolute_paths_refuse_invalid_shapes_by_name() {
+    fn commands_and_absolute_paths_refuse_directory_names_and_other_invalid_shapes_by_name() {
         for (name, program) in [
             ("empty", ""),
             ("spaces", "two words"),

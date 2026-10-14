@@ -6,17 +6,26 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 #[test]
-fn an_absolute_fork_keeps_its_declared_symlink_spelling() -> Result<(), Box<dyn std::error::Error>>
-{
+fn an_absolute_fork_keeps_parent_and_leaf_symlink_spelling_for_invocation()
+-> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
-    let binary = directory.path().join("binary");
+    let real = directory.path().join("real");
+    std::fs::create_dir(&real)?;
+    let binary = real.join("binary");
     std::fs::write(&binary, "#!/bin/sh\nexit 0\n")?;
     std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700))?;
-    let fork = directory.path().join("chosen-fork");
-    std::os::unix::fs::symlink(binary, &fork)?;
+    std::os::unix::fs::symlink("binary", real.join("chosen-fork"))?;
+    let declared = directory.path().join("declared");
+    std::os::unix::fs::symlink(&real, &declared)?;
+    let fork = declared.join("chosen-fork");
+    assert_ne!(fork, fork.canonicalize()?);
     assert_eq!(
         super::selected(fork.to_str().ok_or("path is not text")?, &BTreeMap::new())?,
         fork
+    );
+    assert_eq!(
+        Path::new(&super::executable(&fork)?.path),
+        binary.canonicalize()?
     );
     Ok(())
 }

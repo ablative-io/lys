@@ -13,6 +13,9 @@
 //!   `/type` `{operation, text}`, `/attach` `{cursor?, follow?}`: in
 //!   `seats_run.rs` and `seats_send.rs`
 //!
+//! Ordinary terminal starts resume the seat's recorded native conversation
+//! in its recorded working folder. Restart selects a fresh conversation.
+//!
 //! A seat is added by the administrator or the person responsible for its
 //! agent, as that agent's start command is given. Its agent must be held
 //! by the directory, its profile version reviewed and declaring a harness,

@@ -149,43 +149,6 @@ fn an_expired_managed_event_cursor_names_the_coverage_gap() -> Result {
     Ok(())
 }
 #[test]
-fn a_known_adapter_reaches_entry_proof_instead_of_refusing_its_newer_version() -> Result {
-    use lys_runner::harness_control::{ManagedLaunch, Transport};
-    use std::os::unix::fs::PermissionsExt;
-    with_sessions(|sessions, directory| {
-        let executable = directory.join("fixture-harness");
-        let marker = directory.join("executed");
-        std::fs::write(
-            &executable,
-            "#!/bin/sh\nif [ \"$1\" = --version ]; then printf '%8192s' ''; echo 'fixture-harness 9.8.7'; exit 0; fi\nprintf executed > executed\n",
-        )?;
-        std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))?;
-        let mut managed = launch();
-        managed.directory = directory.display().to_string();
-        managed.program = executable.display().to_string();
-        managed.arguments.clear();
-        let error = sessions
-            .start_managed(
-                ManagedLaunch {
-                    resume: false,
-                    launch: managed,
-                    transport: Transport::Claude,
-                    conversation: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
-                    requires_controls: true,
-                    owner: None,
-                },
-                None,
-                None,
-            )
-            .err()
-            .ok_or("the integration test executable supplied entry proof")?;
-        assert_eq!(error.name(), "control_frame_invalid");
-        assert!(!marker.exists());
-        Ok(())
-    })
-}
-
-#[test]
 fn a_large_harness_output_frame_is_read_whole() -> Result {
     let text = "image-data".repeat(200_000);
     let frame = serde_json::json!({"type":"user","message":{"content":text}});

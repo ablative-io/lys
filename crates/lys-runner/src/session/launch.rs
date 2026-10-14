@@ -77,6 +77,9 @@ impl Sessions {
             .transpose()?;
         let harness = launch.config.as_ref().and_then(|config| config.harness);
         crate::launch_config::prepare(&self.state_dir, &mut launch)?;
+        if managed.is_none() {
+            crate::pty_conversation::prepare(&mut launch)?;
+        }
         self.status_line_named(&mut launch);
         super::notify_named(&mut launch)?;
         let id = launch.session.clone();

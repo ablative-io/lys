@@ -4,6 +4,73 @@ use super::qualification::{Candidate, admit};
 use std::os::unix::fs::PermissionsExt;
 
 #[test]
+fn a_known_adapter_reaches_entry_proof_with_a_startup_reading_fixture_instead_of_refusing_its_newer_version()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crate::harness_control::{ManagedLaunch, Transport};
+
+    let directory = tempfile::tempdir()?;
+    let executable = directory.path().join("fixture-harness");
+    let marker = directory.path().join("executed");
+    std::fs::write(
+        &executable,
+        "#!/bin/sh\nif [ \"$1\" = --version ]; then printf '%8192s' ''; echo 'fixture-harness 9.8.7'; exit 0; fi\nprintf executed > executed\n",
+    )?;
+    std::fs::set_permissions(&executable, std::fs::Permissions::from_mode(0o700))?;
+    let entry = directory.path().join("malformed-entry");
+    std::fs::write(
+        &entry,
+        "#!/bin/sh\nIFS= read -r startup || exit 2\nprintf 'not-json\\n' || exit 3\nIFS= read -r permission\n",
+    )?;
+    std::fs::set_permissions(&entry, std::fs::Permissions::from_mode(0o700))?;
+    let admission = admit(Candidate {
+        adapter: "claude-stream-json/1",
+        version: "2.1.296",
+        entry,
+    })?;
+    assert!(!super::qualification::approved(
+        "claude-stream-json/1",
+        "9.8.7"
+    )?);
+    let managed = crate::Launch {
+        session: "newer-version-entry".to_owned(),
+        program: executable.display().to_string(),
+        arguments: Vec::new(),
+        directory: directory.path().display().to_string(),
+        environment: std::collections::BTreeMap::new(),
+        config: None,
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    };
+    let sessions = crate::Sessions::open(directory.path(), 4096)?;
+    let result: Result<(), Box<dyn std::error::Error>> = (|| {
+        let error = sessions
+            .start_managed(
+                ManagedLaunch {
+                    resume: false,
+                    launch: managed,
+                    transport: Transport::Claude,
+                    conversation: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
+                    requires_controls: true,
+                    owner: None,
+                },
+                None,
+                None,
+            )
+            .err()
+            .ok_or("the malformed entry fixture supplied entry proof")?;
+        assert_eq!(error.name(), "control_frame_invalid");
+        assert!(!marker.exists());
+        Ok(())
+    })();
+    let stopped = sessions.stop_all();
+    drop(admission);
+    stopped?;
+    result
+}
+
+#[test]
 fn a_newer_claude_starts_and_its_start_answer_names_both_versions()
 -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;

@@ -64,7 +64,7 @@ pub fn executable(path: &Path) -> Result<Executable, RunnerError> {
     })
 }
 
-pub(super) fn report_version(
+pub(crate) fn report_version(
     program: &Path,
     environment: &BTreeMap<String, String>,
 ) -> Result<(std::process::ExitStatus, Vec<u8>), RunnerError> {

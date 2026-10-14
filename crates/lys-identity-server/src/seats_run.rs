@@ -10,7 +10,6 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{OriginalUri, Path, State};
 use axum::http::HeaderMap;
 use lys_identity::{AgentId, OperationId};
-use lys_runner::operations::{Operation, OperationRequest};
 use lys_runner::{Act, Answer};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -22,9 +21,16 @@ use crate::routes::{AppState, hex};
 use crate::runner_sessions::{driven, ended_in, kind};
 use crate::seats_acts::{RESTART, START, STOP, Standing, act, admitted, live_session};
 use crate::seats_api::{body, seat, shown, with_seats};
-use crate::seats_state::{Line, Seat, Started, Stopped};
+use crate::seats_state::{Line, Seat, Started};
 use crate::seats_views::{SeatRestarted, SeatStartBody, SeatStarted, SeatStopBody, SeatStopped};
 use crate::session::now;
+
+mod agent;
+pub(crate) use agent::{check_terminal_seat, remember_started, start_from_agent};
+mod conversation;
+mod selection;
+mod stop;
+use stop::{harness_session, request_end};
 
 /// A seat's session started, as the start answers it.
 struct Begun {
@@ -61,7 +67,7 @@ pub(crate) async fn start(
         (&held, &standing),
         &admission.caller,
         &given.operation,
-        given.conversation,
+        (given.conversation, false, None),
     ))
     .await?;
     let held = seat(&state, &name)?;
@@ -138,7 +144,7 @@ pub(crate) async fn restart(
         (&held, &standing),
         &admission.caller,
         &part(&given.operation, "start"),
-        None,
+        (None, true, None),
     ))
     .await?;
     notes.extend(begun.notes);
@@ -166,7 +172,7 @@ async fn begin(
     (held, standing): (&Seat, &Standing),
     caller: &str,
     operation: &str,
-    conversation: Option<String>,
+    (conversation, fresh, directory): (Option<String>, bool, Option<String>),
 ) -> Result<Begun, ServerError> {
     let name = held.added.name.clone();
     if standing.responsible.is_none() {
@@ -192,10 +198,20 @@ async fn begin(
         "pty"
     }
     .to_owned();
+    let selected = selection::choose(
+        state,
+        held,
+        &version,
+        operation,
+        conversation.as_deref(),
+        fresh,
+        directory,
+    )
+    .await?;
     let chosen = Chosen {
         profile: Some(version),
-        directory: held.added.working_folder.clone(),
-        conversation,
+        directory: selected.directory,
+        conversation: selected.resume,
     };
     let Json(start) = Box::pin(start_as(
         state,
@@ -213,7 +229,33 @@ async fn begin(
         .ok_or_else(|| ServerError::LaunchUnrenderable {
             reason: "the kept start names no session".to_owned(),
         })?;
-    let harness_session = harness_session(state, &held.added.machine, &session, &mut notes).await;
+    let observed = harness_session(state, &held.added.machine, &session, &mut notes).await;
+    if let (Some(expected), Some(observed)) = (&selected.expected, &observed)
+        && expected != observed
+    {
+        let launched = driven(state, &session)?;
+        let (answer, _) = act(
+            state,
+            (&launched, caller, "seat_start_refused"),
+            None,
+            Act::End {
+                session: session.clone(),
+            },
+        )
+        .await?;
+        if !matches!(answer, Answer::Ended { .. }) {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: format!("ending a mismatched seat start answered {}", kind(&answer)),
+            });
+        }
+        return Err(lys_runner::RunnerError::refused(
+            "pty_conversation_mismatch",
+            "the runner reported another native conversation and the new process was ended; choose Start again",
+        )
+        .into());
+    }
+    let harness_session = selected.expected.or(observed);
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
             qualification: start["qualification"].as_str().map(str::to_owned),
@@ -301,16 +343,7 @@ async fn end(
             words: "the seat stop answered without the process exit".to_owned(),
         });
     }
-    with_seats(state, |store| {
-        store.keep(Line::Stopped(Stopped {
-            operation: operation.to_owned(),
-            name,
-            session: session.clone(),
-            forced: force,
-            by: caller.to_owned(),
-            at: now(),
-        }))
-    })?;
+    stop::remember_end(state, held, caller, operation, force, &mut notes).await?;
     Ok(StopAnswer {
         session,
         ended,
@@ -359,7 +392,7 @@ mod tests {
             (&held, &standing),
             "person",
             "op-seatfix",
-            None,
+            (None, false, None),
         )
         .await
         .err()
@@ -420,88 +453,4 @@ async fn ready_start(
         .into());
     }
     Ok(())
-}
-
-async fn request_end(
-    state: &Arc<AppState>,
-    driven: &crate::runner_sessions::Driven,
-    (name, session, caller, operation): (&str, &str, &str, &str),
-    notes: &mut Vec<String>,
-) -> Result<bool, ServerError> {
-    let mut ended = false;
-    let live = live_session(state, &driven.machine, session).await?;
-    match &live {
-        Some(live) if live.alive && !live.ended => {
-            if live.turn_active {
-                return Err(SeatError::TurnInProgress {
-                    name: name.to_owned(),
-                    session: session.to_owned(),
-                }
-                .into());
-            }
-            if live.managed {
-                let stop = Act::Operate {
-                    operation: Operation {
-                        operation: operation.to_owned(),
-                        session: session.to_owned(),
-                        request: OperationRequest::Stop,
-                    },
-                };
-                let (answer, _) = act(state, (driven, caller, "seat_stop"), None, stop).await?;
-                if let Answer::Operation { outcome } = &answer
-                    && outcome.ended.is_some()
-                {
-                    ended = true;
-                    notes.push("the harness's own end request ended the session".to_owned());
-                } else {
-                    notes.push(format!(
-                        "the harness was asked to end the session ({})",
-                        kind(&answer)
-                    ));
-                }
-            } else {
-                let (exited, receipt) =
-                    crate::seats_monitor::stop_pty(state, driven, caller, operation).await?;
-                ended = exited;
-                notes.extend(receipt);
-            }
-        }
-        Some(_) | None => {
-            ended = true;
-            notes.push("the runner already holds the session ended".to_owned());
-        }
-    }
-    Ok(ended)
-}
-
-async fn harness_session(
-    state: &Arc<AppState>,
-    machine: &str,
-    session: &str,
-    notes: &mut Vec<String>,
-) -> Option<String> {
-    match live_session(state, machine, session).await {
-        Ok(Some(live)) => {
-            notes.push(format!(
-                "the runner reports transport={} for session {session}",
-                if live.managed { "managed" } else { "pty" }
-            ));
-            if live.harness_session.is_none() {
-                notes.push(format!(
-                    "the runner has not yet seen the harness name its own session for {session}"
-                ));
-            }
-            live.harness_session
-        }
-        Ok(None) => {
-            notes.push(format!("the runner holds no session {session} to read"));
-            None
-        }
-        Err(refused) => {
-            notes.push(format!(
-                "the harness's own session id for {session} is not known: {refused}"
-            ));
-            None
-        }
-    }
 }

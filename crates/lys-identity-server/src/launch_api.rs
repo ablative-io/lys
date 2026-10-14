@@ -40,6 +40,7 @@
 mod kept;
 pub use kept::kept_launch;
 
+mod ordinary;
 mod runner;
 pub(crate) use runner::enforced;
 #[cfg(test)]
@@ -107,6 +108,9 @@ pub struct StartCommandView {
     /// An existing harness conversation selected by a seat start.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<String>,
+    /// The native terminal conversation selected before launch, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub native_conversation: Option<String>,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -141,11 +145,25 @@ async fn start_command(
     }) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let chosen = Chosen {
-        profile: None,
-        directory,
-        conversation: None,
-    };
+    let directory = directory
+        .map(|given| crate::provisioning_api::folder("directory", given))
+        .transpose()?;
+    OperationId::from_str(&operation)?;
+    start_caller(&state, &headers, &actor, &agent.to_string())?;
+    if let Some(start) = crate::seats_run::start_from_agent(
+        &state,
+        &headers,
+        &agent.to_string(),
+        &machine,
+        &operation,
+        directory.as_deref(),
+    )
+    .await?
+    {
+        return Ok(Json(start));
+    }
+    let chosen =
+        ordinary::chosen(&state, &agent.to_string(), &machine, &operation, directory).await?;
     start_profile(
         &state, &headers, &actor, agent, &machine, &operation, chosen,
     )
@@ -241,6 +259,7 @@ pub(crate) async fn start_as(
         .transpose()?;
     let session = OperationId::from_str(operation)?.to_string();
     let agent = agent.to_string();
+    let record_seat = matches!(&who, Who::Caller(_));
     let admitted_by = match who {
         Who::Caller(actor) => start_caller(state, headers, actor, &agent)?,
         Who::Admitted(by) => by,
@@ -251,7 +270,7 @@ pub(crate) async fn start_as(
             if kept.get("conversation").and_then(Value::as_str) != conversation.as_deref() {
                 return Err(ServerError::RuntimeReportReused { operation: session });
             }
-            return run(state, kept, &admitted_by).await;
+            return run(state, kept, &admitted_by, record_seat).await;
         }
         Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
     };
@@ -283,6 +302,23 @@ pub(crate) async fn start_as(
         },
         &handles,
     )?;
+    let native_conversation = if crate::launch_template::requires_controls(&version) {
+        None
+    } else {
+        match version
+            .settings
+            .harness
+            .as_ref()
+            .and_then(crate::launch_template::runner_harness)
+        {
+            Some(lys_runner::tracking::Harness::ClaudeCode) => Some(match &conversation {
+                Some(conversation) => conversation.clone(),
+                None => lys_runner::pty_conversation::conversation_uuid(&session)?,
+            }),
+            Some(lys_runner::tracking::Harness::Codex) => conversation.clone(),
+            None => None,
+        }
+    };
     let view = serde_json::to_value(StartCommandView {
         agent: agent.clone(),
         machine: machine.to_owned(),
@@ -298,6 +334,7 @@ pub(crate) async fn start_as(
         left_out: Vec::new(),
         executed: false,
         conversation,
+        native_conversation,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
@@ -322,7 +359,7 @@ pub(crate) async fn start_as(
         .first()
         .and_then(|first| first.launch.clone())
         .ok_or(ServerError::RuntimeReportReused { operation: session })?;
-    let result = run(state, kept, &admitted_by).await;
+    let result = run(state, kept, &admitted_by, record_seat).await;
     drop(pending);
     result
 }

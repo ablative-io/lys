@@ -37,6 +37,11 @@ impl Sessions {
                 format!("the collector keeps no hook {event}"),
             ));
         }
+        if event == "SessionStart"
+            && let Some(words) = self.proxy_claude_start(id, input)?
+        {
+            return Ok(words);
+        }
         let untracked = self.hook_untracked(id, event)?;
         let words = match event {
             "SessionStart" if untracked => {
@@ -76,6 +81,85 @@ impl Sessions {
         } else {
             words
         })
+    }
+
+    fn proxy_claude_start(
+        self: &Arc<Self>,
+        id: &str,
+        input: &Value,
+    ) -> Result<Option<String>, RunnerError> {
+        let mut table = self.lock()?;
+        let session = table
+            .sessions
+            .get(id)
+            .ok_or_else(|| crate::session::unknown(id))?;
+        let Some(proxy) = session.guard.proxy.as_ref() else {
+            return Ok(None);
+        };
+        let claude = text(input, "session_id").ok_or_else(|| {
+            RunnerError::refused("hook_malformed", "SessionStart names no native Claude UUID")
+        })?;
+        crate::harness_control::Transport::Claude
+            .validate_resume(claude)
+            .map_err(|error| {
+                RunnerError::refused(
+                    "hook_malformed",
+                    format!("SessionStart names an invalid native Claude UUID: {error}"),
+                )
+            })?;
+        if session
+            .guard
+            .tracking
+            .as_ref()
+            .is_some_and(|tracking| tracking.harness != Harness::ClaudeCode)
+        {
+            return Err(RunnerError::refused(
+                "hook_malformed",
+                "a Claude SessionStart cannot bind another harness's native conversation",
+            ));
+        }
+        if let Some(managed) = &session.managed {
+            if managed.transport != crate::harness_control::Transport::Claude
+                || managed.conversation != claude
+            {
+                return Err(RunnerError::refused(
+                    "native_conversation_changed",
+                    "SessionStart differs from the managed Claude conversation",
+                ));
+            }
+        } else if let Some(launch) = &session.launch
+            && let Some(expected) = declared_claude_identity(&launch.arguments)?
+            && expected != claude
+        {
+            return Err(RunnerError::refused(
+                "native_conversation_changed",
+                "SessionStart differs from the native Claude UUID declared by the launch",
+            ));
+        }
+        let mut source = table.feed.source(id).cloned().ok_or_else(|| {
+            RunnerError::refused(
+                "transcript_unbound",
+                "the proxied Claude session has no bound accounting source",
+            )
+        })?;
+        if source.bound != proxy.run {
+            return Err(RunnerError::refused(
+                "transcript_unbound",
+                "the proxied Claude session's source no longer names its proxy run",
+            ));
+        }
+        source.check_native_conversation(claude)?;
+        source.native_conversation = Some(claude.to_owned());
+        append(
+            &mut table,
+            id,
+            vec![boundary("session_start", None)],
+            Some(source),
+        )?;
+        Ok(Some(
+            "native Claude session start kept beside the unchanged proxy accounting source"
+                .to_owned(),
+        ))
     }
 
     fn hook_untracked(&self, id: &str, event: &str) -> Result<bool, RunnerError> {
@@ -193,6 +277,44 @@ impl Sessions {
         }
         self.bind(&mut table, id, (given, claude), false)
     }
+}
+
+fn declared_claude_identity(arguments: &[String]) -> Result<Option<&str>, RunnerError> {
+    let mut expected = None;
+    for (at, argument) in arguments.iter().enumerate() {
+        let (flag, attached) = argument
+            .split_once('=')
+            .map_or((argument.as_str(), None), |(flag, value)| {
+                (flag, Some(value))
+            });
+        if !matches!(flag, "--session-id" | "--resume" | "-r") {
+            continue;
+        }
+        if expected.is_some() {
+            return Err(RunnerError::refused(
+                "hook_malformed",
+                "the Claude launch declares more than one native conversation",
+            ));
+        }
+        let conversation = attached
+            .or_else(|| arguments.get(at + 1).map(String::as_str))
+            .ok_or_else(|| {
+                RunnerError::refused(
+                    "hook_malformed",
+                    "the Claude launch's identity flag names no UUID",
+                )
+            })?;
+        crate::harness_control::Transport::Claude
+            .validate_resume(conversation)
+            .map_err(|error| {
+                RunnerError::refused(
+                    "hook_malformed",
+                    format!("the Claude launch declares an invalid native UUID: {error}"),
+                )
+            })?;
+        expected = Some(conversation);
+    }
+    Ok(expected)
 }
 
 fn observe(table: &mut Table, id: &str, state: &str, words: String) -> Result<(), RunnerError> {

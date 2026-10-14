@@ -28,6 +28,10 @@ use crate::error::ServerError;
 use crate::error_seat::SeatError;
 use crate::seats_state::{DOMAIN, Held, Line, Seat};
 
+mod batch;
+#[cfg(test)]
+mod batch_tests;
+
 /// How the leaf store is opened again after an append whose outcome is not known.
 pub type Reopen<S> = Box<dyn Fn() -> StoreResult<S> + Send>;
 
@@ -213,6 +217,15 @@ impl<S: LeafStore> SeatStore<S> {
             })
     }
 
+    /// The latest session's native conversation, retained after a stop.
+    /// An unknown id stays unknown; an earlier session's id is never reused.
+    ///
+    /// # Errors
+    /// Refuses a name for which no unretired seat is retained.
+    pub fn remembered_conversation(&self, name: &str) -> Result<Option<String>, ServerError> {
+        Ok(self.named(name)?.harness_session)
+    }
+
     /// The line kept under `operation`.
     pub fn recorded(&self, operation: &str) -> Option<&Line> {
         self.held.operation(operation)
@@ -238,42 +251,15 @@ impl<S: LeafStore> SeatStore<S> {
             }
             .into());
         }
-        if matches!(line, Line::Added(_))
-            && self
-                .held
-                .seat(line.name())
-                .is_some_and(|seat| !seat.retired)
-        {
-            return Err(SeatError::NameTaken {
-                name: line.name().to_owned(),
-            }
-            .into());
-        }
-        if !matches!(line, Line::Added(_))
-            && self.held.seat(line.name()).is_none_or(|seat| seat.retired)
-        {
-            return Err(SeatError::Unknown {
-                name: line.name().to_owned(),
-            }
-            .into());
-        }
-        if matches!(line, Line::Moved(_) | Line::Retired(_))
-            && let Some(seat) = self.held.seat(line.name()).filter(|seat| seat.running)
-        {
-            let session = seat
-                .session
-                .clone()
-                .ok_or_else(|| unavailable("a running seat names no session"))?;
-            return Err(SeatError::Running {
-                name: line.name().to_owned(),
-                session,
-            }
-            .into());
-        }
+        batch::checked(&self.held, &line)?;
         self.append(line.clone())?;
         Ok(line)
     }
 }
+
+#[cfg(test)]
+#[path = "seats_store_conversation_tests.rs"]
+mod conversation_tests;
 
 /// Open the log from its snapshot, or from every leaf when the snapshot or
 /// its state is refused, and fold what the start hands back.
