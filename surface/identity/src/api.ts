@@ -176,13 +176,30 @@ export function useLoad<T>(read: () => Promise<T>, key: string): Load<T> {
   useEffect(() => {
     let live = true;
     setState({ status: 'loading' });
-    read().then(
-      (data) => live && setState({ status: 'ok', data }),
-      (error: unknown) => live && setState({ status: 'refused', refused: asRefused(error) }),
-    );
-    return () => {
-      live = false;
+    let reading = false;
+    let again = false;
+    let unsubscribe: (() => void) | null = null;
+    const once = async () => {
+      if (reading) { again = true; return; }
+      reading = true;
+      try {
+        const data = await read();
+        if (live) { setState({ status: 'ok', data }); unsubscribe?.(); unsubscribe = null; }
+      } catch (error) {
+        if (live) {
+          const refused = asRefused(error);
+          setState({ status: 'refused', refused });
+          if (!unsubscribe && (refused.status >= 500 || refused.refusal.refusal === 'ServiceUnreachable')) {
+            unsubscribe = subscribeChanges(() => { void once(); }, () => undefined);
+          }
+        }
+      } finally {
+        reading = false;
+        if (live && again) { again = false; void once(); }
+      }
     };
+    void once();
+    return () => { live = false; unsubscribe?.(); };
   }, [key]);
   return state;
 }
