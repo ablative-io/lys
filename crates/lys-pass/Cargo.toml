@@ -1,7 +1,7 @@
 [package]
 name = "lys-pass"
 description = "Lys pass verification, live permission checks and product draft execution"
-version = "0.3.2"
+version = "0.3.3"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
