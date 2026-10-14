@@ -201,10 +201,31 @@ pub(super) fn preflight(launch: &Launch) -> Result<(), RunnerError> {
 
 /// A fresh start remains available even when native resume has no reviewed proof.
 pub(super) fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
-    preflight(launch)?;
+    match preflight(launch) {
+        Ok(()) => {}
+        Err(error) if error.name() == "pty_resume_missing" => {
+            let at = launch
+                .arguments
+                .iter()
+                .position(|argument| argument == "resume")
+                .ok_or_else(|| {
+                    super::resume_refused(
+                        "pty_resume_arguments_invalid",
+                        "the missing transcript has no explicit resume argument",
+                    )
+                })?;
+            launch.arguments.truncate(at);
+            super::missing::mark(launch);
+        }
+        Err(error) => return Err(error),
+    }
     if requested(&launch.arguments)?.is_none()
         && let Some(note) = version::fresh_note(launch)?
     {
+        let note = launch
+            .environment
+            .get("LYS_PTY_STATUS_NOTE")
+            .map_or_else(|| note.clone(), |earlier| format!("{earlier}; {note}"));
         launch
             .environment
             .insert("LYS_PTY_STATUS_NOTE".to_owned(), note);

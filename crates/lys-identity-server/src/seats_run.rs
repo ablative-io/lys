@@ -229,8 +229,13 @@ async fn begin(
         .ok_or_else(|| ServerError::LaunchUnrenderable {
             reason: "the kept start names no session".to_owned(),
         })?;
+    let expected = if start["runner"]["started_fresh"].as_bool() == Some(true) {
+        start["native_conversation"].as_str().map(str::to_owned)
+    } else {
+        selected.expected
+    };
     let observed = harness_session(state, &held.added.machine, &session, &mut notes).await;
-    if let (Some(expected), Some(observed)) = (&selected.expected, &observed)
+    if let (Some(expected), Some(observed)) = (&expected, &observed)
         && expected != observed
     {
         let launched = driven(state, &session)?;
@@ -255,7 +260,7 @@ async fn begin(
         )
         .into());
     }
-    let harness_session = selected.expected.or(observed);
+    let harness_session = expected.or(observed);
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
             qualification: start["qualification"].as_str().map(str::to_owned),

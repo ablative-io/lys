@@ -37,10 +37,10 @@ fn tracked(session: &str, agent: Option<&str>, machine: &str, launch: Option<Val
             session: session.to_owned(),
             agent: agent.map(str::to_owned),
             machine: machine.to_owned(),
-            state: Reported::Starting,
-            what: String::new(),
+            state: Reported::Running,
+            what: "the runner started process 42".to_owned(),
             confirmation: String::new(),
-            reported_by: "person".to_owned(),
+            reported_by: format!("the runner of machine {machine}"),
             at: 1,
             launch,
         }],
@@ -307,6 +307,19 @@ fn no_known_conversation_uses_the_new_folder_instead_of_refusing_an_old_folder_c
         Some(view("claude-code")),
     );
     let chosen = prior(&held, Harness::ClaudeCode, Some(CURRENT_FOLDER))?;
+    assert_eq!(chosen.native, None);
+    assert_eq!(chosen.directory, None);
+    Ok(())
+}
+
+#[test]
+fn an_admitted_uuid_is_not_a_remembered_conversation_until_the_runner_started_the_child() -> Result
+{
+    let mut launch = view("claude-code");
+    launch["native_conversation"] = json!(UUID);
+    let mut held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(launch));
+    held.reports[0].state = Reported::Starting;
+    let chosen = prior(&held, Harness::ClaudeCode, None)?;
     assert_eq!(chosen.native, None);
     assert_eq!(chosen.directory, None);
     Ok(())

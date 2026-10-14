@@ -80,8 +80,29 @@ pub(crate) async fn run(
         conversation,
     )
     .await?;
+    let session = member("session")?;
     let mut view = view;
     view["runner"] = ran;
+    if terminal
+        && let Some(live) = crate::seats_acts::live_session(state, &machine, &session).await?
+    {
+        if let Some(native) = &live.harness_session {
+            match view.get("harness").and_then(Value::as_str) {
+                Some("claude-code") => {
+                    lys_runner::harness_control::Transport::Claude.validate_resume(native)?
+                }
+                Some("codex") => {
+                    lys_runner::harness_control::Transport::Codex.validate_resume(native)?
+                }
+                _ => {}
+            }
+        }
+        if live.started_fresh {
+            view["conversation"] = Value::Null;
+            view["native_conversation"] = serde_json::json!(live.harness_session);
+            view["runner"]["started_fresh"] = Value::Bool(true);
+        }
+    }
     if terminal && record_seat {
         crate::seats_run::remember_started(state, &view, admitted_by).await?;
     }

@@ -8,7 +8,10 @@ use rustix::fs::{Mode, OFlags, open};
 use serde::Deserialize;
 
 use crate::error::RunnerError;
+
+mod missing;
 use crate::protocol::Launch;
+pub(crate) use missing::{fresh_native, started_fresh};
 
 mod codex;
 mod restart;
@@ -266,8 +269,16 @@ pub fn preflight_claude_resume(
     conversation: &str,
 ) -> Result<PathBuf, RunnerError> {
     let (path, directory) = transcript_path(launch, conversation)?;
-    let file = transcript_file(&path)?;
-    verify_metadata(BufReader::new(file), &directory, conversation)?;
+    let inspected = || {
+        let file = transcript_file(&path)?;
+        verify_metadata(BufReader::new(file), &directory, conversation)
+    };
+    inspected().map_err(|error| {
+        RunnerError::refused(
+            &error.name(),
+            format!("{error}; transcript path {}", path.display()),
+        )
+    })?;
     Ok(path)
 }
 
@@ -287,7 +298,12 @@ fn transcript_file(path: &Path) -> Result<File, RunnerError> {
             } else {
                 "pty_resume_unreadable"
             },
-            format!("the requested native transcript cannot be opened: {error}"),
+            if error.kind() == std::io::ErrorKind::NotFound {
+                "the earlier conversation's transcript is gone; Start again begins a new one"
+                    .to_owned()
+            } else {
+                format!("the requested native transcript cannot be opened: {error}")
+            },
         )
     })?;
     let metadata = file.metadata().map_err(|error| {
@@ -399,7 +415,7 @@ pub fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
     }
     let expected = conversation_uuid(&launch.session)?;
     if claude_resume(&launch.arguments)?.is_some() {
-        return preflight(launch);
+        return missing::claude(launch, &expected);
     }
     let mut identity = None;
     for (at, argument) in launch.arguments.iter().enumerate() {

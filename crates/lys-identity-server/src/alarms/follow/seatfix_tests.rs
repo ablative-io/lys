@@ -142,6 +142,7 @@ async fn reconcile_phantoms(evidence: Evidence, starting_only: bool) -> Result<(
                             alive: true,
                             managed: false,
                             harness_session: None,
+                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: Some(1_000),
                             started_at: 1_000,

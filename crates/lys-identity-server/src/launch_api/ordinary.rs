@@ -104,10 +104,18 @@ fn prior(
     requested: Option<&str>,
 ) -> Result<Prior, ServerError> {
     let view = tracked.first().and_then(|first| first.launch.as_ref());
-    let native = view
-        .map(|view| saved_native(view, harness))
-        .transpose()?
-        .flatten();
+    let started = tracked.reports.iter().any(|report| {
+        report.state == crate::runtime_state::Reported::Running
+            && report.reported_by == format!("the runner of machine {}", tracked.machine)
+            && report.what.starts_with("the runner started process ")
+    });
+    let native = if started {
+        view.map(|view| saved_native(view, harness))
+            .transpose()?
+            .flatten()
+    } else {
+        None
+    };
     let directory = if native.is_some() {
         let view =
             view.ok_or_else(|| refused("the previous conversation has no recorded launch"))?;
@@ -211,12 +219,10 @@ pub(super) async fn chosen(
             conversation: None,
         });
     };
-    let native = match prior.native {
-        Some(native) => Some(native),
-        None => crate::seats_acts::live_session(state, machine, &prior.session)
-            .await?
-            .and_then(|live| live.harness_session),
-    };
+    let native = crate::seats_acts::live_session(state, machine, &prior.session)
+        .await?
+        .and_then(|live| live.harness_session)
+        .or(prior.native);
     let native = known_native(harness, native)?;
     let directory = if native.is_some() {
         match prior.directory {

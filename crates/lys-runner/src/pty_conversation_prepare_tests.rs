@@ -139,10 +139,21 @@ fn native_resume_is_preflighted_and_preserved_without_becoming_a_fresh_operation
         .arguments
         .extend(["--resume".to_owned(), UUID.to_owned()]);
     let before = prepared.clone();
-    let missing = prepare(&mut prepared).unwrap_err();
-    assert_eq!(missing.name(), "pty_resume_missing", "{missing}");
-    assert!(missing.to_string().contains("Start again"), "{missing}");
-    assert_eq!(prepared, before);
+    prepare(&mut prepared)?;
+    assert!(
+        prepared
+            .arguments
+            .iter()
+            .any(|argument| argument == "--session-id")
+    );
+    assert_eq!(
+        prepared
+            .environment
+            .get("LYS_PTY_STATUS_NOTE")
+            .map(String::as_str),
+        Some("the earlier conversation left no transcript; started a new one")
+    );
+    prepared = before.clone();
     let metadata = json!({"sessionId": UUID, "cwd": cwd_text});
     std::fs::write(transcript, format!("{metadata}\n"))?;
     prepare(&mut prepared)?;
@@ -162,7 +173,8 @@ fn generic_non_operation_runner_sessions_keep_their_terminal_arguments() -> Test
 }
 
 #[test]
-fn an_undeclared_harness_or_fresh_codex_terminal_gets_no_guessed_conversation_flag() -> TestResult {
+fn an_undeclared_harness_keeps_its_launch_and_fresh_codex_names_unproved_resume_without_guessing_an_id()
+-> TestResult {
     for harness in [None, Some(Harness::Codex)] {
         let mut prepared = launch();
         prepared
@@ -172,6 +184,15 @@ fn an_undeclared_harness_or_fresh_codex_terminal_gets_no_guessed_conversation_fl
             .harness = harness;
         let before = prepared.clone();
         prepare(&mut prepared)?;
+        if harness == Some(Harness::Codex) {
+            assert!(
+                prepared
+                    .environment
+                    .get("LYS_PTY_STATUS_NOTE")
+                    .is_some_and(|note| note.starts_with("resume not proven for codex "))
+            );
+            prepared.environment.remove("LYS_PTY_STATUS_NOTE");
+        }
         assert_eq!(prepared, before);
     }
     Ok(())
@@ -197,4 +218,34 @@ fn invalid_operation_ids_and_fresh_continue_fork_or_no_persistence_flags_are_ref
         assert_eq!(error.name(), refusal, "{error}");
         assert_eq!(prepared, before);
     }
+}
+
+#[test]
+fn a_known_conversation_without_a_transcript_starts_fresh_and_names_the_lost_history() -> TestResult
+{
+    let directory = tempfile::tempdir()?;
+    let cwd = directory.path().canonicalize()?;
+    let mut prepared = launch();
+    prepared.directory = cwd.display().to_string();
+    prepared.environment.insert(
+        "CLAUDE_CONFIG_DIR".to_owned(),
+        cwd.join("claude-config").display().to_string(),
+    );
+    prepared.arguments.extend([
+        "--resume".to_owned(),
+        "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
+    ]);
+    prepare(&mut prepared)?;
+    assert_eq!(
+        prepared.arguments,
+        ["--model", "chosen", "--session-id", UUID]
+    );
+    assert_eq!(
+        prepared
+            .environment
+            .get("LYS_PTY_STATUS_NOTE")
+            .map(String::as_str),
+        Some("the earlier conversation left no transcript; started a new one")
+    );
+    Ok(())
 }

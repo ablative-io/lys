@@ -32,6 +32,9 @@ pub struct LivenessView {
     /// The harness's own session it is bound to: the managed conversation
     /// once the harness proved it, or the session a `SessionStart` hook bound.
     pub harness_session: Option<String>,
+    /// The runner started a fresh conversation because the selected transcript was absent.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub started_fresh: bool,
     /// Whether a turn is in progress: a managed turn reserved or active, or
     /// a terminal session whose harness began a turn and has not stopped.
     pub turn_active: bool,
@@ -87,6 +90,19 @@ fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError>
             .source(id)
             .and_then(|source| recorded_conversation(source, session.guard.proxy.as_ref())),
     };
+    let harness_session = match harness_session {
+        Some(id) => Some(id),
+        None => session
+            .launch
+            .as_ref()
+            .map(crate::pty_conversation::fresh_native)
+            .transpose()?
+            .flatten(),
+    };
+    let started_fresh = session
+        .launch
+        .as_ref()
+        .is_some_and(crate::pty_conversation::started_fresh);
     let output = session.output.lock()?.last_at();
     let held = session.ended.is_none() && session.live.is_some();
     Ok(Seen {
@@ -96,6 +112,7 @@ fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError>
             alive: false,
             managed: session.managed.is_some(),
             harness_session,
+            started_fresh,
             turn_active,
             last_signal_at: session.last_signal.max(output),
             started_at: session.started_at,
