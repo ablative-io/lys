@@ -40,6 +40,12 @@ pub struct TranslateArgs {
 }
 
 /// Run `translate-codex` and return its report.
+///
+/// # Errors
+///
+/// Refuses an absent or held session, an unmeasured Codex version, an
+/// unnamed or unknown zone, invalid entry stamps, existing output files,
+/// or failed translation reads, writes or side-leaf append.
 pub fn run(args: &TranslateArgs) -> Result<Value, HomeError> {
     let home = Home::read(&args.home)?;
     let mut session = home.open_session(&args.session)?;

@@ -44,6 +44,11 @@ pub struct Session {
 
 impl Session {
     /// Create a session file at `file` with this header.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a file another owner holds, one that already exists, or a
+    /// header or head that cannot be encoded, written or made durable.
     pub fn create(file: impl Into<PathBuf>, header: SessionHeader) -> Result<Self, HomeError> {
         let file = file.into();
         let lock = SessionLock::take(&file)?;
@@ -87,6 +92,12 @@ impl Session {
     /// that head is persisted here and now, so a side leaf appended later
     /// ([`Session::append_beside`]) can never be taken for the head. What a
     /// part-way staged import of this id left beside it is removed first.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a held file, a staged remainder that cannot be cleared, an
+    /// unreadable or malformed session, an unindexed head, or a rebuilt index
+    /// or initial head that cannot be made durable.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
         let lock = SessionLock::take(&file)?;
@@ -188,18 +199,33 @@ impl Session {
 
     /// The head entry's id; `None` when the head is the header. Refused while
     /// the session is stale, like every read.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `StaleIndex` while a failed append has left this owner's
+    /// index behind the session file.
     pub fn head(&self) -> Result<Option<&str>, HomeError> {
         self.fresh()?;
         Ok(self.head.as_deref())
     }
 
     /// How many entries the file holds.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `StaleIndex` while this owner's entry count may lag the file
+    /// after a failed append.
     pub fn len(&self) -> Result<usize, HomeError> {
         self.fresh()?;
         Ok(self.index.len())
     }
 
     /// Whether the file holds no entries.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `StaleIndex` while a failed append leaves the index unable
+    /// to answer whether the file holds entries.
     pub fn is_empty(&self) -> Result<bool, HomeError> {
         self.fresh()?;
         Ok(self.index.is_empty())
@@ -212,6 +238,11 @@ impl Session {
     }
 
     /// Whether an entry of this id is on record.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `StaleIndex` while a failed append leaves this owner's
+    /// entry lookup behind the session file.
     pub fn contains(&self, id: &str) -> Result<bool, HomeError> {
         self.fresh()?;
         Ok(self.index.row(id).is_some())
@@ -220,6 +251,11 @@ impl Session {
     /// Append an entry as a child of the head, with a fresh id and the current
     /// time, and advance the head to it. The entry line is durable before the
     /// index row, which is durable before the head.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when reconciliation fails, the new entry cannot be encoded or
+    /// made durable with its index and head, or the call map cannot be updated.
     pub fn append(&mut self, body: EntryBody) -> Result<String, HomeError> {
         self.reconcile()?;
         let id = fresh_id();
@@ -238,6 +274,12 @@ impl Session {
     /// Append an entry exactly as given (id, parent and timestamp included), as
     /// an importer does, and advance the head to it. The parent must be on
     /// record or `None`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a duplicate id or an unknown parent, failed reconciliation,
+    /// or an entry, index row, head or call map that cannot be recorded.
+    /// An error after the line is durable still returns that error.
     pub fn append_entry(&mut self, entry: &Entry) -> Result<(), HomeError> {
         self.append_line(entry)?;
         if let Err(e) = self.persist_head(Some(entry.id())) {
@@ -285,6 +327,11 @@ impl Session {
 
     /// Move the head to an entry on record (or to the header with `None`).
     /// Nothing in the file changes.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an id not on record, failed reconciliation, or a head that
+    /// cannot be written and made durable.
     pub fn move_head(&mut self, id: Option<&str>) -> Result<(), HomeError> {
         self.reconcile()?;
         if let Some(id) = id
@@ -334,6 +381,11 @@ impl Session {
 
     /// Every entry of the file in file order, read through this owner's
     /// index with the file opened once.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, an unreadable or malformed indexed line,
+    /// a row too long to read, or an entry whose id differs from its row.
     pub fn entries(&self) -> Result<Vec<Entry>, HomeError> {
         self.fresh()?;
         let rows: Vec<&IndexRow> = self.index.rows().iter().collect();

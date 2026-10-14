@@ -95,6 +95,13 @@ pub(super) struct Importer<'a> {
 }
 
 /// Import one Claude Code JSONL into an open, empty session.
+///
+/// # Errors
+///
+/// Refuses an unreadable transcript, a malformed JSONL record, or a
+/// message or compaction whose fields cannot be mapped. Block storage,
+/// block-row writes, session reconciliation and durable appends also
+/// refuse by their named step.
 pub fn import_claude_code(
     source: &Path,
     session: &mut Session,

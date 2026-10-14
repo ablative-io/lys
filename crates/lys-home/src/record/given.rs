@@ -132,6 +132,11 @@ impl GivenRecord {
     }
 
     /// The data as it rides in the entry.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `Json` when the given record cannot be serialised as entry
+    /// data.
     pub fn data(&self) -> Result<Value, HomeError> {
         serde_json::to_value(self).map_err(|source| HomeError::Json {
             context: "a given record could not be serialised",
@@ -140,6 +145,11 @@ impl GivenRecord {
     }
 
     /// The canonical bytes of the data, the payload a given statement signs.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `Json` when the record cannot be serialised as data or
+    /// those data cannot be written as canonical bytes.
     pub fn canonical_bytes(&self) -> Result<CanonicalGiven, HomeError> {
         serde_json::to_vec(&self.data()?)
             .map(CanonicalGiven)
@@ -150,12 +160,22 @@ impl GivenRecord {
     }
 
     /// The given hash: the SHA-256 of the canonical bytes.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the given record's canonical bytes cannot be serialised;
+    /// no hash is answered for an unwritten payload.
     pub fn given_hash(&self) -> Result<Hash, HomeError> {
         Ok(self.canonical_bytes()?.hash())
     }
 
     /// Append the record as a `lys.given` entry under `parent`, the render
     /// event it follows, leaving the head where it stands. Returns the id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses data that cannot be serialised, a parent not on record, or
+    /// a session that cannot reconcile or durably append the given entry.
     pub fn append_under(&self, session: &mut Session, parent: &str) -> Result<String, HomeError> {
         session.append_under(
             parent,
@@ -168,6 +188,11 @@ impl GivenRecord {
 
     /// The record a `lys.given` entry carries; an entry of any other kind is
     /// refused by id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an entry that is not `lys.given` with data as `NotOfCustomType`,
+    /// or data that does not read as a given record as `Json`.
     pub fn from_entry(entry: &Entry) -> Result<Self, HomeError> {
         let EntryBody::Custom {
             custom_type,
@@ -186,6 +211,11 @@ impl GivenRecord {
     }
 
     /// Every `lys.given` entry of the session in file order, each with its id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, an unreadable or mismatched custom row, or
+    /// a given entry whose data does not read as a given record.
     pub fn read_all(session: &Session) -> Result<Vec<(String, Self)>, HomeError> {
         session
             .customs_everywhere(CUSTOM_GIVEN)?
@@ -238,6 +268,11 @@ fn given_of(reader: &SessionReader, session: &str) -> Result<Vec<GivenSeen>, Hom
 /// given rows only. The home writes every timestamp in one RFC 3339 form in
 /// UTC, so the last is the greatest as text. A session that cannot be read
 /// is skipped and named.
+///
+/// # Errors
+///
+/// Refuses when the home's session ids cannot be listed. A session or
+/// given entry that cannot be read is reported in `skipped` instead.
 pub fn last_given(home: &Home) -> Result<GivenLast, HomeError> {
     let mut last: Option<GivenSeen> = None;
     let mut skipped = Vec::new();

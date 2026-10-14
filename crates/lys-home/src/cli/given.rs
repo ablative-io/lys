@@ -122,6 +122,11 @@ pub struct ListedRecord {
 impl ListedRecord {
     /// The record listed under its entry id, with the paths of it that do
     /// not exist now named as unresolved.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when a config or document path cannot be resolved for a reason
+    /// other than its absence; absent paths are recorded in `unresolved`.
     pub fn new(entry: String, record: GivenRecord) -> Result<Self, HomeError> {
         let mut unresolved = Vec::new();
         if canonical_dir(&record.config_dir.path)?.is_unresolved() {
@@ -141,6 +146,11 @@ impl ListedRecord {
 }
 
 /// `given`: every `lys.given` entry of the session, in file order.
+///
+/// # Errors
+///
+/// Refuses a home or session that cannot be opened, malformed given data,
+/// or a config or document path that cannot be resolved.
 pub fn list(args: &GivenArgs) -> Result<Value, HomeError> {
     let home = Home::open(&args.home)?;
     let session = home.open_session(&args.session)?;
@@ -159,6 +169,12 @@ pub fn list(args: &GivenArgs) -> Result<Value, HomeError> {
 /// `given-check`: hash the file and answer `matches` when its SHA-256 and
 /// length equal the listed document's, `differs` otherwise. A refusal names
 /// the id, the path or the file concerned.
+///
+/// # Errors
+///
+/// Refuses an unreadable home, session or given entry, an entry that is
+/// not a given record, an unlisted document path, or a file that cannot be
+/// resolved or read. A differing hash or length is an `Outcome`, not an error.
 pub fn check(args: &GivenCheckArgs) -> Result<Outcome, HomeError> {
     let home = Home::open(&args.home)?;
     let session = home.open_session(&args.session)?;

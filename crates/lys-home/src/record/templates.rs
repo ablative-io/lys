@@ -37,6 +37,11 @@ impl TemplateStore {
 
     /// Keep a template's bytes under their hash: the hash and whether this
     /// put wrote it. Bytes already held are not written again.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the template store or shard cannot be created, or the
+    /// bytes cannot be written, synced and placed under their hash.
     pub fn put(&self, bytes: &[u8]) -> Result<Put, HomeError> {
         BlockStore::open(&self.root)?.put(bytes)
     }
@@ -48,6 +53,11 @@ impl TemplateStore {
     }
 
     /// Read a template by hash.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an absent template as `NoBlock`; any other read failure names
+    /// the template's path in an I/O error.
     pub fn get(&self, hash: &Hash) -> Result<Vec<u8>, HomeError> {
         let path = self.path_of(hash);
         match std::fs::read(&path) {

@@ -17,6 +17,11 @@ use crate::record::io_counts::IoCounter;
 /// name longer than the file system takes is refused by the file system.
 /// Every name that is joined onto a directory passes through here, so `..`,
 /// `/` and an absolute path can never leave the directory chosen.
+///
+/// # Errors
+///
+/// Refuses as `BadName` when the name is empty, begins with a dot, or
+/// holds a byte outside ASCII letters, digits, dots, underscores and hyphens.
 pub fn safe_component(what: &'static str, name: &str) -> Result<(), HomeError> {
     let ok = !name.is_empty()
         && !name.starts_with('.')

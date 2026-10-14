@@ -59,6 +59,12 @@ struct OnPath {
 }
 
 /// List the compactions of session `session` in the home at `home`.
+///
+/// # Errors
+///
+/// Refuses an absent home, an unsafe session id, or a header, index, head
+/// or ancestry that cannot be read. Opening an existing block store can
+/// also refuse; individual unreadable entries are named in the listing.
 pub fn list_compactions(home: &Path, session: &str) -> Result<Listing, HomeError> {
     let home = Home::read(home)?;
     let reader = home.read_session(session)?;

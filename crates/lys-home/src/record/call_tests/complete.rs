@@ -148,6 +148,16 @@ fn a_complete_call_from_bytes_refuses_a_malformed_or_partless_response_and_a_str
     )
     .unwrap();
     assert_eq!((r.response_parts, r.already_recorded), (1, false));
+    drop(s);
+    dir.close().unwrap();
+}
+
+#[test]
+fn outcome_bodies_distinguish_unreadable_files_from_incomplete_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = Home::open(dir.path().join("home")).unwrap();
+    let blocks = home.blocks().unwrap();
+    let mut s = home.create_session("outcomes", "/w", None).unwrap();
     // An outcome whose request file is a directory is an I/O error, not an absence.
     let dirpath = dir.path().join("a-directory");
     std::fs::create_dir(&dirpath).unwrap();

@@ -41,6 +41,7 @@ impl Literal {
     /// The environment text of this setting, by the one rule every render
     /// uses: text byte for byte, an integer in plain decimal, a boolean as
     /// `true` or `false`. Empty text stays set and empty.
+    #[must_use]
     pub fn text(&self) -> String {
         match self {
             Self::Boolean(value) => value.to_string(),
@@ -63,6 +64,7 @@ pub enum Channel {
 
 impl Channel {
     /// An omitted policy in an older profile already means off.
+    #[must_use]
     pub fn is_off(&self) -> bool {
         *self == Self::Off
     }
@@ -83,6 +85,7 @@ pub enum InstructionsMode {
 
 impl InstructionsMode {
     /// An omitted mode in an older profile already means append.
+    #[must_use]
     pub fn is_append(&self) -> bool {
         *self == Self::Append
     }

@@ -217,6 +217,13 @@ impl Session {
 /// one is named, and return the report. The candidate hashes are taken
 /// from the cut before anything is written, and counted against the store
 /// after the child stands.
+///
+/// # Errors
+///
+/// Refuses the lantern resolution and cut's errors, malformed candidate
+/// block hashes or carried-message data, a held parent, or a child whose
+/// header, copied entries or fork record cannot be written. Opening the
+/// block store can refuse too; failed child cleanup is `ForkHalfWritten`.
 pub fn fork(home: &Home, lantern: &str, session: Option<&str>) -> Result<ForkReport, HomeError> {
     let cut = resolve_and_cut(home, lantern, session)?;
     let candidates = candidate_hashes(&cut.session, &cut.entries)?;

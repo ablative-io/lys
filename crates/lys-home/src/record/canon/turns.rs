@@ -16,6 +16,11 @@ pub enum Role {
 /// Parse a turns file: `user: text` or `assistant: text` per line, blank
 /// lines skipped. A line that names another role, has no role, or holds a
 /// thinking block is refused by line number: thinking is never authored.
+///
+/// # Errors
+///
+/// Refuses an unreadable file, a line without a user or assistant role,
+/// a line holding a thinking block, or a file with no turns.
 pub fn parse_turns(path: &Path) -> Result<Vec<(Role, String)>, HomeError> {
     let text = std::fs::read_to_string(path)
         .map_err(|e| HomeError::io("reading the turns file", path, e))?;

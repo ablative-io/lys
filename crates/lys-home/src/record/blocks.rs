@@ -22,6 +22,10 @@ impl Hash {
     }
 
     /// Accept a string as a hash only when it is 64 lowercase hex characters.
+    ///
+    /// # Errors
+    ///
+    /// Refuses as `NotAHash` unless the text is exactly 64 lowercase hex digits.
     pub fn parse(text: &str) -> Result<Self, HomeError> {
         let well_formed =
             text.len() == 64 && text.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'));
@@ -71,6 +75,10 @@ pub struct BlockStore {
 
 impl BlockStore {
     /// Open (creating if needed) the block store under `root`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses by path when the block-store directory cannot be created.
     pub fn open(root: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let root = root.into();
         fs::create_dir_all(&root)
@@ -103,6 +111,12 @@ impl BlockStore {
     /// A new block is written to a temporary file in its directory, fsynced,
     /// renamed into place, and the directory fsynced, so a block that exists is
     /// whole.
+    ///
+    /// # Errors
+    ///
+    /// Refuses by path when a block directory or temporary file cannot be
+    /// created, the bytes cannot be written and synced, the block cannot be
+    /// placed, or a surplus temporary file cannot be removed.
     pub fn put(&self, bytes: &[u8]) -> Result<Put, HomeError> {
         let hash = Hash::of(bytes);
         let path = self.path_of(&hash);
@@ -145,6 +159,12 @@ impl BlockStore {
     /// Store a file's bytes as a block without holding them in memory: the
     /// file is copied to a temporary file while its hash is computed, then
     /// renamed to its hash name, or discarded when that block is already held.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the source cannot be opened or read, the temporary block
+    /// cannot be written and synced, or its shard, placement or surplus-file
+    /// removal fails. The I/O refusal names the path and step.
     pub fn put_file(&self, source: &Path) -> Result<Put, HomeError> {
         use std::io::Read;
         let mut input =
@@ -234,6 +254,11 @@ impl BlockStore {
     }
 
     /// Read a block by hash.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an absent block as `NoBlock`; other failures to read its file
+    /// are returned as I/O errors naming the path.
     pub fn get(&self, hash: &Hash) -> Result<Vec<u8>, HomeError> {
         let path = self.path_of(hash);
         match fs::read(&path) {
@@ -247,6 +272,11 @@ impl BlockStore {
 
     /// Every hash held, in no particular order, with whether its bytes still
     /// hash to its name.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when a store directory cannot be listed or a named block
+    /// cannot be read. Bytes that do not hash to their name return `false`.
     pub fn verify_all(&self) -> Result<Vec<(Hash, bool)>, HomeError> {
         let mut out = Vec::new();
         let dirs = fs::read_dir(&self.root)

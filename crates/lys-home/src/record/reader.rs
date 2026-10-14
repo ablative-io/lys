@@ -39,6 +39,11 @@ pub struct SessionReader {
 
 impl SessionReader {
     /// Open a session file for reading. Nothing is locked or written.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an unreadable or malformed header, a cache that cannot be
+    /// checked by I/O, or a session that cannot be scanned into a valid index.
     pub fn open(file: impl Into<PathBuf>) -> Result<Self, HomeError> {
         let file = file.into();
         let (header, index, scanned) = Index::read(&file)?;
@@ -99,6 +104,11 @@ impl SessionReader {
     }
 
     /// One entry by id, read by seeking to it.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an unknown id, a row that reads no matching entry, or an
+    /// indexed line that cannot be sought, read or parsed.
     pub fn entry(&self, id: &str) -> Result<Entry, HomeError> {
         let (mut entries, _) = self.read_rows(&[self.row(id)?])?;
         entries.pop().ok_or(HomeError::StaleIndex {
@@ -108,6 +118,11 @@ impl SessionReader {
     }
 
     /// Entries by id, in the order given, read in one pass over the file.
+    ///
+    /// # Errors
+    ///
+    /// Refuses any id absent from this reader's index, or an indexed line
+    /// that cannot be read and parsed with the id its row names.
     pub fn entries(&self, ids: &[String]) -> Result<Vec<Entry>, HomeError> {
         let rows = ids
             .iter()
@@ -119,6 +134,11 @@ impl SessionReader {
 
     /// Every custom entry of a given custom type in the file, on any branch,
     /// in file order, read by seeking to the rows the index names.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a selected row that is too long to read, cannot be sought or
+    /// read, is not an entry, or carries a different id from its row.
     pub fn customs_everywhere(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
         let rows = self.index.rows_of_custom(custom_type);
         let (entries, _) = self.read_rows(&rows)?;
@@ -143,6 +163,12 @@ impl SessionReader {
 /// session header, which is an index or a block rows file. A file that
 /// cannot be read while listing refuses by path; a missing directory lists
 /// nothing.
+///
+/// # Errors
+///
+/// Refuses when a directory entry or file type cannot be read, a file
+/// name is not Unicode, or the header check of a possible index or block
+/// rows file fails with anything other than `NoHeader`.
 pub fn session_ids(sessions: &Path) -> Result<Vec<String>, HomeError> {
     let entries = match std::fs::read_dir(sessions) {
         Ok(entries) => entries,

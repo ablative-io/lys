@@ -44,6 +44,10 @@ impl Created {
     }
 
     /// Create `dir` and every missing directory above it, recording each.
+    ///
+    /// # Errors
+    ///
+    /// Refuses by path when any missing directory cannot be created.
     pub fn make_dir(&mut self, dir: &Path) -> Result<(), HomeError> {
         let mut missing: Vec<PathBuf> = dir
             .ancestors()
@@ -86,6 +90,12 @@ impl Created {
 
     /// Remove every recorded path, deepest first, then check the target is
     /// as it was: absent when fetch made it, existing and empty otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Refuses by path when a recorded path cannot be removed, the target
+    /// cannot be listed afterwards, or its remaining contents differ from
+    /// what stood before the fetch.
     pub fn undo(&self) -> Result<(), HomeError> {
         let mut order: Vec<&(PathBuf, Kind)> = self.paths.iter().rev().collect();
         order.sort_by_key(|(path, _)| std::cmp::Reverse(path.components().count()));

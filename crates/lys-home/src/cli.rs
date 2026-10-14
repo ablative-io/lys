@@ -18,7 +18,7 @@ mod resume;
 pub use fewshot::write_fewshot;
 pub use resume::{ResumeReport, resume_check};
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Args, Parser, Subcommand};
 use serde_json::{Value, json};
@@ -249,12 +249,24 @@ impl Command {
 
 /// Run a command and return its report; a refusal is the caller's to exit on
 /// with [`Command::refusal_status`].
+///
+/// # Errors
+///
+/// Refuses the selected command's invalid inputs, unreadable records,
+/// failed durable writes or report serialisation. A resume check with
+/// repeated tool-use ids refuses as `RepeatedToolActions`.
 pub fn run(cli: Cli) -> Result<Value, HomeError> {
     run_with_status(cli).map(|outcome| outcome.report)
 }
 
 /// Run a command and return its report with the status the process exits
 /// with: 0 for every command but a `given-check` that answers differs.
+///
+/// # Errors
+///
+/// Refuses the selected command's input, record, storage or report errors.
+/// Given-check differences, stale ship indexes, failed fetch verification
+/// and incomplete compaction checks are returned with their exit status.
 pub fn run_with_status(cli: Cli) -> Result<Outcome, HomeError> {
     match cli.command {
         Command::GivenCheck(args) => given::check(&args),
@@ -303,39 +315,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
             let report = render_claude_code(&s, &target, user_home.as_deref())?;
             Ok(json!({"command": "render", "report": report}))
         }
-        Command::Canon { action } => match action {
-            CanonAction::Create { canon } => {
-                crate::record::canon::create(&canon)?;
-                Ok(json!({"command": "canon create", "canon": canon}))
-            }
-            CanonAction::Add {
-                canon,
-                home,
-                from,
-                entries,
-                authored,
-                rule,
-                by,
-            } => {
-                let report = match (authored, home, from) {
-                    (Some(turns), _, _) => {
-                        crate::record::canon::add_authored(&canon, &turns, &rule, &by)?
-                    }
-                    (None, Some(home), Some(from)) => {
-                        let home = Home::open(home)?;
-                        let s = home.open_session(&from)?;
-                        crate::record::canon::add_from(&canon, &s, &entries, &rule, &by)?
-                    }
-                    (None, _, _) => {
-                        return Err(HomeError::BodyShape {
-                            api: "canon",
-                            reason: "an example comes from --home/--from/--entries or from --authored",
-                        });
-                    }
-                };
-                Ok(json!({"command": "canon add", "report": report}))
-            }
-        },
+        Command::Canon { action } => canon(action),
         Command::Fewshot { out, turns, cwd } => {
             let turns = crate::record::canon::parse_turns(&turns)?;
             let written = crate::write_fewshot(&out, &turns, &cwd)?;
@@ -358,30 +338,8 @@ fn report(command: Command) -> Result<Value, HomeError> {
             started_at,
             duration_ms,
         } => {
-            let api = match api.as_str() {
-                "anthropic-messages" => Api::Messages,
-                "openai-chat-completions" => Api::ChatCompletions,
-                "openai-responses" => Api::Responses,
-                _ => {
-                    return Err(HomeError::BodyShape {
-                        api: "cli",
-                        reason: "api must be anthropic-messages, openai-chat-completions or openai-responses",
-                    });
-                }
-            };
-            let parts = match parts {
-                Some(path) => {
-                    let text = std::fs::read(&path)
-                        .map_err(|e| HomeError::io("reading the parts file", &path, e))?;
-                    let value: Vec<Value> =
-                        serde_json::from_slice(&text).map_err(|source| HomeError::Json {
-                            context: "the parts file is not a JSON array",
-                            source,
-                        })?;
-                    Some(value)
-                }
-                None => None,
-            };
+            let api = call_api(&api)?;
+            let parts = read_parts(parts.as_deref())?;
             let meta = CallMeta {
                 call_id,
                 provider,
@@ -412,14 +370,7 @@ fn report(command: Command) -> Result<Value, HomeError> {
         Command::Lantern { action } => crate::cli_lantern::run(action),
         Command::Fork(args) => crate::cli_fork::run(&args),
         Command::TranslateCodex(args) => crate::cli_translate::run(&args),
-        Command::Handover(args) => {
-            let report = handover(&args.home, &args.from, &args.letter, &args.successor)?;
-            let report = serde_json::to_value(&report).map_err(|source| HomeError::Json {
-                context: "the handover report could not be serialised",
-                source,
-            })?;
-            Ok(json!({"command": "handover", "report": report}))
-        }
+        Command::Handover(args) => handover_report(&args),
         Command::Ship(args) => crate::cli_move::run_ship(&args).map(|outcome| outcome.report),
         Command::Fetch(args) => crate::cli_move::run_fetch(&args).map(|outcome| outcome.report),
         Command::Compactions { home, session } => {
@@ -436,4 +387,77 @@ fn compactions(home: &std::path::Path, session: &str) -> Result<Outcome, HomeErr
         report: listing.report,
         status: i32::from(!listing.whole),
     })
+}
+
+fn canon(action: CanonAction) -> Result<Value, HomeError> {
+    match action {
+        CanonAction::Create { canon } => {
+            crate::record::canon::create(&canon)?;
+            Ok(json!({"command": "canon create", "canon": canon}))
+        }
+        CanonAction::Add {
+            canon,
+            home,
+            from,
+            entries,
+            authored,
+            rule,
+            by,
+        } => {
+            let report = match (authored, home, from) {
+                (Some(turns), _, _) => {
+                    crate::record::canon::add_authored(&canon, &turns, &rule, &by)?
+                }
+                (None, Some(home), Some(from)) => {
+                    let home = Home::open(home)?;
+                    let s = home.open_session(&from)?;
+                    crate::record::canon::add_from(&canon, &s, &entries, &rule, &by)?
+                }
+                (None, _, _) => {
+                    return Err(HomeError::BodyShape {
+                        api: "canon",
+                        reason: "an example comes from --home/--from/--entries or from --authored",
+                    });
+                }
+            };
+            Ok(json!({"command": "canon add", "report": report}))
+        }
+    }
+}
+
+fn call_api(api: &str) -> Result<Api, HomeError> {
+    match api {
+        "anthropic-messages" => Ok(Api::Messages),
+        "openai-chat-completions" => Ok(Api::ChatCompletions),
+        "openai-responses" => Ok(Api::Responses),
+        _ => Err(HomeError::BodyShape {
+            api: "cli",
+            reason: "api must be anthropic-messages, openai-chat-completions or openai-responses",
+        }),
+    }
+}
+
+fn read_parts(parts: Option<&Path>) -> Result<Option<Vec<Value>>, HomeError> {
+    Ok(match parts {
+        Some(path) => {
+            let text = std::fs::read(path)
+                .map_err(|e| HomeError::io("reading the parts file", path, e))?;
+            let value: Vec<Value> =
+                serde_json::from_slice(&text).map_err(|source| HomeError::Json {
+                    context: "the parts file is not a JSON array",
+                    source,
+                })?;
+            Some(value)
+        }
+        None => None,
+    })
+}
+
+fn handover_report(args: &HandoverArgs) -> Result<Value, HomeError> {
+    let report = handover(&args.home, &args.from, &args.letter, &args.successor)?;
+    let report = serde_json::to_value(&report).map_err(|source| HomeError::Json {
+        context: "the handover report could not be serialised",
+        source,
+    })?;
+    Ok(json!({"command": "handover", "report": report}))
 }

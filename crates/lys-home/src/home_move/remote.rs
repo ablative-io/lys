@@ -19,6 +19,11 @@ use crate::error::HomeError;
 /// Take a remote argument as an absolute path on this machine, resolving a
 /// relative one against `base`; anything else refuses as
 /// `remote_not_local`.
+///
+/// # Errors
+///
+/// Refuses a URL or scp-style remote as `remote_not_local`, and a path
+/// that cannot be resolved to an absolute path by its I/O error.
 pub fn take_remote(remote: &str, base: &Path) -> Result<PathBuf, HomeError> {
     let before_slash = remote.split('/').next().unwrap_or(remote);
     if remote.contains("://") || before_slash.contains(':') {

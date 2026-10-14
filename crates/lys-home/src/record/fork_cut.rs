@@ -147,6 +147,13 @@ fn role_of(entry: &Entry) -> Option<&str> {
 
 /// Resolve `lantern` to the session it was lit in, cutting from `session`
 /// when one is named as R2 reads it, and cut that session's chain.
+///
+/// # Errors
+///
+/// Refuses an absent or ambiguous lantern, a mismatched or invalid
+/// lit-in session, an unknown point, or a chain with no assistant message
+/// to cut at. Session listing, index reads and malformed lantern data
+/// also refuse before any write.
 pub fn resolve_and_cut(
     home: &Home,
     lantern: &str,

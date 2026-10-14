@@ -170,6 +170,12 @@ pub(crate) fn json_hash<T: Serialize + ?Sized>(value: &T) -> String {
 /// its directory. A path already there is refused as the translation's
 /// target, naming it; a file this call created and could not fill is
 /// removed before the refusal returns.
+///
+/// # Errors
+///
+/// Refuses an existing output file or one that cannot be created, written
+/// and synced with its directory. A failed write attempts to remove the
+/// file it created, then returns the write failure.
 pub fn write_new(path: &Path, bytes: &[u8]) -> Result<(), HomeError> {
     let mut file = match std::fs::OpenOptions::new()
         .create_new(true)

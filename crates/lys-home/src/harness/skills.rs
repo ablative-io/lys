@@ -47,6 +47,11 @@ fn refused(name: &str, reason: &'static str) -> HomeError {
 
 /// `file` as the launch records it, once its name is one visible path
 /// component and its text hashes to the hash it carries.
+///
+/// # Errors
+///
+/// Refuses a name that is not one visible path component of at most
+/// 64 bytes, or text that does not hash to the supplied SHA-256.
 pub fn check(file: &SkillFile) -> Result<KeptSkill, HomeError> {
     let name = &file.name;
     let visible = !name.is_empty()
@@ -224,6 +229,13 @@ fn owned(config_dir: &Path) -> Result<PathBuf, HomeError> {
 /// Write each of `files` under `config_dir`, answering them as recorded.
 /// Every file is checked before the first is written, and nothing is
 /// written through a symlink at or below `config_dir`.
+///
+/// # Errors
+///
+/// Refuses invalid skills, a config path that is not absolute and already
+/// canonical where it exists, symlinks or other non-directory path parts,
+/// or a different existing skill. Creation, staging, linking and syncing
+/// failures name the path and step.
 pub fn write(config_dir: &Path, files: &[SkillFile]) -> Result<Vec<KeptSkill>, HomeError> {
     let config_dir = owned(config_dir)?;
     let config_dir = config_dir.as_path();

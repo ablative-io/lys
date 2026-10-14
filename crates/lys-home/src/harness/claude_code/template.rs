@@ -94,6 +94,11 @@ pub fn plugin_named(name: &str) -> bool {
 
 /// Read a template file and parse it, returning the template and the bytes
 /// as read, which are what its hash is of and what the home keeps.
+///
+/// # Errors
+///
+/// Refuses an unreadable template or any parse error: malformed JSON,
+/// missing or unknown slots, invalid fields or unsupported secret readers.
 pub fn read_template(path: &Path) -> Result<(Template, Vec<u8>), HomeError> {
     let bytes =
         std::fs::read(path).map_err(|e| HomeError::io("reading the launch template", path, e))?;
@@ -102,6 +107,12 @@ pub fn read_template(path: &Path) -> Result<(Template, Vec<u8>), HomeError> {
 }
 
 /// Parse a template from its bytes, checking every rule the schema states.
+///
+/// # Errors
+///
+/// Refuses malformed JSON, unknown members or slots, missing slots,
+/// invalid field shapes, an unbuilt readable-secret binding, duplicate
+/// variables, invalid skills or plugins, or invalid seat declarations.
 pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
     let hash = Hash::of(bytes);
     let root: Value = serde_json::from_slice(bytes).map_err(|source| HomeError::Json {
@@ -150,20 +161,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
     let Value::String(instructions) = &slots["instructions"] else {
         return Err(shape("slots.instructions", "must be a string"));
     };
-    let skills = match slots.get("skills") {
-        None => Vec::new(),
-        Some(given) => {
-            let skills: Vec<SkillFile> =
-                serde_json::from_value(given.clone()).map_err(|source| HomeError::Json {
-                    context: "slots.skills is not a list of kept skills",
-                    source,
-                })?;
-            for skill in &skills {
-                check(skill)?;
-            }
-            skills
-        }
-    };
+    let skills = kept_skills(slots.get("skills"))?;
     let permissions = slots.get("permissions").map(permissions).transpose()?;
     let plugins = match slots.get("plugins") {
         None => Vec::new(),
@@ -183,24 +181,7 @@ pub fn parse_template(bytes: &[u8]) -> Result<Template, HomeError> {
             });
         }
     }
-    let seat_slots = slots
-        .iter()
-        .filter(|(name, _)| SeatFields::NAMES.contains(&name.as_str()))
-        .map(|(name, value)| (name.clone(), value.clone()))
-        .collect();
-    let seat = SeatFields::parse(&seat_slots, "claude-code/template-v1").map_err(|error| {
-        if error.detail.is_empty() {
-            HomeError::TemplateShape {
-                field: format!("slots.{}", error.field),
-                reason: error.reason,
-            }
-        } else {
-            HomeError::Json {
-                context: "launch template seat fields",
-                source: <serde_json::Error as serde::de::Error>::custom(error),
-            }
-        }
-    })?;
+    let seat = seat_fields(slots)?;
     Ok(Template {
         hash,
         flags,
@@ -375,3 +356,41 @@ fn secret_list(field: &str, value: &Value) -> Result<Vec<SecretRef>, HomeError> 
 
 #[cfg(test)]
 mod seat_slot_tests;
+
+fn kept_skills(given: Option<&Value>) -> Result<Vec<SkillFile>, HomeError> {
+    Ok(match given {
+        None => Vec::new(),
+        Some(given) => {
+            let skills: Vec<SkillFile> =
+                serde_json::from_value(given.clone()).map_err(|source| HomeError::Json {
+                    context: "slots.skills is not a list of kept skills",
+                    source,
+                })?;
+            for skill in &skills {
+                check(skill)?;
+            }
+            skills
+        }
+    })
+}
+
+fn seat_fields(slots: &Map<String, Value>) -> Result<SeatFields, HomeError> {
+    let seat_slots = slots
+        .iter()
+        .filter(|(name, _)| SeatFields::NAMES.contains(&name.as_str()))
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect();
+    SeatFields::parse(&seat_slots, "claude-code/template-v1").map_err(|error| {
+        if error.detail.is_empty() {
+            HomeError::TemplateShape {
+                field: format!("slots.{}", error.field),
+                reason: error.reason,
+            }
+        } else {
+            HomeError::Json {
+                context: "launch template seat fields",
+                source: <serde_json::Error as serde::de::Error>::custom(error),
+            }
+        }
+    })
+}

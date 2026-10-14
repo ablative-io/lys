@@ -68,6 +68,13 @@ pub enum Shipped {
 /// Ship the home at `home_dir` to `remote`, a path resolved against `base`,
 /// running git with PATH from `inherited`. The remote and the home are both
 /// made absolute before anything runs.
+///
+/// # Errors
+///
+/// Refuses a non-local or non-bare remote, an absent or empty home, a held
+/// session, a missing index or head, foreign tracked paths, or a diverged
+/// remote ref. Listing, locking, verification I/O and git failures propagate;
+/// stale session indexes are returned as `Shipped::StaleIndex`.
 pub fn ship(
     home_dir: &Path,
     remote: &str,

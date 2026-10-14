@@ -77,6 +77,13 @@ pub enum Fetched {
 
 /// Fetch `refs/lys/home` from `remote`, a path resolved against `base`,
 /// into the new home `home_dir`, running git with PATH from `inherited`.
+///
+/// # Errors
+///
+/// Refuses a non-local remote, a target that holds a home or is not empty,
+/// or a failed fetch, checkout, arrival append or commit. Failures after a
+/// write remove the paths created here; a removal failure is
+/// `FetchHalfWritten`. Failed verification is returned in `Fetched`.
 pub fn fetch(
     remote: &str,
     home_dir: &Path,

@@ -80,6 +80,11 @@ fn id_counts(records: &[(String, Vec<String>)]) -> HashMap<&str, u64> {
 /// Compare a rendered transcript with the fork a resume wrote: records, the
 /// fork's new records and their `tool_use` parts, and the `tool_use` ids the
 /// fork holds more times than the rendered file.
+///
+/// # Errors
+///
+/// Refuses either transcript when its file cannot be read or a nonblank
+/// line is not JSON, naming the file and line.
 pub fn resume_check(rendered: &Path, forked: &Path) -> Result<ResumeReport, HomeError> {
     let before = tool_uses(rendered)?;
     let after = tool_uses(forked)?;

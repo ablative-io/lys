@@ -9,6 +9,11 @@ use crate::error::HomeError;
 use crate::record::call::{Api, CallMeta};
 
 /// Split a request body into its parts, in order, by api.
+///
+/// # Errors
+///
+/// Refuses a body that is not JSON, a Messages or Chat Completions body
+/// without a messages array, or a Responses body without input.
 pub fn request_parts(api: Api, body: &[u8]) -> Result<Vec<Value>, HomeError> {
     let json: Value = serde_json::from_slice(body).map_err(|source| HomeError::Json {
         context: "the request is not JSON",
@@ -19,6 +24,12 @@ pub fn request_parts(api: Api, body: &[u8]) -> Result<Vec<Value>, HomeError> {
 
 /// Read a request body from a file and split it, holding only the parsed
 /// value, never a second copy of the bytes.
+///
+/// # Errors
+///
+/// Refuses a body file that cannot be read or parsed as JSON, a Messages
+/// or Chat Completions body without a messages array, or a Responses body
+/// without input.
 pub fn request_parts_file(api: Api, path: &Path) -> Result<Vec<Value>, HomeError> {
     let json = read_json(path, "the request is not JSON")?;
     request_parts_of(api, &json)
@@ -101,6 +112,12 @@ pub(super) fn request_parts_of(api: Api, json: &Value) -> Result<Vec<Value>, Hom
 ///
 /// [`ingest_call`]: crate::record::call::ingest_call
 /// [`ingest_call_files`]: crate::record::call::ingest_call_files
+///
+/// # Errors
+///
+/// Refuses a body that is not JSON or not a successful response for its
+/// api: an error or absent content array, missing choices or messages,
+/// or a Responses body without completed status and an output array.
 pub fn response_parts(api: Api, body: &[u8]) -> Result<Vec<Value>, HomeError> {
     let json = serde_json::from_slice::<Value>(body).map_err(|source| HomeError::Json {
         context: "the response is not JSON",

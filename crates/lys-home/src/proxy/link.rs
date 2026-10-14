@@ -97,6 +97,28 @@ pub fn link_of_metadata(metadata: &Value) -> Link {
         .map_or(Link::Unlinked, Link::Session)
 }
 
+#[derive(Debug, Default)]
+enum Quoted {
+    #[default]
+    Outside,
+    Text {
+        escaped: bool,
+    },
+    Key {
+        escaped: bool,
+        offset: usize,
+        matches: bool,
+    },
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+enum Capture {
+    #[default]
+    Waiting,
+    Reading,
+    Done,
+}
+
 /// Reads a JSON body as it passes and keeps only its top-level `metadata`
 /// value. Strings, escapes and nesting are
 /// followed so a `metadata` key inside a message is never mistaken for the
@@ -104,17 +126,12 @@ pub fn link_of_metadata(metadata: &Value) -> Link {
 #[derive(Debug, Default)]
 pub struct KeyScanner {
     depth: u32,
-    in_string: bool,
-    escaped: bool,
+    quoted: Quoted,
     expecting_key: bool,
-    in_key: bool,
-    key_offset: usize,
-    key_matches: bool,
     metadata_key: bool,
-    capturing: bool,
+    capture: Capture,
     captured: Vec<u8>,
     resolved: Option<Link>,
-    done: bool,
 }
 
 impl KeyScanner {
@@ -127,7 +144,7 @@ impl KeyScanner {
     /// Inline work: scans the request frame until the complete metadata value is kept.
     pub fn feed(&mut self, bytes: &[u8]) {
         for &b in bytes {
-            if self.done {
+            if self.capture == Capture::Done {
                 break;
             }
             self.step(b);
@@ -135,22 +152,25 @@ impl KeyScanner {
     }
 
     fn step(&mut self, b: u8) {
-        if self.capturing {
+        if self.capture == Capture::Reading {
             self.captured.push(b);
         }
-        if self.in_string {
+        if !matches!(self.quoted, Quoted::Outside) {
             self.string_byte(b);
             return;
         }
         match b {
             b'"' => {
-                self.in_string = true;
-                if self.depth == 1 && self.expecting_key {
+                self.quoted = if self.depth == 1 && self.expecting_key {
                     self.expecting_key = false;
-                    self.in_key = true;
-                    self.key_offset = 0;
-                    self.key_matches = true;
-                }
+                    Quoted::Key {
+                        escaped: false,
+                        offset: 0,
+                        matches: true,
+                    }
+                } else {
+                    Quoted::Text { escaped: false }
+                };
             }
             b'{' => {
                 self.depth += 1;
@@ -160,63 +180,67 @@ impl KeyScanner {
             }
             b'[' => self.depth += 1,
             b'}' | b']' => {
-                if self.depth == 1 && self.capturing {
+                if self.depth == 1 && self.capture == Capture::Reading {
                     self.stop_capture();
                 }
                 self.depth = self.depth.saturating_sub(1);
             }
             b',' if self.depth == 1 => {
-                if self.capturing {
+                if self.capture == Capture::Reading {
                     self.stop_capture();
                 }
                 self.expecting_key = true;
             }
             b':' if self.depth == 1 && self.metadata_key => {
                 self.metadata_key = false;
-                self.capturing = true;
+                self.capture = Capture::Reading;
                 self.captured.clear();
             }
             _ => {}
         }
     }
 
-    fn string_byte(&mut self, b: u8) {
-        if self.escaped {
-            self.escaped = false;
-            self.key_byte(b);
-        } else if b == b'\\' {
-            self.escaped = true;
-            self.key_byte(b);
-        } else if b == b'"' {
-            self.in_string = false;
-            if self.in_key {
-                self.in_key = false;
-                self.metadata_key = self.key_matches && self.key_offset == b"metadata".len();
+    fn string_byte(&mut self, byte: u8) {
+        match &mut self.quoted {
+            Quoted::Outside => {}
+            Quoted::Text { escaped } => {
+                if *escaped {
+                    *escaped = false;
+                } else if byte == b'\\' {
+                    *escaped = true;
+                } else if byte == b'"' {
+                    self.quoted = Quoted::Outside;
+                }
             }
-        } else {
-            self.key_byte(b);
-        }
-    }
-
-    fn key_byte(&mut self, b: u8) {
-        // Compare the field name without retaining unrelated keys.
-        if self.in_key && self.key_matches {
-            self.key_matches = b"metadata".get(self.key_offset) == Some(&b);
-            self.key_offset += usize::from(self.key_matches);
+            Quoted::Key {
+                escaped,
+                offset,
+                matches,
+            } => {
+                if !*escaped && byte == b'"' {
+                    self.metadata_key = *matches && *offset == b"metadata".len();
+                    self.quoted = Quoted::Outside;
+                } else {
+                    *escaped = !*escaped && byte == b'\\';
+                    if *matches {
+                        *matches = b"metadata".get(*offset) == Some(&byte);
+                        *offset += usize::from(*matches);
+                    }
+                }
+            }
         }
     }
 
     fn stop_capture(&mut self) {
-        self.capturing = false;
         // The byte that ended the value (`,` or `}`) was kept; it is not the value's.
         self.captured.pop();
-        self.done = true;
+        self.capture = Capture::Done;
     }
 
     /// Inline work: parses a completed metadata value once, keeping only its link.
     #[must_use]
     pub fn link(&mut self) -> Link {
-        if !self.done {
+        if self.capture != Capture::Done {
             return Link::Unlinked;
         }
         if self.resolved.is_none() {

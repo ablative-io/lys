@@ -82,6 +82,12 @@ impl Verification {
 }
 
 /// Verify every session of the home, and nothing of its stores.
+///
+/// # Errors
+///
+/// Refuses when sessions cannot be listed, an id is unsafe, or a session,
+/// index or head cannot be read to check it. Missing or stale side files
+/// are returned as session reasons.
 pub fn verify_sessions(home: &Home) -> Result<Vec<SessionReason>, HomeError> {
     let mut out = Vec::new();
     for session in home.session_ids()? {
@@ -94,6 +100,12 @@ pub fn verify_sessions(home: &Home) -> Result<Vec<SessionReason>, HomeError> {
 
 /// Verify every session of the home, then every block and template of its
 /// tracked set.
+///
+/// # Errors
+///
+/// Refuses session-verification I/O, a tracked set that cannot be listed,
+/// or a stored block or template that cannot be read. Failed content
+/// hashes are returned in the verification report.
 pub fn verify_home(home: &Home) -> Result<Verification, HomeError> {
     let sessions = verify_sessions(home)?;
     let mut bad_blocks = Vec::new();

@@ -15,6 +15,11 @@ use super::{Index, parent_dir};
 /// Read the persisted head: `Some(id)`, `None` when the head is the header
 /// (no entries or moved before the first), or the last indexed entry when no
 /// head file exists.
+///
+/// # Errors
+///
+/// Refuses when the head file cannot be read as text, except that an
+/// absent head uses the last indexed entry.
 pub fn read_head(session_file: &Path, index: &Index) -> Result<Option<String>, HomeError> {
     let path = Index::head_path(session_file);
     match fs::read_to_string(&path) {
@@ -34,6 +39,11 @@ pub fn read_head(session_file: &Path, index: &Index) -> Result<Option<String>, H
 }
 
 /// Persist the head: written whole to a temporary file and renamed into place.
+///
+/// # Errors
+///
+/// Refuses when the temporary head cannot be created, written or synced,
+/// renamed into place, or made durable by syncing its directory.
 pub fn write_head(session_file: &Path, head: Option<&str>) -> Result<(), HomeError> {
     write_head_counted(session_file, head, &IoCounter::default())
 }
@@ -76,6 +86,11 @@ pub(crate) fn place_head(
 }
 
 /// The header line of a session file and its length in bytes.
+///
+/// # Errors
+///
+/// Refuses an empty file or a first line that is not a session header as
+/// `NoHeader`; failures to open or read the file name its path.
 pub fn read_header(session_file: &Path) -> Result<(SessionHeader, u64), HomeError> {
     let mut reader = BufReader::new(
         fs::File::open(session_file)

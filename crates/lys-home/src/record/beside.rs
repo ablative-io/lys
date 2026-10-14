@@ -27,6 +27,11 @@ use crate::record::{Session, fresh_id, now};
 impl Session {
     /// Append an entry as a child of the head, with a fresh id and the
     /// current time, and leave the head where it stands. Returns the id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses failed reconciliation, a duplicate id or unknown parent,
+    /// or a line, index row or call map that cannot be recorded.
     pub fn append_beside(&mut self, body: EntryBody) -> Result<String, HomeError> {
         self.reconcile()?;
         let id = fresh_id();
@@ -45,6 +50,11 @@ impl Session {
     /// Append an entry as a child of a named entry on record, with a fresh
     /// id and the current time, and leave the head where it stands. Returns
     /// the id; a parent not on record is refused by name.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a parent not on record, failed reconciliation, or a side
+    /// entry whose line, index row or call map cannot be recorded.
     pub fn append_under(&mut self, parent: &str, body: EntryBody) -> Result<String, HomeError> {
         self.reconcile()?;
         let id = fresh_id();
@@ -62,6 +72,11 @@ impl Session {
 
     /// The SHA-256 of the head entry's line, newline included, read by
     /// seeking to its row; of the header line when the session has no head.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, an unindexed head, a malformed header, a
+    /// line too long to read, or a file that cannot be opened, sought or read.
     pub fn head_hash(&self) -> Result<Hash, HomeError> {
         self.fresh()?;
         let (offset, len) = if let Some(id) = &self.head {

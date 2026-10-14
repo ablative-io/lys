@@ -35,6 +35,12 @@ impl Held {
 
 /// Take the lock of each named session, in the order given; a session a
 /// live owner holds refuses as `session_held`, naming it.
+///
+/// # Errors
+///
+/// Refuses unsafe session ids, a session another owner holds, or a lock
+/// file that cannot be opened or locked. Locks already taken are released
+/// when the partial set is dropped.
 pub fn hold_all(home: &Home, sessions: &[String]) -> Result<Held, HomeError> {
     let mut locks = Vec::with_capacity(sessions.len());
     for session in sessions {

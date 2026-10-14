@@ -20,6 +20,11 @@ use crate::record::blocks::Hash;
 use crate::record::index::Index;
 
 /// The home's tracked set, as home-relative paths in ascending byte order.
+///
+/// # Errors
+///
+/// Refuses when sessions cannot be listed, an id is unsafe, or a tracked
+/// path's type or a store directory cannot be read.
 pub fn tracked_set(home: &Home) -> Result<Vec<String>, HomeError> {
     let mut paths = Vec::new();
     for id in home.session_ids()? {

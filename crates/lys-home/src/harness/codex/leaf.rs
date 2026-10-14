@@ -42,6 +42,11 @@ pub struct TranslationData {
 }
 
 /// Append the leaf beside the context path; returns its entry id.
+///
+/// # Errors
+///
+/// Refuses translation data that cannot be serialised, failed session
+/// reconciliation, or a side leaf that cannot be recorded durably.
 pub fn append_leaf(session: &mut Session, data: &TranslationData) -> Result<String, HomeError> {
     let value = serde_json::to_value(data).map_err(|source| HomeError::Json {
         context: "the translation's side leaf could not be serialised",

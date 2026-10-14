@@ -45,6 +45,12 @@ pub struct FetchArgs {
 }
 
 /// Run `ship` and return its report with the status the process exits with.
+///
+/// # Errors
+///
+/// Refuses an unreadable current directory or any ship error: invalid
+/// remote, missing or held sessions, foreign tracked paths, divergence,
+/// or failed I/O or git commands. Stale indexes return a refusal report.
 pub fn run_ship(args: &ShipArgs) -> Result<Outcome, HomeError> {
     let base = current_dir()?;
     let inherited: Vec<(OsString, OsString)> = std::env::vars_os().collect();
@@ -58,6 +64,12 @@ pub fn run_ship(args: &ShipArgs) -> Result<Outcome, HomeError> {
 }
 
 /// Run `fetch` and return its report with the status the process exits with.
+///
+/// # Errors
+///
+/// Refuses an unreadable current directory or any fetch error: invalid
+/// remote or target, failed checkout or arrivals, or incomplete cleanup.
+/// Failed verification returns a refusal report with a non-zero status.
 pub fn run_fetch(args: &FetchArgs) -> Result<Outcome, HomeError> {
     let base = current_dir()?;
     let inherited: Vec<(OsString, OsString)> = std::env::vars_os().collect();

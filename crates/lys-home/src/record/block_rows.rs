@@ -63,6 +63,11 @@ pub struct BlockRowWriter {
 impl BlockRowWriter {
     /// Open the rows file beside a session file for appending, creating it
     /// when it is absent.
+    ///
+    /// # Errors
+    ///
+    /// Refuses by path when the block rows file cannot be opened for append
+    /// or created.
     pub fn open(session_file: &Path) -> Result<Self, HomeError> {
         let path = Index::blocks_path(session_file);
         let file = fs::OpenOptions::new()
@@ -86,6 +91,11 @@ impl BlockRowWriter {
     /// Append one row: the part `part` of the entry `entry`, stored under
     /// `hash` as `len` bytes. Only the entry, the index and the hash are
     /// written; the length is held for the loss entry and never written.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the row cannot be serialised or appended to the rows
+    /// file; its in-memory row is added only after the append succeeds.
     pub fn append(
         &mut self,
         entry: &str,
@@ -124,6 +134,10 @@ impl BlockRowWriter {
     }
 
     /// Make every row appended so far durable: the file, then its directory.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the rows file or its containing directory cannot be synced.
     pub fn sync(&self) -> Result<(), HomeError> {
         self.file
             .sync_all()
@@ -135,6 +149,11 @@ impl BlockRowWriter {
 /// The rows beside a session file, in file order; `None` when the rows
 /// file is absent, as it is for a session imported before it existed. A row
 /// that does not parse is refused by line.
+///
+/// # Errors
+///
+/// Refuses a rows file that cannot be opened or read, or a row that does
+/// not parse, naming its line. An absent file returns `None`.
 pub fn read_block_rows(session_file: &Path) -> Result<Option<Vec<BlockRow>>, HomeError> {
     let path = Index::blocks_path(session_file);
     let file = match fs::File::open(&path) {

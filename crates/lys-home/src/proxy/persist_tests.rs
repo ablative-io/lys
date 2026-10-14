@@ -92,18 +92,41 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         seen: Seen::default(),
     };
     journal.write(&job.call)?;
+    interrupt(
+        checkpoint,
+        &home,
+        &journal,
+        &mut job,
+        &blocks,
+        (&request, &response, &capture),
+        req,
+    )?;
+    // Only the intent is durable: the measured duration and call append were interrupted.
+    drop(job);
+    let reports = recover(&home, &journal, &capture)?;
+    assert_eq!(reports.len(), 1);
+    assert_eq!(reports[0].status, CallStatus::Complete);
+    assert!(reports[0].retired);
+    recovered_record(&home, &blocks, checkpoint, resp, &journal, &capture)?;
+    Ok(())
+}
+
+fn interrupt(
+    checkpoint: u8,
+    home: &Home,
+    journal: &Journal,
+    job: &mut Job,
+    blocks: &BlockStore,
+    paths: (&std::path::Path, &std::path::Path, &std::path::Path),
+    request_bytes: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (request, response, capture) = paths;
     if checkpoint == 3 {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o500))?;
+        std::fs::set_permissions(capture, std::fs::Permissions::from_mode(0o500))?;
         let mut sessions = OpenSessions::default();
-        let result = ingest(
-            &home,
-            &journal,
-            &mut sessions,
-            "unlinked-2000-01-01",
-            &mut job,
-        );
-        std::fs::set_permissions(&capture, std::fs::Permissions::from_mode(0o700))?;
+        let result = ingest(home, journal, &mut sessions, "unlinked-2000-01-01", job);
+        std::fs::set_permissions(capture, std::fs::Permissions::from_mode(0o700))?;
         let (status, report) = result?;
         assert_eq!(status, CallStatus::Complete);
         assert!(!report.already_recorded);
@@ -114,23 +137,28 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         assert!(timing.request_spool_kept && timing.response_spool_kept);
         assert_eq!(timing.refusals.len(), 2);
     } else if checkpoint == 0 {
-        blocks.admit_spool(&request, &Hash::of(req))?;
+        blocks.admit_spool(request, &Hash::of(request_bytes))?;
         assert!(!request.exists());
         assert!(response.exists());
     } else {
-        install(&blocks, &journal, &mut job)?;
+        install(blocks, journal, job)?;
         assert!(!request.exists());
         assert!(!response.exists());
         if checkpoint == 2 {
             journal.write(&job.call)?;
         }
     }
-    // Only the intent is durable: the measured duration and call append were interrupted.
-    drop(job);
-    let reports = recover(&home, &journal, &capture)?;
-    assert_eq!(reports.len(), 1);
-    assert_eq!(reports[0].status, CallStatus::Complete);
-    assert!(reports[0].retired);
+    Ok(())
+}
+
+fn recovered_record(
+    home: &Home,
+    blocks: &BlockStore,
+    checkpoint: u8,
+    response: &[u8],
+    journal: &Journal,
+    capture: &std::path::Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     let session = home.open_session("unlinked-2000-01-01")?;
     let calls = session.customs_everywhere(CUSTOM_CALL)?;
     let crate::record::entries::EntryBody::Custom {
@@ -155,8 +183,8 @@ fn recover_at(checkpoint: u8) -> Result<(), Box<dyn std::error::Error>> {
         blocks.get(&Hash::parse(
             record.raw_response.as_deref().ok_or("raw body absent")?
         )?)?,
-        resp
+        response
     );
-    assert!(recover(&home, &journal, &capture)?.is_empty());
+    assert!(recover(home, journal, capture)?.is_empty());
     Ok(())
 }

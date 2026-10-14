@@ -120,34 +120,7 @@ pub(super) async fn capture_whole(
     }
     assert_eq!(report.status, status);
     assert!(report.retired);
-    let calls = harness.calls(KEY)?;
-    if sent.len() > 64 * 1024 * 1024 {
-        println!("capture_measurements={:?}", calls[0].capture);
-    }
-    assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].status, status);
-    assert!(calls[0].stream);
-    let hash_started = std::time::Instant::now();
-    let raw_hash = Hash::of(&sent);
-    if sent.len() >= 64 * 1024 * 1024 {
-        println!(
-            "fixture_hash_nanoseconds={}",
-            hash_started.elapsed().as_nanos()
-        );
-    }
-    assert_eq!(calls[0].raw_response, Some(raw_hash.to_string()));
-    let blocks = harness.home()?.blocks()?;
-    assert_eq!(blocks.get(&raw_hash)?, &*sent);
-    if status == CallStatus::Complete {
-        assert_eq!(calls[0].response.len(), 1);
-        let part = blocks.get(&Hash::parse(&calls[0].response[0])?)?;
-        assert_eq!(
-            serde_json::from_slice::<serde_json::Value>(&part)?,
-            json!({"type":"text","text":"answer"})
-        );
-    } else {
-        assert!(calls[0].response.is_empty());
-    }
+    recorded_body(&harness, &sent, status)?;
     assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 1);
     connection.abort();
     if let Err(error) = connection.await
@@ -378,3 +351,35 @@ const MEMBERS: &[u8] = &[
     56, 205, 30, 162, 142, 41, 233, 139, 183, 138, 243, 15, 185, 242, 3, 22, 207, 51, 188, 220, 0,
     0, 0,
 ];
+
+fn recorded_body(harness: &Harness, sent: &[u8], status: CallStatus) -> Res {
+    let calls = harness.calls(KEY)?;
+    if sent.len() > 64 * 1024 * 1024 {
+        println!("capture_measurements={:?}", calls[0].capture);
+    }
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].status, status);
+    assert!(calls[0].stream);
+    let hash_started = std::time::Instant::now();
+    let raw_hash = Hash::of(sent);
+    if sent.len() >= 64 * 1024 * 1024 {
+        println!(
+            "fixture_hash_nanoseconds={}",
+            hash_started.elapsed().as_nanos()
+        );
+    }
+    assert_eq!(calls[0].raw_response, Some(raw_hash.to_string()));
+    let blocks = harness.home()?.blocks()?;
+    assert_eq!(blocks.get(&raw_hash)?, sent);
+    if status == CallStatus::Complete {
+        assert_eq!(calls[0].response.len(), 1);
+        let part = blocks.get(&Hash::parse(&calls[0].response[0])?)?;
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&part)?,
+            json!({"type":"text","text":"answer"})
+        );
+    } else {
+        assert!(calls[0].response.is_empty());
+    }
+    Ok(())
+}

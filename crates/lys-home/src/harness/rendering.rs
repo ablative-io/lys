@@ -129,6 +129,7 @@ pub(crate) fn filtered_seat(seat: &SeatFields) -> SeatFields {
 }
 
 /// Run the seat's status command after Lys with the same input and one output line.
+#[must_use]
 pub fn status_line_command(command: Option<&str>) -> String {
     let Some(command) = command else {
         return STATUS_LINE_COMMAND.to_owned();
@@ -191,11 +192,19 @@ fn resolve(contract: &str) -> Option<Contract> {
 }
 
 /// Whether the rendering registry can resolve this explicit contract.
+#[must_use]
 pub fn registered(contract: &str) -> bool {
     resolve(contract).is_some()
 }
 
 /// Resolve the explicit rendering contract; display names are never examined.
+///
+/// # Errors
+///
+/// Refuses an unknown contract or fields the selected contract cannot
+/// represent, including confinement, model encoding, MCP transports,
+/// proxy bindings, skills, secrets or seat declarations. Native-template
+/// validation and serialisation failures name the affected member.
 pub fn render(
     input: &impl TemplateFields,
     skills: &[SkillFile],

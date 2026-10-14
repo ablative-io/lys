@@ -141,6 +141,11 @@ impl ConfigDir {
     /// absolute path: a relative one, an empty one or one beginning with
     /// `~` would resolve against lys-home's own working directory, which is
     /// never the session's.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when neither the template nor the process home names a config
+    /// directory, or the chosen path is empty, relative or begins with `~`.
     pub fn resolve(template: Option<&str>, process_home: Option<&Path>) -> Result<Self, HomeError> {
         if let Some(dir) = template {
             let path = absolute_or_refused(CONFIG_DIR_VARIABLE, Path::new(dir))?;
@@ -224,6 +229,12 @@ pub struct Resolution {
 /// and the two written files keep their paths relative to `out`.
 ///
 /// [`given_path`]: crate::harness::claude_code::given_path
+///
+/// # Errors
+///
+/// Refuses a working directory that is not absolute, a path that cannot
+/// be canonicalised for a reason other than absence, or a document that
+/// cannot be read to measure its length and hash.
 pub fn resolve_given(
     cwd: &str,
     mut config_dir: ConfigDir,

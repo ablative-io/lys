@@ -20,6 +20,12 @@ use crate::record::now;
 /// session id, each record naming `cwd`. The file is created exclusively and
 /// never written over; it is synced with its directory before the count of
 /// records written is answered.
+///
+/// # Errors
+///
+/// Refuses an existing output, an output directory that cannot be created,
+/// or records that cannot be serialised, written and synced with their
+/// directory.
 pub fn write_fewshot(out: &Path, turns: &[(Role, String)], cwd: &str) -> Result<u64, HomeError> {
     let session_id = random_uuid();
     let mut prev: Option<String> = None;

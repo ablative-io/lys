@@ -42,6 +42,11 @@ pub struct Added {
 
 /// The epilogue data of a `lys.lantern_epilogue` entry of `session`, refused
 /// by name when the entry is not one or its data is not the epilogue shape.
+///
+/// # Errors
+///
+/// Refuses as `EntryShape` when the entry is not a `lys.lantern_epilogue`
+/// with data that reads as `EpilogueData`.
 pub fn epilogue_of(session: &str, entry: &Entry) -> Result<EpilogueData, HomeError> {
     data_of(session, entry, CUSTOM_LANTERN_EPILOGUE)
 }
@@ -59,6 +64,12 @@ fn epilogues_so_far(owner: &Session, session: &str, lantern: &str) -> Result<usi
 }
 
 /// Add `words` as an epilogue to the lantern `lantern` of `session`, by `by`.
+///
+/// # Errors
+///
+/// Refuses an absent, unsafe or held session, an unknown or malformed
+/// lantern, a blank epilogue, or an existing epilogue with malformed data.
+/// Session reads, data serialisation and the durable append can also refuse.
 pub fn add_epilogue(
     home: &Home,
     session: &str,

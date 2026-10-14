@@ -81,6 +81,11 @@ pub struct RenderManifest {
 
 impl RenderManifest {
     /// Store the manifest as a block of the home.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the manifest cannot be serialised or its bytes cannot
+    /// be stored and made durable as a block.
     pub fn store(&self, blocks: &BlockStore) -> Result<Put, HomeError> {
         let bytes = serde_json::to_vec(self).map_err(|source| HomeError::Json {
             context: "the render manifest could not be serialised",
@@ -158,6 +163,11 @@ impl HarnessEvent {
 /// The event a non-message record maps to, storing the record as a block:
 /// `attachment`, `system` and `permission-mode` records; `None` for a record
 /// type R8 does not map.
+///
+/// # Errors
+///
+/// Refuses when a mapped record cannot be serialised or stored as a
+/// durable block. An unmapped record type returns `None`.
 pub fn event_of(record: &Value, blocks: &BlockStore) -> Result<Option<HarnessEvent>, HomeError> {
     let kind = record.get("type").and_then(Value::as_str).unwrap_or("");
     let (event_kind, detail) = match kind {

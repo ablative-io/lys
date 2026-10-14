@@ -52,6 +52,12 @@ pub struct ForkReport {
 /// The distinct candidate hashes the copied entries name: each content
 /// part of a message entry by its own SHA-256, and each block hash a
 /// harness event or call record names in its data.
+///
+/// # Errors
+///
+/// Refuses a content part that cannot be serialised, a named hash that
+/// is not 64 lowercase hex digits, or a hash field or list item of the
+/// wrong shape.
 pub fn candidate_hashes(session: &str, entries: &[Entry]) -> Result<BTreeSet<Hash>, HomeError> {
     let mut out = BTreeSet::new();
     for entry in entries {

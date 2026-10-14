@@ -44,6 +44,12 @@ impl GivenStatement {
     /// Sign `canonical`, the record of the `lys.given` entry `given`, with
     /// `key`, keep the statement as a block and append the entry under
     /// `given`, leaving the head where it stands.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the statement cannot be stored as a durable block, its
+    /// entry data cannot be serialised, or the session cannot append it
+    /// under the named given entry.
     pub fn sign(
         session: &mut Session,
         blocks: &BlockStore,
@@ -72,6 +78,11 @@ impl GivenStatement {
 
     /// Every `lys.given_statement` entry of the session in file order, each
     /// with its id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, an unreadable or mismatched custom row, or
+    /// statement data that does not read as a `GivenStatement`.
     pub fn read_all(session: &Session) -> Result<Vec<(String, Self)>, HomeError> {
         session
             .customs_everywhere(CUSTOM_GIVEN_STATEMENT)?

@@ -48,13 +48,14 @@ use crate::harness::claude_code::launch_env::{
 use crate::harness::claude_code::render::{RenderTarget, render_claude_code};
 use crate::harness::claude_code::seed::seed_argument;
 use crate::harness::claude_code::template::{Template, read_template};
+use crate::harness::launch_fields::KeptSkill;
 use crate::harness::rendering_launch::{NO_SETTING_SOURCES, ONLY_GIVEN_MCP, always_given};
 use crate::harness::skills;
-use crate::record::blocks::Hash;
+use crate::record::blocks::{BlockStore, Hash};
 use crate::record::entries::{CUSTOM_HARNESS_EVENT, EntryBody};
-use crate::record::given::GivenRecord;
+use crate::record::given::{CanonicalGiven, GivenRecord};
 use crate::record::given_statement::GivenStatement;
-use crate::record::{Home, safe_component};
+use crate::record::{Home, Session, safe_component};
 
 /// The MCP configuration file's name under `--out`.
 pub const MCP_FILE: &str = "mcp.json";
@@ -119,9 +120,31 @@ fn targets(out: &Path, uuid: &str) -> [PathBuf; 5] {
     ]
 }
 
-/// Run `render-launch` and return its report.
-pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
-    let (mut template, template_bytes) = read_template(&args.template)?;
+struct PreparedLaunch {
+    template: Template,
+    template_bytes: Vec<u8>,
+    home: Home,
+    session: Session,
+    out: PathBuf,
+    paths: [PathBuf; 5],
+    signing: Option<Signing>,
+    config_dir: ConfigDir,
+}
+
+struct Signing {
+    key: Ed25519Identity,
+    statement: PathBuf,
+    payload: PathBuf,
+}
+
+struct SignedFiles {
+    entry: String,
+    statement: PathBuf,
+    payload: PathBuf,
+}
+
+fn prepare(args: &LaunchArgs) -> Result<PreparedLaunch, HomeError> {
+    let (template, template_bytes) = read_template(&args.template)?;
     confinement_named(&template)?;
     own_setup_left_out(&template)?;
     safe_component("uuid", &args.uuid)?;
@@ -136,13 +159,21 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         })
         .transpose()?;
     let home = Home::open(&args.home)?;
-    let mut session = home.open_session(&args.session)?;
+    let session = home.open_session(&args.session)?;
     let out = std::path::absolute(&args.out)
         .map_err(|e| HomeError::io("resolving the out directory", &args.out, e))?;
     let [rendered, loss, mcp_file, env, instructions] = targets(&out, &args.uuid);
-    let signing = key.map(|key| (key, out.join(STATEMENT_FILE), out.join(PAYLOAD_FILE)));
+    let signing = key.map(|key| Signing {
+        key,
+        statement: out.join(STATEMENT_FILE),
+        payload: out.join(PAYLOAD_FILE),
+    });
     let mut refused = vec![&rendered, &loss, &mcp_file, &env, &instructions];
-    refused.extend(signing.iter().flat_map(|(_, cose, data)| [cose, data]));
+    refused.extend(
+        signing
+            .iter()
+            .flat_map(|signing| [&signing.statement, &signing.payload]),
+    );
     for path in refused {
         if path.exists() {
             return Err(HomeError::LaunchTargetExists { path: path.clone() });
@@ -172,6 +203,37 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     // Before anything is written: a plugin the run's config directory lacks
     // would be turned on and silently not load.
     super::installed_plugins::require(&config_dir.path, &template.plugins)?;
+    Ok(PreparedLaunch {
+        template,
+        template_bytes,
+        home,
+        session,
+        out,
+        paths: [rendered, loss, mcp_file, env, instructions],
+        signing,
+        config_dir,
+    })
+}
+
+/// Run `render-launch` and return its report.
+///
+/// # Errors
+///
+/// Refuses an invalid template, unnamed confinement, unsafe uuid, invalid
+/// signing key, existing target, or unsuitable config directory or plugins.
+/// Session reads, rendering, file and block writes, given-document
+/// resolution and recording the render can also refuse.
+pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
+    let PreparedLaunch {
+        mut template,
+        template_bytes,
+        home,
+        mut session,
+        out,
+        paths: [rendered, loss, mcp_file, env, instructions],
+        signing,
+        config_dir,
+    } = prepare(args)?;
     let session_head = session.head_hash()?;
     let head = session.head()?.map(str::to_owned);
     let target = RenderTarget {
@@ -203,22 +265,12 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     } else {
         skills::write(&config_dir.path, &template.skills)?
     };
-    let skill_paths: Vec<PathBuf> = skills
-        .iter()
-        .map(|skill| config_dir.path.join(&skill.path))
-        .collect();
-    let mut written: Vec<&Path> = vec![&rendered, &loss, &mcp_file, &env, &instructions];
-    if let Some(seed) = &render.seed {
-        written.push(seed);
-    }
-    written.extend(skill_paths.iter().map(PathBuf::as_path));
-    let mut files = Vec::with_capacity(written.len());
-    for path in written {
-        files.push(ManifestFile {
-            path: path.to_path_buf(),
-            sha256: hash_file(path)?.as_str().to_owned(),
-        });
-    }
+    let files = manifest_files(
+        &[&rendered, &loss, &mcp_file, &env, &instructions],
+        render.seed.as_deref(),
+        &config_dir.path,
+        &skills,
+    )?;
     let manifest = RenderManifest {
         template: stored.hash.as_str().to_owned(),
         session_head: session_head.as_str().to_owned(),
@@ -242,15 +294,7 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
     })?;
     let given_id = given.append_under(&mut session, &event_id)?;
     let canonical = given.canonical_bytes()?;
-    let signed = match &signing {
-        Some((key, cose_file, data_file)) => {
-            let signed = GivenStatement::sign(&mut session, &blocks, &given_id, &canonical, key)?;
-            write_new(data_file, canonical.as_bytes())?;
-            write_new(cose_file, &signed.cose)?;
-            Some((signed.entry, cose_file, data_file))
-        }
-        None => None,
-    };
+    let signed = sign_given(signing, &mut session, &blocks, &given_id, &canonical)?;
     let launch = launch_line(
         &template,
         &rendered,
@@ -275,10 +319,10 @@ pub fn render_launch(args: &LaunchArgs) -> Result<Value, HomeError> {
         "skills": skills,
         "signing": if signed.is_some() { "signed" } else { "unsigned" },
     });
-    if let Some((entry, cose_file, data_file)) = signed {
-        report["statement"] = json!(entry);
-        report["statement_file"] = json!(cose_file);
-        report["payload_file"] = json!(data_file);
+    if let Some(signed) = signed {
+        report["statement"] = json!(signed.entry);
+        report["statement_file"] = json!(signed.statement);
+        report["payload_file"] = json!(signed.payload);
     }
     Ok(report)
 }
@@ -358,4 +402,50 @@ fn with_newline(mut bytes: Vec<u8>) -> Vec<u8> {
 fn hash_file(path: &Path) -> Result<Hash, HomeError> {
     let bytes = std::fs::read(path).map_err(|e| HomeError::io("hashing a launch file", path, e))?;
     Ok(Hash::of(&bytes))
+}
+
+fn manifest_files(
+    paths: &[&Path],
+    seed: Option<&Path>,
+    config_dir: &Path,
+    skills: &[KeptSkill],
+) -> Result<Vec<ManifestFile>, HomeError> {
+    let skill_paths: Vec<PathBuf> = skills
+        .iter()
+        .map(|skill| config_dir.join(&skill.path))
+        .collect();
+
+    let mut written = paths.to_vec();
+    if let Some(seed) = seed {
+        written.push(seed);
+    }
+    written.extend(skill_paths.iter().map(PathBuf::as_path));
+    let mut files = Vec::with_capacity(written.len());
+    for path in written {
+        files.push(ManifestFile {
+            path: path.to_path_buf(),
+            sha256: hash_file(path)?.as_str().to_owned(),
+        });
+    }
+    Ok(files)
+}
+
+fn sign_given(
+    signing: Option<Signing>,
+    session: &mut Session,
+    blocks: &BlockStore,
+    given: &str,
+    canonical: &CanonicalGiven,
+) -> Result<Option<SignedFiles>, HomeError> {
+    let Some(signing) = signing else {
+        return Ok(None);
+    };
+    let signed = GivenStatement::sign(session, blocks, given, canonical, &signing.key)?;
+    write_new(&signing.payload, canonical.as_bytes())?;
+    write_new(&signing.statement, &signed.cose)?;
+    Ok(Some(SignedFiles {
+        entry: signed.entry,
+        statement: signing.statement,
+        payload: signing.payload,
+    }))
 }

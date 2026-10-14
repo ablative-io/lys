@@ -22,6 +22,11 @@ use crate::error::HomeError;
 pub const MEASURED_VERSION: &str = "0.156.0";
 
 /// Refuse any Codex version but the measured one, exactly; no prefix passes.
+///
+/// # Errors
+///
+/// Refuses any version unequal to `MEASURED_VERSION` as
+/// `UnmeasuredCodexVersion`.
 pub fn check_version(version: &str) -> Result<(), HomeError> {
     if version == MEASURED_VERSION {
         Ok(())
@@ -49,6 +54,11 @@ fn iana_shaped(name: &str) -> bool {
 /// The zone of a name from the bundled database. An absent or empty name,
 /// or one not IANA-shaped, is refused as unnamed; a shaped name the database
 /// does not hold is refused as unknown.
+///
+/// # Errors
+///
+/// Refuses an absent, empty or non-IANA-shaped name as `UnnamedTimeZone`,
+/// and a name absent from the bundled database as `UnknownTimeZone`.
 pub fn zone_of(name: Option<&str>) -> Result<TimeZone, HomeError> {
     let Some(name) = name else {
         return Err(HomeError::Translate(TranslateError::UnnamedTimeZone {
@@ -70,6 +80,11 @@ pub fn zone_of(name: Option<&str>) -> Result<TimeZone, HomeError> {
 
 /// An entry's stamp parsed as RFC 3339; a stamp that does not parse is
 /// refused naming the entry.
+///
+/// # Errors
+///
+/// Refuses a stamp that does not parse as RFC 3339 as `StampNotRfc3339`,
+/// naming the entry rather than quoting the stamp.
 pub fn parse_stamp(entry: &str, stamp: &str) -> Result<OffsetDateTime, HomeError> {
     // The parser's own error would quote the stamp; the refusal names the entry.
     OffsetDateTime::parse(stamp, &Rfc3339)
@@ -80,12 +95,22 @@ pub fn parse_stamp(entry: &str, stamp: &str) -> Result<OffsetDateTime, HomeError
 }
 
 /// An entry's stamp as the local date and time in the zone, to the second.
+///
+/// # Errors
+///
+/// Refuses a stamp that does not parse as RFC 3339 or whose instant is
+/// outside the timestamp range the zone conversion accepts.
 pub fn local_time(entry: &str, stamp: &str, zone: &TimeZone) -> Result<DateTime, HomeError> {
     in_zone(entry, parse_stamp(entry, stamp)?, zone)
 }
 
 /// An instant already parsed from an entry's stamp, as the local date and
 /// time in the zone, to the second.
+///
+/// # Errors
+///
+/// Refuses as `StampNotRfc3339` when the instant's Unix seconds are
+/// outside the timestamp range the zone conversion accepts.
 pub fn in_zone(
     entry: &str,
     instant: OffsetDateTime,

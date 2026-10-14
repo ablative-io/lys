@@ -76,6 +76,11 @@ impl Git {
 
     /// Run a git command with this input on its standard input, and return
     /// its exit code and standard output whatever the code.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot be started, its input cannot be written, or its
+    /// output cannot be collected. A non-zero exit is returned in `Ran`.
     pub fn run(&self, args: &[&dyn AsRef<OsStr>], input: Option<&[u8]>) -> Result<Ran, HomeError> {
         let mut command = Command::new("git");
         command.env_clear();
@@ -155,6 +160,11 @@ impl Git {
 
     /// Run a git command and return its standard output; a non-zero exit
     /// refuses as `git_failed`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the command cannot run or exits with a code other than
+    /// zero, including an end by signal; `git_failed` names the subcommand.
     pub fn output(
         &self,
         args: &[&dyn AsRef<OsStr>],
@@ -169,6 +179,11 @@ impl Git {
     }
 
     /// Run a git command and return its standard output as trimmed text.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the command cannot run or does not exit with code zero.
+    /// The refusal names the subcommand, never its output.
     pub fn text(&self, args: &[&dyn AsRef<OsStr>]) -> Result<String, HomeError> {
         let stdout = self.output(args, None)?;
         Ok(String::from_utf8_lossy(&stdout).trim().to_owned())
@@ -176,6 +191,11 @@ impl Git {
 
     /// The commit a ref names, or `None` when the repository has no such
     /// ref.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot run or `rev-parse` exits with a code other than
+    /// zero or one. Exit one means the ref names no commit.
     pub fn commit_of(&self, name: &str) -> Result<Option<String>, HomeError> {
         let spec = format!("{name}^{{commit}}");
         let ran = self.run(&[&"rev-parse", &"--verify", &"--quiet", &spec], None)?;
@@ -188,6 +208,11 @@ impl Git {
 
     /// Initialise the repository: `bare` for a remote, otherwise with this
     /// runner's work tree.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot run or cannot initialise this repository,
+    /// including a repository directory it cannot write.
     pub fn init(&self, bare: bool) -> Result<(), HomeError> {
         if bare {
             self.output(&[&"init", &"--quiet", &"--bare"], None)?;
@@ -200,6 +225,11 @@ impl Git {
     /// Write each file under `root` named by these root-relative paths into
     /// the repository with `hash-object -w --no-filters`, and return each
     /// blob's id, in the order given.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot read or store a named file, cannot run, or
+    /// answers with a different number of blob ids than paths.
     pub fn hash_files(&self, root: &Path, paths: &[String]) -> Result<Vec<String>, HomeError> {
         if paths.is_empty() {
             return Ok(Vec::new());
@@ -230,6 +260,11 @@ impl Git {
 
     /// Put these root-relative files into the index as regular files, each
     /// written into the repository first; entries for other paths stay.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when a named file cannot be stored as a blob or git cannot
+    /// update the index with those blobs.
     pub fn stage(&self, root: &Path, paths: &[String]) -> Result<(), HomeError> {
         let ids = self.hash_files(root, paths)?;
         let mut info = Vec::new();
@@ -243,6 +278,11 @@ impl Git {
 
     /// Make the index hold exactly these root-relative files, and write it
     /// as a tree; returns the tree's id.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot clear the index, store and stage the named
+    /// files, or write the resulting tree.
     pub fn stage_exactly(&self, root: &Path, paths: &[String]) -> Result<String, HomeError> {
         self.output(&[&"read-tree", &"--empty"], None)?;
         self.stage(root, paths)?;
@@ -251,6 +291,11 @@ impl Git {
 
     /// Commit a tree with at most one parent and this message; returns the
     /// commit's id. No ref moves.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot write the commit from the given tree and
+    /// parent, or the command cannot be run.
     pub fn commit_tree(
         &self,
         tree: &str,
@@ -264,12 +309,20 @@ impl Git {
     }
 
     /// The paths a tree-ish holds, recursively, as git names them.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot run or `ls-tree` cannot read the named tree.
     pub fn tree_paths(&self, treeish: &str) -> Result<Vec<String>, HomeError> {
         let stdout = self.output(&[&"ls-tree", &"-r", &"-z", &"--name-only", &treeish], None)?;
         Ok(nul_separated(&stdout))
     }
 
     /// The paths the index holds.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when git cannot run or `ls-files` cannot read the index.
     pub fn index_paths(&self) -> Result<Vec<String>, HomeError> {
         let stdout = self.output(&[&"ls-files", &"-z", &"--cached"], None)?;
         Ok(nul_separated(&stdout))

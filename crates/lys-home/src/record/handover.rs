@@ -55,6 +55,13 @@ pub struct HandoverReport {
 /// letter entry being an assistant message, the run standing next to each
 /// other on the root-to-head path in the order given, no entry authored,
 /// and at least one thinking block.
+///
+/// # Errors
+///
+/// Refuses a non-empty successor, an unreadable outgoing session, or a
+/// letter that is not a contiguous run of assistant messages on its path,
+/// is authored, or has no thinking block. Successor creation, entry
+/// serialisation, durable writes and readback failures propagate.
 pub fn handover(
     home: &Path,
     from: &str,

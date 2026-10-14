@@ -39,6 +39,12 @@ impl Session {
     /// four syncs regardless of the entry count; staged entries remain
     /// unsynced until publication. A failed write is reconciled before any
     /// later act, and its error is returned even when reconciliation succeeds.
+    ///
+    /// # Errors
+    ///
+    /// Refuses failed reconciliation, duplicate generated ids, overflowing
+    /// byte offsets, or entries that cannot be encoded. A failed line, row,
+    /// head or call-map write also refuses, even if reconciliation succeeds.
     pub fn append_all(&mut self, bodies: &[EntryBody]) -> Result<Vec<String>, HomeError> {
         self.append_all_observed(bodies, |_| {})
     }

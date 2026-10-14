@@ -34,6 +34,12 @@ pub struct ForkArgs {
 }
 
 /// Run `fork` and return its report.
+///
+/// # Errors
+///
+/// Refuses an absent home, a lantern that cannot be resolved and cut,
+/// a child that cannot be published, or a fork report that cannot be
+/// serialised.
 pub fn run(args: &ForkArgs) -> Result<Value, HomeError> {
     let home = Home::read(&args.home)?;
     let report = fork(&home, &args.lantern, args.session.as_deref())?;

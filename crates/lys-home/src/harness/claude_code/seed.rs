@@ -125,6 +125,12 @@ pub(crate) fn sessions_dir_of(file: &Path) -> Result<&Path, HomeError> {
 /// The seed the session's path calls for: `None` unless the path carries a
 /// `lys.forked_from` entry with `coordinate_carried` true, in which case the
 /// carried entry is read from the parent session beside this one.
+///
+/// # Errors
+///
+/// Refuses malformed fork data, an unsafe parent id, a session outside a
+/// sessions directory, an unreadable parent or carried entry, or a carried
+/// entry with no message, invalid content, or text parts without text.
 pub fn seed_of(session: &Session, path: &[Entry]) -> Result<Option<Seed>, HomeError> {
     let Some(entry) = path
         .iter()
@@ -165,6 +171,11 @@ pub fn seed_path(rendered: &Path) -> PathBuf {
 }
 
 /// Write the seed to a path that does not yet exist, and sync it.
+///
+/// # Errors
+///
+/// Refuses an existing path or a seed file that cannot be created,
+/// written or synced.
 pub fn write_seed(path: &Path, seed: &Seed) -> Result<(), HomeError> {
     let mut file = std::fs::OpenOptions::new()
         .create_new(true)

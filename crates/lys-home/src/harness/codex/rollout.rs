@@ -25,6 +25,7 @@ use crate::error::TranslateError;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use jiff::tz::TimeZone;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -153,6 +154,14 @@ pub(crate) fn text_only(kind: &str, index: usize) -> String {
 }
 
 /// Translate the session's context path into a Codex rollout under `out`.
+///
+/// # Errors
+///
+/// Refuses an unmeasured version, unnamed or unknown zone, empty context,
+/// invalid stamp, existing output or account, or unreadable session entries.
+/// Encoding, writing, syncing and appending the translation leaf can
+/// also refuse. A failed account write or leaf append attempts to remove
+/// the output files, then returns the original failure.
 pub fn translate(
     session: &mut Session,
     out: &Path,
@@ -166,30 +175,9 @@ pub fn translate(
         api: "translate-codex",
         reason: "the session holds no entry to translate",
     })?;
-    let mut head_instant = None;
-    for entry in beside.context() {
-        let instant = parse_stamp(entry.id(), &entry.base.timestamp)?;
-        if std::ptr::eq(entry, head) {
-            head_instant = Some(instant);
-        }
-    }
     let head_stamp = head.base.timestamp.as_str();
-    let head_instant = match head_instant {
-        Some(instant) => instant,
-        None => parse_stamp(head.id(), head_stamp)?,
-    };
-    let local = in_zone(head.id(), head_instant, &zone)?;
     let session_id = session.header().id.as_str();
-    let thread = record_uuid(session_id, head.id());
-    let name = format!(
-        "rollout-{}-{}.jsonl",
-        local.strftime("%Y-%m-%dT%H-%M-%S"),
-        thread
-    );
-    let relative = format!("sessions/{}/{name}", local.strftime("%Y/%m/%d"));
-    let rollout = relative
-        .split('/')
-        .fold(out.to_path_buf(), |at, part| at.join(part));
+    let (thread, relative, rollout) = rollout_path(&beside, head, out, &zone, session_id)?;
     let account_path = rollout.with_extension("loss.json");
     for target in [&rollout, &account_path] {
         if target.exists() {
@@ -397,4 +385,37 @@ fn body_keys(body: &EntryBody) -> BTreeSet<&str> {
         )
         .filter(|key| !frame.contains(key))
         .collect()
+}
+
+fn rollout_path(
+    beside: &Beside,
+    head: &Entry,
+    out: &Path,
+    zone: &TimeZone,
+    session_id: &str,
+) -> Result<(String, String, PathBuf), HomeError> {
+    let mut head_instant = None;
+    for entry in beside.context() {
+        let instant = parse_stamp(entry.id(), &entry.base.timestamp)?;
+        if std::ptr::eq(entry, head) {
+            head_instant = Some(instant);
+        }
+    }
+    let head_stamp = head.base.timestamp.as_str();
+    let head_instant = match head_instant {
+        Some(instant) => instant,
+        None => parse_stamp(head.id(), head_stamp)?,
+    };
+    let local = in_zone(head.id(), head_instant, zone)?;
+    let thread = record_uuid(session_id, head.id());
+    let name = format!(
+        "rollout-{}-{}.jsonl",
+        local.strftime("%Y-%m-%dT%H-%M-%S"),
+        thread
+    );
+    let relative = format!("sessions/{}/{name}", local.strftime("%Y/%m/%d"));
+    let rollout = relative
+        .split('/')
+        .fold(out.to_path_buf(), |at, part| at.join(part));
+    Ok((thread, relative, rollout))
 }

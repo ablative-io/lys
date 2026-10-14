@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use super::launch_template::parse;
-use crate::harness::launch_fields::{InstructionsMode, Transport};
+use super::launch_template::{Template, parse};
+use crate::harness::launch_fields::{InstructionsMode, LaunchFields, LaunchMcp, Transport};
 use crate::harness::rendering_launch::{File, Launch};
 use crate::harness::skills::check;
 use crate::record::blocks::Hash;
@@ -65,35 +65,7 @@ fn runner_path(environment: &BTreeMap<String, String>, name: &str) -> Result<Str
 
 pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Result<Launch, String> {
     let template = parse(text)?;
-    let mut servers = serde_json::Map::new();
-    for server in &template.fields.mcp_servers {
-        let value = match &server.transport {
-            Transport::Http { url } => json!({"url": url}),
-            Transport::Stdio {
-                program,
-                args,
-                cwd,
-                env,
-                handles,
-            } => {
-                let variables: BTreeMap<_, _> = env
-                    .iter()
-                    .map(|one| (one.name.clone(), one.text.clone()))
-                    .chain(
-                        handles
-                            .iter()
-                            .map(|one| (one.name.clone(), one.handle_id.clone())),
-                    )
-                    .collect();
-                let mut value = json!({"command": program, "args": args, "env": variables});
-                if let Some(cwd) = cwd {
-                    value["cwd"] = json!(cwd);
-                }
-                value
-            }
-        };
-        servers.insert(server.name.clone(), value);
-    }
+    let servers = server_values(&template.fields.mcp_servers);
     let mut files = Vec::new();
     let mut argument_files = BTreeMap::new();
     for skill in &template.skills {
@@ -102,45 +74,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
     }
     // Each profile server augments the native setup rather than replacing its table.
     let mut arguments = vec!["--model".to_owned(), template.fields.models[0].clone()];
-    if let Some(settings) = &template.seat.settings {
-        for (key, value) in settings {
-            if key == "notify"
-                || (template.fields.model_proxy.is_some()
-                    && matches!(key.as_str(), "model_provider" | "model_providers"))
-            {
-                continue;
-            }
-            if key.is_empty()
-                || !key
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
-            {
-                return Err(format!("settings.{key}: is not a bare native config key"));
-            }
-            arguments.extend([
-                "-c".to_owned(),
-                format!(
-                    "{key}={}",
-                    native_value(value).map_err(|error| format!("settings.{key}: {error}"))?
-                ),
-            ]);
-        }
-    }
-    for (name, value) in &servers {
-        if name.is_empty()
-            || !name
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-        {
-            return Err(format!(
-                "mcp_servers: `{name}` is not a bare TOML key; use letters, digits, _ and -"
-            ));
-        }
-        arguments.extend([
-            "-c".to_owned(),
-            format!("mcp_servers.{name}={}", native_value(value)?),
-        ]);
-    }
+    native_settings(&template, &servers, &mut arguments)?;
     let program_path = runner_path(
         &template.environment,
         crate::harness::rendering::PROGRAM_VARIABLE,
@@ -162,27 +96,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
             ]))?
         ),
     ]);
-    if let Some(proxy) = &template.fields.model_proxy {
-        // Codex is pointed at Lys's proxy as a provider of its own, signed
-        // in as the machine's Codex is, over plain HTTP event streams: the
-        // proxy reads a call as it passes, and a WebSocket it cannot read.
-        // (Measured on codex-cli 0.159.2, 4 Oct 2026: OPENAI_BASE_URL in the
-        // environment is ignored; the built-in provider opens a WebSocket.)
-        let base = crate::harness::rendering::openai_base(proxy, template.fields.run.as_deref())
-            .ok_or_else(|| {
-                "model_proxy: the model proxy's address has no host a Codex run can be given"
-                    .to_owned()
-            })?;
-        arguments.extend([
-            "-c".to_owned(),
-            format!(
-                "model_providers.lys={{name=\"OpenAI through Lys\",base_url={},wire_api=\"responses\",requires_openai_auth=true,supports_websockets=false}}",
-                native_value(&json!(base))?
-            ),
-            "-c".to_owned(),
-            "model_provider=\"lys\"".to_owned(),
-        ]);
-    }
+    model_proxy_arguments(&template.fields, &mut arguments)?;
     if let Some(sandbox) = template.permissions.default_mode {
         if sandbox == "workspace-write" {
             // Command-line settings keep project configuration from widening the boundary.
@@ -245,4 +159,109 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
         argument_files,
         environment_paths: BTreeMap::new(),
     })
+}
+
+fn server_values(servers: &[LaunchMcp]) -> serde_json::Map<String, Value> {
+    let mut values = serde_json::Map::new();
+    for server in servers {
+        let value = match &server.transport {
+            Transport::Http { url } => json!({"url": url}),
+            Transport::Stdio {
+                program,
+                args,
+                cwd,
+                env,
+                handles,
+            } => {
+                let variables: BTreeMap<_, _> = env
+                    .iter()
+                    .map(|one| (one.name.clone(), one.text.clone()))
+                    .chain(
+                        handles
+                            .iter()
+                            .map(|one| (one.name.clone(), one.handle_id.clone())),
+                    )
+                    .collect();
+                let mut value = json!({"command": program, "args": args, "env": variables});
+                if let Some(cwd) = cwd {
+                    value["cwd"] = json!(cwd);
+                }
+                value
+            }
+        };
+        values.insert(server.name.clone(), value);
+    }
+    values
+}
+
+fn native_settings(
+    template: &Template,
+    servers: &serde_json::Map<String, Value>,
+    arguments: &mut Vec<String>,
+) -> Result<(), String> {
+    if let Some(settings) = &template.seat.settings {
+        for (key, value) in settings {
+            if key == "notify"
+                || (template.fields.model_proxy.is_some()
+                    && matches!(key.as_str(), "model_provider" | "model_providers"))
+            {
+                continue;
+            }
+            if key.is_empty()
+                || !key
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-'))
+            {
+                return Err(format!("settings.{key}: is not a bare native config key"));
+            }
+            arguments.extend([
+                "-c".to_owned(),
+                format!(
+                    "{key}={}",
+                    native_value(value).map_err(|error| format!("settings.{key}: {error}"))?
+                ),
+            ]);
+        }
+    }
+    for (name, value) in servers {
+        if name.is_empty()
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(format!(
+                "mcp_servers: `{name}` is not a bare TOML key; use letters, digits, _ and -"
+            ));
+        }
+        arguments.extend([
+            "-c".to_owned(),
+            format!("mcp_servers.{name}={}", native_value(value)?),
+        ]);
+    }
+    Ok(())
+}
+
+fn model_proxy_arguments(fields: &LaunchFields, arguments: &mut Vec<String>) -> Result<(), String> {
+    if let Some(proxy) = &fields.model_proxy {
+        // Codex is pointed at Lys's proxy as a provider of its own, signed
+        // in as the machine's Codex is, over plain HTTP event streams: the
+        // proxy reads a call as it passes, and a WebSocket it cannot read.
+        // (Measured on codex-cli 0.159.2, 4 Oct 2026: OPENAI_BASE_URL in the
+        // environment is ignored; the built-in provider opens a WebSocket.)
+        let base = crate::harness::rendering::openai_base(proxy, fields.run.as_deref())
+            .ok_or_else(|| {
+                "model_proxy: the model proxy's address has no host a Codex run can be given"
+                    .to_owned()
+            })?;
+        arguments.extend([
+            "-c".to_owned(),
+            format!(
+                "model_providers.lys={{name=\"OpenAI through Lys\",base_url={},wire_api=\"responses\",requires_openai_auth=true,supports_websockets=false}}",
+                native_value(&json!(base))?
+            ),
+            "-c".to_owned(),
+            "model_provider=\"lys\"".to_owned(),
+        ]);
+    }
+    Ok(())
 }

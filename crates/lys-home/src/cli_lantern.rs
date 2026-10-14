@@ -94,6 +94,11 @@ fn report<T: Serialize>(value: &T) -> Result<Value, HomeError> {
 }
 
 /// Run a lantern command and return its report.
+///
+/// # Errors
+///
+/// Refuses an absent home, invalid light, epilogue or recall inputs,
+/// failed session reads or appends, or a report that cannot be serialised.
 pub fn run(action: LanternAction) -> Result<Value, HomeError> {
     match action {
         LanternAction::Light {

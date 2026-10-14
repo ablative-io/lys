@@ -124,6 +124,11 @@ pub struct AddReport {
 }
 
 /// Create the canon file with its header line; refuses an existing file.
+///
+/// # Errors
+///
+/// Refuses an existing path, a directory or file that cannot be created,
+/// or a header that cannot be encoded, written and synced.
 pub fn create(path: &Path) -> Result<(), HomeError> {
     if path.exists() {
         return Err(HomeError::Exists {
@@ -156,6 +161,12 @@ pub fn create(path: &Path) -> Result<(), HomeError> {
 /// `lys.inherited` entry whose data carries no `rule` is refused by name
 /// ([`HomeError::CanonExampleWithoutRule`]), so `canon add` and a render
 /// with a canon both refuse it before writing anything.
+///
+/// # Errors
+///
+/// Refuses an unreadable file, a missing or malformed header, malformed
+/// entries, duplicate ids, parents not yet on record, or an inherited
+/// example without a rule.
 pub fn load(path: &Path) -> Result<Canon, HomeError> {
     let text =
         std::fs::read_to_string(path).map_err(|e| HomeError::io("reading the canon", path, e))?;
@@ -232,6 +243,12 @@ fn states_rule(entry: &Entry) -> bool {
 /// entry naming where they came from and the rule they show. The entries
 /// keep their ids, so the same example cannot be added twice; only their
 /// parent links are rewritten to chain onto the canon.
+///
+/// # Errors
+///
+/// Refuses an empty or repeated id list, unknown or non-message source
+/// entries, a canon held by another adder, or a canon that cannot be
+/// loaded, encoded, appended and synced.
 pub fn add_from(
     canon_path: &Path,
     session: &Session,
@@ -283,6 +300,12 @@ pub fn add_from(
 /// Add a hand-written example: user and assistant turns from a turns file
 /// (`user: text` or `assistant: text`, one per line), with provider, api and
 /// model `authored`. A turns file holding a thinking block is refused by line.
+///
+/// # Errors
+///
+/// Refuses an unreadable or empty turns file, a malformed role or an
+/// authored thinking block, a canon held by another adder, or a canon
+/// that cannot be loaded, encoded, appended and synced.
 pub fn add_authored(
     canon_path: &Path,
     turns: &Path,

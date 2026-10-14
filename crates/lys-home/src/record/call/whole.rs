@@ -39,6 +39,13 @@ pub struct CallWhole {
 }
 
 /// The call kept as `entry` of `session` in `home`.
+///
+/// # Errors
+///
+/// Refuses an unsafe or unreadable session, an unknown or non-call entry,
+/// malformed call data or hashes, or a raw body block that cannot be read.
+/// Decoding and JSON-shape failures within a body are reported in that
+/// body's `unreadable` field.
 pub fn call_whole(home: &Home, session: &str, entry: &str) -> Result<CallWhole, HomeError> {
     let kept = home.read_session(session)?.entry(entry)?;
     let call = match &kept.body {

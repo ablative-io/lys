@@ -137,6 +137,11 @@ fn mentions(row: &LanternRow, folded: &str) -> bool {
 
 /// Every lantern of the home, by session id then file position. A session
 /// that cannot be read is skipped and named.
+///
+/// # Errors
+///
+/// Refuses when the home's session ids cannot be listed. Unreadable
+/// sessions and malformed lantern or epilogue data are named in `skipped`.
 pub fn recall_all(home: &Home) -> Result<RecallReport, HomeError> {
     recall_where(home, |_row| true)
 }
@@ -144,6 +149,11 @@ pub fn recall_all(home: &Home) -> Result<RecallReport, HomeError> {
 /// Every lantern of the home whose note or one of whose epilogues contains
 /// `words` as one contiguous phrase, case-folded. Blank words are refused
 /// by name. A session that cannot be read is skipped and named.
+///
+/// # Errors
+///
+/// Refuses blank search words or a home whose session ids cannot be
+/// listed. Per-session read and shape failures are named in `skipped`.
 pub fn recall_by_note(home: &Home, words: &str) -> Result<RecallReport, HomeError> {
     require_words("words", words)?;
     let folded = words.to_lowercase();
@@ -175,6 +185,12 @@ fn recall_where(
 /// Every lantern of `session` whose point is `point`. A session with no
 /// file is refused by name, as is an entry the session does not hold; an
 /// entry with no lantern on it lists nothing.
+///
+/// # Errors
+///
+/// Refuses an unsafe or absent session, an unknown point, unreadable
+/// session rows, malformed lantern or epilogue data, or a recorded
+/// `lit_in` that names no session of the home.
 pub fn recall_by_point(home: &Home, session: &str, point: &str) -> Result<RecallReport, HomeError> {
     let reader = SessionReader::open(session_file(home, session)?)?;
     if !reader.contains(point) {

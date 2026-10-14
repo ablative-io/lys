@@ -14,6 +14,11 @@ use crate::record::session::Session;
 
 impl Session {
     /// One entry by id, read by seeking to it.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session or unknown id, a row that reads no matching
+    /// entry, or a line that cannot be sought, read or parsed.
     pub fn entry(&self, id: &str) -> Result<Entry, HomeError> {
         self.fresh()?;
         let row = self.index.row(id).ok_or_else(|| HomeError::UnknownEntry {
@@ -30,6 +35,11 @@ impl Session {
 
     /// The entries from the root to the head, root first, read by seeking to
     /// each; the second value is how many bytes of the file were read.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, an ancestry with a missing parent, or a row
+    /// whose line cannot be read and parsed with the indexed id.
     pub fn path(&self) -> Result<(Vec<Entry>, u64), HomeError> {
         self.fresh()?;
         let Some(head) = &self.head else {
@@ -45,6 +55,11 @@ impl Session {
     /// a compaction on the path, the compaction entry first, then the kept
     /// entries from `first_kept_entry_id` up to the compaction, then everything
     /// after it; without one, the whole path.
+    ///
+    /// # Errors
+    ///
+    /// Refuses when the root-to-head path cannot be read: a stale session,
+    /// a missing parent, or an unreadable or mismatched indexed entry.
     pub fn context_path(&self) -> Result<Vec<Entry>, HomeError> {
         let (path, _) = self.path()?;
         let Some(positions) = Self::context_positions(&path) else {
@@ -59,6 +74,11 @@ impl Session {
     }
 
     /// The custom entries of a given custom type on the path, root first.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session, a missing parent on the head's ancestry,
+    /// or a selected custom entry that cannot be read from its indexed row.
     pub fn customs(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
         self.fresh()?;
         let Some(head) = &self.head else {
@@ -77,6 +97,11 @@ impl Session {
 
     /// Every durable custom entry of a given custom type in the file, on any
     /// branch and whatever the head, in file order, read by seeking to each.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a stale session or a selected custom row whose line cannot
+    /// be read, parsed, or matched to its indexed id.
     pub fn customs_everywhere(&self, custom_type: &str) -> Result<Vec<Entry>, HomeError> {
         self.fresh()?;
         let rows = self.index.rows_of_custom(custom_type);

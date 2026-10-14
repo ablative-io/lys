@@ -86,6 +86,7 @@ pub struct Compacted<'a> {
 
 /// The SHA-256 hex of block hashes, each followed by one newline, in the
 /// order given.
+#[must_use]
 pub fn blocks_digest(hashes: &[&str]) -> String {
     let mut digest = Sha256::new();
     for hash in hashes {
@@ -98,6 +99,11 @@ pub fn blocks_digest(hashes: &[&str]) -> String {
 /// The loss data of a compaction already appended to `session`, its span
 /// walked through the index by seeking and its blocks taken from the rows
 /// `rows` holds.
+///
+/// # Errors
+///
+/// Refuses a stale session, a missing parent in the compaction's ancestry,
+/// or a span row that cannot be read as the indexed entry.
 pub fn loss_data(
     session: &Session,
     compacted: &Compacted<'_>,
@@ -140,6 +146,12 @@ pub fn loss_data(
 /// Append the loss entry of the compaction `compaction` as a side leaf
 /// under it: a fresh id, the compaction's timestamp, and the head left
 /// where it stands. Returns the entry's id.
+///
+/// # Errors
+///
+/// Refuses loss data that cannot be serialised, failed reconciliation,
+/// a duplicate id or unknown parent, or a loss entry that cannot be
+/// recorded with its index row.
 pub fn append_loss(
     session: &mut Session,
     compaction: &str,

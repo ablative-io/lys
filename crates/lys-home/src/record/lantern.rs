@@ -64,6 +64,11 @@ pub(crate) fn data_of<T: for<'de> Deserialize<'de>>(
 
 /// The lantern data of a `lys.lantern` entry of `session`, refused by name
 /// when the entry is not one or its data is not the lantern shape.
+///
+/// # Errors
+///
+/// Refuses as `EntryShape` when the entry is not a `lys.lantern` with
+/// data that reads as `LanternData`, naming the session and entry.
 pub fn lantern_of(session: &str, entry: &Entry) -> Result<LanternData, HomeError> {
     data_of(session, entry, CUSTOM_LANTERN)
 }
@@ -126,6 +131,12 @@ pub(crate) fn require_words(what: &'static str, text: &str) -> Result<(), HomeEr
 }
 
 /// Light a lantern at `point` of `session` with `note`, lit by `by`.
+///
+/// # Errors
+///
+/// Refuses an absent, unsafe or held session, an unknown point, a point
+/// that is itself a lantern or epilogue, or a blank note. Session reads,
+/// lantern serialisation and the durable append can also refuse.
 pub fn light(
     home: &Home,
     session: &str,

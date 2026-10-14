@@ -66,6 +66,11 @@ impl GivenPath {
 
 /// Canonicalise a directory path whole: every symlink, `..` and trailing
 /// slash resolved.
+///
+/// # Errors
+///
+/// Refuses a canonicalisation error other than a missing path. Relative
+/// paths are kept as relative; missing absolute paths are kept unresolved.
 pub fn canonical_dir(path: &Path) -> Result<GivenPath, HomeError> {
     if !path.is_absolute() {
         return Ok(GivenPath::Relative(path.to_path_buf()));
@@ -78,6 +83,12 @@ pub fn canonical_dir(path: &Path) -> Result<GivenPath, HomeError> {
 
 /// Canonicalise a document path: its parent directory whole, its own final
 /// name kept, and that entry's own existence read without following it.
+///
+/// # Errors
+///
+/// Refuses when the parent cannot be resolved or the final entry's
+/// metadata cannot be read, except for missing paths, which remain
+/// unresolved. Relative paths are kept as given.
 pub fn canonical_document(path: &Path) -> Result<GivenPath, HomeError> {
     if !path.is_absolute() {
         return Ok(GivenPath::Relative(path.to_path_buf()));

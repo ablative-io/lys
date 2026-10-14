@@ -66,6 +66,11 @@ pub fn confinement_named(template: &Template) -> Result<(), HomeError> {
 /// The settings file's bytes: `{"env": {...}}`, keys sorted, with the
 /// template's `permissions` beside `env` when it sets them, and the
 /// `statusLine` every run is given; one trailing newline.
+///
+/// # Errors
+///
+/// Refuses invalid seat declarations or workspace-confinement settings,
+/// or an environment settings file that cannot be serialised.
 pub fn env_settings(template: &Template) -> Result<Vec<u8>, HomeError> {
     settings(template, None)
 }
@@ -218,6 +223,11 @@ impl Judge {
     /// be absolute, so the hook never depends on the session's directory or
     /// search path, and neither may hold a character the hook's shell would
     /// read as more than a path.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a program or socket path that is not absolute, is not Unicode,
+    /// or contains a character the hook's shell would interpret.
     pub fn new(program: &Path, socket: &Path) -> Result<Self, HomeError> {
         let program = hook_path("--judge-program", program)?;
         let socket = hook_path("--judge-socket", socket)?;
@@ -252,6 +262,7 @@ impl Judge {
     }
 
     /// The hook's command line.
+    #[must_use]
     pub fn command(&self) -> &str {
         &self.command
     }
@@ -269,6 +280,11 @@ fn hook_path<'a>(flag: &'static str, path: &'a Path) -> Result<&'a str, HomeErro
 
 /// The settings file's bytes with the judge's `PreToolUse` hook beside
 /// `env` when there is a judge; without one, exactly [`env_settings`].
+///
+/// # Errors
+///
+/// Refuses invalid seat declarations or workspace-confinement settings,
+/// or settings that cannot be serialised with the optional judge hook.
 pub fn settings(template: &Template, judge: Option<&Judge>) -> Result<Vec<u8>, HomeError> {
     let value = settings_value(template, judge)?;
     let mut bytes = serde_json::to_vec_pretty(&value).map_err(|source| HomeError::Json {
@@ -280,6 +296,11 @@ pub fn settings(template: &Template, judge: Option<&Judge>) -> Result<Vec<u8>, H
 }
 
 /// Write the environment file at `path`, which must not exist.
+///
+/// # Errors
+///
+/// Refuses settings that cannot be encoded, an existing target, or a
+/// file that cannot be created, written and synced.
 pub fn write_env_file(
     template: &Template,
     judge: Option<&Judge>,
@@ -290,6 +311,11 @@ pub fn write_env_file(
 
 /// Write a launch file exclusively (an existing path is refused by name),
 /// sync it, and return the hash of the bytes written.
+///
+/// # Errors
+///
+/// Refuses an existing path as `LaunchTargetExists`, or a file that
+/// cannot be created, written and synced.
 pub fn write_new(path: &Path, bytes: &[u8]) -> Result<Hash, HomeError> {
     let mut file = match std::fs::OpenOptions::new()
         .create_new(true)
