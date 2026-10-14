@@ -1,13 +1,8 @@
 # Lys crash course: bringing a person and their agent on
 
-Written by Waffles, 13 October 2026 night, from the two Codex walks of the installed servers
-(Lys ca2da3f9, Cambium b89f098b9). Every step below was exercised on the installed servers that
-night unless it says "tonight's lane"; those steps land with the overnight installs and are read
-back in the morning. Updated 14 October 03:1x: Lys 3fac9c99 is installed (the AGENTS-008 rows below are
-in it; its full-suite reruns are still pending, so each of those steps is read back in the morning before
-anyone is sent through it); the Cambium door is d4d4f2014 (ACCESS-007); ACCESS-008 is on Cambium main at
-dee2861c7 and installs with the PERF read-boundary work. The addresses are the public ones: https://lys.ablative.com.au and
-https://cambium.ablative.com.au.
+Use https://lys.ablative.com.au and https://cambium.ablative.com.au. These instructions include
+the evening source changes. Waffles installs them and reads the steps back on the installed
+servers before the morning room uses them.
 
 ## 1. Admit the person (an administrator, once per person)
 
@@ -28,12 +23,15 @@ the door retries Lys once on a fresh connection before it says so. Reload once; 
 
 ## 3. The person gets an agent in Lys
 
-Today an administrator registers the agent (**Agents**, add, the person as responsible), activates
-it, and reviews a profile: which harness (Claude Code or Codex), which executable on which computer,
-model, working folder, controls. Since Lys 3fac9c99 the person registers and certifies their own agent
-(AGENTS-008 R6). The profile's executable must be the absolute path on the computer the seat
-runs on; since 3fac9c99 the catalogue asks the chosen computer's runner (R2); before it only showed the
-server's own programs.
+In Lys, open **Agents**, add the agent with yourself as responsible, and choose its harness
+(Claude Code or Codex), computer, model, working folder and controls. The profile names the command
+to run: `claude`, `codex`, `cdx`, or the absolute path to your fork. A plain command is resolved on
+the chosen computer at each start. An absolute path is launched exactly as written. The catalogue
+asks that computer's runner which programs it can use. Give a working folder on that computer
+before saving and starting the profile.
+
+The add-agent form's **Access** choices are described in step 6. Select them before adding the agent
+if it will use Cambium straight away.
 
 ## 4. The person's computer joins (their own Mac)
 
@@ -67,11 +65,19 @@ the same `lys seat ...` verbs with `--server`, as the person, with no operator t
 
 ## 6. The agent reaches Cambium
 
-In Cambium, the **Invite** chip, **Agent seat**, a handle, **Add seat**. Today this mints a key and
-a seat file that Lys knows nothing about, so the seat cannot get its Lys pass; ACCESS-008 (on Cambium main
-dee2861c7, installs with the next door) makes Add seat pick one of the person's Lys agents, has Lys certify the seat's key,
-writes `lysUrl` and `lysAgentId` into the seat file, and lets a Lys-started seat prove itself with
-the run pass Lys gave it. Until that install, agent seats on Cambium are the ones already enrolled.
+In Lys's add-agent form, under **Access**, find the Cambium resource you want the agent to use and
+tick the acts it needs. Lys offers the acts Cambium declares under `agents` for that kind: read and
+send on channels and topics, and the declared acts on the other kinds. A combined relation gives
+every act named in its label. **Everything here** selects only the offered acts. An act Cambium
+withholds stays grey with its reason. The person must hold access they may pass on to an agent;
+ask the administrator for that access if no Cambium choices are offered.
+
+For an agent already added, give it the same Cambium access from its agent page before asking it
+to act there. Giving access and enrolling a Cambium seat are separate steps:
+
+In Cambium, open **Invite**, choose **Agent seat**, choose your Lys agent, give the seat a handle,
+and press **Add seat**. Cambium asks Lys to certify that seat's key and writes `lysUrl` and
+`lysAgentId` into the seat file. A Lys-started seat proves itself with the run pass Lys gave it.
 
 ## 7. What refuses, and what it means
 
@@ -89,6 +95,13 @@ the run pass Lys gave it. Until that install, agent seats on Cambium are the one
 
 ## 8. The Lys MCP
 
-Waffles' seat gets the Lys MCP once Tom authorises it in the browser (the authorize link in the
-night's last message); the same tools answer the same routes as the screens above, so the morning
-crash course is the steps here, done by asking.
+A harness started by Lys receives its Lys MCP connection and run pass at launch. To connect an
+external MCP app, add `https://lys.ablative.com.au/api/mcp` in that app and follow its sign-in link.
+Sign in through Lys. The consent screen groups its choices by resource; tick what the app may do,
+then press **Connect**. **Don't connect** refuses the connection. Ticking nothing connects nothing:
+the app connects with no permissions.
+
+Ask **what-can-I-do** to read the routes and resources that connection may reach. With no selected
+access, it answers "nothing: connect again and tick what the app may do". Reconnect and choose the
+needed access before sending a change. The MCP uses the same permissions and refusals as Lys's
+screens.
