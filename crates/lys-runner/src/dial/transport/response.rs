@@ -18,7 +18,12 @@ fn line(stream: &mut impl BufRead, remaining: &mut usize) -> Result<String, Runn
     stream
         .take(u64::try_from(*remaining).map_err(|error| failed(error.to_string()))? + 1)
         .read_until(b'\n', &mut bytes)
-        .map_err(|error| failed(format!("response metadata was not read: {error}")))?;
+        .map_err(|error| super::network_error("response metadata was not read", &error))?;
+    if bytes.is_empty() {
+        return Err(RunnerError::Unreachable {
+            reason: "the server closed the connection before answering".to_owned(),
+        });
+    }
     if bytes.len() > *remaining {
         return Err(RunnerError::refused(
             "runner_dial_headers_too_large",
@@ -156,7 +161,7 @@ pub(super) fn read_response(stream: &mut impl BufRead) -> Result<(Response, bool
         let mut body = vec![0; length];
         stream
             .read_exact(&mut body)
-            .map_err(|error| failed(format!("the response body is incomplete: {error}")))?;
+            .map_err(|error| super::network_error("the response body is incomplete", &error))?;
         body
     } else {
         if reusable {
@@ -167,7 +172,7 @@ pub(super) fn read_response(stream: &mut impl BufRead) -> Result<(Response, bool
         stream
             .take(1_048_577)
             .read_to_end(&mut body)
-            .map_err(|error| failed(format!("the response body was not read: {error}")))?;
+            .map_err(|error| super::network_error("the response body was not read", &error))?;
         if body.len() > BODY_LIMIT {
             return Err(too_large());
         }
@@ -208,11 +213,11 @@ fn chunks(stream: &mut impl BufRead, remaining: &mut usize) -> Result<Vec<u8>, R
         body.resize(start + size, 0);
         stream
             .read_exact(&mut body[start..])
-            .map_err(|error| failed(format!("a chunk is incomplete: {error}")))?;
+            .map_err(|error| super::network_error("a chunk is incomplete", &error))?;
         let mut ending = [0; 2];
         stream
             .read_exact(&mut ending)
-            .map_err(|error| failed(format!("a chunk ending is incomplete: {error}")))?;
+            .map_err(|error| super::network_error("a chunk ending is incomplete", &error))?;
         if ending != *b"\r\n" {
             return Err(failed("a chunk does not end its line"));
         }

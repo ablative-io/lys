@@ -155,6 +155,8 @@ pub(crate) fn failed(what: impl std::fmt::Display) -> RunnerError {
     }
 }
 
+mod reconnect;
+
 /// The signed side of a bridge, shared by the threads that post replies.
 struct Signer {
     channel: Channel,
@@ -163,12 +165,12 @@ struct Signer {
 }
 
 impl Dial {
-    /// Relay every request the server has for this machine, until the
-    /// server or the runner cannot be reached, or the server refuses the
-    /// machine, which is answered by name.
+    /// Relay requests until the local runner ends or the server refuses this machine.
+    /// A lost server connection reads a fresh epoch and reconnects without replaying a request.
     pub fn bridge(&self) -> Result<(), RunnerError> {
         let signer = Arc::new(self.signer()?);
-        let mut epoch = signer.epoch()?;
+        let mut disconnected = false;
+        let mut epoch = reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
         let mut dispatch = dispatch::Dispatch::new();
         loop {
             let mut connection = crate::client::connect(&self.socket)?;
@@ -176,11 +178,30 @@ impl Dial {
             let (ticket, line) = match signer.next(&epoch, &greeting) {
                 Err(RunnerError::DialStale { reason }) => {
                     crate::error::said(&format!("{STALE}: {reason}: reading the new epoch"));
-                    epoch = signer.epoch()?;
+                    epoch =
+                        reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
+                    continue;
+                }
+                Err(RunnerError::Unreachable { .. }) => {
+                    if !disconnected {
+                        crate::error::said(
+                            "runner_dial_disconnected: the server connection was lost; reconnecting",
+                        );
+                    }
+                    disconnected = true;
+                    reconnect::pause();
+                    epoch =
+                        reconnect::ready(|| signer.epoch(), &mut disconnected, reconnect::pause)?;
                     continue;
                 }
                 taken => taken?,
             };
+            if disconnected {
+                crate::error::said(
+                    "runner_dial_reconnected: the server accepted this runner again",
+                );
+                disconnected = false;
+            }
             let control = control_request(&line);
             let posted = Arc::clone(&signer);
             let posting_epoch = epoch.clone();

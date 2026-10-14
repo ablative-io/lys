@@ -203,6 +203,14 @@ impl Channel {
         if response.status == 200 {
             return Ok(response);
         }
+        if response.status >= 500 {
+            return Err(RunnerError::Unreachable {
+                reason: format!(
+                    "the server answered HTTP {} while reconnecting",
+                    response.status
+                ),
+            });
+        }
         let words = String::from_utf8_lossy(&response.body).into_owned();
         let refusal = serde_json::from_str::<serde_json::Value>(&words)
             .ok()
@@ -281,8 +289,9 @@ impl Channel {
         } else {
             format!("{}:{port}", self.authority)
         };
-        let stream = TcpStream::connect(&address)
-            .map_err(|error| failed(format!("{} could not be reached: {error}", self.authority)))?;
+        let stream = TcpStream::connect(&address).map_err(|error| {
+            network_error(&format!("{} could not be reached", self.authority), &error)
+        })?;
         keepalive(&stream)?;
         let stream = match &self.scheme {
             Scheme::Loopback => Stream::Plain(stream),
@@ -345,10 +354,20 @@ fn exchange(
         .write_all(head)
         .and_then(|()| stream.get_mut().write_all(body))
         .and_then(|()| stream.get_mut().flush())
-        .map_err(|error| failed(format!("the request was not sent: {error}")))?;
+        .map_err(|error| network_error("the request was not sent", &error))?;
     read_response(stream)
 }
 
 #[cfg(test)]
 #[path = "../../tests/transport/cases.rs"]
 mod tests;
+
+fn network_error(context: &str, error: &std::io::Error) -> RunnerError {
+    let reason = format!("{context}: {error}");
+    match error.kind() {
+        std::io::ErrorKind::InvalidData
+        | std::io::ErrorKind::InvalidInput
+        | std::io::ErrorKind::PermissionDenied => failed(reason),
+        _ => RunnerError::Unreachable { reason },
+    }
+}
