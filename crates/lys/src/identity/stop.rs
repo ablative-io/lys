@@ -379,7 +379,33 @@ pub fn start(options: &StartOptions, json: bool) -> IdentityResult<()> {
     super::install::start_installed(&layout, ports, &units, &mut |line| {
         emitter.note(line);
     })?;
-    emitter.field("open", "url", ports.service_url());
+    if json {
+        emitter.field("address", "url", ports.service_url());
+    } else {
+        write_address(&mut std::io::stdout(), &ports.service_url()).map_err(|error| {
+            IdentityError::new(
+                ErrorKind::PrivateFileIo,
+                "print",
+                "address",
+                error.to_string(),
+            )
+        })?;
+    }
     emitter.finish();
     Ok(())
+}
+
+pub(super) fn write_address(out: &mut impl std::io::Write, address: &str) -> std::io::Result<()> {
+    writeln!(out, "{address}")
+}
+
+#[cfg(test)]
+mod address_tests {
+    #[test]
+    fn identity_start_prints_the_address_without_a_browser_action() -> std::io::Result<()> {
+        let mut output = Vec::new();
+        super::write_address(&mut output, "http://localhost:8490")?;
+        assert_eq!(output, b"http://localhost:8490\n");
+        Ok(())
+    }
 }
