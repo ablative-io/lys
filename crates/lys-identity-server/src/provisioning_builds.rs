@@ -35,6 +35,7 @@ pub(super) fn entry(version: &Version) -> Entry {
         BuildView {
             name: harness.name.clone(),
             program: harness.program.clone(),
+            command: None,
             package: harness.package.clone(),
             source: BuildSource::Profile,
         },

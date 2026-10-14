@@ -74,6 +74,9 @@ pub struct BuildView {
     /// A command resolved on the machine's login PATH, or a reviewed
     /// absolute fork path kept exactly as declared.
     pub program: String,
+    /// The runner's command name for this installed copy, when reported.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
     /// Its package or build identity.
     pub package: String,
     /// Where this declaration was read from.
@@ -459,6 +462,7 @@ pub(crate) async fn machine_view(
             .map(|copy| BuildView {
                 name: format!("{} {}", program.name, copy.version),
                 program: copy.program.clone(),
+                command: copy.command.clone(),
                 package: format!("{} {}", program.command, copy.version),
                 source: BuildSource::Installed,
             })

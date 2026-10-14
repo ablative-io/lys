@@ -112,6 +112,7 @@ pub(super) fn version(
     Ok(BuildView {
         name: format!("Installed {command}"),
         program: command.to_owned(),
+        command: Some(command.to_owned()),
         package: version.to_owned(),
         source: BuildSource::Installed,
     })

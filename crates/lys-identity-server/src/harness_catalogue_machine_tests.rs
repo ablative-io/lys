@@ -42,8 +42,8 @@ async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Err
                     Answer::refusal(&lys_runner::RunnerError::refused("harness_programs_unreadable", "the chosen programme version report is not UTF-8"))
                 } else if act == Act::Programs {
                     Answer::Programs { found: lys_runner::dial::programs::Programs { programs: vec![
-                        lys_runner::dial::programs::HarnessProgram { program: "claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
-                        lys_runner::dial::programs::HarnessProgram { program: "codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
+                        lys_runner::dial::programs::HarnessProgram { command: Some("claude".to_owned()), program: "claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
+                        lys_runner::dial::programs::HarnessProgram { command: Some("codex".to_owned()), program: "codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
                     ], reason: None } }
                 } else { Answer::refusal(&lys_runner::RunnerError::refused("fixture_standing_unavailable", "this fixture answers programme discovery only")) };
                 stream.get_mut().write_all(format!("{}\n", lys_runner::protocol::reply_line(answer)).as_bytes()).await?;

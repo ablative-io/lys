@@ -11,9 +11,11 @@ use crate::RunnerError;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HarnessProgram {
-    /// The command as the login PATH names it (`claude`, `codex`, `cdx`), so a
-    /// launch always runs the copy installed at that moment, updates included.
+    /// The absolute path of the installed copy selected on this computer.
     pub program: String,
+    /// The command name that selected this installed copy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
     /// The version its own version command reported.
     pub version: String,
     /// The managed adapter matching this programme.
@@ -58,7 +60,21 @@ pub fn discover_in(path: &OsStr) -> Result<Programs, RunnerError> {
         let Some(selected) = crate::program_path::resolve_in(command, path).map_err(failed)? else {
             continue;
         };
-        let program = command.to_owned();
+        let selected = if selected.is_absolute() {
+            selected
+        } else {
+            std::env::current_dir()
+                .map_err(|error| {
+                    failed(format!(
+                        "the executable base directory cannot be read: {error}"
+                    ))
+                })?
+                .join(selected)
+        };
+        let program = selected
+            .to_str()
+            .ok_or_else(|| failed(format!("the resolved {command} path is not UTF-8")))?
+            .to_owned();
         let output = Command::new(&selected)
             .arg("--version")
             .env("PATH", path)
@@ -75,6 +91,7 @@ pub fn discover_in(path: &OsStr) -> Result<Programs, RunnerError> {
         match crate::tracking::version_in(&text) {
             Some(version) => programs.push(HarnessProgram {
                 program,
+                command: Some(command.to_owned()),
                 version,
                 adapter: adapter.to_owned(),
             }),
@@ -109,8 +126,16 @@ mod tests {
         }
         let answer = discover_in(dir.path().as_os_str())?;
         assert_eq!(answer.programs.len(), 2);
-        assert_eq!(answer.programs[0].program, "claude");
-        assert_eq!(answer.programs[1].program, "codex");
+        assert_eq!(
+            answer.programs[0].program,
+            dir.path().join("claude").display().to_string()
+        );
+        assert_eq!(
+            answer.programs[1].program,
+            dir.path().join("codex").display().to_string()
+        );
+        assert_eq!(answer.programs[0].command.as_deref(), Some("claude"));
+        assert_eq!(answer.programs[1].command.as_deref(), Some("codex"));
         assert_eq!(answer.programs[0].version, "2.1.300");
         assert_eq!(answer.programs[0].adapter, "claude-stream-json/1");
         assert_eq!(answer.programs[1].version, "0.161.0-alpha.3");
@@ -157,7 +182,7 @@ mod tests {
             answer
                 .programs
                 .iter()
-                .map(|program| program.program.as_str())
+                .map(|program| program.command.as_deref().unwrap_or(""))
                 .collect::<Vec<_>>(),
             ["codex", "cdx"]
         );
@@ -185,7 +210,11 @@ mod tests {
         }
         let answer = discover_in(chosen.as_os_str())?;
         assert_eq!(answer.programs.len(), 1, "{:?}", answer.reason);
-        assert_eq!(answer.programs[0].program, "claude");
+        assert_eq!(
+            answer.programs[0].program,
+            chosen.join("claude").display().to_string()
+        );
+        assert_eq!(answer.programs[0].command.as_deref(), Some("claude"));
         assert_eq!(answer.programs[0].version, "2.1.300");
         assert!(answer.reason.is_none(), "{:?}", answer.reason);
         assert_eq!(

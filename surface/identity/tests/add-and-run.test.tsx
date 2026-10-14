@@ -10,7 +10,7 @@ import { ADA, RECEIPTS, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 import type { Answer, Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 import { addAndRunCapability } from '../src/features/people/registration-capability';
-import { readAddAndRun } from '../src/features/people/add-and-run';
+import { profileFromSettings, readAddAndRun } from '../src/features/people/add-and-run';
 
 const agent = 'agent-' + 'f'.repeat(32);
 const prefix = '/agents/' + agent;
@@ -448,4 +448,9 @@ describe('Add and run on an existing computer', () => {
     await submit();
     expect(posted.filter((entry) => entry.path === '/network/machines' || entry.path.endsWith('/agents') && entry.path.startsWith('/network/') || entry.path.endsWith('/start-command'))).toEqual([]);
   });
+});
+
+it('accepts a first computer build reported as a bare command without calling the new settings retained', () => {
+  const profile = profileFromSettings({ harness: { name: 'Claude Code', program: 'claude', package: 'claude 2.1.300', description }, model_access: ['care'], permissions: { default_mode: 'default' }, tools: [], skills: [], mcp_servers: [], instructions: '', note: '', working_folder: '/project' });
+  expect(profile.harness?.program).toBe('claude');
 });
