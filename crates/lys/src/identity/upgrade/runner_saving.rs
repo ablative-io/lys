@@ -76,28 +76,14 @@ impl Restart {
             return Ok(());
         }
         let before = status(&self.client, &self.socket)?;
-        let sessions = match self.client.ask(&Act::UpgradeSessions) {
-            Ok(Answer::UpgradeSessions { sessions }) => sessions,
-            Ok(Answer::Refused { words, .. })
-                if words.contains("unknown variant")
-                    && words.contains("upgrade_sessions")
-                    && before
-                        .sessions
-                        .iter()
-                        .all(|session| session.ended.is_some()) =>
-            {
-                Vec::new()
-            }
-            answer => {
-                return Err(refuse(
-                    "runner_upgrade_capture_unavailable",
-                    format!(
-                        "running launches could not be retained; no process was stopped: {answer:?}"
-                    ),
-                    &self.socket,
-                ));
-            }
-        };
+        let sessions = captured(
+            self.client.ask(&Act::UpgradeSessions),
+            before
+                .sessions
+                .iter()
+                .all(|session| session.ended.is_some()),
+            &self.socket,
+        )?;
         let result = self.retain_with(sessions);
         if result.is_err() {
             match self.client.ask(&Act::CancelUpgrade) {
@@ -240,3 +226,36 @@ impl Restart {
         Ok(())
     }
 }
+
+fn captured(
+    answer: Result<Answer, lys_runner::error::RunnerError>,
+    all_ended: bool,
+    socket: &Path,
+) -> IdentityResult<Vec<UpgradeSession>> {
+    match answer {
+        Ok(Answer::UpgradeSessions { sessions }) => Ok(sessions),
+        Err(lys_runner::error::RunnerError::Refused { refusal, words, .. })
+            if refusal == "runner_request_malformed"
+                && words.starts_with("the act does not read")
+                && all_ended =>
+        {
+            Ok(Vec::new())
+        }
+        Ok(Answer::Refused { words, .. })
+            if words.contains("unknown variant")
+                && words.contains("upgrade_sessions")
+                && all_ended =>
+        {
+            Ok(Vec::new())
+        }
+        answer => Err(refuse(
+            "runner_upgrade_capture_unavailable",
+            format!("running launches could not be retained; no process was stopped: {answer:?}"),
+            socket,
+        )),
+    }
+}
+
+#[cfg(test)]
+#[path = "runner_legacy_tests.rs"]
+mod tests;
