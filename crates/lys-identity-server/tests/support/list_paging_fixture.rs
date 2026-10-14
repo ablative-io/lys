@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::Read;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 use std::time::Instant;
@@ -28,15 +28,12 @@ fn fingerprint() -> Result<&'static str, Box<dyn Error>> {
         let result = || -> Result<String, Box<dyn Error>> {
             let mut digest = Sha256::new();
             digest.update(include_bytes!("list_paging_fixture.rs"));
-            let mut executable = File::open(std::env::current_exe()?)?;
-            let mut buffer = [0; 8192];
-            loop {
-                let read = executable.read(&mut buffer)?;
-                if read == 0 {
-                    break;
-                }
-                digest.update(&buffer[..read]);
-            }
+            let metadata = fs::metadata(std::env::current_exe()?)?;
+            digest.update(metadata.dev().to_le_bytes());
+            digest.update(metadata.ino().to_le_bytes());
+            digest.update(metadata.len().to_le_bytes());
+            digest.update(metadata.mtime().to_le_bytes());
+            digest.update(metadata.mtime_nsec().to_le_bytes());
             Ok(format!("{:x}", digest.finalize()))
         };
         result().map_err(|error| format!("hashing paging fixture: {error}"))

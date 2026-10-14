@@ -3,7 +3,8 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{self, BufRead};
+use std::io;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use std::time::Instant;
@@ -28,24 +29,15 @@ fn executable_hash() -> Result<&'static str, Failure> {
 }
 
 fn program_hash(path: &Path) -> io::Result<String> {
-    let mut input = io::BufReader::with_capacity(256 * 1024, File::open(path)?);
-    let mut hash = ring::digest::Context::new(&ring::digest::SHA256);
-    loop {
-        let bytes = input.fill_buf()?;
-        if bytes.is_empty() {
-            break;
-        }
-        hash.update(bytes);
-        let count = bytes.len();
-        input.consume(count);
-    }
-    let digest = hash.finish();
-    let mut encoded = String::with_capacity(64);
-    for byte in digest.as_ref() {
-        std::fmt::Write::write_fmt(&mut encoded, format_args!("{byte:02x}"))
-            .map_err(io::Error::other)?;
-    }
-    Ok(encoded)
+    let metadata = fs::metadata(path)?;
+    Ok(format!(
+        "{}:{}:{}:{}:{}",
+        metadata.dev(),
+        metadata.ino(),
+        metadata.len(),
+        metadata.mtime(),
+        metadata.mtime_nsec()
+    ))
 }
 
 fn cache_dir() -> Result<PathBuf, Failure> {
