@@ -18,31 +18,7 @@ use super::{
 pub(super) fn scan(dir: &Path, read_only: bool) -> StoreResult<FileLeafStore> {
     let config = read_identity(dir)?;
     let segments = list_segments(dir)?;
-    // Every segment but the last is sealed: its offsets file is whole and
-    // flushed by the roll, and the next segment begins where it ends.
-    for pair in segments.windows(2) {
-        let count = segment::read_offsets(&offsets_path(dir, pair[0]))?.len();
-        let count =
-            u64::try_from(count).map_err(|source| StoreError::LeafCountUnrepresentable {
-                count: pair[0],
-                source,
-            })?;
-        let next = pair[0]
-            .checked_add(count)
-            .ok_or_else(|| StoreError::Corrupt {
-                path: dir.to_path_buf(),
-                reason: format!("segment {} overflows the leaf index range", pair[0]),
-            })?;
-        if next != pair[1] {
-            return Err(StoreError::Corrupt {
-                path: dir.to_path_buf(),
-                reason: format!(
-                    "segment {} ends at {next} but the next segment begins at {}",
-                    pair[0], pair[1]
-                ),
-            });
-        }
-    }
+    check_sealed_boundaries(dir, &segments)?;
     let last = *segments.last().ok_or_else(|| StoreError::Corrupt {
         path: dir.to_path_buf(),
         reason: "leaves/segments holds no segment".to_owned(),
@@ -132,6 +108,35 @@ pub(super) fn scan(dir: &Path, read_only: bool) -> StoreResult<FileLeafStore> {
         migrated: None,
         roll_bytes: segment::ROLL_BYTES,
     })
+}
+
+fn check_sealed_boundaries(dir: &Path, segments: &[u64]) -> StoreResult<()> {
+    // Every segment but the last is sealed: its offsets file is whole and
+    // flushed by the roll, and the next segment begins where it ends.
+    for pair in segments.windows(2) {
+        let count = segment::read_offsets(&offsets_path(dir, pair[0]))?.len();
+        let count =
+            u64::try_from(count).map_err(|source| StoreError::LeafCountUnrepresentable {
+                count: pair[0],
+                source,
+            })?;
+        let next = pair[0]
+            .checked_add(count)
+            .ok_or_else(|| StoreError::Corrupt {
+                path: dir.to_path_buf(),
+                reason: format!("segment {} overflows the leaf index range", pair[0]),
+            })?;
+        if next != pair[1] {
+            return Err(StoreError::Corrupt {
+                path: dir.to_path_buf(),
+                reason: format!(
+                    "segment {} ends at {next} but the next segment begins at {}",
+                    pair[0], pair[1]
+                ),
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Cut an unfinished act: truncate the last segment at the head's end and

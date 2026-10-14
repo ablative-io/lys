@@ -46,6 +46,11 @@ pub struct Migrated {
 }
 
 /// The name the v1 directory is kept under: the store's own name with `.v1`.
+///
+/// # Errors
+///
+/// [`StoreError::Corrupt`] when `dir` has no UTF-8 final component to use
+/// as the kept directory's name.
 pub fn kept_name(dir: &Path) -> StoreResult<PathBuf> {
     sibling(dir, "v1")
 }

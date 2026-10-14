@@ -38,6 +38,7 @@ pub enum Method {
 
 impl Method {
     /// The method's word in a document, lowercase.
+    #[must_use]
     pub fn word(self) -> &'static str {
         match self {
             Self::Get => "get",
@@ -69,6 +70,7 @@ pub enum Auth {
 
 impl Auth {
     /// The security scheme's name in a document; none for a public route.
+    #[must_use]
     pub fn scheme(self) -> Option<&'static str> {
         match self {
             Self::Public => None,
@@ -137,6 +139,7 @@ fn reference(name: &str) -> Value {
 }
 
 /// Each parameter a path template names, in order.
+#[must_use]
 pub fn parameters(path: &str) -> Vec<&str> {
     path.split('/')
         .filter_map(|segment| segment.strip_prefix('{')?.strip_suffix('}'))
@@ -145,6 +148,7 @@ pub fn parameters(path: &str) -> Vec<&str> {
 
 impl Api {
     /// An empty table titled `title`, at `version`, described by `description`.
+    #[must_use]
     pub fn new(title: &str, version: &str, description: &str) -> Self {
         let mut api = Self {
             title: title.to_owned(),
@@ -197,6 +201,7 @@ impl Api {
     }
 
     /// Every route of the table, in the order added.
+    #[must_use]
     pub fn routes(&self) -> &[Route] {
         &self.routes
     }
@@ -242,6 +247,12 @@ impl Api {
     }
 
     /// The document, or every fault met while generating it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the recorded faults when a schema cannot be serialised or
+    /// different schemas share a name, or a fault when console signature
+    /// routes name different headers for the same security scheme.
     pub fn document(&self) -> Result<Value, Vec<String>> {
         if !self.faults.is_empty() {
             return Err(self.faults.clone());
@@ -308,6 +319,7 @@ fn references<'a>(value: &'a Value, found: &mut Vec<&'a str>) {
 }
 
 /// Every fault `document` holds as `OpenAPI` 3.1; none when it holds none.
+#[must_use]
 pub fn validate(document: &Value) -> Vec<String> {
     let mut faults = Vec::new();
     if let Err(error) = serde_json::from_value::<utoipa::openapi::OpenApi>(document.clone()) {

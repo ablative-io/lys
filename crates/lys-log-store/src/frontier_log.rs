@@ -207,36 +207,43 @@ impl<S: LeafStore> FrontierLog<S> {
 
     /// The tree size an interrupted append was recovered to at open, if one
     /// was. `None` means the log opened clean.
+    #[must_use]
     pub fn recovered_to(&self) -> Option<u64> {
         self.recovered_to
     }
 
     /// The number of leaves.
+    #[must_use]
     pub fn len(&self) -> u64 {
         self.frontier.size()
     }
 
     /// Whether the log holds no leaf.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.frontier.is_empty()
     }
 
     /// The current root, with its size.
+    #[must_use]
     pub fn root(&self) -> RootHash {
         self.frontier.root_hash()
     }
 
     /// The current frontier.
+    #[must_use]
     pub fn frontier(&self) -> &Frontier {
         &self.frontier
     }
 
     /// The log's origin, fixed when its store was created.
+    #[must_use]
     pub fn origin(&self) -> &str {
         self.store.origin()
     }
 
     /// The underlying store.
+    #[must_use]
     pub fn store(&self) -> &S {
         &self.store
     }

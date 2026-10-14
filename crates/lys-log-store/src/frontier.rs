@@ -54,6 +54,7 @@ impl Default for Frontier {
 
 impl Frontier {
     /// The frontier of the empty tree.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             size: 0,
@@ -81,6 +82,7 @@ impl Frontier {
     }
 
     /// The frontier of the tree over `leaves`, in order.
+    #[must_use]
     pub fn from_leaves<I>(leaves: I) -> Self
     where
         I: IntoIterator,
@@ -94,16 +96,19 @@ impl Frontier {
     }
 
     /// The number of leaves the frontier covers.
+    #[must_use]
     pub fn size(&self) -> u64 {
         self.size
     }
 
     /// Whether the frontier covers no leaf.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.size == 0
     }
 
     /// The subtree roots, largest first.
+    #[must_use]
     pub fn nodes(&self) -> &[[u8; 32]] {
         &self.nodes
     }
@@ -135,6 +140,7 @@ impl Frontier {
     }
 
     /// The RFC 6962 root of the tree the frontier covers.
+    #[must_use]
     pub fn root(&self) -> [u8; 32] {
         let mut nodes = self.nodes.iter().rev();
         let Some(last) = nodes.next() else {
@@ -144,6 +150,7 @@ impl Frontier {
     }
 
     /// The root with its size, in `lys-core`'s form.
+    #[must_use]
     pub fn root_hash(&self) -> RootHash {
         RootHash::from_parts(self.root(), self.size)
     }

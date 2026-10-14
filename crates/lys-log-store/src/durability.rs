@@ -11,6 +11,7 @@ static PROCESS_FLUSHES: std::sync::atomic::AtomicU64 = std::sync::atomic::Atomic
 /// Number of real flush attempts across this process, including spawned tasks.
 /// A difference measures one startup only when the test owns the process.
 #[cfg(feature = "flush-counts")]
+#[must_use]
 pub fn process_flush_count() -> u64 {
     PROCESS_FLUSHES.load(std::sync::atomic::Ordering::Relaxed)
 }
@@ -18,6 +19,7 @@ pub fn process_flush_count() -> u64 {
 /// Number of real file and directory flush attempts on the calling thread.
 /// Measure synchronous store work, or use a current-thread async runtime.
 #[cfg(any(test, feature = "flush-counts"))]
+#[must_use]
 pub fn flush_count() -> u64 {
     FLUSHES.get()
 }

@@ -120,16 +120,19 @@ impl std::fmt::Debug for Snapshot {
 
 impl Snapshot {
     /// The tree at the snapshot's size.
+    #[must_use]
     pub fn frontier(&self) -> &Frontier {
         &self.frontier
     }
 
     /// The owner's encoded state.
+    #[must_use]
     pub fn state(&self) -> &[u8] {
         &self.state
     }
 
     /// The frontier and state, taken apart.
+    #[must_use]
     pub fn into_parts(self) -> (Frontier, Vec<u8>) {
         (self.frontier, self.state)
     }
@@ -137,6 +140,7 @@ impl Snapshot {
 
 /// Encodes and signs a snapshot of `state`, folded from the log `origin` at
 /// the tree `frontier` describes.
+#[must_use]
 pub fn seal(
     domain: &str,
     origin: &str,

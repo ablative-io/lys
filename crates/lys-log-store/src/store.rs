@@ -158,6 +158,11 @@ pub trait LeafStore {
     ///
     /// The bytes are returned verbatim: they are the RFC 6962 leaf preimage,
     /// so the store must not frame, pad, or re-encode them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the backend's I/O or corruption error if the stored leaf
+    /// cannot be read.
     fn leaf(&self, index: u64) -> StoreResult<Option<Vec<u8>>>;
 
     /// Stores `leaves` at `index..` and `pin`, the frontier they make, as one

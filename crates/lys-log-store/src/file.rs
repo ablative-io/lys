@@ -257,17 +257,20 @@ impl FileLeafStore {
     }
 
     /// The store's directory.
+    #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
 
     /// What the open found past the head: cut by a writable open, left by a
     /// read-only one. `None` when the last act was whole.
+    #[must_use]
     pub fn unfinished_tail(&self) -> Option<&UnfinishedTail> {
         self.unfinished_tail.as_ref()
     }
 
     /// The migration out of the v1 layout this open performed, when it did.
+    #[must_use]
     pub fn migrated(&self) -> Option<&Migrated> {
         self.migrated.as_ref()
     }

@@ -81,13 +81,11 @@ fn head_of(home: &Path) -> Result<(String, Entry), Box<dyn Error>> {
     Ok((head, entry))
 }
 
-#[test]
-fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
-    let dir = tempfile::tempdir()?;
-    let home = fixture_home(dir.path())?;
-    let home_arg = home.to_str().ok_or("home path is not text")?;
-    let mut outputs: Vec<Output> = Vec::new();
-
+fn light_and_refusals(
+    home: &Path,
+    home_arg: &str,
+    outputs: &mut Vec<Output>,
+) -> Result<String, Box<dyn Error>> {
     let lit = lantern(&[
         "light",
         "--home",
@@ -110,7 +108,7 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
     assert_eq!(report["lit_in"], FIXTURE);
     assert_eq!(report["point"], "e2");
     let l1 = report["id"].as_str().ok_or("no id")?.to_owned();
-    assert_eq!(head_of(&home)?.0, l1);
+    assert_eq!(head_of(home)?.0, l1);
     assert!(!String::from_utf8_lossy(&lit.stdout).contains(NOTE));
     outputs.push(lit);
 
@@ -145,7 +143,15 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
     ])?;
     refused(&blank, 1)?;
     outputs.push(blank);
+    Ok(l1)
+}
 
+fn epilogue_report(
+    home: &Path,
+    home_arg: &str,
+    lantern_id: &str,
+    outputs: &mut Vec<Output>,
+) -> Gate {
     let added = lantern(&[
         "epilogue",
         "--home",
@@ -153,7 +159,7 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
         "--session",
         FIXTURE,
         "--lantern",
-        &l1,
+        lantern_id,
         "--words",
         WORDS,
         "--by",
@@ -166,17 +172,28 @@ fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
             "added_at", "added_by", "id", "lantern", "ordinal", "session"
         ]
     );
-    assert_eq!(report["lantern"], l1);
+    assert_eq!(report["lantern"], lantern_id);
     assert_eq!(report["ordinal"], 1);
-    let (head, entry) = head_of(&home)?;
+    let (head, entry) = head_of(home)?;
     assert_eq!(report["id"], head);
     let EntryBody::Custom { custom_type, data } = entry.body else {
         return Err("the head is not a custom entry".into());
     };
     assert_eq!(custom_type, "lys.lantern_epilogue");
-    assert_eq!(data.ok_or("no data")?["lantern"], l1);
+    assert_eq!(data.ok_or("no data")?["lantern"], lantern_id);
     assert!(!String::from_utf8_lossy(&added.stdout).contains("cobalt"));
     outputs.push(added);
+    Ok(())
+}
+
+#[test]
+fn light_epilogue_and_recall_print_their_reports_and_refuse_by_name() -> Gate {
+    let dir = tempfile::tempdir()?;
+    let home = fixture_home(dir.path())?;
+    let home_arg = home.to_str().ok_or("home path is not text")?;
+    let mut outputs: Vec<Output> = Vec::new();
+    let l1 = light_and_refusals(&home, home_arg, &mut outputs)?;
+    epilogue_report(&home, home_arg, &l1, &mut outputs)?;
 
     let by_note = lantern(&["recall", "--home", home_arg, "--note", "cobalt"])?;
     let report = one_object(&by_note)?;

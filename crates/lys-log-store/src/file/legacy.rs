@@ -43,6 +43,7 @@ impl FileLeafStore {
     }
 
     /// The deferred check, retained when an owner rebuilds its snapshot.
+    #[must_use]
     pub fn deferred_migration(&self) -> Option<MigrationReady> {
         self.legacy.clone()
     }

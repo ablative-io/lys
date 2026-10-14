@@ -16,6 +16,7 @@ static PROCESS_READS: AtomicU64 = AtomicU64::new(0);
 
 /// How many physical leaf and snapshot reads every file store in this
 /// process has made.
+#[must_use]
 pub fn process_read_count() -> u64 {
     PROCESS_READS.load(Ordering::Relaxed)
 }

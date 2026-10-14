@@ -18,15 +18,16 @@ use serde_json::Value;
 
 use crate::error::HomeError;
 use crate::record::Session;
-use crate::record::blocks::{BlockStore, Hash, Put};
-use crate::record::entries::{CUSTOM_CALL, EntryBody};
+use crate::record::blocks::{BlockStore, Hash};
 
 pub(crate) mod captured;
 mod coding;
+mod ingest;
 mod parts;
 mod reported;
 pub mod whole;
 
+use ingest::{already, finish_ingest, finish_ingest_counted};
 use parts::{complete_response_parts, read_json, request_parts_of};
 pub use parts::{request_model, request_parts, request_parts_file, response_parts};
 
@@ -223,12 +224,25 @@ pub struct OutcomeMeta {
 /// first lookup on an open session reads every `lys.call` entry once into a
 /// map from call id to entry id, kept current by every append; later lookups
 /// read nothing.
+///
+/// # Errors
+///
+/// Refuses a stale session, a poisoned call map, or an indexed call entry
+/// that cannot be read, parsed or matched to its row.
 pub fn find_call(session: &Session, call_id: &str) -> Result<Option<String>, HomeError> {
     session.call_entry(call_id)
 }
 
 /// Store a complete call's parts and raw bodies as blocks and append one
 /// `lys.call` entry under the session's head. Idempotent on the call id.
+///
+/// # Errors
+///
+/// Propagates [`find_call`] failures. Refuses a request that is not JSON or
+/// its api's shape, a response that needs parsing but is not a successful
+/// JSON response, or a streamed response without supplied parts. Also refuses
+/// blocks or call data that cannot be serialised and stored, or a session
+/// append whose entry, index, head or call map cannot be recorded.
 pub fn ingest_call(
     session: &mut Session,
     blocks: &BlockStore,
@@ -285,6 +299,11 @@ pub fn ingest_call(
 /// forwarding hands them over: the raw bodies are streamed into the store,
 /// the request is parsed from its file, and the response's parts are either
 /// parsed from a JSON body or supplied by the proxy for an event stream.
+///
+/// # Errors
+///
+/// Refuses the same lookup, body-shape, storage and append failures as
+/// [`ingest_call`], and body files that cannot be opened or read.
 pub fn ingest_call_files(
     session: &mut Session,
     blocks: &BlockStore,
@@ -338,6 +357,14 @@ pub fn ingest_call_files(
 /// that parses gives its parts and model; one that does not, or none, gives
 /// neither; a response file is kept raw, and never yields response parts.
 /// Idempotent on the call id. Refuses `Complete`.
+///
+/// # Errors
+///
+/// Refuses `Complete` and propagates [`find_call`] failures. Refuses an
+/// unreadable body file or blocks or call data that cannot be serialised and
+/// stored, or a session append whose entry, index, head or call map cannot be
+/// recorded.
+/// A malformed request is recorded without parts rather than refused.
 pub fn ingest_outcome(
     session: &mut Session,
     blocks: &BlockStore,
@@ -396,92 +423,12 @@ pub fn ingest_outcome(
     finish_ingest_counted(session, blocks, record, &req, &[], raw_new)
 }
 
-fn already(entry_id: String) -> IngestReport {
-    IngestReport {
-        entry_id,
-        already_recorded: true,
-        part_blocks_new: 0,
-        part_blocks_reused: 0,
-        raw_blocks: 0,
-        request_parts: 0,
-        response_parts: 0,
-    }
-}
-
-fn finish_ingest(
-    session: &mut Session,
-    blocks: &BlockStore,
-    record: CallRecord,
-    req: &[Value],
-    resp: &[Value],
-    raw_req_new: bool,
-    raw_resp_new: bool,
-) -> Result<IngestReport, HomeError> {
-    finish_ingest_counted(
-        session,
-        blocks,
-        record,
-        req,
-        resp,
-        u64::from(raw_req_new) + u64::from(raw_resp_new),
-    )
-}
-
-fn finish_ingest_counted(
-    session: &mut Session,
-    blocks: &BlockStore,
-    mut record: CallRecord,
-    req: &[Value],
-    resp: &[Value],
-    raw_blocks: u64,
-) -> Result<IngestReport, HomeError> {
-    let mut new = 0u64;
-    let mut reused = 0u64;
-    let mut put_parts = |parts: &[Value]| -> Result<Vec<String>, HomeError> {
-        let mut hashes = Vec::with_capacity(parts.len());
-        for part in parts {
-            let bytes = serde_json::to_vec(part).map_err(|source| HomeError::Json {
-                context: "a part could not be serialised",
-                source,
-            })?;
-            let put: Put = blocks.put(&bytes)?;
-            if put.new {
-                new += 1;
-            } else {
-                reused += 1;
-            }
-            hashes.push(put.hash.to_string());
-        }
-        Ok(hashes)
-    };
-    record.request = put_parts(req)?;
-    // Only a complete call carries response parts.
-    record.response = if record.status == CallStatus::Complete {
-        put_parts(resp)?
-    } else {
-        Vec::new()
-    };
-    let response_parts = record.response.len() as u64;
-    let data = serde_json::to_value(&record).map_err(|source| HomeError::Json {
-        context: "the call record could not be serialised",
-        source,
-    })?;
-    let entry_id = session.append(EntryBody::Custom {
-        custom_type: CUSTOM_CALL.to_owned(),
-        data: Some(data),
-    })?;
-    Ok(IngestReport {
-        entry_id,
-        already_recorded: false,
-        part_blocks_new: new,
-        part_blocks_reused: reused,
-        raw_blocks,
-        request_parts: req.len() as u64,
-        response_parts,
-    })
-}
-
 /// Read a `lys.call` entry's data back.
+///
+/// # Errors
+///
+/// Refuses data that cannot be deserialised as a [`CallRecord`], naming the
+/// JSON deserialiser's reason.
 pub fn call_record(data: &Value) -> Result<CallRecord, HomeError> {
     serde_json::from_value(data.clone()).map_err(|source| HomeError::Json {
         context: "the entry's data is not a call record",
@@ -490,6 +437,10 @@ pub fn call_record(data: &Value) -> Result<CallRecord, HomeError> {
 }
 
 /// A hash named in a record, checked.
+///
+/// # Errors
+///
+/// Refuses as `NotAHash` unless the text is exactly 64 lowercase hex digits.
 pub fn named_hash(text: &str) -> Result<Hash, HomeError> {
     Hash::parse(text)
 }

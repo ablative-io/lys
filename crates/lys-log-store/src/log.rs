@@ -230,6 +230,7 @@ impl<S: LeafStore> Log<S> {
     /// Returned rather than logged: a library writing to stderr decides for its
     /// caller how a recovery gets reported, and a repair the operator never
     /// hears about is indistinguishable from one that never happened.
+    #[must_use]
     pub fn recovered_to(&self) -> Option<u64> {
         self.recovered_to
     }
@@ -238,6 +239,7 @@ impl<S: LeafStore> Log<S> {
     /// opened by [`Log::open_at_pin`] with leaves standing ahead of its pin.
     /// `None` when no repair is pending, and always `None` for a log from
     /// [`Log::open`], which performs the repair itself.
+    #[must_use]
     pub fn pending_repair(&self) -> Option<u64> {
         self.pending_repair
     }
@@ -314,21 +316,25 @@ impl<S: LeafStore> Log<S> {
     }
 
     /// The log's origin, fixed when its store was created.
+    #[must_use]
     pub fn origin(&self) -> &str {
         self.store.origin()
     }
 
     /// The current tree — rebuilt and reconciled at open, extended by append.
+    #[must_use]
     pub fn tree(&self) -> &AppendOnlyTree<RawLeaf> {
         &self.tree
     }
 
     /// The underlying store.
+    #[must_use]
     pub fn store(&self) -> &S {
         &self.store
     }
 
     /// The raw bytes of the leaf at `index`, if it exists.
+    #[must_use]
     pub fn leaf_bytes(&self, index: u64) -> Option<&[u8]> {
         usize::try_from(index)
             .ok()

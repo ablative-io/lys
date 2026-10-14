@@ -45,6 +45,7 @@ pub enum Start {
 
 impl Start {
     /// The refusal that sent the start to the whole log, if one did.
+    #[must_use]
     pub fn refusal(&self) -> Option<&SnapshotRefusal> {
         match self {
             Self::Resumed { .. } => None,
