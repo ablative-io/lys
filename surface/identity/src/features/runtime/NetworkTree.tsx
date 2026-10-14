@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLive } from '../../api';
 import type { SeatView } from '../../api';
 import { Gate } from '../signin/Gate';
@@ -106,6 +106,7 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const [changes, setChanges] = useState<Record<string, SeatView>>({});
   const [width, setWidth] = useState<number | null>(null);
   const drag = useRef<number | null>(null);
+  const watched = useRef<{ choice: string; agent: string } | null>(null);
   const all = useMemo(() => load.status === 'ok' ? branches(load.data, { ...load.data, seats: load.data.seats.map((seat) => {
     const changed = changes[seat.name];
     return changed && (seat.revision === undefined || changed.revision > seat.revision) ? changed : seat;
@@ -118,6 +119,13 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const agentLive = agentChoice && !chosen ? agentChoice.each.running[0] ?? null : null;
   // A seatless agent's live session, chosen by its row: watched through the session's own terminal.
   const session = selected?.startsWith(SESSION_CHOICE) ? all.flatMap((branch) => branch.agents.flatMap((each) => each.running.map((live) => ({ live, agent: each, machine: branch.machine })))).find((each) => SESSION_CHOICE + each.live.session === selected) ?? null : null;
+  useEffect(() => {
+    if (session && selected) watched.current = { choice: selected, agent: session.agent.id };
+    else if (running.status === 'ok' && load.status === 'ok' && !running.data.unanswered && watched.current?.choice === selected
+      && all.some((branch) => branch.agents.some((each) => each.id === watched.current?.agent))) {
+      select(AGENT_CHOICE + watched.current.agent);
+    }
+  }, [session, selected, running, load, all, select]);
   const change = (seat: SeatView) => setChanges((before) => ({ ...before, [seat.name]: seat }));
   const base = paneWidth ?? fifthOf(window.innerWidth);
   const shown = within(width ?? base);
