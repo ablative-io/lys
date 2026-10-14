@@ -81,6 +81,38 @@ describe('Token classes and provider windows on the canvas usage widget', () => 
   beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(at); });
   afterEach(() => { vi.restoreAllMocks(); });
 
+  it('collapses an empty day beside a measured week because repeated missing component tables say nothing new', async () => {
+    const empty: TokensUsed = { ...tokens(), figure: null, unavailable: 'tokens were not reported', tokens: {
+      ...components, calls: 1, refused_calls: 1, input_tokens: { reported: null, missing_calls: 1 },
+      output_tokens: { reported: null, missing_calls: 1 }, cache_creation_tokens: { reported: null, missing_calls: 1 },
+      cache_read_tokens: { reported: null, missing_calls: 1 },
+    } };
+    const week = { ...tokens(), period: 'week' as const };
+    const host = await render(<WidgetUsageReadings rows={[row('Agent', [empty, week])]} keys={['tokens/day', 'tokens/week']} />);
+    expect(host.querySelector('[data-token-period="day"]')?.querySelector('table')).toBeNull();
+    expect(host.querySelector('[data-token-period="day"]')?.textContent).toBe('Today: nothing reported yet · 1 call refused by the provider');
+    expect(host.querySelector('[data-token-period="week"]')?.querySelectorAll('tr')).toHaveLength(4);
+  });
+
+  it('names the live session before its first completed call without repeating context counter errors', async () => {
+    const waiting: ContextUsed = { unit: 'context_percent', period: null, since_ms: null, figure: null,
+      unavailable: 'context counters not reported: input_tokens, cache_creation_tokens, cache_read_tokens',
+      context: { session: 'fresh-live', read_at_ms: null, reported_none: 1, completed_call: false, model, context_tokens: null, window_tokens: null } };
+    const host = await render(<ContextReadings rows={[row('Agent', [waiting])]} />);
+    expect(host.querySelector('b')?.textContent).toBe('No messages yet');
+    expect(host.textContent).toContain('session fresh-live');
+    expect(host.textContent).not.toContain('context counters not reported');
+  });
+
+  it('keeps missing counters named after a completed call because absence of context does not mean no messages', async () => {
+    const waiting: ContextUsed = { unit: 'context_percent', period: null, since_ms: null, figure: null,
+      unavailable: 'context counters not reported: input_tokens', context: { session: 'live', read_at_ms: null,
+        reported_none: 1, completed_call: true, model, context_tokens: null, window_tokens: null } };
+    const host = await render(<ContextReadings rows={[row('Agent', [waiting])]} />);
+    expect(host.textContent).not.toContain('No messages yet');
+    expect(host.textContent).toContain('context counters not reported: input_tokens');
+  });
+
   it('renders four token classes and call/session counts per agent without displaying the unrelated combined scalar', async () => {
     const host = await render(<TokenReadings rows={[row('One', [tokens()]), row('Other', [tokens()])]} />);
     expect(host.querySelectorAll('[data-token-agent]')).toHaveLength(2);

@@ -55,6 +55,40 @@ pub(super) fn call(event: &str, session: &str, at_ms: i64, input: Option<u64>) -
 }
 
 #[test]
+fn no_messages_is_known_only_before_a_completed_call_not_when_context_counters_are_missing()
+-> Result<(), String> {
+    for (status, completed) in [
+        (None, None),
+        (Some("upstream_refused"), Some(false)),
+        (Some("complete"), Some(true)),
+    ] {
+        let mut held = Held::default();
+        let mut usage = call("call", "session", 10_000, None);
+        if let Some(call) = &mut usage.call {
+            call.record = status.map(|status| lys_runner::tracking::RecordAt {
+                session: "home".to_owned(),
+                entry: "entry".to_owned(),
+                status: status.to_owned(),
+                duration_ms: None,
+            });
+        }
+        held.hold(Leaf::Used(usage))?;
+        let reading =
+            held.session_context(&limit(), &live(&[("session", 1)]), &windows(), 20_000)?;
+        let context = reading.context.ok_or("missing context")?;
+        assert_eq!(context.completed_call, completed);
+        assert_eq!(context.context_tokens, None);
+    }
+    let held = Held::default();
+    let fresh = held.session_context(&limit(), &live(&[("fresh", 1)]), &windows(), 20_000)?;
+    assert_eq!(
+        fresh.context.ok_or("missing fresh context")?.completed_call,
+        Some(false)
+    );
+    Ok(())
+}
+
+#[test]
 fn reported_input_and_cached_input_produce_5_8795_percent_of_the_declared_million_token_window()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut held = Held::default();

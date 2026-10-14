@@ -28,6 +28,8 @@ pub struct SessionReading {
     pub read_at_ms: Option<i64>,
     /// Later calls that omitted at least one context counter.
     pub reported_none: usize,
+    /// Whether a call completed; unknown when its source did not record an outcome.
+    pub completed_call: Option<bool>,
     /// The reading's model, or the latest incomplete call's model.
     pub model: Option<String>,
     /// Input and cached input tokens, excluding output.
@@ -57,6 +59,7 @@ impl Session {
                 session: id.to_owned(),
                 read_at_ms: None,
                 reported_none: 0,
+                completed_call: Some(false),
                 model: None,
                 context_tokens: None,
                 window_tokens: None,
@@ -74,6 +77,17 @@ impl Session {
             .call
             .as_ref()
             .ok_or("context call index selected a record without a call")?;
+        if self.reading.completed_call != Some(true) {
+            let completed = call
+                .record
+                .as_ref()
+                .map(|record| record.status == "complete");
+            self.reading.completed_call = match (self.reading.completed_call, completed) {
+                (_, Some(true)) => Some(true),
+                (Some(false), Some(false)) => Some(false),
+                _ => None,
+            };
+        }
         let context = context_tokens(call)?;
         let model = call.model.as_deref();
         let model_window = model.and_then(|model| windows.get(model));
@@ -273,6 +287,7 @@ impl Held {
                 session: Some(session.reading.session.clone()),
                 read_at_ms: session.reading.read_at_ms,
                 reported_none: session.reading.reported_none,
+                completed_call: session.reading.completed_call,
                 model: session.reading.model.clone(),
                 context_tokens: session.reading.context_tokens,
                 window_tokens: session.reading.window_tokens,

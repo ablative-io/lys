@@ -17,6 +17,7 @@ export interface TokenComponents {
   calls: number;
   sessions: number;
   calls_without_session: number;
+  refused_calls?: number;
 }
 
 export type TokensUsed = Used & { tokens?: TokenComponents };
@@ -32,6 +33,7 @@ export interface TokenPresentation {
   components: { key: TokenKey; label: string; reported: number | null; missing_calls: number; words: string }[];
   counts: string;
   unavailable: string | null;
+  empty: string | null;
 }
 
 const count = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
@@ -51,6 +53,7 @@ function componentsGap(tokens: TokenComponents): string | null {
     if (count(tokens.calls) && component.missing_calls > tokens.calls) return TOKEN_LABELS[key] + ' names more missing calls than recorded calls';
   }
   if (!count(tokens.calls)) return 'the recorded call count is invalid';
+  if (tokens.refused_calls !== undefined && (!count(tokens.refused_calls) || tokens.refused_calls > tokens.calls)) return 'the refused call count is invalid';
   if (!count(tokens.sessions)) return 'the recorded session count is invalid';
   if (!count(tokens.calls_without_session) || tokens.calls_without_session > tokens.calls) return 'the count of calls without a session is invalid';
   if (tokens.sessions > tokens.calls - tokens.calls_without_session) return 'the recorded session count exceeds calls with a session';
@@ -61,7 +64,7 @@ function componentsGap(tokens: TokenComponents): string | null {
 export function tokenPresentations(rows: DashboardAgent[], period: Length): TokenPresentation[] {
   return rows.map((row) => {
     const base: TokenPresentation = { agent: row.agent.id, name: row.agent.display_name, period, since_ms: null,
-      components: [], counts: 'Call and session counts not reported', unavailable: null };
+      components: [], counts: 'Call and session counts not reported', unavailable: null, empty: null };
     if (refusedPart(row.usage)) return { ...base, unavailable: row.usage.refusal + ': ' + row.usage.reason };
     const figures = row.usage.figures;
     if (figures !== undefined && (!Array.isArray(figures) || figures.some((used) => !used || typeof used !== 'object'))) {
@@ -81,7 +84,10 @@ export function tokenPresentations(rows: DashboardAgent[], period: Length): Toke
     const tokens = used.tokens;
     const counts = namedCount(tokens.calls, 'call') + ' · ' + namedCount(tokens.sessions, 'session')
       + (tokens.calls_without_session ? ' · ' + namedCount(tokens.calls_without_session, 'call') + ' named no session' : '');
-    return { ...base, since_ms: used.since_ms, counts,
+    const empty = TOKEN_KEYS.every((key) => tokens[key].reported === null)
+      ? 'nothing reported yet' + (tokens.refused_calls ? ' · ' + namedCount(tokens.refused_calls, 'call') + ' refused by the provider'
+        : tokens.calls ? ' · ' + namedCount(tokens.calls, 'call') + ' reported no token figures' : '') : null;
+    return { ...base, since_ms: used.since_ms, counts, empty,
       components: TOKEN_KEYS.map((key) => ({ key, label: TOKEN_LABELS[key], ...tokens[key], words: componentWords(tokens[key]) })) };
   });
 }

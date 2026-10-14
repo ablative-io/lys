@@ -19,6 +19,7 @@ const context = (figure: number | null, changes: Partial<ContextUsed> = {}): Con
   unit: 'context_percent', period: null, since_ms: null,
   ...(figure === null ? { figure, unavailable: 'context_percent was not reported' } : { figure, unavailable: null }),
   source: 'model', context: { session, read_at_ms: figure === null ? null : at, reported_none: 2, model,
+    completed_call: figure !== null,
     context_tokens: figure === null ? null : 58_795, window_tokens: 1_000_000, live_sessions: [] }, ...changes,
 } as ContextUsed);
 const older: SessionContext = { session: 'older-session', read_at_ms: at - 600_000, reported_none: 8, model,
@@ -84,9 +85,9 @@ describe('Current live-session context readings', () => {
     expect(rendered(reading).textContent).toBe(reading?.words);
   });
 
-  it('says Not reported when the selected session never supplied a context reading', () => {
+  it('says No messages yet because the selected session has not completed its first context reading', () => {
     expect(contextPresentation([row('Agent', [context(null)])])).toMatchObject({ session, figure: null,
-      display: 'Not reported', read_at_ms: null, words: 'session current-session · 2 calls reported none' });
+      display: 'No messages yet', read_at_ms: null, words: 'session current-session' });
   });
 
   it('retains side-work and oversized-context reasons rather than calling their models undeclared', () => {

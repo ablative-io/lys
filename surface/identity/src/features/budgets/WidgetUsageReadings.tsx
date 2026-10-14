@@ -50,12 +50,14 @@ export function ContextReadings({ rows, selected, select, renderLevel }: { rows:
 export function TokenReadings({ rows, period = 'day' }: { rows: DashboardAgent[]; period?: Length }) {
   return <>{tokenPresentations(rows, period).map((reading) => <section className="canvas-stat" key={reading.agent} data-token-agent={reading.agent}
     data-token-period={period} aria-label={'Tokens of ' + reading.name + ' ' + THIS[period]}>
+    {reading.empty ? <span>{period === 'five_hour' ? 'This 5-hour interval' : THIS[period][0].toUpperCase() + THIS[period].slice(1)}: {reading.empty}</span> : <>
     <span className="sec">Tokens {period === 'five_hour' ? 'in this 5-hour interval' : THIS[period]} of {reading.name}</span>
     {reading.unavailable ? <span className="why-not" data-token-unavailable>{reading.unavailable}</span> : <table className="dash-table"><tbody>
       {reading.components.map((each) => <tr key={each.key} data-token-component={each.key}><th scope="row">{each.label}</th><td>{each.words}</td></tr>)}
     </tbody></table>}
     <span className="sec" data-token-counts>{reading.counts}</span>
     <span className="dim">{reading.since_ms === null ? 'Period start not reported' : <>Since <time dateTime={new Date(reading.since_ms).toISOString()}>{clockMs(reading.since_ms)}</time></>}</span>
+    </>}
   </section>)}</>;
 }
 

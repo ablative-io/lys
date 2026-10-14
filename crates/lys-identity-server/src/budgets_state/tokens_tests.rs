@@ -45,6 +45,27 @@ fn components(held: &Held) -> Result<TokenComponents, String> {
 }
 
 #[test]
+fn provider_refusals_are_counted_from_the_record_status_never_from_missing_tokens() -> TestResult {
+    let mut held = Held::default();
+    let mut refused = call("refused", NOW, Some("session"), [None; 4]);
+    if let Some(call) = &mut refused.call {
+        call.record = Some(lys_runner::tracking::RecordAt {
+            session: "home".to_owned(),
+            entry: "entry".to_owned(),
+            status: "upstream_refused".to_owned(),
+            duration_ms: Some(1),
+        });
+    }
+    held.hold(Leaf::Used(refused))?;
+    held.hold(Leaf::Used(call("missing", NOW, Some("session"), [None; 4])))?;
+    let parts = components(&held)?;
+    assert_eq!(parts.calls, 2);
+    assert_eq!(parts.refused_calls, 1);
+    assert_eq!(parts.input_tokens.reported, None);
+    Ok(())
+}
+
+#[test]
 fn each_token_component_keeps_its_reported_subtotal_beside_its_own_missing_calls() -> TestResult {
     let mut held = Held::default();
     held.hold(Leaf::Used(call(
@@ -267,7 +288,7 @@ fn serialised_component_coverage_keeps_absence_distinct_from_reported_zero() -> 
             "output_tokens": { "reported": null, "missing_calls": 1 },
             "cache_creation_tokens": { "reported": 7, "missing_calls": 0 },
             "cache_read_tokens": { "reported": 8, "missing_calls": 0 },
-            "calls": 1, "sessions": 0, "calls_without_session": 1,
+            "calls": 1, "refused_calls": 0, "sessions": 0, "calls_without_session": 1,
         })
     );
     Ok(())

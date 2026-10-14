@@ -37,6 +37,9 @@ pub struct ContextReading {
     pub read_at_ms: Option<i64>,
     /// Later model calls in this session that reported no context figure.
     pub reported_none: usize,
+    /// Whether a call completed; absent when older records do not say how it ended.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completed_call: Option<bool>,
     /// The model that supplied the reading, or the unmeasured session's model.
     pub model: Option<String>,
     /// The call's reported input, cache writes and cache reads, excluding output.
@@ -66,6 +69,7 @@ impl Reading {
             session: Some(self.session.clone()),
             read_at_ms: self.figure.map(|_| self.at_ms),
             reported_none: self.reported_none,
+            completed_call: self.figure.map(|_| true),
             model: self.model.clone(),
             context_tokens: None,
             window_tokens: None,

@@ -54,6 +54,8 @@ pub struct TokenComponents {
     pub cache_read_tokens: TokenComponent,
     /// All recorded model calls in the period, including calls that reported no figures.
     pub calls: usize,
+    /// Recorded calls whose provider refused the request.
+    pub refused_calls: usize,
     /// Distinct named sessions, counted separately for each agent.
     pub sessions: usize,
     /// Calls whose session was not named; the number of their distinct sessions is unknown.
@@ -74,6 +76,16 @@ impl TokenComponents {
             .calls
             .checked_add(1)
             .ok_or("token component call count overflows")?;
+        if call
+            .record
+            .as_ref()
+            .is_some_and(|record| record.status == "upstream_refused")
+        {
+            self.refused_calls = self
+                .refused_calls
+                .checked_add(1)
+                .ok_or("refused call count overflows")?;
+        }
         if let Some(session) = usage.session.as_ref().filter(|session| !session.is_empty()) {
             sessions.insert((usage.agent.as_str(), session.as_str()));
         } else {

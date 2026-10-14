@@ -9,6 +9,7 @@ export interface ContextReading {
   session?: string | null;
   read_at_ms: number | null;
   reported_none: number;
+  completed_call?: boolean | null;
   model: string | null;
   context_tokens?: number | null;
   window_tokens?: number | null;
@@ -19,6 +20,7 @@ export interface SessionContext {
   session: string;
   read_at_ms: number | null;
   reported_none: number;
+  completed_call?: boolean | null;
   model: string | null;
   context_tokens: number | null;
   window_tokens: number | null;
@@ -123,18 +125,20 @@ export function contextPresentation(rows: DashboardAgent[], selectedSession?: st
     : contextTokens !== null && windowTokens !== null ? (session !== null ? contextTokens * 100 / windowTokens : null)
       : used.figure;
   const readAt = reading?.read_at_ms ?? null;
+  const noMessages = session !== null && readAt === null && contextTokens === null && reading?.completed_call === false
+    && (used.unavailable === 'context_percent was not reported' || used.unavailable?.startsWith('context counters not reported:'));
   const missing = missingDisplay(used);
   const missingWindow = missing === 'Not reported' && windowTokens === null && (contextTokens !== null || used.figure !== null);
   const words = [session === null ? 'current session not reported' : 'session ' + session,
     readAt !== null ? 'read ' + clockMs(readAt) : contextTokens !== null || used.figure !== null ? 'read time not reported' : '',
-    reading ? calls(reading.reported_none) : 'count of calls that reported none not reported',
+    noMessages ? '' : reading ? calls(reading.reported_none) : 'count of calls that reported none not reported',
     contextTokens === null && used.figure !== null ? 'context tokens not reported' : '',
     missingWindow ? 'declared context window not reported' : '']
     .filter(Boolean).join(' · ');
   const display = figure !== null ? figure.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%'
-    : missing !== 'Not reported' ? missing : missingWindow ? 'Declared context window not reported' : 'Not reported';
+    : noMessages ? 'No messages yet' : missing !== 'Not reported' ? missing : missingWindow ? 'Declared context window not reported' : 'Not reported';
   return { figure, display, read_at_ms: readAt, reported_none: reading?.reported_none ?? null, words,
-    unavailable: used.unavailable ? [readings[0].agent + ': ' + used.unavailable] : [], session,
+    unavailable: used.unavailable && !noMessages ? [readings[0].agent + ': ' + used.unavailable] : [], session,
     model: reading?.model ?? null, context_tokens: contextTokens, window_tokens: windowTokens, live_sessions: live };
 }
 
