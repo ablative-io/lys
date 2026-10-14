@@ -326,9 +326,9 @@ fn codex(
 
 /// Add the reserved entry. A launch that names `--mcp-config` is Claude
 /// Code's and gets the entry in its `mcp.json`; any other launch is Codex's
-/// and gets a `-c mcp_servers.lys=` setting with the pass and seat in its
-/// environment. Other files and process inputs remain untouched; errors
-/// change nothing.
+/// and gets a `-c mcp_servers.lys=` setting. Both receive the run pass in
+/// their environment, so their other MCP children may request an audience.
+/// Errors change nothing.
 ///
 /// # Errors
 /// Refuses invalid endpoints, passes, config shapes, a Claude Code launch
@@ -340,6 +340,9 @@ pub fn render(
     entry: &LysMcp,
 ) -> Result<(), Refusal> {
     check(entry)?;
+    if environment.contains_key(CODEX_PASS_VARIABLE) {
+        return Err(Refusal::Duplicate);
+    }
     if !arguments.iter().any(|argument| argument == "--mcp-config") {
         return codex(arguments, environment, entry);
     }
@@ -353,5 +356,6 @@ pub fn render(
         .as_str()
         .clone_into(&mut file.sha256);
     file.text = text;
+    environment.insert(CODEX_PASS_VARIABLE.to_owned(), entry.pass.clone());
     Ok(())
 }
