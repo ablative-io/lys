@@ -63,13 +63,15 @@ it('C738 stops through the seat route and shows confirmed end without a terminal
   expect(document.body.textContent).toContain('Session session-first ended');
   expect(document.querySelector('.terminal-screen')).toBeNull();
 });
-it('C738 offline and unknown leaves show their state and reason without mounting a terminal', async () => {
+it('C738 offline and unknown leaves show their state, reason and Start without mounting a terminal', async () => {
   await render('first', 'offline');
   expect(document.querySelector('button[aria-label="Start first"]')).not.toBeNull();
   expect(document.querySelector('.terminal-screen')).toBeNull();
   await act(async () => { root?.render(<NetworkTreePane key="unknown" seat={seat('unknown', 'unknown') as never} name="unknown" reason="runner_unreachable: socket absent" change={vi.fn()} />); });
   expect(document.body.textContent).toContain('runner_unreachable: socket absent');
   expect(document.querySelector('.terminal-screen')).toBeNull();
+  // Whether an unknown seat runs was not read: Start is offered, and the service refuses it if the seat is running.
+  expect(document.querySelector('button[aria-label="Start unknown"]')).not.toBeNull();
 });
 it('C738 follows managed attach lines, preserves the cursor, and names the stream end', async () => {
   const posted: { path: string; body: unknown }[] = [];

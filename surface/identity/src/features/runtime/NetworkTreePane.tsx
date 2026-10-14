@@ -70,7 +70,7 @@ export function NetworkTreePane({ seat, name, reason, change }: { seat: SeatView
     {running && seat.session ? seat.transport === 'pty' ? <GpuTerminal key={seat.session} session={seat.session} onEnd={end} onFailure={(error) => setFailure(said(error))} />
       : seat.transport === 'managed' ? <ManagedTerminal key={seat.session} seat={seat} end={() => setEnded('Session ' + seat.session + ' ended.')} failure={setFailure} />
       : <p className="why-not" role="alert">SeatTransportUnknown: this seat has no confirmed terminal transport.</p>
-      : !running && (seat.state === 'offline' || seat.state === 'not-seen') ? <SeatStart seat={seat} change={change} />
+      : !running && (seat.state === 'offline' || seat.state === 'not-seen' || seat.state === 'unknown') ? <SeatStart seat={seat} change={change} />
       : !seat.session && running ? <p className="why-not" role="alert">SeatSessionMissing: the online seat names no session.</p> : null}
   </section>;
 }

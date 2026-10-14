@@ -1,5 +1,7 @@
 /* The Network view: the tree down the left, about a fifth of the page, and the chosen seat's terminal filling the rest. */
-.network-tree { display: flex; flex: 1; min-height: 0; padding-top: 48px; }
+/* The tree starts at the top, as an editor's does. The view switch floats over the middle of the page, over the
+   terminal space and not the tree, so only the terminal space keeps clear of it. */
+.network-tree { display: flex; flex: 1; min-height: 0; }
 .network-list { width: var(--network-pane-width); flex: none; min-width: 200px; max-width: 640px; overflow: auto; padding: 4px 0 12px; }
 .network-branches, .network-branches ul { list-style: none; margin: 0; padding: 0; }
 .network-branches summary { list-style: none; cursor: pointer; }
@@ -11,16 +13,14 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-fold:hover, .network-fold:focus-visible { background: var(--surface-hover); outline: none; }
 .network-fold-name, .network-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .network-machine .network-fold-name { font-weight: 600; }
-.network-kind, .network-count { color: var(--text-secondary); font-size: 11px; flex: none; }
 .network-branches > li > details > ul { --network-indent: 20px; }
 .network-branches > li > details > ul > li > details > ul, .network-branches > li > details > ul > li > ul { --network-indent: 34px; }
 .network-branches > li > details > ul > li > details > ul { --network-indent: 48px; }
 .network-leaf { border-radius: 0; }
 .network-leaf:hover { background: var(--surface-hover); }
-.network-leaf[data-selected="true"] { background: var(--accent-wash); }
+.network-leaf[data-selected="true"], .network-fold[data-selected="true"] { background: var(--accent-wash); }
 .network-name { text-decoration: none; color: inherit; cursor: pointer; }
 .network-name::before { content: attr(data-mark); width: 14px; flex: none; text-align: center; color: var(--ok); font-size: 10px; }
-.network-seatless .network-name { cursor: default; }
 [data-state="online-working"] .network-name::before { color: var(--accent); }
 [data-state="offline"] .network-name, [data-state="not-seen"] .network-name { color: var(--text-secondary); }
 [data-state="offline"] .network-name::before, [data-state="not-seen"] .network-name::before { color: var(--muted-dot); }
@@ -32,7 +32,7 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: var(--border-default); }
 .network-divider:hover::after, .network-divider:focus-visible::after { background: var(--accent); width: 2px; }
 .network-divider:focus-visible { outline: none; }
-.network-pane { flex: 1; min-width: 0; display: flex; padding: 12px; }
+.network-pane { flex: 1; min-width: 0; display: flex; padding: 48px 12px 12px; }
 .network-terminal { flex: 1; min-width: 0; min-height: 0; }
 .network-terminal .terminal-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .network-terminal .seat-send { display: flex; gap: 8px; padding: 8px; }
@@ -40,8 +40,8 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-managed { flex: 1; overflow: auto; padding: 12px; background: var(--surface-code); }
 .network-managed pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
 @media (max-width: 760px) {
-  .network-tree { flex-direction: column; overflow: auto; }
+  .network-tree { flex-direction: column; overflow: auto; padding-top: 48px; }
   .network-list { width: 100%; max-width: none; border-bottom: 1px solid var(--border-default); }
-  .network-pane { width: 100%; min-height: 320px; flex: 1; }
+  .network-pane { width: 100%; min-height: 320px; flex: 1; padding-top: 12px; }
   .network-divider { display: none; }
 }

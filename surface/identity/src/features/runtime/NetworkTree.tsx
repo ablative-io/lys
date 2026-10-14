@@ -2,12 +2,14 @@ import { useMemo, useRef, useState } from 'react';
 import { useLive } from '../../api';
 import type { SeatView } from '../../api';
 import { Gate } from '../signin/Gate';
-import { branches, readNetworkTree, readRunning, SESSION_CHOICE } from './network-tree';
+import { AGENT_CHOICE, branches, readNetworkTree, readRunning, SESSION_CHOICE, useAgentNames } from './network-tree';
 import { Terminal } from './Terminal';
 import { said } from './canvas-kept';
 import type { TreeAgent, TreeBranch } from './network-tree';
 import { NetworkTreePane } from './NetworkTreePane';
 import { PANE_WIDTH } from './canvas-kept';
+import { fifthOf } from './canvas-operations';
+import { NetworkAgentStart } from './NetworkAgentPane';
 import './network-tree.css';
 
 const MARKS = { 'online-idle': '●', 'online-working': '◉', offline: '○', 'not-seen': '◌', unknown: '?' };
@@ -42,11 +44,13 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
         <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['online-working']} title={title + ' · running outside a seat · session ' + session.session + (agent.running.length > 1 ? ' and ' + (agent.running.length - 1) + ' more' : '')} aria-label={agent.name + ', running, session ' + session.session} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
       </li></ul>;
     }
-    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state="not-seen" role="none">
-      <span role="treeitem" tabIndex={-1} className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · live sessions not read: ' + unsurveyed : '')}>{agent.name}</span>
+    const choice = AGENT_CHOICE + agent.id;
+    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state="not-seen" data-selected={selected === choice} role="none">
+      <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · live sessions not read: ' + unsurveyed : '')} aria-label={agent.name + ', not running'} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
     </li></ul>;
   }
-  return <details open><summary role="treeitem" className="network-fold network-agent" title={title}><span className="network-fold-name">{agent.name}</span><span className="network-count">{agent.leaves.length}</span></summary>
+  const choice = AGENT_CHOICE + agent.id;
+  return <details open><summary role="treeitem" className="network-fold network-agent" title={title + ' · ' + agent.leaves.length + ' seats'} data-selected={selected === choice} aria-selected={selected === choice} onClick={() => select(choice)}><span className="network-fold-name">{agent.name}</span></summary>
     <ul role="group">{agent.leaves.map((leaf) => <Leaf key={leaf.seat.name} {...leaf} label={leaf.seat.name} selected={selected} select={select} />)}</ul>
   </details>;
 }
@@ -60,7 +64,7 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
  */
 export function NetworkBranches({ branches: all, selected, select, unsurveyed = null }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void; unsurveyed?: string | null }) {
   return <ul className="network-branches" role="tree" aria-label="Network machines" onKeyDown={walk}>{all.map(({ machine, agents }) => <li key={machine.id} data-machine={machine.id} role="none">
-    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span><span className="network-kind">{machine.kind}</span></summary>
+    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span></summary>
       <ul role="group">{agents.length ? agents.map((agent) => <li key={agent.id} data-agent={agent.id} role="none"><AgentRow agent={agent} selected={selected} select={select} unsurveyed={unsurveyed} /></li>) : <li className="dim network-empty" role="none">no agents</li>}</ul>
     </details>
   </li>)}</ul>;
@@ -85,13 +89,17 @@ function walk(event: React.KeyboardEvent<HTMLUListElement>) {
 }
 
 const within = (width: number): number => Math.round(Math.max(PANE_WIDTH.least, Math.min(PANE_WIDTH.most, width)));
+/** A fifth of the window, kept within what the service keeps, while the person has not set a width of their own. */
+const FIFTH = 'clamp(' + PANE_WIDTH.least + 'px, 20vw, ' + PANE_WIDTH.most + 'px)';
 
 /**
- * The Network view: the tree down the left, about a fifth of the page and dragged or keyed to the width the person
- * wants (kept by the service), and the chosen seat's terminal filling the rest.
+ * The Network view: the tree down the left, a fifth of the window until the person drags or keys it to the width they
+ * want (kept by the service), and the chosen row's terminal filling the rest. The tree is drawn the moment the
+ * computers and the seats answer; agents' names and the live sessions fill in as they arrive.
  */
-export function NetworkTree({ selected, select, paneWidth, resize, agent }: { selected: string | null; select: (seat: string) => void; paneWidth: number; resize: (width: number) => void; agent?: string }) {
+export function NetworkTree({ selected, select, paneWidth, resize, agent }: { selected: string | null; select: (seat: string) => void; paneWidth: number | null; resize: (width: number) => void; agent?: string }) {
   const load = useLive(readNetworkTree, 'operations-network-tree');
+  const named = useAgentNames(load.status === 'ok' ? load.data : null);
   // The live sessions arrive on their own; the tree never waits for them.
   const running = useLive(readRunning, 'operations-network-running');
   const unsurveyed = running.status === 'ok' ? running.data.unanswered : running.status === 'refused' ? said(running.refused) : 'the live session list has not answered yet';
@@ -101,22 +109,30 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const all = useMemo(() => load.status === 'ok' ? branches(load.data, { ...load.data, seats: load.data.seats.map((seat) => {
     const changed = changes[seat.name];
     return changed && (seat.revision === undefined || changed.revision > seat.revision) ? changed : seat;
-  }) }, load.data.names, load.data.nameReasons, running.status === 'ok' ? running.data.sessions : []) : [], [load, changes, running]);
-  const chosen = all.flatMap((branch) => branch.leaves).find((leaf) => selected ? leaf.seat.name === selected : agent && leaf.seat.agent === agent);
+  }) }, named.names, named.reasons, running.status === 'ok' ? running.data.sessions : []) : [], [load, changes, running, named]);
+  // An agent's own row: the agent on the computer it was chosen on, with its seats there and its live sessions.
+  const agentChoice = selected?.startsWith(AGENT_CHOICE) ? all.flatMap((branch) => branch.agents.map((each) => ({ each, machine: branch.machine }))).find(({ each }) => AGENT_CHOICE + each.id === selected) ?? null : null;
+  // Chosen by its seat, or by its agent: the seat that is running, else its first, which offers Start.
+  const chosen = agentChoice ? agentChoice.each.leaves.find((leaf) => leaf.seat.state === 'online-idle' || leaf.seat.state === 'online-working') ?? agentChoice.each.leaves[0]
+    : all.flatMap((branch) => branch.leaves).find((leaf) => selected ? leaf.seat.name === selected : agent && leaf.seat.agent === agent);
+  const agentLive = agentChoice && !chosen ? agentChoice.each.running[0] ?? null : null;
   // A seatless agent's live session, chosen by its row: watched through the session's own terminal.
   const session = selected?.startsWith(SESSION_CHOICE) ? all.flatMap((branch) => branch.agents.flatMap((each) => each.running.map((live) => ({ live, agent: each, machine: branch.machine })))).find((each) => SESSION_CHOICE + each.live.session === selected) ?? null : null;
   const change = (seat: SeatView) => setChanges((before) => ({ ...before, [seat.name]: seat }));
-  const shown = within(width ?? paneWidth);
-  return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': shown + 'px' } as React.CSSProperties}>
-    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={session ? selected : chosen?.seat.name ?? null} select={select} unsurveyed={unsurveyed} />
+  const base = paneWidth ?? fifthOf(window.innerWidth);
+  const shown = within(width ?? base);
+  return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': width === null && paneWidth === null ? FIFTH : shown + 'px' } as React.CSSProperties}>
+    <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={session || agentChoice ? selected : chosen?.seat.name ?? null} select={select} unsurveyed={unsurveyed} />
       {!all.length ? <p className="note">No active machine was returned.</p> : null}
     </aside>
     <div className="network-divider" role="separator" aria-label="Network tree width" aria-orientation="vertical" tabIndex={0} aria-valuenow={shown} aria-valuemin={PANE_WIDTH.least} aria-valuemax={PANE_WIDTH.most}
-      onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resize(within(paneWidth + (event.key === 'ArrowRight' ? 24 : -24))); } }}
+      onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resize(within(base + (event.key === 'ArrowRight' ? 24 : -24))); } }}
       onPointerDown={(event) => { drag.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }}
-      onPointerMove={(event) => { if (drag.current !== null) setWidth(within(paneWidth + event.clientX - drag.current)); }}
+      onPointerMove={(event) => { if (drag.current !== null) setWidth(within(base + event.clientX - drag.current)); }}
       onPointerUp={() => { if (drag.current !== null && width !== null) resize(within(width)); drag.current = null; setWidth(null); }} onPointerCancel={() => { drag.current = null; setWidth(null); }} />
     <div className="network-pane">{session ? <section className="terminal network-terminal" aria-label={'Terminal of ' + session.agent.name}><Terminal key={session.live.session} session={session.live.session} agent={session.agent.id} machine={session.machine.name} /></section>
+      : agentLive && agentChoice ? <section className="terminal network-terminal" aria-label={'Terminal of ' + agentChoice.each.name}><Terminal key={agentLive.session} session={agentLive.session} agent={agentChoice.each.id} machine={agentChoice.machine.name} /></section>
+      : agentChoice && !chosen ? <NetworkAgentStart key={agentChoice.each.id} agent={agentChoice.each.id} name={agentChoice.each.name} reason={agentChoice.each.reason} />
       : chosen ? <NetworkTreePane key={chosen.seat.name + ':' + (chosen.seat.session ?? '')} {...chosen} change={change} />
       : <p className="note" role="status">{selected?.startsWith(SESSION_CHOICE) ? running.status === 'ok' ? 'The selected session is not running on an active machine.' : 'Reading the live sessions for the selected session…' : selected ? 'The selected seat was not returned on an active machine.' : 'Choose a seat in the tree to watch its terminal.'}</p>}</div>
   </div>} />;

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, operationId, Refused, request, seats } from '../../api';
 import type { SeatList, SeatView } from '../../api';
 import type { RuntimeSession } from './RuntimeSessions';
@@ -17,12 +17,16 @@ export interface TreeLeaf { seat: SeatView; name: string; reason: string | null 
 export interface TreeAgent { id: string; name: string; reason: string | null; leaves: TreeLeaf[]; running: RuntimeSession[] }
 /** A computer: its agents, and every seat on it in one list for whoever wants them flat. */
 export interface TreeBranch { machine: Machine; agents: TreeAgent[]; leaves: TreeLeaf[] }
-export interface TreeRead extends SeatList { machines: Machine[]; names: Record<string, string>; nameReasons: Record<string, string> }
+export interface TreeRead extends SeatList { machines: Machine[] }
+/** Agents' names as they arrive, and why a name could not be read. */
+export interface AgentNames { names: Record<string, string>; reasons: Record<string, string> }
 /** The live sessions, and which sessions' runners did not answer, as one line, or null when all did. */
 export interface RunningRead { sessions: RuntimeSession[]; unanswered: string | null }
 
 /** What a seatless agent's row selects: its live session, told from a seat's name by this prefix. */
 export const SESSION_CHOICE = 'session:';
+/** What an agent's own row selects when it is not one seat's row: the agent, told from a seat's name by this prefix. */
+export const AGENT_CHOICE = 'agent:';
 
 export const online = (seat: SeatView): boolean => seat.state === 'online-idle' || seat.state === 'online-working';
 
@@ -50,21 +54,53 @@ export async function readRunning(): Promise<RunningRead> {
   return { sessions: answer.sessions, unanswered: unanswered || null };
 }
 
+/**
+ * The computers and the seats: all the tree needs to be drawn. Names the computers do not give arrive afterwards, on
+ * their own (see `useAgentNames`), so the first draw never waits on them.
+ */
 export async function readNetworkTree(): Promise<TreeRead> {
   const [network, list] = await Promise.all([
     readEveryPage<NetworkView & Paged>('/network', (before, page) => ({ ...networkPage(before), machines: [...before.machines, ...networkPage(page).machines] })).then(networkPage),
     seats.list(),
   ]);
-  const names: Record<string, string> = Object.fromEntries(network.machines.flatMap((machine) => machine.may_run.map((agent) => [agent.id, agent.display_name])));
-  const nameReasons: Record<string, string> = {};
-  await readBounded([...new Set(list.seats.map((seat) => seat.agent))].filter((agent) => !(agent in names)), async (agent) => {
-    try {
-      const record = await api.agent(agent);
-      if (typeof record.display_name !== 'string' || !record.display_name.trim()) throw new Error('AgentNameUnreadable: the service gave no display name.');
-      names[agent] = record.display_name;
-    } catch (error) { nameReasons[agent] = said(error); }
-  });
-  return { ...list, machines: network.machines, names, nameReasons };
+  return { ...list, machines: network.machines };
+}
+
+/** Every name the computers give, by agent. */
+const givenNames = (tree: TreeRead): Record<string, string> => Object.fromEntries(tree.machines.flatMap((machine) => machine.may_run.map((agent) => [agent.id, agent.display_name])));
+
+/** One agent's name from the directory, or why it could not be read. */
+export async function readAgentName(agent: string): Promise<{ name: string } | { reason: string }> {
+  try {
+    const record = await api.agent(agent);
+    if (typeof record.display_name !== 'string' || !record.display_name.trim()) throw new Error('AgentNameUnreadable: the service gave no display name.');
+    return { name: record.display_name };
+  } catch (error) { return { reason: said(error) }; }
+}
+
+/**
+ * The names of the agents holding seats whose computers do not name them, read after the tree is drawn and filled in
+ * as each answers, the way the live sessions fill in the running marks. Until a name arrives its row shows the
+ * agent's id. A name already read is not read again when the tree is read again.
+ */
+export function useAgentNames(tree: TreeRead | null): AgentNames {
+  const [read, setRead] = useState<AgentNames>({ names: {}, reasons: {} });
+  const given = tree ? givenNames(tree) : {};
+  const missing = tree ? [...new Set(tree.seats.map((seat) => seat.agent))].filter((agent) => !(agent in given) && !(agent in read.names)).sort() : [];
+  const key = missing.join('\n');
+  useEffect(() => {
+    if (!key) return undefined;
+    let live = true;
+    void readBounded(key.split('\n'), async (agent) => {
+      const answer = await readAgentName(agent);
+      if (!live) return;
+      setRead((before) => 'name' in answer
+        ? { names: { ...before.names, [agent]: answer.name }, reasons: Object.fromEntries(Object.entries(before.reasons).filter(([id]) => id !== agent)) }
+        : { names: before.names, reasons: { ...before.reasons, [agent]: answer.reason } });
+    });
+    return () => { live = false; };
+  }, [key]);
+  return { names: { ...read.names, ...given }, reasons: read.reasons };
 }
 
 /**
@@ -81,7 +117,7 @@ export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, na
   return network.machines.filter((machine) => machine.state !== 'retired').map((machine) => {
     const allowed = new Map(machine.may_run.map((agent) => [agent.id, agent.display_name]));
     const leaves: TreeLeaf[] = (byMachine.get(machine.id) ?? []).map((seat) => ({ seat,
-      name: names[seat.agent] ?? allowed.get(seat.agent) ?? 'Agent name unavailable (' + seat.name + ')',
+      name: names[seat.agent] ?? allowed.get(seat.agent) ?? seat.agent,
       reason: [seat.reason, list.runner === 'unknown' ? list.reason ?? 'Runner unknown: no reason returned.' : null, nameReasons[seat.agent]].filter((value) => value).join('; ') || null,
     }));
     const agents: TreeAgent[] = [];

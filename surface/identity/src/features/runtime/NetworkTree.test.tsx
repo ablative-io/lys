@@ -4,7 +4,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { NetworkTree, NetworkBranches } from './NetworkTree';
 import { branches, readNetworkTree } from './network-tree';
 import { click, mount, serve, settle } from '../../../tests/harness';
-import { ok, refused, SERVICE } from '../../../tests/fixtures';
+import { ok, refused, SCRIBE, SCRIBE_VIEW, SERVICE } from '../../../tests/fixtures';
+import { fifthOf } from './canvas-operations';
+
+// The agent's own Start is the team page's; here it is stood in for, to show which agent the terminal space offers.
+vi.mock('../team/Start', () => ({ Start: ({ entry }: { entry: { id: string; display_name: string } }) => <button type="button" data-start-agent={entry.id}>Start {entry.display_name}</button> }));
 import { keepOperations, readKeeping } from './canvas-kept';
 
 const machine = (id: string, state = 'in_use') => ({ id, name: id, kind: 'desktop', state, runtime: null, may_run: [{ id: 'agent', display_name: 'Long display name' }] });
@@ -29,7 +33,12 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   expect(host.querySelector('[data-machine="empty"] [data-agent-only]')?.querySelector('[title]')?.getAttribute('title')).toContain('no seat on this computer');
   expect(host.textContent).not.toContain('no seats');
   // The agent is named once, on its row; the seats under it carry their own names and the agent's name for a reader.
-  expect(host.querySelectorAll('[data-agent] > details > summary[title="Long display name"]')).toHaveLength(1);
+  expect(host.querySelectorAll('[data-agent] > details > summary[title^="Long display name"]')).toHaveLength(1);
+  // Names, a chevron and a dot: the machine's kind and an agent's seat count are in the row's title, not drawn.
+  expect(host.querySelectorAll('.network-kind, .network-count')).toHaveLength(0);
+  expect(host.querySelector('[data-machine="one"] > details > summary')?.getAttribute('title')).toBe('one · desktop');
+  expect(host.textContent).not.toContain('desktop');
+  expect(host.querySelector('[data-agent] > details > summary')?.getAttribute('title')).toContain('5 seats');
   expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, pty · offline');
   // A tree like an editor's: names, chevrons and a dot, and nothing else in it. Reasons and Start are the terminal space's; a reason is in the row's title.
   expect(host.querySelectorAll('button, .network-reason, p')).toHaveLength(0);
@@ -135,7 +144,8 @@ it('C739 keeps one change with existing canvas marks and names a server refusal 
   await click(container.querySelector('.operations-swap a[href="#/canvas?view=sessions"]'));
   const changes = posted.filter((each) => each.path === 'PUT /canvas');
   expect(changes).toHaveLength(1);
-  expect(changes[0].body).toEqual({ arrangement: { ...arrangement, operations: { view: 'sessions', selected: null, pane_width: 300 } } });
+  // No width was set by the person: the fifth of the window the tree is drawn at is what the service keeps.
+  expect(changes[0].body).toEqual({ arrangement: { ...arrangement, operations: { view: 'sessions', selected: null, pane_width: fifthOf(window.innerWidth) } } });
   expect(container.textContent).toContain('The Lys service is older than this page');
   expect(container.textContent).toContain('unknown field operations');
   expect(localStorage.getItem('lys.canvas')).toBeNull();
@@ -163,4 +173,60 @@ it('C739 an explicit canvas layout or tool-panel address keeps its canvas destin
   const { container } = await mount('#/canvas?panel=layouts&layout=Morning', routes);
   expect(container.querySelector('.operations-swap a[aria-current="page"]')?.textContent).toBe('Canvas');
   expect(container.querySelector('.canvas-side')).not.toBeNull();
+});
+it('C737 a seatless agent that is not running is chosen by its row, and the terminal space offers its own Start', async () => {
+  const one = { ...machine('one'), may_run: [{ id: SCRIBE, display_name: 'Scribe' }] };
+  serve({ ...SERVICE, '/network': ok({ machines: [one], next: null }), '/seats': ok({ runner: 'read', seats: [] }), '/runtime/live': ok({ sessions: [], unanswered: [] }) });
+  const select = vi.fn();
+  let host = await render(<NetworkTree selected={null} select={select} paneWidth={null} resize={vi.fn()} />);
+  await settle();
+  const row = host.querySelector('[data-agent-only="' + SCRIBE + '"] [role="treeitem"]') as HTMLElement;
+  expect(row.tagName).toBe('A');
+  await act(async () => { row.click(); });
+  expect(select).toHaveBeenCalledWith('agent:' + SCRIBE);
+  await act(async () => { root.unmount(); });
+  host = await render(<NetworkTree selected={'agent:' + SCRIBE} select={select} paneWidth={null} resize={vi.fn()} />);
+  await settle();
+  expect(host.querySelector('[data-agent-only="' + SCRIBE + '"]')?.getAttribute('data-selected')).toBe('true');
+  expect(host.querySelector('.network-pane [data-start-agent="' + SCRIBE + '"]')?.textContent).toBe('Start ' + SCRIBE_VIEW.display_name);
+  // Still nothing but rows in the tree itself.
+  expect(host.querySelector('.network-list button')).toBeNull();
+});
+it('C737 an agent with several seats is chosen by its row and shows its running seat, else its first with Start', async () => {
+  const routes = { '/network': ok({ machines: [machine('one')], next: null }), '/runtime/live': ok({ sessions: [], unanswered: [] }) };
+  serve({ ...routes, '/seats': ok({ runner: 'read', seats: [seat('first', 'offline'), seat('second', 'unknown')] }) });
+  const select = vi.fn();
+  const host = await render(<NetworkTree selected="agent:agent" select={select} paneWidth={null} resize={vi.fn()} />);
+  await settle();
+  expect(host.querySelector('[data-agent] > details > summary')?.getAttribute('data-selected')).toBe('true');
+  expect(host.querySelector('.network-pane button[aria-label="Start first"]')).not.toBeNull();
+  await act(async () => { (host.querySelector('[data-agent] > details > summary') as HTMLElement).click(); });
+  expect(select).toHaveBeenCalledWith('agent:agent');
+});
+it('C737 draws the tree before agents\' names are read, shows the agent id until the name arrives', async () => {
+  let answer: (value: unknown) => void = () => undefined;
+  const one = { ...machine('one'), may_run: [] };
+  serve({ '/network': ok({ machines: [one], next: null }), '/seats': ok({ runner: 'read', seats: [{ ...seat('held', 'offline'), agent: SCRIBE }] }),
+    '/runtime/live': ok({ sessions: [], unanswered: [] }), ['/directory/agents/' + SCRIBE]: (() => new Promise((resolve) => { answer = resolve; })) as never });
+  const host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={null} resize={vi.fn()} />);
+  await settle();
+  expect(host.querySelector('[data-seat="held"]')?.textContent).toBe(SCRIBE);
+  answer(ok(SCRIBE_VIEW));
+  await settle();
+  expect(host.querySelector('[data-seat="held"]')?.textContent).toBe(SCRIBE_VIEW.display_name);
+});
+it('C739 the tree is a fifth of the window until the person sets a width, then keeps theirs', async () => {
+  const routes = { '/network': ok({ machines: [machine('one')], next: null }), '/seats': ok(list), '/runtime/live': ok({ sessions: [], unanswered: [] }) };
+  serve(routes);
+  let host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={null} resize={vi.fn()} />);
+  await settle();
+  expect((host.querySelector('.network-tree') as HTMLElement).style.getPropertyValue('--network-pane-width')).toBe('clamp(200px, 20vw, 640px)');
+  expect(host.querySelector('[role="separator"]')?.getAttribute('aria-valuenow')).toBe(String(fifthOf(window.innerWidth)));
+  await act(async () => { root.unmount(); });
+  const resize = vi.fn();
+  host = await render(<NetworkTree selected={null} select={vi.fn()} paneWidth={320} resize={resize} />);
+  await settle();
+  expect((host.querySelector('.network-tree') as HTMLElement).style.getPropertyValue('--network-pane-width')).toBe('320px');
+  await act(async () => { host.querySelector('[role="separator"]')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); });
+  expect(resize).toHaveBeenCalledWith(344);
 });
