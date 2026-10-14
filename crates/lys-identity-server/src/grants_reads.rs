@@ -16,6 +16,235 @@ use preparation::Style;
 pub(crate) use crate::spicedb::context::Data as Prepared;
 use crate::spicedb::context::Hold;
 
+/// Counts and elapsed time belong to the request, including refused readings.
+pub(crate) struct ReachRead {
+    started: std::time::Instant,
+    resources: usize,
+    holders: std::cell::Cell<usize>,
+    questions: std::cell::Cell<usize>,
+    batches: std::cell::Cell<usize>,
+    reason: std::cell::RefCell<Option<String>>,
+}
+
+impl ReachRead {
+    pub(crate) fn new(resources: usize) -> Self {
+        Self {
+            started: std::time::Instant::now(),
+            resources,
+            holders: std::cell::Cell::new(0),
+            questions: std::cell::Cell::new(0),
+            batches: std::cell::Cell::new(0),
+            reason: std::cell::RefCell::new(Some("grant questions were not prepared".to_owned())),
+        }
+    }
+}
+
+impl Drop for ReachRead {
+    fn drop(&mut self) {
+        tracing::info!(target: "lys_identity_server::passfast",
+            resources = self.resources, holders = self.holders.get(),
+            questions = self.questions.get(), batches = self.batches.get(),
+            elapsed_ms = self.started.elapsed().as_millis(),
+            reason = ?self.reason.borrow().as_deref(), "reach grant reads");
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ReadingStyle<'a> {
+    Ordinary(Style),
+    Reach(&'a ReachRead),
+}
+
+impl ReadingStyle<'_> {
+    fn prepare(
+        self,
+        engine: &crate::spicedb::Relationships,
+        stamp: &lys_identity::grants::ReadStamp,
+        asked: preparation::Asked,
+        at: u64,
+    ) -> Result<Prepared, GrantError> {
+        match self {
+            Self::Ordinary(style) => preparation::prepare(engine, stamp, asked, at, style),
+            Self::Reach(measured) => prepare_reach(engine, stamp, asked, at, measured),
+        }
+    }
+}
+
+/// Reach prepares the carried questions together without a rights-claim cap.
+pub(crate) fn with_reach_grants<T>(
+    state: &AppState,
+    at: u64,
+    measured: &ReachRead,
+    questions: impl Fn(&mut Judged<'_>) -> Result<Vec<ExerciseRequest>, ServerError>,
+    act: impl FnOnce(Judged<'_>) -> Result<T, ServerError>,
+) -> Result<T, ServerError> {
+    with_directory(
+        state,
+        None,
+        at,
+        questions,
+        act,
+        |_, answer| Ok(answer),
+        ReadingStyle::Reach(measured),
+    )
+}
+
+fn prepare_reach(
+    engine: &crate::spicedb::Relationships,
+    stamp: &lys_identity::grants::ReadStamp,
+    asked: preparation::Asked,
+    at: u64,
+    measured: &ReachRead,
+) -> Result<Prepared, GrantError> {
+    let started = std::time::Instant::now();
+    measured.holders.set(
+        asked
+            .keys()
+            .map(|(holder, _, _)| *holder)
+            .collect::<BTreeSet<_>>()
+            .len(),
+    );
+    measured.questions.set(asked.len());
+    measured.batches.set(0);
+    let batch = if asked.is_empty() {
+        *measured.reason.borrow_mut() = Some("no carried actions on visible grants".to_owned());
+        None
+    } else {
+        let covered = asked
+            .keys()
+            .map(|(holder, resource, _)| (*holder, resource.clone()))
+            .collect();
+        let questions = asked.keys().cloned().collect();
+        match engine
+            .read_batch(stamp.revision(), covered, &questions, at)
+            .and_then(|batch| {
+                // A partial bulk answer is discarded before an independently certified read.
+                if let Some(error) = batch
+                    .checks
+                    .values()
+                    .find_map(|answer| answer.as_ref().err())
+                {
+                    return Err(error.clone());
+                }
+                Ok(batch)
+            }) {
+            Ok(batch) => {
+                measured.batches.set(1);
+                *measured.reason.borrow_mut() = None;
+                Some(batch)
+            }
+            Err(error) => {
+                *measured.reason.borrow_mut() = Some(error.to_string());
+                None
+            }
+        }
+    };
+    let mut prepared = match batch {
+        Some(batch) => {
+            let (subject, resource, _) =
+                asked
+                    .keys()
+                    .next()
+                    .ok_or_else(|| GrantError::PermissionEngineUnavailable {
+                        reason: "the reach batch has no question for its frame".to_owned(),
+                    })?;
+            whole_reach(stamp, batch, *subject, resource)?
+        }
+        None => preparation::from_batch(engine, stamp, asked, at, None)?,
+    };
+    prepared.reads_elapsed_ms = started.elapsed().as_millis();
+    // Reach explains from relationships, as before. Name an unavailable ancillary
+    // permission check rather than silently treating it as an answered question.
+    if let Some(error) = prepared
+        .checks
+        .values()
+        .find_map(|answer| answer.as_ref().err())
+    {
+        let mut reason = measured.reason.borrow_mut();
+        *reason = Some(match reason.as_ref() {
+            Some(batch) => format!("{batch}; unbatched permission check: {error}"),
+            None => format!("unbatched permission check: {error}"),
+        });
+    }
+    Ok(prepared)
+}
+
+fn whole_reach(
+    stamp: &lys_identity::grants::ReadStamp,
+    batch: crate::spicedb::batch::Batch,
+    subject: IdentityId,
+    resource: &Resource,
+) -> Result<Prepared, GrantError> {
+    // Reach uses a whole frame. Keep the exported graph once rather than copying
+    // each holder's source graph again for every resource it is asked about.
+    let reading = stamp.read_about(&ReachSnapshot(batch.snapshot), subject, resource)?;
+    Ok(Prepared {
+        revision: stamp.revision(),
+        resources_read: 1,
+        reads_elapsed_ms: 0,
+        batch: true,
+        truncated: false,
+        stamp: Some(stamp.clone()),
+        validation: Ok(()),
+        readings: BTreeMap::from([((subject, resource.clone()), Ok(reading))]),
+        checks: batch.checks,
+    })
+}
+
+struct ReachSnapshot(crate::spicedb::snapshot::Snapshot);
+
+impl RelationshipStore for ReachSnapshot {
+    fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError> {
+        self.0.admit_resource(resource)
+    }
+
+    fn revision(&self) -> Result<u64, GrantError> {
+        self.0.revision()
+    }
+
+    fn write(
+        &mut self,
+        revision: u64,
+        touch: &[lys_identity::grants::Relationship],
+        delete: &[lys_identity::grants::Relationship],
+    ) -> Result<(), GrantError> {
+        self.0.write(revision, touch, delete)
+    }
+
+    fn read_about(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+    ) -> Result<BTreeSet<lys_identity::grants::Relationship>, GrantError> {
+        if !self.0.covers(subject, resource) {
+            return Err(GrantError::PermissionEngineUnavailable {
+                reason: "the resource is outside the reach batch".to_owned(),
+            });
+        }
+        self.read()
+    }
+
+    fn read_about_at(
+        &self,
+        subject: IdentityId,
+        resource: &Resource,
+        revision: u64,
+    ) -> Result<BTreeSet<lys_identity::grants::Relationship>, GrantError> {
+        let projected = self.revision()?;
+        if revision != projected {
+            return Err(GrantError::StaleDecision {
+                required: revision,
+                projected,
+            });
+        }
+        self.read_about(subject, resource)
+    }
+
+    fn read(&self) -> Result<BTreeSet<lys_identity::grants::Relationship>, GrantError> {
+        self.0.read()
+    }
+}
+
 impl Prepared {
     pub(crate) fn frame<'d, S: lys_log_store::LeafStore>(
         &self,
@@ -56,7 +285,15 @@ pub(crate) fn with_read_directory_grants<A, T>(
         A,
     ) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
-    with_directory(state, at_least, at, questions, act, apply, Style::Resource)
+    with_directory(
+        state,
+        at_least,
+        at,
+        questions,
+        act,
+        apply,
+        ReadingStyle::Ordinary(Style::Resource),
+    )
 }
 
 pub(crate) fn with_pass_grants<T>(
@@ -74,7 +311,7 @@ pub(crate) fn with_pass_grants<T>(
         questions,
         act,
         |_, answer| Ok(answer),
-        Style::Pass { cap, bind },
+        ReadingStyle::Ordinary(Style::Pass { cap, bind }),
     )
 }
 
@@ -88,7 +325,7 @@ fn with_directory<A, T>(
         &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
         A,
     ) -> Result<T, ServerError>,
-    style: Style,
+    style: ReadingStyle<'_>,
 ) -> Result<T, ServerError> {
     let mut apply = Some(apply);
     let mut act = Some(act);
@@ -102,7 +339,10 @@ fn with_directory<A, T>(
                 let plan = judged.grants.read_plan(known, at_least)?;
                 let mut asked = BTreeMap::new();
                 for request in questions(&mut judged)? {
-                    let reach = judged.apps.reach(&request.resource);
+                    let reach = match style {
+                        ReadingStyle::Ordinary(_) => judged.apps.reach(&request.resource),
+                        ReadingStyle::Reach(_) => vec![request.resource.clone()],
+                    };
                     asked.insert(
                         (
                             request.caller,
@@ -121,7 +361,7 @@ fn with_directory<A, T>(
                 ))
             })?;
         let stamp = plan.execute(&mut engine)?;
-        let prepared = preparation::prepare(&engine, &stamp, asked, at, style)?;
+        let prepared = style.prepare(&engine, &stamp, asked, at)?;
         let guard = Hold::enter(&prepared);
         let result = with_prepared_directory_grants(
             state,
@@ -237,3 +477,7 @@ pub(crate) fn resource_questions(
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "grants_reads_tests.rs"]
+mod tests;

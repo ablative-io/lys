@@ -15,14 +15,14 @@
 //! (ACCESS-004 R2) is answered with `restricted` true, so the reach view
 //! shows it apart: nothing held on its parent reaches it.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::HeaderMap;
 use lys_identity::IdentityId;
-use lys_identity::grants::{Action, ExerciseRequest, Grant, Resource};
+use lys_identity::grants::{Action, ExerciseRequest, Grant, Resource, Route};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
@@ -97,6 +97,7 @@ pub(crate) async fn reach(
     headers: HeaderMap,
     Json(body): Json<ReachBody>,
 ) -> Result<Json<ReachAnswer>, ServerError> {
+    let measured = crate::grants_reads::ReachRead::new(body.resources.len());
     if body.resources.is_empty() {
         return Err(ServerError::RequestMalformed {
             reason: "resources names at least one resource".to_owned(),
@@ -104,86 +105,40 @@ pub(crate) async fn reach(
     }
     let route = body.route.into();
     let at = now();
-    crate::grants_reads::with_read_grants(
+    crate::grants_reads::with_reach_grants(
         &state,
-        None,
         at,
+        &measured,
         |judged| {
-            let mut asked = Vec::new();
-            for wire in &body.resources {
-                let resource = Resource::new(&wire.kind, &wire.id)?;
-                for action in &wire.actions {
-                    asked.extend(crate::grants_reads::resource_questions(
-                        judged,
-                        &resource,
-                        &Action::new(action)?,
-                    ));
+            let caller = crate::service_account_grants::caller(&state, &headers, judged)?;
+            let mut known = HashMap::new();
+            let mut asked = BTreeSet::new();
+            for (_, resource, actions) in admit_resources(judged, &body.resources)? {
+                for (_, (holder, held)) in
+                    held_actions(judged, caller, &resource, &actions, &mut known)
+                {
+                    for action in held {
+                        asked.insert((holder, resource.clone(), action.clone()));
+                    }
                 }
             }
-            Ok(asked)
+            Ok(asked
+                .into_iter()
+                .map(|(caller, resource, action)| ExerciseRequest {
+                    caller,
+                    route,
+                    resource,
+                    action,
+                })
+                .collect())
         },
         |judged| {
             let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
             let asked = admit_resources(&judged, &body.resources)?;
             let frame = judged.grants.frame(judged.directory, None)?;
-            let mut known = HashMap::new();
-            let mut resources = Vec::with_capacity(asked.len());
-            for (wire, resource, actions) in asked {
-                let mut holders: BTreeMap<String, (IdentityId, Vec<&Action>)> = BTreeMap::new();
-                for record in judged.grants.book().on_resource(&resource) {
-                    if !sees_with(&judged, caller, record, &mut known) {
-                        continue;
-                    }
-                    let holder = record.grant().holder();
-                    let entry = holders
-                        .entry(holder.to_string())
-                        .or_insert_with(|| (holder, Vec::new()));
-                    let held = judged.grants.model().actions_of(record.grant());
-                    for action in &actions {
-                        if held.contains(action) && !entry.1.contains(&action) {
-                            entry.1.push(action);
-                        }
-                    }
-                }
-                let mut permitted = Vec::new();
-                for (text, (holder, held)) in holders {
-                    let mut may = Vec::new();
-                    let mut modes = Vec::new();
-                    for action in actions.iter().filter(|action| held.contains(action)) {
-                        let request = ExerciseRequest {
-                            caller: holder,
-                            route,
-                            resource: resource.clone(),
-                            action: action.clone(),
-                        };
-                        match judged.grants.explain_in(&frame, &request, at) {
-                            // A permit naming a grant the book no longer holds is
-                            // answered as not permitted, as `which` answers it.
-                            Ok(permit) => {
-                                if let Some(grant) = judged.grants.book().grant(permit.grant) {
-                                    may.push(action.to_string());
-                                    modes.push(Grant::mode(grant).as_str());
-                                }
-                            }
-                            Err(error) if unanswered(&error) => return Err(error.into()),
-                            Err(_) => {}
-                        }
-                    }
-                    if !may.is_empty() {
-                        permitted.push(ReachHolder {
-                            holder: text,
-                            actions: may,
-                            modes,
-                        });
-                    }
-                }
-                resources.push(ReachView {
-                    kind: wire.kind.clone(),
-                    id: wire.id.clone(),
-                    holders: permitted,
-                    restricted: judged.apps.is_restricted(&resource),
-                });
-            }
+            let resources = views(&judged, caller, asked, route, |request| {
+                judged.grants.explain_in(&frame, request, at)
+            })?;
             Ok(Json(ReachAnswer {
                 revision: frame.revision(),
                 resources,
@@ -196,6 +151,92 @@ pub(crate) async fn reach(
 }
 
 type AskedResource<'a> = (&'a ReachResource, Resource, Vec<Action>);
+
+fn held_actions<'a>(
+    judged: &crate::grants::Judged<'_>,
+    caller: IdentityId,
+    resource: &Resource,
+    actions: &'a [Action],
+    known: &mut HashMap<lys_identity::grants::GrantId, bool>,
+) -> BTreeMap<String, (IdentityId, Vec<&'a Action>)> {
+    let mut holders: BTreeMap<String, (IdentityId, Vec<&Action>)> = BTreeMap::new();
+    for record in judged.grants.book().on_resource(resource) {
+        if !sees_with(judged, caller, record, known) {
+            continue;
+        }
+        let holder = record.grant().holder();
+        let entry = holders
+            .entry(holder.to_string())
+            .or_insert_with(|| (holder, Vec::new()));
+        let held = judged.grants.model().actions_of(record.grant());
+        for action in actions {
+            if held.contains(action) && !entry.1.contains(&action) {
+                entry.1.push(action);
+            }
+        }
+    }
+    holders
+}
+
+fn views(
+    judged: &crate::grants::Judged<'_>,
+    caller: IdentityId,
+    asked: Vec<AskedResource<'_>>,
+    route: Route,
+    mut explain: impl FnMut(
+        &ExerciseRequest,
+    )
+        -> Result<lys_identity::grants::Permit, lys_identity::grants::GrantError>,
+) -> Result<Vec<ReachView>, ServerError> {
+    let mut known = HashMap::new();
+    let mut explanations = BTreeMap::new();
+    let mut resources = Vec::with_capacity(asked.len());
+    for (wire, resource, actions) in asked {
+        let holders = held_actions(judged, caller, &resource, &actions, &mut known);
+        let mut permitted = Vec::new();
+        for (text, (holder, held)) in holders {
+            let mut may = Vec::new();
+            let mut modes = Vec::new();
+            for action in actions.iter().filter(|action| held.contains(action)) {
+                let key = (holder, resource.clone(), action.clone());
+                let decided = explanations.entry(key).or_insert_with(|| {
+                    explain(&ExerciseRequest {
+                        caller: holder,
+                        route,
+                        resource: resource.clone(),
+                        action: action.clone(),
+                    })
+                });
+                match decided {
+                    // Retain the selected grant's mode and the caller's action order,
+                    // including repeated actions, while deciding each question once.
+                    Ok(permit) => {
+                        if let Some(grant) = judged.grants.book().grant(permit.grant) {
+                            may.push(action.to_string());
+                            modes.push(Grant::mode(grant).as_str());
+                        }
+                    }
+                    Err(error) if unanswered(error) => return Err(error.clone().into()),
+                    Err(_) => {}
+                }
+            }
+            if !may.is_empty() {
+                permitted.push(ReachHolder {
+                    holder: text,
+                    actions: may,
+                    modes,
+                });
+            }
+        }
+        resources.push(ReachView {
+            kind: wire.kind.clone(),
+            id: wire.id.clone(),
+            holders: permitted,
+            restricted: judged.apps.is_restricted(&resource),
+        });
+    }
+    Ok(resources)
+}
 
 fn admit_resources<'a>(
     judged: &crate::grants::Judged<'_>,
@@ -213,3 +254,7 @@ fn admit_resources<'a>(
     }
     Ok(asked)
 }
+
+#[cfg(test)]
+#[path = "grants_reach_tests.rs"]
+mod tests;
