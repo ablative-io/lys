@@ -460,63 +460,6 @@ async fn an_upstream_that_drops_mid_request_sees_one_request_and_the_call_is_par
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn a_client_that_closes_mid_stream_is_recorded_cancelled_with_no_response_parts() -> Res {
-    let (upstream, _) = fake(|| async {
-        let (tx, response) = fed(StatusCode::OK, "text/event-stream");
-        tokio::spawn(async move {
-            // Events go on until the proxy lets the stream go.
-            for event in messages_events(1).into_iter().cycle() {
-                if tx.send(event).await.is_err() {
-                    break;
-                }
-            }
-        });
-        response
-    })
-    .await?;
-    let harness = Harness::start(upstream).await?;
-    let (response, connection) = send(harness.addr, messages_request(Some(KEY), true)?).await?;
-    let mut body = response.into_body();
-    let first = body.frame().await.ok_or("no first frame")??;
-    assert!(first.is_data());
-    drop(body);
-    connection.abort();
-    let report = harness.report()?;
-    assert_eq!(report.status, CallStatus::Cancelled);
-    let calls = harness.calls(KEY)?;
-    assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].status, CallStatus::Cancelled);
-    assert!(calls[0].response.is_empty());
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn an_upstream_stream_that_ends_before_message_stop_is_partial() -> Res {
-    let (upstream, _) = fake(|| async {
-        let (tx, response) = fed(StatusCode::OK, "text/event-stream");
-        tokio::spawn(async move {
-            for event in messages_events(3).into_iter().take(4) {
-                if tx.send(event).await.is_err() {
-                    return;
-                }
-            }
-        });
-        response
-    })
-    .await?;
-    let harness = Harness::start(upstream).await?;
-    let (response, _connection) = send(harness.addr, messages_request(Some(KEY), true)?).await?;
-    let received = response.into_body().collect().await?.to_bytes();
-    assert_eq!(received, messages_events(3)[..4].concat());
-    let report = harness.report()?;
-    assert_eq!(report.status, CallStatus::Partial);
-    let calls = harness.calls(KEY)?;
-    assert_eq!(calls.len(), 1);
-    assert!(calls[0].response.is_empty());
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_response_larger_than_the_old_bound_is_forwarded_and_recorded_whole() -> Res {
     let mut sent = vec![b'\n'; 64 * 1024 * 1024];
     sent.extend_from_slice(super::capture_decode_tests::PLAIN);
@@ -535,3 +478,6 @@ async fn a_response_larger_than_the_old_bound_is_forwarded_and_recorded_whole() 
 
 #[path = "forward_codex_tests.rs"]
 mod codex;
+
+#[path = "forward_end_tests.rs"]
+mod end_tests;

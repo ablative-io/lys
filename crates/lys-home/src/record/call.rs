@@ -66,11 +66,28 @@ pub enum CallStatus {
     Cancelled,
     /// The upstream stream ended early or malformed.
     Partial,
+    /// The upstream refused the request; its HTTP status is kept in the head.
+    UpstreamRefused,
     /// The call was forwarded but its capture could not be written or read
     /// into parts; the record's `unrecorded_reason` says which.
     Unrecorded,
     /// The process died mid-call; known from the open-call journal.
     Lost,
+}
+
+impl CallStatus {
+    /// The outcome's stable word in records and usage reports.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Complete => "complete",
+            Self::Cancelled => "cancelled",
+            Self::Partial => "partial",
+            Self::UpstreamRefused => "upstream_refused",
+            Self::Unrecorded => "unrecorded",
+            Self::Lost => "lost",
+        }
+    }
 }
 
 /// The data of a `lys.call` entry.

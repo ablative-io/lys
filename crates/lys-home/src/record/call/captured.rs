@@ -324,6 +324,13 @@ impl PreparedCall {
             None => (Vec::new(), None, false),
         };
         let mut status = meta.status;
+        if matches!(
+            status,
+            CallStatus::Complete | CallStatus::Partial | CallStatus::Cancelled
+        ) && input.seen.head.status.is_some_and(|status| status >= 400)
+        {
+            status = CallStatus::UpstreamRefused;
+        }
         let mut reason = input.seen.unrecorded.clone();
         let mut whole = WholeBody::default();
         let response = if status == CallStatus::Complete {

@@ -218,10 +218,14 @@ impl ProxyReading<'_> {
             .map(|(session, entry)| crate::tracking::RecordAt {
                 session,
                 entry,
-                status: serde_json::to_value(line.status)
-                    .ok()
-                    .and_then(|word| word.as_str().map(str::to_owned))
-                    .unwrap_or_default(),
+                status: if line.status == CallStatus::UpstreamRefused {
+                    line.http.map_or_else(
+                        || "upstream_refused (HTTP status not reported)".to_owned(),
+                        |status| format!("upstream_refused (HTTP {status})"),
+                    )
+                } else {
+                    line.status.as_str().to_owned()
+                },
                 duration_ms: observed
                     .zip(instant(&line.started_at))
                     .and_then(|(ended, started)| ended.checked_sub(started)),

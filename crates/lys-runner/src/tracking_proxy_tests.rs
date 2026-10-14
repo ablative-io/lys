@@ -1,6 +1,9 @@
 use super::*;
 use serde_json::json;
 
+#[path = "tracking_proxy_refused_tests.rs"]
+mod refused_tests;
+
 const RUN: &str = "0123456789abcdef0123456789abcdef";
 
 fn read(line: &Value) -> Vec<Body> {

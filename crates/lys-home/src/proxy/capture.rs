@@ -211,11 +211,10 @@ impl Call {
             // What a stream that stopped short had reported by then; a
             // stream read to its end gives its whole figures below.
             let mut tokens = s.reader.as_ref().and_then(Reader::tokens);
-            let parts = s.reader.take().and_then(|reader| {
-                if end != End::Complete {
-                    return None;
-                }
-                match reader.finish_counted() {
+            let parts = s
+                .reader
+                .take()
+                .and_then(|reader| match reader.finish_counted() {
                     Ok((parts, counted)) => {
                         if counted.is_some() {
                             tokens = counted;
@@ -229,8 +228,10 @@ impl Call {
                         );
                         None
                     }
-                }
-            });
+                });
+            // The provider's terminal event is complete even when its client
+            // closes before HTTP EOF. The reader also validates framing and coding.
+            let end = if parts.is_some() { End::Complete } else { end };
             let unspooled = s.capture_failed || s.journal_failed;
             let status = match end {
                 End::Dropped => CallStatus::Cancelled,
