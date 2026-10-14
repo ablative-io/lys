@@ -1,4 +1,4 @@
-//! Approval failures say whether the held request or its browser session changed.
+//! Approval belongs to the person and client, across that person's browser sessions.
 
 use axum::http::{StatusCode, header};
 use axum::response::{Html, IntoResponse, Response};
@@ -17,17 +17,18 @@ pub(super) fn take(
     key: &str,
     session: &SessionEntry,
 ) -> Result<Approval, ServerError> {
+    let person = crate::routes::with_directory(&apps.state, |directory| {
+        crate::read_api::own_person(directory.projection()?, &session.actor)
+    })?;
     let mut waiting = held(&apps.asking)?;
     let cause = match waiting.get(key) {
         None => Some(("asking_missing", String::new())),
-        Some(asking) if asking.expires_at <= now() => Some((
-            "asking_expired",
-            asking.session_id.chars().take(8).collect(),
-        )),
-        Some(asking) if asking.session_id != session.id => Some((
-            "session_mismatch",
-            asking.session_id.chars().take(8).collect(),
-        )),
+        Some(asking) if asking.expires_at <= now() => {
+            Some(("asking_expired", asking.person.to_string()))
+        }
+        Some(asking) if asking.person != person => {
+            Some(("person_mismatch", asking.person.to_string()))
+        }
         Some(_) => None,
     };
     if let Some((cause, prior)) = cause {
@@ -35,14 +36,10 @@ pub(super) fn take(
             waiting.remove(key);
         }
         drop(waiting);
-        let person = crate::routes::with_directory(&apps.state, |directory| {
-            crate::read_api::own_person(directory.projection()?, &session.actor)
-        })?;
-        let current: String = session.id.chars().take(8).collect();
-        tracing::warn!(refusal = "CodeUnknown", cause, person = %person, asking_session = prior, consent_session = current, "CLI or app approval refused");
+        tracing::warn!(refusal = "CodeUnknown", cause, person = %person, asking_person = prior, "CLI or app approval refused");
         let words = match cause {
-            "session_mismatch" => {
-                "The sign-in changed while this approval was open. Start sign-in again from your terminal, then approve its new page."
+            "person_mismatch" => {
+                "This approval belongs to another person. Sign in as the person who opened it, or start sign-in again from your terminal."
             }
             "asking_expired" => {
                 "This approval expired. Start sign-in again from your terminal, then approve its new page."

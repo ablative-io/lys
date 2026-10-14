@@ -5,7 +5,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 #[tokio::test]
-async fn native_pkce_approves_the_person_refreshes_and_refuses_foreign_redirects()
+async fn native_pkce_approves_the_same_person_after_browser_session_renewal_and_refuses_foreign_redirects()
 -> Result<(), Box<dyn std::error::Error>> {
     let (service, cookie) = crate::mcp_oauth::tests::service().await?;
     let client = reqwest::Client::builder()
@@ -56,6 +56,11 @@ async fn native_pkce_approves_the_person_refreshes_and_refuses_foreign_redirects
         .nth(1)
         .and_then(|text| text.split('"').next())
         .ok_or("approval absent")?;
+    let cookie = service
+        .sign_in(identity_contract::apps::login(
+            identity_contract::harness::ADMINISTRATOR,
+        ))
+        .await?;
     let response = client
         .post(format!("{}/oauth/mcp/consent", service.base))
         .header("cookie", &cookie)

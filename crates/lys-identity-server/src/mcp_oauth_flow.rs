@@ -125,6 +125,9 @@ pub(super) async fn authorize(
         Err(error) => return Err(error),
     };
     let session_actor = session.actor.clone();
+    let person = crate::routes::with_directory(&apps.state, |directory| {
+        crate::read_api::own_person(directory.projection()?, &session_actor)
+    })?;
     let asking = random()?;
     let at = now();
     {
@@ -133,7 +136,7 @@ pub(super) async fn authorize(
         held_asking.insert(
             asking.clone(),
             Asking {
-                session_id: session.id,
+                person,
                 client_id: asked.client_id,
                 redirect_uri: asked.redirect_uri.clone(),
                 challenge,
@@ -142,9 +145,6 @@ pub(super) async fn authorize(
             },
         );
     }
-    let person = crate::routes::with_directory(&apps.state, |directory| {
-        crate::read_api::own_person(directory.projection()?, &session_actor)
-    })?;
     if native {
         return Ok(([(header::CACHE_CONTROL, "no-store"), (header::X_FRAME_OPTIONS, "DENY"),
             (header::CONTENT_SECURITY_POLICY, "default-src 'none'; form-action 'self'")],

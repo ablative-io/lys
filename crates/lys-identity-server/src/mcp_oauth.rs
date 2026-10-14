@@ -55,7 +55,7 @@ pub(crate) const LAUNCH: &str = "connected-app";
 
 /// An approval waiting for the person's answer.
 struct Asking {
-    session_id: String,
+    person: lys_identity::PersonId,
     client_id: String,
     redirect_uri: String,
     challenge: String,
