@@ -8,6 +8,9 @@ use crate::error_budget::BudgetError;
 use crate::routes::AppState;
 
 /// Whether budget migration must remain memory-only, with an unreadable intent refused.
+///
+/// # Errors
+/// Refuses an upgrade intent that cannot be inspected.
 pub fn pending(state: &AppState) -> Result<bool, ServerError> {
     crate::operator::upgrade_pending(state).map_err(|error| {
         ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
@@ -23,6 +26,10 @@ pub fn pending(state: &AppState) -> Result<bool, ServerError> {
 }
 
 /// New-format confirmations are refused while the previous build may be restored.
+///
+/// # Errors
+/// Refuses an unreadable upgrade intent or a reversible upgrade window
+/// still open.
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
         return Err(ServerError::Agents(AgentsError::Budget(
@@ -37,6 +44,10 @@ pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
 }
 
 /// Finish migration at startup or the next mutating admission, never from a read.
+///
+/// # Errors
+/// Refuses an unreadable upgrade intent or budgets settlement and durable
+/// migration completion failures.
 pub fn advance(state: &AppState) -> Result<(), ServerError> {
     if state.budgets.is_some() && !pending(state)? {
         with_budgets(state, crate::budgets_store::BudgetStore::finish_migration)?;

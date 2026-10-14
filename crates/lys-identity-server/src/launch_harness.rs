@@ -9,6 +9,9 @@ pub use crate::start_checks::fields;
 
 /// The text of each skill `version` pinned, as the launch carries it; a pin
 /// whose text Lys no longer keeps is refused.
+///
+/// # Errors
+/// Refuses a skill pin whose name and digest have no retained text.
 pub fn skill_files(
     store: &ProvisioningStore,
     version: &Version,

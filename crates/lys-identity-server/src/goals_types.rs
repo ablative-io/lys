@@ -114,6 +114,7 @@ pub enum Standing {
 
 impl Standing {
     /// Its name.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Open => "open",
@@ -196,6 +197,10 @@ pub enum Change {
 
 impl Change {
     /// Refuse new words that cannot be reminded as one line.
+    ///
+    /// # Errors
+    /// Refuses empty replacement words or words containing a newline or
+    /// control character.
     pub fn check(&self) -> Result<(), GoalError> {
         if let Self::Words { words } = self {
             if words.trim().is_empty() {

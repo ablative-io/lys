@@ -55,6 +55,11 @@ pub async fn guard(State(state): State<Arc<AppState>>, request: Request, next: N
 
 /// Begin a session while its bound identity may authenticate, serialized
 /// with lifecycle transitions. Unbound first-run administrator login is kept.
+///
+/// # Errors
+/// Refuses lifecycle admission, unavailable account lock or account read,
+/// an account without its enabled flag, a disabled or changed binding,
+/// or session clock, random source and durable write failures.
 pub async fn begin(state: &AppState, actor: Actor) -> Result<String, ServerError> {
     let account = with_directory(state, |directory| {
         Ok(account_id(

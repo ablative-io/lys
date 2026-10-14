@@ -223,6 +223,10 @@ fn wide(value: usize) -> u64 {
 
 /// The capability's counts, to the administrator alone: an app's counts
 /// would describe other apps' traffic.
+///
+/// # Errors
+/// Refuses an unauthenticated or non-administrator caller, unavailable
+/// grants, or a poisoned membership cursor lock.
 pub async fn counts(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

@@ -4,6 +4,11 @@ use super::{Fired, GoalError, GoalStore, Item, LeafStore, Line, ServerError, spa
 
 impl<S: LeafStore> GoalStore<S> {
     /// Keep a responsible person's distinct resend without consuming its regular timer.
+    ///
+    /// # Errors
+    /// Refuses a reused occurrence, a prior already resent or an invalid
+    /// uncertain prior and delivery. Propagates settlement and durable resend
+    /// write failures.
     pub fn resend(&mut self, resent: crate::goals_state::Resent) -> Result<Fired, ServerError> {
         self.settle()?;
         if self.held.kept(&resent.fired.operation) {

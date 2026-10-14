@@ -4,6 +4,11 @@ use crate::budgets_state::Usage;
 use crate::error::ServerError;
 
 /// Validate reported fields before charging any event or asking any act.
+///
+/// # Errors
+/// Refuses a missing event, negative observation instant, context outside
+/// 0 to 100, an empty reported account or an invalid plan duration, reset
+/// instant or percentage.
 pub fn checked(usage: &Usage) -> Result<(), ServerError> {
     if usage.event.is_empty()
         || usage.at_ms < 0

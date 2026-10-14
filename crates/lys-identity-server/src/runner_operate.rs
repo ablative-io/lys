@@ -27,6 +27,11 @@ pub enum Undelivered {
 }
 
 /// Ask `operation` of its session's runner, answering how it stands.
+///
+/// # Errors
+/// Refuses an unavailable or unadmitted session runner by reason. Answers
+/// unknown delivery when the runner cannot be reached or its answer cannot
+/// be read, and preserves the runner's own named refusal.
 pub async fn operate(
     state: &Arc<AppState>,
     operation: Operation,
@@ -64,6 +69,11 @@ pub async fn operate(
 /// Withdraw an accepted `operation` of `session` before its boundary,
 /// answering how it then stands; a runner refusal (the operation already
 /// being typed, or unknown) is final.
+///
+/// # Errors
+/// Refuses an unavailable session runner or the runner's final withdrawal
+/// refusal. Answers unknown delivery for transport failures or an unexpected
+/// runner answer.
 pub async fn withdraw(
     state: &Arc<AppState>,
     session: &str,

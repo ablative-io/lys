@@ -19,6 +19,10 @@ pub struct ControlSessions {
 
 impl Held {
     /// Borrow this agent's session identities strictly after a cursor it owns.
+    ///
+    /// # Errors
+    /// Refuses an unknown cursor session or a cursor belonging to another
+    /// agent's session list.
     pub fn control_sessions(
         &self,
         agent: &str,

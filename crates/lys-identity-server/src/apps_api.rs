@@ -233,6 +233,10 @@ pub fn routes() -> Router<Arc<AppState>> {
 /// recorded from the model file when the log does not hold it yet, saying
 /// through `say` how the log started and where the app `lys`'s schema came
 /// from. Once the log holds the app `lys`, the model file is not read.
+///
+/// # Errors
+/// Refuses apps store opening or schema upgrade failures, an unreadable
+/// initial grant model or a failed durable recording of Lys's own app.
 pub fn opened(
     config: &Config,
     key: Arc<Ed25519Identity>,

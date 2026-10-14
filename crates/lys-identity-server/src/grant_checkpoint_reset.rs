@@ -82,6 +82,11 @@ fn reopened(
 
 /// Discard the refused grant checkpoint the administrator names and open
 /// the grants from every leaf of their log.
+///
+/// # Errors
+/// Refuses malformed input, a non-administrator caller, absent root grants,
+/// poisoned apps or grants locks, a reset while no checkpoint is refused,
+/// or grant reopening and checkpoint discard failures.
 pub async fn reset(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

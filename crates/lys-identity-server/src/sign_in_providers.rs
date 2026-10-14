@@ -102,6 +102,7 @@ pub const OFFERED: [Provider; 3] = [Provider::Google, Provider::Microsoft, Provi
 
 impl Provider {
     /// The name the provider is kept under at the issuer.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Google => "Google",
@@ -111,6 +112,7 @@ impl Provider {
     }
 
     /// The provider kept under `name`, if it is one offered.
+    #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         OFFERED.into_iter().find(|provider| provider.name() == name)
     }

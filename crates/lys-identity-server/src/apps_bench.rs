@@ -66,6 +66,9 @@ pub struct Benches {
 impl Benches {
     /// The benches, their namespaces made under `dir`. Whatever an earlier
     /// run left there is removed, and said through `say`.
+    ///
+    /// # Errors
+    /// Refuses when the namespace left by an earlier bench run cannot be removed.
     pub fn new(dir: PathBuf, say: &dyn Fn(&str)) -> Result<Self, ServerError> {
         if dir.exists() {
             std::fs::remove_dir_all(&dir).map_err(|error| AppError::AppsUnavailable {

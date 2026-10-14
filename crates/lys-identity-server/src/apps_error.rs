@@ -252,6 +252,7 @@ impl From<SchemaError> for AppError {
 
 impl AppError {
     /// The HTTP status the refusal is answered with.
+    #[must_use]
     pub fn status(&self) -> StatusCode {
         match self {
             Self::AppIdInvalid { .. }
@@ -283,6 +284,7 @@ impl AppError {
     }
 
     /// The fields at fault, as JSON pointers into the request body.
+    #[must_use]
     pub fn fields(&self) -> Vec<Field> {
         let at = |at: String| Field { at, count: None };
         match self {

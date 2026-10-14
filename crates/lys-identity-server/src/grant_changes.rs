@@ -128,6 +128,11 @@ fn malformed(reason: &str) -> ServerError {
 }
 
 /// Read the grant change stream after the consumer's cursor.
+///
+/// # Errors
+/// Refuses malformed or foreign cursors and placement bounds, an
+/// unadmitted asker, unavailable grant log or an invalid revision reading,
+/// or a closed grant commit signal while waiting.
 pub async fn changes(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

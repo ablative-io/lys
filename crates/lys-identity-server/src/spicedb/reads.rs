@@ -205,6 +205,10 @@ impl SpiceDb {
     }
 
     /// Ask one permission at the engine's confirmed public revision and private token.
+    ///
+    /// # Errors
+    /// Refuses an unavailable or uncertifiable grant revision, permission
+    /// engine transport or check refusal, or a malformed permission answer.
     pub fn check(
         &self,
         resource: &Resource,

@@ -263,6 +263,10 @@ impl OpenIdProvider {
     }
 
     /// The provider `settings` names, answering as `issuer`, Lys's origin.
+    ///
+    /// # Errors
+    /// Refuses invalid provider settings, an unreadable signing key or an
+    /// unreadable or unwritable retained access token table.
     pub fn open(settings: &ProviderSettings, issuer: String) -> Result<Self, ServerError> {
         if settings.pass_seconds == 0 {
             return Err(ServerError::ConfigInvalid {

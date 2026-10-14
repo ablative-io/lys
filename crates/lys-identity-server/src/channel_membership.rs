@@ -201,6 +201,11 @@ pub(crate) fn judge<S: LeafStore>(
 }
 
 /// Decide one channel membership question at the grants' current revision.
+///
+/// # Errors
+/// Refuses a malformed question, unauthenticated or unadmitted asker,
+/// invalid subject, resource or action, or grants and permission readings
+/// that cannot decide at the requested revision.
 pub async fn membership(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

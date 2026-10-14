@@ -9,6 +9,11 @@ use crate::error_holding::HoldingError;
 /// Refuse a gift unless each unit, period, zone and amount is held by its giver.
 /// Multiple matching restrictions use their tightest amount, regardless of act.
 /// An empty collection removes every restriction and cannot be given by an agent.
+///
+/// # Errors
+/// Refuses a giver without current limits, removal of every restriction,
+/// unrepresentable amounts or any limit the giver's tightest matching
+/// restriction does not cover.
 pub fn holds(
     held: &Held,
     giver: &Holder,

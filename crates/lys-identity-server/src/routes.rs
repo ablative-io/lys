@@ -167,6 +167,11 @@ pub mod start;
 
 /// Open the directory, discover the issuer and answer the service's routes,
 /// as `config` says. The log is created when its directory does not exist.
+///
+/// # Errors
+/// Refuses invalid configuration, directory and store opening or migration
+/// failures, issuer discovery failures or startup admission and reconciliation
+/// failures.
 pub async fn service(config: &Config) -> Result<Router, ServerError> {
     Box::pin(service_saying(config, Arc::new(|_| {}))).await
 }
@@ -175,6 +180,11 @@ pub async fn service(config: &Config) -> Result<Router, ServerError> {
 /// directory log from its snapshot or from every leaf, each store with what
 /// it read and how much it holds, and the grant log when the grants are
 /// opened on their first use.
+///
+/// # Errors
+/// Refuses invalid configuration, directory and store opening or migration
+/// failures, issuer discovery failures or startup admission and reconciliation
+/// failures.
 pub async fn service_saying(config: &Config, say: Say) -> Result<Router, ServerError> {
     Box::pin(service_saying_with_clock(
         config,
@@ -212,6 +222,10 @@ pub async fn service_saying_with_clock(
 
 /// Open the directory `config` names, creating its log when the log's
 /// directory does not exist.
+///
+/// # Errors
+/// Refuses log creation, an unreadable event key, directory migration or
+/// opening failures, or retained directory state the service cannot read.
 pub fn open_directory(config: &Config) -> Result<Directory<FileLeafStore>, ServerError> {
     if !config.log_dir.exists() {
         FileLeafStore::create(&config.log_dir, &config.log_origin).map_err(|error| {

@@ -16,6 +16,9 @@ use crate::teams_state::Team;
 ///
 /// Team membership is reversed in one pass over the teams, so each agent reads
 /// only the teams it belongs to and the parents above them.
+///
+/// # Errors
+/// Refuses invalid identity words needed to construct an agent's coverage.
 pub fn from_parts(directory: &Projection, teams: &[Team]) -> Result<Vec<Standing>, ServerError> {
     let membership = Membership::of(teams);
     directory
@@ -105,6 +108,10 @@ impl<'a> Membership<'a> {
 }
 
 /// Settled directory and team coverage, with no clock or runner request.
+///
+/// # Errors
+/// Refuses unavailable or unsettled teams or directory state, or coverage
+/// identities that cannot be read.
 pub fn standings(state: &AppState) -> Result<Vec<Standing>, ServerError> {
     let teams = if state.teams.is_some() {
         crate::teams_api::with_teams(state, |store| Ok(store.teams().to_vec()))?
@@ -117,6 +124,7 @@ pub fn standings(state: &AppState) -> Result<Vec<Standing>, ServerError> {
 }
 
 /// Every admitted agent a holder covers, deduplicated across nested teams.
+#[must_use]
 pub fn covered(holder: &Holder, standings: &[Standing]) -> BTreeSet<String> {
     standings
         .iter()

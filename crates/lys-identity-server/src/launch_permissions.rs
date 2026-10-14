@@ -65,6 +65,10 @@ fn expressible(rule: &str) -> bool {
 
 /// `given`, refused by the first rule, mode or directory the settings file
 /// cannot express.
+///
+/// # Errors
+/// Refuses permission rules, modes or extra directories the recorded
+/// permission contract cannot represent.
 pub fn checked(
     given: Permissions,
     contract: &PermissionContract,
@@ -116,6 +120,10 @@ fn push(list: &mut Vec<String>, rule: String) {
 /// The settings file's `permissions`: the profile's, with each of `tools`
 /// allowed and each hard rule of `policy` denied, in that order, each rule
 /// once. A hard rule the settings file cannot express is refused by its id.
+///
+/// # Errors
+/// Refuses permissions or hard policy rules the contract cannot represent,
+/// or permissions and policy values that cannot be encoded.
 pub fn settings(
     permissions: Option<&Permissions>,
     tools: &[String],

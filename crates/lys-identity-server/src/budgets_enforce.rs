@@ -29,6 +29,10 @@ fn unavailable(reason: impl std::fmt::Display) -> ServerError {
 }
 
 /// Unknown figures make no claim about being under a stop threshold.
+///
+/// # Errors
+/// Refuses unrepresentable monetary amounts or a figure and threshold the
+/// runner's unit comparison cannot compare.
 pub fn reached(unit: Measure, figure: &Number, threshold: &Number) -> Result<bool, String> {
     if !matches!(unit, Measure::PlanPercent | Measure::ContextPercent) {
         let places = if unit == Measure::Dollars { 6 } else { 0 };
@@ -63,6 +67,11 @@ struct Target {
 }
 
 /// Capture indexed activity, resolve only crossed compaction targets, then commit at one revision.
+///
+/// # Errors
+/// Refuses malformed usage, pending migration, an invisible or mismatched
+/// agent session, unavailable organisation, membership, runtime or budget
+/// state, or compaction resolution and durable charge failures.
 pub async fn keep(state: &Arc<AppState>, usage: Usage) -> Result<(), ServerError> {
     checked(&usage)?;
     crate::budgets_migration::require_committed(state)?;
@@ -373,6 +382,11 @@ fn measured_crossings(
 }
 
 /// Fresh starts require an available figure below every periodic stop limit.
+///
+/// # Errors
+/// Refuses unavailable organisation, membership, runtime or budget state,
+/// unknown spend for a stop limit, an unrepresentable period or amount,
+/// or a periodic stop budget already exhausted.
 pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerError> {
     if state.budgets.is_none() {
         return Ok(());

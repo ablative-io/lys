@@ -25,6 +25,11 @@ fn refused(reason: impl Into<String>) -> ServerError {
 }
 
 /// Keep each charge durably, then keep the refusals and cursor together.
+///
+/// # Errors
+/// Refuses an invalid feed format or cursor, malformed or unexpected feed
+/// entries, unavailable organisation and folded stores, or durable charge,
+/// outcome, refusal and cursor writes and change signals that fail.
 pub async fn keep_page(
     state: &Arc<AppState>,
     machine: &str,

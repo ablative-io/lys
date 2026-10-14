@@ -5,6 +5,10 @@ use lys_home::harness::launch_fields::DeclaredHarness;
 use crate::error::ServerError;
 
 /// Refuse an absent model or the first model the described build cannot carry.
+///
+/// # Errors
+/// Refuses an absent model or a model, count or selection syntax the
+/// recorded harness description cannot represent.
 pub fn models(harness: &DeclaredHarness, models: &[String]) -> Result<(), ServerError> {
     let contract = &harness.description.models;
     let refused = |model: &str, reason: &str| ServerError::ModelUnrepresentable {
@@ -50,6 +54,10 @@ pub fn models(harness: &DeclaredHarness, models: &[String]) -> Result<(), Server
 }
 
 /// Refuse MCP members absent from the recorded capability description.
+///
+/// # Errors
+/// Refuses MCP transports, channel policies, working folders or handle
+/// variables absent from the recorded harness description.
 pub fn mcp(
     harness: &DeclaredHarness,
     servers: &[crate::provisioning_store::McpServer],

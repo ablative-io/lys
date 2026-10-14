@@ -83,6 +83,7 @@ impl Crossing {
 
     /// The operation id of a crossing of `holder`'s `measure` budget at
     /// `version`, in the period or rise `mark` names, for `session`.
+    #[must_use]
     pub fn id(
         holder: &Holder,
         measure: Measure,
@@ -135,6 +136,7 @@ pub struct Acted {
 
 impl Acted {
     /// What the runner's `outcome` says of the crossing.
+    #[must_use]
     pub fn from_runner(outcome: &OperationOutcome, at_ms: i64) -> Self {
         let stands = match outcome.state {
             OperationState::Accepted | OperationState::Delivering => Stands::Accepted,
@@ -236,6 +238,7 @@ impl From<StoredCrossings> for Crossings {
 
 impl Crossings {
     /// Check an operation's identity without walking previous crossings.
+    #[must_use]
     pub fn holds(&self, operation: &str) -> bool {
         #[cfg(test)]
         crate::budgets_work::visit(crate::budgets_work::Work::CrossingLookup);
@@ -274,11 +277,13 @@ impl Crossings {
     }
 
     /// Pending acts, in retained order, independent of settled history.
+    #[must_use]
     pub fn unsettled(&self) -> Vec<Crossing> {
         self.selected(self.index.pending.iter().copied())
     }
 
     /// An agent read retries only that agent's pending acts.
+    #[must_use]
     pub fn unsettled_for(&self, agent: &str) -> Vec<Crossing> {
         self.selected(
             self.index
@@ -290,6 +295,7 @@ impl Crossings {
     }
 
     /// Each crossing of `agent`, with what came of it: its receipt.
+    #[must_use]
     pub fn of_agent(&self, agent: &str) -> Vec<Receipt> {
         self.index
             .agents

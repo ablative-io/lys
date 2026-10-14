@@ -456,6 +456,11 @@ fn serve<T>(
 }
 
 /// A page of the resources one subject may act on within a workspace.
+///
+/// # Errors
+/// Refuses a malformed resource page question, an unadmitted asker,
+/// invalid scope or cursor, or grants and permission readings that cannot
+/// answer at the requested revision.
 pub async fn resources(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -499,6 +504,11 @@ pub async fn resources(
 }
 
 /// A page of the subjects who may act on one channel.
+///
+/// # Errors
+/// Refuses a malformed recipient page question, an unadmitted asker,
+/// invalid channel or cursor, or grants and permission readings that cannot
+/// answer at the requested revision.
 pub async fn recipients(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

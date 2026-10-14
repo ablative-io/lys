@@ -67,6 +67,10 @@ impl IssuerSignIn {
     /// Begin a sign-in through the issuer's provider `provider` for the
     /// person at `address`, answering the provider's address to send the
     /// browser to.
+    ///
+    /// # Errors
+    /// Refuses an unknown provider, unavailable or exhausted sign-in pools,
+    /// issuer provider flow failures or an invalid returned provider address.
     pub async fn begin_provider(
         &self,
         oidc: &Oidc,
@@ -192,6 +196,10 @@ impl IssuerSignIn {
 
     /// Finish the provider sign-in in flight under the provider's `upstream`
     /// state with the provider's `code`, answering the actor it signs in.
+    ///
+    /// # Errors
+    /// Refuses an unknown, expired or mismatched provider continuation,
+    /// issuer provider or code exchange failures, or an invalid ID token.
     pub async fn finish_provider(
         &self,
         oidc: &Oidc,

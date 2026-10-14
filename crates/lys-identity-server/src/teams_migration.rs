@@ -35,6 +35,10 @@ fn pending(state: &AppState) -> Result<bool, ServerError> {
 }
 
 /// New-format team events wait until rollback is closed.
+///
+/// # Errors
+/// Refuses an unreadable upgrade intent or a reversible upgrade window
+/// still open.
 pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
     if pending(state)? {
         return Err(unavailable(
@@ -45,6 +49,10 @@ pub fn require_committed(state: &AppState) -> Result<(), ServerError> {
 }
 
 /// Finish pending migration on a family admission, never on a clock or a read.
+///
+/// # Errors
+/// Refuses an unreadable upgrade intent or teams settlement and durable
+/// migration completion failures.
 pub fn advance(state: &AppState) -> Result<(), ServerError> {
     if state.teams.is_some() && !pending(state)? {
         with_teams(state, crate::teams_store::TeamStore::finish_migration)?;
@@ -53,6 +61,10 @@ pub fn advance(state: &AppState) -> Result<(), ServerError> {
 }
 
 /// Derive and enforce legacy holds before reminders or budget settlement start.
+///
+/// # Errors
+/// Refuses unavailable team history, a missing retained membership,
+/// permission readings that fail or staged and durable migration failures.
 pub fn at_start(state: &AppState) -> Result<(), ServerError> {
     if state.teams.is_none() {
         return Ok(());

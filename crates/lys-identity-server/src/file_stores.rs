@@ -16,6 +16,10 @@ pub type FileStores = (
 
 /// The machines, roles and provisioning profiles `config` names, each
 /// saying through `say` how many it holds; none for a file not named.
+///
+/// # Errors
+/// Refuses unreadable or malformed configured machine, role or provisioning
+/// records, including their retained journals and migrations.
 pub fn opened(
     config: &Config,
     say: &(dyn Fn(&str) + Send + Sync),

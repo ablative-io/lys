@@ -24,6 +24,10 @@ pub(crate) fn store(state: &AppState) -> Result<MutexGuard<'_, Passes>, ServerEr
 
 /// Resolve only the cached pass; lifecycle and grants are checked by admission.
 /// No directory lock is taken, including when admission already holds it.
+///
+/// # Errors
+/// Refuses an unreadable pass header, an unavailable or uncertain pass
+/// store, an unknown pass or a seat signature that does not verify.
 pub fn holder(state: &AppState, headers: &HeaderMap) -> Result<Option<AgentId>, ServerError> {
     let Some(pass) = value(headers)? else {
         return Ok(None);

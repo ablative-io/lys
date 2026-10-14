@@ -99,6 +99,7 @@ pub struct ClientCredential {
 impl ClientCredential {
     /// Whether the credential is live on `app`: not revoked, and the app not
     /// retired.
+    #[must_use]
     pub fn live_on(&self, app: &App) -> bool {
         self.revoked.is_none() && app.retired.is_none()
     }
@@ -106,6 +107,7 @@ impl ClientCredential {
 
 impl App {
     /// Every client credential issued for the app, in the order issued.
+    #[must_use]
     pub fn client_credentials(&self) -> Vec<ClientCredential> {
         let mut credentials: Vec<ClientCredential> = Vec::new();
         for line in &self.history {
@@ -140,6 +142,7 @@ impl App {
     }
 
     /// The ids of the app's live client credentials.
+    #[must_use]
     pub fn live_client_credentials(&self) -> Vec<String> {
         self.client_credentials()
             .into_iter()
@@ -150,6 +153,7 @@ impl App {
 
     /// The ids of the credentials no longer live that the broker has not
     /// yet confirmed ending.
+    #[must_use]
     pub fn client_credentials_to_end(&self) -> Vec<String> {
         self.client_credentials()
             .into_iter()
@@ -159,6 +163,7 @@ impl App {
     }
 
     /// The custody owner the app's credentials were issued under.
+    #[must_use]
     pub fn client_custody_owner(&self) -> Option<String> {
         self.history.iter().rev().find_map(|line| match line {
             Line::ClientCredentialIssued(issued) => Some(issued.owner.clone()),

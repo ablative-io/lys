@@ -236,6 +236,11 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
 }
 
 /// Many checks at once, each answered in order at one named revision.
+///
+/// # Errors
+/// Refuses a malformed batch, an unadmitted asker or an unavailable or
+/// inconsistent grants and permission reading; individual questions keep
+/// their own verdicts.
 pub async fn batch(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -298,6 +303,11 @@ pub async fn batch(
 }
 
 /// The ids of `kind` a subject may take `action` on, a page at a time.
+///
+/// # Errors
+/// Refuses malformed page size, subject, kind or action, an unadmitted
+/// asker, an app kind or action outside its declaration, or unavailable,
+/// stale or unprepared grants and permission readings.
 pub async fn which(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

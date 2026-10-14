@@ -49,6 +49,9 @@ pub struct ReportedPart {
 }
 
 /// Convert checked comparison micros back to the declared unit without a float cast.
+///
+/// # Errors
+/// Refuses a micro-unit amount that cannot be encoded as a JSON number.
 pub fn number(unit: Measure, amount: u64) -> Result<Number, String> {
     match unit {
         Measure::Tokens | Measure::RunningMs => Ok(amount.into()),
@@ -65,6 +68,10 @@ pub fn number(unit: Measure, amount: u64) -> Result<Number, String> {
 }
 
 /// The calendar or fixed interval starts in the limit's effective zone.
+///
+/// # Errors
+/// Refuses an unknown effective zone or a period boundary outside its
+/// time representation.
 pub fn start(limit: &Limit, zone: &str, at_ms: i64) -> Result<Option<i64>, String> {
     let Some(length) = limit.period else {
         return Ok(None);
@@ -78,6 +85,10 @@ pub fn start(limit: &Limit, zone: &str, at_ms: i64) -> Result<Option<i64>, Strin
 }
 
 /// The next boundary is computed in the same zone, including daylight-saving changes.
+///
+/// # Errors
+/// Refuses a period start or zone that cannot be read, calendar boundary
+/// conversion failures or a reset that overflows milliseconds.
 pub fn reset(limit: &Limit, zone: &str, at_ms: i64) -> Result<Option<i64>, String> {
     use jiff::ToSpan;
     let Some((length, start)) = limit.period.zip(start(limit, zone, at_ms)?) else {
@@ -135,6 +146,10 @@ fn present(limit: &Limit, since_ms: Option<i64>, amount: u64) -> Result<Used, St
 }
 
 /// Include an uncharged event only when computing the threshold it is about to cross.
+///
+/// # Errors
+/// Refuses a figure whose period, amount or indexed usage cannot be
+/// represented or read from the retained observations.
 pub fn figure(
     held: &Held,
     limit: &Limit,

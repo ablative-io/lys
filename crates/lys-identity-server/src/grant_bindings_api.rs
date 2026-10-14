@@ -115,6 +115,11 @@ fn shaped(request: &BindRequest, acting_for: Option<&str>) -> Result<(), ServerE
 }
 
 /// Bind a pass Lys did not issue to the grants its rights rest on.
+///
+/// # Errors
+/// Refuses malformed bindings, an unadmitted asker, invalid or unheld
+/// grants and lineage, degraded or unresolved readings, a revision that
+/// moves during binding or a binding the provider cannot sign.
 pub async fn bind(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

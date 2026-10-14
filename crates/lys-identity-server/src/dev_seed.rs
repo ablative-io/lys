@@ -164,6 +164,10 @@ impl<S: LeafStore> Writer<'_, S> {
 
 /// Seed `directory`, which must hold no identity, with the two test people
 /// bound to `subjects` at `issuer`, written as `administrator`.
+///
+/// # Errors
+/// Refuses a directory already holding identities, invalid seed identity
+/// words, or directory projection, durable record and log head failures.
 pub fn seed<S: LeafStore>(
     directory: &mut Directory<S>,
     administrator: LoginBinding,
@@ -189,6 +193,10 @@ pub fn seed<S: LeafStore>(
 
 /// Seed the directory `config` names, creating its log when it does not
 /// exist, with the two test people bound to `subjects` at the configured issuer.
+///
+/// # Errors
+/// Refuses configured directory opening, an absent or invalid administrator,
+/// or seed writes to a nonempty or unavailable directory.
 pub fn seed_configured(config: &Config, subjects: [&str; 2]) -> Result<Seeded, ServerError> {
     let mut directory = open_directory(config)?;
     seed(

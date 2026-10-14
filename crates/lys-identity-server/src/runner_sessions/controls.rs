@@ -6,6 +6,10 @@ use lys_runner::Act;
 /// Start `launch` for `agent` on `machine`'s runner and keep it running;
 /// refuse when the machine names no runner. A start sent again finds the
 /// session the runner already holds.
+///
+/// # Errors
+/// Refuses a machine without a runner, an unadmitted start or runner refusal,
+/// or runtime reporting, credential and durable start record failures.
 pub async fn run_on_runner(
     state: &Arc<AppState>,
     (agent, machine, caller): (&str, &str, &str),

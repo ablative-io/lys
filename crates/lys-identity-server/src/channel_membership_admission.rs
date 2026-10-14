@@ -131,6 +131,11 @@ pub(crate) fn admission<S: LeafStore>(
 }
 
 /// Whether a subject holds a current grant within a workspace.
+///
+/// # Errors
+/// Refuses a malformed admission question, unauthenticated or unadmitted
+/// asker, invalid workspace or subject, or a grants reading that cannot
+/// answer at the requested revision.
 pub async fn admit(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

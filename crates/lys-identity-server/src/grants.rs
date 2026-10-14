@@ -98,6 +98,9 @@ impl GrantSetup {
     }
 
     /// Lys's own model as the apps log last gave it.
+    ///
+    /// # Errors
+    /// Refuses a poisoned current app model lock.
     pub fn model(&self) -> Result<Model, ServerError> {
         Ok(self
             .model
@@ -109,6 +112,9 @@ impl GrantSetup {
     }
 
     /// Hold `model` as Lys's own model from now on.
+    ///
+    /// # Errors
+    /// Refuses a poisoned current app model lock.
     pub fn hold_model(&self, model: Model) -> Result<(), ServerError> {
         *self
             .model

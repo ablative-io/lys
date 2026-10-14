@@ -102,6 +102,10 @@ fn resource(example: &Example) -> Result<Resource, ServerError> {
 
 /// Answer the question in process-only stores and remove its engine scope
 /// before returning. No scratch key, leaf or snapshot reaches disk.
+///
+/// # Errors
+/// Refuses random namespace creation, scratch model or example evaluation
+/// failures, or a scratch permission scope that cannot be removed.
 pub fn answer_in(draft: &Draft<'_>, examples: &Examples<'_>) -> Result<BenchAnswer, ServerError> {
     let (random, _) = new_secret()?;
     let scope = scope_for(&random);

@@ -9,6 +9,10 @@ use crate::error::ServerError;
 
 /// Resolve the caller and enforce ADR-011/C39: both an acting identity and
 /// an agent's responsible person must be Active, before an authority query.
+///
+/// # Errors
+/// Refuses an unknown or inactive acting identity or an agent whose
+/// responsible person is absent or inactive.
 pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId, ServerError> {
     resolve(directory, actor, false)
 }
