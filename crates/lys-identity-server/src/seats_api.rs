@@ -39,7 +39,7 @@ use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
 use crate::provisioning_api::with_provisioning;
 use crate::routes::{AppState, signed_in, with_directory};
-use crate::seats_acts::{Live, liveness};
+use crate::seats_acts::Live;
 use crate::seats_state::{Added, Line, Seat};
 use crate::seats_store::SeatStore;
 use crate::seats_views::{Reading, SeatAddBody, SeatList, SeatUnregistered, SeatView, view};
@@ -309,31 +309,60 @@ async fn list(
         .map(|seat| seat.added.machine.clone())
         .collect();
     let mut read: BTreeMap<String, Result<Vec<Live>, String>> = BTreeMap::new();
-    for machine in machines {
-        let answer = liveness(&state, &machine, None)
-            .await
-            .map_err(|refused| refused.to_string());
-        read.insert(machine, answer);
-    }
-    // A supervised seat's session lives in its owner, which the machine's runner does
-    // not list: each such session is asked of its owner on its own. An owner that
-    // cannot be asked leaves its seat unread, named, never read as stopped: a
-    // running seat shown as stopped invites a second start on its conversation.
     let mut owned: BTreeMap<String, Result<Live, String>> = BTreeMap::new();
-    for seat in &seats {
-        let (Some(session), Some(Ok(held))) = (&seat.session, read.get(&seat.added.machine)) else {
-            continue;
-        };
-        if held.iter().any(|live| &live.session == session) {
-            continue;
-        }
-        match crate::seats_acts::live_session(&state, &seat.added.machine, session).await {
-            Ok(Some(live)) => {
-                owned.insert(session.clone(), Ok(live));
+    let mut readings = tokio::task::JoinSet::new();
+    for machine in machines {
+        let known = seats
+            .iter()
+            .filter(|seat| seat.added.machine == machine)
+            .filter_map(|seat| seat.session.clone())
+            .collect();
+        let state = Arc::clone(&state);
+        readings.spawn(async move {
+            let answer = match crate::runner_sessions::machine_runner(&state, &machine) {
+                Ok(Some(runner)) => {
+                    crate::runner_client::observations::read(&state, &machine, runner, true, &known)
+                        .await
+                }
+                Ok(None) => Err(ServerError::RunnerAbsent {
+                    machine: machine.clone(),
+                }),
+                Err(error) => Err(error),
+            };
+            (machine, answer)
+        });
+    }
+    while let Some(reading) = readings.join_next().await {
+        let (machine, answer) = reading.map_err(|error| ServerError::Runner {
+            refusal: "runner_unreachable".to_owned(),
+            words: error.to_string(),
+        })?;
+        match answer {
+            Err(error) => {
+                read.insert(machine, Err(error.to_string()));
             }
-            Ok(None) => {}
-            Err(refused) => {
-                owned.insert(session.clone(), Err(refused.to_string()));
+            Ok(observed) => {
+                let mut live = Vec::new();
+                for (session, answer) in observed.sessions {
+                    match answer {
+                        Ok(lys_runner::Answer::Liveness { sessions }) => live.extend(sessions),
+                        Err(ServerError::Runner { refusal, .. })
+                            if refusal == "session_unknown" => {}
+                        Err(error) => {
+                            owned.insert(session, Err(error.to_string()));
+                        }
+                        Ok(other) => {
+                            owned.insert(
+                                session,
+                                Err(format!(
+                                    "the liveness snapshot answered {}",
+                                    crate::runner_sessions::kind(&other)
+                                )),
+                            );
+                        }
+                    }
+                }
+                read.insert(machine, Ok(live));
             }
         }
     }

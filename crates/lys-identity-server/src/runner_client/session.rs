@@ -108,7 +108,7 @@ fn never_held(
     })
 }
 
-fn record_unknown(
+pub(super) fn record_unknown(
     state: &crate::routes::AppState,
     machine: &str,
     session: &str,
@@ -229,7 +229,7 @@ async fn holder_of(
 
 /// [`ask`] of exactly `record`'s runner; `standing` when that is the
 /// machine's own runner, whose standing link an answer begins again.
-async fn ask_exactly(
+pub(super) async fn ask_exactly(
     state: &Arc<crate::routes::AppState>,
     machine: &str,
     record: RunnerRecord,
@@ -240,13 +240,27 @@ async fn ask_exactly(
     let guard = LeaveOnDrop(Arc::clone(&leave));
     let (shared, asked_machine, asked_record) =
         (Arc::clone(state), machine.to_owned(), record.clone());
-    let asked = tokio::task::spawn_blocking(move || {
+    let bounded = matches!(&act, Act::Status { .. } | Act::Liveness { .. } | Act::Owned);
+    let waiting = tokio::task::spawn_blocking(move || {
         shared
             .runners
             .ask(&asked_machine, &asked_record, &act, &leave)
-    })
-    .await
-    .map_err(|failed| ServerError::Runner {
+    });
+    let joined = if bounded {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), waiting).await {
+            Ok(joined) => joined,
+            Err(_) => {
+                guard.0.leave()?;
+                return Err(ServerError::Runner {
+                    refusal: "runner_unreachable".to_owned(),
+                    words: "this computer's runner did not answer within 5 seconds; check its connection".to_owned(),
+                });
+            }
+        }
+    } else {
+        waiting.await
+    };
+    let asked = joined.map_err(|failed| ServerError::Runner {
         refusal: "runner_unreachable".to_owned(),
         words: format!("the request to the runner ended abnormally: {failed}"),
     })?;
@@ -427,3 +441,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "read_deadline_tests.rs"]
+mod read_deadline_tests;

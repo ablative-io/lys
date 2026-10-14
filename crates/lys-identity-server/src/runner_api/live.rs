@@ -1,7 +1,6 @@
 use super::{
     AppState, Arc, HeaderMap, Json, ServerError, State, Value, driven, ended_in, record_end,
 };
-use lys_runner::Act;
 use serde_json::json;
 
 /// The sessions the caller may see that are not confirmed stopped, each
@@ -17,33 +16,78 @@ pub(super) async fn live(
     let seen = crate::runtime_api::visible_sessions(&state, &headers)?;
     let page = crate::list_page::Page::read(query, "/runtime/live")?;
     let mut unanswered = Vec::new();
+    let mut machines: std::collections::BTreeMap<String, Vec<super::Driven>> =
+        std::collections::BTreeMap::new();
     for tracked in seen.iter().filter(|tracked| !tracked.stopped()) {
-        let driven = match driven(&state, &tracked.session) {
-            Ok(driven) => driven,
-            Err(ServerError::RunnerAbsent { .. }) => continue,
-            Err(other) => return Err(other),
+        match driven(&state, &tracked.session) {
+            Ok(driven) => machines
+                .entry(driven.machine.clone())
+                .or_default()
+                .push(driven),
+            Err(ServerError::RunnerAbsent { .. }) => {}
+            Err(error) => return Err(error),
+        }
+    }
+    let mut readings = tokio::task::JoinSet::new();
+    for (machine, driven) in machines {
+        let runner = driven
+            .first()
+            .ok_or_else(|| ServerError::Runner {
+                refusal: "runner_unreachable".to_owned(),
+                words: "the computer snapshot has no requested sessions".to_owned(),
+            })?
+            .runner
+            .clone();
+        let state = Arc::clone(&state);
+        readings.spawn(async move {
+            let known = driven.iter().map(|driven| driven.session.clone()).collect();
+            let answer =
+                crate::runner_client::observations::read(&state, &machine, runner, false, &known)
+                    .await;
+            (driven, answer)
+        });
+    }
+    while let Some(reading) = readings.join_next().await {
+        let (driven, answer) = reading.map_err(|error| ServerError::Runner {
+            refusal: "runner_unreachable".to_owned(),
+            words: error.to_string(),
+        })?;
+        let mut sessions = match answer {
+            Ok(read) => read.sessions,
+            Err(error) => driven
+                .iter()
+                .map(|driven| {
+                    (
+                        driven.session.clone(),
+                        Err(ServerError::Runner {
+                            refusal: error.name(),
+                            words: error.to_string(),
+                        }),
+                    )
+                })
+                .collect(),
         };
-        let act = Act::Status {
-            session: Some(driven.session.clone()),
-        };
-        match crate::runner_client::ask(&state, &driven.machine, driven.runner.clone(), act).await {
-            Ok(answer) => {
-                if let Some(ended) = ended_in(&answer) {
-                    record_end(&state, &driven, ended)?;
+        for driven in driven {
+            let answer = sessions
+                .remove(&driven.session)
+                .ok_or_else(|| ServerError::Runner {
+                    refusal: "runner_reply_malformed".to_owned(),
+                    words: "the session snapshot omitted a requested session".to_owned(),
+                })?;
+            match answer {
+                Ok(answer) => {
+                    if let Some(ended) = ended_in(&answer) {
+                        record_end(&state, &driven, ended)?;
+                    }
                 }
-            }
-            Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => {}
-            Err(refused) => {
-                (state.say)(&format!(
-                    "runner of machine {} did not answer for session {}: {refused}",
-                    driven.machine, driven.session
-                ));
-                unanswered.push(json!({
-                    "session": driven.session,
-                    "machine": driven.machine,
-                    "refusal": refused.name(),
-                    "reason": refused.to_string(),
-                }));
+                Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => {}
+                Err(refused) => {
+                    (state.say)(&format!(
+                        "runner of machine {} did not answer for session {}: {refused}",
+                        driven.machine, driven.session
+                    ));
+                    unanswered.push(json!({"session":driven.session,"machine":driven.machine,"refusal":refused.name(),"reason":refused.to_string()}));
+                }
             }
         }
     }

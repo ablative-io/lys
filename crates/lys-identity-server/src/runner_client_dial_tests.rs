@@ -94,3 +94,50 @@ fn an_old_delivered_ticket_does_not_claim_the_disconnected_runner_is_still_prese
     );
     Ok(())
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_runner_between_two_handoffs_remains_connected_and_serves_both_requests()
+-> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    let waiting = Arc::clone(&runners);
+    let bridge = tokio::spawn(async move { waiting.hub().next("machine").await });
+    while !runners.hub().bridged("machine")? {
+        tokio::task::yield_now().await;
+    }
+    let first = runners
+        .hub()
+        .queue("machine", Act::Liveness { session: None })?;
+    let (ticket, _) = bridge.await??;
+    runners
+        .hub()
+        .reply("machine", &ticket, Ok("first".to_owned()))?;
+    assert_eq!(first.answer.recv()??, "first");
+    let second = runners
+        .hub()
+        .queue("machine", Act::Liveness { session: None })?;
+    let (ticket, _) = runners.hub().next("machine").await?;
+    runners
+        .hub()
+        .reply("machine", &ticket, Ok("second".to_owned()))?;
+    assert_eq!(second.answer.recv()??, "second");
+    Ok(())
+}
+
+#[test]
+fn retiring_an_epoch_clears_its_nonce_memory_without_accepting_its_signed_dials()
+-> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    let hub = runners.hub();
+    hub.with("machine", |held| {
+        held.nonces.insert("retired".to_owned());
+    })?;
+    let rejected = hub
+        .fresh_in("machine", "retired", "retired-epoch")
+        .err()
+        .ok_or("retired signature accepted")?;
+    assert_eq!(rejected.name(), "runner_dial_stale");
+    assert!(hub.fresh("machine", "current")?);
+    assert_eq!(hub.with("machine", |held| held.nonces.len())?, 1);
+    assert!(!hub.fresh("machine", "current")?);
+    Ok(())
+}

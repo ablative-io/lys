@@ -128,7 +128,7 @@ pub(crate) fn signed_by(
             "the dial is not signed by machine `{machine}`'s key: {forged}"
         ))
     })?;
-    if !state.runners.hub().fresh(machine, nonce)? {
+    if !state.runners.hub().fresh_in(machine, nonce, epoch)? {
         return Err(refused(format!("nonce `{nonce}` was already used")));
     }
     Ok(())

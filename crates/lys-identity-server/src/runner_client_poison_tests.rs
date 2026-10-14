@@ -67,10 +67,12 @@ async fn a_poisoned_dial_hub_cannot_recover_nonce_or_deliver_work() -> Result<()
 #[test]
 fn a_poisoned_dial_hub_still_answers_the_caller_who_leaves() -> Result<(), Box<dyn Error>> {
     let hub = Arc::new(DialHub::default());
+    hub.with("machine", |held| held.bridges = 1)?;
     let Queued {
         ticket,
         answer,
         cancellation,
+        ..
     } = hub.queue("machine", lys_runner::Act::Status { session: None })?;
     let leave = Leave::default();
     leave.hold(withdraw_on_leave(

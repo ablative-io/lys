@@ -19,16 +19,14 @@
 //! once by name instead (14 Oct 2026: a machine in use whose runner had
 //! stopped dialling held every survey of the runners open for good).
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use lys_core::Ed25519Identity;
 use lys_runner::protocol::{Greeting, read_reply, sign_request, unhex};
 use lys_runner::{Act, Answer, RunnerError};
 use serde::{Deserialize, Serialize};
-use tokio::sync::Notify;
 
 use crate::error::ServerError;
 
@@ -125,186 +123,9 @@ pub use leave::{Leave, LeaveOnDrop};
 /// or why there is none.
 type Replied = Result<String, RunnerError>;
 
-/// A request waiting for a machine's bridge to take it.
-struct Pending {
-    ticket: String,
-    act: Act,
-    reply: mpsc::Sender<Replied>,
-}
-
-struct Queued {
-    ticket: String,
-    answer: mpsc::Receiver<Replied>,
-    cancellation: mpsc::Sender<Replied>,
-}
-
-/// One machine's side of the hub.
-#[derive(Default)]
-struct Machine {
-    queue: VecDeque<Pending>,
-    notify: Arc<Notify>,
-    delivered: HashMap<String, mpsc::Sender<Replied>>,
-    nonces: HashSet<String>,
-    /// How many of the machine's bridges are dialled in now, each waiting
-    /// for its next request.
-    bridges: usize,
-}
-
-/// A bridge dialled in and waiting: counted while its ask is held, and no
-/// longer once it is answered or the bridge leaves.
-struct Bridged<'a> {
-    hub: &'a DialHub,
-    machine: &'a str,
-}
-
-impl Drop for Bridged<'_> {
-    fn drop(&mut self) {
-        let left = self.hub.with(self.machine, |held| {
-            held.bridges = held.bridges.saturating_sub(1);
-        });
-        if let Err(error) = left {
-            tracing::error!("runner bridge count unavailable: {error}");
-        }
-    }
-}
-
-/// Where requests for dialled runners wait for their machine's bridge.
-///
-/// A dial is signed under the hub's epoch, made fresh each time the server
-/// starts, and each of its nonces is admitted once within it. A dial
-/// captured under an earlier epoch names an epoch this hub never had, so
-/// nothing need be remembered across a restart to refuse it.
-pub struct DialHub {
-    epoch: String,
-    machines: Mutex<HashMap<String, Machine>>,
-}
-
-impl Default for DialHub {
-    fn default() -> Self {
-        Self {
-            epoch: lys_runner::protocol::hex(&rand::random::<[u8; 32]>()),
-            machines: Mutex::default(),
-        }
-    }
-}
-
-impl DialHub {
-    fn with<T>(
-        &self,
-        machine: &str,
-        act: impl FnOnce(&mut Machine) -> T,
-    ) -> Result<T, RunnerError> {
-        let mut machines = self
-            .machines
-            .lock()
-            .map_err(|error| RunnerError::Unreachable {
-                reason: format!("runner dial hub unavailable: {error}"),
-            })?;
-        Ok(act(machines.entry(machine.to_owned()).or_default()))
-    }
-
-    /// The epoch every dial to this server is signed under.
-    pub fn epoch(&self) -> &str {
-        &self.epoch
-    }
-
-    /// Whether `nonce` is new for `machine` in this epoch, holding it.
-    ///
-    /// # Errors
-    /// Returns a refusal when the dial hub lock is unavailable.
-    pub fn fresh(&self, machine: &str, nonce: &str) -> Result<bool, ServerError> {
-        Ok(self.with(machine, |held| held.nonces.insert(nonce.to_owned()))?)
-    }
-
-    /// Queue `act` for `machine`'s bridge, answering the ticket and what
-    /// its reply arrives on.
-    fn queue(&self, machine: &str, act: Act) -> Result<Queued, RunnerError> {
-        let (reply, answer) = mpsc::channel();
-        let cancellation = reply.clone();
-        let ticket = lys_runner::protocol::nonce();
-        self.with(machine, |held| {
-            if held.bridges == 0 {
-                return Err(RunnerError::Unreachable {
-                    reason: "this computer's runner is not connected; reconnect it before starting"
-                        .to_owned(),
-                });
-            }
-            held.queue.push_back(Pending {
-                ticket: ticket.clone(),
-                act,
-                reply,
-            });
-            held.notify.notify_one();
-            Ok(())
-        })??;
-        Ok(Queued {
-            ticket,
-            answer,
-            cancellation,
-        })
-    }
-
-    /// Withdraw `ticket` for `machine`, whether still waiting or taken: its
-    /// caller left, so its reply has no one to reach.
-    fn withdraw(&self, machine: &str, ticket: &str) -> Result<(), RunnerError> {
-        self.with(machine, |held| {
-            held.queue.retain(|pending| pending.ticket != ticket);
-            held.delivered.remove(ticket);
-        })
-    }
-
-    /// Whether `machine`'s runner is dialled in now: a bridge of its waits
-    /// for its next request, or holds one it has not yet answered. A runner
-    /// that is not is never asked, since nothing would take the request.
-    ///
-    /// # Errors
-    /// Returns a refusal when the dial hub lock is unavailable.
-    pub fn bridged(&self, machine: &str) -> Result<bool, RunnerError> {
-        self.with(machine, |held| held.bridges > 0)
-    }
-
-    /// The next act for `machine` and its ticket, once there is one.
-    ///
-    /// # Errors
-    /// Returns dial hub failures while registering or taking the next request.
-    pub async fn next(&self, machine: &str) -> Result<(String, Act), ServerError> {
-        self.with(machine, |held| held.bridges += 1)?;
-        let _waiting = Bridged { hub: self, machine };
-        loop {
-            let (taken, notify) = self.with(machine, |held| {
-                let taken = held.queue.pop_front().map(|pending| {
-                    held.delivered.insert(pending.ticket.clone(), pending.reply);
-                    (pending.ticket, pending.act)
-                });
-                (taken, Arc::clone(&held.notify))
-            })?;
-            if let Some(taken) = taken {
-                return Ok(taken);
-            }
-            notify.notified().await;
-        }
-    }
-
-    /// Hand `reply` to the caller waiting on `ticket`.
-    ///
-    /// # Errors
-    /// Refuses unavailable hub state, an unknown ticket or a departed caller.
-    pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
-        let waiting = self.with(machine, |held| held.delivered.remove(ticket))?;
-        let waiting = waiting.ok_or_else(|| {
-            crate::error_machine::MachineError::dial_refused(format!(
-                "no request of machine `{machine}` waits on ticket `{ticket}`"
-            ))
-        })?;
-        if waiting.send(reply).is_err() {
-            return Err(ServerError::Runner {
-                refusal: "caller_left".to_owned(),
-                words: "the caller left before the runner answered".to_owned(),
-            });
-        }
-        Ok(())
-    }
-}
+mod hub;
+pub use hub::DialHub;
+use hub::Queued;
 
 /// How the server reaches runners.
 pub struct Runners {
@@ -389,9 +210,21 @@ impl Runners {
                     ticket,
                     answer,
                     cancellation,
+                    taken,
                 } = self.hub.queue(machine, act.clone())?;
                 let (hub, machine) = (Arc::clone(&self.hub), machine.to_owned());
                 leave.hold(withdraw_on_leave(hub, machine, ticket, cancellation))?;
+                if taken
+                    .recv_timeout(std::time::Duration::from_secs(2))
+                    .is_err()
+                {
+                    leave.leave()?;
+                    return Err(RunnerError::Unreachable {
+                        reason:
+                            "this computer's runner is not connected; reconnect it before starting"
+                                .to_owned(),
+                    });
+                }
                 let reply = answer.recv().map_err(|_left| RunnerError::Unreachable {
                     reason: "the request was withdrawn before the machine's runner answered"
                         .to_owned(),
@@ -484,6 +317,7 @@ pub(crate) async fn programs(
         }),
     }
 }
+pub(crate) mod observations;
 mod session;
 pub use session::ask;
 pub(crate) use session::outcome;
