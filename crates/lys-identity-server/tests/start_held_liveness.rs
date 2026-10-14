@@ -99,6 +99,7 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
                             alive: true,
                             managed: true,
                             harness_session: Some(conversation.to_owned()),
+                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: None,
                             started_at: 1,
