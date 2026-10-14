@@ -132,7 +132,13 @@ impl Render for Templates {
         if let Some(messages) = &self.messages {
             carried.message_service = Some(messages.clone());
         }
-        let service = server_config::render(layout, &config, &carried, screens);
+        let mut service = server_config::render(layout, &config, &carried, screens);
+        let previous = std::fs::read(layout.service_config())
+            .map(Zeroizing::new)
+            .map_err(|error| rendering_failed("identity.json", &error))?;
+        let previous: serde_json::Value = serde_json::from_slice(&previous)
+            .map_err(|error| rendering_failed("identity.json", &error))?;
+        carry_sign_in(&previous, &mut service)?;
         let service = serde_json::to_vec_pretty(&service)
             .map_err(|error| rendering_failed("identity.json", &error))?;
         let file = |name, target, bytes: &[u8], private, compose| RenderedFile {
@@ -197,3 +203,43 @@ impl Render for Templates {
 #[cfg(test)]
 #[path = "render_tests.rs"]
 mod tests;
+
+fn carry_sign_in(previous: &serde_json::Value, next: &mut serde_json::Value) -> IdentityResult<()> {
+    for key in ["secure_cookie", "session_seconds"] {
+        let Some(value) = previous.get(key) else {
+            continue;
+        };
+        let valid = match key {
+            "secure_cookie" => value.is_boolean(),
+            _ => value.as_u64().is_some_and(|seconds| seconds > 0),
+        };
+        if !valid {
+            return Err(IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "carry sign-in settings",
+                "identity.json",
+                format!("{key} is not a valid sign-in setting"),
+            ));
+        }
+        next[key] = value.clone();
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod sign_in_tests {
+    #[test]
+    fn an_upgrade_keeps_secure_cookies_and_the_operators_session_duration()
+    -> crate::identity::error::IdentityResult<()> {
+        let mut next = serde_json::json!({"secure_cookie": false, "session_seconds": 28800});
+        super::carry_sign_in(
+            &serde_json::json!({"secure_cookie": true, "session_seconds": 43200}),
+            &mut next,
+        )?;
+        assert_eq!(
+            next,
+            serde_json::json!({"secure_cookie": true, "session_seconds": 43200})
+        );
+        Ok(())
+    }
+}
