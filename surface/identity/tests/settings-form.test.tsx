@@ -27,7 +27,7 @@ describe('The settings form', () => {
     const service = routes();
     const { posted } = await open(service);
     const copies = field('build');
-    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another program…');
+    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another command or program…');
     await choose(copies, 'another');
     const input = document.querySelector('input[name="program-path"]');
     expect(input).not.toBeNull();
@@ -39,6 +39,24 @@ describe('The settings form', () => {
     unmountAll(); document.body.innerHTML = '';
     await open(routes({ ...saved, version: 1, reviewed_by: ADA, session: null }));
     expect(document.querySelector<HTMLInputElement>('input[name="program-path"]')?.value).toBe('/opt/forks/claude-fork');
+  });
+
+  it('takes a bare command last, saves it as the command the computer resolves and reads it back', async () => {
+    const service = routes();
+    const { posted } = await open(service);
+    const copies = field('build');
+    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another command or program…');
+    await choose(copies, 'another');
+    const input = document.querySelector('input[name="program-path"]');
+    expect(input).not.toBeNull();
+    await type(input, 'cdx');
+    await click(button());
+    const saved = posted.find((entry) => entry.path === path)?.body as Record<string, unknown>;
+    expect(saved).toMatchObject({ harness: { name: program.name, program: 'cdx', description }, model_access: ['default'], permissions: { default_mode: 'default' } });
+    expect(posted.map((entry) => entry.path)).toEqual([path]);
+    unmountAll(); document.body.innerHTML = '';
+    await open(routes({ ...saved, version: 1, reviewed_by: ADA, session: null }));
+    expect(document.querySelector<HTMLInputElement>('input[name="program-path"]')?.value).toBe('cdx');
   });
   it('offers the typed path when no installed copy was found', async () => {
     const { posted } = await open({ ...routes(), '/harnesses': ok({ programs: [{ ...program, builds: [] }] }) });

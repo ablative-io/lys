@@ -198,3 +198,24 @@ async fn rights_batch_incomplete_or_mismatched_answers_are_named() -> Result<(),
     }
     Ok(())
 }
+
+#[test]
+fn the_engines_echo_with_an_empty_optional_relation_is_the_question_sent_and_a_moved_one_is_not() {
+    let sent = serde_json::json!({"resource":{"objectType":"ablative/workspace","objectId":"ablative"},
+        "permission":"read","subject":{"object":{"objectType":"ablative/identity","objectId":"person-cfbcf33e3d08c87be44abf5831308247"}},
+        "context":{"now":1_791_945_371}});
+    // The engine's own echo of 14 Oct 2026, HTTP door 127.0.0.1:58443: `optionalRelation` added, empty.
+    let echoed = serde_json::json!({"resource":{"objectType":"ablative/workspace","objectId":"ablative"},
+        "permission":"read","subject":{"object":{"objectType":"ablative/identity","objectId":"person-cfbcf33e3d08c87be44abf5831308247"},"optionalRelation":""},
+        "context":{"now":1_791_945_371}});
+    assert!(super::same_question(&sent, &echoed));
+    let mut other = echoed.clone();
+    other["resource"]["objectId"] = serde_json::json!("other");
+    assert!(!super::same_question(&sent, &other));
+    let mut related = echoed.clone();
+    related["subject"]["optionalRelation"] = serde_json::json!("member");
+    assert!(!super::same_question(&sent, &related));
+    let mut moved = echoed;
+    moved["permission"] = serde_json::json!("write");
+    assert!(!super::same_question(&sent, &moved));
+}

@@ -149,7 +149,10 @@ impl SpiceDb {
             .filter(|pairs| pairs.len() == sent.len())
             .ok_or_else(|| unavailable("the permission batch did not answer every question"))?;
         for ((key, item), pair) in sent.into_iter().zip(pairs) {
-            if pair.get("request") != Some(&item) {
+            if !pair
+                .get("request")
+                .is_some_and(|echoed| same_question(&item, echoed))
+            {
                 return Err(unavailable(
                     "the permission batch answered a different question",
                 ));
@@ -167,6 +170,29 @@ impl SpiceDb {
         }
         Ok(checks)
     }
+}
+
+/// Whether the engine's echo of a bulk item is the question that was sent: the
+/// same resource, permission and subject object. The engine echoes the request
+/// as it parsed it, with members the question never carried (`optionalRelation`
+/// on the subject, written out empty), so the members are compared and never
+/// the bytes.
+pub(super) fn same_question(sent: &Value, echoed: &Value) -> bool {
+    [
+        "/resource/objectType",
+        "/resource/objectId",
+        "/permission",
+        "/subject/object/objectType",
+        "/subject/object/objectId",
+    ]
+    .iter()
+    .all(|member| {
+        sent.pointer(member)
+            .is_some_and(|value| echoed.pointer(member) == Some(value))
+    }) && echoed
+        .pointer("/subject/optionalRelation")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
 }
 
 #[cfg(test)]

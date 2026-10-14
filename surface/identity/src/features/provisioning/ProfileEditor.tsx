@@ -13,6 +13,12 @@ import { McpServers } from './McpServers';
 import { Skills, ToolsNamed, PluginsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 
+/** A program is a bare command the chosen computer resolves on its login PATH at every start (`claude`, `cdx`), or an absolute path; nothing else. */
+export function isCommandOrPath(program: string): boolean {
+  if (program.startsWith('/')) return !/[\u0000-\u001f]/.test(program);
+  return program.length > 0 && !program.includes('/') && !/[\s=\u0000-\u001f]/.test(program);
+}
+
 export function ProfileEditor({ id, profile, choices, people, readOnly = false, saved }: {
   id: string; profile: ProvisioningProfile | null; choices: Choices; people: PeopleView; readOnly?: boolean;
   /** Called once the settings are saved, when the form is the set-up before a start. */
@@ -82,7 +88,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     return () => { current = false; };
   }, [preferred]);
   const supported = program?.instructions_modes ?? ['keep', 'append'];
-  const selected = build === 'another' && programPath.startsWith('/') && !programPath.includes('\0')
+  const selected = build === 'another' && isCommandOrPath(programPath)
     ? { program: programPath, package: heldBuild && heldBuild.program === programPath ? heldBuild.package : programPath }
     : builds.find((entry) => entry.program + '\n' + entry.package === build);
   let refusal = '';
@@ -90,7 +96,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (preferred && catalogue?.machine !== preferred) refusal = 'Reading this computer’s programs.';
   else if (preferred && catalogue?.reason) refusal = catalogue.reason;
   else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
-  else if (!selected) refusal = build === 'another' ? 'Enter the program’s full path, starting with /.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
+  else if (!selected) refusal = build === 'another' ? 'Enter the command this computer runs (for instance cdx), or the program’s full path starting with /.' : builds.length === 0 ? program.name + ' is not installed on this computer.' + (program.not_found ? ' ' + program.not_found : '') : 'Choose an installed copy of ' + program.name + '.';
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
@@ -131,8 +137,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
       {!available.some((entry) => entry.name === programName) ? <option value={programName}>{programName || 'Choose a program'}</option> : null}
       {available.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
     </select></label>
-    {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose an installed copy</option>{builds.map((entry) => <option key={entry.program + '\n' + entry.package} value={entry.program + '\n' + entry.package}>{entry.name} — {entry.package}</option>)}<option value="another">Another program…</option></select></label> : null}
-    {build === 'another' ? <label className="field">Program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
+    {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => setBuild(event.target.value)}><option value="">Choose an installed copy</option>{builds.map((entry) => <option key={entry.program + '\n' + entry.package} value={entry.program + '\n' + entry.package}>{entry.name} — {entry.package}</option>)}<option value="another">Another command or program…</option></select></label> : null}
+    {build === 'another' ? <label className="field">Command or program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
     {modelField}
     {computerField}
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
