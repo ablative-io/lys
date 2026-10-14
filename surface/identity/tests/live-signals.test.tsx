@@ -11,7 +11,26 @@ function deferred<T>() {
   return { promise, resolve };
 }
 const generation = (digit: string) => ({ generation: 'op-' + digit.repeat(32) });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+it('reconnects after a transient 502 without needing focus because an upgrade can interrupt the shared feed', async () => {
+  vi.useFakeTimers();
+  const resumed = deferred<void>();
+  const refused = deferred<void>();
+  const pending = deferred<Response>();
+  const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ refusal: 'ProxyUnavailable', reason: 'upgrade interrupted the connection' }), { status: 502 }))
+    .mockResolvedValueOnce(new Response(JSON.stringify(generation('9')))).mockReturnValue(pending.promise);
+  vi.stubGlobal('fetch', fetch);
+  const leave = subscribeChanges(() => resumed.resolve(), () => refused.resolve());
+  try {
+    await refused.promise;
+    expect(fetch).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+    await resumed.promise;
+  } finally { leave(); pending.resolve(new Response(JSON.stringify(generation('8')))); }
+  expect(vi.getTimerCount()).toBe(0);
+});
 
 it('shares one signal wait, never starts a timer, and aborts when the final view leaves', async () => {
   const requests: { path: string; signal?: AbortSignal | null; result: ReturnType<typeof deferred<Response>> }[] = [];
