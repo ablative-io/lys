@@ -270,83 +270,8 @@ pub(crate) async fn issue(
     }
     let person = crate::secrets_api::person(&state, &headers)?;
     end_pending(&state, &person).await?;
-    let answer = crate::secrets_api::ask_as(
-        &state,
-        &person,
-        Method::POST,
-        "/_lys/apps/client/issue",
-        encoded(&json!({ "app": id })),
-    )
-    .await;
-    let answer = match answer {
-        Ok(answer) => answer,
-        Err(ServerError::SecretsRefused { refusal, .. }) if refusal == "AppClientNoCustody" => {
-            crate::apps_credentials::prepare(&state, &headers, &id).await?;
-            crate::secrets_api::ask_as(
-                &state,
-                &person,
-                Method::POST,
-                "/_lys/apps/client/issue",
-                encoded(&json!({"app": id})),
-            )
-            .await?
-        }
-        Err(error) => return Err(error),
-    };
-    let issued: Issued =
-        serde_json::from_value(answer).map_err(|_error| unconfirmed("the credential's issue"))?;
-    let shaped = issued.credential_id.len() == 16
-        && issued
-            .credential_id
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-        && issued
-            .value
-            .strip_prefix(APP_CLIENT_PREFIX)
-            .and_then(|rest| rest.strip_prefix(id.as_str()))
-            .is_some_and(|rest| rest.starts_with('.'));
-    if issued.app != id
-        || !shaped
-        || issued.client_secret_sha256.len() != 64
-        || !issued
-            .client_secret_sha256
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(unconfirmed("the credential's issue"));
-    }
-    let current = with_apps(&state, |apps, _projection| {
-        approved(apps, &id)?
-            .approved
-            .as_ref()
-            .map(|approved| approved.client.secret_sha256.clone())
-            .ok_or_else(|| AppError::AppNotApproved { app: id.clone() }.into())
-    })?;
-    if current != issued.client_secret_sha256 {
-        let by = with_apps(&state, |apps, projection| {
-            may_issue(&acting(&state, apps.held(), &headers, projection)?)
-        })?;
-        let prefix = format!("lys-app-{}-{id}", issued.owner);
-        crate::apps_credentials::keep_custody(
-            &state,
-            &headers,
-            CustodyPrepared {
-                operation: OperationId::generate()?.to_string(),
-                app: id.clone(),
-                client: Client {
-                    client_id: id.clone(),
-                    secret_sha256: issued.client_secret_sha256.clone(),
-                },
-                owner: issued.owner.clone(),
-                client_secret_ref: format!("{prefix}-client"),
-                api_credential_ref: format!("{prefix}-api"),
-                bearer_issued: false,
-                by,
-                at: now(),
-            },
-            &previous_digest,
-        )?;
-    }
+    let issued = issue_at_broker(&state, &headers, &id, &person).await?;
+    confirm_issued(&state, &headers, &id, &issued, &previous_digest)?;
     let kept = with_apps(&state, |apps, projection| {
         let by = may_issue(&acting(&state, apps.held(), &headers, projection)?)?;
         if let Some(line) = apps.held().operation(&operation) {
@@ -503,4 +428,100 @@ async fn end_at_broker(
         return Err(unconfirmed("the credentials' ending"));
     }
     Ok(())
+}
+
+fn confirm_issued(
+    state: &AppState,
+    headers: &HeaderMap,
+    id: &str,
+    issued: &Issued,
+    previous_digest: &str,
+) -> Result<(), ServerError> {
+    let shaped = issued.credential_id.len() == 16
+        && issued
+            .credential_id
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+        && issued
+            .value
+            .strip_prefix(APP_CLIENT_PREFIX)
+            .and_then(|rest| rest.strip_prefix(id))
+            .is_some_and(|rest| rest.starts_with('.'));
+    if issued.app != id
+        || !shaped
+        || issued.client_secret_sha256.len() != 64
+        || !issued
+            .client_secret_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err(unconfirmed("the credential's issue"));
+    }
+    let current = with_apps(state, |apps, _projection| {
+        approved(apps, id)?
+            .approved
+            .as_ref()
+            .map(|approved| approved.client.secret_sha256.clone())
+            .ok_or_else(|| AppError::AppNotApproved { app: id.to_owned() }.into())
+    })?;
+    if current != issued.client_secret_sha256 {
+        let by = with_apps(state, |apps, projection| {
+            may_issue(&acting(state, apps.held(), headers, projection)?)
+        })?;
+        let prefix = format!("lys-app-{}-{id}", issued.owner);
+        crate::apps_credentials::keep_custody(
+            state,
+            headers,
+            CustodyPrepared {
+                operation: OperationId::generate()?.to_string(),
+                app: id.to_owned(),
+                client: Client {
+                    client_id: id.to_owned(),
+                    secret_sha256: issued.client_secret_sha256.clone(),
+                },
+                owner: issued.owner.clone(),
+                client_secret_ref: format!("{prefix}-client"),
+                api_credential_ref: format!("{prefix}-api"),
+                bearer_issued: false,
+                by,
+                at: now(),
+            },
+            previous_digest,
+        )?;
+    }
+    Ok(())
+}
+
+async fn issue_at_broker(
+    state: &AppState,
+    headers: &HeaderMap,
+    id: &str,
+    person: &str,
+) -> Result<Issued, ServerError> {
+    let answer = crate::secrets_api::ask_as(
+        state,
+        person,
+        Method::POST,
+        "/_lys/apps/client/issue",
+        encoded(&json!({ "app": id })),
+    )
+    .await;
+    let answer = match answer {
+        Ok(answer) => answer,
+        Err(ServerError::SecretsRefused { refusal, .. }) if refusal == "AppClientNoCustody" => {
+            crate::apps_credentials::prepare(state, headers, id).await?;
+            crate::secrets_api::ask_as(
+                state,
+                person,
+                Method::POST,
+                "/_lys/apps/client/issue",
+                encoded(&json!({"app": id})),
+            )
+            .await?
+        }
+        Err(error) => return Err(error),
+    };
+    let issued: Issued =
+        serde_json::from_value(answer).map_err(|_error| unconfirmed("the credential's issue"))?;
+    Ok(issued)
 }

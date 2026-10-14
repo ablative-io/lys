@@ -87,10 +87,8 @@ pub(super) async fn resend(
     axum::extract::Path(goal): axum::extract::Path<String>,
     body: Result<axum::Json<ResendBody>, axum::extract::rejection::JsonRejection>,
 ) -> Result<axum::Json<ResendView>, ServerError> {
-    use crate::receipts_api::control::{
-        managed_status, read_receipt, record_decision, service_target,
-    };
-    use lys_runner::operations::{OperationState, Reconciled, Reconciliation};
+    use crate::receipts_api::control::{read_receipt, record_decision, service_target};
+    use lys_runner::operations::Reconciled;
     let refused = |name: &str, words: &str| ServerError::Runner {
         refusal: name.to_owned(),
         words: words.to_owned(),
@@ -128,60 +126,12 @@ pub(super) async fn resend(
     })?;
     let original = service_target(&state, &source)?;
     let prior = read_receipt(&state, &original, &body.prior).await?;
-    if prior.state != OperationState::Uncertain
-        || prior
-            .reference
-            .as_ref()
-            .is_some_and(|reference| reference.goal != goal)
-    {
-        return Err(refused(
-            "control_not_uncertain",
-            "the prior receipt does not name uncertain delivery of this goal",
-        ));
-    }
-    let choice = Reconciliation::Resent {
-        occurrence: body.operation.clone(),
-    };
-    if prior.reconciled.as_ref().is_some_and(|kept| {
-        kept.operation != body.operation || kept.by != person || kept.decision != choice
-    }) {
-        return Err(refused(
-            "control_already_reconciled",
-            "a different person decision is already recorded",
-        ));
-    }
+    let choice = resend_choice(&prior, &goal, &body.operation, &person)?;
     let fired = if kept {
         crate::receipts_api::control::responsible(&state, &original, &prior, &person)?;
         resent.fired
     } else {
-        let agent = with_runtime(&state, |store| {
-            let tracked = store
-                .session(&body.session)
-                .ok_or(ServerError::RuntimeSessionUnknown)?;
-            if tracked.stopped() {
-                return Err(ServerError::RuntimeSessionUnknown);
-            }
-            tracked
-                .agent
-                .clone()
-                .ok_or(ServerError::RuntimeSessionUnknown)
-        })?;
-        if !control_recipient(&state, &holder, &person, &agent, true)? {
-            return Err(refused(
-                "goal_authority_revoked",
-                "the intended session is no longer an admitted recipient",
-            ));
-        }
-        let driven = service_target(&state, &body.session)?;
-        let status = managed_status(&state, &driven).await?;
-        crate::budgets_act::resend_allowed(&state, &agent, &body.session, &status)?;
-        // Authority is re-read after runner IO, and the dispatcher judges it again before any write.
-        if !control_recipient(&state, &holder, &person, &agent, true)? {
-            return Err(refused(
-                "goal_authority_revoked",
-                "the intended recipient changed before the occurrence was recorded",
-            ));
-        }
+        admit_resend(&state, &body.session, &holder, &person).await?;
         goals.with(|store| store.resend(resent))?
     };
     let decision = record_decision(
@@ -343,4 +293,82 @@ mod authority_tests {
             person: Some(LifecycleState::Active)
         }));
     }
+}
+
+async fn admit_resend(
+    state: &std::sync::Arc<AppState>,
+    session: &str,
+    holder: &Holder,
+    person: &str,
+) -> Result<(), ServerError> {
+    use crate::receipts_api::control::{managed_status, service_target};
+    let refused = |name: &str, words: &str| ServerError::Runner {
+        refusal: name.to_owned(),
+        words: words.to_owned(),
+    };
+    let agent = with_runtime(state, |store| {
+        let tracked = store
+            .session(session)
+            .ok_or(ServerError::RuntimeSessionUnknown)?;
+        if tracked.stopped() {
+            return Err(ServerError::RuntimeSessionUnknown);
+        }
+        tracked
+            .agent
+            .clone()
+            .ok_or(ServerError::RuntimeSessionUnknown)
+    })?;
+    if !control_recipient(state, holder, person, &agent, true)? {
+        return Err(refused(
+            "goal_authority_revoked",
+            "the intended session is no longer an admitted recipient",
+        ));
+    }
+    let driven = service_target(state, session)?;
+    let status = managed_status(state, &driven).await?;
+    crate::budgets_act::resend_allowed(state, &agent, session, &status)?;
+    // Authority is re-read after runner IO, and the dispatcher judges it again before any write.
+    if !control_recipient(state, holder, person, &agent, true)? {
+        return Err(refused(
+            "goal_authority_revoked",
+            "the intended recipient changed before the occurrence was recorded",
+        ));
+    }
+    Ok(())
+}
+
+fn resend_choice(
+    prior: &lys_runner::operations::ControlReceipt,
+    goal: &str,
+    operation: &str,
+    person: &str,
+) -> Result<lys_runner::operations::Reconciliation, ServerError> {
+    use lys_runner::operations::{OperationState, Reconciliation};
+    let refused = |name: &str, words: &str| ServerError::Runner {
+        refusal: name.to_owned(),
+        words: words.to_owned(),
+    };
+    if prior.state != OperationState::Uncertain
+        || prior
+            .reference
+            .as_ref()
+            .is_some_and(|reference| reference.goal != goal)
+    {
+        return Err(refused(
+            "control_not_uncertain",
+            "the prior receipt does not name uncertain delivery of this goal",
+        ));
+    }
+    let choice = Reconciliation::Resent {
+        occurrence: operation.to_owned(),
+    };
+    if prior.reconciled.as_ref().is_some_and(|kept| {
+        kept.operation != operation || kept.by != person || kept.decision != choice
+    }) {
+        return Err(refused(
+            "control_already_reconciled",
+            "a different person decision is already recorded",
+        ));
+    }
+    Ok(choice)
 }

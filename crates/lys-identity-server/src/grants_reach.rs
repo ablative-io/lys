@@ -124,16 +124,7 @@ pub(crate) async fn reach(
         },
         |judged| {
             let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
-            let mut asked = Vec::with_capacity(body.resources.len());
-            for wire in &body.resources {
-                judged.apps.admit_kind(None, &wire.kind)?;
-                let mut actions = Vec::with_capacity(wire.actions.len());
-                for action in &wire.actions {
-                    judged.apps.admit_action(&wire.kind, action)?;
-                    actions.push(Action::new(action)?);
-                }
-                asked.push((wire, Resource::new(&wire.kind, &wire.id)?, actions));
-            }
+            let asked = admit_resources(&judged, &body.resources)?;
             let frame = judged.grants.frame(judged.directory, None)?;
             let mut known = HashMap::new();
             let mut resources = Vec::with_capacity(asked.len());
@@ -202,4 +193,23 @@ pub(crate) async fn reach(
             }))
         },
     )
+}
+
+type AskedResource<'a> = (&'a ReachResource, Resource, Vec<Action>);
+
+fn admit_resources<'a>(
+    judged: &crate::grants::Judged<'_>,
+    resources: &'a [ReachResource],
+) -> Result<Vec<AskedResource<'a>>, ServerError> {
+    let mut asked = Vec::with_capacity(resources.len());
+    for wire in resources {
+        judged.apps.admit_kind(None, &wire.kind)?;
+        let mut actions = Vec::with_capacity(wire.actions.len());
+        for action in &wire.actions {
+            judged.apps.admit_action(&wire.kind, action)?;
+            actions.push(Action::new(action)?);
+        }
+        asked.push((wire, Resource::new(&wire.kind, &wire.id)?, actions));
+    }
+    Ok(asked)
 }

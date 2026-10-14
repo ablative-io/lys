@@ -6,35 +6,14 @@ use std::sync::Arc;
 impl Held {
     /// Fold one leaf. A leaf that contradicts what came before is refused,
     /// since every kept leaf was checked against it.
+    ///
+    /// # Errors
+    /// Refuses invalid goals or changes, duplicate goal or operation identities,
+    /// unknown or closed goals, marks without required evidence, invalid firings,
+    /// resends or answers, or events the preceding goal history cannot accept.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         match line {
-            Line::Set(goal) => {
-                goal.check().map_err(|error| error.to_string())?;
-                if self.item(&goal.id).is_some() {
-                    return Err(format!("goal `{}` is already set", goal.id));
-                }
-                let timers = goal
-                    .reminders
-                    .iter()
-                    .map(|remind| Timer {
-                        remind: remind.clone(),
-                        next_due: first_due(&goal, remind),
-                    })
-                    .collect();
-                Arc::make_mut(&mut self.index)
-                    .items
-                    .insert(goal.id.clone(), self.items.len());
-                let position = self.items.len();
-                self.items.push(Item {
-                    goal,
-                    standing: Standing::Open,
-                    marked: None,
-                    timers,
-                    fired: Vec::new(),
-                    changes: Vec::new(),
-                });
-                Arc::make_mut(&mut self.index).compaction(position, &self.items[position]);
-            }
+            Line::Set(goal) => self.set(goal)?,
             Line::Marked(marked) => {
                 let position = self.position(&marked.goal)?;
                 let operation = marked.operation.clone();
@@ -107,6 +86,34 @@ impl Held {
                 }
             }
         }
+        Ok(())
+    }
+    fn set(&mut self, goal: super::Goal) -> Result<(), String> {
+        goal.check().map_err(|error| error.to_string())?;
+        if self.item(&goal.id).is_some() {
+            return Err(format!("goal `{}` is already set", goal.id));
+        }
+        let timers = goal
+            .reminders
+            .iter()
+            .map(|remind| Timer {
+                remind: remind.clone(),
+                next_due: first_due(&goal, remind),
+            })
+            .collect();
+        Arc::make_mut(&mut self.index)
+            .items
+            .insert(goal.id.clone(), self.items.len());
+        let position = self.items.len();
+        self.items.push(Item {
+            goal,
+            standing: Standing::Open,
+            marked: None,
+            timers,
+            fired: Vec::new(),
+            changes: Vec::new(),
+        });
+        Arc::make_mut(&mut self.index).compaction(position, &self.items[position]);
         Ok(())
     }
 }

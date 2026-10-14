@@ -188,71 +188,7 @@ pub(super) fn page<S: LeafStore>(
         }
     };
     let through = planned.revision;
-    // One pass from the checkpoint at or below the cursor: the replay's
-    // cost is the checkpoint distance and the range, never the history.
-    let replayed = judged.grants.ledger().entries_between(cursor, through)?;
-    let expected = usize::try_from(through - cursor).ok();
-    if Some(replayed.len()) != expected {
-        return Err(GrantError::LogUnavailable {
-            reason: format!(
-                "grant log positions {cursor} to {through} are not all below the head {head}"
-            ),
-        }
-        .into());
-    }
-    let book = judged.grants.book();
-    let mut replayed = replayed.iter();
-    let mut hidden = Hidden::default();
-    for step in &planned.steps {
-        match *step {
-            Step::Change(revision) => {
-                let Some((signed, coordinate)) = replayed.next() else {
-                    return Err(GrantError::LogUnavailable {
-                        reason: format!("grant log position {revision} was not read"),
-                    }
-                    .into());
-                };
-                let index = coordinate.index;
-                if index.saturating_add(1) != revision {
-                    return Err(GrantError::LogUnavailable {
-                        reason: format!(
-                            "grant log position {revision} was read as position {}",
-                            index.saturating_add(1)
-                        ),
-                    }
-                    .into());
-                }
-                let event = signed.event();
-                match shown(book, acting_for, event, index) {
-                    Some(change) => {
-                        hidden.flush(&mut frames);
-                        frames.push(ChangeFrame::Change {
-                            revision,
-                            grant: event.grant().to_string(),
-                            change,
-                            event: event_hex(signed.bytes()),
-                        });
-                    }
-                    None => hidden.revision = Some(revision),
-                }
-            }
-            Step::Placement(position) => {
-                let (_, kept) = placements::at(apps, position)?;
-                let Some(after) = kept.revision else {
-                    return Err(GrantError::LogUnavailable {
-                        reason: format!("placement {position} names no grant revision"),
-                    }
-                    .into());
-                };
-                if placements::shown(acting_for, kept) {
-                    hidden.flush(&mut frames);
-                    frames.push(placements::frame(apps, book, acting_for, position, after)?);
-                } else {
-                    hidden.placement = Some((after, position));
-                }
-            }
-        }
-    }
+    let mut hidden = replay(judged, acting_for, &planned, cursor, head, &mut frames)?;
     let at_head = through == head && planned.placed.is_none_or(|covered| covered == count);
     if placed.is_some() && at_head {
         // Before readiness, a read following placements is told the head
@@ -291,4 +227,82 @@ impl Hidden {
             });
         }
     }
+}
+
+fn replay<S: LeafStore>(
+    judged: &Judged<'_, S>,
+    acting_for: Option<&str>,
+    planned: &placements::Planned,
+    cursor: u64,
+    head: u64,
+    frames: &mut Vec<ChangeFrame>,
+) -> Result<Hidden, ServerError> {
+    let apps = judged.apps.held();
+    let through = planned.revision;
+    // One pass from the checkpoint at or below the cursor: the replay's
+    // cost is the checkpoint distance and the range, never the history.
+    let replayed = judged.grants.ledger().entries_between(cursor, through)?;
+    let expected = usize::try_from(through - cursor).ok();
+    if Some(replayed.len()) != expected {
+        return Err(GrantError::LogUnavailable {
+            reason: format!(
+                "grant log positions {cursor} to {through} are not all below the head {head}"
+            ),
+        }
+        .into());
+    }
+    let book = judged.grants.book();
+    let mut replayed = replayed.iter();
+    let mut hidden = Hidden::default();
+    for step in &planned.steps {
+        match *step {
+            Step::Change(revision) => {
+                let Some((signed, coordinate)) = replayed.next() else {
+                    return Err(GrantError::LogUnavailable {
+                        reason: format!("grant log position {revision} was not read"),
+                    }
+                    .into());
+                };
+                let index = coordinate.index;
+                if index.saturating_add(1) != revision {
+                    return Err(GrantError::LogUnavailable {
+                        reason: format!(
+                            "grant log position {revision} was read as position {}",
+                            index.saturating_add(1)
+                        ),
+                    }
+                    .into());
+                }
+                let event = signed.event();
+                match shown(book, acting_for, event, index) {
+                    Some(change) => {
+                        hidden.flush(frames);
+                        frames.push(ChangeFrame::Change {
+                            revision,
+                            grant: event.grant().to_string(),
+                            change,
+                            event: event_hex(signed.bytes()),
+                        });
+                    }
+                    None => hidden.revision = Some(revision),
+                }
+            }
+            Step::Placement(position) => {
+                let (_, kept) = placements::at(apps, position)?;
+                let Some(after) = kept.revision else {
+                    return Err(GrantError::LogUnavailable {
+                        reason: format!("placement {position} names no grant revision"),
+                    }
+                    .into());
+                };
+                if placements::shown(acting_for, kept) {
+                    hidden.flush(frames);
+                    frames.push(placements::frame(apps, book, acting_for, position, after)?);
+                } else {
+                    hidden.placement = Some((after, position));
+                }
+            }
+        }
+    }
+    Ok(hidden)
 }

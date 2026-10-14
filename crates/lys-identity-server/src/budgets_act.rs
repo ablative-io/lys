@@ -176,6 +176,10 @@ fn standing(state: &AppState, agent: &str) -> Result<Standing, ServerError> {
 
 /// Ask every crossing not yet settled of its runner, under its own id, and
 /// keep what came of each; one whose answer was lost waits for the next.
+///
+/// # Errors
+/// Refuses budgets store reads or durable crossing outcome writes that
+/// fail during settlement.
 pub async fn settle(state: &Arc<AppState>) -> Result<(), ServerError> {
     if state.budgets.is_none() {
         return Ok(());
@@ -249,31 +253,10 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         at_ms: at_ms(),
         ended: None,
     };
-    if crossing.holder.kind == crate::budgets_state::HolderKind::Team {
-        match standing(state, &crossing.agent) {
-            Ok(standing) if standing.teams.contains(&crossing.holder.id) => {}
-            Ok(_) => {
-                return Some(kept(
-                    Stands::Refused,
-                    format!(
-                        "team_membership_held: agent `{}` is not an admitted member of team `{}`",
-                        crossing.agent, crossing.holder.id
-                    ),
-                ));
-            }
-            Err(error) => {
-                (state.say)(&format!(
-                    "budget crossing `{}` awaits membership read: {error}",
-                    crossing.operation
-                ));
-                return None;
-            }
-        }
-    }
-    if let Some(session) = crossing.session.as_deref()
-        && let Err(error) = usage_session(state, &crossing.agent, session)
-    {
-        return Some(kept(Stands::Refused, error.to_string()));
+    match crossing_admission(state, crossing, &kept) {
+        CrossingAdmission::Admitted => {}
+        CrossingAdmission::Kept(acted) => return Some(acted),
+        CrossingAdmission::Unknown => return None,
     }
     let compact_profile = if crossing.act == Act::Compact {
         match crossing
@@ -295,34 +278,12 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
         Ok(words) => words,
         Err(error) => return Some(kept(Stands::Refused, error.to_string())),
     };
-    let request = match (
-        crossing.act,
-        worded
-            .or_else(|| crossing.text.clone())
-            .or_else(|| compact_profile.as_ref().map(|(text, _, _)| text.clone())),
-    ) {
-        (Act::Tell, _) => {
-            return Some(kept(
-                Stands::Told,
-                format!(
-                    "kept for agent {}'s responsible person to read; nothing is sent",
-                    crossing.agent
-                ),
-            ));
-        }
-        (Act::Stop, _) => OperationRequest::Stop,
-        (Act::Compact, Some(text)) if requires_controls => OperationRequest::ContextCompact {
-            text,
-            crossing: crossing.operation.clone(),
-        },
-        (Act::Compact, Some(text)) => OperationRequest::Compact { text },
-        (Act::Notice, Some(text)) => OperationRequest::Notice { text },
-        (Act::Compact, None) => OperationRequest::Compact {
-            text: "/compact".to_owned(),
-        },
-        (Act::Notice, None) => {
-            return Some(kept(Stands::Refused, "a notice with no words".to_owned()));
-        }
+    let text = worded
+        .or_else(|| crossing.text.clone())
+        .or_else(|| compact_profile.as_ref().map(|(text, _, _)| text.clone()));
+    let request = match crossing_request(crossing, text, requires_controls, &kept) {
+        CrossingRequest::Runner(request) => request,
+        CrossingRequest::Kept(acted) => return Some(acted),
     };
     let Some(session) = crossing.session.clone() else {
         return Some(kept(
@@ -378,4 +339,85 @@ async fn act(state: &Arc<AppState>, crossing: &Crossing) -> Option<Acted> {
             None
         }
     }
+}
+
+fn crossing_request(
+    crossing: &Crossing,
+    text: Option<String>,
+    requires_controls: bool,
+    kept: &impl Fn(Stands, String) -> Acted,
+) -> CrossingRequest {
+    let request = match (crossing.act, text) {
+        (Act::Tell, _) => {
+            return CrossingRequest::Kept(kept(
+                Stands::Told,
+                format!(
+                    "kept for agent {}'s responsible person to read; nothing is sent",
+                    crossing.agent
+                ),
+            ));
+        }
+        (Act::Stop, _) => OperationRequest::Stop,
+        (Act::Compact, Some(text)) if requires_controls => OperationRequest::ContextCompact {
+            text,
+            crossing: crossing.operation.clone(),
+        },
+        (Act::Compact, Some(text)) => OperationRequest::Compact { text },
+        (Act::Notice, Some(text)) => OperationRequest::Notice { text },
+        (Act::Compact, None) => OperationRequest::Compact {
+            text: "/compact".to_owned(),
+        },
+        (Act::Notice, None) => {
+            return CrossingRequest::Kept(kept(
+                Stands::Refused,
+                "a notice with no words".to_owned(),
+            ));
+        }
+    };
+    CrossingRequest::Runner(request)
+}
+
+enum CrossingRequest {
+    Runner(OperationRequest),
+    Kept(Acted),
+}
+
+fn crossing_admission(
+    state: &AppState,
+    crossing: &Crossing,
+    kept: &impl Fn(Stands, String) -> Acted,
+) -> CrossingAdmission {
+    if crossing.holder.kind == crate::budgets_state::HolderKind::Team {
+        match standing(state, &crossing.agent) {
+            Ok(standing) if standing.teams.contains(&crossing.holder.id) => {}
+            Ok(_) => {
+                return CrossingAdmission::Kept(kept(
+                    Stands::Refused,
+                    format!(
+                        "team_membership_held: agent `{}` is not an admitted member of team `{}`",
+                        crossing.agent, crossing.holder.id
+                    ),
+                ));
+            }
+            Err(error) => {
+                (state.say)(&format!(
+                    "budget crossing `{}` awaits membership read: {error}",
+                    crossing.operation
+                ));
+                return CrossingAdmission::Unknown;
+            }
+        }
+    }
+    if let Some(session) = crossing.session.as_deref()
+        && let Err(error) = usage_session(state, &crossing.agent, session)
+    {
+        return CrossingAdmission::Kept(kept(Stands::Refused, error.to_string()));
+    }
+    CrossingAdmission::Admitted
+}
+
+enum CrossingAdmission {
+    Admitted,
+    Kept(Acted),
+    Unknown,
 }

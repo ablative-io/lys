@@ -19,6 +19,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
+mod fold;
+
 use crate::read_views::Login;
 
 /// The snapshot domain the teams' folded state is sealed under.
@@ -113,6 +115,7 @@ pub enum Line {
 
 impl Line {
     /// The operation id the line was kept under.
+    #[must_use]
     pub fn operation(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
@@ -128,6 +131,7 @@ impl Line {
     }
 
     /// The team the line is about.
+    #[must_use]
     pub fn team(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
@@ -175,6 +179,7 @@ impl Line {
     }
 
     /// Whether `other` is the same act as this line, whenever each was received.
+    #[must_use]
     pub fn same_act(&self, other: &Self) -> bool {
         *self == other.at(self.received())
     }
@@ -362,6 +367,7 @@ pub enum Refused {
 
 impl Held {
     /// The team named `id`.
+    #[must_use]
     pub fn team(&self, id: &str) -> Option<&Team> {
         self.index
             .positions
@@ -370,6 +376,9 @@ impl Held {
     }
 
     /// A team and each descendant, without visiting unrelated teams.
+    ///
+    /// # Errors
+    /// Refuses a root that names no retained team.
     pub fn subtree(&self, root: &str) -> Result<BTreeSet<String>, Refused> {
         if !self.index.positions.contains_key(root) {
             return Err(Refused::Unknown);
@@ -389,6 +398,7 @@ impl Held {
     }
 
     /// The line kept under `operation`, whichever kind it is.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<Line> {
         let operation = self.index.operations.get(operation)?;
         #[cfg(test)]
@@ -406,6 +416,11 @@ impl Held {
     }
 
     /// Whether `line` may be kept on the teams as they stand, by reason.
+    ///
+    /// # Errors
+    /// Refuses invalid team nesting, a repeated nesting check, an unknown or
+    /// retired team, or a membership or holding change its current state does
+    /// not allow.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
         match line {
             Line::CreatedV1(created) => {
@@ -451,131 +466,11 @@ impl Held {
         }
     }
 
-    /// Fold one line. A line the lines before it do not allow is refused by
-    /// reason, since every kept line was checked against what came before.
-    pub fn hold(&mut self, line: Line) -> Result<(), String> {
-        if self.index.operations.contains_key(line.operation()) {
-            return Err(format!(
-                "operation `{}` already names a line",
-                line.operation()
-            ));
-        }
-        self.allows(&line).map_err(|refused| {
-            format!(
-                "line `{}` on team `{}` is refused: {refused:?}",
-                line.operation(),
-                line.team()
-            )
-        })?;
-        match line {
-            Line::Created(created) => {
-                Arc::make_mut(&mut self.index)
-                    .operations
-                    .insert(created.id.clone(), Operation::Created(self.teams.len()));
-                Arc::make_mut(&mut self.index)
-                    .positions
-                    .insert(created.id.clone(), self.teams.len());
-                self.teams.push(Team {
-                    created,
-                    parent: None,
-                    lead: None,
-                    members: Vec::new(),
-                    retired: None,
-                    held: Vec::new(),
-                    changes: Vec::new(),
-                });
-                return Ok(());
-            }
-            Line::CreatedV1(created) => {
-                let index = Arc::make_mut(&mut self.index);
-                index.operations.insert(
-                    created.created.id.clone(),
-                    Operation::Change(self.teams.len(), 0),
-                );
-                index
-                    .positions
-                    .insert(created.created.id.clone(), self.teams.len());
-                if let Some(parent) = &created.parent {
-                    index
-                        .children
-                        .entry(parent.clone())
-                        .or_default()
-                        .insert(created.created.id.clone());
-                }
-                self.teams.push(Team {
-                    created: created.created.clone(),
-                    parent: created.parent.clone(),
-                    lead: created.lead.clone(),
-                    members: Vec::new(),
-                    retired: None,
-                    held: Vec::new(),
-                    changes: vec![Line::CreatedV1(created)],
-                });
-                return Ok(());
-            }
-            Line::Checked(checked) => {
-                Arc::make_mut(&mut self.index)
-                    .operations
-                    .insert(checked.operation.clone(), Operation::Checked);
-                self.checked = Some(checked);
-                return Ok(());
-            }
-            _ => {}
-        }
-        let position = *self
-            .index
-            .positions
-            .get(line.team())
-            .ok_or_else(|| format!("team `{}` was never created", line.team()))?;
-        let team = &mut self.teams[position];
-        match &line {
-            Line::Added(changed) => team.members.push(changed.member.clone()),
-            Line::Removed(changed) => {
-                team.members.retain(|member| *member != changed.member);
-                team.held.retain(|held| held.member != changed.member);
-                if team.lead.as_ref() == Some(&changed.member) {
-                    team.lead = None;
-                }
-            }
-            Line::Retired(changed) => team.retired = Some(changed.clone()),
-            Line::Held(hold) => {
-                if team.lead.as_ref() == Some(&hold.member) {
-                    team.lead = None;
-                }
-                team.held.push(hold.clone());
-            }
-            Line::Confirmed(changed) => team.held.retain(|held| held.member != changed.member),
-            Line::NestedV1(nested) => {
-                let index = Arc::make_mut(&mut self.index);
-                if let Some(parent) = &team.parent {
-                    if let Some(children) = index.children.get_mut(parent) {
-                        children.remove(&team.created.id);
-                        if children.is_empty() {
-                            index.children.remove(parent);
-                        }
-                    }
-                }
-                if let Some(parent) = &nested.parent {
-                    index
-                        .children
-                        .entry(parent.clone())
-                        .or_default()
-                        .insert(team.created.id.clone());
-                }
-                team.parent.clone_from(&nested.parent);
-                team.lead.clone_from(&nested.lead);
-            }
-            Line::Created(_) | Line::CreatedV1(_) | Line::Checked(_) => {}
-        }
-        Arc::make_mut(&mut self.index).operations.insert(
-            line.operation().to_owned(),
-            Operation::Change(position, team.changes.len()),
-        );
-        team.changes.push(line);
-        Ok(())
-    }
-
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses malformed team leaves or acts the preceding team history does
+    /// not allow, naming the leaf that failed.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -587,6 +482,9 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the teams snapshot cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealing {
             format: FORMAT,
@@ -597,6 +495,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses bytes that do not read as a whole teams snapshot in the teams
+    /// state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("teams state: {error}"))?;

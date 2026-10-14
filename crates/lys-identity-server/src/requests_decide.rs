@@ -137,7 +137,7 @@ pub(crate) async fn approve(
     Path(id): Path<String>,
     body: Result<Json<ApproveBody>, JsonRejection>,
 ) -> Result<Json<RequestView>, ServerError> {
-    with_grants(&state, |judged| {
+    with_grants(&state, |mut judged| {
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let body = taken(body)?;
         let at = state.sessions.now()?;
@@ -180,25 +180,14 @@ pub(crate) async fn approve(
                 answer,
             })?;
             let recorded = match (source, weighed.seeker) {
-                (Some(source), _) => {
-                    let request = DelegateRequest {
-                        operation,
-                        caller,
-                        route: body.route.into(),
-                        source,
-                        recipient: weighed.seeker,
-                        responsible: weighed.responsible,
-                        resource: weighed.resource.clone(),
-                        relation: weighed.relation.clone(),
-                        pass_on: PassOn::UseOnly,
-                        window,
-                    };
-                    if answer == Answer::Once {
-                        judged.grants.delegate_once(judged.directory, &request, at)
-                    } else {
-                        judged.grants.delegate(judged.directory, &request, at)
-                    }
-                }
+                (Some(source), _) => delegate_approval(
+                    &mut judged,
+                    caller,
+                    source,
+                    &weighed,
+                    (operation, body.route, window, answer),
+                    at,
+                ),
                 (None, IdentityId::Person(holder)) => judged.grants.issue_root(
                     judged.directory,
                     &RootRequest {
@@ -317,4 +306,31 @@ pub(crate) async fn decline(
             )?))
         })
     })
+}
+
+fn delegate_approval(
+    judged: &mut Judged<'_>,
+    caller: IdentityId,
+    source: GrantId,
+    weighed: &Weighed,
+    (operation, route, window, answer): (OperationId, RouteWire, Window, Answer),
+    at: u64,
+) -> Result<lys_identity::grants::Recorded, lys_identity::grants::GrantError> {
+    let request = DelegateRequest {
+        operation,
+        caller,
+        route: route.into(),
+        source,
+        recipient: weighed.seeker,
+        responsible: weighed.responsible,
+        resource: weighed.resource.clone(),
+        relation: weighed.relation.clone(),
+        pass_on: PassOn::UseOnly,
+        window,
+    };
+    if answer == Answer::Once {
+        judged.grants.delegate_once(judged.directory, &request, at)
+    } else {
+        judged.grants.delegate(judged.directory, &request, at)
+    }
 }

@@ -88,63 +88,13 @@ pub(crate) fn for_judged(
 ) -> Result<Vec<CanGrant>, ServerError> {
     let caller = IdentityId::Agent(agent);
     let root = IdentityId::Person(judged.root);
-    let mut chain = Vec::new();
-    let mut seen = BTreeSet::from([caller]);
-    let mut cursor = caller;
-    while cursor != root {
-        let record =
-            judged
-                .directory
-                .record(cursor)
-                .ok_or_else(|| IdentityError::IdentityUnknown {
-                    identity: cursor.to_string(),
-                })?;
-        let Some(parent) = record.reports_to() else {
-            if matches!(cursor, IdentityId::Person(_)) {
-                break;
-            }
-            return Err(IdentityError::NoAccountablePerson {
-                chain: seen.iter().map(ToString::to_string).collect(),
-            }
-            .into());
-        };
-        if !seen.insert(parent) {
-            return Err(IdentityError::AnswersToCycle {
-                chain: chain
-                    .iter()
-                    .map(ToString::to_string)
-                    .chain([parent.to_string()])
-                    .collect(),
-            }
-            .into());
-        }
-        chain.push(parent);
-        cursor = parent;
-    }
-
+    let (mut chain, mut seen) = accountability_chain(judged.directory, caller, root)?;
     let book = judged.grants.book();
     let candidates: Vec<_> = book
         .on_resource(resource)
         .map(lys_identity::grants::projection::GrantRecord::grant)
         .collect();
-    for grant in &candidates {
-        if grant.holder() == caller {
-            for ancestor in book.lineage(grant.id())?.path.into_iter().skip(1) {
-                let holder = book
-                    .grant(ancestor)
-                    .ok_or_else(|| lys_identity::grants::GrantError::GrantUnknown {
-                        grant: ancestor.to_string(),
-                    })?
-                    .holder();
-                if seen.insert(holder) {
-                    chain.push(holder);
-                }
-                if holder == root {
-                    break;
-                }
-            }
-        }
-    }
+    grant_ancestors(book, &candidates, caller, root, &mut chain, &mut seen)?;
     let mut possible = BTreeMap::<_, Vec<_>>::new();
     // A service account or an app's connector is never named as one to ask:
     // neither answers a request; the person each answers to is.
@@ -268,4 +218,73 @@ pub fn refusal<'a>(error: impl Into<AuthorityRefusal<'a>>, holders: &[CanGrant])
         })),
     )
         .into_response()
+}
+
+fn accountability_chain(
+    directory: &lys_identity::projection::Projection,
+    caller: IdentityId,
+    root: IdentityId,
+) -> Result<(Vec<IdentityId>, BTreeSet<IdentityId>), ServerError> {
+    let mut chain = Vec::new();
+    let mut seen = BTreeSet::from([caller]);
+    let mut cursor = caller;
+    while cursor != root {
+        let record = directory
+            .record(cursor)
+            .ok_or_else(|| IdentityError::IdentityUnknown {
+                identity: cursor.to_string(),
+            })?;
+        let Some(parent) = record.reports_to() else {
+            if matches!(cursor, IdentityId::Person(_)) {
+                break;
+            }
+            return Err(IdentityError::NoAccountablePerson {
+                chain: seen.iter().map(ToString::to_string).collect(),
+            }
+            .into());
+        };
+        if !seen.insert(parent) {
+            return Err(IdentityError::AnswersToCycle {
+                chain: chain
+                    .iter()
+                    .map(ToString::to_string)
+                    .chain([parent.to_string()])
+                    .collect(),
+            }
+            .into());
+        }
+        chain.push(parent);
+        cursor = parent;
+    }
+
+    Ok((chain, seen))
+}
+
+fn grant_ancestors(
+    book: &lys_identity::grants::GrantBook,
+    candidates: &[&lys_identity::grants::Grant],
+    caller: IdentityId,
+    root: IdentityId,
+    chain: &mut Vec<IdentityId>,
+    seen: &mut BTreeSet<IdentityId>,
+) -> Result<(), ServerError> {
+    for grant in candidates {
+        if grant.holder() == caller {
+            for ancestor in book.lineage(grant.id())?.path.into_iter().skip(1) {
+                let holder = book
+                    .grant(ancestor)
+                    .ok_or_else(|| lys_identity::grants::GrantError::GrantUnknown {
+                        grant: ancestor.to_string(),
+                    })?
+                    .holder();
+                if seen.insert(holder) {
+                    chain.push(holder);
+                }
+                if holder == root {
+                    break;
+                }
+            }
+        }
+    }
+    Ok(())
 }
