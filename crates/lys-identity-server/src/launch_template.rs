@@ -165,11 +165,34 @@ pub fn from_template(
     }
     lys_home::harness::rendering_launch::render(
         &harness.description.rendering_contract,
-        &harness.program,
+        &launch_command(harness),
         template,
         version.settings.instructions_mode,
     )
     .map_err(|reason| ServerError::LaunchUnrenderable { reason })
+}
+
+/// The command a launch runs: the profile's command as declared, or, for a
+/// profile written when Lys pinned the absolute path of one installed build,
+/// the command that build was found by. The computer resolves the command on
+/// its login PATH at every start, so the copy installed now is the one that
+/// runs, and a program that updated itself since the profile was reviewed
+/// starts instead of being refused.
+#[must_use]
+pub fn launch_command(harness: &lys_home::harness::launch_fields::DeclaredHarness) -> String {
+    if !harness.program.contains('/') {
+        return harness.program.clone();
+    }
+    let file_name = std::path::Path::new(&harness.program)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
+    match harness.description.rendering_contract.as_str() {
+        "claude-code/template-v1" => "claude".to_owned(),
+        "codex/template-v1" if file_name == "cdx" => "cdx".to_owned(),
+        "codex/template-v1" => "codex".to_owned(),
+        _ => harness.program.clone(),
+    }
 }
 
 /// Display the deterministic process inputs before the runner binds locations.
@@ -223,4 +246,58 @@ pub(crate) fn requires_controls(version: &Version) -> bool {
         .session
         .as_ref()
         .is_some_and(|session| session.requires_controls)
+}
+
+#[cfg(test)]
+mod launch_command_tests {
+    use super::launch_command;
+    use lys_home::harness::launch_fields::DeclaredHarness;
+
+    const CLAUDE: &str = include_str!("../../../docs/harness/catalogue/claude-code.json");
+    const CODEX: &str = include_str!("../../../docs/harness/catalogue/codex.json");
+
+    fn declared(contract: &str, program: &str) -> Result<DeclaredHarness, serde_json::Error> {
+        let text = if contract.starts_with("codex") {
+            CODEX
+        } else {
+            CLAUDE
+        };
+        let catalogue: serde_json::Value = serde_json::from_str(text)?;
+        serde_json::from_value(serde_json::json!({
+            "name": "a program", "program": program, "package": "p 1",
+            "description": catalogue["description"],
+        }))
+    }
+
+    #[test]
+    fn a_command_is_launched_as_declared_and_a_pinned_path_by_its_command()
+    -> Result<(), serde_json::Error> {
+        assert_eq!(
+            launch_command(&declared("claude-code/template-v1", "claude")?),
+            "claude"
+        );
+        assert_eq!(
+            launch_command(&declared("codex/template-v1", "cdx")?),
+            "cdx"
+        );
+        assert_eq!(
+            launch_command(&declared(
+                "claude-code/template-v1",
+                "/Users/tom/.local/share/claude/versions/2.1.288"
+            )?),
+            "claude"
+        );
+        assert_eq!(
+            launch_command(&declared("codex/template-v1", "/Users/tom/.local/bin/cdx")?),
+            "cdx"
+        );
+        assert_eq!(
+            launch_command(&declared(
+                "codex/template-v1",
+                "/u/lib/node_modules/@openai/codex/bin/codex.js"
+            )?),
+            "codex"
+        );
+        Ok(())
+    }
 }

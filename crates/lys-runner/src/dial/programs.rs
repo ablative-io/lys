@@ -13,7 +13,8 @@ use crate::RunnerError;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HarnessProgram {
-    /// The executable's absolute path on this computer.
+    /// The command as the login PATH names it (`claude`, `codex`, `cdx`), so a
+    /// launch always runs the copy installed at that moment, updates included.
     pub program: String,
     /// The version its own version command reported.
     pub version: String,
@@ -68,6 +69,7 @@ pub fn discover() -> Result<Programs, RunnerError> {
 /// Returns an unreadable filesystem entry or a failed executable resolution.
 pub fn discover_in(path: &OsStr) -> Result<Programs, RunnerError> {
     let mut programs = Vec::<HarnessProgram>::new();
+    let mut resolved = Vec::<std::path::PathBuf>::new();
     let mut reasons = Vec::new();
     for (command, adapter) in [
         ("claude", "claude-stream-json/1"),
@@ -97,13 +99,11 @@ pub fn discover_in(path: &OsStr) -> Result<Programs, RunnerError> {
         let Some(selected) = selected else {
             continue;
         };
-        let program = selected
-            .to_str()
-            .ok_or_else(|| failed("a harness path is not UTF-8"))?
-            .to_owned();
-        if programs.iter().any(|held| held.program == program) {
+        if resolved.contains(&selected) {
             continue;
         }
+        resolved.push(selected.clone());
+        let program = command.to_owned();
         let output = Command::new(&selected)
             .arg("--version")
             .env("PATH", path)
@@ -141,7 +141,7 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
-    fn programmes_answer_absolute_paths_versions_and_adapters_from_the_chosen_path()
+    fn programmes_answer_commands_versions_and_adapters_from_the_chosen_path()
     -> Result<(), Box<dyn std::error::Error>> {
         let dir = tempfile::tempdir()?;
         for (command, report) in [
@@ -154,10 +154,8 @@ mod tests {
         }
         let answer = discover_in(dir.path().as_os_str())?;
         assert_eq!(answer.programs.len(), 2);
-        assert_eq!(
-            answer.programs[0].program,
-            dir.path().join("claude").canonicalize()?.to_string_lossy()
-        );
+        assert_eq!(answer.programs[0].program, "claude");
+        assert_eq!(answer.programs[1].program, "codex");
         assert_eq!(answer.programs[0].version, "2.1.300");
         assert_eq!(answer.programs[0].adapter, "claude-stream-json/1");
         assert_eq!(answer.programs[1].version, "0.161.0-alpha.3");

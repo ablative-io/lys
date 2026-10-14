@@ -71,7 +71,8 @@ pub enum BuildSource {
 pub struct BuildView {
     /// The name given to this build.
     pub name: String,
-    /// Its absolute programme path.
+    /// The command the machine resolves on its login PATH at every start
+    /// (`claude`, `codex`, `cdx`), so an update never strands an agent.
     pub program: String,
     /// Its package or build identity.
     pub package: String,

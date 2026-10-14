@@ -32,8 +32,8 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
                     Answer::refusal(&lys_runner::RunnerError::refused("harness_programs_unreadable", "the chosen programme version report is not UTF-8"))
                 } else if act == Act::Programs {
                     Answer::Programs { found: lys_runner::dial::programs::Programs { programs: vec![
-                        lys_runner::dial::programs::HarnessProgram { program: "/chosen/bin/claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
-                        lys_runner::dial::programs::HarnessProgram { program: "/chosen/bin/codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
+                        lys_runner::dial::programs::HarnessProgram { program: "claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
+                        lys_runner::dial::programs::HarnessProgram { program: "codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
                     ], reason: None } }
                 } else { Answer::refusal(&lys_runner::RunnerError::refused("fixture_standing_unavailable", "this fixture answers programme discovery only")) };
                 stream.get_mut().write_all(format!("{}\n", lys_runner::protocol::reply_line(answer)).as_bytes()).await?;
@@ -58,7 +58,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     assert!(builds.iter().all(|build| {
         build["program"]
             .as_str()
-            .is_some_and(|path| path.starts_with("/chosen/bin/"))
+            .is_some_and(|command| command == "claude" || command == "codex")
     }));
     assert!(builds.iter().any(|build| {
         build["package"]
@@ -70,14 +70,17 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     ))?;
     let agent = seeded.people[0].agents[0].id.to_string();
     let mut body = json!({"operation":lys_identity::OperationId::generate()?.to_string(),"from_version":0,"model_access":["default"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"", "runs_on":machine,
-        "harness":{"name":"Claude Code", "program":"/chosen/bin/missing", "package":"claude 2.1.300", "description":description["description"]}});
+        "harness":{"name":"Claude Code", "program":"missing", "package":"claude 2.1.300", "description":description["description"]}});
     let route = format!("/agents/{agent}/provisioning");
     let (status, refusal) = service.post(&route, Some(&cookie), &body).await?;
     assert_eq!(status, 409);
     assert_eq!(refusal["refusal"], "harness_program_unknown");
-    assert!(refusal["reason"].as_str().is_some_and(
-        |words| words.contains("/chosen/bin/claude") && words.contains("/chosen/bin/codex")
-    ));
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("claude version 2.1.300")
+                && words.contains("codex version 0.161.0-alpha.3"))
+    );
     body["harness"]["program"] = json!("/chosen/bin/claude");
     body["model_access"] = json!([description["models"][0]["id"]]);
     unreadable.send(true)?;

@@ -65,6 +65,21 @@ fn file(path: &str, text: String) -> File {
     }
 }
 
+/// A program is either a bare command the running computer resolves on its
+/// login PATH at every start (`claude`, `codex`, `cdx`), or an absolute path.
+/// A relative path and control characters are refused.
+#[must_use]
+pub fn command_or_absolute_path(program: &str) -> bool {
+    if program.starts_with('/') {
+        return !program.chars().any(char::is_control);
+    }
+    !program.is_empty()
+        && !program.contains('/')
+        && !program
+            .chars()
+            .any(|c| c.is_control() || c.is_whitespace() || c == '=')
+}
+
 /// Rebuild a fresh launch without inspecting any machine settings.
 ///
 /// # Errors
@@ -81,8 +96,10 @@ pub fn render(
     if !matches!(contract, "claude-code/template-v1" | "codex/template-v1") {
         return Err(format!("unknown rendering contract `{contract}`"));
     }
-    if !program.starts_with('/') || program.chars().any(char::is_control) {
-        return Err("the declared program is not an absolute plain path".to_owned());
+    if !command_or_absolute_path(program) {
+        return Err(
+            "the declared program is not a plain command name or an absolute plain path".to_owned(),
+        );
     }
     if contract == "codex/template-v1" {
         return super::codex::launch::render(program, text, instructions_mode);

@@ -24,12 +24,12 @@ function refusalOf(error: unknown): StartRefusal {
 
 interface MachineCatalogue {
   machine: string;
-  programs: { builds: { program: string; from: string }[]; not_found?: string }[];
+  programs: { name: string; builds: { program: string; from: string }[]; not_found?: string }[];
 }
 
-/** An installed copy must be evidence from the computer the person chose. */
+/** The computer the person chose must report an installed copy of the program by name; which copy runs is resolved there at every start, so an update never strands the agent. */
 export async function readMachineHarness(
-  computer: string, program: string,
+  computer: string, harness: { name: string; program: string },
   read: (path: string) => Promise<MachineCatalogue> = request,
 ): Promise<StartRefusal | null> {
   const catalogue = await read('/harnesses?machine=' + encodeURIComponent(computer));
@@ -37,13 +37,13 @@ export async function readMachineHarness(
     refusal: 'harness_catalogue_wrong_machine',
     reason: 'The harness catalogue did not name the chosen computer ' + computer + '.',
   };
-  if (catalogue.programs.some((choice) => choice.builds.some((copy) =>
-    copy.program === program && (copy.from === 'installed' || copy.from === 'runner'),
+  if (catalogue.programs.some((choice) => choice.name === harness.name && choice.builds.some((copy) =>
+    copy.from === 'installed' || copy.from === 'runner',
   ))) return null;
   const reasons = catalogue.programs.flatMap((choice) => choice.not_found ? [choice.not_found] : []);
   return {
     refusal: 'harness_absent_on_machine',
-    reason: 'Computer ' + computer + ' does not have the program ' + program + '.'
+    reason: 'Computer ' + computer + ' does not have ' + harness.name + ' installed.'
       + (reasons.length ? ' ' + reasons.join('; ') : ''),
   };
 }
@@ -69,10 +69,10 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     const allowed = allowedToRun(network.machines, roles.roles, agent);
     const saved = allowed.find((machine) => machine.id === provisioning.profile?.runs_on);
     const choices = saved ? [saved] : allowed;
-    const program = provisioning.profile?.harness?.program;
-    const availability: Record<string, StartRefusal | null> = program ? Object.fromEntries(
+    const harness = provisioning.profile?.harness;
+    const availability: Record<string, StartRefusal | null> = harness ? Object.fromEntries(
       await Promise.all(choices.map(async (computer) => {
-        try { return [computer.id, await readMachineHarness(computer.id, program)]; }
+        try { return [computer.id, await readMachineHarness(computer.id, harness)]; }
         catch (error) { return [computer.id, refusalOf(error)]; }
       })),
     ) : {};
@@ -111,7 +111,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       // A request this tab already sent and never saw answered is sent again, the same one, before anything new.
       const raw = sessionStorage.getItem(key);
       if (raw === null && profile.harness) {
-        const unavailable = await readMachineHarness(computer, profile.harness.program);
+        const unavailable = await readMachineHarness(computer, profile.harness);
         if (unavailable) { setRefusal(unavailable); return; }
       }
       let current: Pending = raw === null
@@ -126,9 +126,9 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
           return;
         }
         const confirmed = await sendKept(key, sent, () => profileRequest(agent, sent), true);
-        const program = confirmed.profile.harness?.program;
-        if (!program) throw new Error('HarnessUnnamed: The approved settings name no program.');
-        const unavailable = await readMachineHarness(current.machine, program);
+        const harness = confirmed.profile.harness;
+        if (!harness?.program) throw new Error('HarnessUnnamed: The approved settings name no program.');
+        const unavailable = await readMachineHarness(current.machine, harness);
         if (unavailable) { setRefusal(unavailable); return; }
         current = current.stage === 'profile' && !confirmed.profile.reviewed_by ? review(confirmed.version, current.machine) : start(confirmed.version, current.machine);
       }
