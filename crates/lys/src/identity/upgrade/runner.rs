@@ -1,4 +1,4 @@
-//! The runner is stopped only after its live sessions have been ruled out.
+//! The runner is stopped only after every live launch has been retained.
 //! A replacement is ready only when its own process holds the exit lock,
 //! has said it listens and answers with Status. The model proxy runs from
 //! the same `lys` and moves with it: stopped after the runner, before
@@ -22,6 +22,9 @@ use super::super::install::ports::Ports;
 use super::super::install::{login, proxy, services};
 use super::super::private_files;
 use super::{Ready, Unit};
+
+#[path = "runner_saving.rs"]
+mod saving;
 
 fn refuse(name: &str, detail: impl std::fmt::Display, path: &Path) -> IdentityError {
     IdentityError::new(
@@ -72,6 +75,8 @@ pub struct Restart {
     pub proxy: Unit,
     proxy_url: String,
     client: Client,
+    key: Arc<Ed25519Identity>,
+    saved_path: std::path::PathBuf,
     socket: std::path::PathBuf,
     exit: ExitWatch,
     pid: u32,
@@ -107,7 +112,7 @@ impl Restart {
         let pid_file = layout.run_dir().join("runner.pid");
         let down = down_allowed && ExitWatch::open(&pid_file)?.exited()?;
         if !down {
-            Self::empty(&client, &socket)?;
+            status(&client, &socket)?;
         }
         let public = layout.run_dir().join("runner-server.pub");
         let bytes = std::fs::read_to_string(&public)
@@ -153,29 +158,14 @@ impl Restart {
                 },
             },
             client,
+            key,
+            saved_path: layout.run_dir().join("upgrade-sessions.json"),
             socket,
             exit,
             pid,
             child: None,
             recorded: true,
         })
-    }
-
-    fn empty(client: &Client, socket: &Path) -> IdentityResult<()> {
-        let live: Vec<_> = status(client, socket)?
-            .sessions
-            .into_iter()
-            .filter(|session| session.ended.is_none())
-            .map(|session| session.session)
-            .collect();
-        if live.is_empty() {
-            return Ok(());
-        }
-        Err(refuse(
-            "runner_sessions_live",
-            format!("end these sessions before upgrading: {}", live.join(", ")),
-            socket,
-        ))
     }
 
     /// Stops the captured process, after checking Status again if it lives.
@@ -189,7 +179,7 @@ impl Restart {
             ));
         }
         if !self.exit.exited()? {
-            Self::empty(&self.client, &self.socket)?;
+            self.retain()?;
             let result = Command::new("kill")
                 .arg(self.pid.to_string())
                 .stdin(Stdio::null())
@@ -332,12 +322,12 @@ impl Restart {
         // names it gets it, and a lys that cannot serve it is refused by name.
         if !configured_proxy {
             say("the service's configuration names no model proxy; none started");
-            return Ok(());
+            return self.resume_saved(say);
         }
         proxy::configure(layout, login::login()?, say)?;
         super::launch(layout, &self.proxy, true)?;
         say(&format!("model proxy {word} on {}", self.proxy_url));
-        Ok(())
+        self.resume_saved(say)
     }
 
     fn named_output(&self, from: u64) -> IdentityResult<String> {

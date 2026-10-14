@@ -28,7 +28,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex, Weak, mpsc};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::MasterPty;
 
@@ -86,14 +85,8 @@ pub use stop::{Ask, StoppedEverything};
 /// The runner's own name, as `status` answers it.
 pub const RUNNER: &str = "lys-runner";
 
-/// Milliseconds since the Unix epoch.
-pub fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_or(0, |elapsed| {
-            u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
-        })
-}
+mod clock;
+pub use clock::now_ms;
 
 /// The live ends of a running process.
 pub(crate) struct Live {
@@ -245,6 +238,7 @@ pub(crate) struct Table {
 
 /// The sessions a runner holds, and what wakes those waiting on them.
 pub struct Sessions {
+    upgrading: std::sync::atomic::AtomicBool,
     table: Mutex<Table>,
     changed: Condvar,
     state: StateFile,
@@ -414,6 +408,7 @@ impl Sessions {
         let sessions = Arc::new_cyclic(|owner| {
             table.owner = Weak::clone(owner);
             Self {
+                upgrading: std::sync::atomic::AtomicBool::new(false),
                 table: Mutex::new(table),
                 changed: Condvar::new(),
                 state,
@@ -499,3 +494,6 @@ pub(crate) mod control_history {
         pub(crate) static READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
     }
 }
+
+/// Retained launches for a controlled runner replacement.
+pub mod upgrade;

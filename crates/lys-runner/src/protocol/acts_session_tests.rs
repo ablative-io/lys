@@ -40,3 +40,10 @@ fn an_act_about_a_session_names_it_and_any_other_names_none() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn an_upgrade_can_capture_running_launches_before_stopping_the_runner() -> TestResult {
+    let request = act(&serde_json::json!({"act": "upgrade_sessions"}))?;
+    assert_eq!(request.session(), None);
+    Ok(())
+}

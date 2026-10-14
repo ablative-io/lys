@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-//! Runner upgrades preserve sessions by refusing while any remain live.
+//! Runner upgrades retain launches and resume them after replacement.
 
 use std::collections::BTreeMap;
 use std::io::{BufRead, BufReader, Write};
@@ -130,7 +130,7 @@ impl Running {
         Ok(Command::new(std::env::current_exe()?)
             .args([
                 "--exact",
-                "identity::upgrade::tests::runner::upgrade_command_child",
+                "identity::upgrade::tests::runner::recovery::upgrade_command_child",
                 "--nocapture",
             ])
             .env("LYS_UPGRADE_TEST_ROOT", &self.scratch.layout.root)
@@ -299,72 +299,8 @@ fn runner_start_refusal_is_nonzero_named_and_never_reported_started() -> TestRes
     Ok(())
 }
 
-#[test]
-fn an_upgrade_refuses_live_sessions_and_later_restarts_without_losing_keys() -> TestResult {
-    let running = Running::new()?;
-    let new = running.new_build(false)?;
-    let keys = running.keys()?;
-    for session in ["held-one", "held-two"] {
-        let launch = Launch {
-            session: session.into(),
-            program: "/bin/cat".into(),
-            arguments: vec![],
-            directory: running.scratch.work().display().to_string(),
-            environment: BTreeMap::new(),
-            config: None,
-            columns: 80,
-            rows: 24,
-            rotation: None,
-            policy: None,
-        };
-        assert!(matches!(
-            running.client().ask(&Act::Start {
-                tracking: None,
-                lys_mcp: None,
-                proxy: None,
-                launch: Box::new(launch)
-            })?,
-            Answer::Started { .. }
-        ));
-    }
-    let before = running.unchanged()?;
-    let pid = std::fs::read(running.pid())?;
-    let mut said = Vec::new();
-    let error = running
-        .upgrade(&new, &mut said)
-        .err()
-        .ok_or("a live runner was upgraded")?;
-    let named = error.to_string();
-    assert!(named.contains("runner_sessions_live"), "{named}");
-    for session in ["held-one", "held-two"] {
-        assert!(named.contains(session), "{named}");
-    }
-    assert_eq!(running.unchanged()?, before);
-    assert!(said.is_empty(), "{said:?}");
-    let Answer::Status { status } = running.client().ask(&Act::Status { session: None })? else {
-        return Err("the old runner stopped answering Status".into());
-    };
-    assert_eq!(status.sessions.len(), 2);
-    assert!(
-        status
-            .sessions
-            .iter()
-            .all(|session| session.ended.is_none())
-    );
-    for session in ["held-one", "held-two"] {
-        assert!(matches!(
-            running.client().ask(&Act::End {
-                session: session.into()
-            })?,
-            Answer::Ended { .. }
-        ));
-    }
-    running.upgrade(&new, &mut Vec::new())?;
-    assert_ne!(std::fs::read(running.pid())?, pid);
-    assert_eq!(running.keys()?, keys);
-    assert_eq!(version(&running.scratch.layout.binary("lys"), "lys")?, B);
-    Ok(())
-}
+#[path = "runner_resume_tests.rs"]
+mod resume;
 
 #[test]
 fn unreadable_status_refuses_before_changing_any_file_or_process() -> TestResult {
@@ -425,162 +361,5 @@ fn status_reply(
     }))
 }
 
-#[test]
-fn upgrade_command_child() -> TestResult {
-    let Some(root) = std::env::var_os("LYS_UPGRADE_TEST_ROOT") else {
-        return Ok(());
-    };
-    let from = PathBuf::from(std::env::var_os("LYS_UPGRADE_TEST_FROM").ok_or("missing build")?);
-    let file = std::env::var_os("LYS_UPGRADE_TEST_UNITS").ok_or("missing units")?;
-    let fixture: Vec<FixtureUnit> = serde_json::from_slice(&std::fs::read(file)?)?;
-    let units = fixture
-        .into_iter()
-        .map(|unit| {
-            let binary = BINARIES
-                .into_iter()
-                .find(|name| *name == unit.binary)
-                .ok_or("unknown unit")?;
-            Ok(Unit {
-                binary,
-                args: unit.args,
-                log: unit.log,
-                pid: unit.pid,
-                ready: Ready {
-                    says: "ready".into(),
-                    answers: None,
-                },
-            })
-        })
-        .collect::<TestResult<Vec<_>>>()?;
-    let program = from.join("lys");
-    let mut parts = Parts {
-        runner: Some(&program),
-        units: &units,
-        engine: &mut Recorder::default(),
-        render: &Fixed,
-    };
-    let result = upgrade(
-        &Layout::at(PathBuf::from(root)),
-        &from,
-        None,
-        &mut parts,
-        &mut |line| println!("{line}"),
-    )
-    .map_err(CliError::from);
-    match result {
-        Ok(_) => std::process::exit(0),
-        Err(error) => {
-            eprintln!("error: {error}");
-            std::process::exit(1);
-        }
-    }
-}
-
-#[test]
-fn recovery_after_lys_is_placed_restores_the_runner_starts_a_stopped_one_or_refuses_live_sessions()
--> TestResult {
-    use super::super::intent::{Intent, Step};
-    use super::super::{launch, swap};
-
-    for state in ["empty", "live", "down"] {
-        let running = Running::new()?;
-        let new = running.new_build(false)?;
-        let layout = &running.scratch.layout;
-        let keys = running.keys()?;
-        services::stop(&running.pid())?;
-        swap::stop_all(&running.scratch.units, &mut |_| {})?;
-        let mut intent = Intent {
-            from: BINARIES
-                .into_iter()
-                .chain(["lys"])
-                .map(|name| (name.into(), A.into()))
-                .collect(),
-            to: BINARIES
-                .into_iter()
-                .chain(["lys"])
-                .map(|name| (name.into(), B.into()))
-                .collect(),
-            screens: false,
-            screens_existed: true,
-            files: Vec::new(),
-            compose_changed: false,
-            steps: vec![Step::Stopped],
-        };
-        intent.write(layout)?;
-        swap::keep_binaries(layout, &mut intent)?;
-        swap::place_binaries(
-            layout,
-            &new,
-            &[BINARIES[0], BINARIES[1], "lys"],
-            &mut intent,
-        )?;
-        for unit in &running.scratch.units {
-            launch(layout, unit, false)?;
-        }
-        if state != "down" {
-            install::start_runner(layout, &running.key, &layout.binary("lys"), &mut |_| {})?;
-        }
-        if state == "live" {
-            let launch = Launch {
-                session: "recovery-held".into(),
-                program: "/bin/cat".into(),
-                arguments: vec![],
-                directory: running.scratch.work().display().to_string(),
-                environment: BTreeMap::new(),
-                config: None,
-                columns: 80,
-                rows: 24,
-                rotation: None,
-                policy: None,
-            };
-            assert!(matches!(
-                running.client().ask(&Act::Start {
-                    tracking: None,
-                    lys_mcp: None,
-                    proxy: None,
-                    launch: Box::new(launch)
-                })?,
-                Answer::Started { .. }
-            ));
-        }
-        let before = running.unchanged()?;
-        let pid = std::fs::read(running.pid())?;
-        let recorded = std::fs::read(layout.upgrade_intent())?;
-        let result = swap::recover(
-            layout,
-            &running.scratch.units,
-            &mut Recorder::default(),
-            &mut |_| {},
-        );
-        if state == "live" {
-            let error = result.err().ok_or("recovery acted on live sessions")?;
-            let named = error.to_string();
-            assert!(named.contains("runner_sessions_live"), "{named}");
-            assert!(named.contains("recovery-held"), "{named}");
-            assert_eq!(running.unchanged()?, before);
-            assert_eq!(std::fs::read(layout.upgrade_intent())?, recorded);
-        } else {
-            result?;
-            assert_eq!(version(&layout.binary("lys"), "lys")?, A);
-            assert_ne!(
-                std::fs::read(running.pid())?,
-                pid,
-                "recovery kept the replacement runner"
-            );
-            assert!(matches!(
-                running.client().ask(&Act::Status { session: None })?,
-                Answer::Status { .. }
-            ));
-            assert!(!layout.upgrade_intent().exists());
-        }
-        assert_eq!(running.keys()?, keys);
-        // Live: the placed replacement (from `new`) is what runs; otherwise
-        // recovery put the previous build back and restarted its runner.
-        if state == "live" {
-            runner_environment_is_the_login(&new)?;
-        } else {
-            runner_environment_is_the_login(&layout.bin_dir())?;
-        }
-    }
-    Ok(())
-}
+#[path = "runner_recovery_tests.rs"]
+mod recovery;

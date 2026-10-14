@@ -44,6 +44,9 @@ pub(super) fn perform(
     context: Option<&crate::legacy_input::InputContext<'_>>,
 ) -> Result<Answer, RunnerError> {
     match act {
+        upgrade @ (Act::UpgradeSessions | Act::CancelUpgrade | Act::ResumeUpgrade { .. }) => {
+            super::upgrade::perform(sessions, upgrade)
+        }
         Act::Programs => Ok(Answer::Programs {
             found: crate::dial::programs::discover()?,
         }),

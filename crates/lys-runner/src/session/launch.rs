@@ -41,7 +41,7 @@ impl Sessions {
             .map(RotationState::new)
             .transpose()?;
         let mut table = self.lock()?;
-        if table.stopping {
+        if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
             return Err(RunnerError::refused(
                 "runner_stopping",
                 "the runner is stopping and starts nothing",
@@ -156,7 +156,7 @@ impl Sessions {
                 return Err(error);
             }
         };
-        if table.stopping {
+        if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
             drop(table);
             pending.cancel()?;
             return Err(RunnerError::refused(

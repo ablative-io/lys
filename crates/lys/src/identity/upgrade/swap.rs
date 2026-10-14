@@ -318,6 +318,8 @@ pub fn forward(
     say: &mut dyn FnMut(&str),
 ) -> Result<(), String> {
     if let Some(restart) = restart.as_deref_mut() {
+        restart.retain().map_err(|error| error.to_string())?;
+        stop_all(units, say).map_err(|error| error.to_string())?;
         restart.stop(say).map_err(|error| error.to_string())?;
     }
     swap_in(layout, plan, intent, units, engine, say).map_err(|error| error.to_string())?;

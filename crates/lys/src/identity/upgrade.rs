@@ -38,9 +38,6 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use serde::Serialize;
-use sha2::{Digest, Sha256};
-
 use super::config::DeploymentConfig;
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::install::layout::{BINARIES, Layout};
@@ -48,33 +45,22 @@ use super::install::log_wait::{self, LogCursor};
 use super::install::ports::Ports;
 use super::install::{self, login, services, surface};
 use super::private_files;
-use crate::commands::output::Emitter;
 
 pub mod adopt;
+mod command;
+#[cfg(test)]
+use command::ClientRender;
 pub mod data_kept;
 pub mod intent;
+mod record;
 pub mod render;
 mod runner;
 pub mod swap;
+pub use command::{Options, run};
+pub use record::{BuildRecord, SurfaceBuild, record_build};
 
 use intent::Intent;
 use render::Render;
-
-/// What the operator chose.
-#[derive(Debug)]
-pub struct Options {
-    /// Built client pairs grouped by Rust target.
-    pub clients: Option<PathBuf>,
-    /// The folder holding the newly built binaries.
-    pub from: PathBuf,
-    /// A compiled screens package to verify and place.
-    pub surface: Option<PathBuf>,
-    /// The data root; the platform's application data path when absent.
-    pub root: Option<PathBuf>,
-    /// A JSON file holding the message service connection to write in
-    /// place of the one the install carries.
-    pub message_service: Option<PathBuf>,
-}
 
 /// How a started process is known to be ready: its log gains `says` after
 /// it starts, and then, when `answers` names a loopback port and path, that
@@ -179,6 +165,13 @@ pub struct Parts<'a> {
     pub render: &'a dyn Render,
 }
 
+/// Read deployment configuration and verify the installed issuer authority.
+pub(super) fn verified_config(layout: &Layout) -> IdentityResult<DeploymentConfig> {
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+    install::directory_key::verify(&config)?;
+    Ok(config)
+}
+
 fn refuse(
     kind: ErrorKind,
     action: &'static str,
@@ -254,100 +247,6 @@ pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
         .filter(|commit| !commit.is_empty())
         .map(str::to_string)
         .ok_or_else(|| unreadable(format!("`{line}` is not `{name} VERSION (COMMIT)`")))
-}
-
-/// The build an install is running, as `install/build.json` records it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct BuildRecord {
-    /// Downloadable client releases, also kept by the configuration rollback.
-    pub clients: BTreeMap<String, install::layout::ClientRelease>,
-    /// Each binary in `bin/` by name, with the commit its `--version` names
-    /// or [`adopt::UNSTAMPED`].
-    pub binaries: BTreeMap<String, String>,
-    /// The placed screens, when there are any.
-    pub surface: Option<SurfaceBuild>,
-    /// The environment the services were started with: the names kept
-    /// from the login and the login shell's `PATH`.
-    pub environment: login::EnvironmentRecord,
-    /// The settings the service configuration runs with (ACCESS-002 R2).
-    pub settings: install::settings::RecordedSettings,
-    /// This install's runner key and its recorded join, when it has joined.
-    pub runner_machine: install::layout::runner_machine::Recorded,
-}
-
-/// The placed screens package.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct SurfaceBuild {
-    /// The commit the manifest names.
-    pub commit: String,
-    /// The SHA-256 of the placed manifest, lowercase hex.
-    pub manifest_sha256: String,
-}
-
-/// Reads what `bin/` and the placed screens are, writes it to
-/// `install/build.json` and says it.
-pub fn record_build(
-    layout: &Layout,
-    names: &[&str],
-    say: &mut dyn FnMut(&str),
-) -> IdentityResult<BuildRecord> {
-    let mut binaries = BTreeMap::new();
-    for name in names {
-        let commit = adopt::commit_or_unstamped(&layout.binary(name), name)?;
-        say(&format!("build {name} {commit}"));
-        binaries.insert((*name).to_string(), commit);
-    }
-    let manifest_path = layout.surface_dir().join(surface::MANIFEST);
-    let surface = match std::fs::read(&manifest_path) {
-        Ok(bytes) => {
-            let manifest: surface::Manifest = serde_json::from_slice(&bytes).map_err(|error| {
-                refuse(
-                    ErrorKind::ConfigInvalid,
-                    "read screens",
-                    "surface",
-                    error.to_string(),
-                )
-                .at(&manifest_path)
-            })?;
-            let digest = format!("{:x}", Sha256::digest(&bytes));
-            say(&format!(
-                "build screens {} manifest sha256 {digest}",
-                manifest.commit
-            ));
-            Some(SurfaceBuild {
-                commit: manifest.commit,
-                manifest_sha256: digest,
-            })
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-        Err(error) => return Err(io("read screens", &manifest_path, &error)),
-    };
-    let environment = login::login()?.record();
-    say(&format!(
-        "build environment keeps {} and PATH={}",
-        environment.kept.join(","),
-        environment.path
-    ));
-    let settings = install::settings::recorded(layout)?;
-    let record = BuildRecord {
-        clients: install::layout::client_releases(layout)?,
-        binaries,
-        surface,
-        environment,
-        settings,
-        runner_machine: install::layout::runner_machine::recorded(layout, say)?,
-    };
-    let text = serde_json::to_vec_pretty(&record).map_err(|error| {
-        refuse(
-            ErrorKind::RenderFailed,
-            "render",
-            "build.json",
-            error.to_string(),
-        )
-    })?;
-    private_files::ensure_dir(&layout.install_dir())?;
-    install::layout::runner_machine::write_build_record(layout, &text, say)?;
-    Ok(record)
 }
 
 /// Refuses by name unless `layout` holds an install.
@@ -452,7 +351,15 @@ pub fn upgrade(
         compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
         steps: Vec::new(),
     };
-    intent.write(layout)?;
+    if let Some(restart) = &restart {
+        restart.retain()?;
+    }
+    if let Err(error) = intent.write(layout) {
+        if let Some(restart) = &restart {
+            restart.cancel()?;
+        }
+        return Err(error);
+    }
     let plan = swap::Plan {
         from,
         names: &names,
@@ -501,108 +408,6 @@ pub fn upgrade(
         "install",
         format!("{failure}; the previous build is back and running"),
     ))
-}
-
-/// Reads deployment configuration and verifies the live issuer authority.
-pub(super) fn verified_config(layout: &Layout) -> IdentityResult<DeploymentConfig> {
-    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
-    install::directory_key::verify(&config)?;
-    Ok(config)
-}
-
-/// Runs `lys identity upgrade` after checking the live issuer authority.
-pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
-    let client_program = options.from.join("lys");
-    let clients = install::layout::prepare_clients(
-        options.clients.as_deref(),
-        &options.from,
-        &version(&client_program, "lys")?,
-    )?;
-    let layout = match &options.root {
-        Some(root) => Layout::at(root.clone()),
-        None => Layout::discover()?,
-    };
-    let mut emitter = Emitter::new(json);
-    emitter.field("root", "root", layout.root.display().to_string());
-    let units = units(&layout)?;
-    require_install(&layout)?;
-    let config = verified_config(&layout)?;
-    install::server_keys(&layout, &config)?;
-    let templates = render::Templates {
-        messages: options
-            .message_service
-            .as_deref()
-            .map(install::server_config::messages_from)
-            .transpose()?,
-    };
-    if templates.messages.is_some() {
-        emitter.note("message service connection from the given file");
-    }
-    let runner = options.from.join("lys");
-    let mut parts = Parts {
-        runner: Some(&runner),
-        units: &units,
-        engine: &mut Compose,
-        render: &ClientRender {
-            base: &templates,
-            clients: &clients,
-        },
-    };
-    clients.place(&layout)?;
-    let record = upgrade(
-        &layout,
-        &options.from,
-        options.surface.as_deref(),
-        &mut parts,
-        &mut |line| {
-            if !json {
-                println!("{line}");
-            }
-        },
-    )?;
-    let value = serde_json::to_value(&record).map_err(|error| {
-        refuse(
-            ErrorKind::RenderFailed,
-            "render",
-            "build.json",
-            error.to_string(),
-        )
-    })?;
-    if json {
-        emitter.field("build", "build", value);
-    }
-    let placed = install::server_config::carried(&layout)?;
-    let membership = placed
-        .as_ref()
-        .and_then(|carried| carried.membership.as_ref());
-    emitter.note(&install::server_config::membership_readback(membership));
-    let rights_bytes = placed
-        .as_ref()
-        .and_then(|carried| carried.rights_bytes.as_ref());
-    emitter.note(&install::server_config::provider_readback(
-        rights_bytes,
-        &layout.logs_dir().join("identity.log"),
-    )?);
-    emitter.finish();
-    Ok(())
-}
-
-struct ClientRender<'a> {
-    base: &'a dyn Render,
-    clients: &'a install::layout::ClientSet,
-}
-
-impl Render for ClientRender<'_> {
-    fn render(
-        &self,
-        layout: &Layout,
-        build: &BTreeMap<String, String>,
-        screens: bool,
-    ) -> IdentityResult<Vec<render::RenderedFile>> {
-        let mut files = self.base.render(layout, build, screens)?;
-        files.push(self.clients.manifest(layout)?);
-        Ok(files)
-    }
 }
 
 #[cfg(test)]

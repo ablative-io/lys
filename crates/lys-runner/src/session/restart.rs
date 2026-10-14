@@ -25,7 +25,7 @@ impl Sessions {
         }
         let (outcome, fresh) = {
             let mut table = self.lock()?;
-            if table.stopping {
+            if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
                 return Err(RunnerError::refused(
                     "runner_stopping",
                     "the runner is stopping and restarts nothing",
@@ -71,7 +71,7 @@ impl Sessions {
 
     fn relaunch(self: &Arc<Self>, id: &str) -> Result<(), RunnerError> {
         let mut table = self.lock()?;
-        if table.stopping {
+        if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
             return Err(RunnerError::refused(
                 "runner_stopping",
                 "the runner stopped before the session could restart",

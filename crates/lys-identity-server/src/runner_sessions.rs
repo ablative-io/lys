@@ -337,6 +337,8 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::Owner { .. } => "owner",
         Answer::Owned { .. } => "owned",
         Answer::Plugins { .. } => "plugins",
+        Answer::UpgradeSessions { .. } => "upgrade_sessions",
+        Answer::UpgradeCancelled => "upgrade_cancelled",
     }
 }
 
