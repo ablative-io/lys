@@ -152,11 +152,30 @@ fn an_unreviewed_codex_can_start_fresh_with_a_named_status_note_but_cannot_resum
     let fixture = Fixture::new()?;
     fixture.script("printf 'codex-cli 0.36.0\\n'")?;
     assert_eq!(
-        super::fresh_note(&fixture.launch)?,
+        super::fresh_note(&fixture.launch),
         Some("resume not proven for codex 0.36.0, started fresh".to_owned())
     );
     assert_eq!(
         prove(&fixture.launch).unwrap_err().name(),
+        "pty_resume_unsupported"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_codex_command_with_no_version_report_starts_fresh_with_the_probe_failure_named() -> TestResult
+{
+    let fixture = Fixture::new()?;
+    fixture.script("printf 'no version\\n'")?;
+    let note = super::fresh_note(&fixture.launch).ok_or("no fresh-start note")?;
+    assert!(note.contains("version unavailable"));
+    assert!(note.contains("no semantic version"));
+    assert!(note.ends_with("started fresh"));
+    assert_eq!(
+        prove(&fixture.launch)
+            .err()
+            .ok_or("unknown command resumed")?
+            .name(),
         "pty_resume_unsupported"
     );
     Ok(())

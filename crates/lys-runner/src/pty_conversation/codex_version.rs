@@ -48,10 +48,16 @@ fn reviewed(version: &str) -> bool {
     matches!(version, "0.161.0-alpha.3" | "0.161.0-channels.6")
 }
 
-pub(super) fn fresh_note(launch: &Launch) -> Result<Option<String>, RunnerError> {
-    let version = reported(launch)?;
-    Ok((!reviewed(&version))
-        .then(|| format!("resume not proven for codex {version}, started fresh")))
+pub(super) fn fresh_note(launch: &Launch) -> Option<String> {
+    let version = match reported(launch) {
+        Ok(version) => version,
+        Err(error) => {
+            return Some(format!(
+                "resume not proven for codex (version unavailable: {error}), started fresh"
+            ));
+        }
+    };
+    (!reviewed(&version)).then(|| format!("resume not proven for codex {version}, started fresh"))
 }
 
 pub(super) fn prove(launch: &Launch) -> Result<(), RunnerError> {

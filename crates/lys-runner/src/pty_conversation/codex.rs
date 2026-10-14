@@ -220,7 +220,7 @@ pub(super) fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
         Err(error) => return Err(error),
     }
     if requested(&launch.arguments)?.is_none()
-        && let Some(note) = version::fresh_note(launch)?
+        && let Some(note) = version::fresh_note(launch)
     {
         let note = launch
             .environment
