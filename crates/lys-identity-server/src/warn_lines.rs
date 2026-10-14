@@ -70,6 +70,12 @@ fn line(event: &Event<'_>) -> String {
     let mut fields = Fields::default();
     event.record(&mut fields);
     let metadata = event.metadata();
+    if metadata.target() == "lys_identity_server::passfast" {
+        fields.rest.push_str(&format!(
+            " at_ms={}",
+            jiff::Timestamp::now().as_millisecond()
+        ));
+    }
     format!(
         "{} {}: {}{}",
         metadata.level(),
@@ -147,6 +153,23 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::WarnLines;
+
+    #[test]
+    fn pass_timings_name_the_observation_instant_so_other_services_can_correlate_the_waits()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let (say, heard) = capture();
+        tracing::subscriber::with_default(WarnLines::new(say), || {
+            tracing::info!(target: "lys_identity_server::passfast", elapsed_ms = 7, "token exchange");
+        });
+        let heard = heard.lock().map_err(|error| error.to_string())?;
+        let field = heard[0]
+            .split_whitespace()
+            .find_map(|field| field.strip_prefix("at_ms="))
+            .ok_or("timing has no observation instant")?;
+        assert!(field.parse::<i64>()? > 0);
+        assert!(heard[0].contains("elapsed_ms=7"));
+        Ok(())
+    }
     use crate::routes::Say;
 
     fn capture() -> (Say, Arc<Mutex<Vec<String>>>) {
