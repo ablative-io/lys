@@ -15,12 +15,11 @@ export interface TreeLeaf { seat: SeatView; name: string; reason: string | null 
 export interface TreeAgent { id: string; name: string; reason: string | null; leaves: TreeLeaf[]; running: UnregisteredSession[] }
 /** A computer: its agents, and every seat on it in one list for whoever wants them flat. */
 export interface TreeBranch { machine: Machine; agents: TreeAgent[]; leaves: TreeLeaf[] }
-export interface TreeRead extends SeatList { machines: Machine[]; names: Record<string, string>; nameReasons: Record<string, string>; unregistered: UnregisteredSession[]; unregisteredReason: string | null }
+export interface TreeRead extends SeatList { machines: Machine[]; names: Record<string, string>; nameReasons: Record<string, string> }
+/** The sessions runners hold for no seat, and which runners did not answer the survey, as one line, or null when all did. */
+export interface RunningRead { sessions: UnregisteredSession[]; unanswered: string | null }
 
 export const online = (seat: SeatView): boolean => seat.state === 'online-idle' || seat.state === 'online-working';
-
-/** How long the tree waits for the runners' session list before drawing without it; the reason is kept and shown. */
-export const UNREGISTERED_WAIT_MS = 4000;
 
 function networkPage(value: NetworkView & Paged): NetworkView & Paged {
   if (!value || !Array.isArray(value.machines) || !value.machines.every((machine) => readableMachine(machine)
@@ -31,23 +30,21 @@ function networkPage(value: NetworkView & Paged): NetworkView & Paged {
   return value;
 }
 
-/** The sessions held for no seat, or the reason they are not known; a slow runner read does not hold the tree. */
-async function readUnregistered(): Promise<{ sessions: UnregisteredSession[]; reason: string | null }> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('RunnerSlow: the session list did not answer within ' + UNREGISTERED_WAIT_MS + ' ms.')), UNREGISTERED_WAIT_MS); });
-  try {
-    const answer = await Promise.race([seats.unregistered(), late]);
-    const unanswered = (answer.unanswered ?? []).map((runner) => runner.name + ': ' + runner.reason).join('; ');
-    return { sessions: answer.sessions, reason: unanswered || null };
-  } catch (error) { return { sessions: [], reason: said(error) }; }
-  finally { clearTimeout(timer); }
+/**
+ * The sessions runners hold for no seat. Read on its own, never as part of the tree: the tree is drawn from the
+ * network and the seats the moment they answer, and this survey of every runner only adds the running marks when
+ * it arrives. A runner that did not answer is named in `unanswered`, for the rows it leaves unmarked.
+ */
+export async function readRunning(): Promise<RunningRead> {
+  const answer = await seats.unregistered();
+  const unanswered = (answer.unanswered ?? []).map((runner) => runner.name + ': ' + runner.reason).join('; ');
+  return { sessions: answer.sessions, unanswered: unanswered || null };
 }
 
 export async function readNetworkTree(): Promise<TreeRead> {
-  const [network, list, unregistered] = await Promise.all([
+  const [network, list] = await Promise.all([
     readEveryPage<NetworkView & Paged>('/network', (before, page) => ({ ...networkPage(before), machines: [...before.machines, ...networkPage(page).machines] })).then(networkPage),
     seats.list(),
-    readUnregistered(),
   ]);
   const names: Record<string, string> = Object.fromEntries(network.machines.flatMap((machine) => machine.may_run.map((agent) => [agent.id, agent.display_name])));
   const nameReasons: Record<string, string> = {};
@@ -58,7 +55,7 @@ export async function readNetworkTree(): Promise<TreeRead> {
       names[agent] = record.display_name;
     } catch (error) { nameReasons[agent] = said(error); }
   });
-  return { ...list, machines: network.machines, names, nameReasons, unregistered: unregistered.sessions, unregisteredReason: unregistered.reason };
+  return { ...list, machines: network.machines, names, nameReasons };
 }
 
 /**
