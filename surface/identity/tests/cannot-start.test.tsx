@@ -50,17 +50,22 @@ describe('why an agent cannot start', () => {
     }
   });
 
-  it('gives any other reason as a sentence with its name off the front, and offers the same start again', () => {
+  it('uses the shared approval and unanswered sentences and offers the same start again', () => {
     expect(whyNot('Scribe', { refusal: 'ProfileNotReviewed', reason: 'ProfileNotReviewed: version 3 of the agent\'s profile is not reviewed; review it before the agent is started' }))
-      .toEqual({ sentence: 'Version 3 of the agent\'s profile is not reviewed; review it before the agent is started.', fix: { kind: 'try-again' } });
-    expect(whyNot('Scribe', { refusal: 'Unanswered', reason: '' }).sentence).toBe('This agent could not be started.');
+      .toEqual({ sentence: 'These settings need approval before the agent can use them.', fix: { kind: 'try-again' } });
+    expect(whyNot('Scribe', { refusal: 'Unanswered', reason: '' }).sentence).toBe('Lys answered without confirming the request’s outcome. Check its original outcome before sending another.');
+    expect(whyNot('Scribe', { refusal: 'FutureStartRule', reason: '' }).sentence).toBe('Lys refused without explaining why.');
   });
 
-  it('shows the sentence open, never folded, with the refusal name small at its end', async () => {
+  it('keeps the explanation and fix visible while the exact refusal stays in closed details', async () => {
     const { host } = await shown(notActive('suspended'));
-    expect(host.querySelector('details')).toBeNull();
-    expect(host.querySelector('[role="alert"] p')?.textContent).toBe('Scribe is paused. AgentNotActive');
-    expect(host.querySelector('small.refusal-name')?.textContent).toBe('AgentNotActive');
+    const sentence = host.querySelector('.cannot-start > p');
+    expect(sentence?.textContent).toBe('Scribe is paused.');
+    expect(sentence?.closest('details')).toBeNull();
+    expect(host.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(host.querySelector('details .refusal-name')?.textContent).toBe('AgentNotActive: ' + notActive('suspended').reason);
+    expect(host.querySelector('.cannot-start')?.getAttribute('title')).toBe('AgentNotActive: ' + notActive('suspended').reason);
+    expect(host.querySelector('button')?.closest('details')).toBeNull();
     expect(buttons(host)).toEqual(['Turn back on']);
   });
 
@@ -91,7 +96,10 @@ describe('why an agent cannot start', () => {
     const path = '/identities/' + SCRIBE + '/transitions';
     const { host, calls } = await shown(notActive('suspended'), { ['POST ' + path]: refused(403, 'NotAdmitted', 'only an administrator moves an identity\'s state') });
     await click(host.querySelector('button'));
-    expect(host.textContent).toContain('That did not work. Only an administrator moves an identity\'s state. NotAdmitted');
+    expect(host.querySelector('.why-not[role="alert"] > p')?.textContent).toBe('You do not have permission to do this. Ask the directory administrator to make the change.');
+    expect(host.querySelector('.why-not[role="alert"]')?.getAttribute('title')).toBe('NotAdmitted: only an administrator moves an identity\'s state');
+    expect(host.querySelector('.why-not details')?.hasAttribute('open')).toBe(false);
+    expect(host.textContent).not.toContain('Ask the administrator to check why this change failed');
     expect(buttons(host)).toEqual(['Turn back on']);
     expect(calls.again).toBe(0);
   });
@@ -126,7 +134,9 @@ describe('why an agent cannot start', () => {
     await click(lab ?? null);
     expect(posted.map((entry) => entry.path)).toEqual([path, path]);
     expect(posted[1].body).toEqual(posted[0].body);
-    expect(host.textContent).toContain('That did not work. The network record could not be written. NetworkUnavailable');
+    expect(host.querySelector('.why-not[role="alert"] > p')?.textContent).toBe('Lys could not read the computers. Ask the administrator to check the service.');
+    expect(host.querySelector('.why-not[role="alert"]')?.getAttribute('title')).toBe('NetworkUnavailable: the network record could not be written');
+    expect(host.querySelector('.why-not details')?.hasAttribute('open')).toBe(false);
     expect(calls.again).toBe(0);
   });
 
@@ -138,8 +148,67 @@ describe('why an agent cannot start', () => {
 
   it('offers the same start again for a reason it has no fix for', async () => {
     const { host, calls } = await shown({ refusal: 'RuntimeUnavailable', reason: 'the runner did not answer' });
-    expect(host.querySelector('[role="alert"] p')?.textContent).toBe('The runner did not answer. RuntimeUnavailable');
+    expect(host.querySelector('.cannot-start > p')?.textContent).toBe('Lys could not read or change this agent’s sessions. Check the current session before repeating a change.');
+    expect(host.querySelector('.cannot-start')?.getAttribute('title')).toBe('RuntimeUnavailable: the runner did not answer');
     await click(host.querySelector('button'));
+    expect(calls.again).toBe(1);
+  });
+
+  it('keeps an unknown refusal’s server explanation visible and its code in closed details while retrying the same start', async () => {
+    const reason = 'future_start_rule: Choose a computer with access to the records service.';
+    const { host, calls, posted } = await shown({ refusal: 'future_start_rule', reason });
+    expect(host.querySelector('.cannot-start > p')?.textContent).toBe('Lys refused: Choose a computer with access to the records service.');
+    expect(host.querySelector('.cannot-start > p')?.textContent).not.toContain('future_start_rule');
+    expect(host.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(host.querySelector('details .refusal-name')?.textContent).toBe('future_start_rule: ' + reason);
+    expect(buttons(host)).toEqual(['Try again']);
+    await click(host.querySelector('button'));
+    expect(calls.again).toBe(1);
+    expect(posted).toEqual([]);
+  });
+
+  it('keeps a refused activation actionable and retries it after the server permits the same transition', async () => {
+    const path = '/identities/' + SCRIBE + '/transitions';
+    let permitted = false;
+    const reason = 'FutureActivationRule: Ask the administrator to restore access, then turn this agent back on.';
+    const { host, calls, posted } = await shown(notActive('suspended'), {
+      ['POST ' + path]: () => permitted ? ok({}) : refused(409, 'FutureActivationRule', reason),
+    });
+    await click(host.querySelector('button'));
+    expect(host.querySelector('.why-not[role="alert"] > p')?.textContent).toBe('Lys refused: Ask the administrator to restore access, then turn this agent back on.');
+    expect(host.querySelector('.why-not[role="alert"]')?.getAttribute('title')).toBe('FutureActivationRule: ' + reason);
+    expect(host.querySelector('.why-not details')?.hasAttribute('open')).toBe(false);
+    const next = host.querySelector('.cannot-start > .note');
+    expect(next?.textContent).toBe('Ask the administrator to check why this change failed before trying it again.');
+    expect(next?.closest('details')).toBeNull();
+    expect(buttons(host)).toEqual(['Turn back on']);
+    expect(calls.again).toBe(0);
+    permitted = true;
+    await click(host.querySelector('button'));
+    expect(posted).toHaveLength(2);
+    expect(posted[1]).toEqual(posted[0]);
+    expect(host.querySelector('.why-not[role="alert"]')).toBeNull();
+    expect(host.querySelector('.cannot-start > .note')).toBeNull();
+    expect(calls.again).toBe(1);
+  });
+
+  it('does not start from a mismatched computer allowance receipt and repeats the original request until confirmed', async () => {
+    const ward = machine(computer, 'Ward computer');
+    const path = '/network/machines/' + computer + '/agents';
+    let confirm = false;
+    const { host, posted, calls } = await shown({ refusal: 'MachineNotForAgent', reason: 'the machine may not run this agent' }, {
+      '/network': ok({ machines: [ward], reports_served: true }),
+      ['POST ' + path]: (body) => ok({ machine: { ...ward, may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }, recorded: { ...(body as object), machine: computer, by: confirm ? ADA : 'another-person', at: 1 } }),
+    });
+    await click(host.querySelector('button'));
+    expect(host.querySelector('.why-not[role="alert"] > p')?.textContent).toBe('Lys refused: The answer did not confirm this computer permission. Its original request is kept.');
+    expect(host.querySelector('.why-not[role="alert"] > p')?.textContent).not.toContain('MachineAdmissionReceiptMismatch');
+    expect(host.querySelector('.why-not details .refusal-name')?.textContent).toBe('MachineAdmissionReceiptMismatch: The answer did not confirm this computer permission. Its original request is kept.');
+    expect(calls.again).toBe(0);
+    confirm = true;
+    await click(host.querySelector('button'));
+    expect(posted).toHaveLength(2);
+    expect(posted[1]).toEqual(posted[0]);
     expect(calls.again).toBe(1);
   });
 });

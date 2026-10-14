@@ -15,6 +15,7 @@
 import { useRef, useState } from 'react';
 import { Refused, request } from '../../api';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 /** The folders inside one folder of a computer, as its runner answers. */
 export interface FolderList { machine: string; under: string; folders: string[] }
@@ -48,8 +49,8 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
   const [list, setList] = useState<FolderList | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [problem, setProblem] = useState<{ refusal: string; reason: string } | null>(null);
-  const [gone, setGone] = useState<{ folder: string; refusal: string; reason: string } | null>(null);
+  const [problem, setProblem] = useState<Error | null>(null);
+  const [gone, setGone] = useState<{ folder: string; problem: Refused } | null>(null);
   const working = useRef(false);
   const look = async (machine: string, under?: string, first = false) => {
     if (working.current) return;
@@ -61,12 +62,12 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       catch (error) {
         // Only a folder that is gone or unreadable falls back to the home folder, and it is said; any other failure is shown as itself.
         if (!first || !under || !(error instanceof Refused) || !['folder_unreadable', 'folder_invalid'].includes(error.refusal.refusal)) throw error;
-        setGone({ folder: under, refusal: error.refusal.refusal, reason: error.refusal.reason });
+        setGone({ folder: under, problem: error });
         next = await foldersIn(machine);
       }
       setList(next);
     } catch (error) {
-      setProblem(error instanceof Refused ? { refusal: error.refusal.refusal, reason: error.refusal.reason } : { refusal: 'Unexpected', reason: String(error) });
+      setProblem(error instanceof Error ? error : new Error(String(error)));
     } finally { working.current = false; setBusy(false); }
   };
   if (!computers.length) return <p className="folder-chooser">You choose its folder once a computer with Lys running on it is added.</p>;
@@ -82,7 +83,10 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       {computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select></label> : null}
     {busy && !list ? <p role="status">Looking at the folders on {name}…</p> : null}
-    {gone ? <p role="alert">The folder chosen before, <code>{gone.folder}</code>, could not be read. {gone.reason} <small className="refusal-name">{gone.refusal}</small></p> : null}
+    {gone ? <div className="folder-recovery">
+      <p>The folder chosen before, <code>{gone.folder}</code>, could not be read. Lys asked for the computer’s home folder instead. Choose a readable folder or ask its owner to check access.</p>
+      <ErrorWords problem={gone.problem} />
+    </div> : null}
     {list ? <>
       <p>On {name}, in <code>{list.under}</code></p>
       {parent ? <p><Act symbol="back" name={'Back to ' + nameOf(parent)} word={nameOf(parent)} disabled={busy} onClick={() => { void look(list.machine, parent); }} /></p> : null}
@@ -91,7 +95,10 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       </li>)}</ul> : <p>There are no folders inside this one.</p>}
       <p><Act symbol="approve" name={confirm + ' ' + nameOf(list.under)} word={confirm + ' ' + nameOf(list.under)} tone="primary" disabled={busy} onClick={() => { choose(list.under); setOpen(false); }} /></p>
     </> : null}
-    {problem ? <p role="alert">Lys could not look at the folders there. {problem.reason} <small className="refusal-name">{problem.refusal}</small></p> : null}
+    {problem ? <div className="folder-problem">
+      <p>Lys could not look at the folders there. Check the computer’s runner, then close and reopen this chooser to try again.</p>
+      <ErrorWords problem={problem} />
+    </div> : null}
     <p><Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setOpen(false)} /></p>
   </div>;
 }

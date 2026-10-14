@@ -1,8 +1,7 @@
 /**
  * Why an agent cannot start: one sentence a person can act on, and the one
- * button that fixes it, in place. Nothing is folded away and no reason sends
- * a person to another page to find the act. The refusal's own name stays, at
- * the end and small, for whoever debugs.
+ * button that fixes it, in place. The explanation and act stay visible;
+ * the service's refusal name and full reason stay in closed error details.
  *
  * The caller hands over what refused the start, as the service or the screen
  * named it, and `again`, which sends the same start once more. After a fix
@@ -21,6 +20,7 @@ import { FolderChooser } from '../provisioning/FolderChooser';
 import { saveFolder } from '../provisioning/working-folder';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
+import { ErrorWords, problemWords } from '../people/Words';
 import { Act } from '../../shell/Act';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
@@ -49,28 +49,18 @@ export function whyNot(name: string, refusal: StartRefusal): { sentence: string;
   if (state === 'retired') return { sentence: name + ' is retired and cannot be started again.', fix: { kind: 'nothing' } };
   if (refusal.refusal === 'WorkingFolderUnnamed') return { sentence: name + ' has no folder to work in.', fix: { kind: 'choose-folder' } };
   if (NO_COMPUTER.includes(refusal.refusal)) return { sentence: 'No computer is allowed to run ' + name + '.', fix: { kind: 'allow-computer' } };
-  return { sentence: asSentence(refusal.reason), fix: { kind: 'try-again' } };
+  return { sentence: problemWords(new Refused(0, refusal)), fix: { kind: 'try-again' } };
 }
-
-/** A reason as one sentence: its own name taken off the front, a capital, a full stop. */
-function asSentence(reason: string): string {
-  const words = reason.replace(/^[A-Z][A-Za-z]+: /, '').trim();
-  if (!words) return 'This agent could not be started.';
-  const ended = /[.!?]$/.test(words) ? words : words + '.';
-  return ended.charAt(0).toUpperCase() + ended.slice(1);
-}
-
-const refusalOf = (error: unknown): StartRefusal => error instanceof Refused
-  ? { refusal: error.refusal.refusal, reason: error.message }
-  : { refusal: 'Unexpected', reason: String(error) };
 
 export function CannotStart({ agent, name, refusal, machines, again }: {
   /** The computers as the start that was refused read them, so this explanation and that start never disagree. */
   agent: string; name: string; refusal: StartRefusal; machines: Machine[]; again: () => void;
 }) {
   const { sentence, fix } = whyNot(name, refusal);
-  return <div role="alert" className="cannot-start">
-    <p>{sentence} <small className="refusal-name">{refusal.refusal}</small></p>
+  const detail = refusal.refusal + ': ' + refusal.reason;
+  return <div role="alert" className="cannot-start" title={detail}>
+    <p>{sentence}</p>
+    <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{detail}</p></details>
     {fix.kind === 'turn-on' ? <TurnOn agent={agent} name={name} label={fix.label} transition={fix.transition} again={again} /> : null}
     {fix.kind === 'allow-computer' ? <AllowComputer agent={agent} name={name} machines={machines} again={again} /> : null}
     {fix.kind === 'choose-folder' ? <ChooseFolder agent={agent} name={name} machines={machines} again={again} /> : null}
@@ -78,16 +68,23 @@ export function CannotStart({ agent, name, refusal, machines, again }: {
   </div>;
 }
 
-/** What a fix that was itself refused says: one sentence, the name small, the button still there. */
-function Failed({ refusal }: { refusal: StartRefusal | null }) {
-  return refusal ? <p role="alert">That did not work. {asSentence(refusal.reason)} <small className="refusal-name">{refusal.refusal}</small></p> : null;
+/** A failed fix keeps its original explanation and leaves the same act available. */
+interface Failure { problem: unknown }
+function Failed({ refusal }: { refusal: Failure | null }) {
+  if (!refusal) return null;
+  const words = problemWords(refusal.problem);
+  const unknown = words.startsWith('Lys refused:') || words === 'Lys refused without explaining why.';
+  return <>
+    <ErrorWords problem={refusal.problem} />
+    {unknown ? <p className="note">Ask the administrator to check why this change failed before trying it again.</p> : null}
+  </>;
 }
 
 function TurnOn({ agent, name, label, transition, again }: {
   agent: string; name: string; label: string; transition: 'activate' | 'reinstate'; again: () => void;
 }) {
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<StartRefusal | null>(null);
+  const [failed, setFailed] = useState<Failure | null>(null);
   const working = useRef(false);
   const turnOn = async () => {
     if (working.current) return;
@@ -95,7 +92,7 @@ function TurnOn({ agent, name, label, transition, again }: {
     try {
       await request<unknown>('/identities/' + encodeURIComponent(agent) + '/transitions', { transition, reason: label + ' from the start screen, to start ' + name });
       again();
-    } catch (error) { setFailed(refusalOf(error)); }
+    } catch (error) { setFailed({ problem: error }); }
     finally { working.current = false; setBusy(false); }
   };
   return <>
@@ -120,12 +117,12 @@ function ChooseFolder({ agent, name, machines, again }: { agent: string; name: s
     return named ?? (allowed.length === 1 ? allowed[0] : null);
   }, 'cannot-start-folder:' + agent);
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<StartRefusal | null>(null);
+  const [failed, setFailed] = useState<Failure | null>(null);
   const working = useRef(false);
   // One save per folder, kept while this is shown, so a second press sends the same one.
   const asked = useRef(new Map<string, string>());
   if (load.status === 'loading') return <p role="status">Looking for a computer…</p>;
-  if (load.status === 'refused') return <Failed refusal={{ refusal: load.refused.refusal.refusal, reason: load.refused.message }} />;
+  if (load.status === 'refused') return <Failed refusal={{ problem: load.refused }} />;
   if (!load.data) return <p>Lys does not know yet which computer {name} runs on. Its folder is chosen on that computer, so the computer comes first.</p>;
   const save = async (folder: string) => {
     if (working.current) return;
@@ -135,7 +132,7 @@ function ChooseFolder({ agent, name, machines, again }: { agent: string; name: s
       asked.current.set(folder, operation);
       await saveFolder(agent, folder, operation);
       again();
-    } catch (error) { setFailed(refusalOf(error)); }
+    } catch (error) { setFailed({ problem: error }); }
     finally { working.current = false; setBusy(false); }
   };
   return <>
@@ -151,12 +148,12 @@ function AllowComputer({ agent, name, machines, again }: { agent: string; name: 
     return { person: me.person.id, computers: usable(machines) };
   }, 'cannot-start-computers:' + agent);
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState<StartRefusal | null>(null);
+  const [failed, setFailed] = useState<Failure | null>(null);
   const working = useRef(false);
   // One request per computer, kept while this is shown, so a second press sends the same one.
   const asked = useRef(new Map<string, MachineAdmission>());
   if (load.status === 'loading') return <p role="status">Looking for a computer…</p>;
-  if (load.status === 'refused') return <Failed refusal={{ refusal: load.refused.refusal.refusal, reason: load.refused.message }} />;
+  if (load.status === 'refused') return <Failed refusal={{ problem: load.refused }} />;
   const { person, computers } = load.data;
   const allow = async (machine: string) => {
     if (working.current) return;
@@ -167,7 +164,7 @@ function AllowComputer({ agent, name, machines, again }: { agent: string; name: 
       const answer = await request<unknown>('/network/machines/' + encodeURIComponent(machine) + '/agents', body);
       confirmAdmission(answer, machine, body, person);
       again();
-    } catch (error) { setFailed(refusalOf(error)); }
+    } catch (error) { setFailed({ problem: error }); }
     finally { working.current = false; setBusy(false); }
   };
   if (!computers.length) return <>

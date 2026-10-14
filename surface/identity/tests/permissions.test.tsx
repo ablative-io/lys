@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { choose, click, serve, settle, type } from './harness';
-import { SCRIBE, SERVICE, ok } from './fixtures';
+import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import { Permissions } from '../src/features/provisioning/Permissions';
 import type { Program } from '../src/features/provisioning/choices';
 import { forcedBy, firstSentence } from '../src/features/provisioning/permission-modes';
@@ -189,6 +189,104 @@ describe('The rules', () => {
     const body = table(element, 'Rules')?.querySelector('tbody');
     expect(body?.textContent).toContain('Lys could not read this agent’s policy');
     expect(rowOf(element, 'WebSearch')?.querySelector('select')?.value).toBe('deny');
+  });
+  it.each([
+    ['NotAdmitted', 'The policy read requires an administrator.', 'You do not have permission to do this. Ask the directory administrator to make the change.'],
+    ['FuturePolicyReadRefusal', 'The policy store is being repaired.', 'Lys refused: The policy store is being repaired.'],
+  ])('gives words and a correcting action for unread policy %s, keeping its exact refusal in closed details', async (code, reason, words) => {
+    const path = '/agents/' + SCRIBE + '/policy';
+    const { element, requests, posted } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'] }, SCRIBE, {
+      [path]: refused(403, code, reason),
+    });
+    await settle();
+    const problems = [...element.querySelectorAll<HTMLElement>('[role="alert"][title]')];
+    expect(problems).toHaveLength(2);
+    for (const problem of problems) {
+      expect(problem.title).toBe(code + ': ' + reason);
+      expect(problem.querySelector(':scope > p')?.textContent).toBe(words);
+      expect(problem.querySelector(':scope > p')?.textContent).not.toContain(code);
+      expect(problem.querySelector('details')?.open).toBe(false);
+      expect(problem.querySelector('details')?.textContent).toContain(code + ': ' + reason);
+    }
+    const summary = element.querySelector('.rules-summary')?.textContent;
+    expect(summary).toContain('Open this tab again to read its saved rules before changing them.');
+    expect(summary).not.toContain(code);
+    expect(summary).not.toContain(reason);
+    expect(table(element, 'Rules')?.querySelector('tbody')?.textContent).toContain('Open this tab again to read its saved rules before changing them.');
+    expect(rowOf(element, 'WebSearch')?.querySelector('select')?.value).toBe('deny');
+    expect(addRow(element).querySelector('select[name="rule-enforcer"]')).toBeNull();
+    expect(requests).toEqual([path]);
+    expect(posted).toEqual([]);
+  });
+  it('keeps a Codex policy-read refusal in closed details and tells the person how to read the saved rules', async () => {
+    const path = '/agents/' + SCRIBE + '/policy';
+    const reason = 'The policy service is unavailable.';
+    const { element, posted } = await shown(codex, { default_mode: 'workspace-write' }, SCRIBE, {
+      [path]: refused(503, 'PolicyUnavailable', reason),
+    });
+    await settle();
+    const problem = element.querySelector<HTMLElement>('[role="alert"][title]');
+    expect(problem?.title).toBe('PolicyUnavailable: ' + reason);
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys could not read this agent’s tool rules. Check the saved rules before starting it.');
+    expect(problem?.querySelector('details')?.open).toBe(false);
+    expect(element.textContent).toContain('Open this tab again to read its saved rules before changing them.');
+    expect(table(element, 'Rules')).toBeNull();
+    expect(posted).toEqual([]);
+  });
+  it('names an answer for another agent as unreadable policy and does not offer to edit that policy', async () => {
+    const path = '/agents/' + SCRIBE + '/policy';
+    const { element, posted } = await shown(claude, { default_mode: 'default', deny: ['WebSearch'] }, SCRIBE, {
+      [path]: ok({ agent: 'another-agent', policy: null, digest: null, applies: '' }),
+    });
+    await settle();
+    const problem = element.querySelector<HTMLElement>('[role="alert"][title]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys could not read this agent’s tool rules. Check the saved rules before changing them.');
+    expect(problem?.title).toBe('PolicyUnreadable: The service answered, but not with this agent’s policy.');
+    expect(problem?.querySelector('details')?.open).toBe(false);
+    expect(addRow(element).querySelector('select[name="rule-enforcer"]')).toBeNull();
+    expect(button(element, 'Save policy rules for the next start')).toBeNull();
+    expect(rowOf(element, 'WebSearch')).not.toBeNull();
+    expect(posted).toEqual([]);
+  });
+  it.each([
+    ['PolicyVersionConflict', 'The saved policy is now version 2.', 'Someone changed these rules first. Open this tab again to see the saved rules before editing.'],
+    ['NotAdmitted', 'The policy write requires an administrator.', 'You do not have permission to do this. Ask the directory administrator to make the change.'],
+    ['FuturePolicySaveRefusal', 'The policy store is being repaired.', 'Lys refused: The policy store is being repaired.'],
+  ])('keeps the original save refusal %s and the staged rules while giving a correcting action', async (code, reason, words) => {
+    const path = '/agents/' + SCRIBE + '/policy';
+    const { element, posted, requests } = await shown(claude, { default_mode: 'default' }, SCRIBE, {
+      ...policyOf(seeded), ['POST ' + path]: refused(409, code, reason),
+    });
+    await settle();
+    await click(button(element, 'Remove policy rule deny-Read'));
+    await click(button(element, 'Save policy rules for the next start'));
+    const problem = element.querySelector<HTMLElement>('.policy-kept [role="alert"]');
+    expect(problem?.title).toBe(code + ': ' + reason);
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe(words);
+    expect(problem?.querySelector(':scope > p')?.textContent).not.toContain(code);
+    expect(problem?.querySelector('details')?.open).toBe(false);
+    expect(problem?.querySelector('details')?.textContent).toContain(code + ': ' + reason);
+    expect(element.querySelector('.policy-kept')?.textContent).toContain('Open this tab again to check the saved rules before changing them.');
+    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet kept.');
+    expect(element.querySelector('.policy-kept b')?.textContent).toBe('Policy: Version 1.');
+    expect(ruleRows(element).filter((row) => row.dataset.policy).map((row) => row.dataset.policy)).toEqual(['deny-top', 'liftable']);
+    expect(posted).toEqual([{ path, body: { version: 1, rules: seeded.slice(1) } }]);
+    expect(requests).toEqual([path, 'POST ' + path]);
+  });
+  it('keeps staged rules and says to check their outcome when the save receipt does not confirm the next version', async () => {
+    const path = '/agents/' + SCRIBE + '/policy';
+    const { element, posted } = await shown(claude, { default_mode: 'default' }, SCRIBE, {
+      ...policyOf(seeded), ['POST ' + path]: ok({ agent: SCRIBE, policy: { agent: SCRIBE, version: 1, rules: seeded.slice(1) }, digest: null, applies: '' }),
+    });
+    await settle();
+    await click(button(element, 'Remove policy rule deny-Read'));
+    await click(button(element, 'Save policy rules for the next start'));
+    const problem = element.querySelector<HTMLElement>('.policy-kept [role="alert"]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('The answer did not confirm the saved rules. Open this tab again to check the outcome.');
+    expect(problem?.querySelector('details')?.open).toBe(false);
+    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet kept.');
+    expect(element.querySelector('.policy-kept b')?.textContent).toBe('Policy: Version 1.');
+    expect(posted).toEqual([{ path, body: { version: 1, rules: seeded.slice(1) } }]);
   });
   it('names a policy rule the start cannot write, and says the agent will not start until it is changed', async () => {
     const { element } = await shown(claude, { default_mode: 'default' }, SCRIBE, policyOf([hard('deny-glob-path', 'Glob', 'path_prefix', '/srv'), hard('deny-Read', 'Read', 'tool')]));

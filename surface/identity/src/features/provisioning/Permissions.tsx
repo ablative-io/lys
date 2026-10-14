@@ -57,12 +57,6 @@ function lifts(rule: PolicyRule): string {
   return 'A grant of ' + action + ' on ' + resource.kind + ' ' + resource.id;
 }
 
-function said(failure: unknown): string {
-  if (failure instanceof Refused && failure.refusal.refusal === 'PolicyVersionConflict') return 'PolicyVersionConflict: Someone else changed these rules.';
-  if (failure instanceof Refused) return failure.refusal.reason;
-  return String(failure);
-}
-
 /** The last row of the rules table: the kind, the one thing that kind needs, what happens, and Add. */
 function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
   lists: RuleList[]; computers: Computers; computer?: string; enforcer: string; add: (list: RuleList, rule: string) => void;
@@ -168,7 +162,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
   // The policy's rules as they will be kept: the saved ones until one is added or removed here, then the changed list until it is saved.
   const [staged, setStaged] = useState<PolicyRule[] | null>(null);
   const [saving, setSaving] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState<Error | string | null>(null);
   // With no program chosen there are no ways of working or program rules to show, but the agent’s policy is still its own and still shown.
   if (!program && policy.status === 'none') return null;
   const programName = program?.name ?? 'the program';
@@ -188,10 +182,12 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
       const answer = await request<PolicyView>('/agents/' + encodeURIComponent(agent) + '/policy', { version, rules: staged });
       if (answer.agent !== agent || answer.policy?.agent !== agent || answer.policy.version !== version + 1) throw new Error('The answer did not confirm the saved rules. Open this tab again to check the outcome.');
       read.kept(answer); setStaged(null);
-    } catch (error) { setFailure(said(error)); }
+    } catch (error) { setFailure(error instanceof Error ? error : String(error)); }
     finally { setSaving(false); }
   };
-  const unread = policy.status === 'unread' ? <>Lys could not read this agent’s policy, so what it refuses is not shown. {policy.reason} <small className="refusal-name">{policy.refusal}</small></> : null;
+  const unreadProblem = policy.status === 'unread' ? new Refused(0, { refusal: policy.refusal, reason: policy.reason }) : null;
+  const unreadWords = 'Lys could not read this agent’s policy, so what it refuses is not shown. Open this tab again to read its saved rules before changing them.';
+  const unread = unreadProblem ? <><p>{unreadWords}</p><ErrorWords problem={unreadProblem} /></> : null;
   // What Kept to its folder cannot carry, each of which makes the start be refused.
   const keptRules = kept ? (value.allow ?? []).length : 0;
   const keptFolders = kept ? (value.additional_directories ?? []).length : 0;
@@ -221,7 +217,8 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
       <tbody>{ordered.map((entry) => <Mode key={entry.id} entry={entry} chosen={entry.id === mode} pick={() => change({ ...value, default_mode: entry.id })} />)}</tbody>
     </table></TableScroll> : null}
     {takesRules ? <>
-      <p className="rules-summary">{summary(value)}{forced?.written.length ? ' This agent’s policy refuses ' + forced.written.length + (forced.written.length === 1 ? ' thing.' : ' things.') : ''} {unread}</p>
+      <p className="rules-summary">{summary(value)}{forced?.written.length ? ' This agent’s policy refuses ' + forced.written.length + (forced.written.length === 1 ? ' thing.' : ' things.') : ''}{unreadProblem ? ' ' + unreadWords : ''}</p>
+      {unreadProblem ? <ErrorWords problem={unreadProblem} /> : null}
       {forced?.unwritable.map((id) => <p key={id} role="alert" className="why-not">This policy rule cannot be written for {programName}, so the agent will not start until it is changed: {id}</p>)}
       {keptRules || keptFolders ? <p role="alert" className="why-not">Kept to its folder cannot carry {[keptRules ? 'rules that run without asking' : '', keptFolders ? 'extra folders' : ''].filter(Boolean).join(' or ')}. Remove these before it can start as Kept to its folder.</p> : null}
       {keptTools ? <p role="alert" className="why-not">These settings list tools, so it cannot start as Kept to its folder.</p> : null}
@@ -258,7 +255,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
             {' '}
             <Act symbol="save" name="Save policy rules for the next start" word="Save" disabled={saving || staged === null} onClick={() => { void keep(); }} />
             {staged !== null && !saving ? <span className="dim"> The policy rows above are changed and not yet kept.</span> : null}
-            {failure ? <ErrorWords problem={failure} /> : null}
+            {failure ? <><ErrorWords problem={failure} /><p>Open this tab again to check the saved rules before changing them.</p></> : null}
           </td></tr> : null}
         </tbody>
         <tfoot><AddRule lists={takesRules ? offered : []} computers={computers} computer={computer} enforcer={programName} add={add} addPolicy={read ? (rule) => setStaged([...policyRules, rule]) : undefined} /></tfoot>
@@ -266,7 +263,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
     {takesRules || !program ? null : <>
       <p className="dim">{programName} takes no rules about single tools or files.</p>
       {forced?.hard && agent ? <p role="alert" className="why-not">This agent’s policy has {forced.hard} {forced.hard === 1 ? 'rule' : 'rules'}. {programName} cannot carry them, so this agent will not start until they are removed from its policy, in the table above.</p> : null}
-      {unread ? <p className="dim">{unread}</p> : null}
+      {unread ? <div className="dim">{unread}</div> : null}
     </>}
     {program ? extraFolders : null}
   </div>;

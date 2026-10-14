@@ -59,6 +59,8 @@ describe('Agent provisioning', () => {
 });
 
 describe('The folder an agent works in', () => {
+  const computer = { id: 'machine-seat', name: 'Ward desk', runtime: 'runner', state: 'in_use', may_run: [{ id: SCRIBE }] };
+  const folders = 'POST /network/machines/' + computer.id + '/folders';
   it('shows the saved folder in the settings, and never the old promise of a folder of its own', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, [path]: ok({ ...answer, profile: { ...profile, working_folder: '/Users/ada/Developer/receipts' } }) });
     expect(text()).toContain('Works in /Users/ada/Developer/receipts');
@@ -68,6 +70,68 @@ describe('The folder an agent works in', () => {
     await mount('#/file/' + SCRIBE + '/provisioning', routes);
     expect(text()).toContain('No folder chosen yet.');
     expect(text()).not.toContain('Works in /');
+  });
+  it.each([
+    ['folder_unreadable', 'The runner could not read this folder. Choose a readable folder or ask its owner to check access.'],
+    ['folder_invalid', 'Lys refused: the saved folder cannot be opened'],
+  ])('explains %s while retaining the named home-folder recovery', async (code, words) => {
+    const saved = '/srv/removed';
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id, working_folder: saved } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: (value) => {
+        const request = value as { under?: string };
+        return request.under ? refused(409, code, 'the saved folder cannot be opened')
+          : ok({ machine: computer.id, under: '/home/ward', folders: ['notes'] });
+      },
+    });
+    await click(button('Choose another folder'));
+    const recovery = document.querySelector('.folder-recovery');
+    const warning = recovery?.querySelector('[role="alert"]');
+    expect(recovery?.querySelector('p')?.textContent).toContain(saved + ', could not be read. Lys asked for the computer’s home folder instead.');
+    expect(recovery?.textContent).toContain('Choose a readable folder or ask its owner to check access.');
+    expect(warning?.querySelector('p')?.textContent).toBe(words);
+    expect(warning?.querySelector('p')?.textContent).not.toContain(code);
+    expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(warning?.querySelector('details')?.textContent).toContain(code + ': the saved folder cannot be opened');
+    expect(document.querySelector('.folder-chooser[role="group"]')?.textContent).toContain('On Ward desk, in /home/ward');
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: saved }, {}]);
+    await click(button('Work in ward'));
+    expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward');
+    expect(posted.every((entry) => entry.path.endsWith('/folders'))).toBe(true);
+  });
+  it('explains a folder read refusal with a next action and keeps the server code in details', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: refused(409, 'runner_absent', 'machine names no runner'),
+    });
+    await click(button('Choose a folder'));
+    const failure = document.querySelector('.folder-problem');
+    const warning = failure?.querySelector('[role="alert"]');
+    expect(failure?.querySelector('p')?.textContent).toBe('Lys could not look at the folders there. Check the computer’s runner, then close and reopen this chooser to try again.');
+    expect(warning?.querySelector('p')?.textContent).toBe('This computer has no connected Lys runner. Connect its runner before continuing.');
+    expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(warning?.querySelector('details')?.textContent).toContain('runner_absent: machine names no runner');
+    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + computer.id + '/folders']);
+    expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
+  });
+  it('names both failed reads when the saved folder and the home folder are unreadable', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id, working_folder: '/srv/removed' } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: (value) => (value as { under?: string }).under
+        ? refused(409, 'folder_unreadable', 'the saved folder is gone')
+        : refused(409, 'home_unknown', 'the runner account has no home folder'),
+    });
+    await click(button('Choose another folder'));
+    expect(document.querySelector('.folder-recovery [role="alert"] > p')?.textContent).toContain('Choose a readable folder');
+    expect(document.querySelector('.folder-problem [role="alert"] > p')?.textContent).toBe('The runner could not find its home folder. Ask the administrator to check the account it runs under.');
+    expect(document.querySelector('.folder-recovery details')?.textContent).toContain('folder_unreadable: the saved folder is gone');
+    expect(document.querySelector('.folder-problem details')?.textContent).toContain('home_unknown: the runner account has no home folder');
+    expect(button('Work in removed')).toBeNull();
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/srv/removed' }, {}]);
+    expect(document.querySelector('.works-in code')?.textContent).toBe('/srv/removed');
   });
 });
 
@@ -111,28 +175,67 @@ describe('Managed controls in the saved setup', () => {
 describe('Plugins checked on the agent’s own computer', () => {
   const withPlugins = { ...profile, plugins: ['argus@ablative', 'manifold@manifold'], runs_on: 'machine-seat' };
   const asked = '/harnesses/plugins?machine=machine-seat';
-  it('asks the runner of the computer the agent runs on and names the plugin its folder lacks', async () => {
+  const computer = { id: 'machine-seat', name: 'Ward desk', runtime: 'runner', state: 'in_use', may_run: [{ id: SCRIBE }] };
+  const pluginRoutes = { ...routes, '/network': ok({ machines: [computer], reports_served: true }) };
+  it('names the missing plugin and its remedy while keeping the start refusal code in a title', async () => {
     const { requests } = await mount('#/file/' + SCRIBE + '/provisioning', {
-      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
+      ...pluginRoutes, [path]: ok({ ...answer, profile: withPlugins }),
       [asked]: ok({ machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: ['argus@ablative'] }),
     });
     expect(requests).toContain(asked);
-    expect(text()).toContain('Not installed in /Users/seat/.claude on machine-seat: manifold@manifold');
-    expect(text()).toContain('plugin_not_installed');
+    const warning = document.querySelector('.given-plugins > .why-not');
+    expect(warning?.textContent).toContain('Not installed in /Users/seat/.claude on Ward desk: manifold@manifold');
+    expect(warning?.textContent).toContain('until each plugin is installed in that folder or removed from these settings');
+    expect(warning?.textContent).not.toContain('plugin_not_installed');
+    expect(warning?.getAttribute('title')).toBe('plugin_not_installed');
   });
-  it('says the check could not be read when the runner refuses, never that all are installed', async () => {
+  it.each([
+    ['plugins_unreadable', 'The runner could not read the installed plugins. Check the program’s configuration folder.'],
+    ['PluginProbeRefused', 'Lys refused: the installed plugins file is not JSON'],
+  ])('explains %s and a next action while retaining the server details without claiming installation', async (code, words) => {
     await mount('#/file/' + SCRIBE + '/provisioning', {
-      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
-      [asked]: refused(409, 'plugins_unreadable', 'the installed plugins file is not JSON'),
+      ...pluginRoutes, [path]: ok({ ...answer, profile: withPlugins }),
+      [asked]: refused(409, code, 'the installed plugins file is not JSON'),
     });
-    expect(text()).toContain('could not be read: plugins_unreadable');
-    expect(text()).not.toContain('Each is installed');
+    const plugins = document.querySelector('.given-plugins');
+    const warning = plugins?.querySelector('[role="alert"]');
+    expect(plugins?.textContent).toContain('Check that computer’s runner and the program’s configuration folder before starting the agent.');
+    expect(warning?.querySelector('p')?.textContent).toBe(words);
+    expect(warning?.querySelector('p')?.textContent).not.toContain(code);
+    expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(warning?.querySelector('details')?.textContent).toContain(code + ': the installed plugins file is not JSON');
+    expect(plugins?.textContent).not.toContain('Each is installed');
+    expect(plugins?.textContent).not.toContain('plugin_not_installed');
+  });
+  it('asks for a computer before checking installation and explains that starts still check', async () => {
+    const { requests } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...withPlugins, runs_on: '' } }),
+    });
+    const plugins = document.querySelector('.given-plugins');
+    expect(plugins?.textContent).toContain('Choose the computer this agent runs on to check its plugins. A start checks again and refuses any plugin that is missing.');
+    expect(plugins?.textContent).not.toContain('plugin_not_installed');
+    expect(requests.some((request) => request.startsWith('/harnesses/plugins'))).toBe(false);
+  });
+  it.each([
+    { description: 'another computer', installed: { machine: 'other-computer', config_dir: '/Users/seat/.claude', installed: ['argus@ablative', 'manifold@manifold'] } },
+    { description: 'a missing configuration folder', installed: { machine: 'machine-seat', config_dir: '', installed: ['argus@ablative', 'manifold@manifold'] } },
+    { description: 'an unreadable installed list', installed: { machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: 'argus@ablative' } },
+    { description: 'an invalid installed name', installed: { machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: ['argus@ablative', null] } },
+  ])('names a plugins answer for $description as unreadable instead of claiming installation', async ({ installed }) => {
+    await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...pluginRoutes, [path]: ok({ ...answer, profile: withPlugins }), [asked]: ok(installed),
+    });
+    const plugins = document.querySelector('.given-plugins');
+    const warning = plugins?.querySelector('[role="alert"]');
+    expect(warning?.querySelector('p')?.textContent).toBe('The runner could not read the installed plugins. Check the program’s configuration folder.');
+    expect(warning?.querySelector('details')?.textContent).toContain('plugins_unreadable: The computer did not answer which plugins are installed in its configuration folder.');
+    expect(plugins?.textContent).not.toContain('Each is installed');
   });
   it('says each is installed when the computer’s folder holds them all', async () => {
     await mount('#/file/' + SCRIBE + '/provisioning', {
-      ...routes, [path]: ok({ ...answer, profile: withPlugins }),
+      ...pluginRoutes, [path]: ok({ ...answer, profile: withPlugins }),
       [asked]: ok({ machine: 'machine-seat', config_dir: '/Users/seat/.claude', installed: ['argus@ablative', 'manifold@manifold'] }),
     });
-    expect(text()).toContain('Each is installed in /Users/seat/.claude on machine-seat');
+    expect(text()).toContain('Each is installed in /Users/seat/.claude on Ward desk');
   });
 });

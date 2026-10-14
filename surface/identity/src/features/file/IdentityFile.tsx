@@ -5,7 +5,7 @@ import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
 import { EmergencyStop, StopReceipt } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
-import { DirectoryGate as Gate, ErrorWords, ACTION, ACTION_SHORT, STATUS } from '../people/Words';
+import { DirectoryGate as Gate, ErrorWords, refusalWords, ACTION, ACTION_SHORT, STATUS } from '../people/Words';
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
@@ -64,7 +64,10 @@ function AgentEvidence({ data, tab, reload }: { data: FileData; tab: string; rel
 
 /** Why parts of an agent's page could not be read, said in place. */
 function ReadProblems({ problems }: { problems: Refused[] }) {
-  return problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <p key={index}><code>{problem.refusal.refusal}</code>: {problem.message}</p>)}</section> : null;
+  return problems.length ? <section aria-label="Read problems"><h2>What could not be read</h2>{problems.map((problem, index) => <div key={index}>
+    <ErrorWords problem={problem} />
+    {!refusalWords(problem.refusal.refusal) ? <p className="note">Ask the administrator to check why this read failed before changing this agent.</p> : null}
+  </div>)}</section> : null;
 }
 
 function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void;

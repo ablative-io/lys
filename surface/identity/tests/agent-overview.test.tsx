@@ -139,6 +139,11 @@ describe('An agent page explains the agent before its controls', () => {
     expect(overview?.textContent).toContain('Lys could not read model names just now');
     expect(overview?.textContent).not.toContain('model-one');
     expect($('[aria-label="Read problems"]')?.textContent).toContain('HarnessesUnavailable');
+    const problem = $('[aria-label="Read problems"] .why-not[role="alert"]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys refused: The program list could not be read');
+    expect(problem?.querySelector(':scope > p')?.closest('details')).toBeNull();
+    expect(problem?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(problem?.getAttribute('title')).toBe('HarnessesUnavailable: The program list could not be read');
     expect(run()?.textContent).toContain('Scribe is not running.');
     expect(run()?.textContent).toContain('Scribe has no program chosen yet.');
   });
@@ -236,10 +241,45 @@ describe('An agent page explains the agent before its controls', () => {
   it('keeps an unreadable computer list unknown instead of offering to add a first computer', async () => {
     const { posted } = await open({ ...notRunning, '/network': refused(503, 'NetworkUnavailable', 'The computer list could not be read') });
     expect($('[aria-label="Read problems"]')?.textContent).toContain('NetworkUnavailable');
+    const problem = $('[aria-label="Read problems"] .why-not[title="NetworkUnavailable: The computer list could not be read"]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys could not read the computers. Ask the administrator to check the service.');
+    expect(problem?.querySelector(':scope > p')?.textContent).not.toContain('NetworkUnavailable');
+    expect(problem?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(run()?.textContent).toContain('Lys could not read what Scribe needs to start.');
+    expect($('[aria-label="Read problems"]')?.textContent).not.toContain('Ask the administrator to check why this read failed');
     expect(run()?.textContent).not.toContain('No computer has Lys running on it yet');
     expect($('a[href="#/network?add=computer"]')).toBeNull();
     expect([...(run()?.querySelectorAll('button') ?? [])].map((entry) => entry.textContent)).toEqual(['Try again']);
+    expect(posted).toEqual([]);
+  });
+
+  it('keeps an unfamiliar read refusal’s fix visible and its complete server explanation in closed details', async () => {
+    const reason = 'future_team_rule: Ask the team owner to restore access, then open this agent again.';
+    const { posted } = await open({ '/teams': refused(409, 'future_team_rule', reason) });
+    await settle();
+    const problem = $('[aria-label="Read problems"] .why-not[role="alert"]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys refused: Ask the team owner to restore access, then open this agent again.');
+    expect(problem?.querySelector(':scope > p')?.textContent).not.toContain('future_team_rule');
+    expect(problem?.getAttribute('title')).toBe('future_team_rule: ' + reason);
+    expect(problem?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(problem?.querySelector('details .refusal-name')?.textContent).toBe('future_team_rule: ' + reason);
+    expect(problem?.querySelector('code')).toBeNull();
+    const next = $('[aria-label="Read problems"] .note');
+    expect(next?.textContent).toBe('Ask the administrator to check why this read failed before changing this agent.');
+    expect(next?.closest('details')).toBeNull();
+    expect(run()?.querySelector('[data-act="watch"]')).not.toBeNull();
+    expect(posted).toEqual([]);
+  });
+
+  it('explains an unreadable saved-settings answer with its next act while retaining the mismatch diagnosis', async () => {
+    const { posted } = await open({ [prefix + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: { ...ready, model_access: { unreadable: true } } }) });
+    await settle();
+    const problem = $('[aria-label="Read problems"] .why-not[title="AgentSettingsUnreadable: The saved computer and model could not be read."]');
+    expect(problem?.querySelector(':scope > p')?.textContent).toBe('Lys could not read this agent’s saved computer and model. Keep your changes and check its saved settings.');
+    expect(problem?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(problem?.querySelector('details .refusal-name')?.textContent).toBe('AgentSettingsUnreadable: The saved computer and model could not be read.');
+    expect(problem?.textContent).not.toContain('[object Object]');
+    expect(problem?.querySelector('code')).toBeNull();
     expect(posted).toEqual([]);
   });
 

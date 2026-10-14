@@ -4,8 +4,12 @@ use serde_json::Value;
 
 use super::{Sessions, Table, accounts, append, now_ms, text};
 use crate::error::RunnerError;
-use crate::tracking::{Figures, Reading, UsageRecord};
-use crate::tracking_store::{Body, SourceState};
+use crate::tracking::{Figures, Measure, Reading, UsageRecord};
+use crate::tracking_store::{Body, Feed, SourceState};
+
+#[cfg(test)]
+#[path = "status_words_tests.rs"]
+mod words_tests;
 
 #[cfg(test)]
 thread_local! {
@@ -154,16 +158,120 @@ fn proxied_status(
         now: now_ms(),
     };
     let record = format!("status-line:{id}:{}", table.feed.end());
-    let Some(Body::Usage(record)) = reading.status(&mut source, input, record) else {
-        return Ok("the figures repeat the last ones held".to_owned());
+    let reported = reading.status(&mut source, input, record);
+    let Some(Body::Usage(record)) = reported else {
+        let words = proxied_words(
+            &table.feed,
+            id,
+            &proxy.run,
+            &source,
+            previous.map(|pending| &pending.record),
+        )?;
+        return Ok(format!(
+            "{words}; reported cost and running time repeat the last reading"
+        ));
     };
     let pending = PendingStatus::new(record, &source, previous)?;
+    let words = proxied_words(&table.feed, id, &proxy.run, &source, Some(&pending.record))?;
     table
         .sessions
         .get_mut(id)
         .ok_or_else(|| crate::session::unknown(id))?
         .pending_status = Some(pending);
-    Ok("dollars and running time held until the run's next calls are read".to_owned())
+    Ok(words)
+}
+
+fn separated(value: impl std::fmt::Display) -> String {
+    let mut digits = value.to_string();
+    let mut position = digits.len();
+    while position > 3 {
+        position -= 3;
+        digits.insert(position, ',');
+    }
+    digits
+}
+
+/// Only this run's recorded calls count; a later call reporting no context replaces an older reading.
+fn proxied_words(
+    feed: &Feed,
+    id: &str,
+    run: &str,
+    source: &SourceState,
+    pending: Option<&UsageRecord>,
+) -> Result<String, RunnerError> {
+    let mut cursor = None;
+    let mut calls = std::collections::BTreeSet::new();
+    let mut latest: Option<(u64, u64, Option<u64>)> = None;
+    let mut cost_reset = pending.is_some_and(|usage| {
+        usage
+            .unavailable
+            .iter()
+            .any(|note| note.reason == "reported_session_cost_reset")
+    });
+    while feed.after(cursor.as_deref())? {
+        let page = feed.page(cursor.as_deref())?;
+        for entry in page.entries {
+            let Body::Usage(usage) = entry.body else {
+                continue;
+            };
+            if usage.session != id || usage.run.as_deref() != Some(run) {
+                continue;
+            }
+            cost_reset |= usage
+                .unavailable
+                .iter()
+                .any(|note| note.reason == "reported_session_cost_reset");
+            if usage.measure != Measure::Spend {
+                continue;
+            }
+            calls.insert(usage.id);
+            if latest
+                .as_ref()
+                .is_none_or(|(at, seq, _)| (usage.observed_at, entry.seq) > (*at, *seq))
+            {
+                latest = Some((usage.observed_at, entry.seq, usage.figures.context_tokens));
+            }
+        }
+        if cursor.as_ref() == Some(&page.cursor) {
+            return Err(RunnerError::refused(
+                "status_feed_stalled",
+                "the recorded usage cursor did not advance",
+            ));
+        }
+        cursor = Some(page.cursor);
+    }
+    if calls.is_empty() {
+        return Ok("dollars and running time held until the run's first call is read".to_owned());
+    }
+    let context = latest.and_then(|(_, _, tokens)| tokens).map_or_else(
+        || "context not reported by the latest call".to_owned(),
+        |tokens| format!("{} tokens of context", separated(tokens)),
+    );
+    let reported = source
+        .snapshot
+        .as_ref()
+        .and_then(|figures| figures.dollars_micros);
+    let cost = reported.or(source.reported_cost_micros).map_or_else(
+        || "cost not reported".to_owned(),
+        |micros| {
+            let scope = if cost_reset {
+                "reported since the cost reset"
+            } else {
+                "so far"
+            };
+            let scope = if reported.is_none() {
+                "last reported; current cost not reported"
+            } else {
+                scope
+            };
+            format!("${}.{:06} {scope}", micros / 1_000_000, micros % 1_000_000)
+        },
+    );
+    Ok(format!(
+        "{} call{} · {context} · {cost}",
+        separated(calls.len()),
+        if calls.len() == 1 { "" } else { "s" }
+    ))
 }
 
 /// Keep what the status line of session `id`, tracked neither natively nor
