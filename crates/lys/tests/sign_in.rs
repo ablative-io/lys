@@ -17,6 +17,9 @@ use sha2::{Digest, Sha256};
 const PERSON: &str = "person-0123456789abcdef0123456789abcdef";
 type Outcome = Result<(), Box<dyn Error>>;
 
+#[path = "support/sign_in_errors.rs"]
+mod errors_tests;
+
 struct Request {
     method: String,
     path: String,

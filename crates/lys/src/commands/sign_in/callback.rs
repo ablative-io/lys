@@ -1,7 +1,8 @@
 //! The loopback approval receiver validates the callback before exchanging authority.
 
-use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::time::{Duration, Instant};
 use zeroize::Zeroizing;
 
 use super::errors::source_refused;
@@ -41,108 +42,188 @@ fn decoded(value: &str) -> CliResult<String> {
 }
 
 pub(super) fn callback(listener: &TcpListener, expected: &str) -> CliResult<Zeroizing<String>> {
-    loop {
-        let (mut stream, peer) = listener.accept().map_err(|error| {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_io()
+        .enable_time()
+        .build()
+        .map_err(|error| {
             source_refused(
                 "sign_in_callback_unavailable",
-                "the loopback receiver could not accept the browser",
+                "the approval receiver could not start",
                 error,
             )
         })?;
-        if !peer.ip().is_loopback() {
-            return Err(refused(
-                "sign_in_callback_invalid",
-                "the browser did not arrive on loopback",
-            ));
+    let socket = listener.try_clone().map_err(|error| {
+        source_refused(
+            "sign_in_callback_unavailable",
+            "the loopback receiver could not be retained",
+            error,
+        )
+    })?;
+    socket.set_nonblocking(true).map_err(|error| {
+        source_refused(
+            "sign_in_callback_unavailable",
+            "the loopback receiver could not accept independently",
+            error,
+        )
+    })?;
+    runtime.block_on(async {
+        let listener = tokio::net::TcpListener::from_std(socket).map_err(|error| {
+            source_refused(
+                "sign_in_callback_unavailable",
+                "the loopback receiver could not be followed",
+                error,
+            )
+        })?;
+        wait(
+            listener,
+            expected,
+            Instant::now() + Duration::from_secs(600),
+        )
+        .await
+    })
+}
+
+enum Received {
+    Approved(Zeroizing<String>),
+    Unrelated,
+    Incomplete,
+}
+
+async fn wait(
+    listener: tokio::net::TcpListener,
+    expected: &str,
+    until: Instant,
+) -> CliResult<Zeroizing<String>> {
+    let mut reading = tokio::task::JoinSet::new();
+    loop {
+        tokio::select! {
+            () = tokio::time::sleep_until(until) => return Err(refused("sign_in_approval_expired", "the browser approval expired after ten minutes; run `lys sign-in` again and approve its new page")),
+            accepted = listener.accept(), if reading.len() < 16 => {
+                let (stream, peer) = accepted.map_err(|error| source_refused("sign_in_callback_unavailable", "the loopback receiver could not accept the browser", error))?;
+                if !peer.ip().is_loopback() { return Err(refused("sign_in_callback_invalid", "the browser did not arrive on loopback")); }
+                let expected = expected.to_owned();
+                reading.spawn(async move {
+                    match tokio::time::timeout(Duration::from_secs(5), receive(stream, &expected)).await {
+                        Ok(result) => result,
+                        Err(_) => Ok(Received::Incomplete),
+                    }
+                });
+            }
+            Some(answer) = reading.join_next(), if !reading.is_empty() => {
+                match answer.map_err(|error| source_refused("sign_in_callback_unavailable", "the browser receiver did not finish", error))?? {
+                    Received::Approved(code) => return Ok(code),
+                    Received::Unrelated => {},
+                    Received::Incomplete => eprintln!("Lys: sign_in_callback_incomplete: a loopback connection sent no whole callback; waiting for browser approval"),
+                }
+            }
         }
-        let mut request = String::new();
-        let mut input = BufReader::new(&mut stream).take(16384);
-        input.read_line(&mut request).map_err(|error| {
+    }
+}
+
+async fn receive(mut stream: tokio::net::TcpStream, expected: &str) -> CliResult<Received> {
+    let mut request = String::new();
+    let mut input = BufReader::new(&mut stream).take(16384);
+    input.read_line(&mut request).await.map_err(|error| {
+        source_refused(
+            "sign_in_callback_invalid",
+            "the browser's request could not be read",
+            error,
+        )
+    })?;
+    loop {
+        let mut header = String::new();
+        let size = input.read_line(&mut header).await.map_err(|error| {
             source_refused(
                 "sign_in_callback_invalid",
-                "the browser's request could not be read",
+                "the browser's headers could not be read",
                 error,
             )
         })?;
-        loop {
-            let mut header = String::new();
-            let size = input.read_line(&mut header).map_err(|error| {
+        if size == 0 {
+            return Err(refused(
+                "sign_in_callback_invalid",
+                "the browser's headers are incomplete or exceed the callback limit",
+            ));
+        }
+        if header == "\r\n" {
+            break;
+        }
+    }
+    drop(input);
+    let target = request
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| refused("sign_in_callback_invalid", "the browser sent no callback"))?;
+    if !request.starts_with("GET ") || !target.starts_with("/lys/sign-in?") {
+        stream
+            .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await
+            .map_err(|error| {
                 source_refused(
-                    "sign_in_callback_invalid",
-                    "the browser's headers could not be read",
+                    "sign_in_callback_unavailable",
+                    "the browser could not be answered",
                     error,
                 )
             })?;
-            if size == 0 {
-                return Err(refused(
-                    "sign_in_callback_invalid",
-                    "the browser's headers are incomplete",
-                ));
-            }
-            if header == "\r\n" {
-                break;
-            }
+        return Ok(Received::Unrelated);
+    }
+    let mut values = std::collections::BTreeMap::new();
+    for pair in target.trim_start_matches("/lys/sign-in?").split('&') {
+        let (key, value) = pair.split_once('=').ok_or_else(|| {
+            refused(
+                "sign_in_callback_invalid",
+                "the callback fields are incomplete",
+            )
+        })?;
+        if values.insert(decoded(key)?, decoded(value)?).is_some() {
+            return Err(refused(
+                "sign_in_callback_invalid",
+                "a callback field is repeated",
+            ));
         }
-        drop(input);
-        let target = request
-            .split_whitespace()
-            .nth(1)
-            .ok_or_else(|| refused("sign_in_callback_invalid", "the browser sent no callback"))?;
-        if !request.starts_with("GET ") || !target.starts_with("/lys/sign-in?") {
-            stream
-                .write_all(
-                    b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-                )
-                .map_err(|error| {
-                    source_refused(
-                        "sign_in_callback_unavailable",
-                        "the browser could not be answered",
-                        error,
-                    )
-                })?;
-            continue;
-        }
-        let mut values = std::collections::BTreeMap::new();
-        for pair in target.trim_start_matches("/lys/sign-in?").split('&') {
-            let (key, value) = pair.split_once('=').ok_or_else(|| {
+    }
+    if values.get("state").map(String::as_str) != Some(expected) {
+        return Err(refused(
+            "sign_in_state_wrong",
+            "the callback does not answer this sign-in",
+        ));
+    }
+    if values.contains_key("error") {
+        let reason = values
+            .get("error_description")
+            .map_or("the person did not approve this terminal", String::as_str);
+        return Err(refused("sign_in_refused", reason));
+    }
+    let code = Zeroizing::new(
+        values
+            .remove("code")
+            .filter(|code| !code.is_empty())
+            .ok_or_else(|| {
                 refused(
                     "sign_in_callback_invalid",
-                    "the callback fields are incomplete",
+                    "the callback supplied no authorization answer",
                 )
-            })?;
-            if values.insert(decoded(key)?, decoded(value)?).is_some() {
-                return Err(refused(
-                    "sign_in_callback_invalid",
-                    "a callback field is repeated",
-                ));
-            }
-        }
-        if values.get("state").map(String::as_str) != Some(expected) {
-            return Err(refused(
-                "sign_in_state_wrong",
-                "the callback does not answer this sign-in",
-            ));
-        }
-        if values.contains_key("error") {
-            return Err(refused(
-                "sign_in_refused",
-                "the person did not approve this terminal",
-            ));
-        }
-        let code = Zeroizing::new(
-            values
-                .remove("code")
-                .filter(|code| !code.is_empty())
-                .ok_or_else(|| {
-                    refused(
-                        "sign_in_callback_invalid",
-                        "the callback supplied no authorization answer",
-                    )
-                })?,
-        );
-        let body = b"Signed in to Lys. You can close this tab.";
-        write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len())
-            .and_then(|()| stream.write_all(body)).map_err(|error| source_refused("sign_in_callback_unavailable", "the browser could not be answered", error))?;
-        return Ok(code);
-    }
+            })?,
+    );
+    let body = "Approval received. Return to your terminal to see whether sign-in completed.";
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
+    stream
+        .write_all(response.as_bytes())
+        .await
+        .map_err(|error| {
+            source_refused(
+                "sign_in_callback_unavailable",
+                "the browser could not be answered",
+                error,
+            )
+        })?;
+    Ok(Received::Approved(code))
 }
+
+#[cfg(test)]
+#[path = "callback_tests.rs"]
+mod tests;
