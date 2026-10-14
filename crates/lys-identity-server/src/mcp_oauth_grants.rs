@@ -5,7 +5,7 @@
 //! app's agent as their own delegation, use only, so the app holds exactly
 //! what was chosen and never the person's own authority.
 
-use lys_identity::grants::{GrantId, PassOn, RecipientKind, RevokeRequest, Route};
+use lys_identity::grants::{GrantId, Model, PassOn, RecipientKind, RevokeRequest, Route};
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde_json::json;
 
@@ -15,6 +15,10 @@ use crate::grants::with_grants;
 use crate::routes::AppState;
 use crate::session::now;
 
+#[path = "mcp_oauth_choices.rs"]
+mod choices;
+pub(crate) use choices::grouped;
+
 /// One thing a person may pass on to an app.
 pub(crate) struct Offer {
     pub(crate) key: String,
@@ -22,21 +26,21 @@ pub(crate) struct Offer {
     pub(crate) kind: String,
     pub(crate) id: String,
     pub(crate) relation: String,
-    /// What the app may then do, each action's name read as words.
+    /// The declared actions, retained exactly for consent binding.
     pub(crate) actions: Vec<String>,
 }
 
-impl Offer {
-    /// The words the approval page shows for it: what the app may do, and
-    /// to which thing, so a person reads the effect rather than a code.
-    pub(crate) fn words(&self) -> String {
-        let doing = match self.actions.as_slice() {
-            [] => "nothing".to_owned(),
-            [only] => only.clone(),
-            [first @ .., last] => format!("{} and {last}", first.join(", ")),
-        };
-        format!("Let it {doing} the {} called {}", self.kind, self.id)
-    }
+pub(super) fn words(kind: &str, id: &str, actions: &[String]) -> String {
+    let actions: Vec<_> = actions
+        .iter()
+        .map(|action| action.replace(['.', '_', '-'], " "))
+        .collect();
+    let doing = match actions.as_slice() {
+        [] => "nothing".to_owned(),
+        [only] => only.clone(),
+        [first @ .., last] => format!("{} and {last}", first.join(", ")),
+    };
+    format!("Let it {doing} the {kind} called {id}")
 }
 
 /// Every offer `person` may make to an app now.
@@ -66,7 +70,11 @@ pub(crate) fn offers(state: &AppState, person: PersonId) -> Result<Vec<Offer>, S
             }
             let resource = grant.resource();
             for (relation, allowed) in model.relations_on(resource.kind()) {
-                if allowed.is_subset(actions) {
+                if allowed.is_subset(actions)
+                    && allowed
+                        .iter()
+                        .all(|action| model.agent_may_hold(resource.kind(), action))
+                {
                     offers.push(Offer {
                         key: format!("{}:{}", grant.id(), relation.as_str()),
                         source: grant.id().to_string(),
@@ -75,7 +83,7 @@ pub(crate) fn offers(state: &AppState, person: PersonId) -> Result<Vec<Offer>, S
                         relation: relation.as_str().to_owned(),
                         actions: allowed
                             .iter()
-                            .map(|action| action.as_str().replace(['.', '_', '-'], " "))
+                            .map(|action| action.as_str().to_owned())
                             .collect(),
                     });
                 }
@@ -96,19 +104,22 @@ pub(crate) fn chosen(
     if chosen.is_empty() {
         return Ok(Vec::new());
     }
-    let mut offered = offers(state, person)?;
+    let mut offered = grouped(offers(state, person)?)?;
     chosen
         .iter()
         .map(|key| {
             offered
                 .iter()
                 .position(|offer| offer.key == *key)
-                .map(|at| offered.swap_remove(at))
+                .map(|at| offered.swap_remove(at).pick())
                 .ok_or_else(|| ServerError::RequestMalformed {
                     reason: "a chosen permission is not one this person may pass on".to_owned(),
                 })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .map(|groups| groups.into_iter().flatten().collect())
 }
 
 /// Pass every chosen offer on from `person` to `agent`, use only, or none:
@@ -143,6 +154,16 @@ pub(crate) fn pass_on(
         })
         .collect::<Result<Vec<_>, ServerError>>()?;
     with_grants(state, |judged| {
+        if picked
+            .iter()
+            .any(|offer| !still_offered(judged.grants.model(), offer))
+        {
+            return Err(ServerError::RequestMalformed {
+                reason:
+                    "the chosen permissions changed; connect again and choose what the app may do"
+                        .to_owned(),
+            });
+        }
         let mut made = Vec::new();
         for (kind, request) in &requests {
             let passed = judged
@@ -161,6 +182,17 @@ pub(crate) fn pass_on(
             }
         }
         Ok(())
+    })
+}
+
+fn still_offered(model: &Model, offer: &Offer) -> bool {
+    model.relations_on(&offer.kind).any(|(relation, actions)| {
+        relation.as_str() == offer.relation
+            && actions.len() == offer.actions.len()
+            && actions.iter().all(|action| {
+                offer.actions.iter().any(|chosen| chosen == action.as_str())
+                    && model.agent_may_hold(&offer.kind, action)
+            })
     })
 }
 
@@ -205,7 +237,22 @@ fn withdrawn(
 
 #[cfg(test)]
 mod tests {
-    use super::Offer;
+    use super::{Offer, still_offered, words};
+    use lys_identity::grants::{Action, Model, Relation};
+
+    #[test]
+    fn a_relation_cannot_gain_acts_between_consent_and_delegation()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let relation = Relation::new("viewer")?;
+        let read = Action::new("read")?;
+        let write = Action::new("write")?;
+        let before = Model::new(1, [(relation.clone(), [read.clone()].into())])?;
+        let after = Model::new(2, [(relation, [read, write].into())])?;
+        let chosen = offer(&["read"]);
+        assert!(still_offered(&before, &chosen));
+        assert!(!still_offered(&after, &chosen));
+        Ok(())
+    }
 
     fn offer(actions: &[&str]) -> Offer {
         Offer {
@@ -221,13 +268,17 @@ mod tests {
     #[test]
     fn an_offer_reads_as_what_the_app_may_do_to_which_thing() {
         assert_eq!(
-            offer(&["read"]).words(),
+            words("project", "lys", &offer(&["read"]).actions),
             "Let it read the project called lys"
         );
         assert_eq!(
-            offer(&["read", "write", "grant revoke"]).words(),
+            words(
+                "project",
+                "lys",
+                &offer(&["read", "write", "grant revoke"]).actions
+            ),
             "Let it read, write and grant revoke the project called lys"
         );
-        assert!(!offer(&["read"]).words().contains("viewer"));
+        assert!(!words("project", "lys", &offer(&["read"]).actions).contains("viewer"));
     }
 }

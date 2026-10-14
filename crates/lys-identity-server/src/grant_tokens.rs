@@ -125,6 +125,8 @@ pub struct Revoked {
 }
 
 /// Read exactly one token header and refuse a personal session alongside it.
+/// # Errors
+/// Refuses a missing, repeated or unreadable token header.
 pub fn header(headers: &HeaderMap) -> Result<&str, TokenError> {
     if headers.get_all(HEADER).iter().count() != 1 {
         return Err(TokenError::Unknown);
@@ -175,6 +177,8 @@ pub(crate) fn bound(
 
 /// Validate a token against its bound grant in current cached projections.
 /// The consuming route supplies its declared scope and judges its own holding.
+/// # Errors
+/// Refuses an unknown or expired token, an inactive grant chain, or an action outside its scope.
 pub fn validate_with(
     tokens: &Tokens,
     book: &GrantBook,
@@ -195,6 +199,8 @@ pub fn validate_with(
 
 /// Validate only the token's bound grant against caller-supplied declared scope.
 /// This answers grant admission; the consuming route still judges its holding.
+/// # Errors
+/// Refuses unavailable token authority, invalid tokens, or actions outside their live grant.
 pub fn validate(
     state: &AppState,
     token: &str,
@@ -282,6 +288,42 @@ async fn revoke(
                 id: token_id,
                 revoked: true,
             }))
+        })())
+    })?
+}
+
+/// Authenticate a token for reading its one live bound grant.
+pub(crate) fn discovery_principal(
+    state: &AppState,
+    token: &str,
+) -> Result<crate::agent_signature::TokenPrincipal, TokenError> {
+    let at = crate::session::now();
+    crate::grants::with_grants(state, |judged| {
+        Ok((|| {
+            let grant = {
+                let tokens = state.grant_tokens.lock().map_err(|error| {
+                    TokenError::Unavailable(format!("grant token lock poisoned: {error}"))
+                })?;
+                tokens
+                    .lookup(token, at)?
+                    .grant
+                    .parse::<GrantId>()
+                    .map_err(|error| {
+                        TokenError::Unavailable(format!("invalid cached grant id: {error}"))
+                    })?
+            };
+            effective(judged.grants.book(), judged.directory, grant, at)
+                .map_err(ServerError::from)?;
+            let holder = judged
+                .grants
+                .book()
+                .grant(grant)
+                .ok_or(TokenError::Unknown)?
+                .holder();
+            let IdentityId::Agent(holder) = holder else {
+                return Err(TokenError::HolderNotAgent);
+            };
+            Ok(crate::agent_signature::TokenPrincipal { holder, grant })
         })())
     })?
 }

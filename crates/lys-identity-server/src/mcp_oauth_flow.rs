@@ -146,13 +146,25 @@ pub(super) async fn authorize(
     let person = crate::routes::with_directory(&apps.state, |directory| {
         crate::read_api::own_person(directory.projection()?, &session_actor)
     })?;
-    let mut choices = String::new();
     if native {
         return Ok(([(header::CACHE_CONTROL, "no-store"), (header::X_FRAME_OPTIONS, "DENY"),
             (header::CONTENT_SECURITY_POLICY, "default-src 'none'; form-action 'self'")],
             Html(format!("<!doctype html><title>Sign in to Lys CLI</title><h1>Sign in to Lys CLI</h1><p>Your terminal will act as you in Lys. Ending this sign-in ends its authority.</p><form method=\"post\" action=\"/oauth/mcp/consent\"><input type=\"hidden\" name=\"asking\" value=\"{asking}\"><button name=\"decision\" value=\"approve\">Sign in to Lys CLI</button><button name=\"decision\" value=\"refuse\">Cancel</button></form>"))).into_response());
     }
-    for offer in crate::mcp_oauth_grants::offers(&apps.state, person)? {
+    consent_screen(&apps, person, &asking, &name, &asked.redirect_uri)
+}
+
+fn consent_screen(
+    apps: &Apps,
+    person: lys_identity::PersonId,
+    asking: &str,
+    name: &str,
+    redirect_uri: &str,
+) -> Result<Response, ServerError> {
+    let mut choices = String::new();
+    for offer in
+        crate::mcp_oauth_grants::grouped(crate::mcp_oauth_grants::offers(&apps.state, person)?)?
+    {
         choices.push_str("<label><input type=\"checkbox\" name=\"grant\" value=\"");
         choices.push_str(&escaped(&offer.key));
         choices.push_str("\"> ");
@@ -165,9 +177,9 @@ pub(super) async fn authorize(
     } else {
         format!("<p>Choose what it may do for you:</p><p>{choices}</p>")
     };
-    let name = escaped(&name);
+    let name = escaped(name);
     let site = escaped(
-        &reqwest::Url::parse(&asked.redirect_uri)
+        &reqwest::Url::parse(redirect_uri)
             .ok()
             .and_then(|url| url.host_str().map(str::to_owned))
             .unwrap_or_default(),
@@ -191,6 +203,7 @@ button[value=approve]{{background:#1d1d1f;color:#fff;border-color:#1d1d1f}}</sty
 and you can take that away or remove it at any time from your agents in Lys.</p>\
 <form method=\"post\" action=\"/oauth/mcp/consent\">\
 <input type=\"hidden\" name=\"asking\" value=\"{asking}\">{choices}\
+<p>Ticking nothing connects nothing. The app will have no permissions.</p>\
 <button type=\"submit\" name=\"decision\" value=\"approve\">Connect {name}</button>\
 <button type=\"submit\" name=\"decision\" value=\"refuse\">Don't connect</button>\
 </form></body></html>"

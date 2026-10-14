@@ -12,6 +12,9 @@ use reqwest::redirect::Policy;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+#[path = "mcp_oauth_discovery_tests.rs"]
+mod discovery_tests;
+
 const REDIRECT: &str = "https://app.example/callback";
 const VERIFIER: &str = "a-verifier-of-at-least-forty-three-characters-long";
 
