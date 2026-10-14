@@ -10,6 +10,17 @@ use crate::openapi_refusals::{
 };
 use crate::openapi_table::{A, GET, POST, PUT, S};
 
+mod apps;
+
+use crate::apps_api::{AppApprovalBody, DecideBody, RegisterBody, RegistrarBody};
+use crate::apps_bench::{AskBody, BENCH, BenchAnswer, OpenBody};
+use crate::apps_connector_give::ConnectorBody;
+use crate::apps_schema_api::{ChangeBody, ChangeDecision, CheckBody, PlaceBody};
+use crate::apps_sign_in::AppSignInBody;
+use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged};
+use crate::apps_views::{SchemaCheck, SchemaVersionView};
+use crate::grants_batch::{BatchAnswer, BatchBody, WhichBody, WhichPage};
+
 /// The grant log's recorded identity could not be read (DIRECTORY-089 R1).
 const LOG_IDENTITY: &[&str] = &["grant_log_identity_unavailable"];
 /// A read of the grant change stream: its bounded wait, and a log position
@@ -29,19 +40,30 @@ const BINDING: &[&str] = &[
 
 /// The routes an app codes against, each with the types it takes and answers.
 pub(crate) fn typed(api: &mut Api) {
-    use crate::apps_api::{AppApprovalBody, DecideBody, RegisterBody, RegistrarBody};
-    use crate::apps_bench::{AskBody, BENCH, BenchAnswer, OpenBody};
-    use crate::apps_connector_give::ConnectorBody;
-    use crate::apps_schema_api::{ChangeBody, ChangeDecision, CheckBody, PlaceBody};
-    use crate::apps_sign_in::AppSignInBody;
-    use crate::apps_views::{AppView, Approval, AppsView, RegistrarIssued, SchemaChanged};
-    use crate::apps_views::{SchemaCheck, SchemaVersionView};
-    use crate::grants_batch::{BatchAnswer, BatchBody, WhichBody, WhichPage};
-
     let (app, apps) = (api.schema::<AppView>(), api.schema::<AppsView>());
     let decide = api.schema::<DecideBody>();
     let changed = api.schema::<SchemaChanged>();
-    let routes = [
+    let mut routes = Vec::new();
+    routes.extend(service_admin(api));
+    routes.extend(apps::credentials(api, &app));
+    routes.extend(apps::registration(api, &app, apps));
+    routes.extend(apps::approval(api, &app));
+    routes.extend(apps::settings(api, &app));
+    routes.extend(apps::decisions(&app, decide));
+    routes.extend(apps::schemas(api, app, changed));
+    routes.extend(placements(api));
+    routes.extend(benches(api));
+    routes.extend(grant_checks_and_stream(api));
+    routes.extend(grant_stream(api));
+    routes.extend(membership(api));
+    for route in routes {
+        api.route(route);
+    }
+    crate::product_drafts::typed(api);
+}
+
+fn service_admin(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![
         route(
             (
                 POST,
@@ -93,257 +115,25 @@ pub(crate) fn typed(api: &mut Api) {
                 &["ConfigInvalid", "ServiceAccountUnknown", "NotHeld"],
             ],
         ),
-        route(
-            (
-                POST,
-                "/apps/{app}/credentials/issue",
-                "Issue an approved app a client credential, answered once",
-            ),
-            S,
-            Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
-            Some(api.schema::<crate::apps_views::ClientCredentialGiven>()),
-            &[
-                ADMIN_BODY,
-                CREDENTIAL,
-                &["NoPerson", "SecretsUnavailable", "AppClientNoCustody"],
-            ],
+    ]
+}
+
+fn placements(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![route(
+        (
+            POST,
+            "/apps/{app}/placements",
+            "Place a resource in its parent",
         ),
-        route(
-            (
-                POST,
-                "/apps/{app}/bearer/issue",
-                "Issue or rotate an approved app's bearer, answered once",
-            ),
-            S,
-            Some(api.schema::<crate::apps_client_credentials::ClientCredentialIssueBody>()),
-            Some(api.schema::<crate::apps_views::AppBearerGiven>()),
-            &[ADMIN_BODY, CREDENTIAL, &["NoPerson", "SecretsUnavailable"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/credentials/{credential}/revoke",
-                "Revoke one of an app's client credentials",
-            ),
-            S,
-            Some(api.schema::<crate::apps_client_credentials::ClientCredentialRevokeBody>()),
-            Some(app.clone()),
-            &[ADMIN_BODY, CREDENTIAL, &["credential_refused"]],
-        ),
-        route(
-            (
-                POST,
-                "/identity/import",
-                "Import named entries as an independently authorised service account",
-            ),
-            A,
-            Some(api.schema::<crate::import_api::ImportDocument>()),
-            Some(api.schema::<crate::import_api::ImportAnswer>()),
-            &[
-                REGISTER,
-                crate::openapi_refusals::GRANT_MADE,
-                &[
-                    "NotSignedIn",
-                    "NotHeld",
-                    "NoPerson",
-                    "RootAuthorityRefused",
-                    "GrantNotVisible",
-                    "ServiceAccountUnknown",
-                    "app_operation_reused",
-                    "UseOnly",
-                    "ExpiryBeyondSource",
-                    "ActionsOutside",
-                    "RecipientRefused",
-                    "IdentityNotActive",
-                    "Revoked",
-                ],
-            ],
-        ),
-        route(
-            (
-                POST,
-                "/apps",
-                "Register an app: pending until the administrator approves it",
-            ),
-            A,
-            Some(api.schema::<RegisterBody>()),
-            Some(app.clone()),
-            &[REGISTER],
-        ),
-        route(
-            (GET, "/apps", "Every app the caller may see"),
-            A,
-            None,
-            Some(apps),
-            &[APP_READ, &["NoPerson"]],
-        ),
-        route(
-            (GET, "/apps/me", "The app a credential signs in as"),
-            A,
-            None,
-            Some(app.clone()),
-            &[APP_SELF, &["NotSignedIn"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/registrars",
-                "Make a service account a registrar",
-            ),
-            S,
-            Some(api.schema::<RegistrarBody>()),
-            Some(api.schema::<RegistrarIssued>()),
-            &[ADMIN_BODY],
-        ),
-        route(
-            (GET, "/apps/{app}", "One app the caller may see"),
-            A,
-            None,
-            Some(app.clone()),
-            &[APP_READ],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/approve",
-                "Approve an app with its sign-in settings, after configured broker credential custody",
-            ),
-            S,
-            Some(api.schema::<AppApprovalBody>()),
-            Some(api.schema::<Approval>()),
-            &[
-                DECIDE,
-                &[
-                    "RequestMalformed",
-                    "NoPerson",
-                    "SecretsUnavailable",
-                    "redirect_invalid",
-                    "connector_needs_a_person",
-                ],
-            ],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/sign_in",
-                "Set an approved app's return addresses and whether it is given the person's name",
-            ),
-            S,
-            Some(api.schema::<AppSignInBody>()),
-            Some(app.clone()),
-            &[
-                ADMIN_BODY,
-                &[
-                    "app_unknown",
-                    "app_not_approved",
-                    "app_retired",
-                    "redirect_invalid",
-                    "app_operation_reused",
-                ],
-            ],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/connector",
-                "Give an app approved before connectors its connector, answering to the administrator acting",
-            ),
-            S,
-            Some(api.schema::<ConnectorBody>()),
-            Some(app.clone()),
-            &[
-                ADMIN_BODY,
-                &[
-                    "app_unknown",
-                    "app_not_approved",
-                    "app_retired",
-                    "app_is_lys",
-                    "connector_exists",
-                    "connector_needs_a_person",
-                    "app_operation_reused",
-                ],
-            ],
-        ),
-        route(
-            (POST, "/apps/{app}/decline", "Decline an app"),
-            S,
-            Some(decide.clone()),
-            Some(app.clone()),
-            &[DECIDE, &["RequestMalformed"]],
-        ),
-        route(
-            (POST, "/apps/{app}/retire", "Retire an app"),
-            S,
-            Some(decide),
-            Some(app.clone()),
-            &[RETIRE, &["RequestMalformed"]],
-        ),
-        route(
-            (
-                GET,
-                "/apps/{app}/schema",
-                "A schema version, the current one unless `version` names one",
-            ),
-            A,
-            None,
-            Some(api.schema::<SchemaVersionView>()),
-            &[VERSION, &["NotSignedIn"]],
-        ),
-        route(
-            (
-                PUT,
-                "/apps/{app}/schema",
-                "Change a schema, replacing the version named",
-            ),
-            A,
-            Some(api.schema::<ChangeBody>()),
-            Some(changed.clone()),
-            &[CHANGE, &["RequestMalformed"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/schema/check",
-                "What a schema change would do, writing nothing",
-            ),
-            A,
-            Some(api.schema::<CheckBody>()),
-            Some(api.schema::<SchemaCheck>()),
-            &[CHECK, &["RequestMalformed"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/schema/approve",
-                "Approve the schema change waiting",
-            ),
-            S,
-            Some(api.schema::<ChangeDecision>()),
-            Some(changed),
-            &[CHANGE_DECIDE, &["RequestMalformed"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/schema/decline",
-                "Decline the schema change waiting",
-            ),
-            S,
-            Some(api.schema::<ChangeDecision>()),
-            Some(app),
-            &[CHANGE_DECIDE, &["RequestMalformed"]],
-        ),
-        route(
-            (
-                POST,
-                "/apps/{app}/placements",
-                "Place a resource in its parent",
-            ),
-            A,
-            Some(api.schema::<PlaceBody>()),
-            None,
-            &[PLACE, &["RequestMalformed"]],
-        ),
+        A,
+        Some(api.schema::<PlaceBody>()),
+        None,
+        &[PLACE, &["RequestMalformed"]],
+    )]
+}
+
+fn benches(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![
         route(
             (POST, "/apps/bench", "Open a test bench on a draft schema"),
             A,
@@ -369,6 +159,11 @@ pub(crate) fn typed(api: &mut Api) {
             None,
             &[BENCH, &["NotSignedIn"]],
         ),
+    ]
+}
+
+fn grant_checks_and_stream(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![
         route(
             (
                 POST,
@@ -391,6 +186,11 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<WhichPage>()),
             &[WHICH],
         ),
+    ]
+}
+
+fn grant_stream(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![
         route(
             (
                 POST,
@@ -424,6 +224,11 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<crate::grant_bindings_api::BindAnswer>()),
             &[BATCH, LOG_IDENTITY, BINDING],
         ),
+    ]
+}
+
+fn membership(api: &mut Api) -> Vec<lys_openapi::Route> {
+    vec![
         route(
             (
                 POST,
@@ -479,9 +284,5 @@ pub(crate) fn typed(api: &mut Api) {
             Some(api.schema::<crate::channel_membership_counts::MembershipCounts>()),
             &[BATCH],
         ),
-    ];
-    for route in routes {
-        api.route(route);
-    }
-    crate::product_drafts::typed(api);
+    ]
 }

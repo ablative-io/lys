@@ -100,6 +100,7 @@ pub(crate) fn route(
 }
 
 /// The route table: every route the service serves.
+#[must_use]
 pub fn api() -> Api {
     let mut api = Api::new(
         "Lys directory",
@@ -122,6 +123,11 @@ pub fn api() -> Api {
 }
 
 /// The document, generated from the table.
+///
+/// # Errors
+/// Refuses a route table the document generator cannot validate, query
+/// schemas that cannot be amended, or a registration schema without its
+/// `answers_to` field.
 pub fn document() -> Result<Value, ServerError> {
     #[cfg(test)]
     cache_tests::built();

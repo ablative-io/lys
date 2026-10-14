@@ -24,6 +24,18 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
     let (set, review) = (api.schema::<ProfileBody>(), api.schema::<ReviewBody>());
     let (report, session) = (api.schema::<ReportBody>(), api.schema::<RuntimeSession>());
     let running = api.schema::<RuntimeList>();
+    let mut routes = Vec::new();
+    routes.extend(capabilities(api));
+    routes.extend(link_audit(api, receipt, delivery, asked));
+    routes.extend(machines(api, machine));
+    routes.extend(provisioning(api, profile, skills, set, review));
+    routes.extend(runtime(report, session, running));
+    routes.extend(stops(api));
+    routes.extend(accounts(api));
+    routes
+}
+
+fn capabilities(api: &mut Api) -> Vec<Entry> {
     vec![
         (
             GET,
@@ -61,6 +73,16 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::message_edges::EdgeQuery>()),
             Some(api.schema::<crate::message_edges::EdgePage>()),
         ),
+    ]
+}
+
+fn link_audit(
+    api: &mut Api,
+    receipt: std::borrow::Cow<'static, str>,
+    delivery: std::borrow::Cow<'static, str>,
+    asked: std::borrow::Cow<'static, str>,
+) -> Vec<Entry> {
+    vec![
         (POST, "/link-audit", Some(delivery), Some(receipt)),
         (
             POST,
@@ -68,6 +90,11 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(asked),
             Some(api.schema::<LinkAuditPerson>()),
         ),
+    ]
+}
+
+fn machines(api: &mut Api, machine: std::borrow::Cow<'static, str>) -> Vec<Entry> {
+    vec![
         (
             GET,
             "/network",
@@ -93,6 +120,17 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<AgentBody>()),
             Some(api.schema::<MachineAgentsChanged>()),
         ),
+    ]
+}
+
+fn provisioning(
+    api: &mut Api,
+    profile: std::borrow::Cow<'static, str>,
+    skills: std::borrow::Cow<'static, str>,
+    set: std::borrow::Cow<'static, str>,
+    review: std::borrow::Cow<'static, str>,
+) -> Vec<Entry> {
+    vec![
         (
             GET,
             "/agents/{id}/provisioning",
@@ -124,6 +162,15 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<Launch>()),
             Some(api.schema::<StartCommandView>()),
         ),
+    ]
+}
+
+fn runtime(
+    report: std::borrow::Cow<'static, str>,
+    session: std::borrow::Cow<'static, str>,
+    running: std::borrow::Cow<'static, str>,
+) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/agents/{id}/runtime/sessions/{session}/reports",
@@ -144,6 +191,11 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             Some(session),
         ),
         (GET, "/runtime/found", None, Some(running)),
+    ]
+}
+
+fn stops(api: &mut Api) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/agents/{id}/stop",
@@ -156,6 +208,11 @@ pub(super) fn machines_and_runtime(api: &mut Api) -> Vec<Entry> {
             None,
             Some(api.schema::<StopsView>()),
         ),
+    ]
+}
+
+fn accounts(api: &mut Api) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/sign-in",

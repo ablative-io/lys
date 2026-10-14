@@ -28,6 +28,17 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     let empty = api.schema::<Empty>();
     let usage = api.schema::<UsageView>();
     let policy = api.schema::<PolicyView>();
+    let mut routes = Vec::new();
+    routes.extend(control_receipts(api));
+    routes.extend(budgets(api));
+    routes.extend(policy_and_usage(api, usage, policy));
+    routes.extend(session_operations(api, empty));
+    routes.extend(runner_connections(api));
+    routes.extend(joining_and_receipts(api));
+    routes
+}
+
+fn control_receipts(api: &mut Api) -> Vec<Entry> {
     vec![
         (
             GET,
@@ -65,6 +76,11 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::goals_api::ResendBody>()),
             Some(api.schema::<crate::goals_api::ResendView>()),
         ),
+    ]
+}
+
+fn budgets(api: &mut Api) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/budgets/person/{id}/confirm",
@@ -95,6 +111,15 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<BudgetBody>()),
             Some(api.schema::<BudgetsView>()),
         ),
+    ]
+}
+
+fn policy_and_usage(
+    api: &mut Api,
+    usage: std::borrow::Cow<'static, str>,
+    policy: std::borrow::Cow<'static, str>,
+) -> Vec<Entry> {
+    vec![
         (GET, "/agents/{id}/policy", None, Some(policy.clone())),
         (
             POST,
@@ -127,6 +152,11 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<UsageBody>()),
             Some(usage),
         ),
+    ]
+}
+
+fn session_operations(api: &mut Api, empty: std::borrow::Cow<'static, str>) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/runtime/sessions/{id}/input",
@@ -176,6 +206,11 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             None,
         ),
         (POST, "/runtime/sessions/{id}/end", Some(empty), None),
+    ]
+}
+
+fn runner_connections(api: &mut Api) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/agents/{id}/wake",
@@ -210,6 +245,11 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::machine_pass::PassAsked>()),
             Some(api.schema::<crate::provider::MachinePass>()),
         ),
+    ]
+}
+
+fn joining_and_receipts(api: &mut Api) -> Vec<Entry> {
+    vec![
         (
             POST,
             "/network/machines/{id}/join-code",
