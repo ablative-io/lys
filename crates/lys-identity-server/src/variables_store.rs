@@ -33,6 +33,10 @@ pub type VariablesKept = Kept<Variables>;
 /// The variables in the directory `config` names, their snapshots signed by
 /// `key`, saying through `say` how the log started; none when it names no
 /// directory.
+///
+/// # Errors
+/// Refuses when the configured variables leaf store cannot be created,
+/// opened, verified or folded.
 pub fn configured(
     config: &Config,
     key: Arc<Ed25519Identity>,
@@ -51,6 +55,10 @@ pub fn configured(
 }
 
 /// The variables kept in the directory `dir`, created when it does not exist.
+///
+/// # Errors
+/// Refuses variables store creation, reopening, snapshot verification
+/// or variable folding failures.
 pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<VariableStore, ServerError> {
     RecordLog::open(dir, ORIGIN, key, &unavailable)
 }
@@ -73,6 +81,11 @@ pub struct Patch {
 
 /// Keep `patch`, refusing a stale revision, an empty patch, a malformed name
 /// or an expiry already past, and answer the scope as it then reads.
+///
+/// # Errors
+/// Refuses an empty patch, malformed key, past expiry or stale scope
+/// revision. Propagates journal lock, settlement and durable patch write
+/// failures.
 pub fn patch(variables: &VariablesKept, patch: Patch) -> Result<Read, ServerError> {
     if patch.values.is_empty() {
         return Err(VariablesError::Malformed {
@@ -119,6 +132,9 @@ pub fn patch(variables: &VariablesKept, patch: Patch) -> Result<Read, ServerErro
 }
 
 /// `scope`'s variables as they read now.
+///
+/// # Errors
+/// Refuses when the variables journal cannot be settled or its lock is poisoned.
 pub fn read(variables: &VariablesKept, scope: &Scope) -> Result<Read, ServerError> {
     variables.with(|log, _| Ok(log.held().read(scope, now())))
 }

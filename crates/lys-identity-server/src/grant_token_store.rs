@@ -81,6 +81,11 @@ fn digest(token: &str) -> String {
 
 impl Tokens {
     /// Open an existing table, or begin an empty table on an old install.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed grant token tables, an unsupported
+    /// format, invalid digests or grant bindings, or a failed durable expiry
+    /// prune.
     pub fn open(file: PathBuf) -> Result<Self, TokenError> {
         Self::open_at(file, crate::session::now())
     }

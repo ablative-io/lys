@@ -59,6 +59,10 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 impl SeatStore<FileLeafStore> {
     /// The seats kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses seats store creation, reopening, snapshot verification or seat
+    /// folding failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -71,6 +75,9 @@ impl SeatStore<FileLeafStore> {
 impl<S: LeafStore> SeatStore<S> {
     /// The seats kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or seat folding failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -136,6 +143,10 @@ impl<S: LeafStore> SeatStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the seats leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -186,6 +197,9 @@ impl<S: LeafStore> SeatStore<S> {
     }
 
     /// The seat named `name`, refused `seat_unknown` when none is.
+    ///
+    /// # Errors
+    /// Refuses a name for which no seat is retained.
     pub fn named(&self, name: &str) -> Result<Seat, ServerError> {
         self.held
             .seat(name)
@@ -208,6 +222,11 @@ impl<S: LeafStore> SeatStore<S> {
     /// answers the line as first kept and writes nothing; the same
     /// operation in other words is refused `seat_operation_reused`, and a
     /// second seat by a name already held `seat_name_taken`.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, an already taken seat name, an unknown
+    /// seat or a change to a running seat. Propagates inconsistent session,
+    /// settlement and durable seat write failures.
     pub fn keep(&mut self, line: Line) -> Result<Line, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(line.operation()) {

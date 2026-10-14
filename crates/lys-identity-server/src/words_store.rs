@@ -34,6 +34,10 @@ pub type WordsKept = Kept<Words>;
 /// The words in the directory `config` names, their snapshots signed by
 /// `key`, saying through `say` how the log started; none when it names no
 /// directory.
+///
+/// # Errors
+/// Refuses when the configured words leaf store cannot be created,
+/// opened, verified or folded.
 pub fn configured(
     config: &Config,
     key: Arc<Ed25519Identity>,
@@ -53,6 +57,10 @@ pub fn configured(
 }
 
 /// The words kept in the directory `dir`, created when it does not exist.
+///
+/// # Errors
+/// Refuses words store creation, reopening, snapshot verification or
+/// words folding failures.
 pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<WordStore, ServerError> {
     RecordLog::open(dir, ORIGIN, key, &unavailable)
 }
@@ -74,6 +82,11 @@ pub struct Save {
 
 /// Keep `save`, refusing a stale revision, malformed text or a link to no
 /// template, and answer the revision it made.
+///
+/// # Errors
+/// Refuses a stale slot revision, malformed text or template name, or a
+/// link to an unknown template. Propagates journal lock, settlement and
+/// durable words write failures.
 pub fn set(words: &WordsKept, save: Save) -> Result<u64, ServerError> {
     words.with(|log, unavailable| {
         let held = log.held().revision(&save.layer, save.slot);
@@ -116,6 +129,10 @@ pub fn set(words: &WordsKept, save: Save) -> Result<u64, ServerError> {
 
 /// Keep the template `name` as `text`, refusing a stale revision, and
 /// answer the revision it made.
+///
+/// # Errors
+/// Refuses a malformed template name or text or a stale template revision.
+/// Propagates journal lock, settlement and durable template write failures.
 pub fn template(
     words: &WordsKept,
     name: &str,
@@ -151,6 +168,9 @@ pub fn template(
 }
 
 /// Resolve `slot` for `session` of `agent` from the words as held.
+///
+/// # Errors
+/// Refuses when the words journal cannot be settled or its lock is poisoned.
 pub fn resolve(
     words: &WordsKept,
     slot: Slot,
@@ -161,6 +181,9 @@ pub fn resolve(
 }
 
 /// The words as held, whole.
+///
+/// # Errors
+/// Refuses when the words journal cannot be settled or its lock is poisoned.
 pub fn held(words: &WordsKept) -> Result<Words, ServerError> {
     words.with(|log, _| Ok(log.held().clone()))
 }

@@ -214,6 +214,10 @@ impl StoredActor {
 
 /// The sessions kept at `path` that end after `now`, by key. No file is no
 /// sessions: an install that kept none before starts with none.
+///
+/// # Errors
+/// Refuses unreadable or malformed session bytes, an unsupported session
+/// format or an actor that cannot be reconstructed.
 pub fn load(path: &Path, now: u64) -> Result<HashMap<String, SessionEntry>, ServerError> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
@@ -245,6 +249,10 @@ pub fn load(path: &Path, now: u64) -> Result<HashMap<String, SessionEntry>, Serv
 }
 
 /// Replace the file at `path` with `live`, owner-only.
+///
+/// # Errors
+/// Refuses an actor that cannot be encoded, session encoding or owner-only
+/// file creation failures, or a replacement and directory sync that fail.
 pub fn save<S: BuildHasher>(
     path: &Path,
     live: &HashMap<String, SessionEntry, S>,

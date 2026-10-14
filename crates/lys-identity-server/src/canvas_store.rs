@@ -220,6 +220,10 @@ pub struct Operations {
 impl Operations {
     /// Refuses, in words, what cannot be kept: a pane width that is not a
     /// finite number within [`PANE_WIDTH`], or a chosen seat with no name.
+    ///
+    /// # Errors
+    /// Refuses a pane width outside the finite permitted range or a chosen
+    /// seat with an empty name.
     pub fn checked(&self) -> Result<(), ServerError> {
         let refused = |words: String| ServerError::Canvas(CanvasError::Refused { words });
         if !self.pane_width.is_finite() || !PANE_WIDTH.contains(&self.pane_width) {
@@ -273,6 +277,10 @@ pub struct Arrangement {
 
 impl Arrangement {
     /// Refuses, in words, what cannot be kept as it is.
+    ///
+    /// # Errors
+    /// Refuses a pane width outside the finite permitted range or a chosen
+    /// seat with an empty name in the retained layout.
     pub fn checked(&self) -> Result<(), ServerError> {
         match &self.operations {
             Some(operations) => operations.checked(),
@@ -321,6 +329,9 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 
 /// A layout's name as it is kept: without the space around it, holding
 /// something, and holding no control character.
+///
+/// # Errors
+/// Refuses an empty name after trimming or a name with a control character.
 pub fn layout_name(given: &str) -> Result<String, ServerError> {
     let name = given.trim();
     if name.is_empty() {
@@ -352,6 +363,9 @@ impl CanvasStore {
     }
 
     /// `person`'s canvas; an empty one when they have never changed it.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed retained canvas bytes.
     pub fn read(&self, person: PersonId) -> Result<Canvas, ServerError> {
         match fs::read(self.file(person)) {
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
@@ -365,6 +379,11 @@ impl CanvasStore {
     }
 
     /// Change `person`'s canvas and keep it whole before answering it.
+    ///
+    /// # Errors
+    /// Refuses a poisoned canvas lock, unreadable canvas, or the caller's
+    /// change. Propagates encoding, directory creation and durable replacement
+    /// failures.
     pub fn change(
         &self,
         person: PersonId,

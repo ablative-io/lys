@@ -83,6 +83,10 @@ fn digest(token: &str) -> String {
 
 impl Passes {
     /// Open an existing table, or begin an empty table on an old install.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed agent pass tables, an unsupported
+    /// table format or invalid retained pass digests and bindings.
     pub fn open(file: PathBuf) -> Result<Self, ServerError> {
         let stored = match std::fs::read(&file) {
             Ok(bytes) => {
@@ -197,6 +201,9 @@ impl Passes {
     }
 
     /// Whether this run already has a pass, without retaining its secret.
+    ///
+    /// # Errors
+    /// Refuses a pass table whose preceding durable write remains uncertain.
     pub fn has_session(&self, session: &str) -> Result<bool, ServerError> {
         self.ready()?;
         Ok(self
@@ -207,6 +214,10 @@ impl Passes {
     }
 
     /// Issue a fresh run pass, ending any earlier pass for its launch or session.
+    ///
+    /// # Errors
+    /// Refuses an uncertain table, invalid launch or session identifiers,
+    /// a failed random source, a digest collision or a failed durable table write.
     pub fn issue(
         &mut self,
         agent: AgentId,
@@ -244,6 +255,11 @@ impl Passes {
     /// Issue a fresh run pass for `session` under the same lock as the check
     /// that no pass for it is held; `None` when one already is, and the held
     /// pass is left admitted.
+    ///
+    /// # Errors
+    /// Refuses an uncertain table or fresh-pass issuance failure: invalid
+    /// identifiers, random source failure, digest collision or durable write
+    /// failure.
     pub fn issue_unless_present(
         &mut self,
         agent: AgentId,

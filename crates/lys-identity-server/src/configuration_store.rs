@@ -51,6 +51,9 @@ fn unavailable(error: impl std::fmt::Display) -> ServerError {
 }
 
 /// Refuse an unknown zone at the boundary, without falling back to another one.
+///
+/// # Errors
+/// Refuses an unknown time zone or a zone without a named IANA identity.
 pub fn checked(zone: &str) -> Result<(), ServerError> {
     let known = jiff::tz::TimeZone::get(zone).map_err(|error| {
         ServerError::Agents(AgentsError::Budget(BudgetError::BudgetRefused {
@@ -70,6 +73,9 @@ pub fn checked(zone: &str) -> Result<(), ServerError> {
 }
 
 /// Refuse a model with no name or a window of no tokens.
+///
+/// # Errors
+/// Refuses a model with no name or a context window of zero tokens.
 pub fn checked_windows(windows: &crate::budgets_feed::Windows) -> Result<(), ServerError> {
     let refuse = |words: String| {
         Err(ServerError::Agents(AgentsError::Budget(
@@ -96,6 +102,11 @@ pub fn checked_windows(windows: &crate::budgets_feed::Windows) -> Result<(), Ser
 
 impl ConfigurationStore {
     /// An existing install retains its setting; a first setup records its host zone.
+    ///
+    /// # Errors
+    /// Refuses configuration store creation, verification, folding or durable
+    /// writes, exhausted or inconsistent versions, or first setup on a host
+    /// without a named IANA time zone.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -160,6 +171,10 @@ impl ConfigurationStore {
     }
 
     /// Recover an uncertain append before any later read or write.
+    ///
+    /// # Errors
+    /// Refuses when organisation configuration cannot be reopened and verified
+    /// after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let reopened = Self::open(&self.dir, Arc::clone(&self.key))?;
@@ -181,6 +196,11 @@ impl ConfigurationStore {
     /// Store one zone after validating its name and the version read.
     /// Set the zone, and the model windows when they are given; windows not
     /// given stay as held.
+    ///
+    /// # Errors
+    /// Refuses an unknown zone, invalid model windows, a changed expected
+    /// version or version exhaustion. Propagates encoding, settlement, durable
+    /// append and snapshot write failures.
     pub fn set(
         &mut self,
         zone: String,

@@ -197,6 +197,10 @@ pub struct CertificateStore<S: LeafStore = FileLeafStore> {
 impl CertificateStore<FileLeafStore> {
     /// The certificate log in the directory `dir`, created when it does not
     /// exist, its snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses certificate store creation, reopening, snapshot verification,
+    /// certificate folding or initial store maintenance failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -210,6 +214,10 @@ impl CertificateStore<FileLeafStore> {
 
     /// As `open`, saying through `say` how the log was started and how many
     /// certificates it holds.
+    ///
+    /// # Errors
+    /// Refuses the certificate store creation, verification, folding and
+    /// maintenance failures returned by `open`.
     pub fn opened(
         dir: &Path,
         key: Arc<Ed25519Identity>,
@@ -228,6 +236,9 @@ impl CertificateStore<FileLeafStore> {
 impl<S: LeafStore> CertificateStore<S> {
     /// The certificate log in the leaf store `reopen` opens, its snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or certificate folding failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let signing = signing_index(&held);
@@ -293,6 +304,10 @@ impl<S: LeafStore> CertificateStore<S> {
 
     /// Enter `issued`. Entered again with the same bytes and claims it is
     /// kept once; the same serial with other bytes is refused.
+    ///
+    /// # Errors
+    /// Refuses a serial already kept with other certificate bytes or claims.
+    /// Propagates settlement and durable certificate write failures.
     pub fn issue(&mut self, issued: Issued) -> Result<(), ServerError> {
         self.settle()?;
         match self.held.certificates.get(&issued.serial) {
@@ -307,6 +322,11 @@ impl<S: LeafStore> CertificateStore<S> {
     /// Withdraw the certificate named in `withdrawn`. Withdrawn again by the
     /// same person for the same reason it is kept once; one already
     /// withdrawn otherwise is refused naming who withdrew it.
+    ///
+    /// # Errors
+    /// Refuses an unknown serial or a certificate withdrawn by another person
+    /// or for another reason. Propagates settlement and durable withdrawal
+    /// write failures.
     pub fn withdraw(&mut self, withdrawn: Withdrawn) -> Result<(), ServerError> {
         self.settle()?;
         let Some(kept) = self.held.certificates.get(&withdrawn.serial) else {
@@ -328,6 +348,10 @@ impl<S: LeafStore> CertificateStore<S> {
 
     /// The certificate named `serial` with what verifies its entry offline
     /// against the log as it stands now.
+    ///
+    /// # Errors
+    /// Refuses an unknown serial, a missing certificate leaf, or log leaf,
+    /// proof and checkpoint reads that fail.
     pub fn prove(&self, serial: &str) -> Result<Proven, ServerError> {
         let entered = self.held.certificates.get(serial).cloned().ok_or_else(|| {
             ServerError::CertificateUnknown {

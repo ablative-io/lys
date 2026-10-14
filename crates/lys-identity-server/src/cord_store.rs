@@ -352,6 +352,10 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 impl CordStore<FileLeafStore> {
     /// The cord kept in the directory `dir`, created when it does not exist,
     /// its snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses cord store creation, reopening, snapshot verification or cord
+    /// record folding failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -448,6 +452,9 @@ impl<S: LeafStore> CordStore<S> {
     }
 
     /// The pull in force; none when nothing is stopped.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain cord append cannot be settled.
     pub fn standing(&mut self) -> Result<Option<Pull>, ServerError> {
         self.settle()?;
         Ok(self
@@ -457,6 +464,9 @@ impl<S: LeafStore> CordStore<S> {
     }
 
     /// The latest pull and what it did, and the latest release.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain cord append cannot be settled.
     pub fn latest(&mut self) -> Result<(Option<Kept>, Option<Release>), ServerError> {
         self.settle()?;
         Ok((
@@ -468,6 +478,10 @@ impl<S: LeafStore> CordStore<S> {
     /// Keep `pull` as pulled, answering what it did when it finished before,
     /// and the pull to carry out otherwise. The same operation in other
     /// words, or naming a release, is refused `cord_reused`.
+    ///
+    /// # Errors
+    /// Refuses an operation naming a release or a pull in different words.
+    /// Propagates settlement and durable cord write failures.
     pub fn pull(&mut self, pull: Pull) -> Result<Pulling, ServerError> {
         self.pulling(pull, false)
     }
@@ -502,6 +516,10 @@ impl<S: LeafStore> CordStore<S> {
 
     /// Keep what the pull did, once: a pull already finished answers what it
     /// kept then.
+    ///
+    /// # Errors
+    /// Refuses a result for a pull never kept or settlement and durable
+    /// completion write failures.
     pub fn finish(&mut self, result: PullResult) -> Result<PullResult, ServerError> {
         self.settle()?;
         let Some(Spent::Pull(at, _)) = self.held.operations.get(&result.operation).copied() else {
@@ -521,6 +539,11 @@ impl<S: LeafStore> CordStore<S> {
     /// was kept; a release while nothing is stopped is refused
     /// `cord_not_pulled`; the operation of a pull, or of a release in other
     /// words, is refused `cord_reused`.
+    ///
+    /// # Errors
+    /// Refuses when nothing is pulled or the operation names a pull or a
+    /// release in different words. Propagates settlement and durable release
+    /// write failures.
     pub fn release(
         &mut self,
         (operation, by, by_name, at): (String, String, Option<String>, u64),

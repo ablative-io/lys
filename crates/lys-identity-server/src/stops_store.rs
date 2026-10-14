@@ -60,6 +60,10 @@ impl StopStore<FileLeafStore> {
     /// The stops in the directory `config` names, their snapshots signed by
     /// `key`, saying through `say` how the log started; none when it names no
     /// directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured stops leaf store cannot be created,
+    /// opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -79,6 +83,10 @@ impl StopStore<FileLeafStore> {
 
     /// The stops kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses stops store creation, reopening, snapshot verification or
+    /// stop folding failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -91,6 +99,9 @@ impl StopStore<FileLeafStore> {
 impl<S: LeafStore> StopStore<S> {
     /// The stops kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or stop folding failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -148,6 +159,10 @@ impl<S: LeafStore> StopStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the stops leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -201,6 +216,10 @@ impl<S: LeafStore> StopStore<S> {
     /// when the same words were already done; nothing when they are asked
     /// and not yet done, or newly asked; the same operation in other words
     /// is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation already naming a stop in different words or
+    /// settlement and durable stop request write failures.
     pub fn ask(&mut self, stop: Stop) -> Result<Option<Stop>, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&stop.operation) {
@@ -221,6 +240,10 @@ impl<S: LeafStore> StopStore<S> {
     /// Keep `stop` whole, once every part of it is done. Sent again in the
     /// same words it is kept once and answers what was kept; the same
     /// operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation already naming a stop in different words or
+    /// settlement and durable whole stop write failures.
     pub fn keep(&mut self, stop: Stop) -> Result<Stop, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&stop.operation) {

@@ -59,6 +59,10 @@ impl ReviewStore<FileLeafStore> {
     /// The decisions in the directory `config` names, their snapshots signed
     /// by `key`, saying through `say` how the log started; none when it names
     /// no directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured review decisions leaf store cannot be
+    /// created, opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -78,6 +82,10 @@ impl ReviewStore<FileLeafStore> {
 
     /// The decisions kept in the directory `dir`, which is created when it
     /// does not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses review store creation, reopening, snapshot verification or
+    /// decision folding failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -90,6 +98,10 @@ impl ReviewStore<FileLeafStore> {
 impl<S: LeafStore> ReviewStore<S> {
     /// The decisions kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or review decision folding
+    /// failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -147,6 +159,10 @@ impl<S: LeafStore> ReviewStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the review decisions leaf store cannot be reopened,
+    /// verified and folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -199,6 +215,10 @@ impl<S: LeafStore> ReviewStore<S> {
 
     /// The decision already recorded under `kept`'s operation, when it asks
     /// the same decision; the same operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation naming a review decision in different words or
+    /// an uncertain decision append that cannot be settled.
     pub fn already(&mut self, kept: &Kept) -> Result<Option<Kept>, ServerError> {
         self.settle()?;
         match self.held.operation(&kept.operation) {
@@ -213,6 +233,10 @@ impl<S: LeafStore> ReviewStore<S> {
     /// Record `kept` and answer the decision as recorded. Asked again in the
     /// same words it answers what was recorded and writes nothing; the same
     /// operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses a reused decision operation, a decision absent after its write,
+    /// or settlement and durable decision write failures.
     pub fn keep(&mut self, kept: Kept) -> Result<Kept, ServerError> {
         if let Some(recorded) = self.already(&kept)? {
             return Ok(recorded);

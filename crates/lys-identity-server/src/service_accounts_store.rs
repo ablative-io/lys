@@ -61,6 +61,10 @@ impl ServiceAccountStore<FileLeafStore> {
     /// The service accounts in the directory `config` names, their snapshots
     /// signed by `key`, saying through `say` how the log started; none when
     /// it names no directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured service accounts leaf store cannot be
+    /// created, opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -80,6 +84,10 @@ impl ServiceAccountStore<FileLeafStore> {
 
     /// The service accounts kept in the directory `dir`, which is created
     /// when it does not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses service account store creation, reopening, snapshot verification
+    /// or account folding failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -92,6 +100,10 @@ impl ServiceAccountStore<FileLeafStore> {
 impl<S: LeafStore> ServiceAccountStore<S> {
     /// The service accounts kept in the leaf store `reopen` opens, their
     /// snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or service account folding
+    /// failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -149,6 +161,10 @@ impl<S: LeafStore> ServiceAccountStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the service accounts leaf store cannot be reopened,
+    /// verified and folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -210,6 +226,10 @@ impl<S: LeafStore> ServiceAccountStore<S> {
     /// Keep `created` and answer the account as it then stands. Created
     /// again in the same words it is kept once; the same operation in other
     /// words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation used for a different account act or different
+    /// creation words. Propagates settlement and durable creation write failures.
     pub fn create(&mut self, created: Created) -> Result<Account, ServerError> {
         self.settle()?;
         match self.held.operation(&created.id) {
@@ -231,6 +251,11 @@ impl<S: LeafStore> ServiceAccountStore<S> {
     /// again in the same words it is kept once; the same operation in other
     /// words is refused, and so is an account already retired under another
     /// operation.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, an unknown account or an account retired
+    /// under another operation. Propagates settlement and durable retirement
+    /// write failures.
     pub fn retire(&mut self, retired: Retired) -> Result<Account, ServerError> {
         self.settle()?;
         match self.held.operation(&retired.operation) {
@@ -259,6 +284,10 @@ impl<S: LeafStore> ServiceAccountStore<S> {
 
     /// Record an import refusal once per account, operation and named outcome.
     /// It never consumes the requested operation or prevents a later success.
+    ///
+    /// # Errors
+    /// Refuses an unknown account or settlement and durable import refusal
+    /// write failures.
     pub fn record_import_refusal(
         &mut self,
         refused: ImportRefused,
