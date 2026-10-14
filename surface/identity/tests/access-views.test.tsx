@@ -5,7 +5,7 @@ import { ADA, SERVICE, ok, refused } from './fixtures';
 
 describe('Access read views', () => {
   it('renders the served model version and relations instead of a fixed model', async () => {
-    await mount('#/model', { ...SERVICE, '/grants/model': ok({ action_sentences: { read: 'Read this resource', publish: 'Publish this resource' }, version: 19, relations: { reader: ['read'], publisher: ['read', 'publish'] } }) });
+    await mount('#/model', { ...SERVICE, '/grants/model': ok({ action_sentences: { read: 'Read this resource', publish: 'Publish this resource' }, version: 19, relations: { reader: ['read'], publisher: ['read', 'publish'] }, kinds: {} }) });
     expect(text()).toContain('version 19');
     // The model is the one permissions matrix: a row for each action in its sentence, a column for each relation.
     expect($$('table.schema-matrix thead th').map((cell) => cell.textContent)).toEqual(['What it may do', 'reader', 'publisher']);

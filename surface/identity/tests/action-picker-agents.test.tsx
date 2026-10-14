@@ -50,7 +50,7 @@ describe('The app declares what an agent may hold', () => {
       expect(container.querySelector<HTMLInputElement>('input[value="owner"]')?.disabled).toBe(false);
     } finally { act(() => root.unmount()); }
   });
-  it('offers declared actions, greys the rest, and selects only declared actions together', () => {
+  it('offers declared actions, names a withheld action without claiming the app allows no agent actions, and selects only declared actions together', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
     const change = vi.fn();
@@ -64,7 +64,8 @@ describe('The app declares what an agent may hold', () => {
       expect(checkbox('read')?.disabled).toBe(false);
       expect(checkbox('send')?.disabled).toBe(false);
       expect(checkbox('admin')?.disabled).toBe(true);
-      expect(container.textContent?.split(appAgentRefusal).length).toBe(2);
+      expect(container.textContent).not.toContain(appAgentRefusal);
+      expect(container.textContent).toContain('The app does not allow an agent to hold these actions.');
       act(() => container.querySelector<HTMLInputElement>('input[name="all_actions"]')?.click());
       expect(change).toHaveBeenCalledWith(['read', 'send']);
     } finally { act(() => root.unmount()); }
@@ -89,6 +90,7 @@ describe('The app declares what an agent may hold', () => {
       act(() => root.render(<ActionPicker model={combined} resource={resource}
         actions={['read', 'send']} value={[]} onChange={vi.fn()} />));
       expect(container.querySelector<HTMLInputElement>('input[value="member"]')?.disabled).toBe(false);
+      expect(container.textContent).not.toContain('Some actions cannot be selected');
       const source = { ...GRANTS[0], resource, relation: 'member', actions: ['read', 'send'],
         pass_on: { kind: 'to' as const, actions: ['read', 'send'], recipients: ['agent' as const] } };
       const options = grantOptions({ grants: [source], model: combined, problem: null }, ADA, ADA, 'Ada');

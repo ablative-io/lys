@@ -127,7 +127,14 @@ export const CANNOT_GIVE_ROOT_SCRIBE: CannotGiveAnswer = {
 };
 
 /** GET /grants/model: the relations the service's model defines. */
-export const MODEL: GrantModel = { action_sentences: { view: 'View this resource', edit: 'Edit this resource', grant: 'Give access to this resource' }, version: 3, relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'] }, withheld_from_agents: [] };
+export const MODEL: GrantModel = {
+  action_sentences: { view: 'View this resource', edit: 'Edit this resource', grant: 'Give access to this resource' }, version: 3,
+  relations: { editor: ['edit', 'view'], owner: ['edit', 'grant', 'view'], viewer: ['view'] }, withheld_from_agents: [],
+  kinds: {
+    'fixture.doc': { agents: [], relations: { reader: ['read'], publisher: ['publish'] } },
+    'aion.workflow': { agents: [], relations: { runner: ['read', 'run'] } },
+  },
+};
 
 /** The same model as an agent-giving service serves it: one single-action relation, and grant withheld from agents. */
 export const AGENT_MODEL: GrantModel = { ...MODEL, relations: { ...MODEL.relations, 'only.edit': ['edit'] }, withheld_from_agents: ['grant'] };

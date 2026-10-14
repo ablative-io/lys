@@ -10,6 +10,7 @@ const model: GrantModel = {
   action_sentences: { 'agent.stop': 'Stop this agent', 'agent.start': 'Start this agent' },
   relations: { editor: ['agent.start', 'agent.stop'], 'only.agent.stop': ['agent.stop'], 'only.agent.start': ['agent.start'] },
   withheld_from_agents: [],
+  kinds: {},
 };
 const grants = GRANTS.map((grant) => ({ ...grant, resource, relation: grant.id === ROOT_G ? 'editor' : 'only.agent.stop',
   actions: grant.id === ROOT_G ? ['agent.start', 'agent.stop'] : ['agent.stop'],

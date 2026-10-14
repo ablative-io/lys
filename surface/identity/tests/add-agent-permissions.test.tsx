@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { ADA, BEA, COURIER, DIRECTORY, GRANTS, MODEL, RECEIPTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import { serve, leaveTheReachReadOutOfPosted } from './harness';
+import { click, serve, leaveTheReachReadOutOfPosted } from './harness';
 // These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
 leaveTheReachReadOutOfPosted();
 
@@ -57,6 +57,22 @@ async function submit(form: HTMLFormElement) {
 }
 
 describe('Add-agent reporting and permissions', () => {
+  it('offers read and send from a held participant channel when Cambium declares both agent actions', async () => {
+    const app = { ...source, resource: { kind: 'cambium.channel', id: 'room' }, relation: 'participant', actions: ['read', 'send'],
+      pass_on: { kind: 'to', actions: ['read', 'send'], recipients: ['agent'] } };
+    const declared = { ...model, kinds: { 'cambium.channel': { agents: ['read', 'send'], relations: { participant: ['read', 'send'] } } } };
+    const { form, posted } = await open({ '/grants': ok({ grants: [app], revision: 7 }), '/grants/model': ok(declared) });
+    const offered = [...form.querySelectorAll<HTMLInputElement>('input[name="action"]')];
+    expect(offered).toHaveLength(1);
+    expect(offered[0].value).toBe(source.id + ':participant:read');
+    expect(offered[0].disabled).toBe(false);
+    expect(offered[0].closest('tr')?.querySelector('label')?.textContent).toBe('read; send');
+    expect(form.textContent).not.toContain("until the app allows it");
+    await act(async () => { offered[0].click(); });
+    expect(offered[0].checked).toBe(true);
+    expect(posted).toEqual([]);
+  });
+
   it('reads a grant held by a service account and never offers it', async () => {
     const loader = { ...GRANTS[0], id: 'grant-' + 'e'.repeat(32), holder: 'op-' + 'd'.repeat(32) };
     const { form } = await open({ '/grants': ok({ grants: [...GRANTS, loader], revision: 7 }) });
@@ -225,8 +241,11 @@ describe('Add-agent reporting and permissions', () => {
       expect(location.hash).toBe('#/agents/new');
     } finally { write.mockRestore(); }
   });
-  it('lists inactive identities without offering them as reporting targets', async () => {
+  it('hides retired reporting targets by default and keeps them disabled when shown, with registered targets still disabled', async () => {
     const { form } = await open();
+    expect(form.querySelector('[name="answers_to"] option[value="' + BEA + '"]')).toBeNull();
+    const show = [...form.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show retired ('));
+    await click(show ?? null);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + BEA + '"]')?.disabled).toBe(true);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + COURIER + '"]')?.disabled).toBe(true);
   });

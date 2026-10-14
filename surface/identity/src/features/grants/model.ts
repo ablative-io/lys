@@ -1,7 +1,7 @@
 import { actionWords, resourceWords } from './action-words';
-import { api } from '../../api';
+import { api, Refused } from '../../api';
 import type { LifecycleState, MeView, PeopleView } from '../../generated';
-import { resourceText } from '../../generated/grants';
+import { grantKindsProblem, resourceText } from '../../generated/grants';
 import type { Grant, GrantList, GrantModel, PassOn, ResourceRef } from '../../generated/grants';
 import { fileNo } from '../people/directory';
 import { clock, day } from '../file/time';
@@ -25,8 +25,22 @@ export interface GrantWorld {
   who: Map<string, Who>;
 }
 
+/** Require the service's declaration before deciding whether an app permits agents. */
+export function requireGrantKinds(model: GrantModel): GrantModel['kinds'] {
+  const problem = grantKindsProblem(model);
+  if (problem !== null) throw new Refused(200, { refusal: 'GrantModelUnreadable', reason: problem });
+  return model.kinds;
+}
+
+export function appKind(model: GrantModel, kind: string): GrantModel['kinds'][string] {
+  const declared = requireGrantKinds(model)[kind];
+  if (declared === undefined) throw new Refused(200, { refusal: 'GrantModelUnreadable', reason: 'the service did not answer the app kind ' + kind });
+  return declared;
+}
+
 export async function readGrantWorld(knownMe?: MeView): Promise<GrantWorld> {
   const [me, people, list, model] = await Promise.all([knownMe ?? api.me(), api.people(), api.grants(), api.model()]);
+  requireGrantKinds(model);
   const who = new Map<string, Who>();
   for (const p of people.people) {
     who.set(p.id, { name: p.display_name, state: p.state, kind: 'person', responsible: null });

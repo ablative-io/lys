@@ -171,7 +171,21 @@ export interface GrantModel {
   /** The acts no agent may be given; a screen never offers them. */
   withheld_from_agents: string[];
   /** Each app kind's declared agent actions and relation carriers. */
-  kinds?: Record<string, { agents: string[]; relations: Record<string, string[]> }>;
+  kinds: Record<string, { agents: string[]; relations: Record<string, string[]> }>;
+}
+
+/** A missing declaration is a failed read, never the app refusing agent access. */
+export function grantKindsProblem(model: unknown): string | null {
+  const record = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+  const actions = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((action) => typeof action === 'string' && Boolean(action.trim()));
+  if (!record(model) || !record(model.kinds)) return 'the service did not answer the app kinds';
+  for (const [name, kind] of Object.entries(model.kinds)) {
+    if (!record(kind) || !actions(kind.agents)) return 'the service did not answer valid agent actions for ' + name;
+    if (!record(kind.relations) || !Object.values(kind.relations).every(actions)) return 'the service did not answer valid relations for ' + name;
+  }
+  return null;
 }
 
 /** POST /grants/who answers one page of holders, each with its permit. */

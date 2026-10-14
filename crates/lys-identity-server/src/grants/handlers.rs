@@ -20,6 +20,10 @@ use lys_identity::{IdentityError, IdentityId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod model_tests;
+
 pub(super) async fn list(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -42,13 +46,14 @@ pub(super) async fn list(
     })
 }
 
-/// The permission model, so a screen offers only the relations it defines.
+/// The permission model from the approved apps' current schemas, so a
+/// screen offers only the relations and agent actions they declare.
 pub(super) async fn model(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<Json<ModelView>, ServerError> {
     signed_in(&state, &headers)?;
-    Ok(Json(ModelView::from(&state.grant_setup.model()?)))
+    crate::apps_api::with_apps(&state, |apps, _| Ok(Json(ModelView::from(&apps.model()?))))
 }
 
 pub(super) async fn read(

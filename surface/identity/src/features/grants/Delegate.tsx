@@ -1,5 +1,4 @@
-import { ActionPicker, singleActionCarriers } from './ActionPicker';
-import { agentOffer } from './agent-actions';
+import { ActionPicker, agentMayHold, appAgentCarriers, appAgentRefusal, singleActionCarriers, withheldFromAgents } from './ActionPicker';
 import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
@@ -11,7 +10,7 @@ import { useShell } from '../../shell/ShellContext';
 import { day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
+import { appKind, givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
@@ -42,7 +41,9 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const me = w.me.person.id;
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
   const people = [...w.who.entries()].filter(([id, x]) => x.kind === 'person' && id !== me && x.state !== 'retired');
-  const relations = relationsOf(w);
+  const app = source.resource.kind.includes('.');
+  const declared = app ? appKind(w.model, source.resource.kind) : null;
+  const relations = declared ? Object.entries(declared.relations) : relationsOf(w);
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
   const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');
@@ -58,12 +59,26 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
   const toAgent = w.who.get(recipient)?.kind !== 'person';
-  // An agent is offered one action at a time, never a wider relation: what the source may pass on, less what the service withholds from agents.
-  const passable = source.pass_on.kind === 'to' ? source.actions.filter((action) => (source.pass_on as { actions: string[] }).actions.includes(action)) : [];
-  const offer = agentOffer(w.model, source.resource.kind, passable);
-  // The relation that carries one action alone, as the picker itself names it; an action with no such carrier is never offered.
-  const carriers = singleActionCarriers(w.model);
-  const carried = offer.offered.filter((action) => carriers.has(action));
+  const passable = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent')
+    ? source.actions.filter((action) => (source.pass_on as { actions: string[] }).actions.includes(action)) : [];
+  const known = declared !== null || withheldFromAgents(w.model) !== null;
+  const offered = known ? passable.filter((action) => agentMayHold(w.model, source.resource.kind, [action])).sort() : [];
+  const carriers = singleActionCarriers(w.model, source.resource.kind);
+  const appChoices = app ? appAgentCarriers(w.model, source.resource.kind, offered) : [];
+  const carried = offered.filter((action) => carriers.has(action) || appChoices.some(([, actions]) => actions.includes(action)));
+  // App choices retain every action their registered relation carries.
+  const choices = new Map<string, { relation: string; actions: string[] }>();
+  for (const action of carried) {
+    const carrier = carriers.get(action);
+    if (carrier !== undefined) choices.set(action, { relation: carrier, actions: [action] });
+  }
+  for (const [relation, actions] of appChoices) {
+    if (!actions.every((action) => choices.has(action))) choices.set(relation, { relation, actions });
+  }
+  const noActions = declared !== null && declared.agents.length === 0 ? appAgentRefusal
+    : offered.length > 0 ? app ? 'The app has no relation carrying only the agent actions you may pass on.' : 'The permission model has no relation carrying these actions alone.'
+      : 'You hold nothing on this resource that an agent could be given';
+  const heldWords = source.actions.length ? 'You hold: ' + actionWords(w.model, source.resource, source.actions) + '.' : '';
   const actions = relations.find(([r]) => r === relation)?.[1] ?? [];
   const onward = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent');
   const ends = source.window.ends_at;
@@ -154,13 +169,13 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
         [first, ...queue] = rest.bodies;
       } else if (toAgent) {
         const bodies: DelegateBody[] = [];
-        for (const action of picked) {
-          const carrier = carriers.get(action);
+        for (const choice of picked) {
+          const carrier = choices.get(choice);
           if (carrier === undefined) {
-            setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'NoSingleActionRelation', reason: `The permission model has no relation carrying ${action} alone; nothing was sent.` }) });
+            setOutcome({ at: 'refused', refused: new Refused(0, { refusal: 'GrantChoiceUnavailable', reason: `The permission model does not carry the selected choice ${choice}; nothing was sent.` }) });
             return;
           }
-          bodies.push(bodyFor(carrier, [action]));
+          bodies.push(bodyFor(carrier.relation, carrier.actions));
         }
         if (!bodies.length) return;
         [first, ...queue] = bodies;
@@ -237,11 +252,11 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
       </div>
       {toAgent ? <div className="field">
         {/* The picker's own legend names the actions; a label is the heading only when no picker is shown. */}
-        {offer.known && carried.length ? null : <label>Actions</label>}
-        {!offer.known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
-          : !carried.length ? <div className="note">{source.resource.kind.includes('.') ? "Lys can't give an agent this app's actions until the app allows it." : 'Nothing you may pass on here can be held by an agent.'}</div>
+        {known && carried.length ? null : <label>Actions</label>}
+        {!known ? <div className="note">The service has not said which actions an agent may hold, so none are offered yet.</div>
+          : !carried.length ? <div className="note">{noActions}{heldWords ? <div>{heldWords}</div> : null}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
-        <div className="note">Each ticked action is given on its own; an agent is never given a wider relation.</div>
+        <div className="note">{app ? 'Each choice gives exactly the actions shown.' : 'Each ticked action is given on its own; an agent is never given a wider relation.'}</div>
       </div> : <div className="field">
         <label>Relation</label>
         <div>
