@@ -1,0 +1,17 @@
+.canvas-faces > [data-stat="context_percent/"],
+.canvas-faces > [data-stat^="tokens/"],
+.canvas-faces > [data-stat="window/300"],
+.canvas-faces .canvas-stat[data-context-agent],
+.canvas-faces .canvas-stat[data-token-agent],
+.canvas-faces .canvas-stat[data-provider-window] {
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+[data-context-agent] label { display: flex; flex-direction: column; gap: 4px; }
+[data-context-agent] select { width: 100%; max-width: 100%; }
+[data-token-agent] .dash-table { table-layout: fixed; }
+[data-token-agent] .dash-table th { width: 38%; text-align: left; font-size: 11.5px; font-weight: 500; }
+[data-token-agent] .dash-table td { overflow-wrap: anywhere; }
+[data-provider-window-gaps] { margin: 4px 0; padding-left: 18px; overflow-wrap: anywhere; }

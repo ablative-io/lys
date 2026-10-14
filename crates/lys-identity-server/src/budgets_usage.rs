@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use lys_runner::tracking_budget::PlanWindow;
 use serde::Serialize;
 use serde_json::Number;
 
@@ -11,6 +10,16 @@ use crate::budgets_state::{Held, Length, Measure, Period, Usage};
 
 mod spend;
 use spend::spend_gap;
+#[path = "budgets_state/plan.rs"]
+mod plan;
+use plan::plan;
+
+#[cfg(test)]
+#[path = "budgets_state/reported_usage_tests.rs"]
+mod reported_usage_tests;
+#[path = "budgets_state/tokens.rs"]
+mod tokens;
+pub use tokens::{TokenComponent, TokenComponents};
 
 /// One limit's measured figure or its named gap, never an invented zero.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
@@ -25,12 +34,18 @@ pub struct Used {
     /// The context declaration that supplied the winning figure, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// The context reading's own time and later calls that reported none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<crate::budgets_context::ContextReading>,
+    /// The reported token components and call coverage for this period.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tokens: Option<TokenComponents>,
     /// The current period's start, reported window's start, or recorded expired reset.
     pub since_ms: Option<i64>,
     /// Why the figure is unavailable; absent exactly when a figure is present.
     pub unavailable: Option<String>,
-    /// What the period's records did report when some reported nothing: their sum, and how many
-    /// reported nothing. The figure stays absent, since the whole is not known; this is never a total.
+    /// What was reported beside a gap: summed spend or the highest reported account level.
+    /// The figure stays absent while required reports are missing; this is never a complete total.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reported: Option<ReportedPart>,
     /// The account that reported the highest window, retained only for acts.
@@ -38,13 +53,13 @@ pub struct Used {
     pub(crate) account: Option<String>,
 }
 
-/// The part of a period's spend that was reported, beside the count of records that reported none.
+/// A reported subtotal or account level, beside the number of missing reports.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
 pub struct ReportedPart {
-    /// The sum of what was reported, in the limit's unit.
+    /// Summed spend or the highest reported account level, in the limit's unit.
     #[schema(value_type = f64)]
     pub figure: Number,
-    /// How many records in the period carry no figure.
+    /// How many period records or required account reports carry no figure.
     pub missing: usize,
 }
 
@@ -129,6 +144,8 @@ fn unavailable(limit: &Limit, since_ms: Option<i64>, reason: impl Into<String>) 
         reported: None,
         account: None,
         source: None,
+        context: None,
+        tokens: None,
     }
 }
 
@@ -142,6 +159,8 @@ fn present(limit: &Limit, since_ms: Option<i64>, amount: u64) -> Result<Used, St
         reported: None,
         account: None,
         source: None,
+        context: None,
+        tokens: None,
     })
 }
 
@@ -347,96 +366,6 @@ fn period_gap(unit: Measure, usage: &Usage) -> Result<&str, String> {
         .ok_or_else(|| "period gap names a record without its source refusal".to_owned())
 }
 
-fn plan(
-    limit: &Limit,
-    agents: &BTreeSet<String>,
-    uses: &[&Usage],
-    at_ms: i64,
-    purpose: Purpose,
-    never_run: &impl Fn(&str) -> bool,
-) -> Result<Used, String> {
-    let duration = match limit.period {
-        Some(Length::FiveHour) => 300,
-        Some(Length::Week) => 10_080,
-        _ => {
-            return Ok(unavailable(
-                limit,
-                None,
-                "the plan has no reported window for this period",
-            ));
-        }
-    };
-    let now = u64::try_from(at_ms)
-        .map_err(|error| format!("plan observation is before the Unix epoch: {error}"))?;
-    let reports = match plan_reports(agents, uses, duration, now, purpose, never_run) {
-        Ok(reports) => reports,
-        Err(reason) => return Ok(unavailable(limit, None, reason)),
-    };
-    if reports.is_empty() && purpose == Purpose::Spend {
-        return present(limit, None, 0);
-    }
-    let mut largest: Option<(Number, i64, String)> = None;
-    let mut expired: Option<i64> = None;
-    for (account, window) in reports {
-        let Some(window) = window else {
-            return Ok(unavailable(
-                limit,
-                None,
-                "the requested account plan window is unreported",
-            ));
-        };
-        if window.resets_at_ms <= now {
-            let boundary = i64::try_from(window.resets_at_ms)
-                .map_err(|error| format!("reported plan reset is not representable: {error}"))?;
-            expired = Some(expired.map_or(boundary, |earlier| earlier.max(boundary)));
-            continue;
-        }
-        lys_runner::tracking_budget::percent(&serde_json::Value::Number(
-            window.used_percent.clone(),
-        ))
-        .ok_or("reported plan percentage is invalid")?;
-        let length = duration
-            .checked_mul(60_000)
-            .ok_or("reported plan duration overflows")?;
-        let since = window
-            .resets_at_ms
-            .checked_sub(length)
-            .and_then(|value| i64::try_from(value).ok())
-            .ok_or("reported plan window start is not representable")?;
-        let larger = largest
-            .as_ref()
-            .map(|(earlier, _, _)| {
-                lys_runner::tracking_budget::compare(&window.used_percent, earlier)
-                    .map(|order| order == std::cmp::Ordering::Greater)
-            })
-            .transpose()?
-            .unwrap_or(true);
-        if larger {
-            largest = Some((window.used_percent.clone(), since, account.to_owned()));
-        }
-    }
-    match largest {
-        Some((amount, since, account)) => Ok(Used {
-            unit: limit.unit,
-            period: limit.period,
-            figure: Some(amount),
-            since_ms: Some(since),
-            unavailable: None,
-            reported: None,
-            account: Some(account),
-            source: None,
-        }),
-        None => Ok(unavailable(
-            limit,
-            expired,
-            expired.map_or_else(
-                || "no accounts report the requested plan window".to_owned(),
-                |boundary| format!("the plan window reset at {boundary}; no report since"),
-            ),
-        )),
-    }
-}
-
 fn context(limit: &Limit, uses: &[&Usage]) -> Result<Used, String> {
     let mut latest = BTreeMap::new();
     for usage in uses {
@@ -474,74 +403,4 @@ fn context(limit: &Limit, uses: &[&Usage]) -> Result<Used, String> {
             "context_percent has not been reported",
         )),
     }
-}
-
-fn plan_reports<'a>(
-    agents: &BTreeSet<String>,
-    uses: &[&'a Usage],
-    duration: u64,
-    now: u64,
-    purpose: Purpose,
-    never_run: &impl Fn(&str) -> bool,
-) -> Result<BTreeMap<&'a str, Option<&'a PlanWindow>>, String> {
-    let mut sessions = BTreeMap::new();
-    let mut resets = BTreeMap::new();
-    for (index, usage) in uses.iter().copied().enumerate() {
-        let window = usage.plan_windows.as_ref().and_then(|windows| {
-            windows
-                .iter()
-                .find(|window| window.duration_minutes == duration)
-        });
-        if let Some(window) = window {
-            let key = (&usage.agent, &usage.session, usage.account.as_deref());
-            let latest = resets.entry(key).or_insert((index, usage, window));
-            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
-                *latest = (index, usage, window);
-            }
-        }
-        if usage.plan_windows.is_some() {
-            let key = (&usage.agent, &usage.session);
-            let latest = sessions.entry(key).or_insert((index, usage, window));
-            if (usage.at_ms, index) > (latest.1.at_ms, latest.0) {
-                *latest = (index, usage, window);
-            }
-        }
-    }
-    for agent in agents {
-        if (purpose != Purpose::Spend || !never_run(agent))
-            && !sessions.keys().any(|(reported, _)| *reported == agent)
-        {
-            return Err(format!("plan window unreported for agent {agent}"));
-        }
-    }
-    let mut accounts = BTreeMap::new();
-    for (index, report, window) in sessions.values().copied() {
-        let account = report
-            .account
-            .as_deref()
-            .filter(|account| !account.is_empty())
-            .ok_or("the reported plan window names no account")?;
-        let latest = accounts.entry(account).or_insert((index, report, window));
-        if (report.at_ms, index) > (latest.1.at_ms, latest.0) {
-            *latest = (index, report, window);
-        }
-    }
-    Ok(accounts
-        .into_iter()
-        .map(|(account, (_, report, window))| {
-            let window = window.or_else(|| {
-                if !report.unavailable.iter().any(|gap| {
-                    gap.figure == "plan_windows"
-                        && gap.reason == format!("{duration}_minute_window_expired")
-                }) {
-                    return None;
-                }
-                resets
-                    .get(&(&report.agent, &report.session, Some(account)))
-                    .map(|(_, _, window)| *window)
-                    .filter(|window| window.resets_at_ms <= now)
-            });
-            (account, window)
-        })
-        .collect())
 }

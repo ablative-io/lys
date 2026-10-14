@@ -102,7 +102,7 @@ fn prepare(
         }
     }
     with_budgets(state, |store| {
-        Ok(convert(
+        Ok(convert_observed(
             &tracked_machine,
             &agent,
             record,
@@ -110,4 +110,112 @@ fn prepare(
             windows,
         ))
     })
+}
+
+fn convert_observed(
+    machine: &str,
+    agent: &str,
+    record: &UsageRecord,
+    prior: &crate::budgets_state::Held,
+    windows: &Windows,
+) -> Result<Usage, ServerError> {
+    let mut usage = convert(machine, agent, record, prior, windows)?;
+    usage.clear_unobserved_windows();
+    Ok(usage)
+}
+
+#[cfg(test)]
+mod tests {
+    use lys_runner::tracking::{Figures, Measure, RECORD_VERSION, Unavailable};
+    use lys_runner::tracking_budget::PlanWindow;
+
+    use super::{UsageRecord, Windows, convert_observed};
+    use crate::budgets_state::{Held, Leaf};
+    use crate::error::ServerError;
+
+    fn status_record() -> UsageRecord {
+        UsageRecord {
+            version: RECORD_VERSION,
+            id: "proxy-status".to_owned(),
+            runner: "runner".to_owned(),
+            session: "session".to_owned(),
+            generation: 1,
+            offset: Some(100),
+            turn: None,
+            observed_at: 10,
+            measure: Measure::Snapshot,
+            figures: Figures {
+                running_ms: Some(100),
+                dollars_micros: Some(990_000),
+                ..Figures::default()
+            },
+            unavailable: vec![Unavailable {
+                figure: "context_tokens".to_owned(),
+                reason: "counted_from_the_calls_through_the_proxy".to_owned(),
+            }],
+            adapter: "lys-proxy-usage/1".to_owned(),
+            model: Some("claude-opus-5-5".to_owned()),
+            account: Some("account".to_owned()),
+            account_unknown: None,
+            context_window: 0,
+            profile_version: 1,
+            run: Some("0123456789abcdef0123456789abcdef".to_owned()),
+            record: None,
+        }
+    }
+
+    #[test]
+    fn a_proxy_status_without_window_observation_keeps_the_previous_account_reading()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let mut held = Held::default();
+        let mut prior = status_record();
+        prior.id = "provider-window".to_owned();
+        prior.observed_at = 9;
+        prior.figures.plan_windows.push(PlanWindow {
+            duration_minutes: 300,
+            used_percent: 37.into(),
+            resets_at_ms: 18_000_000,
+        });
+        held.hold(Leaf::Used(convert_observed(
+            "machine",
+            "agent",
+            &prior,
+            &held,
+            &Windows::new(),
+        )?))?;
+        let status =
+            convert_observed("machine", "agent", &status_record(), &held, &Windows::new())?;
+        assert_eq!(status.plan_windows, None);
+        assert_eq!(status.dollars_micros, Some(990_000));
+        assert_eq!(status.reported_running_ms, Some(100));
+        held.hold(Leaf::Used(status))?;
+        let accounts = held.account_windows("agent", 10)?;
+        assert_eq!(accounts.len(), 1);
+        assert_eq!(accounts[0].at_ms, 9);
+        assert_eq!(accounts[0].windows[0].used_percent, 37.into());
+        Ok(())
+    }
+
+    #[test]
+    fn an_explicit_window_gap_is_retained_with_the_sources_reason() -> Result<(), ServerError> {
+        let mut record = status_record();
+        record.unavailable.push(Unavailable {
+            figure: "plan_windows".to_owned(),
+            reason: "300_minute_window_expired".to_owned(),
+        });
+        let usage = convert_observed(
+            "machine",
+            "agent",
+            &record,
+            &Held::default(),
+            &Windows::new(),
+        )?;
+        assert_eq!(usage.plan_windows, Some(Vec::new()));
+        assert!(
+            usage.unavailable.iter().any(
+                |gap| gap.figure == "plan_windows" && gap.reason == "300_minute_window_expired"
+            )
+        );
+        Ok(())
+    }
 }

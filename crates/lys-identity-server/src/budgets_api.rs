@@ -34,6 +34,10 @@ mod confirm;
 pub(crate) use confirm::ConfirmBody;
 use confirm::{confirm, source_gaps};
 
+#[path = "budgets_state/current_context.rs"]
+mod widget_context;
+pub use widget_context::{WidgetSessions, current_widget_usage, widget_sessions};
+
 /// A budget to set on a holder.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -464,12 +468,24 @@ pub(crate) fn current_usage(
             .context_availability
             .used_live(limit, agents, at_ms, sessions));
     }
-    crate::budgets_usage::figure_with_sessions(held, limit, agents, zone, at_ms, None, sessions)
-        .map_err(|reason| {
-            ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
-                reason,
-            }))
-        })
+    let mut used = crate::budgets_usage::figure_with_sessions(
+        held, limit, agents, zone, at_ms, None, sessions,
+    )
+    .map_err(|reason| {
+        ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
+            reason,
+        }))
+    })?;
+    if limit.unit == Measure::Tokens {
+        used.tokens = Some(held.token_components(limit, agents, zone, at_ms).map_err(
+            |reason| {
+                ServerError::Agents(AgentsError::Budget(BudgetError::BudgetsUnavailable {
+                    reason,
+                }))
+            },
+        )?);
+    }
+    Ok(used)
 }
 
 #[cfg(test)]
