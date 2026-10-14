@@ -120,7 +120,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   const arrangement = (): Arrangement => {
     // A card that is not here may only be missing because its read was refused this visit, and an agent that is not running keeps its place for when it is. A session with no agent that has ended keeps none.
     const away = Object.fromEntries(Object.entries(moved).filter(([id]) => !(id in boxes) && !id.startsWith('session:') && hereName(graph)(id) === id));
-    return renamed({ boxes: { ...away, ...boxes }, open: [...open], ...marks }, keptName(graph));
+    return renamed({ boxes: { ...away, ...boxes }, open: [...open], ...marks, operations: keeping.operations }, keptName(graph));
   };
   useEffect(() => {
     if (!changes) return;

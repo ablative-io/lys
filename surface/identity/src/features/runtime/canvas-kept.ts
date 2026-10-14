@@ -6,6 +6,10 @@
 import { Refused, request } from '../../api';
 import { readArrangement } from './canvas-marks';
 import type { Arrangement } from './canvas-marks';
+import { FIRST_OPERATIONS, readOperations } from './canvas-operations';
+import type { OperationsChoice } from './canvas-operations';
+export { FIRST_OPERATIONS, PANE_WIDTH } from './canvas-operations';
+export type { OperationsChoice } from './canvas-operations';
 import { ZOOM } from './canvas-view';
 import type { View } from './canvas-view';
 import { AGENT } from './canvas-widgets';
@@ -23,20 +27,12 @@ export interface Keeping {
   operations: OperationsChoice;
 }
 
-export interface OperationsChoice { view: 'tree' | 'canvas' | 'sessions'; selected: string | null; pane_width: number }
-/** The width the network tree may be kept at, in pixels: the service refuses one outside it (canvas_store.rs PANE_WIDTH). */
-export const PANE_WIDTH = { least: 200, most: 640 } as const;
-/** First, the tree takes about a fifth of a screen. */
-export const FIRST_OPERATIONS: OperationsChoice = { view: 'tree', selected: null, pane_width: 300 };
-
 function operationsOf(arrangement: unknown): OperationsChoice {
   const choice = (arrangement as { operations?: unknown } | null)?.operations;
   if (choice === undefined) return FIRST_OPERATIONS;
-  if (!choice || typeof choice !== 'object') throw unreadable();
-  const given = choice as OperationsChoice;
-  if (!['tree', 'canvas', 'sessions'].includes(given.view) || (given.selected !== null && typeof given.selected !== 'string')
-    || !Number.isFinite(given.pane_width) || given.pane_width < PANE_WIDTH.least || given.pane_width > PANE_WIDTH.most) throw unreadable();
-  return { view: given.view, selected: given.selected, pane_width: given.pane_width };
+  const operations = readOperations(choice);
+  if (!operations) throw unreadable();
+  return operations;
 }
 
 /** The view travels with the arrangement; a service that refuses its shape is named, never replaced by browser storage. */
@@ -106,9 +102,7 @@ export async function readKeeping(): Promise<Keeping> {
 /** Keeps the arrangement being worked in. This browser keeps its own copy as the canvas changes, so only the service is told here. */
 export async function keepArrangement(where: Keeping['where'], arrangement: Arrangement): Promise<void> {
   if (where === 'service') {
-    const before = await request<{ arrangement: { operations?: unknown } | null }>('/canvas');
-    const operations = before.arrangement?.operations;
-    await request('/canvas', { arrangement: { ...arrangement, ...(operations === undefined ? {} : { operations: operationsOf(before.arrangement) }) } }, 'PUT');
+    await request('/canvas', { arrangement }, 'PUT');
   }
 }
 

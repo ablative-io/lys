@@ -3,6 +3,9 @@
  * between two things. None of it changes anything but the picture; it is theirs, kept with where their windows sit.
  */
 
+import { readOperations } from './canvas-operations';
+import type { OperationsChoice } from './canvas-operations';
+
 /** Where a thing sits on the surface and how large it is, in the surface's own units. */
 export interface Box { x: number; y: number; w: number; h: number }
 /** A labelled box drawn around windows: "the people working on Iridium". */
@@ -81,7 +84,7 @@ export function stood(widgets: Widget[]): Widget[] {
 }
 export interface Marks { groups: Group[]; notes: Note[]; links: Link[]; widgets: Widget[] }
 /** Everything a person arranged: where each window sits, which terminals are open, and what they drew. */
-export interface Arrangement extends Marks { boxes: Record<string, Box>; open: string[] }
+export interface Arrangement extends Marks { boxes: Record<string, Box>; open: string[]; operations?: OperationsChoice }
 
 export const NO_MARKS: Marks = { groups: [], notes: [], links: [], widgets: [] };
 /** The size a note or a box is made at when it was not drawn out, and the smallest each is dragged to. */
@@ -112,7 +115,9 @@ export function readArrangement(value: unknown): Arrangement | null {
   if (!Array.isArray(open) || !open.every((id) => typeof id === 'string')) return null;
   const [groups, notes, links, widgets] = [listOf(value.groups, isGroup), listOf(value.notes, isNote), listOf(value.links, isLink), listOf(value.widgets, isWidget)];
   if (!groups || !notes || !links || !widgets) return null;
-  return { boxes: boxes as Record<string, Box>, open: open as string[], groups, notes, links, widgets };
+  const operations = value.operations === undefined ? undefined : readOperations(value.operations);
+  if (operations === null) return null;
+  return { boxes: boxes as Record<string, Box>, open: open as string[], groups, notes, links, widgets, ...(operations === undefined ? {} : { operations }) };
 }
 
 /** A name for a new mark that no other has. */

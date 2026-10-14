@@ -45,6 +45,22 @@ async function drawBox(label: string) {
 }
 
 describe('The canvas is the person\'s own', () => {
+  it('carries the operations view when a canvas change is kept, without another canvas read', async () => {
+    const operations = { view: 'canvas', selected: 'seat-one', pane_width: 420 };
+    const { requests, posted } = await mount('#/canvas?view=canvas', {
+      ...routes,
+      '/canvas': ok({ arrangement: { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [], operations }, layouts: [] }),
+      'PUT /canvas': ok({}),
+    });
+    const reads = requests.filter((route) => route === '/canvas').length;
+    await placeNote();
+    await settle();
+    const puts = posted.filter((entry) => entry.path === 'PUT /canvas');
+    expect(puts).toHaveLength(1);
+    expect((puts[0].body as { arrangement: unknown }).arrangement).toMatchObject({ operations });
+    expect(requests.filter((route) => route === '/canvas')).toHaveLength(reads);
+  });
+
   it('draws a labelled box where the person drags, and the box takes the windows in it along when it is moved', async () => {
     localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { [node]: { x: 200, y: 200, w: 440, h: 34 } }, open: [], view: { x: 24, y: 24 } }));
     await mount('#/canvas?view=canvas', routes);
