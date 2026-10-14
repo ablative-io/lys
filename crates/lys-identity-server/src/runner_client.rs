@@ -223,13 +223,20 @@ impl DialHub {
         let cancellation = reply.clone();
         let ticket = lys_runner::protocol::nonce();
         self.with(machine, |held| {
+            if held.bridges == 0 {
+                return Err(RunnerError::Unreachable {
+                    reason: "this computer's runner is not connected; reconnect it before starting"
+                        .to_owned(),
+                });
+            }
             held.queue.push_back(Pending {
                 ticket: ticket.clone(),
                 act,
                 reply,
             });
             held.notify.notify_one();
-        })?;
+            Ok(())
+        })??;
         Ok(Queued {
             ticket,
             answer,
@@ -253,9 +260,7 @@ impl DialHub {
     /// # Errors
     /// Returns a refusal when the dial hub lock is unavailable.
     pub fn bridged(&self, machine: &str) -> Result<bool, RunnerError> {
-        self.with(machine, |held| {
-            held.bridges > 0 || !held.delivered.is_empty()
-        })
+        self.with(machine, |held| held.bridges > 0)
     }
 
     /// The next act for `machine` and its ticket, once there is one.

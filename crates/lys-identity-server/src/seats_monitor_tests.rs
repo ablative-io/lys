@@ -18,6 +18,7 @@ fn projected(live: &lys_runner::liveness::LivenessView) -> Live {
         alive: live.alive,
         managed: live.managed,
         harness_session: live.harness_session.clone(),
+        started_fresh: false,
         turn_active: live.turn_active,
         last_signal_at: live.last_signal_at,
         started_at: live.started_at,

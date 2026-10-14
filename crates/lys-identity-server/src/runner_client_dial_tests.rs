@@ -79,3 +79,18 @@ async fn a_dialled_runner_with_a_bridge_waiting_is_asked_and_its_answer_passed_o
     assert_eq!(answered.name(), "bridge_said");
     Ok(())
 }
+
+#[test]
+fn an_old_delivered_ticket_does_not_claim_the_disconnected_runner_is_still_present()
+-> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    let (reply, _answer) = std::sync::mpsc::channel();
+    runners.hub().with("machine", |held| {
+        held.delivered.insert("old-ticket".to_owned(), reply);
+    })?;
+    assert!(
+        !runners.hub().bridged("machine")?,
+        "a delivered ticket outlived its bridge and would leave the next start waiting forever"
+    );
+    Ok(())
+}
