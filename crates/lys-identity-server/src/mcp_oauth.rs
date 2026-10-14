@@ -38,6 +38,8 @@ const CODE_SECONDS: u64 = 120;
 mod native;
 pub(crate) use native::actor as native_actor;
 const APPROVAL_SECONDS: u64 = 600;
+#[path = "mcp_oauth_consent.rs"]
+mod consent;
 /// At most 1000 apps held, 10 registrations a minute, and a day for a
 /// person to approve an app before its registration is let go: a bound on
 /// what an unauthenticated caller may make the service keep.

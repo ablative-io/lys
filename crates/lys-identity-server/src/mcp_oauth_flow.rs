@@ -18,7 +18,6 @@ use super::{
     encoded, escaped, held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
-use crate::error_provider::ProviderError;
 use crate::mcp_oauth_store::{App, Kind};
 use crate::routes::cookie_header;
 use crate::session::now;
@@ -252,13 +251,10 @@ pub(super) async fn consent(
         return Err(malformed("an approval is answered from Lys's own page"));
     }
     let session = apps.state.sessions.session(cookie_header(&headers))?;
-    let asking = held(&apps.asking)?
-        .remove(&answer.asking)
-        .filter(|asking| asking.expires_at > now())
-        .ok_or(ServerError::Provider(ProviderError::CodeUnknown))?;
-    if asking.session_id != session.id {
-        return Err(ServerError::Provider(ProviderError::CodeUnknown));
-    }
+    let asking = match super::consent::take(&apps, &answer.asking, &session)? {
+        super::consent::Approval::Ready(asking) => asking,
+        super::consent::Approval::Refused(response) => return Ok(response),
+    };
     let state = asking.state.clone().unwrap_or_default();
     let with_state = |mut pairs: Vec<(&'static str, String)>| {
         if asking.state.is_some() {
