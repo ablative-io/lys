@@ -133,7 +133,7 @@ export function operationId(): string {
   return 'op-' + [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export type Load<T> = { status: 'loading' } | { status: 'ok'; data: T } | { status: 'refused'; refused: Refused };
+export type Load<T> = { status: 'loading' } | { status: 'ok'; data: T } | { status: 'refused'; refused: Refused; feed?: boolean };
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
@@ -164,7 +164,7 @@ export function useLive<T>(read: () => Promise<T>, key: string): Load<T> {
     };
     const unsubscribe = subscribeChanges(() => { feedFailure = null; void once(); }, (error) => {
       feedFailure = asRefused(error);
-      if (live) setState({ status: 'refused', refused: feedFailure });
+      if (live) setState({ status: 'refused', refused: feedFailure, feed: true });
     });
     return () => { live = false; unsubscribe(); };
   }, [key]);

@@ -20,7 +20,7 @@ import type { Draft } from '../drafts/contract';
 import type { AccessRequest } from '../requests/contract';
 import { Terminal } from '../runtime/Terminal';
 import '../runtime/terminal.css';
-import { Gate } from '../signin/Gate';
+import { Gate, SignIn } from '../signin/Gate';
 import type { Team } from '../teams/contract';
 import { AgentTree, RunningNow, entryOf, liveOf, whereOf } from './AgentTree';
 import type { Asked, RowContext } from './AgentTree';
@@ -163,8 +163,12 @@ export function Dashboard() {
   const live = load.status === 'ok' && load.data.kind === 'active' && watched ? liveOf(load.data.answer.agents.find((row) => row.agent.id === watched.agent)) : [];
   if (watched && live.some((each) => each.session === watched.session.session)) for (const each of live) beside.current.add(each.session);
   const shown = watched && live.length === 1 && !beside.current.has(live[0].session) ? { ...watched, session: live[0] } : watched;
+  if (read.status === 'refused' && read.refused.status === 401) {
+    last.current = null;
+    return <SignIn />;
+  }
   return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
-    <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
+    <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
       : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null}
         watch={(row, session) => { beside.current = new Set(liveOf(row).map((each) => each.session)); setWatched({ agent: row.agent.id, name: row.agent.display_name, session }); }} />} />

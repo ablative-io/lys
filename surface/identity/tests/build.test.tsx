@@ -1,4 +1,4 @@
-/** The running build is named under Configuration, as the service's /authority answer says it; the sign-in page shows only its title and one button, with no rail beside it. */
+/** The running build is named under Configuration; sign-in keeps its title, button and account help, with no rail beside it. */
 import { describe, expect, it } from 'vitest';
 import { $, $$, mount, text } from './harness';
 import { BUILD, SERVICE, ok, refused } from './fixtures';
@@ -24,18 +24,20 @@ describe('Running build', () => {
   // A signed-out caller's change feed is refused as the service refuses it, so nothing reads on.
   const signedOut = { ...SERVICE, '/changes': refused(401, 'NotSignedIn', 'Sign in first'), '/directory/people': refused(401, 'NotSignedIn', 'Sign in first') };
 
-  it('signs in with the title and one button, and no service prose or build', async () => {
+  it('signs in with the title, one button and one account help line, without service details or build', async () => {
     const { requests } = await mount('#/people', signedOut);
     expect($('#screen h1, .page h1')?.textContent).toBe('Sign in');
     const page = $('.page');
     expect([...(page?.querySelectorAll('a, button') ?? [])].map((each) => each.textContent)).toEqual(['Sign in']);
-    expect(page?.querySelectorAll('p, section, code')).toHaveLength(0);
+    expect(page?.querySelectorAll('p')).toHaveLength(1);
+    expect(page?.querySelector('p.account-help')?.textContent).toBe('No account? Ask your administrator to admit you. Contact your administrator for sign-in help.');
+    expect(page?.querySelectorAll('section, code')).toHaveLength(0);
     expect(text()).not.toContain('Step 1 of the directory');
     expect(text()).not.toContain(BUILD);
     expect(requests).not.toContain('/authority');
   });
 
-  it('shows no rail, help or palette beside the sign-in card while nobody is signed in', async () => {
+  it('shows no rail, dock or palette beside the sign-in card while nobody is signed in', async () => {
     await mount('#/people', signedOut);
     expect($('.page.signed-out .card h1')?.textContent).toBe('Sign in');
     expect($('#rail')).toBeNull();

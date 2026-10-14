@@ -11,6 +11,7 @@ import type { SignedIn } from '../../generated';
 import '../people/recorded-form.css';
 import './sign-in.css';
 import { Act } from '../../shell/Act';
+import { AccountHelp } from '../signin/AccountHelp';
 
 /** Where a person lands once signed in. */
 export const SIGNED_IN = '/#/';
@@ -125,5 +126,6 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
       <Act symbol="enter" name={busy ? 'Signing in…' : 'Sign in'} word={busy ? 'Signing in…' : 'Sign in'} tone="primary" type="submit" disabled={busy} />
     </form>
     <Providers />
+    <AccountHelp />
   </div>;
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { API, api } from '../../api';
 import type { Load, Refused } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
+import { AccountHelp } from './AccountHelp';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
@@ -21,6 +22,7 @@ export function SignIn() {
         <div className="mark"><span className="seal">L</span><span>Lys</span></div>
         <h1>Sign in</h1>
         <div><a className="btn primary" href={API + '/login'}>Sign in</a></div>
+        <AccountHelp />
       </div>
     </div>
   );
