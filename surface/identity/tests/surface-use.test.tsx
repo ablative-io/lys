@@ -8,13 +8,13 @@ import { SERVICE, ok, ADA } from "./fixtures";
 
 const css = (file: string) => readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
 describe("Surface use on laptops and phones", () => {
-  it("keeps a failed run choice unsent and gives a readable next act", async () => {
+  it("offers the confirmed computer because another computer's runner refusal applies only to that computer", async () => {
     sessionStorage.clear();
     const first = "op-" + "e".repeat(32),
       second = "op-" + "f".repeat(32);
     const machine = (id: string) => ({
       id,
-      name: "Ward laptop",
+      name: id === first ? "Own computer" : "Ward laptop",
       state: "in_use",
       kind: "Computer",
       runtime: "lys-runner",
@@ -57,13 +57,13 @@ describe("Surface use on laptops and phones", () => {
     });
     expect(container.querySelector(".add-agent-two")).not.toBeNull();
     const form = container.querySelector("form");
-    expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+    expect(form?.textContent).toContain("Computer: Own computer");
+    expect(form?.textContent).toContain("Ward laptop: not available: The computer’s runner is missing or could not be confirmed.");
+    expect(form?.querySelector('select[name="computer"] option[value="' + second + '"]')).toBeNull();
     expect(form?.textContent).toContain("runner");
     expect(form?.textContent).not.toContain("RunnerReceiptMismatch");
     expect(form?.querySelector('a[href="#/network"]')).not.toBeNull();
-    await act(async () => {
-      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-    });
     expect(posted.filter((call) => call.path === "/agents")).toEqual([]);
   });
 

@@ -1,7 +1,7 @@
 import { singleActionCarriers, withheldFromAgents } from '../grants/ActionPicker';
 import { AgentGrantPicker } from './AgentGrantPicker';
 import type { GrantGroup } from './AgentGrantPicker';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { api, Refused, useLoad } from '../../api';
@@ -13,7 +13,7 @@ import { addAgent, newAgentRequest, readAgentRequest } from './add-agent-request
 import type { PendingAgent } from './add-agent-request';
 import { addAndRunCapability } from './registration-capability';
 import type { AddAndRunCapability } from './registration-capability';
-import { addAndRun, AddAndRunFailure, addAndRunStep, firstRunChoices, newAddAndRun, placementComputer, profileFromSettings, readAddAndRun } from './add-and-run';
+import { addAndRun, AddAndRunFailure, addAndRunStep, firstRunChoices, newAddAndRun, placementComputer, profileFromSettings, readAddAndRun, runnerProblemReason } from './add-and-run';
 import type { AddAndRun, FirstRunOptions } from './add-and-run';
 import { ProfileFields } from '../provisioning/ProfileEditor';
 import { validComputerName } from '../network/AddMachine';
@@ -60,6 +60,9 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation + (entry.resource.kind.includes('.') ? ':' + entry.actions[0] : '')) ?? []);
   const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : '');
   const [computer, setComputer] = useState(saved.walk?.placement.kind === 'existing' ? saved.walk.placement.computer.id : runOptions.computers.length === 1 ? runOptions.computers[0].id : '');
+  useEffect(() => {
+    if (!computer && !walk && runOptions.computers.length === 1) setComputer(runOptions.computers[0].id);
+  }, [computer, walk, runOptions.computers]);
   const selectedComputer = runOptions.computers.find((entry) => entry.id === computer);
   const inUse = useMemo(() => runOptions.network?.machines.filter((machine) => machine.state === 'in_use') ?? [], [runOptions.network]);
   const computerReady = inUse.length ? Boolean(selectedComputer) : validComputerName(computerName.trim());
@@ -70,9 +73,13 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       : walk?.placement.kind === 'existing' && (capability.machineAdmission !== true || !runOptions.computers.some((entry) => entry.id === placementComputer(walk.placement).id))
         ? new Refused(0, { refusal: 'RetainedComputerUnconfirmed', reason: 'The chosen computer, its local runner or its allowance route could not be confirmed. The saved request has not been sent; no replacement computer is chosen.' }) : null;
   const onePress = Boolean(walk) && !hold || !pending && !walk && runOptions.choices !== null;
-  const runUnavailable = onePress && Boolean(runOptions.problem);
+  const runUnavailable = runOptions.loading || Boolean(runOptions.problem) && (onePress || inUse.length > 0 && capability.machineAdmission === true);
   const working = useRef(false);
-  const targets = useMemo(() => reportingChoices(people).filter((entry) => people.scope === 'directory' || entry.id === me.person.id), [people, me.person.id]);
+  const [showRetired, setShowRetired] = useState(false);
+  const targets = useMemo(() => reportingChoices(people).filter((entry) => people.scope === 'directory' || entry.id === me.person.id)
+    .sort((left, right) => Number(right.id === me.person.id) - Number(left.id === me.person.id)), [people, me.person.id]);
+  const retiredCount = targets.filter((entry) => entry.state === 'retired' || entry.state === 'suspended').length;
+  const shownTargets = targets.filter((entry) => showRetired || entry.state !== 'retired' && entry.state !== 'suspended');
   const chosen = targets.find((entry) => entry.id === person);
   const names = useMemo(() => new Map((people.people.find((entry) => entry.id === chosen?.owner)?.agents ?? []).map((agent) => [agent.display_name.trim().toLowerCase(), agent.display_name])), [people, chosen?.owner]);
   const activeTeams = useMemo(() => teams.filter((entry) => entry.state === 'active'), [teams]);
@@ -149,9 +156,10 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     </label>
     {duplicate ? <p className="why-not" id="add-agent-duplicate" role="alert">{duplicate}</p> : null}
     <label className="field">Who this agent answers to<select name="answers_to" value={person} disabled={locked} onChange={(event) => { setPerson(event.target.value); setSelectedGrants([]); if (automaticName) setName(defaultName(people, event.target.value)); }}>
-      {!chosen ? <option value={person}>Reporting target unavailable</option> : null}
-      {targets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
+      {shownTargets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
+      {!shownTargets.some((entry) => entry.id === person) ? <option value={person} disabled>{chosen ? chosen.display_name + ' · ' + chosen.state : 'Reporting target unavailable'}</option> : null}
     </select></label>
+    {retiredCount ? <button type="button" className="btn" aria-pressed={showRetired} disabled={locked} onClick={() => setShowRetired(!showRetired)}>{showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
     <fieldset className="agent-grants-scope"><legend>What this agent is given access to in Lys</legend>
       {chosen?.kind === 'agent' ? <p>This form cannot pass on {chosen.display_name}’s access. Add {name.trim() || 'this agent'} without extra access; <a href={'#/file/' + encodeURIComponent(chosen.id) + '/access'}>review {chosen.display_name}’s access</a>.</p> : <>
         {grants.model && withheldFromAgents(grants.model) !== null ? <AgentGrantPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
@@ -171,7 +179,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
       <div className={fields ? 'add-agent-two' : undefined}>
         <div>{registrationFields}
-        {onePress ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? runOptions.computers.length === 1 ? <p>Computer: {selectedComputer?.name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
+        {onePress || runOptions.runners.length ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? runOptions.computers.length === 1 ? <p>Computer: {runOptions.computers[0].name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
         </div>
         {fields ? <div>{fields}</div> : null}
       </div>
@@ -180,11 +188,13 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       ? "Lys cannot confirm what " + machine.name + "'s roles grant, so it won't give one to " + (name.trim() || 'this agent') + '. Add the agent here, then start it from its page once it is admitted to ' + machine.name + '.'
       : machine.name + ' runs only the agents named when it was added. To add and run from here, add this computer again in Network with a role, then retire ' + machine.name + '.'}</p>) : null}
     {hold ? <ErrorWords problem={hold} /> : null}
-    {inUse.length && (!onePress || hold) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
+    {inUse.length && (!onePress || hold || runOptions.runners.some((entry) => entry.state === 'unavailable')) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
     {capability.problem ? <><p>The service’s registration choices could not be read. You can add an agent under You only.</p><ErrorWords problem={capability.problem} /></> : !capability.answersTo ? <p>This service can register an agent under You only.</p> : null}
     {unsupported ? <p role="alert" className="why-not">{unsupported}</p> : null}
     {invalidChoice ? <p role="alert" className="why-not">{invalidChoice}</p> : null}
-    {runOptions.problem ? <p role="alert" className="why-not">Lys could not confirm the choices for running this agent. Ask the administrator to check the computer’s runner in <a href="#/network">Network</a>, then open this form again.{!onePress ? ' You can add the agent now and start it from its page once the runner is confirmed.' : ''}</p> : null}
+    {runOptions.loading && (!runOptions.runners.some((entry) => entry.state === 'asking') || runOptions.computers.length > 0) ? <p role="status">Reading the choices for running this agent…</p> : null}
+    {runOptions.problem ? <p role="alert" className="why-not">{runnerProblemReason(runOptions.problem)} <a href="#/network">Open Network</a></p> : null}
+    <div aria-live="polite">{runOptions.runners.map((entry) => entry.state === 'confirmed' ? null : <p key={entry.machine.id}>{entry.machine.name}{entry.state === 'asking' ? ': asking its runner…' : ': not available: ' + entry.reason}</p>)}</div>
     {refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><ErrorWords problem={refusal.problem} /></> : <ErrorWords problem={refusal} /> : null}
     {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. {hold ? 'Its original requests are kept.' : 'Its original requests are saved; this button continues them.'}</p> : null}
     {onePress && !walk && profileProblem ? <p className="why-not" role="alert">{profileProblem}</p> : null}
@@ -197,13 +207,24 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''} render={renderForm} /> : renderForm(null);
 }
 
+function ReadyForm({ me, people, teams, search, capability, grants }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: AddAndRunCapability; grants: GrantChoices }) {
+  const [runOptions, setRunOptions] = useState<FirstRunOptions | null>(null);
+  useEffect(() => {
+    let live = true;
+    const receive = (options: FirstRunOptions) => { if (live) setRunOptions(options); };
+    void firstRunChoices(capability, receive).then(receive);
+    return () => { live = false; };
+  }, [capability]);
+  return runOptions ? <Form me={me} people={people} teams={teams} search={search} capability={capability} runOptions={runOptions} grants={grants} /> : <p role="status">Reading computers and their runners…</p>;
+}
+
 export function AddAgent() {
   const location = useLocation();
   const load = useLoad(async () => {
     const [me, people, teams, capability, grants] = await Promise.all([api.me(), api.people(), readTeams(), addAndRunCapability(), readGrantChoices()]);
-    return { me, people, teams, capability, grants, runOptions: await firstRunChoices(capability) };
+    return { me, people, teams, capability, grants };
   }, 'add-agent');
   return <div className="page"><a href="#/people">People and agents</a><h1>Add an agent</h1>
-    <Gate load={load} title="Add an agent" ok={(data) => <Form key={location.search} me={data.me} people={data.people} teams={data.teams} search={location.search} capability={data.capability} runOptions={data.runOptions} grants={data.grants} />} />
+    <Gate load={load} title="Add an agent" ok={(data) => <ReadyForm key={location.search} me={data.me} people={data.people} teams={data.teams} search={location.search} capability={data.capability} grants={data.grants} />} />
   </div>;
 }

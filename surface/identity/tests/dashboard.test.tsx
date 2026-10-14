@@ -36,6 +36,17 @@ const scribeBudget = {
   used: [{ unit: 'dollars', period: 'week', since_ms: null, figure: 100, unavailable: null }, { unit: 'tokens', period: 'day', since_ms: null, figure: 900, unavailable: null }],
 };
 const scribeUsage = { agent: SCRIBE, receipts: [], last_reported_ms: 1790000000000, used: scribeBudget.used };
+const compactBudget = (figure: number | null = null) => ({
+  ...scribeBudget,
+  limits: [{ unit: 'context_percent', amount: 40, period: null, act: 'compact' }],
+  used: [{ unit: 'context_percent', period: null, since_ms: null,
+    ...(figure === null ? { figure, unavailable: 'context_percent was not reported' } : { figure, unavailable: null }) }],
+});
+const contextFigure = (figure: number | null, unavailable: string | null = null) => ({
+  unit: 'context_percent', period: null, since_ms: null, figure, unavailable,
+  context: { session: LIVE, read_at_ms: figure === null ? null : 1790000000000, reported_none: 0, model: 'test-model',
+    context_tokens: figure === null ? null : figure * 1000, window_tokens: 100_000 },
+});
 const names = () => $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
 const rowOf = (name: string) => $$('tr[data-href]').find((tr) => tr.querySelector('td')?.textContent === name) ?? null;
 const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map((td) => td.textContent);
@@ -95,6 +106,51 @@ describe('The Dashboard is the front page', () => {
     // One read: no agent's usage, goals or budgets is asked for on its own.
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
     expect(requests.filter((path) => /\/usage|\/goals|\/budgets/.test(path))).toEqual([]);
+  });
+
+  it('names the compact budget and says not reported when no current context reading was supplied', async () => {
+    const { requests } = await mount('#/', { ...routes, '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used } },
+    })) });
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · not reported');
+    expect(rowOf('Scribe')?.textContent).not.toContain('40% of its context');
+    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · not reported');
+    expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
+    expect(requests.filter((path) => /\/usage|\/budgets/.test(path))).toEqual([]);
+  });
+
+  it('shows current session context separately from the compact budget, using the reading rather than the budget-paired figure', async () => {
+    await mount('#/', { ...routes, '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: compactBudget(99), usage: { ...scribeUsage, used: compactBudget(99).used, figures: [contextFigure(23)] } },
+    })) });
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · 23% now');
+    expect(cells('Scribe')[2]).not.toContain('99%');
+    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · 23% now');
+  });
+
+  it('says 0% now when the current session reported zero context, without replacing it with the compact budget', async () => {
+    await mount('#/', { ...routes, '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used, figures: [contextFigure(0)] } },
+    })) });
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · 0% now');
+  });
+
+  it('keeps the context reading failure reason beside the compact budget instead of presenting the budget as usage', async () => {
+    const reason = 'the runner did not retain the context window declaration';
+    await mount('#/', { ...routes, '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used, figures: [contextFigure(null, reason)] } },
+    })) });
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · context percentage unavailable: Scribe: ' + reason);
+    expect(cells('Scribe')[2]).not.toContain('40% now');
+  });
+
+  it('names missing window provenance for a scalar context percentage instead of showing it as a current reading', async () => {
+    await mount('#/', { ...routes, '/dashboard': ok(dashboard({
+      [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used,
+        figures: [{ unit: 'context_percent', period: null, since_ms: null, figure: 23, unavailable: null }] } },
+    })) });
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · declared context window not reported');
+    expect(cells('Scribe')[2]).not.toContain('23% now');
   });
 
   it('shows the widgets: waiting requests and drafts item by item, budgets nearest the limit first, goals missed first, and a part that could not be read by its refusal name', async () => {

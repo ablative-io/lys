@@ -1,10 +1,11 @@
 /** An agent's budget and goals in one compact line each, as the Dashboard's agents table says them. */
 import { day } from '../file/time';
-import { limitWords, usedAgainst } from '../usage/budgetWords';
-import type { BudgetsView, GoalsView, UsageView } from '../usage/contract';
+import { contextPresentation } from '../budgets/widgetReadings';
+import { amount, limitWords, usedAgainst } from '../usage/budgetWords';
+import type { BudgetsView, GoalsView, Limit } from '../usage/contract';
 import { counted } from '../../shell/count';
 import { refusedPart } from './contract';
-import type { PartRefused } from './contract';
+import type { DashboardAgent, PartRefused } from './contract';
 
 /** How near the limit at `index` is to being reached; a limit with no reported figure is placed after every measured one. */
 const nearness = (budget: BudgetsView, index: number): number => {
@@ -19,16 +20,26 @@ export const tightest = (budget: BudgetsView): number | null => {
   return near < 0 ? null : near;
 };
 
-/**
- * Each limit as used of limit with its unit and period, the tightest first, paired exactly as the agent's Limits and goals
- * page pairs them; "No limit" when there is none; the refusal name when the budget or the usage could not be read.
- */
-export function budgetLine(budget: BudgetsView | PartRefused, usage: UsageView | PartRefused): { words: string; refused: boolean } {
+const CONTEXT_ACTS: Record<Limit['act'], string> = { compact: 'compacts', notice: 'sends a notice', stop: 'stops', tell: 'tells you' };
+
+/** A context limit describes its act; the current reading comes from the same session evidence as the usage widget. */
+function contextWords(row: DashboardAgent, limit: Limit): string {
+  const reading = contextPresentation([row]);
+  const current = reading && reading.figure !== null ? reading.display + ' now'
+    : !reading || reading.display === 'Not reported' ? 'not reported'
+    : reading.display.toLowerCase() + (reading.unavailable.length ? ': ' + reading.unavailable.join('; ') : '');
+  return CONTEXT_ACTS[limit.act] + ' at ' + amount(limit.unit, limit.amount) + ' · ' + current;
+}
+
+/** Each limit with its reading, tightest first; context names the budget's act separately from current usage. */
+export function budgetLine(row: DashboardAgent): { words: string; refused: boolean } {
+  const { budget, usage } = row;
   if (refusedPart(budget)) return { words: budget.refusal, refused: true };
   if (refusedPart(usage)) return { words: usage.refusal, refused: true };
   if (!budget.limits.length) return { words: 'No limit', refused: false };
   const order = budget.limits.map((_, index) => index).sort((left, right) => nearness(budget, right) - nearness(budget, left));
-  return { words: order.map((index) => usedAgainst(budget, index) ?? limitWords(budget.limits[index]) + ', nothing reported yet').join(' · '), refused: false };
+  return { words: order.map((index) => budget.limits[index].unit === 'context_percent' ? contextWords(row, budget.limits[index])
+    : usedAgainst(budget, index) ?? limitWords(budget.limits[index]) + ', nothing reported yet').join(' · '), refused: false };
 }
 
 /** Open goals with the next deadline, missed ones, or that there is none: "2 open, next due 6 Oct", "1 missed", "No goal". */

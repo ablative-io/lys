@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { ADA, ME, SCRIBE, SERVICE, ok } from './fixtures';
-import { serve, type } from './harness';
+import { ADA, ARCHIVIST, BEA, DIRECTORY, LAMPLIGHTER, ME, SCRIBE, SERVICE, ok } from './fixtures';
+import type { Route } from './fixtures';
+import { click, serve, settle, type } from './harness';
 
 const computer = 'op-' + 'a'.repeat(32);
 const team = 'op-' + 'b'.repeat(32);
@@ -28,15 +29,16 @@ let root: Root | null = null;
 beforeEach(() => sessionStorage.clear());
 afterEach(() => { const mounted = root; if (mounted) act(() => mounted.unmount()); root = null; });
 
-async function registration(start = false) {
+async function registration(start = false, extra: Record<string, Route> = {}, target = ADA) {
   const posted: { path: string; body: unknown }[] = [];
-  serve({ ...routes, ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile: null, versions: [], enforced: false }) }, posted);
-  history.replaceState(null, '', start ? '/#/file/' + SCRIBE + '/provisioning' : '/#/agents/new?team=' + team + '&answers_to=' + ADA);
+  serve({ ...routes, ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile: null, versions: [], enforced: false }), ...extra }, posted);
+  history.replaceState(null, '', start ? '/#/file/' + SCRIBE + '/provisioning' : '/#/agents/new?team=' + team + '&answers_to=' + target);
   const container = document.createElement('div');
   document.body.appendChild(container);
   const mounted = createRoot(container);
   root = mounted;
   await act(async () => { mounted.render(<App />); });
+  await settle();
   const form = document.querySelector<HTMLElement>(start ? 'section[aria-label="Settings of this agent"]' : 'form[aria-label="Add an agent"]');
   if (!form) throw new Error('Registration form is missing');
   return { form, posted };
@@ -50,6 +52,41 @@ function choice(form: HTMLElement, name: string, label: string): HTMLSelectEleme
 }
 
 describe('Agent registration choices', () => {
+  it('shows You first and hides retired and suspended reporting targets until Show retired is pressed', async () => {
+    const people = { ...DIRECTORY, people: [...DIRECTORY.people].reverse() };
+    const { form, posted } = await registration(false, { '/directory/people': ok(people) });
+    const select = choice(form, 'answers_to', 'Who this agent answers to');
+    expect(select.options[0].value).toBe(ADA);
+    expect(select.options[0].textContent).toBe('You (' + ME.person.display_name + ')');
+    for (const id of [BEA, ARCHIVIST, LAMPLIGHTER]) expect([...select.options].some((option) => option.value === id)).toBe(false);
+    const show = [...form.querySelectorAll('button')].find((button) => button.textContent === 'Show retired (3)');
+    expect(show?.getAttribute('aria-pressed')).toBe('false');
+    await click(show ?? null);
+    expect(show?.getAttribute('aria-pressed')).toBe('true');
+    for (const id of [BEA, ARCHIVIST, LAMPLIGHTER]) {
+      const option = [...select.options].find((entry) => entry.value === id);
+      expect(option).toBeDefined();
+      expect(option?.disabled).toBe(true);
+    }
+    expect(select.options[0].value).toBe(ADA);
+    await click(show ?? null);
+    expect([...select.options].some((option) => option.value === ARCHIVIST)).toBe(false);
+    expect(posted).toEqual([]);
+  });
+
+  it('names a hidden suspended query target and refuses submission instead of silently selecting You', async () => {
+    const { form, posted } = await registration(false, {}, ARCHIVIST);
+    const select = choice(form, 'answers_to', 'Who this agent answers to');
+    expect(select.value).toBe(ARCHIVIST);
+    expect(select.selectedOptions[0].disabled).toBe(true);
+    expect(select.selectedOptions[0].textContent).toContain('Archivist');
+    expect(select.selectedOptions[0].textContent).toContain('suspended');
+    expect(form.textContent).toContain('Choose an active person or agent for this agent to answer to.');
+    expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    expect(posted).toEqual([]);
+  });
+
   it('offers real people and teams with the clicked defaults', async () => {
     const { form, posted } = await registration();
     expect(choice(form, 'answers_to', 'Who this agent answers to').value).toBe(ADA);

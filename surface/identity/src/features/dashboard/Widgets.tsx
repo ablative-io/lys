@@ -64,8 +64,8 @@ export function draftsPart({ drafts }: { drafts: Draft[] | Refused }) {
 /** Each agent that has a limit, the nearest to its limit first, with a bar for how near; agents with none are counted in one line. */
 export function budgetPart({ rows }: { rows: DashboardAgent[] }) {
   const limited = rows.flatMap((row) => {
-    if (refusedPart(row.budget) || refusedPart(row.usage)) return [{ row, near: 2, line: budgetLine(row.budget, row.usage) }];
-    return row.budget.limits.length ? [{ row, near: tightest(row.budget) ?? -1, line: budgetLine(row.budget, row.usage) }] : [];
+    if (refusedPart(row.budget) || refusedPart(row.usage)) return [{ row, near: 2, line: budgetLine(row) }];
+    return row.budget.limits.length ? [{ row, near: tightest(row.budget) ?? -1, line: budgetLine(row) }] : [];
   }).sort((left, right) => right.near - left.near);
   const known = limited.filter((each) => !each.line.refused);
   const reached = known.filter((each) => each.near >= 1).length;

@@ -124,7 +124,7 @@ function AgentRow({ entry, level, place, open, context }: { entry: Entry; level:
       <td className="sec you-where">{sessionsRefused ? <Refusal name={sessionsRefused} />
         : live.length ? live.map((session) => <span className="dash-line" key={session.session}>{whereOf(session)}</span>)
         : entry.state === 'active' ? 'not running' : entry.state}</td>
-      {row ? <><Cell line={budgetLine(row.budget, row.usage)} /><Cell line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
+      {row ? <><Cell line={budgetLine(row)} /><Cell line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
       <td className="you-act">{sessionsRefused ? null
         : live.length ? live.map((session) => <RunningActs key={session.session} entry={entry} session={session} context={context} place={place} />)
         : asked?.agent === entry.id && asked.what !== 'stop' ? null : <RowStart entry={entry} ask={context.ask} place={place} stopped={context.stopped} />}</td>

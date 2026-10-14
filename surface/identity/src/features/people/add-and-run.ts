@@ -168,23 +168,47 @@ export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: A
     return agent;
   } catch (problem) { throw new AddAndRunFailure(addAndRunStep(current), problem); }
 }
-export interface FirstRunOptions { choices: Choices | null; network: NetworkView | null; computers: Machine[]; problem: unknown }
-export async function firstRunChoices(capability: AddAndRunCapability): Promise<FirstRunOptions> {
+export type RunnerChoice = { machine: Machine; state: 'asking' | 'confirmed' } | { machine: Machine; state: 'unavailable'; reason: string };
+export interface FirstRunOptions { choices: Choices | null; network: NetworkView | null; computers: Machine[]; runners: RunnerChoice[]; loading: boolean; problem: unknown }
+export function runnerProblemReason(problem: unknown): string {
+  return problem instanceof Refused ? problem.refusal.reason : problem instanceof Error ? problem.message : String(problem);
+}
+export async function firstRunChoices(capability: AddAndRunCapability, publish?: (options: FirstRunOptions) => void): Promise<FirstRunOptions> {
   let network: NetworkView | null = null;
+  let runners: RunnerChoice[] = [];
   try {
     const answer = await request<unknown>('/network');
     if (!isRecord(answer) || !Array.isArray(answer.machines) || !answer.machines.every(readableMachine) || typeof answer.reports_served !== 'boolean') throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name readable computers and their admission rules.' });
     network = { machines: answer.machines, reports_served: answer.reports_served };
     const inUse = network.machines.filter((machine) => machine.state === 'in_use');
-    if (!inUse.length) return { choices: await readChoices(network), network, computers: [], problem: null };
-    if (capability.machineAdmission !== true) return { choices: null, network, computers: [], problem: capability.admissionProblem };
+    if (!inUse.length) return { choices: await readChoices(network), network, computers: [], runners, loading: false, problem: null };
+    if (capability.machineAdmission !== true) return { choices: null, network, computers: [], runners, loading: false, problem: capability.admissionProblem };
     const eligible = inUse.filter((machine) => machine.kind === 'Computer' && machine.runtime === 'lys-runner' && operation.test(machine.id));
-    const runners = await Promise.all(eligible.map(async (machine) => {
-      try { confirmRunner(await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner'), machine.id, true); return { machine, problem: null }; }
-      catch (problem) { return { machine: null, problem }; }
-    }));
-    const computers = runners.flatMap((entry) => entry.machine ? [entry.machine] : []);
-    const problem = runners.find((entry) => entry.problem)?.problem ?? (computers.length ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed local Lys runner. Add the agent here, then confirm its computer and runner in Network.' }));
-    return { choices: computers.length ? await readChoices(network) : null, network, computers, problem };
-  } catch (problem) { return { choices: null, network, computers: [], problem }; }
+    runners = eligible.map((machine) => ({ machine, state: 'asking' }));
+    let choices: Choices | null = null;
+    let choicesPending = true;
+    let choicesProblem: unknown = null;
+    const snapshot = (): FirstRunOptions => {
+      const computers = runners.flatMap((entry) => entry.state === 'confirmed' ? [entry.machine] : []);
+      const asking = runners.some((entry) => entry.state === 'asking');
+      const problem = choicesProblem ?? (computers.length || asking ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed local Lys runner.' }));
+      return { choices: computers.length && choices ? { ...choices, machines: computers } : null, network, computers, runners, loading: choicesPending || !computers.length && asking, problem };
+    };
+    publish?.(snapshot());
+    // Programme choices and each runner answer are independent reads. A slow
+    // computer cannot hold back a confirmed computer or replace its answer.
+    await Promise.all([
+      readChoices(network).then((answer) => { choices = answer; }, (problem: unknown) => { choicesProblem = problem; }).then(() => { choicesPending = false; publish?.(snapshot()); }),
+      ...eligible.map(async (machine) => {
+        let answer: RunnerChoice;
+        try {
+          confirmRunner(await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner'), machine.id, true);
+          answer = { machine, state: 'confirmed' };
+        } catch (problem) { answer = { machine, state: 'unavailable', reason: runnerProblemReason(problem) }; }
+        runners = runners.map((entry) => entry.machine.id === machine.id ? answer : entry);
+        publish?.(snapshot());
+      }),
+    ]);
+    return snapshot();
+  } catch (problem) { return { choices: null, network, computers: [], runners, loading: false, problem }; }
 }
