@@ -13,7 +13,11 @@
 //!
 //! The server spawns nothing: it asks. A caller that leaves closes the
 //! request it was waiting on, and the runner stops waiting too; nothing
-//! here ends a request on a clock.
+//! here ends a request on a clock. A runner that dials in is asked only
+//! while one of its bridges is dialled in now: a request for one that is
+//! not would wait for a bridge that may never come, so it is refused at
+//! once by name instead (14 Oct 2026: a machine in use whose runner had
+//! stopped dialling held every survey of the runners open for good).
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
@@ -370,6 +374,12 @@ impl Runners {
                 self.exchange_socket(&PathBuf::from(path), act, leave)?
             }
             RunnerRecord::Dialled { .. } => {
+                if !self.hub.bridged(machine)? {
+                    return Err(RunnerError::Unreachable {
+                        reason: "the machine's runner is not dialled in to Lys, so nothing would take the request"
+                            .to_owned(),
+                    });
+                }
                 let Queued {
                     ticket,
                     answer,
@@ -474,6 +484,9 @@ pub use session::ask;
 pub(crate) use session::outcome;
 use session::withdraw_on_leave;
 
+#[cfg(test)]
+#[path = "runner_client_dial_tests.rs"]
+mod dial_tests;
 #[cfg(test)]
 #[path = "runner_client_poison_tests.rs"]
 mod poison_tests;
