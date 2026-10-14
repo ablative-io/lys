@@ -33,7 +33,9 @@ use serde_json::{Value, json};
 type TestResult = Result<(), Box<dyn Error>>;
 
 const AGENT: &str = "agent-fixture-1";
+const OTHER_AGENT: &str = "agent-fixture-2";
 const MACHINE: &str = "machine-fixture-1";
+const OTHER_MACHINE: &str = "machine-fixture-2";
 const PROFILE: &str = "pv-fixture-1";
 const CALLER: &str = "x-fixture-caller";
 
@@ -42,7 +44,7 @@ struct Seam;
 
 impl AgentRecords for Seam {
     fn agent(&self, agent: &str) -> Option<AgentRecord> {
-        (agent == AGENT).then(|| AgentRecord {
+        ([AGENT, OTHER_AGENT].contains(&agent)).then(|| AgentRecord {
             id: agent.to_owned(),
             responsible: Some("person-fixture-1".to_owned()),
         })
@@ -61,7 +63,7 @@ impl Admission for Seam {
 
 impl Lifecycles for Seam {
     fn state(&self, agent: &str) -> Option<LifecycleState> {
-        (agent == AGENT).then_some(LifecycleState::Active)
+        ([AGENT, OTHER_AGENT].contains(&agent)).then_some(LifecycleState::Active)
     }
 }
 
@@ -77,10 +79,10 @@ impl ProfileReviews for Seam {
 
 impl RoleMachines for Seam {
     fn roles(&self, agent: &str) -> Option<Vec<HeldRole>> {
-        (agent == AGENT).then(|| {
+        ([AGENT, OTHER_AGENT].contains(&agent)).then(|| {
             vec![HeldRole {
                 role: "role-fixture-builder".to_owned(),
-                machines: vec![MACHINE.to_owned()],
+                machines: vec![MACHINE.to_owned(), OTHER_MACHINE.to_owned()],
             }]
         })
     }
@@ -88,7 +90,7 @@ impl RoleMachines for Seam {
 
 impl HandleRecords for Seam {
     fn handles(&self, agent: &str) -> HandleAnswer {
-        if agent == AGENT {
+        if [AGENT, OTHER_AGENT].contains(&agent) {
             HandleAnswer::Held(vec![HeldCredential {
                 id: "vc-fixture-1".to_owned(),
                 valid: true,
@@ -107,7 +109,7 @@ impl ProfileNeeds for Seam {
 
 impl EgressLists for Seam {
     fn egress(&self, machine: &str) -> Option<Vec<String>> {
-        (machine == MACHINE).then(Vec::new)
+        ([MACHINE, OTHER_MACHINE].contains(&machine)).then(Vec::new)
     }
 }
 
@@ -152,6 +154,25 @@ fn fixture_id(text: &str) -> bool {
 
 fn clock() -> u64 {
     1_000
+}
+
+fn owners() -> StartOwners {
+    StartOwners {
+        agents: Box::new(Seam),
+        admission: Box::new(Seam),
+        lifecycles: Box::new(Seam),
+        reviews: Box::new(Seam),
+        role_machines: Box::new(Seam),
+        handles: Box::new(Seam),
+        needs: Box::new(Seam),
+        egress: Box::new(Seam),
+        profiles: Box::new(Seam),
+        sessions: Box::new(Seam),
+        grammars: Grammars {
+            agent_id: fixture_id,
+            credential_id: fixture_id,
+        },
+    }
 }
 
 /// What the launcher answers next.
@@ -206,22 +227,7 @@ struct Served {
 impl Served {
     async fn start() -> Result<Self, Box<dyn Error>> {
         let dir = tempfile::tempdir()?;
-        let owners = StartOwners {
-            agents: Box::new(Seam),
-            admission: Box::new(Seam),
-            lifecycles: Box::new(Seam),
-            reviews: Box::new(Seam),
-            role_machines: Box::new(Seam),
-            handles: Box::new(Seam),
-            needs: Box::new(Seam),
-            egress: Box::new(Seam),
-            profiles: Box::new(Seam),
-            sessions: Box::new(Seam),
-            grammars: Grammars {
-                agent_id: fixture_id,
-                credential_id: fixture_id,
-            },
-        };
+        let owners = owners();
         let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
         let launches = LaunchRecords::open(&dir.path().join("launch-records"), key)?;
         let planned = Arc::new(Planned {
@@ -333,4 +339,83 @@ async fn a_machine_with_no_runner_is_answered_the_start_alone() -> TestResult {
         "the launcher was asked, and ran nothing"
     );
     served.close()
+}
+
+struct Holding {
+    entered: tokio::sync::mpsc::UnboundedSender<String>,
+    released: tokio::sync::watch::Receiver<bool>,
+}
+
+impl Launcher for Holding {
+    fn launch<'a>(&'a self, given: &'a Given, caller: &'a str) -> LaunchFuture<'a> {
+        Box::pin(async move {
+            assert!([MACHINE, OTHER_MACHINE].contains(&given.record.machine.as_str()));
+            assert_eq!(caller, "admin-fixture");
+            if self.entered.send(given.record.machine.clone()).is_err() {
+                return Some(Err(ServerError::Runner {
+                    refusal: "fixture_entry_receiver_lost".to_owned(),
+                    words: "the launcher entry could not be observed".to_owned(),
+                }));
+            }
+            let mut released = self.released.clone();
+            Some(
+                released
+                    .wait_for(|released| *released)
+                    .await
+                    .map_err(|error| ServerError::Runner {
+                        refusal: "fixture_release_lost".to_owned(),
+                        words: error.to_string(),
+                    })
+                    .map(|_| json!({"state":"running"})),
+            )
+        })
+    }
+}
+
+#[tokio::test]
+async fn starts_on_two_computers_enter_their_launchers_before_either_answers() -> TestResult {
+    use tower::ServiceExt;
+    let dir = tempfile::tempdir()?;
+    let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
+    let records = LaunchRecords::open(&dir.path().join("launches"), key)?;
+    let (entered, mut arrivals) = tokio::sync::mpsc::unbounded_channel();
+    let (release, released) = tokio::sync::watch::channel(false);
+    let app = routes(Arc::new(
+        StartService::new(owners(), Box::new(HeaderCallers), records, clock)
+            .with_launcher(Box::new(Holding { entered, released })),
+    ));
+    let request = |machine| {
+        axum::http::Request::builder()
+            .method("POST")
+            .uri(format!(
+                "/agents/{}/start",
+                if machine == MACHINE {
+                    AGENT
+                } else {
+                    OTHER_AGENT
+                }
+            ))
+            .header(CALLER, "admin-fixture")
+            .body(axum::body::Body::from(
+                json!({"profile_version":PROFILE,"machine":machine}).to_string(),
+            ))
+    };
+    let first = tokio::spawn(app.clone().oneshot(request(MACHINE)?));
+    assert_eq!(arrivals.recv().await.as_deref(), Some(MACHINE));
+    let second = tokio::spawn(app.clone().oneshot(request(OTHER_MACHINE)?));
+    assert_eq!(arrivals.recv().await.as_deref(), Some(OTHER_MACHINE));
+    assert!(
+        !first.is_finished(),
+        "the first launcher was released before the second entered"
+    );
+    assert!(
+        !second.is_finished(),
+        "the second launcher was released before the first answered"
+    );
+    release.send(true)?;
+    assert_eq!(first.await??.status(), 200);
+    assert_eq!(second.await??.status(), 200);
+    drop(app);
+    dir.close()?;
+    Ok(())
 }
