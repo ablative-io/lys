@@ -58,6 +58,10 @@ impl BudgetStore<FileLeafStore> {
     /// The budgets in the directory `config` names, their snapshots signed by
     /// `key`, saying through `say` how the log started; none when it names no
     /// directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured budgets leaf store cannot be created,
+    /// opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -81,6 +85,10 @@ impl BudgetStore<FileLeafStore> {
 
     /// The budgets kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the budgets directory cannot be created or its leaf store
+    /// cannot be opened, verified or folded.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -93,6 +101,10 @@ impl BudgetStore<FileLeafStore> {
 impl<S: LeafStore> BudgetStore<S> {
     /// The budgets kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when reopening, snapshot verification or folding the budgets
+    /// leaves fails.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         Self::opening(reopen, key, true)
     }
@@ -119,6 +131,10 @@ impl<S: LeafStore> BudgetStore<S> {
     }
 
     /// Permit current snapshots only after the shared upgrade-intent guard is clear.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain budgets append cannot be settled before
+    /// current snapshots are enabled.
     pub fn finish_migration(&mut self) -> Result<(), ServerError> {
         self.settle()?;
         if !self.snapshots_enabled {
@@ -172,6 +188,10 @@ impl<S: LeafStore> BudgetStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the budgets leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -251,16 +271,28 @@ impl<S: LeafStore> BudgetStore<S> {
     /// Set `budget` as the version after `expected`, the version the caller
     /// read (0 for none); refused `BudgetVersionConflict` when another
     /// change came between.
+    ///
+    /// # Errors
+    /// Refuses a changed expected version, an exhausted version or an invalid
+    /// budget. Propagates settlement and durable append failures.
     pub fn set(&mut self, budget: Budget, expected: u64) -> Result<Budget, ServerError> {
         self.set_version(budget, expected, false)
     }
 
     /// Set an authorized version, resolving any legacy pending confirmation.
+    ///
+    /// # Errors
+    /// Refuses a changed expected version, an exhausted version or an invalid
+    /// budget. Propagates settlement and durable confirmation write failures.
     pub fn set_confirmed(&mut self, budget: Budget, expected: u64) -> Result<Budget, ServerError> {
         self.set_version(budget, expected, true)
     }
 
     /// Replace every limit of one holder atomically at the version read.
+    ///
+    /// # Errors
+    /// Refuses a changed expected version, an exhausted version or invalid
+    /// limits. Propagates settlement and durable collection write failures.
     pub fn set_limits(
         &mut self,
         limits: crate::budgets_limits::Limits,
@@ -324,6 +356,10 @@ impl<S: LeafStore> BudgetStore<S> {
     }
 
     /// Keep what came of a crossing's act.
+    ///
+    /// # Errors
+    /// Refuses when the budgets journal cannot be settled or the crossing's
+    /// outcome cannot be durably appended.
     pub fn acted(&mut self, acted: crate::budgets_crossing::Acted) -> Result<(), ServerError> {
         self.settle()?;
         self.append(Leaf::Acted(acted))
@@ -331,6 +367,10 @@ impl<S: LeafStore> BudgetStore<S> {
 
     /// Keep the refusals a page of `runner`'s feed held, each once, then
     /// how far the feed has been read.
+    ///
+    /// # Errors
+    /// Refuses when the budgets journal cannot be settled or a refusal or
+    /// feed cursor cannot be durably appended.
     pub fn read_feed(
         &mut self,
         runner: &str,
@@ -354,6 +394,10 @@ impl<S: LeafStore> BudgetStore<S> {
 
     /// Charge `usage`; false when its event was charged before, and then
     /// nothing is written.
+    ///
+    /// # Errors
+    /// Refuses an invalid crossing, usage the budgets fold cannot accept,
+    /// or settlement and durable usage write failures.
     pub fn charge(&mut self, usage: Usage) -> Result<bool, ServerError> {
         self.settle()?;
         if self.held.charged.contains(&usage.event) {

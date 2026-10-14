@@ -68,6 +68,10 @@ fn unavailable(what: impl std::fmt::Display) -> AppError {
 impl AppStore<FileLeafStore> {
     /// The apps kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the apps leaf store cannot be created, opened, verified
+    /// or folded, or its schemas and model revision cannot be read.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -80,6 +84,10 @@ impl AppStore<FileLeafStore> {
 impl<S: LeafStore> AppStore<S> {
     /// The apps kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification, app folding or schema and
+    /// model revision reconstruction failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let schemas = schemas_of(&held)?;
@@ -153,6 +161,10 @@ impl<S: LeafStore> AppStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the apps leaf store, schemas or model revision cannot be
+    /// rebuilt after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -267,6 +279,10 @@ impl<S: LeafStore> AppStore<S> {
     /// Keep `line`, answering the line its operation was first kept as. Sent
     /// again in the same words it is kept once; the same operation in other
     /// words is refused, and so is a line the apps as they stand do not take.
+    ///
+    /// # Errors
+    /// Refuses a reused operation or an act the app's current state cannot
+    /// accept. Propagates settlement and durable app write failures.
     pub fn keep(&mut self, line: Line) -> Result<Line, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(line.operation()) {
@@ -292,6 +308,11 @@ impl<S: LeafStore> AppStore<S> {
     /// Sent again under the same operation in the same words it is kept once;
     /// the same operation in other words is refused, and so is an approval the
     /// app as it stands does not take.
+    ///
+    /// # Errors
+    /// Refuses a reused approval operation or an approval the app's current
+    /// state cannot accept. Propagates settlement and durable approval batch
+    /// write failures.
     pub fn keep_approval(
         &mut self,
         approved: Approved,
@@ -326,6 +347,10 @@ impl<S: LeafStore> AppStore<S> {
 
     /// The model the grants judge by: Lys's own relations at the app `lys`'s
     /// current version, and each approved, unretired app's kinds at its own.
+    ///
+    /// # Errors
+    /// Refuses a missing Lys app or schema, or relations the identity model
+    /// cannot accept.
     pub fn model(&self) -> Result<Model, ServerError> {
         let lys = self
             .held
@@ -362,6 +387,10 @@ impl<S: LeafStore> AppStore<S> {
     /// Refuse `kind` unless an approved, unretired app's current schema
     /// declares it, and, for a caller acting for the app `acting_for`,
     /// unless that app owns it.
+    ///
+    /// # Errors
+    /// Refuses a kind owned by another app, a kind not registered, or an app
+    /// that is pending, declined or retired.
     pub fn admit_kind(&self, acting_for: Option<&str>, kind: &str) -> Result<(), AppError> {
         let owner = owner_of(kind);
         if let Some(acting_for) = acting_for
@@ -393,6 +422,9 @@ impl<S: LeafStore> AppStore<S> {
 
     /// Refuse `action` on an app kind that does not declare it. Lys's own
     /// kinds declare no list of actions, so any action is asked of them.
+    ///
+    /// # Errors
+    /// Refuses an action absent from the app kind's declared actions.
     pub fn admit_action(&self, kind: &str, action: &str) -> Result<(), AppError> {
         let owner = owner_of(kind);
         if owner == LYS_APP {

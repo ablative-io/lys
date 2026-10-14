@@ -79,6 +79,10 @@ pub(crate) fn server_name(name: &str) -> Result<String, ServerError> {
 
 impl McpRequestStore<FileLeafStore> {
     /// Open a sibling of the configured access-request log, without changing configuration.
+    ///
+    /// # Errors
+    /// Refuses when the MCP requests sibling log cannot be created, opened,
+    /// verified or replayed.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -97,6 +101,10 @@ impl McpRequestStore<FileLeafStore> {
     }
 
     /// Open the log, creating it when it is first used by an existing install.
+    ///
+    /// # Errors
+    /// Refuses MCP request store creation, reopening, snapshot verification
+    /// or signed record replay failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -113,6 +121,10 @@ impl<S: LeafStore> McpRequestStore<S> {
     }
 
     /// Open pinned leaves and their signed snapshot, verifying every replayed record.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification, signed request replay or
+    /// post-start pending intent reconstruction failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -149,6 +161,10 @@ impl<S: LeafStore> McpRequestStore<S> {
     }
 
     /// Resolve an uncertain append before answering any read or write from memory.
+    ///
+    /// # Errors
+    /// Refuses when the signed MCP requests and pending intents cannot be
+    /// rebuilt after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -162,12 +178,20 @@ impl<S: LeafStore> McpRequestStore<S> {
     }
 
     /// Requests for an agent, in the order recorded, after settling any uncertain write.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain MCP request append cannot be settled.
     pub fn listed(&mut self, agent: &str) -> Result<Vec<McpRequest>, ServerError> {
         self.settle()?;
         self.held.listed(agent)
     }
 
     /// Replay an operation only for the same authenticated caller, agent and server.
+    ///
+    /// # Errors
+    /// Refuses a request operation bound to another caller, agent or server,
+    /// or an operation already consumed by another act. Propagates settlement
+    /// and retained request read failures.
     pub fn replay(
         &mut self,
         id: &str,
@@ -193,6 +217,10 @@ impl<S: LeafStore> McpRequestStore<S> {
     }
 
     /// Append one signed request; a failed append is accepted only after exact read-back.
+    ///
+    /// # Errors
+    /// Refuses malformed or conflicting request words, an invalid retained
+    /// operation, or signing, settlement and durable request write failures.
     pub fn ask(&mut self, request: McpRequest) -> Result<McpRequest, ServerError> {
         validate(&request)?;
         if let Some(kept) = self.replay(

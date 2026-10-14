@@ -48,11 +48,17 @@ pub const ENCODING: &str = lys_runner::admitted::ENCODING;
 const FORMAT: &str = "lys-agent-policies-state/v1";
 
 /// `policy`'s canonical encoding, the one the runner checks at a launch.
+///
+/// # Errors
+/// Refuses a policy that the runner cannot encode canonically.
 pub fn canonical(policy: &Policy) -> Result<Vec<u8>, ServerError> {
     lys_runner::admitted::canonical(policy).map_err(unavailable)
 }
 
 /// `policy`'s digest: the lowercase hex SHA-256 of its canonical encoding.
+///
+/// # Errors
+/// Refuses a policy whose canonical encoding the runner cannot produce.
 pub fn digest(policy: &Policy) -> Result<String, ServerError> {
     lys_runner::admitted::digest(policy).map_err(unavailable)
 }
@@ -74,6 +80,7 @@ struct Sealed {
 
 impl Held {
     /// `agent`'s latest version.
+    #[must_use]
     pub fn latest(&self, agent: &str) -> Option<&Policy> {
         self.policies
             .get(agent)
@@ -168,6 +175,10 @@ fn unavailable(what: impl std::fmt::Display) -> ServerError {
 
 impl PolicyStore<FileLeafStore> {
     /// The policies in the directory `config` names; none when it names none.
+    ///
+    /// # Errors
+    /// Refuses when the configured policies leaf store cannot be created,
+    /// opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -186,6 +197,10 @@ impl PolicyStore<FileLeafStore> {
     }
 
     /// The policies kept in `dir`, created when it does not exist.
+    ///
+    /// # Errors
+    /// Refuses when the policies leaf store cannot be created, opened,
+    /// verified or folded.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -197,6 +212,9 @@ impl PolicyStore<FileLeafStore> {
 
 impl<S: LeafStore> PolicyStore<S> {
     /// The policies kept in the leaf store `reopen` opens.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or policy folding failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -255,6 +273,10 @@ impl<S: LeafStore> PolicyStore<S> {
 
     /// Resolve an append whose outcome is not known by reading the leaf
     /// store again; until then nothing is answered or appended.
+    ///
+    /// # Errors
+    /// Refuses when the policies leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -269,6 +291,10 @@ impl<S: LeafStore> PolicyStore<S> {
 
     /// Persist the first policy without choosing a program's tool vocabulary.
     /// The reviewed profile supplies its native permissions at launch.
+    ///
+    /// # Errors
+    /// Refuses settlement, default policy validation or durable policy write
+    /// failures.
     pub fn ensure_default(&mut self, agent: &str) -> Result<(), ServerError> {
         self.settle()?;
         if self.held.latest(agent).is_some() {
@@ -288,6 +314,10 @@ impl<S: LeafStore> PolicyStore<S> {
     /// Keep `policy` as the version after `expected`, the version the caller
     /// read (0 for none); refused `PolicyVersionConflict` when another change
     /// came between, and by name when its shape is wrong.
+    ///
+    /// # Errors
+    /// Refuses a changed expected version or a policy the runner rejects by
+    /// name. Propagates settlement and durable policy write failures.
     pub fn set(&mut self, policy: Policy, expected: u64) -> Result<Policy, ServerError> {
         self.settle()?;
         let held = self

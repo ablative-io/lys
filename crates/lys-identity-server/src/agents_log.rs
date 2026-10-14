@@ -36,9 +36,16 @@ pub trait Folded: Default + Serialize + DeserializeOwned + Send {
     /// The record kind, for refusals.
     const KIND: &'static str;
     /// Fold one line; a line the fold refuses names why.
+    ///
+    /// # Errors
+    /// Refuses a line whose shape or transition contradicts the records held.
     fn hold(&mut self, line: Self::Line) -> Result<(), String>;
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    /// Refuses a malformed record leaf or a transition the preceding records
+    /// cannot accept, naming the leaf that failed.
     fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -50,6 +57,9 @@ pub trait Folded: Default + Serialize + DeserializeOwned + Send {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    /// Returns the serialization failure if the folded records cannot be encoded.
     fn encode(&self) -> Result<Vec<u8>, String> {
         #[derive(Serialize)]
         struct Sealing<'a, T> {
@@ -65,6 +75,10 @@ pub trait Folded: Default + Serialize + DeserializeOwned + Send {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    /// Refuses malformed snapshot bytes, an absent or different format, or
+    /// an absent or unreadable held record state.
     fn decode(bytes: &[u8]) -> Result<Self, String> {
         let value: serde_json::Value = serde_json::from_slice(bytes)
             .map_err(|error| format!("{} state: {error}", Self::KIND))?;
@@ -105,6 +119,10 @@ type Opened<F, S> = (FrontierLog<S>, F, Start);
 impl<F: Folded> RecordLog<F, FileLeafStore> {
     /// The records kept in the directory `dir`, created with `origin` when
     /// it does not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses leaf store creation, reopening, signed snapshot verification
+    /// or record folding failures through `unavailable`.
     pub fn open(
         dir: &Path,
         origin: &str,
@@ -126,6 +144,10 @@ impl<F: Folded> RecordLog<F, FileLeafStore> {
 impl<F: Folded, S: LeafStore> RecordLog<F, S> {
     /// The records kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`; `unavailable` names a refusal of the store itself.
+    ///
+    /// # Errors
+    /// Refuses reopening, signed snapshot verification or record folding
+    /// failures through `unavailable`.
     pub fn over(
         reopen: Reopen<S>,
         key: Arc<Ed25519Identity>,
@@ -205,6 +227,10 @@ impl<F: Folded, S: LeafStore> RecordLog<F, S> {
     /// Resolve an append whose outcome is not known by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing
     /// is answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when reopening, snapshot verification or folding cannot resolve
+    /// an uncertain record append.
     pub fn settle(
         &mut self,
         unavailable: &dyn Fn(String) -> ServerError,
@@ -223,6 +249,10 @@ impl<F: Folded, S: LeafStore> RecordLog<F, S> {
     /// Append one line as one leaf and fold it. A failed append is settled
     /// by reading back: the line is kept only if the leaf store holds
     /// exactly it.
+    ///
+    /// # Errors
+    /// Refuses settlement, line encoding or folding failures, an append absent
+    /// on readback, or a different leaf kept at its intended position.
     pub fn append(
         &mut self,
         line: F::Line,
@@ -311,6 +341,10 @@ impl<F: Folded> Kept<F> {
     }
 
     /// Run `act` on the settled log.
+    ///
+    /// # Errors
+    /// Refuses a poisoned records lock or an append that cannot be settled.
+    /// Returns any refusal from `act`.
     pub fn with<T>(
         &self,
         act: impl FnOnce(&mut RecordLog<F>, &dyn Fn(String) -> ServerError) -> Result<T, ServerError>,

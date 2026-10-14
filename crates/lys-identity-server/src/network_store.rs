@@ -201,6 +201,10 @@ fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 impl NetworkStore {
     /// The machines kept in the file `path`, none when it does not exist.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed machine records, inconsistent original
+    /// allowance receipts, or a failed durable journal snapshot.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let (kept, is_journal, mut since_snapshot) = journal::read(path)?;
         let original_agents = original_agents(&kept)?;
@@ -221,6 +225,10 @@ impl NetworkStore {
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
+    ///
+    /// # Errors
+    /// Refuses machine records that cannot be read back, receipt reconstruction
+    /// that fails, or a file, directory or snapshot that cannot be synced.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (kept, is_journal, mut since_snapshot) = journal::read(&self.path)?;
@@ -294,11 +302,13 @@ impl NetworkStore {
     }
 
     /// Every machine, in the order named.
+    #[must_use]
     pub fn machines(&self) -> &[Machine] {
         &self.kept.machines
     }
 
     /// The machine named `id`.
+    #[must_use]
     pub fn machine(&self, id: &str) -> Option<&Machine> {
         self.ordered
             .get(id)
@@ -307,6 +317,10 @@ impl NetworkStore {
 
     /// Keep `machine`. Named again in the same words it is kept once; the
     /// same operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation already naming another machine or different
+    /// machine words. Propagates settlement and durable write failures.
     pub fn name(&mut self, mut machine: Machine) -> Result<(), ServerError> {
         self.settle()?;
         machine.creation_team.clone_from(&machine.team);
@@ -328,6 +342,7 @@ impl NetworkStore {
     }
 
     /// The original ownership receipt, if this operation has been recorded.
+    #[must_use]
     pub fn team_recorded(&self, operation: &str) -> Option<&TeamRecorded> {
         self.kept.team_changes.get(operation)
     }
@@ -338,6 +353,10 @@ impl NetworkStore {
     }
 
     /// Keep ownership and its receipt together. A repeat writes nothing.
+    ///
+    /// # Errors
+    /// Refuses a reused ownership operation or an unknown or retired machine.
+    /// Propagates settlement and durable receipt write failures.
     pub fn assign_team(&mut self, recorded: TeamRecorded) -> Result<TeamRecorded, ServerError> {
         self.settle()?;
         if let Some(first) = self.team_recorded(&recorded.operation) {
@@ -364,6 +383,7 @@ impl NetworkStore {
     }
 
     /// The original allowance receipt, if this operation has been recorded.
+    #[must_use]
     pub fn agent_recorded(&self, operation: &str) -> Option<&AgentsRecorded> {
         self.kept.agent_changes.get(operation)
     }
@@ -374,6 +394,11 @@ impl NetworkStore {
     }
 
     /// Keep allowance and receipt together. A repeat writes nothing and never reapplies the act.
+    ///
+    /// # Errors
+    /// Refuses a reused allowance operation, an unknown or retired machine,
+    /// or a machine without a runtime. Propagates settlement and durable
+    /// receipt write failures.
     pub fn change_agent(
         &mut self,
         mut recorded: AgentsRecorded,
@@ -412,6 +437,10 @@ impl NetworkStore {
     }
 
     /// Retire the machine `id`. A machine already retired stays as it was retired.
+    ///
+    /// # Errors
+    /// Refuses an unknown machine or machine records that cannot be settled
+    /// or durably written.
     pub fn retire(&mut self, id: &str, retirement: Retirement) -> Result<(), ServerError> {
         self.settle()?;
         let machine = self.machine(id).ok_or(ServerError::MachineUnknown)?;
@@ -425,6 +454,7 @@ impl NetworkStore {
     }
 
     /// The runner the machine `id` names, none when it names none.
+    #[must_use]
     pub fn runner(&self, id: &str) -> Option<&RunnerRecord> {
         self.kept.runners.get(id)
     }
@@ -433,6 +463,11 @@ impl NetworkStore {
     /// machine takes no runner, and this install's own runner is named by
     /// one live machine only (AGENTS-002 D3): naming it for a second is
     /// refused `runner_lys_taken`, naming the machine that holds it.
+    ///
+    /// # Errors
+    /// Refuses an unknown or retired machine or this install's runner already
+    /// held by another live machine. Propagates settlement and durable write
+    /// failures.
     pub fn name_runner(
         &mut self,
         id: &str,

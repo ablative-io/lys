@@ -194,6 +194,10 @@ impl RequestStore<FileLeafStore> {
     /// The access requests in the directory the configuration names, if it
     /// names one, saying through `say` how the log was started and how many
     /// requests it holds.
+    ///
+    /// # Errors
+    /// Refuses when the configured requests leaf store cannot be created,
+    /// opened, verified or folded.
     pub fn opened(
         config: &crate::config::Config,
         key: Arc<Ed25519Identity>,
@@ -213,6 +217,10 @@ impl RequestStore<FileLeafStore> {
 
     /// The requests kept in the directory `dir`, which is created when it
     /// does not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the requests leaf store cannot be created, opened,
+    /// verified or folded.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -225,6 +233,9 @@ impl RequestStore<FileLeafStore> {
 impl<S: LeafStore> RequestStore<S> {
     /// The requests kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or request folding failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -282,6 +293,10 @@ impl<S: LeafStore> RequestStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the requests leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -350,6 +365,10 @@ impl<S: LeafStore> RequestStore<S> {
 
     /// Keep `asked`. Asked again in the same words it is kept once; the same
     /// operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation already used for a request in different words.
+    /// Propagates settlement and durable request write failures.
     pub fn ask(&mut self, asked: Asked) -> Result<(), ServerError> {
         self.settle()?;
         match self.request(&asked.id) {
@@ -366,6 +385,10 @@ impl<S: LeafStore> RequestStore<S> {
 
     /// Keep the intent to approve a request that waits. Intended again in the
     /// same words it is kept once; while one stands any other is refused.
+    ///
+    /// # Errors
+    /// Refuses an unknown or decided request or an intent already held in
+    /// other words. Propagates settlement and durable intent write failures.
     pub fn intend(&mut self, intended: Intended) -> Result<(), ServerError> {
         self.settle()?;
         match self.request(&intended.id) {
@@ -383,6 +406,9 @@ impl<S: LeafStore> RequestStore<S> {
 
     /// Give up the intent on the request `id` made under `operation`, when
     /// one stands.
+    ///
+    /// # Errors
+    /// Refuses when request settlement or the durable withdrawal write fails.
     pub fn withdraw(&mut self, id: &str, operation: &str) -> Result<(), ServerError> {
         self.settle()?;
         match self.held.intended.get(id) {
@@ -397,6 +423,11 @@ impl<S: LeafStore> RequestStore<S> {
     /// Keep the decision on a request that waits. Decided again the same way
     /// it is kept once; a request decided another way is refused, and so is
     /// any decision but the one an intent that stands was made for.
+    ///
+    /// # Errors
+    /// Refuses an unknown request, a decision already kept another way or a
+    /// decision different from the held intent. Propagates settlement and
+    /// durable decision write failures.
     pub fn decide(&mut self, decided: Decided) -> Result<(), ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.intended.get(&decided.id)

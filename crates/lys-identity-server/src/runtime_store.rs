@@ -83,6 +83,7 @@ pub struct SessionActivity {
 
 impl SessionActivity {
     /// The live session ids, without their report history.
+    #[must_use]
     pub fn live_sessions(&self) -> &BTreeSet<String> {
         &self.sessions
     }
@@ -118,6 +119,10 @@ impl RuntimeStore<FileLeafStore> {
     /// The reports in the directory `config` names, their snapshots signed
     /// by the service's event key, saying through `say` how the log started;
     /// none when it names no directory.
+    ///
+    /// # Errors
+    /// Refuses an unreadable service event key or a reports leaf store that
+    /// cannot be created, opened, verified or folded.
     pub fn configured(config: &Config, say: &Say) -> Result<Option<Self>, ServerError> {
         let Some(dir) = config.runtime_dir.as_deref() else {
             return Ok(None);
@@ -133,6 +138,10 @@ impl RuntimeStore<FileLeafStore> {
 
     /// The reports kept in the directory `dir`, which is created when it
     /// does not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the reports leaf store cannot be created, opened,
+    /// verified or folded, or its session index cannot be built.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -145,6 +154,10 @@ impl RuntimeStore<FileLeafStore> {
 impl<S: LeafStore> RuntimeStore<S> {
     /// The reports kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification or report folding failures,
+    /// or an invalid session index.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let agents_with_sessions = session_agents(&held)?;
@@ -204,6 +217,10 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the reports leaf store or its session index cannot be
+    /// rebuilt after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -295,6 +312,9 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 
     /// A bounded identifier page from the derived set, without cloning report history.
+    ///
+    /// # Errors
+    /// Refuses a derived session location outside the retained reports.
     pub fn control_sessions(
         &self,
         agent: &str,
@@ -325,6 +345,10 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 
     /// Selected agents' activity, detached from the mutable index and report history.
+    ///
+    /// # Errors
+    /// Refuses when an uncertain reports append cannot be settled before
+    /// selected agents' activity is read.
     pub fn agents_with_sessions(
         &mut self,
         selected: &BTreeSet<String>,
@@ -388,6 +412,11 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// Keep `report` and answer the session as it then stands. Sent again in
     /// the same words it is kept once; the same operation in other words is
     /// refused, and so is a report the session as it stands does not take.
+    ///
+    /// # Errors
+    /// Refuses a reused operation or a report the session's current agent,
+    /// machine or reported state cannot accept. Propagates settlement and
+    /// durable report write failures.
     pub fn report(&mut self, report: Report) -> Result<Tracked, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.operation(&report.operation) {
@@ -409,6 +438,11 @@ impl<S: LeafStore> RuntimeStore<S> {
     /// same operation in other words, a session named twice, or a report its
     /// session as it stands does not take refuses the whole batch before
     /// anything is written.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, a session named twice or a report its
+    /// session cannot accept. Propagates settlement and durable batch write
+    /// failures.
     pub fn report_all(&mut self, reports: Vec<Report>) -> Result<(), ServerError> {
         self.settle()?;
         let mut fresh: Vec<Report> = Vec::new();
@@ -475,6 +509,10 @@ impl<S: LeafStore> RuntimeStore<S> {
     }
 
     /// Observe whole-index copies; the private index is updated in place.
+    ///
+    /// # Errors
+    /// Refuses settlement or report admission and durable write failures,
+    /// or a session index copy count that overflows.
     pub fn report_observing(
         &mut self,
         report: Report,

@@ -74,6 +74,10 @@ impl TeamStore<FileLeafStore> {
     /// The teams in the directory `config` names, their snapshots signed by
     /// `key`, saying through `say` how the log started; none when it names no
     /// directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured teams leaf store cannot be created,
+    /// opened, verified or folded, or its migration overlay cannot be rebuilt.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -97,6 +101,10 @@ impl TeamStore<FileLeafStore> {
 
     /// The teams kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses team store creation, reopening, snapshot verification, folding
+    /// or migration overlay failures.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -109,6 +117,10 @@ impl TeamStore<FileLeafStore> {
 impl<S: LeafStore> TeamStore<S> {
     /// The teams kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses reopening, snapshot verification, team folding or migration
+    /// overlay failures.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         Self::opening(reopen, key, true)
     }
@@ -180,6 +192,10 @@ impl<S: LeafStore> TeamStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the teams leaf store and migration overlay cannot be
+    /// rebuilt after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -248,6 +264,9 @@ impl<S: LeafStore> TeamStore<S> {
     }
 
     /// A team and each descendant under the current migration overlay.
+    ///
+    /// # Errors
+    /// Refuses an unknown root team or a subtree the retained teams cannot read.
     pub fn subtree(&self, root: &str) -> Result<BTreeSet<String>, ServerError> {
         self.held.subtree(root).map_err(|reason| match reason {
             Refused::Unknown => ServerError::Team(TeamError::Unknown),
@@ -263,6 +282,11 @@ impl<S: LeafStore> TeamStore<S> {
     /// Keep `line` and answer its team as it then stands. Sent again in the
     /// same words it is kept once; the same operation in other words is
     /// refused, and so is a line the team as it stands does not take.
+    ///
+    /// # Errors
+    /// Refuses migration lines through this writer, reused operations, invalid
+    /// nesting or leads, or membership and holding changes the team cannot take.
+    /// Propagates settlement and durable team write failures.
     pub fn keep(&mut self, line: Line) -> Result<Team, ServerError> {
         self.settle()?;
         if matches!(line, Line::Held(_) | Line::Checked(_)) {
@@ -303,6 +327,9 @@ impl<S: LeafStore> TeamStore<S> {
     }
 
     /// Enforce a validated migration in memory without changing any leaf or snapshot.
+    ///
+    /// # Errors
+    /// Refuses a staged team migration the retained teams cannot fold.
     pub fn stage_migration(&mut self, lines: Vec<Line>) -> Result<(), ServerError> {
         self.pending = lines;
         self.refresh_overlay()
@@ -342,6 +369,9 @@ impl<S: LeafStore> TeamStore<S> {
 
     /// Complete staged migration after the reversible upgrade window closes.
     /// Each leaf is idempotent; a crash prefix is completed by the next start.
+    ///
+    /// # Errors
+    /// Refuses settlement or durable migration leaf write failures.
     pub fn finish_migration(&mut self) -> Result<(), ServerError> {
         self.settle()?;
         if self.pending.is_empty() && self.snapshots_enabled {

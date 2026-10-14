@@ -90,6 +90,10 @@ mod persistence_tests;
 
 impl RolesStore {
     /// The roles kept in the file `path`, none when it does not exist.
+    ///
+    /// # Errors
+    /// Refuses unreadable or malformed role records or a retained role edit
+    /// that cannot be folded.
     pub fn open(path: &Path) -> Result<Self, ServerError> {
         let (persistence, kept) = Persistence::open(path)?;
         Ok(Self {
@@ -100,6 +104,9 @@ impl RolesStore {
     }
 
     /// Resolve a write whose outcome is not known, by reading the file again.
+    ///
+    /// # Errors
+    /// Refuses when role records cannot be read back after an uncertain write.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             self.kept = self.persistence.read()?;
@@ -129,11 +136,13 @@ impl RolesStore {
     }
 
     /// Every role, in the order made.
+    #[must_use]
     pub fn roles(&self) -> &[Role] {
         &self.kept.roles
     }
 
     /// The role named `id`.
+    #[must_use]
     pub fn role(&self, id: &str) -> Option<&Role> {
         self.kept.roles.iter().find(|role| role.id == id)
     }
@@ -163,6 +172,10 @@ impl RolesStore {
 
     /// Keep a new role at its first version. Made again in the same words it
     /// is kept once; the same operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses an operation already naming a different act or different role
+    /// words. Propagates settlement and durable role write failures.
     pub fn make(&mut self, name: String, first: Version) -> Result<(), ServerError> {
         self.settle()?;
         let id = first.operation.clone();
@@ -188,6 +201,10 @@ impl RolesStore {
 
     /// Keep the next version of the role `id`, and answer its number. No
     /// holder is moved.
+    ///
+    /// # Errors
+    /// Refuses an unknown role, a reused operation or version number overflow.
+    /// Propagates settlement and durable version write failures.
     pub fn revise(
         &mut self,
         id: &str,
@@ -234,6 +251,11 @@ impl RolesStore {
     /// Keep `holding` of the role `id`, at the role's latest version.
     /// Assigned again in the same words it is kept once. A holder whose
     /// holding still stands at `holding.assigned_at` is refused another.
+    ///
+    /// # Errors
+    /// Refuses an unknown role, a reused operation or a holder whose last
+    /// holding still stands. Propagates settlement and durable holding write
+    /// failures.
     pub fn assign(&mut self, id: &str, holding: Holding) -> Result<(), ServerError> {
         self.settle()?;
         let role = self.role(id).ok_or(ServerError::RoleUnknown)?;
@@ -275,6 +297,11 @@ impl RolesStore {
     /// in the same words stays as it was made. A holding that is no longer
     /// the holder's last, or no longer at the version moved from, is
     /// refused. The end of the holding is not changed.
+    ///
+    /// # Errors
+    /// Refuses an unknown role, version or holder, a changed or ended holding,
+    /// or a move that does not name a newer version. Propagates settlement and
+    /// durable move write failures.
     pub fn move_holder(
         &mut self,
         id: &str,
@@ -325,6 +352,10 @@ impl RolesStore {
     /// End the holding of `holder` assigned as `assignment` in the role
     /// `id`. A holding already ended stays as it was ended. A holding that
     /// is no longer the holder's last is refused.
+    ///
+    /// # Errors
+    /// Refuses an unknown role or holder or an assignment that is no longer
+    /// the holder's last. Propagates settlement and durable ending write failures.
     pub fn end(
         &mut self,
         id: &str,

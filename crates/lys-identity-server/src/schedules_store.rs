@@ -59,6 +59,10 @@ impl SchedulesKept {
     }
 
     /// Run `act` on the settled log.
+    ///
+    /// # Errors
+    /// Refuses a poisoned schedules lock or an append that cannot be settled.
+    /// Returns any refusal from `act`.
     pub fn with<T>(
         &self,
         act: impl FnOnce(&mut ScheduleStore) -> Result<T, ServerError>,
@@ -75,6 +79,10 @@ impl SchedulesKept {
 /// The schedules in the directory `config` names, their snapshots signed by
 /// `key`, saying through `say` how the log started; none when it names no
 /// directory.
+///
+/// # Errors
+/// Refuses when the configured schedules leaf store cannot be created,
+/// opened, verified or folded.
 pub fn configured(
     config: &Config,
     key: Arc<Ed25519Identity>,
@@ -93,12 +101,20 @@ pub fn configured(
 }
 
 /// The schedules kept in the directory `dir`, created when it does not exist.
+///
+/// # Errors
+/// Refuses when the schedules leaf store cannot be created, opened,
+/// verified or folded.
 pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<ScheduleStore, ServerError> {
     RecordLog::open(dir, ORIGIN, key, &unavailable)
 }
 
 /// Keep `schedule` as set. Sent again in the same words it answers the
 /// schedule as it stands; the same operation in other words is refused.
+///
+/// # Errors
+/// Refuses an invalid schedule or an operation already used in other
+/// words. Propagates journal settlement and durable append failures.
 pub fn set(schedules: &SchedulesKept, schedule: Schedule) -> Result<Item, ServerError> {
     schedule.check(now())?;
     let kept = schedules.with(|log| Ok(log.held().item(&schedule.id).cloned()))?;
@@ -122,6 +138,9 @@ pub fn set(schedules: &SchedulesKept, schedule: Schedule) -> Result<Item, Server
 }
 
 /// The schedule `id` as it stands.
+///
+/// # Errors
+/// Refuses an unknown schedule or a journal that cannot be settled or locked.
 pub fn item(schedules: &SchedulesKept, id: &str) -> Result<Item, ServerError> {
     schedules.with(|log| {
         log.held()
@@ -132,12 +151,20 @@ pub fn item(schedules: &SchedulesKept, id: &str) -> Result<Item, ServerError> {
 }
 
 /// Every schedule, in the order set.
+///
+/// # Errors
+/// Refuses when the schedules journal cannot be settled or its lock is poisoned.
 pub fn items(schedules: &SchedulesKept) -> Result<Vec<Item>, ServerError> {
     schedules.with(|log| Ok(log.held().items.clone()))
 }
 
 /// Keep `changed`, refusing a stopped schedule; the same operation sent
 /// again in the same words answers the schedule as it stands.
+///
+/// # Errors
+/// Refuses an unknown or stopped schedule, a reused operation, empty
+/// recipients, invalid text or a zero occurrence limit. Propagates journal
+/// settlement and durable append failures.
 pub fn change(schedules: &SchedulesKept, changed: Changed) -> Result<Item, ServerError> {
     let held = item(schedules, &changed.schedule)?;
     if let Some(kept) = held
@@ -194,6 +221,10 @@ pub fn change(schedules: &SchedulesKept, changed: Changed) -> Result<Item, Serve
 
 /// Stop the schedule `id` for `reason`; a schedule already stopped answers
 /// as it stands.
+///
+/// # Errors
+/// Refuses an unknown schedule or a journal that cannot be settled,
+/// locked or durably appended.
 pub fn stop(schedules: &SchedulesKept, id: &str, reason: String) -> Result<Item, ServerError> {
     let held = item(schedules, id)?;
     if held.stopped.is_some() {
@@ -227,8 +258,14 @@ pub struct Worded {
 pub trait Deliver: Send + Sync {
     /// The live sessions of `recipient`, each with its agent; or why none
     /// can be reached, by name.
+    ///
+    /// # Errors
+    /// Refuses an unknown or unadmitted recipient or unavailable live sessions.
     fn sessions(&self, recipient: &Recipient) -> Result<Vec<(String, Option<String>)>, String>;
     /// `source` rendered for `session` of `agent` now.
+    ///
+    /// # Errors
+    /// Refuses unavailable words or variables needed to resolve and render the source.
     fn worded(&self, source: &Source, agent: Option<&str>, session: &str)
     -> Result<Worded, String>;
     /// Ask the session's runner for `operation`, answering how it stands.
@@ -244,6 +281,10 @@ fn op_id(parts: &[&str]) -> String {
 /// One pass at `at`: every delivery still unsettled is asked again under
 /// its own operation id, and every occurrence due fires once, kept before
 /// any runner is asked. Answers the next due instant.
+///
+/// # Errors
+/// Refuses journal reads or durable occurrence, answer and stop writes
+/// that fail, including a schedule absent during delivery.
 pub async fn pass(
     schedules: &SchedulesKept,
     deliver: &dyn Deliver,

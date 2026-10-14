@@ -80,6 +80,10 @@ impl GoalStore<FileLeafStore> {
     /// The goals in the directory `config` names, their snapshots signed by
     /// `key`, saying through `say` how the log started; none when it names no
     /// directory.
+    ///
+    /// # Errors
+    /// Refuses when the configured goals leaf store cannot be created,
+    /// opened, verified or folded.
     pub fn configured(
         config: &Config,
         key: Arc<Ed25519Identity>,
@@ -99,6 +103,10 @@ impl GoalStore<FileLeafStore> {
 
     /// The goals kept in the directory `dir`, which is created when it does
     /// not exist, their snapshots signed by `key`.
+    ///
+    /// # Errors
+    /// Refuses when the goals directory cannot be created or its leaf store
+    /// cannot be opened, verified or folded.
     pub fn open(dir: &Path, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         if !dir.exists() {
             FileLeafStore::create(dir, ORIGIN).map_err(unavailable)?;
@@ -112,6 +120,10 @@ impl<S: LeafStore> GoalStore<S> {
     /// The goals kept in the leaf store `reopen` opens, their snapshots
     /// signed by `key`. A reminder due before now fell due while the
     /// service was stopped.
+    ///
+    /// # Errors
+    /// Refuses when reopening, snapshot verification or folding the goals
+    /// leaves fails.
     pub fn over(reopen: Reopen<S>, key: Arc<Ed25519Identity>) -> Result<Self, ServerError> {
         let (log, held, start) = opened(&reopen, &key)?;
         let mut store = Self {
@@ -173,6 +185,10 @@ impl<S: LeafStore> GoalStore<S> {
     /// Resolve an append whose outcome is not known, by opening the leaf
     /// store again and reading what it holds. Until that succeeds nothing is
     /// answered from memory and nothing is appended.
+    ///
+    /// # Errors
+    /// Refuses when the goals leaf store cannot be reopened, verified and
+    /// folded after an uncertain append.
     pub fn settle(&mut self) -> Result<(), ServerError> {
         if self.uncertain {
             let (log, held, start) = opened(&self.reopen, &self.key)?;
@@ -250,6 +266,11 @@ impl<S: LeafStore> GoalStore<S> {
 
     /// Keep `goal` as set. Sent again in the same words it answers the item
     /// as it stands; the same operation in other words is refused.
+    ///
+    /// # Errors
+    /// Refuses invalid reminder or evidence requirements, a reused operation,
+    /// or a goal absent after its set. Propagates settlement and durable append
+    /// failures.
     pub fn set(&mut self, goal: crate::goals_state::Goal) -> Result<Item, ServerError> {
         self.settle()?;
         goal.check()?;
@@ -279,6 +300,11 @@ impl<S: LeafStore> GoalStore<S> {
     /// reminder. Sent again in the same words it answers the item as it
     /// stands; the same operation in other words is refused, as is a mark
     /// of an item already closed and a met deliverable claiming no evidence.
+    ///
+    /// # Errors
+    /// Refuses a reused operation, an unknown or closed goal, or a met
+    /// deliverable without evidence. Propagates settlement and durable append
+    /// failures.
     pub fn mark(&mut self, marked: Marked) -> Result<Item, ServerError> {
         self.settle()?;
         if let Some(kept) = self.held.marked(&marked.operation) {
@@ -327,6 +353,10 @@ impl<S: LeafStore> GoalStore<S> {
     }
 
     /// Keep an activity or words change under its operation id, retaining the original set.
+    ///
+    /// # Errors
+    /// Refuses an invalid change, a reused operation or an unknown or closed
+    /// goal. Propagates settlement and durable append failures.
     pub fn change(&mut self, changed: Changed) -> Result<Item, ServerError> {
         self.settle()?;
         changed.change.check()?;
@@ -370,6 +400,10 @@ impl<S: LeafStore> GoalStore<S> {
 
     /// Keep `evented` for the open items it concerns, making each reminder
     /// waiting on it due at its instant. Kept once under its operation.
+    ///
+    /// # Errors
+    /// Refuses an unknown goal named by the event or a journal that cannot be
+    /// settled or durably appended.
     pub fn event(&mut self, evented: Evented) -> Result<(), ServerError> {
         self.settle()?;
         if self.held.kept(&evented.operation) {
@@ -430,6 +464,10 @@ impl<S: LeafStore> GoalStore<S> {
     }
 
     /// Keep a runner's answer to a delivery, when it changes what is kept.
+    ///
+    /// # Errors
+    /// Refuses when the goals journal cannot be settled or the runner's
+    /// changed answer cannot be durably appended.
     pub fn answer(&mut self, answered: Answered) -> Result<(), ServerError> {
         self.settle()?;
         let changed = self
@@ -473,6 +511,9 @@ pub type Delivering<'a> =
 /// runner, under the runner's operation ids.
 pub trait Deliver: Send + Sync {
     /// The live sessions of `holder`, or why none can be reached, by name.
+    ///
+    /// # Errors
+    /// Refuses unavailable holder membership or live session records.
     fn sessions(&self, holder: &Holder) -> Result<Vec<String>, String>;
     /// Ask the session's runner for `operation`, answering how it stands.
     fn operate(&self, operation: Operation) -> Delivering<'_>;
@@ -496,6 +537,10 @@ impl Goals {
     }
 
     /// Run `act` on the store once it is settled.
+    ///
+    /// # Errors
+    /// Refuses a poisoned goals lock or an append that cannot be settled.
+    /// Returns any refusal from `act`.
     pub fn with<T>(
         &self,
         act: impl FnOnce(&mut GoalStore) -> Result<T, ServerError>,
@@ -510,6 +555,10 @@ impl Goals {
 
 /// One pass at `at`: every delivery still unsettled is asked again under its
 /// own operation id, and every reminder due fires once.
+///
+/// # Errors
+/// Refuses inconsistent queued reminder locations, unavailable recipient
+/// sessions, or goals journal reads and durable writes that fail.
 pub async fn remind(goals: &Goals, deliver: &dyn Deliver, at: u64) -> Result<(), ServerError> {
     let asks = goals.with(|store| {
         let mut asks = Vec::new();
