@@ -4,6 +4,13 @@ experimental = ["setup-scripts"]
 [scripts.setup.go-fixture]
 command = { command-line = "cargo run --offline --locked -p lys-core --example go_conformance_fixture", env = { LYS_GO_PROFILE = "1" } }
 
+[scripts.setup.clock-fixture]
+command = "cargo run --offline --locked -p lys --features clock-fixture --example clock-cli -- --nextest-setup"
+
+[[profile.default.scripts]]
+filter = 'package(lys) & binary(ca_log_tests) & test(/^issuer_cert::/)'
+setup = "clock-fixture"
+
 [[profile.default.scripts]]
 filter = '((package(lys-core) & binary(/^(bundle_conformance|receipt_conformance|cose_conformance|consistency_conformance|consistency_receipt_conformance|delegation_conformance|go_conformance)$/)) | (package(lys-anchor) & binary(/^(anchor_receipt_conformance|checkpoint_note_conformance)$/))) & (test(/(^|::)go_/) | binary(/^consistency_conformance$/))'
 setup = "go-fixture"

@@ -9,6 +9,8 @@ pub mod commands;
 #[path = "../src/identity/mod.rs"]
 pub mod identity;
 
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -40,6 +42,21 @@ fn run() -> Result<ExitCode, Box<dyn std::error::Error>> {
     let supplied = supplied
         .to_str()
         .ok_or("fixture creation time is not UTF-8")?;
+    if supplied == "--nextest-setup" {
+        let path = std::env::current_exe()?;
+        let path = path.to_str().ok_or("clock_fixture_path_not_utf8")?;
+        if path.contains(['\r', '\n']) {
+            return Err("clock_fixture_path_contains_newline".into());
+        }
+        let environment =
+            std::env::var_os("NEXTEST_ENV").ok_or("clock_fixture_nextest_environment_missing")?;
+        OpenOptions::new()
+            .append(true)
+            .open(environment)?
+            .write_all(format!("LYS_CLOCK_FIXTURE={path}\n").as_bytes())?;
+        eprintln!("clock fixture prepared: {path}");
+        return Ok(ExitCode::SUCCESS);
+    }
     let at = if supplied == "unavailable" {
         None
     } else {
