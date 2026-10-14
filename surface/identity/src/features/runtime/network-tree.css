@@ -1,28 +1,37 @@
 /* The Network view: the tree down the left, about a fifth of the page, and the chosen seat's terminal filling the rest. */
 .network-tree { display: flex; flex: 1; min-height: 0; padding-top: 48px; }
-.network-list { width: var(--network-pane-width); flex: none; min-width: 200px; max-width: 640px; overflow: auto; padding: 6px 4px 12px; border-right: 1px solid var(--border-default); }
+.network-list { width: var(--network-pane-width); flex: none; min-width: 200px; max-width: 640px; overflow: auto; padding: 4px 0 12px; }
 .network-branches, .network-branches ul { list-style: none; margin: 0; padding: 0; }
 .network-branches summary { list-style: none; cursor: pointer; }
 .network-branches summary::-webkit-details-marker { display: none; }
-.network-fold { display: flex; align-items: center; min-height: 22px; line-height: 22px; padding: 0 6px 0 18px; position: relative; border-radius: var(--radius-sm); font-size: 13px; }
-.network-fold::before { content: '▾'; position: absolute; left: 4px; color: var(--text-secondary); font-size: 10px; }
+/* Rows: 22px tall, 13px, one indent step of 14px per level, the chevron or the dot in the row's own gutter. */
+.network-fold, .network-name { display: flex; align-items: center; gap: 6px; min-height: 22px; line-height: 22px; padding: 0 8px 0 var(--network-indent, 6px); position: relative; font-size: 13px; }
+.network-fold::before { content: '▾'; width: 14px; flex: none; text-align: center; color: var(--text-secondary); font-size: 9px; }
 details:not([open]) > .network-fold::before { content: '▸'; }
-.network-fold:hover, .network-fold:focus-visible { background: var(--surface-hover); }
-.network-fold-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.network-fold:hover, .network-fold:focus-visible { background: var(--surface-hover); outline: none; }
+.network-fold-name, .network-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .network-machine .network-fold-name { font-weight: 600; }
-.network-branches ul { margin-left: 10px; padding-left: 6px; border-left: 1px solid var(--border-default); }
-.network-leaf { border-radius: var(--radius-sm); }
+.network-kind, .network-count { color: var(--text-secondary); font-size: 11px; flex: none; }
+.network-branches > li > details > ul { --network-indent: 20px; }
+.network-branches > li > details > ul > li > details > ul, .network-branches > li > details > ul > li > ul { --network-indent: 34px; }
+.network-branches > li > details > ul > li > details > ul { --network-indent: 48px; }
+.network-leaf { border-radius: 0; }
 .network-leaf:hover { background: var(--surface-hover); }
 .network-leaf[data-selected="true"] { background: var(--accent-wash); }
-.network-name { display: block; position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 22px; line-height: 22px; padding: 0 6px 0 20px; font-size: 13px; text-decoration: none; color: inherit; }
-.network-name::before { content: attr(data-mark); position: absolute; left: 6px; color: var(--ok); width: 12px; font-size: 11px; }
+.network-name { text-decoration: none; color: inherit; cursor: pointer; }
+.network-name::before { content: attr(data-mark); width: 14px; flex: none; text-align: center; color: var(--ok); font-size: 10px; }
+.network-seatless .network-name { cursor: default; }
 [data-state="online-working"] .network-name::before { color: var(--accent); }
 [data-state="offline"] .network-name, [data-state="not-seen"] .network-name { color: var(--text-secondary); }
 [data-state="offline"] .network-name::before, [data-state="not-seen"] .network-name::before { color: var(--muted-dot); }
 [data-state="unknown"] .network-name::before { color: var(--warn); }
-.network-reason { color: var(--warn); font-size: 12px; margin: 4px 0; overflow-wrap: anywhere; }
-.network-divider { width: 6px; flex: none; cursor: col-resize; background: var(--border-default); touch-action: none; }
-.network-divider:hover, .network-divider:focus-visible { background: var(--accent); }
+.network-empty { padding-left: 20px; font-size: 12px; }
+.network-reason { color: var(--warn); font-size: 12px; margin: 8px; overflow-wrap: anywhere; }
+/* The divider is a hairline; the grab zone around it is wider than it looks. */
+.network-divider { width: 7px; margin: 0 -3px; flex: none; cursor: col-resize; background: transparent; touch-action: none; position: relative; z-index: 1; }
+.network-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: var(--border-default); }
+.network-divider:hover::after, .network-divider:focus-visible::after { background: var(--accent); width: 2px; }
+.network-divider:focus-visible { outline: none; }
 .network-pane { flex: 1; min-width: 0; display: flex; padding: 12px; }
 .network-terminal { flex: 1; min-width: 0; min-height: 0; }
 .network-terminal .terminal-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -32,7 +41,7 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-managed pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 12px; }
 @media (max-width: 760px) {
   .network-tree { flex-direction: column; overflow: auto; }
-  .network-list { width: 100%; max-width: none; border-right: none; border-bottom: 1px solid var(--border-default); }
+  .network-list { width: 100%; max-width: none; border-bottom: 1px solid var(--border-default); }
   .network-pane { width: 100%; min-height: 320px; flex: 1; }
   .network-divider { display: none; }
 }

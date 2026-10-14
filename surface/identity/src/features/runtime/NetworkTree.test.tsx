@@ -21,11 +21,13 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   const value = branches({ machines: [machine('one'), machine('retired', 'retired'), machine('empty')] } as never, { ...list, runner: 'unknown', reason: 'runner_unreachable: no connection' } as never);
   const host = await render(<NetworkBranches branches={value} selected={null} select={vi.fn()} />);
   expect(host.querySelectorAll('[data-machine]')).toHaveLength(2);
-  expect(host.querySelectorAll('[data-agent]')).toHaveLength(1);
+  // Every agent a computer may run is under it, once: the one with seats on 'one', the same agent seatless on 'empty'.
+  expect(host.querySelectorAll('[data-agent]')).toHaveLength(2);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(5);
   for (const state of list.seats.map((each) => each.state)) expect(host.querySelector('[data-state="' + state + '"]')).not.toBeNull();
-  expect([...host.querySelectorAll('[data-mark]')].map((leaf) => leaf.getAttribute('data-mark'))).toEqual(['●', '◉', '○', '◌', '?']);
-  expect(host.textContent).toContain('no seats');
+  expect([...host.querySelectorAll('[data-mark]')].map((leaf) => leaf.getAttribute('data-mark'))).toEqual(['●', '◉', '○', '◌', '?', '◌']);
+  expect(host.querySelector('[data-machine="empty"] [data-agent-only]')?.querySelector('[title]')?.getAttribute('title')).toContain('no seat on this computer');
+  expect(host.textContent).not.toContain('no seats');
   // The agent is named once, on its row; the seats under it carry their own names and the agent's name for a reader.
   expect(host.querySelectorAll('[data-agent] > details > summary[title="Long display name"]')).toHaveLength(1);
   expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, pty · offline');
@@ -35,7 +37,7 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   expect(host.textContent).not.toContain('runner_unreachable');
   // Computers and agents fold: the tree is the browser's own disclosure, open first.
   expect(host.querySelectorAll('details[open]')).toHaveLength(3);
-  expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(8);
+  expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(9);
 });
 it('C737 names one unreadable agent name on the agent row, not on every seat', () => {
   const value = branches({ machines: [{ ...machine('one'), may_run: [] }] } as never, list as never, {}, { agent: 'AgentUnreadable: no display name' });

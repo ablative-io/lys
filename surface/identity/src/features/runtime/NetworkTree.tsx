@@ -3,7 +3,7 @@ import { useLive } from '../../api';
 import type { SeatView } from '../../api';
 import { Gate } from '../signin/Gate';
 import { branches, readNetworkTree } from './network-tree';
-import type { TreeBranch } from './network-tree';
+import type { TreeAgent, TreeBranch } from './network-tree';
 import { NetworkTreePane } from './NetworkTreePane';
 import { PANE_WIDTH } from './canvas-kept';
 import './network-tree.css';
@@ -13,23 +13,45 @@ const MARKS = { 'online-idle': '●', 'online-working': '◉', offline: '○', '
 /** A seat's standing in a few words: its terminal's kind and its state. */
 const detail = (seat: SeatView): string => (seat.transport ?? 'not started') + ' · ' + seat.state;
 
+/** The one seat row: the state dot, the name, and everything else in the title. */
+function Leaf({ seat, name, reason, label, selected, select }: { seat: SeatView; name: string; reason: string | null; label: string; selected: string | null; select: (seat: string) => void }) {
+  return <li className="network-leaf" data-seat={seat.name} data-state={seat.state} data-selected={selected === seat.name} role="none">
+    <a href={'#/canvas?seat=' + encodeURIComponent(seat.name)} role="treeitem" title={name + ' · seat ' + seat.name + ' · ' + detail(seat) + (reason ? ' · ' + reason : '')} className="network-name" data-mark={MARKS[seat.state]} aria-label={name + ', seat ' + seat.name + ', ' + detail(seat)} aria-current={selected === seat.name ? 'true' : undefined} aria-selected={selected === seat.name} onClick={(event) => { event.preventDefault(); select(seat.name); }}>{label}</a>
+  </li>;
+}
+
 /**
- * The network as a tree, the way an editor shows files: each computer, under it each agent that has a seat there,
- * under that the seats. Names, a chevron and a state dot, nothing else in it: a seat is chosen by pressing it, and
- * everything about it (its standing, its reasons, Start when it is not running) is in the terminal space beside the
- * tree. The folds are the browser's own disclosure, so Enter and Space work on them as everywhere, and the arrow
- * keys walk the rows (see `walk`). What a row cannot show is in its title, for hovering and for a screen reader.
+ * An agent's row. One seat: the agent is the row, pressed to choose that seat. Several: a fold named for the agent
+ * with a row per seat. None: the agent's name alone, running if a runner holds a session for it outside any seat.
+ */
+function AgentRow({ agent, selected, select }: { agent: TreeAgent; selected: string | null; select: (seat: string) => void }) {
+  const title = agent.reason ? agent.name + ' · ' + agent.reason : agent.name;
+  if (agent.leaves.length === 1) {
+    const [leaf] = agent.leaves;
+    return <ul role="group"><Leaf {...leaf} label={agent.name} selected={selected} select={select} /></ul>;
+  }
+  if (!agent.leaves.length) {
+    const running = agent.running.length > 0;
+    return <ul role="group"><li className="network-leaf network-seatless" data-agent-only={agent.id} data-state={running ? 'online-working' : 'not-seen'} role="none">
+      <span role="treeitem" tabIndex={-1} className="network-name" data-mark={running ? MARKS['online-working'] : MARKS['not-seen']} title={title + (running ? ' · running outside a seat: ' + agent.running.map((session) => session.session + ' (pid ' + session.pid + ')').join(', ') : ' · no seat on this computer')}>{agent.name}</span>
+    </li></ul>;
+  }
+  return <details open><summary role="treeitem" className="network-fold network-agent" title={title}><span className="network-fold-name">{agent.name}</span><span className="network-count">{agent.leaves.length}</span></summary>
+    <ul role="group">{agent.leaves.map((leaf) => <Leaf key={leaf.seat.name} {...leaf} label={leaf.seat.name} selected={selected} select={select} />)}</ul>
+  </details>;
+}
+
+/**
+ * The network as a tree, the way an editor shows files: each computer, under it every agent it may run, once each,
+ * and under an agent with several seats its seats. Names, a chevron and a state dot, nothing else in it: a seat is
+ * chosen by pressing its row, and everything about it (its standing, its reasons, Start when it is not running) is in
+ * the terminal space beside the tree. The folds are the browser's own disclosure, so Enter and Space work on them as
+ * everywhere, and the arrow keys walk the rows (see `walk`). What a row cannot show is in its title.
  */
 export function NetworkBranches({ branches: all, selected, select }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void }) {
   return <ul className="network-branches" role="tree" aria-label="Network machines" onKeyDown={walk}>{all.map(({ machine, agents }) => <li key={machine.id} data-machine={machine.id} role="none">
-    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span></summary>
-      <ul role="group">{agents.length ? agents.map((agent) => <li key={agent.id} data-agent={agent.id} role="none">
-        <details open><summary role="treeitem" className="network-fold network-agent" title={agent.reason ? agent.name + ' · ' + agent.reason : agent.name}><span className="network-fold-name">{agent.name}</span></summary>
-          <ul role="group">{agent.leaves.map(({ seat, name, reason }) => <li className="network-leaf" key={seat.name} data-seat={seat.name} data-state={seat.state} data-selected={selected === seat.name} role="none">
-            <a href={'#/canvas?seat=' + encodeURIComponent(seat.name)} role="treeitem" title={name + ' · ' + detail(seat) + (reason ? ' · ' + reason : '')} className="network-name" data-mark={MARKS[seat.state]} aria-label={name + ', seat ' + seat.name + ', ' + detail(seat)} aria-current={selected === seat.name ? 'true' : undefined} aria-selected={selected === seat.name} onClick={(event) => { event.preventDefault(); select(seat.name); }}>{seat.name}</a>
-          </li>)}</ul>
-        </details>
-      </li>) : <li className="dim" role="none">no seats</li>}</ul>
+    <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span><span className="network-kind">{machine.kind}</span></summary>
+      <ul role="group">{agents.length ? agents.map((agent) => <li key={agent.id} data-agent={agent.id} role="none"><AgentRow agent={agent} selected={selected} select={select} /></li>) : <li className="dim network-empty" role="none">no agents</li>}</ul>
     </details>
   </li>)}</ul>;
 }
@@ -66,13 +88,14 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const all = useMemo(() => load.status === 'ok' ? branches(load.data, { ...load.data, seats: load.data.seats.map((seat) => {
     const changed = changes[seat.name];
     return changed && (seat.revision === undefined || changed.revision > seat.revision) ? changed : seat;
-  }) }, load.data.names, load.data.nameReasons) : [], [load, changes]);
+  }) }, load.data.names, load.data.nameReasons, load.data.unregistered) : [], [load, changes]);
   const chosen = all.flatMap((branch) => branch.leaves).find((leaf) => selected ? leaf.seat.name === selected : agent && leaf.seat.agent === agent);
   const change = (seat: SeatView) => setChanges((before) => ({ ...before, [seat.name]: seat }));
   const shown = within(width ?? paneWidth);
   return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': shown + 'px' } as React.CSSProperties}>
     <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={chosen?.seat.name ?? null} select={select} />
       {!all.length ? <p className="note">No active machine was returned.</p> : null}
+      {load.status === 'ok' && load.data.unregisteredReason ? <p className="network-reason" title={load.data.unregisteredReason}>Sessions outside seats are not known: {load.data.unregisteredReason}</p> : null}
     </aside>
     <div className="network-divider" role="separator" aria-label="Network tree width" aria-orientation="vertical" tabIndex={0} aria-valuenow={shown} aria-valuemin={PANE_WIDTH.least} aria-valuemax={PANE_WIDTH.most}
       onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resize(within(paneWidth + (event.key === 'ArrowRight' ? 24 : -24))); } }}
