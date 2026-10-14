@@ -9,6 +9,7 @@ import { Gate } from '../signin/Gate';
 import { OwnAccount } from '../people/Account';
 import { SessionList } from '../sessions/Sessions';
 import './you.css';
+import { PageHeader } from '../../shell/PageHeader';
 
 interface ActiveData {
   kind: 'active';
@@ -98,12 +99,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
 function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
   return (
     <div className="page fill you-page">
-      <div className="head">
-        <div>
-          <div className="eyebrow">Signed in as</div>
-          <h1>{data.me.person.display_name}</h1>
-        </div>
-      </div>
+      <PageHeader title={data.me.person.display_name} subtitle="Your account, signed-in sessions and the access you hold." />
       <Account data={data} reload={reload} />
     </div>
   );
@@ -111,10 +107,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
 
 function Registered({ me }: { me: MeView }) {
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Signed in as</div>
-      <h1>{me.person.display_name}</h1>
-      <p>Your account is waiting for activation by an administrator.</p>
-    </div></div>
+    <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." />
     <div className="pane">
     <OwnAccount readOnly />
     <section className="card" aria-label="Your signed-in sessions">

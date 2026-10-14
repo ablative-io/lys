@@ -15,6 +15,8 @@ import type { PeopleView } from '../../generated';
 import { entries } from '../people/directory';
 import { Gate } from '../signin/Gate';
 import { IdentityName, ReadFailure } from '../signin/words';
+import { RecordName } from '../../shell/RecordName';
+import { secretName } from './secret-name';
 
 /** The existing /_lys/secrets response in lys-secrets/bin/lys-secrets/view.rs. */
 export interface SecretListing {
@@ -56,15 +58,13 @@ export function SecretRows({ listing, people, teams = [], me = '', whose = { kin
   const scoped = listing.secrets.filter((entry) => inWhose(whose, teams, me, held(entry)));
   const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
   const columns: Column<Secret>[] = [
-    { head: 'Name', cell: (entry) => entry.name },
+    { head: 'Name', cell: (entry) => <RecordName id={entry.name} name={secretName(entry.name, names)} /> },
     { head: 'Kind', cell: (entry) => <span className="sec">{entry.class}</span> },
     { head: 'Owner', cell: (entry) => <IdentityName id={entry.owner} people={people} /> },
-    { head: 'Recorded change', cell: (entry) => <span className="sec">{entry.sequence}</span> },
-    { head: 'Change', cell: (entry) => <a className="btn" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Visibility and who may receive it</a> },
+    { head: 'Recorded change', cell: (entry) => <span className="sec">Change {entry.sequence}</span> },
+    { head: 'Change', cell: (entry) => <a className="btn" aria-label="Visibility and who may receive it" title="Visibility and who may receive it" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Visibility</a> },
   ];
   return <>
-    {/* One line of explanation; an empty list says so once, in the table body. */}
-    <p className="sub">A secret's value is never shown, and seeing it here does not give permission to use it.</p>
     <SecretControls listing={listing} changed={changed} />
     <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}

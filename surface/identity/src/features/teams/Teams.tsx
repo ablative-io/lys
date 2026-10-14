@@ -74,7 +74,7 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
         {teams.length ? null : <p className="dim">No teams yet. A team is how Lys groups people and their agents: create the first one.</p>}
       </div>
       <div className="pane">
-        {creating ? <Create key={revision} person={me.person.id} login={me.signed_in} changed={changed} /> : team ? <div key={team.id}>
+        {creating ? <Create key={revision} person={me.person.id} login={me.signed_in} changed={changed} /> : team ? <div key={team.id} className="team-detail">
           <section className="card"><h2>{team.name}</h2>
             {team.description ? <p className="sec">{team.description}</p> : null}
             <p>Managed by <a href={'#/file/' + team.owner}>{name(team.owner)}</a>.</p>

@@ -53,7 +53,7 @@ describe('Network', () => {
   it('is titled Network and counts one computer in the singular, once', async () => {
     await mount('#/network', routes);
     expect($('#screen .page.fill .head h1')?.textContent).toBe('Network');
-    expect($('#screen .page.fill .head .sub')).toBeNull();
+    expect($('#screen .page.fill .head .sub')?.textContent).toBe('The computers agents run on, and who may start there.');
     expect($('.tools .count')?.textContent).toBe('1 computer');
     expect($('#screen input[type="search"]')?.getAttribute('placeholder')).toBe('Search 1 computer');
     expect($$('#screen tbody tr[data-href]')[0].textContent).not.toMatch(/\b1 (computers|agents)\b/);
@@ -321,7 +321,8 @@ describe('Computers at the size of a business', () => {
     await mount('#/network', big);
     expect($$('#screen tr.group .group-name').map((name) => name.textContent)).toEqual(['Team 1', 'Team 2']);
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['55', '5', '0']);
-    expect($('.tools .count')?.textContent).toBe('60 computers in 2 groups');
+    expect($('.tools .count')?.textContent).toBe('60 computers across 2 groups');
+    expect($('.tools .count')?.getAttribute('title')).toBe('Each item is counted once. It may belong to more than one group.');
     expect(text().split('60 computers')).toHaveLength(2);
   });
   it('shows only the computers whose runner is not answering, in one click', async () => {

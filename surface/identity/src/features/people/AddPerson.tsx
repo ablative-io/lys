@@ -7,6 +7,7 @@ import { identity } from '../access/Resources';
 import type { ResourcesView } from '../access/Resources';
 import './add-agent.css';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
 
 /** Adding a person is one act, POST /people/admit: register them, make their sign-in account at the issuer by
  * email, bind it, activate them and issue their first grant. The answer is one receipt naming each step and the log
@@ -162,7 +163,7 @@ export function AddPerson() {
     const [me, people, model, resources] = await Promise.all([api.me(), api.people(), api.model(), request<ResourcesView>('/resources')]);
     return { me, people, model, resources };
   }, 'add-person');
-  return <div className="page"><a href="#/people">People and agents</a><h1>Add a person</h1>
+  return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory and choose the access they begin with." />
     <DirectoryGate load={load} title="Add a person" ok={(data) => data.people.scope === 'directory'
       ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} /> : <p>Only the Lys administrator can add people.</p>} />
   </div>;

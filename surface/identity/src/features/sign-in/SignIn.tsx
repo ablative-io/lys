@@ -12,6 +12,7 @@ import '../people/recorded-form.css';
 import './sign-in.css';
 import { Act } from '../../shell/Act';
 import { AccountHelp } from '../signin/AccountHelp';
+import { LysMark } from '../../shell/LysMark';
 
 /** Where a person lands once signed in. */
 export const SIGNED_IN = '/#/';
@@ -109,8 +110,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
   }
 
   return <div className="page sign-in">
-    <div className="sign-in-mark" aria-hidden="true">ID</div>
-    <div className="eyebrow">Lys</div>
+    <LysMark />
     <h1 ref={heading} tabIndex={-1}>Sign in</h1>
     <p className="sub">Sign in to Lys with your email and password.</p>
     <form className="recorded-form sign-in-form" aria-label="Sign in" onSubmit={submit} aria-busy={busy} noValidate>

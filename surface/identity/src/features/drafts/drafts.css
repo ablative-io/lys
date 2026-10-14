@@ -2,6 +2,8 @@
 .drafts-page > .tools { flex: none; display: flex; align-items: center; gap: 14px; margin: 10px 0; }
 .drafts-page > .tools .why-not { margin: 0; }
 .drafts-page > .pane { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.drafts-body { flex: 1; min-height: 0; overflow: auto; }
+.drafts-body > .pane { overflow-x: auto; }
 .drafts { width: 100%; }
 .drafts thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); }
 .drafts tr[data-draft] { cursor: pointer; }

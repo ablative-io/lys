@@ -35,10 +35,10 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
     { head: 'Owner', cell: (account) => <IdentityName id={account.owner} /> },
     { head: 'What it is for', cell: (account) => account.description },
     { head: 'Created', cell: (account) => <span className="sec">{clock(account.created_at)}</span> },
-    { head: 'Retired', cell: (account) => account.retired_at !== null ? <span className="sec">{clock(account.retired_at)}</span> : <Retire key={account.id + ':' + revision} account={account} person={me.person.id} changed={changed} /> },
+    { head: 'Retire or retired at', cell: (account) => account.retired_at !== null ? <span className="sec">{clock(account.retired_at)}</span> : <Retire key={account.id + ':' + revision} account={account} person={me.person.id} changed={changed} /> },
   ];
   return <>
-    <div className="tools"><span className="note">{accounts.scope === 'directory' ? 'Showing the directory’s account records.' : 'Showing your own account records.'}</span>
+    <div className="tools account-tools"><span className="note">{accounts.scope === 'directory' ? 'Showing the directory’s account records.' : 'Showing your own account records.'}</span>
       {!adding ? <Act symbol="add" name="Register an account" word="Register" tone="primary" onClick={() => setAdding(true)} /> : null}</div>
     {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); }} /> : null}
     {!adding && !accounts.service_accounts.length ? <p>No service-account records were returned.</p> : null}

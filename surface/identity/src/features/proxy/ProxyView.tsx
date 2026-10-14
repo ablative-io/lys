@@ -36,8 +36,8 @@ function Agents({ board, chosen }: { board: Load<Board>; chosen: string | null }
   if (board.status === 'loading') return <p role="status">Reading the agents…</p>;
   if (board.status === 'refused') return unread(board.refused, 'The agents');
   return <table className="usage-table proxy-agents"><thead><tr><th>Agent</th><th>Now</th></tr></thead><tbody>
-    {board.data.rows.map((row) => <tr key={row.agent.id} data-agent={row.agent.id} aria-current={chosen === row.agent.id ? 'true' : undefined}>
-      <td><a href={proxyHref({ agent: row.agent.id })}>{row.agent.display_name}</a></td>
+    {[...new Map(board.data.rows.map(row => [row.agent.id, row])).values()].sort((a, b) => Number(!refusedPart(b.sessions) && b.sessions.length > 0) - Number(!refusedPart(a.sessions) && a.sessions.length > 0)).map((row) => <tr key={row.agent.id} data-agent={row.agent.id} aria-current={chosen === row.agent.id ? 'true' : undefined}>
+      <td><a title={row.agent.id} href={proxyHref({ agent: row.agent.id })}>{row.agent.display_name}</a></td>
       <td className="sec">{refusedPart(row.sessions) ? <small className="refusal-name" title={row.sessions.reason}>{row.sessions.refusal}</small> : row.sessions.length ? 'Running' : 'Not running'}</td></tr>)}
     {board.data.rows.length ? null : <tr className="empty"><td className="dim" colSpan={2}>There is no agent you may see.</td></tr>}
   </tbody></table>;

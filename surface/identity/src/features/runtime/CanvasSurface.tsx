@@ -149,7 +149,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
       if (theirs) changed();
     }
     setFront(id);
-    if (element.clientWidth && element.clientHeight) setView(now => fitCanvasBox(box, element, Math.min(1, zoomOf(now))));
+    if (element.clientWidth && element.clientHeight) setView(fitCanvasBox(box, element));
   };
 
   // On arriving, and again when the route names another agent: that agent's terminal is open, at the open size, in the middle of the view.

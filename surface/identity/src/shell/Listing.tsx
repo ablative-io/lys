@@ -27,7 +27,7 @@ export interface ListingProps<T> {
   holds: (items: T[]) => string;
   /** Rows folded under a row, such as a person's agents. */
   under?: (item: T) => T[];
-  underNoun?: (count: number) => string;
+  underNoun?: (count: number, item: T) => string;
   /** The heading of the column that opens a row's folded rows. */
   underHead?: string;
   selected: string | null;
@@ -88,7 +88,7 @@ export function Listing<T>(props: ListingProps<T>) {
           onFocus={() => key !== selected && select(item)}>
           {columns.map((column, index) => [
             <td key={column.head} data-col={column.head} style={index === 0 && depth ? { paddingLeft: 28 } : undefined}>{column.cell(item)}</td>,
-            index === 0 && under ? <td key="under">{children.length && !needle ? <button className="btn under" aria-expanded={isOpen(item)} onClick={(event) => { event.stopPropagation(); setOpened((set) => toggle(set, fold)); }}>{underNoun?.(children.length) ?? count(children.length)}</button> : null}</td> : null,
+            index === 0 && under ? <td key="under">{children.length && !needle ? <button className="btn under" aria-expanded={isOpen(item)} onClick={(event) => { event.stopPropagation(); setOpened((set) => toggle(set, fold)); }}>{underNoun?.(children.length, item) ?? count(children.length)}</button> : null}</td> : null,
           ])}
         </tr>;
       })}
@@ -104,7 +104,7 @@ export function Listing<T>(props: ListingProps<T>) {
       <input className="search" type="search" aria-label={'Search ' + noun} placeholder={distinct.size ? 'Search ' + counted(distinct.size, noun) : 'Search ' + noun} value={query} onChange={(event) => setQuery(event.target.value)} />
       {tools}
       {/* An empty list says so once, in the table body; the count says nothing then. */}
-      {distinct.size ? <span className="note count">{needle ? count(found.size) + ' of ' + count(distinct.size) + ' match' : counted(distinct.size, noun) + (groups.length > 1 ? ' in ' + counted(groups.length, 'groups') : '')}</span> : null}
+      {distinct.size ? <span className="note count" title={groups.length > 1 ? 'Each item is counted once. It may belong to more than one group.' : undefined}>{needle ? count(found.size) + ' of ' + count(distinct.size) + ' match' : counted(distinct.size, noun) + (groups.length > 1 ? ' across ' + counted(groups.length, 'groups') : '')}</span> : null}
     </div>
     <TableScroll className="pane" label={noun}>
       <table>

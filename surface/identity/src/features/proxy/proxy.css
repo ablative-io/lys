@@ -1,5 +1,8 @@
 /* The proxy view: three columns filling the page, each scrolling in itself; the page never scrolls. */
-.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(170px, 200px) minmax(560px, 1fr) minmax(420px, 1.2fr); gap: 12px; }
+.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; }
+.proxy-agents td { white-space: nowrap; }
+.proxy-view .proxy-agents { table-layout: auto; }
+@container surface (max-width: 1000px) { .proxy-view { grid-template-columns: 1fr; grid-auto-rows: minmax(180px, 1fr); overflow: auto; } }
 .proxy-view > section { min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-card); padding: 8px 10px; }
 .proxy-view table { width: 100%; }
 .proxy-view th.num, .proxy-view td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

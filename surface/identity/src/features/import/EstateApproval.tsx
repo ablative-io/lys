@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, Refused, request } from '../../api';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
+import { TableScroll } from '../../shell/Listing';
+import { AccessTabs } from '../access/AccessTabs';
 
 type Resource = { kind: string; id: string; relation: string; actions: string[]; seats: string[]; evidence: string };
 type Plan = { version: 1; resources: Resource[]; agents: { display_name: string }[] };
 type Receipt = { operation: string; grant: string; receipt: { caller: string } };
+export const evidenceWords = (resource: Resource): string => resource.evidence.replace(/^Cambium \/conversation\/places .*?workspace ([^.;]+)[.;]\s*/, 'From the Cambium place ' + resource.id + ' in workspace $1. ');
 
 export function planOf(value: unknown): Plan {
   const plan = value as Plan;
@@ -83,14 +87,13 @@ export function EstateApproval() {
     finally { working.current=false;setBusy(false); }
   };
   return <div className="page fill">
-    <div className="head"><div><div className="eyebrow">Access</div><h1>Approve estate grants</h1></div>
-      {plan ? <Act symbol="approve" name="Approve and apply estate grants" word="Approve" tone="primary" disabled={busy || !account} onClick={()=>void approve()} /> : null}</div>
-    <p className="sub">Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active.</p>
+    <PageHeader title="Approve estate grants" subtitle="Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active." actions={plan ? <Act symbol="approve" name="Approve and apply estate grants" word="Approve" tone="primary" disabled={busy || !account} onClick={()=>void approve()} /> : null} />
+    <AccessTabs on="grants" />
     {status ? <p role="status">{status}</p> : null}
     {plan ? <div className="pane">
       <p className="note">Using your installed Lys directory loader. {plan.resources.length} resources. No expiry of their own. You can revoke the roots or loader grants later.</p>
-      <table><thead><tr><th>Resource</th><th>Kind</th><th>Actions</th><th>Passed to</th><th>Why</th></tr></thead>
-        <tbody>{plan.resources.map((r)=><tr key={r.kind+'/'+r.id}><td><strong>{r.id}</strong></td><td className="sec">{r.kind}</td><td className="mono">{r.actions.join(', ')}</td><td className="sec">{r.seats.join(', ')}</td><td className="dim">{r.evidence}</td></tr>)}</tbody></table>
+      <TableScroll label="Estate grants"><table><thead><tr><th>Resource</th><th>Kind</th><th>Actions</th><th>Passed to</th><th>Why</th></tr></thead>
+        <tbody>{plan.resources.map((r)=><tr key={r.kind+'/'+r.id}><td><strong>{r.id}</strong></td><td className="sec">{r.kind}</td><td className="mono">{r.actions.join(', ')}</td><td className="sec">{r.seats.join(', ')}</td><td className="dim" title={r.evidence}>{evidenceWords(r)}</td></tr>)}</tbody></table></TableScroll>
     </div> : null}
   </div>;
 }

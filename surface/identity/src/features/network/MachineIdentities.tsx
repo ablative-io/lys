@@ -13,6 +13,9 @@ import { day } from '../file/time';
 import { Act } from '../../shell/Act';
 import { readMachineIdentities } from './contract';
 import type { MachineGrant, MachineIdentity } from './contract';
+import { RecordCopy } from '../../shell/RecordCopy';
+import { RecordName } from '../../shell/RecordName';
+import { TableScroll } from '../../shell/Listing';
 
 /** Every machine the service knows, for the administrator. */
 export async function readIdentities(): Promise<MachineIdentity[]> {
@@ -24,29 +27,29 @@ const whoHref = (grant: MachineGrant) => '#/access/who/' + encodeURIComponent(gr
 const MODES: Record<MachineGrant['mode'], string> = { outright: 'At once', by_draft: 'By draft', by_two: 'By two approvals' };
 
 /** Every machine a computer's joins made, the one it answers as now first. */
-export function MachineHolders({ machine, identities, me, changed }: { machine: string; identities: MachineIdentity[]; me: string; changed: (message: string) => void }) {
+export function MachineHolders({ machine, name, identities, me, changed }: { machine: string; name?: string; identities: MachineIdentity[]; me: string; changed: (message: string) => void }) {
   const mine = identities.filter((identity) => identity.machine === machine).reverse();
   if (!mine.length) return <p className="dim">This computer has not joined with a connection code, so it is no machine yet and holds nothing.</p>;
-  return <>{mine.map((identity) => <MachineCard key={identity.identity} identity={identity} me={me} changed={changed} />)}</>;
+  return <>{mine.map((identity) => <MachineCard key={identity.identity} identity={identity} name={name} me={me} changed={changed} />)}</>;
 }
 
-function MachineCard({ identity, me, changed }: { identity: MachineIdentity; me: string; changed: (message: string) => void }) {
+function MachineCard({ identity, name, me, changed }: { identity: MachineIdentity; name?: string; me: string; changed: (message: string) => void }) {
   const active = !identity.replaced && identity.state === 'active';
   return <div className="card" aria-label={'Machine ' + identity.identity} data-machine={identity.identity}>
-    <div className="row"><span className="sec">Machine</span><span className="mono">{identity.identity}</span></div>
-    <div className="row"><span className="sec">Key id</span><span className="mono" data-key>{identity.key}</span></div>
+    <div className="row"><span className="sec">Machine</span><RecordCopy name={name ?? 'Machine identity'} value={identity.identity} /></div>
+    <div className="row"><span className="sec">Key id</span><span data-key title={identity.key}><RecordCopy name="Signing key" value={identity.key} /></span></div>
     <div className="row"><span className="sec">Answers to</span><span><a href={'#/file/' + identity.responsible}>{identity.responsible_name ?? 'a person outside your view'}</a>, who gave its connection code</span></div>
     <div className="row"><span className="sec">Joined</span><span>{day(identity.joined_at)}</span></div>
     <div className="row"><span className="sec">Stands</span><span>{identity.replaced ? 'Replaced by a later join of this computer; its grants no longer count.' : identity.state === 'active' ? 'Active' : 'Not active (' + identity.state + '); its grants do not count while it is not.'}</span></div>
-    <table className="usage-table" aria-label={'Grants held by ' + identity.identity}><thead><tr><th>On</th><th>Actions</th><th>How</th><th>Grant</th></tr></thead><tbody>
+    <TableScroll label="Machine grants"><table className="usage-table" aria-label={'Grants held by ' + identity.identity}><thead><tr><th>On</th><th>Actions</th><th>How</th><th>Grant</th></tr></thead><tbody>
       {identity.grants.map((grant) => <tr key={grant.grant} data-grant={grant.grant}>
         <td><a href={whoHref(grant)}>{resourceWords(grant.resource)}</a></td>
         <td className="mono">{grant.actions.join(', ')}</td>
         <td>{MODES[grant.mode]}{grant.admitted ? '' : ', not in force now'}</td>
-        <td className="mono">{grant.grant}</td>
+        <td><RecordName id={grant.grant} name={'Access to ' + resourceWords(grant.resource)} /></td>
       </tr>)}
       {identity.grants.length ? null : <tr><td colSpan={4} className="dim">It holds no grant.</td></tr>}
-    </tbody></table>
+    </tbody></table></TableScroll>
     {active ? <GiveToMachine identity={identity} me={me} changed={changed} /> : null}
   </div>;
 }

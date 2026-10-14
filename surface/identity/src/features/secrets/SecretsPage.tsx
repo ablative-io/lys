@@ -5,6 +5,8 @@ import { Secrets } from './Secrets';
 import type { SecretListing } from './Secrets';
 import { SecretAudit, SecretGrants } from './SecretsDetail';
 import { secretsApi } from './secretsApi';
+import { PageHeader } from '../../shell/PageHeader';
+import { NotFound } from '../../shell/NotFound';
 
 const listing = () => request<SecretListing>('/secrets');
 const TABS = [['entries', 'Entries'], ['grants', 'Access'], ['audit', 'Activity']] as const;
@@ -13,8 +15,9 @@ const MERGED: Record<string, string> = { manage: 'entries', revocation: 'audit' 
 export function SecretsPage() {
   const { section: asked = 'entries' } = useParams();
   const section = MERGED[asked] ?? asked;
+  if (!TABS.some(([key]) => key === section)) return <NotFound />;
   return <div className="page fill">
-    <div className="head"><div><h1>Secrets</h1></div></div>
+    <PageHeader title="Secrets" subtitle="A secret's value is never shown, and seeing it here does not give permission to use it." />
     <nav className="tabs" aria-label="Secrets views">
       {TABS.map(([key, label]) => <Link key={key} className={section === key ? 'on' : ''} aria-current={section === key ? 'page' : undefined} to={'/secrets/' + key}>{label}</Link>)}
     </nav>

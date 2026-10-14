@@ -6,7 +6,7 @@ import type { Column } from '../../shell/Listing';
 import { TableScroll } from '../../shell/Listing';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
-import { chainOf, grantNo, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
+import { chainOf, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 import { modeWords } from './mode-words';
@@ -25,7 +25,7 @@ export function breakable(text: string): ReactNode {
 /** The columns of a grant, the same on every screen that lists one. Grant and Relation never wrap; On and the path take the room. Stands comes last, so a void grant's row ends on why it is void. */
 export function grantColumns(w: GrantWorld): Column<Grant>[] {
   return [
-    { head: 'Grant', cell: (g) => <span className="mono g-tight">{grantNo(g.id)}</span> },
+    { head: 'Grant', cell: (g) => <span title={g.id}>Access to {resourceName(w, g.resource)}</span> },
     { head: 'Holder', cell: (g) => <span title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}</span> },
     { head: 'Allows', cell: (g) => mayText(w, g) },
     { head: 'Relation', cell: (g) => <span className="mono g-tight">{g.relation}</span> },

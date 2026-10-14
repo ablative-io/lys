@@ -3,6 +3,11 @@
 .dock { width: 0; flex: none; overflow: hidden; background: var(--surface-base); border-left: 1px solid var(--border-subtle); transition: width .32s var(--spring); }
 .dock-right .dock { border-left: 0; border-right: 1px solid var(--border-subtle); }
 .dock.open { width: 380px; }
+@media (max-width: 900px) {
+  .dock.open { position: absolute; z-index: 40; right: 0; top: 0; bottom: 0; width: min(380px, calc(100% - var(--rail))); }
+  .dock.open .dock-in { width: 100%; }
+  .dock-right .dock.open { right: auto; left: 0; }
+}
 .dock-in { width: 380px; height: 100%; display: flex; flex-direction: column; }
 .dock-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border-subtle); }
 .dock-body { flex: 1; overflow: auto; padding: 12px 14px; }

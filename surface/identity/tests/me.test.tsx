@@ -11,7 +11,7 @@ describe('You', () => {
   it('shows the signed-in person from /me', async () => {
     const { requests } = await mount('#/me');
     expect(requests).toEqual(expect.arrayContaining(['/me', '/people']));
-    expect($('.eyebrow')?.textContent).toBe('Signed in as');
+    expect($('.page-header .sub')?.textContent).toBe('Your account, signed-in sessions and the access you hold.');
     expect($('.page h1')?.textContent).toBe('Ada (test person)');
   });
 

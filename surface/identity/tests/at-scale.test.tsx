@@ -49,7 +49,8 @@ describe('Directory at the size of a business', () => {
     const squad = $$('#screen tr.group').find((row) => row.textContent?.includes('Squad 01'));
     expect(squad?.textContent).toMatch(/led by Person 0 · 9 people, 36 agents/);
     expect(rows().length).toBeLessThanOrEqual(40 * 25);
-    expect($('.tools .count')?.textContent).toBe('1,500 people and agents in 40 groups');
+    expect($('.tools .count')?.textContent).toBe('1,500 people and agents across 40 groups');
+    expect($('.tools .count')?.getAttribute('title')).toContain('Each item is counted once.');
   });
 
   it('folds each person\'s agents under them until opened', async () => {

@@ -17,6 +17,7 @@ export interface SessionView {
 }
 interface SessionsView { person: string; sessions: SessionView[] }
 const sessionPath = (person: string) => person ? '/directory/people/' + encodeURIComponent(person) + '/sessions' : '/sessions';
+const providerName = (issuer: string): string => { try { return new URL(issuer).host; } catch { return 'Provider address not recognised'; } };
 
 export function SessionList({ person }: { person: string }) {
   const [revision, setRevision] = useState(0);
@@ -59,8 +60,8 @@ export function SessionList({ person }: { person: string }) {
     </section> : null}
     <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <TableScroll label="Sign-in sessions"><table>
       <thead><tr><th>Session</th><th>Started</th><th>Expires</th><th>Action</th></tr></thead>
-      <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).map((session) => <tr key={session.id}>
-        <td>{session.current ? 'This session' : 'Another signed-in session'}<p className="note">Provider: {session.login.issuer}</p></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
+      <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).sort((a, b) => Number(b.current) - Number(a.current) || b.started_at - a.started_at).map((session) => <tr key={session.id}>
+        <td>{session.current ? 'This session' : 'Another signed-in session'}<p className="note">Provider: <span title={session.login.issuer}>{providerName(session.login.issuer)}</span></p></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
         <td><Act symbol="stop" name={session.current ? 'Sign out' : 'End session'} word={session.current ? 'Sign out' : 'End'} disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)} /></td>
       </tr>)}</tbody>
     </table></TableScroll> : <p className="note">No live sessions were returned for this person.</p>} />

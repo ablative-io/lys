@@ -24,6 +24,7 @@ import { readIdentities } from './MachineIdentities';
 import type { MachineIdentity } from './contract';
 import type { RunnerRecord } from './MachineDetail';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
 
 /**
  * What Lys knows of a computer's runner: still being asked; answered, with its record and whether the runner answered
@@ -158,10 +159,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
   ];
   const changed = (message: string) => { refresh(message); };
   return <>
-    <div className="head">
-      <div><div className="eyebrow">Where agents run</div><h1>Network</h1></div>
-      {admin ? <Act symbol="add" name="Add a computer" word="Computer" tone="primary" onClick={() => name.current?.focus()} /> : null}
-    </div>
+    <PageHeader title="Network" subtitle="The computers agents run on, and who may start there." actions={admin ? <Act symbol="add" name="Add a computer" word="Computer" tone="primary" onClick={() => name.current?.focus()} /> : null} />
     {/* How many computers there are is the list's own count; the strip says only what the list does not. */}
     <div className="stat-strip">
       <div className="stat"><div className="n">{count(up)}</div><div className="l">up now</div></div>
@@ -199,6 +197,6 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
 export function mayStart(machine: Machine): string {
   if (machine.runtime === null) return 'Lys does not start agents here.';
   const roles = (machine.may_run_roles ?? []).map((role) => 'anyone holding ' + role);
-  const all = [...machine.may_run.map((agent) => agent.display_name), ...roles];
+  const all = [...new Map(machine.may_run.map(agent => [agent.id, agent.display_name])).values(), ...roles];
   return all.length ? all.join(', ') : 'No agent may start here yet.';
 }

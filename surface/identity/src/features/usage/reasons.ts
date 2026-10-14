@@ -15,7 +15,7 @@ function sentence(part: string, holder: Named): string {
   if (dollars) return 'No dollar spend has been reported for ' + who(dollars[1]) + '.';
   const plan = /^plan window unreported for agent (\S+)$/.exec(part);
   if (plan) return 'No plan window has been reported for ' + who(plan[1]) + '.';
-  const plain = part.replace(/\b(?:agent|person|team) ((?:agent|person|team)-[0-9A-Za-z]+)\b/g, '$1').replace(IDENTIFIER, (id) => who(id)).trim();
+  const plain = part.replace(/context_percent\b/gi, 'context use').replace(/\b(?:agent|person|team) ((?:agent|person|team)-[0-9A-Za-z]+)\b/g, '$1').replace(IDENTIFIER, (id) => who(id)).trim();
   const capital = plain.charAt(0).toUpperCase() + plain.slice(1);
   return /[.!?]$/.test(capital) ? capital : capital + '.';
 }

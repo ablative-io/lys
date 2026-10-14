@@ -143,10 +143,10 @@ export function Apps() {
 }
 
 /** The sign-in settings' two fields: the return addresses, one to a line, and whether the app is given the person's name. */
-function SignInFields({ redirects, setRedirects, profile, setProfile, app }: { redirects: string; setRedirects: (text: string) => void; profile: boolean; setProfile: (on: boolean) => void; app: string }) {
+function SignInFields({ redirects, setRedirects, profile, setProfile, app, name }: { redirects: string; setRedirects: (text: string) => void; profile: boolean; setProfile: (on: boolean) => void; app: string; name: string }) {
   return <>
     <label className="field">Return addresses the sign-in may send a person back to, one to a line<textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} aria-label={'Return addresses of ' + app} /></label>
-    <label className="tick"><input type="checkbox" checked={profile} onChange={(event) => setProfile(event.target.checked)} /> Give {app} the person’s name</label>
+    <label className="tick" title={app}><input type="checkbox" checked={profile} onChange={(event) => setProfile(event.target.checked)} /> Give {name} the person’s name</label>
   </>;
 }
 
@@ -172,7 +172,7 @@ function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => 
     <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>
     {stored ? <CustodyConfirmed answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions app-signin">
-      <SignInFields app={app.id} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
+      <SignInFields app={app.id} name={app.name} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
       <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
       <Act symbol="approve" name={'Approve ' + app.name} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/approve', { redirects: lines(redirects), profile }, (answer) => { const approval = approvalAnswer(answer, app.id); if (approval.credentials) saved(approval.credentials); approved(approval.app); }); }} />
       <Act symbol="decline" name={'Decline ' + app.name} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }} />
@@ -207,7 +207,7 @@ function SignInSettings({ app, busy, act, changed }: { app: AppRecord; busy: boo
   const [redirects, setRedirects] = useState((app.sign_in?.redirects ?? app.redirects).join('\n'));
   const [profile, setProfile] = useState(app.sign_in?.profile ?? false);
   return <div className="app-actions app-signin" aria-label={'Change the sign-in of ' + app.id}>
-    <SignInFields app={app.id} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
+    <SignInFields app={app.id} name={app.name} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
     <Act symbol="save" name={'Save the sign-in of ' + app.name} word="Save" tone="primary" disabled={busy} onClick={() => { void act('/sign_in', { redirects: lines(redirects), profile }, (answer) => { const kept = appAnswer(answer, app.id, 'approved', 'sign-in settings'); changed(kept.name + '’s sign-in now sends people back to ' + kept.sign_in?.redirects.join(', ') + (kept.sign_in?.profile ? ' and gives it their name.' : ' and withholds their name.')); }); }} />
   </div>;
 }

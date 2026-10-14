@@ -34,6 +34,7 @@ describe("Canvas fit to the available surface", () => {
         unanswered: [],
       }),
     });
+    if (width === 1232) await click($('[data-act="zoom-out"]'));
     await click($('[data-node="session:' + session + '"] [data-act="toggle"]'));
     const transform = $(".session-canvas")?.style.transform ?? "";
     const values = /translate\(([-\d.]+)px, ([-\d.]+)px\)(?: scale\(([-\d.]+)\))?/.exec(transform);
@@ -42,6 +43,7 @@ describe("Canvas fit to the available surface", () => {
     const scale = Number(values?.[3] ?? 1),
       x = Number(values?.[1] ?? 0),
       y = Number(values?.[2] ?? 0);
+    if (width === 1232) expect(scale).toBe(1);
     const left = x + Number.parseFloat(node?.style.left ?? "0") * scale;
     const top = y + Number.parseFloat(node?.style.top ?? "0") * scale;
     expect(left).toBeGreaterThanOrEqual(0);

@@ -11,6 +11,7 @@ import { RoleHolders } from './RoleHolders';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
 
 export function Roles() {
   const { id } = useParams();
@@ -32,8 +33,7 @@ export function Roles() {
   const role = id ? roles.find((entry) => entry.id === id) : undefined;
   const me = authority.status === 'ok' ? authority.data.me.person.id : '';
   const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} /> : null;
-  return <div className="page fill"><div className="head"><div><div className="eyebrow">{id ? <a href="#/roles">Roles</a> : 'Directory'}</div><h1>{role ? role.name : 'Roles'}</h1>{id ? null : <p className="sub">Describe a job, assign it to people or agents, and review changes before updating their assigned version.</p>}</div>
-    {admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} onClick={() => setEditing((value) => !value)} /> : null}</div>
+  return <div className="page fill"><PageHeader title={role ? role.name : 'Roles'} breadcrumb={id ? <a href="#/roles">Roles</a> : undefined} subtitle={id ? undefined : 'Describe a job, assign it to people or agents, and review changes before updating their assigned version.'} actions={admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} tone={editing ? 'plain' : 'primary'} onClick={() => setEditing((value) => !value)} /> : null} />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Roles" ok={() => {
       if (id && !role) return <p className="why-not">This role was not returned by the service.</p>;

@@ -32,16 +32,16 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
     const tracked = tracking(usage);
-    return <>
+    return <div className="usage">
       <ControlSetup agent={agent} />
-      <ManagedControls agent={agent} />
+      <ManagedControls agent={agent} name={name} />
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
       {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <p className="dim" role="status">The words could not be read: {words.refused}</p>}
       {'held' in variables ? <Variables agent={agent} variables={variables.held} changed={changed} /> : <p className="dim" role="status">The variables could not be read: {variables.refused}</p>}
       {'held' in schedules ? <Schedules agent={agent} schedules={schedules.held.schedules} changed={changed} /> : <p className="dim" role="status">The schedules could not be read: {schedules.refused}</p>}
-    </>;
+    </div>;
   }} /></>;
 }
 
@@ -82,25 +82,25 @@ function ControlSetup({ agent }: { agent: string }) {
 function controlFailure(failure: Refused) { return <p role="status">{failure.refusal.refusal}: {failure.message}</p>; }
 
 /** Session and operation pages follow the existing change signal and advance only on a person's action. */
-export function ManagedControls({ agent }: { agent: string }) {
+export function ManagedControls({ agent, name }: { agent: string; name?: string }) {
   const [after, setAfter] = useState<string | null>(null);
   const load = useLive(() => controls.sessions(agent, after), 'control-sessions:' + agent + ':' + after);
   return <section aria-label="Managed controls" className="managed-controls">
     <h3>Managed controls</h3>
     <Gate load={load} title="Control sessions" renderError={controlFailure} ok={(page) => <>
-      <ControlSessionPage key={after ?? 'first'} page={page} />
+      <ControlSessionPage key={after ?? 'first'} page={page} name={name} />
       {after ? <Act symbol="back" name="First sessions" word="First" onClick={() => setAfter(null)} /> : null}
       {page.after ? <Act symbol="more" name="More sessions" word="More" onClick={() => setAfter(page.after)} /> : null}
     </>} />
   </section>;
 }
 
-function ControlSessionPage({ page }: { page: ControlSessionsPage }) {
+function ControlSessionPage({ page, name }: { page: ControlSessionsPage; name?: string }) {
   const [selected, setSelected] = useState(page.sessions[0] ?? '');
   const session = page.sessions.includes(selected) ? selected : page.sessions[0];
   if (!session) return <p>No session has been reported for this agent.</p>;
   return <>
-    <label>Control session <select aria-label="Control session" value={session} onChange={(event) => setSelected(event.target.value)}>{page.sessions.map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+    <label className="field">Control session <select aria-label="Control session" value={session} onChange={(event) => setSelected(event.target.value)}>{page.sessions.map((id, index) => <option key={id} value={id} title={id}>{name ? name + ': session ' : 'Session '}{index + 1}</option>)}</select></label>
     <SessionControls key={session} session={session} />
   </>;
 }

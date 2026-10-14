@@ -4,6 +4,7 @@ import { API, api } from '../../api';
 import type { Load, Refused } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
 import { AccountHelp } from './AccountHelp';
+import { LysMark } from '../../shell/LysMark';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
@@ -19,7 +20,7 @@ export function SignIn() {
   return (
     <div className="page signed-out">
       <div className="card">
-        <div className="mark"><span className="seal">L</span><span>Lys</span></div>
+        <LysMark />
         <h1>Sign in</h1>
         <div><a className="btn primary" href={API + '/login'}>Sign in</a></div>
         <AccountHelp />

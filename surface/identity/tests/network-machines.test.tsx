@@ -43,8 +43,10 @@ describe('Machines on the Network screen', () => {
     await mount('#/network', routes([machine()]));
     const shown = card(NOW);
     expect(shown).not.toBeNull();
-    expect(shown?.textContent).toContain(NOW);
-    expect(shown?.querySelector('[data-key]')?.textContent).toBe(KEY);
+    expect(shown?.querySelector('.record-copy')?.getAttribute('title')).toBe(NOW);
+    expect(shown?.querySelector('.record-copy')?.textContent).toContain(computer.name);
+    expect(shown?.querySelector('[data-key]')?.getAttribute('title')).toBe(KEY);
+    expect(shown?.querySelector('[data-key]')?.textContent).toContain('Signing key');
     const answers = [...(shown?.querySelectorAll('a') ?? [])].find((a) => a.getAttribute('href') === '#/file/' + ADA);
     expect(answers?.textContent).toBe('Ada (test person)');
     const row = shown?.querySelector('tr[data-grant="' + held.grant + '"]');

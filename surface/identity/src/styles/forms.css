@@ -26,7 +26,14 @@ select {
   background-repeat: no-repeat; background-position: right 11px center;
 }
 select option { background: var(--surface-default); color: var(--text-primary); }
-input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; padding: 0; }
+input[type=checkbox] { appearance: none; display: inline-grid; place-content: center; flex: none; width: 15px; height: 15px; padding: 0; border: 1px solid var(--text-muted); border-radius: 3px; background: var(--surface-code); cursor: pointer; }
+input[type=checkbox]::before { content: ''; width: 8px; height: 4px; border-left: 2px solid #17110b; border-bottom: 2px solid #17110b; transform: translateY(-1px) rotate(-45deg); visibility: hidden; }
+input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
+input[type=checkbox]:checked::before { visibility: visible; }
+input[type=checkbox]:indeterminate { background: var(--accent); border-color: var(--accent); }
+input[type=checkbox]:indeterminate::before { visibility: visible; height: 2px; border: 0; background: #17110b; transform: none; }
+input[type=checkbox]:disabled { cursor: not-allowed; }
+.permissions select { min-width: 20ch; }
 /* The one pill: what the two earlier definitions drew together. */
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; margin: 2px 4px 2px 0; border: 1px solid var(--border-default); border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
 .pill.human { border-color: rgba(212,151,90,.4); color: var(--accent); text-decoration: none; }

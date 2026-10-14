@@ -19,6 +19,14 @@ h2 { font-size: 14px; font-weight: 600; letter-spacing: -.01em; margin: 0; }
 .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; margin-bottom: 12px; }
 .head > div { min-width: 0; flex: 1 1 200px; }
 .head > button, .head > a { flex: none; }
+.head > .head-actions { flex: 0 1 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.head .sub { margin-bottom: 0; }
+.breadcrumb { margin: 0 0 8px; color: var(--text-secondary); }
+.page > a:first-child { margin-bottom: 8px; }
+.page > a:first-child + h1 { margin-bottom: 14px; }
+.effective-settings h2 { margin: 22px 0 10px; }
+.effective-settings > :first-child { margin-top: 0; }
+.account-tools > .act { margin-left: auto; }
 .seg { display: inline-flex; background: var(--surface-default); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 3px; gap: 2px; }
 .seg button, .seg a { padding: 3px 10px; border-radius: var(--radius-sm); color: var(--text-muted); font-size: 12px; text-decoration: none; }
 .seg .on { background: var(--surface-hover); color: var(--text-primary); }
@@ -63,6 +71,8 @@ td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-spa
 .table-scroll > table { width: max-content; min-width: 100%; }
 .table-scroll td { max-width: 42ch; }
 .record-name { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.record-copy { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.record-copy [role="alert"] { flex-basis: 100%; }
 .seg button { white-space: nowrap; }
 .listing > .table-scroll { flex: 1; }
 thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-base); }

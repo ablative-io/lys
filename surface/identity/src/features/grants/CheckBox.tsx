@@ -83,12 +83,11 @@ export function CheckBox({ w, who }: { w: GrantWorld; who?: string }) {
       <span className="sec">Can</span>
       {who ? <span className="ask-field"><span className="note">Who</span><strong>{calledBy(who, nameOf(w, who))}</strong></span> : <WhoChoice w={w} id="cWho" value={chosen} change={(id) => { setChosen(id); setAnswer(null); setRefused(null); }} />}
       <label className="ask-field"><span className="note">Do what</span><select id="cPerm" value={action} onChange={(e) => setAction(e.target.value)}>
-        {picked ? actions.map((a) => <option key={a} value={a}>{actionSentence(w.model, picked.resource, a)}</option>) : null}
+        {picked ? actions.map((a) => <option key={a} value={a} title={a}>{actionSentence(w.model, picked.resource, a).replace(/_/g, ' ')}</option>) : null}
       </select></label>
       <label className="ask-field"><span className="note">On what</span><select id="cRes" value={res} onChange={(e) => pickRes(e.target.value)}>
         {[...resources].map(([k, v]) => <option key={k} value={k}>{resourceLabel(v.resource, w)}</option>)}
       </select></label>
-      <span className="sec">?</span>
       <Act symbol="again" name="Check" hint="Check: press c" word="Check" data-act="check" onClick={check} disabled={asking || !keys.length} />
     </div>
   );

@@ -158,7 +158,7 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
     </div>
     <AccessTabs on={asking ? 'ask' : 'grants'} />
     {asking ? <div className="pane">
-      <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={mode === k ? 'on' : ''}>{l}</a>)}</div>
+      <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={(mode === 'ask' ? 'can' : mode) === k ? 'on' : ''} aria-current={(mode === 'ask' ? 'can' : mode) === k ? 'page' : undefined}>{l}</a>)}</div>
       <div className="check">{q}</div>
     </div> : <>
       {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}

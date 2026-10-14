@@ -63,7 +63,7 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, mach
     </tbody></table>}
     <div className="section-h">May start here</div>
     {machine.runtime === null ? <p>Lys does not start agents here.</p> : <table className="usage-table" aria-label="May start here"><thead><tr><th>Who</th><th>Through</th></tr></thead><tbody>
-      {machine.may_run.map((agent) => <tr key={agent.id}><td><a href={'#/file/' + agent.id}>{agent.display_name}</a></td><td>Named on this computer</td></tr>)}
+      {[...new Map(machine.may_run.map(agent => [agent.id, agent])).values()].map((agent) => <tr key={agent.id}><td><a title={agent.id} href={'#/file/' + agent.id}>{agent.display_name}</a></td><td>Named on this computer</td></tr>)}
       {(machine.may_run_roles ?? []).map((role) => <tr key={role}><td>Anyone holding {role}</td><td>Role</td></tr>)}
       {!machine.may_run.length && !(machine.may_run_roles ?? []).length ? <tr><td colSpan={2} className="dim">No agent may start here yet.</td></tr> : null}
     </tbody></table>}
@@ -73,7 +73,7 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, mach
     {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
     {computer.asked === 'unread' ? <p className="why-not">Lys could not ask its runner: {computer.reason}</p> : null}
     {(admin || machine.named_by === me) && connectable(computer) ? <NewCode machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
-    {machines ? <><div className="section-h">As a machine</div><MachineHolders machine={machine.id} identities={machines} me={me} changed={changed} /></> : null}
+    {machines ? <><div className="section-h">As a machine</div><MachineHolders machine={machine.id} name={machine.name} identities={machines} me={me} changed={changed} /></> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
     {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={changed} /> : null}
   </section>;

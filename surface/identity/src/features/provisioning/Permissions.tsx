@@ -29,6 +29,7 @@ import type { RuleKind } from './permission-rules';
 import type { Permissions as Value } from './Provisioning';
 import './permissions.css';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
 
 type Computers = { id: string; name: string }[];
 
@@ -204,7 +205,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
   const offered: RuleList[] = kept ? ['ask', 'deny'] : ['allow', 'ask', 'deny'];
   const folders = value.additional_directories ?? [];
   const own = LISTS.flatMap((list) => (value[list.id] ?? []).map((rule) => ({ list: list.id, rule })));
-  const extraFolders = <table className="usage-table" aria-label="Extra folders">
+  const extraFolders = <TableScroll label="Extra folders"><table className="usage-table" aria-label="Extra folders">
     <thead><tr><th>Extra folders it may also work in</th><th>Change</th></tr></thead>
     <tbody>
       {folders.map((entry) => <tr key={entry} className="rule-row"><td><code>{entry}</code></td><td><Act symbol="remove" name={'Remove ' + entry} onClick={() => remove('additional_directories', entry)} /></td></tr>)}
@@ -212,20 +213,20 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
       {kept && folders.length ? <tr><td colSpan={2} className="dim">Not available with Kept to its folder: that setting keeps the agent to its one working folder. Remove these before it can start as Kept to its folder.</td></tr> : null}
     </tbody>
     {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" word="Add" confirm="Add" /></td></tr></tfoot>}
-  </table>;
+  </table></TableScroll>;
   return <div className="permissions wide" role="group" aria-label="What this agent may do">
-    {program ? <table className="usage-table modes" aria-label="How it works">
+    {program ? <TableScroll label="How it works"><table className="usage-table modes" aria-label="How it works">
       <colgroup><col className="mode-pick" /><col className="mode-name" /><col /></colgroup>
       <thead><tr><th aria-label="Chosen" /><th>How {programName} works</th><th>What that means</th></tr></thead>
       <tbody>{ordered.map((entry) => <Mode key={entry.id} entry={entry} chosen={entry.id === mode} pick={() => change({ ...value, default_mode: entry.id })} />)}</tbody>
-    </table> : null}
+    </table></TableScroll> : null}
     {takesRules ? <>
       <p className="rules-summary">{summary(value)}{forced?.written.length ? ' This agent’s policy refuses ' + forced.written.length + (forced.written.length === 1 ? ' thing.' : ' things.') : ''} {unread}</p>
       {forced?.unwritable.map((id) => <p key={id} role="alert" className="why-not">This policy rule cannot be written for {programName}, so the agent will not start until it is changed: {id}</p>)}
       {keptRules || keptFolders ? <p role="alert" className="why-not">Kept to its folder cannot carry {[keptRules ? 'rules that run without asking' : '', keptFolders ? 'extra folders' : ''].filter(Boolean).join(' or ')}. Remove these before it can start as Kept to its folder.</p> : null}
       {keptTools ? <p role="alert" className="why-not">These settings list tools, so it cannot start as Kept to its folder.</p> : null}
     </> : null}
-    {takesRules || read ? <table className="usage-table rules" aria-label="Rules">
+    {takesRules || read ? <TableScroll label="Rules"><table className="usage-table rules" aria-label="Rules">
         <colgroup>{RULE_COLUMNS.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>
         <thead><tr><th>What it covers</th><th>Exact rule</th><th>What happens</th><th>Enforced by</th><th>Change</th></tr></thead>
         <tbody>
@@ -253,7 +254,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
           {unread ? <tr className="rule-row"><td colSpan={5}>{unread}</td></tr> : null}
           {!own.length && !policyRules.length && !unread ? <tr><td colSpan={5} className="dim">Nothing.</td></tr> : null}
           {read ? <tr className="policy-kept"><td colSpan={5}>
-            <b>{read.view.policy ? 'Policy: Version ' + read.view.policy.version : 'No policy set'}.</b> A kept version {read.view.applies}. Sessions already running keep their original rules.
+            <b>{read.view.policy ? 'Policy: Version ' + read.view.policy.version : 'No policy set'}.</b> A kept version {read.view.applies}.
             {' '}
             <Act symbol="save" name="Save policy rules for the next start" word="Save" disabled={saving || staged === null} onClick={() => { void keep(); }} />
             {staged !== null && !saving ? <span className="dim"> The policy rows above are changed and not yet kept.</span> : null}
@@ -261,7 +262,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
           </td></tr> : null}
         </tbody>
         <tfoot><AddRule lists={takesRules ? offered : []} computers={computers} computer={computer} enforcer={programName} add={add} addPolicy={read ? (rule) => setStaged([...policyRules, rule]) : undefined} /></tfoot>
-      </table> : null}
+      </table></TableScroll> : null}
     {takesRules || !program ? null : <>
       <p className="dim">{programName} takes no rules about single tools or files.</p>
       {forced?.hard && agent ? <p role="alert" className="why-not">This agent’s policy has {forced.hard} {forced.hard === 1 ? 'rule' : 'rules'}. {programName} cannot carry them, so this agent will not start until they are removed from its policy, in the table above.</p> : null}

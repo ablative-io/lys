@@ -19,7 +19,10 @@ import { entries, needsNewPerson, visibleEntries } from './directory';
 import type { Entry } from './directory';
 import { readTeams } from '../teams/Teams';
 import { Reach, readDirectoryReach } from './reach';
+import type { DirectoryReach } from './reach';
+import type { Load } from '../../api';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
+import { PageHeader } from '../../shell/PageHeader';
 
 /** The views of People and agents, each with its own address. */
 const VIEWS: [KindFilter, string, string][] = [
@@ -32,16 +35,10 @@ function PeopleHead() {
   const navigate = useNavigate();
   return (
     <>
-      <div className="head">
-        <div>
-          <h1>People and agents</h1>
-          <p className="sub">Everyone who works here, human or not. Every agent answers to a person.</p>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      <PageHeader title="People and agents" subtitle="Everyone who works here, human or not. Every agent answers to a person." actions={<>
           <a className="btn primary" href="#/agents/new">Add agent</a>
           <a className="btn" href="#/people/new">Add person</a>
-        </div>
-      </div>
+        </>} />
       <nav className="tabs" aria-label="People and agents views">
         {VIEWS.map(([k, l, path]) => (
           <a key={k} data-kind={k} href={'#' + path} className={shell.filterKind === k ? 'on' : ''} aria-current={shell.filterKind === k ? 'page' : undefined}
@@ -87,8 +84,7 @@ function holds(rows: Row[]): string {
   return words.filter(Boolean).join(', ') || 'no one yet';
 }
 
-function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: string }) {
-  const reach = useLoad(readDirectoryReach, 'directory-reach');
+function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; me: string; reach: Load<DirectoryReach> }) {
   const roles = useLoad(readRoles, 'directory-roles');
   const shell = useShell();
   const navigate = useNavigate();
@@ -136,7 +132,7 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
         <Listing<Row>
           groups={groups} columns={columns} id={(x) => x.id} href={(x) => '#/file/' + x.id} words={(x) => x.display_name}
           noun={shell.filterKind === 'agent' ? 'agents' : shell.filterKind === 'person' ? 'people' : 'people and agents'}
-          holds={holds} under={shell.filterKind === 'all' ? (x) => x.agents.map((agent) => ({ ...agent, agents: [] })) : undefined} underNoun={(n) => n + (n === 1 ? ' agent' : ' agents')} underHead={shell.filterKind === 'all' ? 'Agents' : undefined}
+          holds={holds} under={shell.filterKind === 'all' ? (x) => x.agents.map((agent) => ({ ...agent, agents: [] })) : undefined} underNoun={(n, row) => { const active = row.agents.filter(agent => agent.state === 'active').length; return n + (n === 1 ? ' agent' : ' agents') + (active === n ? '' : ' (' + active + ' active)'); }} underHead={shell.filterKind === 'all' ? 'Agents' : undefined}
           selected={selected?.id ?? null} select={(x) => shell.setCursor(Math.max(0, shown.indexOf('#/file/' + x.id)))} open={(x) => navigate('/file/' + x.id)}
           tools={<><WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />{retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}</>} shown={setShown}
         />
@@ -147,19 +143,24 @@ function List({ view, teams, me }: { view: PeopleView; teams: OrgTeam[]; me: str
 
 export function People() {
   const shell = useShell();
-  const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
   // The address says which view is shown; the view is kept in the shell so the keys and the list agree with it.
   const { view } = useParams();
   const addressed = VIEWS.find(([, , path]) => path === '/people/view/' + view)?.[0];
   useEffect(() => { shell.setFilterKind(addressed ?? 'all'); }, [view]);
-  if (shell.filterKind === 'teams' || shell.filterKind === 'found' || shell.filterKind === 'accounts') {
+  if (addressed === 'teams' || addressed === 'found' || addressed === 'accounts') {
     return (
       <div className="page fill">
         <PeopleHead />
-        {shell.filterKind === 'found' ? <RuntimeSessions found /> : shell.filterKind === 'accounts' ? <ServiceAccountsList /> : <Teams />}
+        {addressed === 'found' ? <RuntimeSessions found /> : addressed === 'accounts' ? <ServiceAccountsList /> : <Teams />}
       </div>
     );
   }
+  return <DirectoryPage />;
+}
+
+function DirectoryPage() {
+  const load = useLoad(() => readTogether({ view: api.people(), me: api.me(), teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })) }), 'people');
+  const reach = useLoad(readDirectoryReach, 'directory-reach');
   return (
     <Gate
       load={load}
@@ -168,7 +169,7 @@ export function People() {
         <div className="page fill">
           <PeopleHead />
           {d.teams.refused ? <p className="why-not">Teams cannot be read, so everyone is listed without their team. {d.teams.refused}</p> : null}
-          <List view={d.view} teams={d.teams.teams} me={d.me.person.id} />
+          <List view={d.view} teams={d.teams.teams} me={d.me.person.id} reach={reach} />
         </div>
       )}
     />

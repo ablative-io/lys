@@ -26,7 +26,7 @@ export function EffectiveSettings({ section }: { section?: string }) {
   const [round, setRound] = useState(0);
   const load = useLoad(() => request<Configuration>('/configuration'), 'effective-configuration:' + round);
   const authority = useLoad(api.authority, 'service-build');
-  return <Gate load={load} title="Configuration" ok={(settings) => <>
+  return <Gate load={load} title="Configuration" ok={(settings) => <section className="effective-settings">
     <p className="note">These are the settings this service started with. Changing startup configuration requires an administrator to update the service configuration and restart it. This screen does not pretend to apply those changes live.</p>
     {show('signin') ? <><h2>Sign-in</h2><dl className="facts"><dt>Provider</dt><dd>{settings.sign_in.provider_origin}</dd><dt>Session duration</dt><dd>{duration(settings.sign_in.session_seconds)}</dd><dt>HTTPS-only session cookie</dt><dd>{settings.sign_in.secure_cookie ? 'Yes' : 'No'}</dd></dl></> : null}
     {show('directory') ? <><h2>Directory</h2><dl className="facts"><dt>Role records</dt><dd>{configured(settings.directory.roles_configured)}</dd></dl></> : null}
@@ -36,6 +36,6 @@ export function EffectiveSettings({ section }: { section?: string }) {
     {show('models') && settings.organisation ? <ModelWindows key={settings.organisation.version} organisation={settings.organisation} undeclared={settings.models_undeclared ?? []} saved={() => setRound((now) => now + 1)} /> : null}
     {show('build') ? <><h2>Build</h2><dl className="facts"><dt>Running build</dt><dd>{authority.status === 'ok' ? <code>{authority.data.build}</code>
       : authority.status === 'loading' ? 'Reading…' : authority.refused.refusal.refusal + ': ' + authority.refused.refusal.reason}</dd></dl></> : null}
-    {show('storage') ? <><h2>Storage and keys</h2><dl className="facts"><dt>Directory records</dt><dd>{settings.storage.directory_format}</dd><dt>Grant records</dt><dd>{settings.storage.grant_format}</dd><dt>Access request storage</dt><dd>{configured(settings.storage.requests_configured)}</dd></dl><p>Signing keys, credentials and private file paths are not returned to the screen.</p></> : null}
-  </>} />;
+    {show('storage') ? <><h2>Storage and keys</h2><dl className="facts"><dt>Directory records</dt><dd title={settings.storage.directory_format}>{settings.storage.directory_format === 'signed_leaf_log' ? 'Signed record log' : settings.storage.directory_format}</dd><dt>Grant records</dt><dd title={settings.storage.grant_format}>{settings.storage.grant_format === 'signed_leaf_log' ? 'Signed record log' : settings.storage.grant_format}</dd><dt>Access request storage</dt><dd>{configured(settings.storage.requests_configured)}</dd></dl><p>Signing keys, credentials and private file paths are not returned to the screen.</p></> : null}
+  </section>} />;
 }

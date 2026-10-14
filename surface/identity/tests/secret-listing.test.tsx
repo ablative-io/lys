@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { SecretRows } from '../src/features/secrets/Secrets';
+import { $, mount, text } from './harness';
+import { SERVICE } from './fixtures';
 
 describe('Secrets listing renderer', () => {
   it('renders recorded metadata without extra values, handles, digests or upstream credentials', () => {
@@ -21,10 +23,10 @@ describe('Secrets listing renderer', () => {
     expect(html).not.toMatch(/Nothing here yet|No secrets were returned|0 secrets/);
   });
 
-  it('explains the list in one line above the table', () => {
-    const html = renderToStaticMarkup(<MemoryRouter><SecretRows listing={{ secrets: [] }} /></MemoryRouter>);
-    expect(html.match(/<p[ >]/g)).toHaveLength(1);
-    expect(html).toContain('never shown');
-    expect(html).not.toContain('Find the secrets');
+  it('explains the list once in the page subtitle above the table', async () => {
+    await mount('#/secrets', SERVICE);
+    expect($('.page-header .sub')?.textContent).toBe("A secret's value is never shown, and seeing it here does not give permission to use it.");
+    expect(text().split('never shown')).toHaveLength(2);
+    expect(text()).not.toContain('Find the secrets');
   });
 });

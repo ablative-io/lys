@@ -140,7 +140,7 @@ function Drawing({ world: whole, installed, focus, reach }: { world: GrantWorld;
   const scale = () => { const box = svg.current?.getBoundingClientRect(); return box && box.width && box.height ? Math.max(view.w / box.width, view.h / box.height) : 1; };
   // Marks and names keep their size on the screen whatever the zoom, so the first, fitted view is readable: they are drawn at the drawing's units per screen pixel.
   const [, resized] = useState(0);
-  useEffect(() => { const again = () => resized((n) => n + 1); window.addEventListener('resize', again); again(); return () => window.removeEventListener('resize', again); }, []);
+  useEffect(() => { const again = () => resized((n) => n + 1); window.addEventListener('resize', again); const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(again); if (svg.current) observer?.observe(svg.current); again(); return () => { window.removeEventListener('resize', again); observer?.disconnect(); }; }, []);
   const size = scale();
   const [hover, setHover] = useState<string | null>(null);
   useGraphLabels(svg, nodes, size, focus, hover);

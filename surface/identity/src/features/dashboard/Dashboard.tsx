@@ -68,7 +68,9 @@ function treeOf(me: MeView, rows: DashboardAgent[], teams: Team[]): Node {
   const tree = buildTree(person, shown, [person, ...agents]);
   const placed = new Set(agentsOf(tree).map((entry) => entry.id));
   const missing = agents.filter((agent) => !placed.has(agent.id));
-  return missing.length ? { ...tree, branches: [...tree.branches, { team: null, members: missing.map((entry) => ({ entry, branches: [] })) }] } : tree;
+  const complete = missing.length ? { ...tree, branches: [...tree.branches, { team: null, members: missing.map((entry) => ({ entry, branches: [] })) }] } : tree;
+  const trim = (node: Node): Node => ({ ...node, branches: node.branches.map(branch => ({ ...branch, members: branch.members.map(trim) })).filter(branch => branch.members.some(member => member.entry.kind === 'agent' || member.branches.length)) });
+  return trim(complete);
 }
 
 const WAITING: [keyof Waiting, string, string][] = [

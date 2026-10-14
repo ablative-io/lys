@@ -21,7 +21,10 @@ export function useCanvasFit(
     if (!element) return;
     const fit = () => {
       if (!element.clientWidth || !element.clientHeight) return;
-      const all = Object.values(latest.current),
+      const sessions = Object.entries(latest.current)
+        .filter(([id]) => id.startsWith("session:"))
+        .map(([, box]) => box);
+      const all = sessions.length ? sessions : Object.values(latest.current),
         part = around(all);
       if (!part) return;
       setView((current) => {
