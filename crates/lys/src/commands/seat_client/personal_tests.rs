@@ -8,6 +8,19 @@ type Result = std::result::Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn a_personal_401_preserves_the_servers_name_and_prints_its_exact_sign_in_command() -> Result {
+    personal_401(
+        r#"{"refusal":"pass_revoked","reason":"this terminal's pass was ended"}"#,
+        "pass_revoked",
+        "this terminal's pass was ended",
+    )
+}
+
+#[test]
+fn a_non_json_401_still_names_sign_in_because_a_proxy_can_answer_before_lys() -> Result {
+    personal_401("<html>Sign in</html>", "person_pass_expired", "HTTP 401")
+}
+
+fn personal_401(body: &'static str, name: &str, reason: &str) -> Result {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let base = format!("http://{}/api", listener.local_addr()?);
     let response = std::thread::spawn(move || -> std::result::Result<String, std::io::Error> {
@@ -21,7 +34,6 @@ fn a_personal_401_preserves_the_servers_name_and_prints_its_exact_sign_in_comman
             }
             request.extend_from_slice(&buffer[..length]);
         }
-        let body = r#"{"refusal":"pass_revoked","reason":"this terminal's pass was ended"}"#;
         write!(
             stream,
             "HTTP/1.1 401 Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
@@ -42,8 +54,8 @@ fn a_personal_401_preserves_the_servers_name_and_prints_its_exact_sign_in_comman
         .err()
         .ok_or("revoked pass accepted")?
         .to_string();
-    assert!(error.starts_with("pass_revoked:"), "{error}");
-    assert!(error.contains("this terminal's pass was ended"));
+    assert!(error.starts_with(&format!("{name}:")), "{error}");
+    assert!(error.contains(reason));
     assert!(error.contains(&format!("lys sign-in --server {base}")));
     assert!(!error.contains("fixture-person-access"));
     assert!(!error.contains("fixture-person-refresh"));
