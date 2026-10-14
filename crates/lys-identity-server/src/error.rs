@@ -1,6 +1,9 @@
 //! Named service refusals preserve the public enum and its derived conversions.
 mod directory;
 directory::directory_refusals! {
+    /// A product's own-agent view requires a person's access pass.
+    #[error("ProductPassPersonRequired: this route requires a person's access pass")]
+    ProductPassPersonRequired,
     /// The roles cannot be read or written.
     #[error("RolesUnavailable: {reason}")]
     RolesUnavailable {

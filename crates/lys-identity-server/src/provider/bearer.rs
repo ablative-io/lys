@@ -47,6 +47,15 @@ pub(crate) fn pass_holder(
     pass: &str,
     audience: &str,
 ) -> Result<IdentityId, ServerError> {
+    let verified = verified_pass(state, pass, audience)?;
+    retained_holder(state, pass, audience, &verified)
+}
+
+fn verified_pass(
+    state: &AppState,
+    pass: &str,
+    audience: &str,
+) -> Result<VerifiedPass, ServerError> {
     let provider = provider(state)?;
     let at = now();
     let published = held(&provider.keys)?.published(at, provider.published_seconds());
@@ -56,16 +65,28 @@ pub(crate) fn pass_holder(
             error.name()
         ))
     })?;
-    let verified =
-        VerifiedPass::verify(pass, &keys, &provider.issuer, audience, at).map_err(|error| {
-            ServerError::Provider(ProviderError::PassRefused {
-                refusal: error.name().to_owned(),
-            })
-        })?;
+    VerifiedPass::verify(pass, &keys, &provider.issuer, audience, at).map_err(|error| {
+        ServerError::Provider(ProviderError::PassRefused {
+            refusal: error.name().to_owned(),
+        })
+    })
+}
+
+fn retained_holder(
+    state: &AppState,
+    pass: &str,
+    audience: &str,
+    verified: &VerifiedPass,
+) -> Result<IdentityId, ServerError> {
+    let provider = provider(state)?;
+    let at = now();
     let session = {
         let tokens = held(&provider.tokens)?;
         let kept = tokens.get(&hex(&Sha256::digest(pass.as_bytes())), at)?;
-        if kept.kind == Some(Kind::Refresh) {
+        if kept.kind == Some(Kind::Refresh)
+            || kept.app != audience
+            || kept.subject != verified.claims().sub
+        {
             return Err(ServerError::Provider(ProviderError::TokenUnknown));
         }
         kept.session_id.clone()
@@ -74,6 +95,51 @@ pub(crate) fn pass_holder(
         return Err(ServerError::Provider(ProviderError::TokenUnknown));
     }
     identity_id(&verified.claims().sub)
+}
+
+/// A person's kept access pass, verified for its own signed audience.
+pub(crate) fn product_person(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<lys_identity::PersonId, ServerError> {
+    let pass = presented_pass(headers).ok_or(ServerError::Provider(ProviderError::TokenUnknown))?;
+    if headers.contains_key(header::COOKIE) || headers.contains_key("lys-operator") {
+        return Err(ProviderError::PassRefused {
+            refusal: "mixed_credentials".to_owned(),
+        }
+        .into());
+    }
+    let refused = || ProviderError::PassRefused {
+        refusal: "pass_audience_invalid".to_owned(),
+    };
+    let payload = pass.split('.').nth(1).ok_or_else(refused)?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(payload)
+        .map_err(|error| ProviderError::PassRefused {
+            refusal: format!("pass_payload_invalid: {error}"),
+        })?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|error| ProviderError::PassRefused {
+            refusal: format!(
+                "pass_claims_invalid: {:?} at {}:{}",
+                error.classify(),
+                error.line(),
+                error.column()
+            ),
+        })?;
+    let audience = claims["aud"]
+        .as_str()
+        .filter(|audience| !audience.is_empty())
+        .ok_or_else(refused)?;
+    // The unverified audience selects the verifier; the kept, signed pass grants authority.
+    let verified = verified_pass(state, pass, audience)?;
+    if verified.claims().holder.kind != "person" {
+        return Err(ServerError::ProductPassPersonRequired);
+    }
+    match retained_holder(state, pass, audience, &verified)? {
+        IdentityId::Person(person) => Ok(person),
+        _ => Err(ServerError::ProductPassPersonRequired),
+    }
 }
 
 /// A live person pass for Lys itself retains its issuing sign-in's actor.

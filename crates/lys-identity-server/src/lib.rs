@@ -190,6 +190,7 @@ pub mod operator;
 mod pass_provenance_tests;
 pub mod people_admit;
 pub mod plugins_installed_api;
+mod product_agents;
 pub mod product_drafts;
 pub mod provider;
 pub mod provisioning_api;

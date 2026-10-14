@@ -162,6 +162,7 @@ impl ServerError {
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
             | Self::NoPerson
+            | Self::ProductPassPersonRequired
             | Self::SetupRequired
             | Self::Withheld { .. }
             | Self::MachineNotForAgent

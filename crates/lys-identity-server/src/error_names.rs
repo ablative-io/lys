@@ -23,6 +23,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::Agents(error) => agents(error),
         ServerError::Call(error) => error.name(),
         ServerError::Provider(error) => error.name(),
+        ServerError::ProductPassPersonRequired => "ProductPassPersonRequired",
         ServerError::GrantStream(error) => error.name(),
         ServerError::Holding(error) => error.name(),
         ServerError::Machine(error) => error.name(),

@@ -91,6 +91,12 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
         Some(api.schema::<crate::grant_tokens::Revoked>()),
     ));
     entries.extend(crate::drafts_api::types(api));
+    entries.push((
+        GET,
+        "/apps/me/agents",
+        Some(api.schema::<crate::product_agents::ProductAgentsQuery>()),
+        Some(api.schema::<crate::product_agents::ProductAgents>()),
+    ));
     entries.extend(crate::cord_api::types(api));
     entries.extend(crate::canvas_api::types(api));
     entries.extend(crate::dashboard_api::types(api));

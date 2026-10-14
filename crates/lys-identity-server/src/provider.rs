@@ -72,7 +72,7 @@ mod rights_cached;
 mod rights_claim;
 pub(crate) use agent_issue::{AgentAppPass, agent_app_pass};
 pub(crate) use bearer::personal_actor;
-pub(crate) use bearer::{pass_holder, presented_pass};
+pub(crate) use bearer::{pass_holder, presented_pass, product_person};
 pub use endpoints::{api_keys, routes};
 pub(crate) use grant_binding::signed_binding;
 pub use keys::{RotateAnswer, RotateBody};
@@ -340,3 +340,7 @@ impl OpenIdProvider {
 #[cfg(test)]
 #[path = "provider_tests.rs"]
 pub(crate) mod tests;
+
+#[cfg(test)]
+#[path = "product_agents_tests.rs"]
+mod product_agents_tests;

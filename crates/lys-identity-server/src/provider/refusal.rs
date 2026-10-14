@@ -48,6 +48,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::NotSignedIn
         | ServerError::NotAdmitted { .. }
         | ServerError::NoPerson
+        | ServerError::ProductPassPersonRequired
         | ServerError::SetupRequired
         | ServerError::AgentNotVisible
         | ServerError::Call(..)

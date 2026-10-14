@@ -285,6 +285,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/oauth/mcp/consent" "The person connects an app or refuses it" P [&["RequestMalformed", "RedirectUnregistered", "CodeUnknown", "NotSignedIn"]];
     POST "/oauth/mcp/token" "Exchange a connected app's code or refresh token for tokens" P [];
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["apps_unavailable"]];
+    GET "/apps/me/agents" "The access pass holder's own agents" B [SIGNED, &["TokenUnknown", "PassRefused", "ProductPassPersonRequired", "HolderRetired", "NoPerson", "RequestMalformed", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"]];
     POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     GET "/sign-in/providers" "The providers the sign-in page offers" P [];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [&["IssuerChallengeExpired"]];

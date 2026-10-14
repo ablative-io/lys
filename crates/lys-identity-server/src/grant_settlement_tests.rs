@@ -30,6 +30,26 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 include!("grant_settlement_fixture_tests.rs");
 
+pub(crate) async fn person_fixture() -> TestResult<(
+    tempfile::TempDir,
+    AppState,
+    Actor,
+    PersonId,
+    AgentId,
+    AgentId,
+)> {
+    let dir = tempfile::tempdir()?;
+    let ready = Table::prepare(dir.path()).await?;
+    Ok((
+        dir,
+        ready.state,
+        ready.actor,
+        ready.asker,
+        ready.holder,
+        ready.agent,
+    ))
+}
+
 fn exact(error: &ServerError) {
     assert_eq!(error.name(), "PermissionEngineUnavailable");
     assert!(
