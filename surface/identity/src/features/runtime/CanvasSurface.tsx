@@ -19,6 +19,7 @@ import { tidied } from './canvas-tidy';
 import type { View } from './canvas-view';
 import { TypeTogether } from './CanvasTogether';
 import { WidgetCard, heldOf } from './CanvasWidgets';
+import type { SessionSelection } from '../budgets/WidgetUsageReadings';
 import { AGENT, KINDS } from './canvas-widgets';
 import type { Board } from '../dashboard/board';
 import './session-canvas.css';
@@ -109,6 +110,11 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   /** Where a thing on the surface is: a window, a box or a note; a line's end kept under an agent's name is that agent's window. */
   // Widgets where they stand now: one opened out moves those under it down for as long as it is open.
   const widgets = useMemo(() => stood(marks.widgets), [marks.widgets]);
+  const [contextSessions, setContextSessions] = useState<Record<string, Record<string, string>>>({});
+  const sessionSelections: Record<string, SessionSelection> = Object.fromEntries(widgets.map((widget) => [widget.id, {
+    selected: contextSessions[widget.id] ?? {},
+    select: (agent: string, session: string) => setContextSessions((all) => ({ ...all, [widget.id]: { ...all[widget.id], [agent]: session } })),
+  }]));
   const at = (id: string): Box | undefined => boxes[id] ?? boxes[hereName(graph)(id)] ?? [...marks.groups, ...marks.notes, ...widgets].find((each) => each.id === id);
   const put = (id: string, box: Box) => {
     const onto = <T extends Box & { id: string }>(all: T[]): T[] => all.map((each) => each.id === id ? { ...each, x: box.x, y: box.y, w: box.w, h: box.h } : each);
@@ -335,6 +341,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   };
   /** Takes a box, a note or a line away; a line that ended on what was taken away goes with it. */
   const removeMark = (id: string) => {
+    setContextSessions((all) => Object.fromEntries(Object.entries(all).filter(([widget]) => widget !== id)));
     setMarks((all) => ({ groups: all.groups.filter((each) => each.id !== id), notes: all.notes.filter((each) => each.id !== id), widgets: all.widgets.filter((each) => each.id !== id), links: all.links.filter((each) => each.id !== id && each.from !== id && each.to !== id) }));
     changed();
   };
@@ -470,7 +477,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
       })}
       {marks.notes.map((note) => <NoteCard key={note.id} note={note} fresh={fresh === note.id} pick={pick?.(note.id)} move={moving(note.id)} size={sizing(note.id, SMALLEST_MARK)} link={linking(note.id)}
         change={(text) => reworded(note.id, text)} colour={() => recoloured(note.id)} remove={() => removeMark(note.id)} />)}
-      {widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} held={board.status === 'ok' ? heldOf(widget, { widgets, links: marks.links, groups: marks.groups, windows, board: board.data }) : null}
+      {widgets.map((widget) => <WidgetCard key={widget.id} widget={widget} board={board} morph={morph === widget.id} chosen={chosen === widget.id} held={board.status === 'ok' ? heldOf(widget, { widgets, links: marks.links, groups: marks.groups, windows, board: board.data, sessionSelections }) : null}
         pick={pick?.(widget.id)} move={moving(widget.id)} link={linking(widget.id)} remove={() => removeMark(widget.id)}
         fit={(h) => setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, h } : each) }))}
         set={(change) => { setMarks((all) => ({ ...all, widgets: all.widgets.map((each) => each.id === widget.id ? { ...each, ...change } : each) })); if ('view' in change) setMorph(widget.id); changed(); }} />)}

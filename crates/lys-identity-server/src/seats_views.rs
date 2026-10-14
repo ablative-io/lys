@@ -50,7 +50,7 @@ pub struct SeatOperationBody {
 pub struct SeatStartBody {
     /// The operation admitting the start.
     pub operation: String,
-    /// The existing Claude session UUID or Codex thread UUID; absent, start fresh.
+    /// The Claude or Codex UUID; absent, resume the last conversation or create the first.
     #[serde(default)]
     pub conversation: Option<String>,
 }

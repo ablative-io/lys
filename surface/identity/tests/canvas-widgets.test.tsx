@@ -21,6 +21,12 @@ const pointer = (target: Element | null, kind: string, x: number, y: number) => 
 const kept = () => JSON.parse(localStorage.getItem('lys.canvas') ?? 'null') as { widgets: { id: string; kind: string; shows?: string; x: number; y: number }[]; links: { from: string; to: string }[] };
 const widget = (kind: string) => $('[data-widget][data-kind="' + kind + '"]');
 const start = (more: Record<string, unknown> = {}) => localStorage.setItem('lys.canvas', JSON.stringify({ boxes: { [node]: { x: 200, y: 200, w: 440, h: 34 } }, open: [], view: { x: 24, y: 24 }, ...more }));
+const canvas = async (marks: Record<string, unknown> = {}, services: Record<string, Route> = {}, address = '#/canvas?view=canvas') => { start(marks); await mount(address, { ...routes, ...services }); };
+const tapOn = async (target: Element | null, x: number, y: number) => { await pointer(target, 'pointerdown', x, y); await pointer($('.session-canvas-scroll'), 'pointerup', x, y); };
+const dragOn = async (target: Element | null, from: [number, number], to: [number, number]) => {
+  await pointer(target, 'pointerdown', ...from);
+  await pointer($('.session-canvas-scroll'), 'pointermove', ...to); await pointer($('.session-canvas-scroll'), 'pointerup', ...to);
+};
 
 /** What the pointer is over when it is let go: the test's page has no layout to ask. */
 const under = (element: Element | null) => { document.elementFromPoint = () => element; };
@@ -29,13 +35,36 @@ const under = (element: Element | null) => { document.elementFromPoint = () => e
 async function place(kind: string, x: number, y: number) {
   await click($('[data-act="draw-widget"]'));
   await click($('[data-act="place-widget"][data-kind="' + kind + '"]'));
-  const surface = $('.session-canvas-scroll');
-  await pointer(surface, 'pointerdown', x, y);
-  await pointer(surface, 'pointerup', x, y);
+  await tapOn($('.session-canvas-scroll'), x, y);
 }
 
 const used = (unit: string, period: string | null, figure: number | null, unavailable: string | null = null) => ({ unit, period, since_ms: null, figure, unavailable });
 const usage = (agent: string, figures: unknown[], accounts: unknown[] = []) => ({ agent, used: [], receipts: [], last_reported_ms: 1790000000000, figures, accounts });
+const readAt = 1790000000000;
+const model = 'claude-opus-5-5';
+const context = (context_tokens = 58795, more: Record<string, unknown> = {}) => {
+  const reading = { session, read_at_ms: readAt, reported_none: 2, model, context_tokens, window_tokens: 1000000, figure: context_tokens / 10000, unavailable: null, ...more };
+  return { ...used('context_percent', null, reading.figure, reading.unavailable), context: { ...reading, live_sessions: [reading] } };
+};
+const components = (more: Record<string, unknown> = {}) => ({ ...used('tokens', 'day', 177540), tokens: {
+  input_tokens: { reported: 500, missing_calls: 0 }, output_tokens: { reported: 20, missing_calls: 0 },
+  cache_creation_tokens: { reported: 100, missing_calls: 0 }, cache_read_tokens: { reported: 58195, missing_calls: 1 },
+  calls: 2, sessions: 1, calls_without_session: 0, ...more,
+} });
+const usageWidget = (id: string, more: Record<string, unknown> = {}) => ({ id, kind: 'usage', x: 700, y: 300, w: 340, h: 250, ...more });
+const formulaWidget = (id: string, more: Record<string, unknown> = {}) => ({ id, kind: 'formula', x: 1100, y: 300, w: 320, h: 150, ...more });
+const link = (from: string, to: string) => ({ id: from + '/' + to, from, to });
+const fedUsage = (more: Record<string, unknown>, widgets: Record<string, unknown>[] = [], links: ReturnType<typeof link>[] = []) => ({
+  widgets: [usageWidget('widget:u', { view: 'faces', shows: 'context_percent/', ...more }), ...widgets], links: [link('agent:' + SCRIBE, 'widget:u'), ...links],
+});
+const cardOf = (id: string) => $('[data-widget="' + id + '"]') as HTMLElement;
+const figureOf = (id: string) => cardOf(id).querySelector('.canvas-widget-figure')?.textContent;
+const turn = async (id: string, times = 1) => { for (let at = 0; at < times; at++) await click(cardOf(id).querySelector('[data-act="widget-view"]')); };
+const choose = (select: HTMLSelectElement, value: string) => act(async () => { select.value = value; select.dispatchEvent(new Event('change', { bubbles: true })); });
+async function reportedUsage(figures: unknown[], more: Record<string, unknown> = {}, services: Record<string, Route> = {}) {
+  await canvas({ ...fedUsage({}), ...more }, { ...services, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, figures) } })) });
+  return cardOf('widget:u');
+}
 
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -44,8 +73,7 @@ beforeEach(() => {
 
 describe('Widgets on the canvas', () => {
   it('offers every kind by its symbol and name in a panel the address names, and places the one in hand where the canvas is pressed', async () => {
-    start();
-    await mount('#/canvas?view=canvas', routes);
+    await canvas();
     await click($('[data-act="draw-widget"]'));
     expect(location.hash).toContain('panel=widgets');
     expect($$('[data-act="place-widget"]').map((each) => each.textContent)).toEqual(['Usage', 'Budget', 'Goals', 'Requests', 'Drafts', 'Formula']);
@@ -54,19 +82,16 @@ describe('Widgets on the canvas', () => {
     expect($('[data-act="draw-widget"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(location.hash).not.toContain('panel=');
     const surface = $('.session-canvas-scroll');
-    await pointer(surface, 'pointerdown', 1024, 824);
-    await pointer(surface, 'pointerup', 1024, 824);
+    await tapOn(surface, 1024, 824);
     const goals = widget('goals') as HTMLElement;
     // No line reaches it and it sits in no box: it counts every agent.
     expect(goals.getAttribute('aria-label')).toBe('Goals of Every agent');
     expect([goals.style.left, goals.style.top]).toEqual(['1000px', '800px']);
     expect($('[data-act="draw-widget"]')?.getAttribute('aria-pressed')).toBe('false');
     expect(kept().widgets).toEqual([expect.objectContaining({ kind: 'goals', x: 1000, y: 800 })]);
-    // It is a pill until its own button opens it out; pressing it only chooses it, and Delete takes the chosen thing away.
     expect([goals.dataset.view, goals.style.width, goals.style.height]).toEqual(['pill', '248px', '34px']);
     expect(goals.querySelector('.canvas-widget-figure')?.textContent).toBe('No goal');
-    await pointer(goals.querySelector('.canvas-widget-bar'), 'pointerdown', 1030, 830);
-    await pointer(surface, 'pointerup', 1030, 830);
+    await tapOn(goals.querySelector('.canvas-widget-bar'), 1030, 830);
     expect(goals.dataset.view).toBe('pill');
     expect($('.canvas-chosen')).not.toBeNull();
     await press('Delete');
@@ -75,8 +100,7 @@ describe('Widgets on the canvas', () => {
   });
 
   it('holds out each kind beside the agent window in front, and adds one fed by a line from that agent, each under the last', async () => {
-    start();
-    await mount('#/canvas?view=canvas', routes);
+    await canvas();
     expect($('[data-add-widget]')).toBeNull();
     await pointer($('.session-canvas-node.sessions h3'), 'pointerdown', 300, 240);
     expect($$('[data-add-widget]').map((each) => each.getAttribute('aria-label'))).toEqual(['Add Usage for Scribe', 'Add Budget for Scribe', 'Add Goals for Scribe', 'Add Requests for Scribe', 'Add Drafts for Scribe']);
@@ -90,33 +114,25 @@ describe('Widgets on the canvas', () => {
     // The line is what feeds it, and it is kept under the agent's name so it holds when the agent starts again.
     expect(kept().links.map((link) => link.from)).toEqual(['agent:' + SCRIBE, 'agent:' + SCRIBE]);
     expect($$('path.person-line')).toHaveLength(2);
-    // Pressing the canvas lets go of the window, and what it held out goes.
-    await pointer($('.session-canvas-scroll'), 'pointerdown', 1200, 900);
-    await pointer($('.session-canvas-scroll'), 'pointerup', 1200, 900);
+    await tapOn($('.session-canvas-scroll'), 1200, 900);
     expect($('[data-add-widget]')).toBeNull();
-    // With its line taken away the widget is no longer that agent's alone.
     await click($('.canvas-link-remove'));
     expect(first.getAttribute('aria-label')).toBe('Usage of Every agent');
   });
 
   it('counts the agents in the box it sits in until a line feeds it, and then what the lines join it to', async () => {
-    start({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }] });
-    await mount('#/canvas?view=canvas', routes);
+    await canvas({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }] });
     await place('budget', 224, 324);
     expect(widget('budget')?.getAttribute('aria-label')).toBe('Budget of Iridium: 1 agent');
-    // A line dragged from the window's dot and let go over the widget feeds it from that agent.
     const dot = $('.session-canvas-node.sessions [data-anchor="bottom"]');
     under(widget('budget'));
-    await pointer(dot, 'pointerdown', 444, 258);
-    await pointer($('.session-canvas-scroll'), 'pointermove', 300, 400);
-    await pointer($('.session-canvas-scroll'), 'pointerup', 300, 400);
+    await dragOn(dot, [444, 258], [300, 400]);
     expect(widget('budget')?.getAttribute('aria-label')).toBe('Budget of Scribe');
     expect(kept().links).toEqual([expect.objectContaining({ from: 'agent:' + SCRIBE, to: kept().widgets[0].id })]);
   });
 
   it('is dragged from the panel onto the canvas, and onto an agent window to be fed by it', async () => {
-    start();
-    await mount('#/canvas?panel=widgets', routes);
+    await canvas({}, {}, '#/canvas?panel=widgets');
     const surface = $('.session-canvas-scroll') as HTMLElement;
     const drag = async (kind: string, over: Element | null, x: number, y: number) => {
       const from = $('[data-act="place-widget"][data-kind="' + kind + '"]');
@@ -135,35 +151,35 @@ describe('Widgets on the canvas', () => {
     expect($('[data-act="draw-widget"]')?.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('opens out to what was reported, each figure once, and its settings choose the figure, how a level is drawn, and its colour', async () => {
-    const figures = [used('context_percent', null, 43), used('tokens', 'day', 120000), used('dollars', 'day', null, 'dollars have not been reported')];
+  it('opens reported session context and separate token components because their classes cannot form one scalar, and preserves every figure and look setting', async () => {
+    const figures = [context(430000, { model: 'fixture-model', reported_none: 0 }), components({ input_tokens: { reported: 120000, missing_calls: 0 }, output_tokens: { reported: 3210, missing_calls: 0 }, cache_creation_tokens: { reported: 10000, missing_calls: 0 }, cache_read_tokens: { reported: 300000, missing_calls: 0 }, calls: 1 }), used('dollars', 'day', null, 'dollars have not been reported')];
     const accounts = [{ account: 'org-main', at_ms: 1790000000000, windows: [{ duration_minutes: 300, used_percent: 28, resets_at_ms: 1790003600000 }, { duration_minutes: 10080, used_percent: 61, resets_at_ms: 1790400000000 }] }];
     start({ widgets: [{ id: 'widget:u', kind: 'usage', x: 700, y: 300, w: 340, h: 250 }], links: [{ id: 'link:u', from: 'agent:' + SCRIBE, to: 'widget:u' }] });
     await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, figures, accounts) } })) });
     const card = widget('usage') as HTMLElement;
-    const turn = () => click(card.querySelector('[data-act="widget-view"]'));
+    const turn = async (times = 1) => { for (let at = 0; at < times; at++) await click(card.querySelector('[data-act="widget-view"]')); };
     const figure = () => card.querySelector('.canvas-widget-figure')?.textContent;
-    expect([card.getAttribute('aria-label'), card.dataset.view, figure()]).toEqual(['Usage of Scribe', 'pill', '43% context']);
+    expect([card.getAttribute('aria-label'), card.dataset.view, figure()]).toEqual(['Usage of Scribe', 'pill', '43% context · session ' + session + ' · read ' + clockMs(readAt) + ' · 0 calls reported none']);
     expect(card.querySelector('.canvas-widget-body')).toBeNull();
-    // Its medium face: a few figures side by side, each its number over what it is, until the person chooses their own.
     await turn();
     expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['faces', '340px', '']);
     expect($$('[data-widget] [data-stat]').map((each) => [each.dataset.stat, each.querySelector('b')?.textContent, each.querySelector('.sec')?.textContent])).toEqual([
-      ['context_percent/', '43%', 'Context now'], ['tokens/day', '120,000 tokens', 'Tokens today'], ['window/300/org-main', '28%', '5-hour window of org-main, resets ' + clockMs(1790003600000)]]);
+      ['context_percent/', '43%', 'Context of Scribe, fixture-model'], ['tokens/day', undefined, 'Tokens today of Scribe'], ['window/300', '28%', '5-hour provider window of org-main, resets ' + clockMs(1790003600000)]]);
+    expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
+    expect(Array.from(card.querySelectorAll('[data-token-component]')).map((row) => row.textContent)).toEqual(['New input120,000 tokens reported', 'Output3,210 tokens reported', 'Cache written10,000 tokens reported', 'Cache read300,000 tokens reported']);
+    expect(card.querySelector('[data-token-counts]')?.textContent).toBe('1 call · 1 session');
     expect(card.querySelector('.session-canvas-grip')).toBeNull();
-    // Its large face: everything it holds.
     await turn();
     expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['detail', '340px', '']);
-    expect($$('[data-widget] tr[data-figure]').map((row) => row.textContent)).toEqual(['Context now43%', 'Tokens today120,000 tokens', 'Dollars todayNot reported']);
-    expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 5-hour', 'org-main, 7-day']);
+    expect($$('[data-widget] tr[data-figure]').map((row) => row.textContent)).toEqual(['Dollars todayNot reported']);
+    expect(Array.from(card.querySelectorAll('[data-context-percent], [data-token-component], [data-provider-window] > b')).map((row) => row.textContent)).toEqual(['43%', 'New input120,000 tokens reported', 'Output3,210 tokens reported', 'Cache written10,000 tokens reported', 'Cache read300,000 tokens reported', '28%']);
+    expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 7-day']);
     await turn();
     expect(card.dataset.view).toBe('settings');
-    // The usage of one agent opens on that agent's model calls, where each can be read whole.
     expect([card.querySelector('[data-act="whole-page"]')?.textContent, card.querySelector('[data-act="whole-page"]')?.getAttribute('href')]).toEqual(['Open its model calls', '#/canvas?view=proxy&agent=' + SCRIBE]);
     expect($$('[data-variant]').map((each) => each.textContent)).toEqual(['First reported', 'Context', 'Tokens today', 'Tokens this week', 'Dollars today', 'Dollars this week', 'Running today', 'Running this week', '5-hour window', '7-day window']);
     await click($('[data-variant="window/10080"]'));
     expect([figure(), kept().widgets[0].shows]).toEqual(['61% of 7-day', 'window/10080']);
-    // A level is drawn as its number, with a bar, or as a dial, on the pill and opened out.
     await click($('[data-look="bar"]'));
     expect(card.querySelector('.canvas-widget-level > span')?.getAttribute('style')).toContain('61%');
     await click($('[data-look="dial"]'));
@@ -171,48 +187,36 @@ describe('Widgets on the canvas', () => {
     expect((kept().widgets[0] as { look?: string }).look).toBe('dial');
     await click($('[data-colour="blue"]'));
     expect([(kept().widgets[0] as { colour?: string }).colour, card.style.getPropertyValue('--tint')]).toEqual(['blue', '#7aa7d9']);
-    await turn();
-    await turn();
+    await turn(2);
     expect([card.dataset.view, $$('[data-widget] .canvas-stat.dial b').map((each) => each.textContent)]).toEqual(['faces', ['43%', '28%']]);
-    // The figures of the medium face are chosen in its settings, each on or off, and stay in the order they are offered.
-    await turn();
-    await turn();
+    await turn(2);
     expect($$('[data-face][aria-pressed="true"]').map((each) => each.dataset.face)).toEqual(['context_percent/', 'tokens/day', 'window/300']);
     await click($('[data-face="window/10080"]'));
     await click($('[data-face="tokens/day"]'));
     await click($('[data-face="dollars/day"]'));
     expect((kept().widgets[0] as { faces?: string[] }).faces).toEqual(['context_percent/', 'dollars/day', 'window/300', 'window/10080']);
-    await turn();
-    await turn();
+    await turn(2);
     // A figure nobody reported is said so on the face, never shown as zero.
     expect($$('[data-widget] [data-stat]').map((each) => [each.dataset.stat, each.querySelector('b')?.textContent])).toEqual([
-      ['context_percent/', '43%'], ['dollars/day', 'Not reported'], ['window/300/org-main', '28%'], ['window/10080/org-main', '61%']]);
+      ['context_percent/', '43%'], ['dollars/day', 'Not reported'], ['window/300', '28%'], ['window/10080/org-main', '61%']]);
     expect($('[data-stat="dollars/day"]')?.getAttribute('title')).toBe('Scribe: dollars have not been reported');
-    // With nothing but an unreported figure shown there is no level to draw; with no figure chosen the face says so.
-    await turn();
-    await turn();
+    await turn(2);
     await click($('[data-variant="dollars/day"]'));
     for (const key of ['context_percent/', 'window/300', 'window/10080']) await click($('[data-face="' + key + '"]'));
     expect([figure(), $('[data-look]')]).toEqual(['Not reported', null]);
     await click($('[data-face="dollars/day"]'));
     expect((kept().widgets[0] as { faces?: string[] }).faces).toEqual([]);
-    await turn();
-    await turn();
+    await turn(2);
     expect([card.dataset.view, card.querySelector('.canvas-widget-body')?.textContent]).toEqual(['faces', 'No figure is chosen for this face.']);
-    await turn();
-    await turn();
+    await turn(2);
     await click($('[data-variant=""]'));
     expect(kept().widgets[0].shows).toBeUndefined();
-    // Locked, it is not opened, moved or taken away; unlocked, it is again.
     await click(card.querySelector('[data-act="widget-lock"]'));
     expect([(kept().widgets[0] as { locked?: boolean }).locked, (card.querySelector('[data-act="widget-view"]') as HTMLButtonElement).disabled, $('[data-act="remove-widget"]')]).toEqual([true, true, null]);
-    await pointer(card.querySelector('.canvas-widget-bar'), 'pointerdown', 710, 310);
-    await pointer($('.session-canvas-scroll'), 'pointermove', 900, 500);
-    await pointer($('.session-canvas-scroll'), 'pointerup', 900, 500);
+    await dragOn(card.querySelector('.canvas-widget-bar'), [710, 310], [900, 500]);
     expect([card.style.left, card.style.top]).toEqual(['700px', '300px']);
     await click(card.querySelector('[data-act="widget-lock"]'));
     expect((kept().widgets[0] as { locked?: boolean }).locked).toBeUndefined();
-    // A press with the other button opens the settings from any view, and the small cross there takes the widget away.
     await turn();
     expect(card.dataset.view).toBe('pill');
     await act(async () => { card.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })); });
@@ -221,10 +225,65 @@ describe('Widgets on the canvas', () => {
     expect($('[data-widget]')).toBeNull();
   });
 
-  it('combines the figures of the widgets a line joins a formula to, the way the person chose, and says when they cannot be combined', async () => {
-    const tokens = (id: string, y: number) => ({ id, kind: 'usage', shows: 'tokens/day', x: 700, y, w: 340, h: 250 });
+  it('shows the current live session rather than the highest context, and one canvas selection drives its faces and every linked formula', async () => {
+    const older = 'op-' + '8'.repeat(32), now = context();
+    const earlier = { ...now.context.live_sessions[0], session: older, context_tokens: 980000, figure: 98, read_at_ms: readAt - 300000, reported_none: 8 };
+    const current = { ...now, figure: 5, context: { ...now.context, live_sessions: [earlier, now.context.live_sessions[0]] } };
+    const source = fedUsage({ look: 'dial' }, [usageWidget('widget:v', { y: 600, shows: 'context_percent/' }), formulaWidget('widget:f'), formulaWidget('widget:t', { shows: 'highest', x: 1500 })],
+      [link('agent:' + SCRIBE, 'widget:v'), link('widget:u', 'widget:f'), link('widget:f', 'widget:t')]);
+    const card = await reportedUsage([current, components()], source, { '/runtime/live': ok({ sessions: [running, { ...running, session: older }], unanswered: [] }) });
+    const picker = () => card.querySelector('select[aria-label="Context session for Scribe"]') as HTMLSelectElement;
+    const header = (id: string, at: number, none: number, percent: string) => percent + '% context · session ' + id + ' · read ' + clockMs(at) + ' · ' + none + ' calls reported none';
+    expect([figureOf('widget:u'), figureOf('widget:v'), figureOf('widget:f'), figureOf('widget:t')]).toEqual([header(session, readAt, 2, '5.9'), header(session, readAt, 2, '5.9'), '5.9%', '5.9%']);
+    expect(Array.from(picker().options).map((option) => [option.value, option.textContent])).toEqual([[older, older + ', ' + model], [session, session + ' (current), ' + model]]);
+    expect(picker().value).toBe(session);
+    expect([card.querySelector('[data-context-percent]')?.textContent, card.querySelector('.canvas-widget-bar .canvas-dial')?.getAttribute('aria-label')]).toEqual(['5.9%', '5.9%']);
+    expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
+    expect(card.querySelector('[data-context-tokens]')?.textContent).toBe('58,795 tokens reported of the declared 1,000,000 tokens window');
+    expect(card.querySelector('[data-context-reading]')?.textContent).toContain('2 calls reported none');
+    await choose(picker(), older);
+    expect([figureOf('widget:u'), figureOf('widget:v'), figureOf('widget:f'), figureOf('widget:t')]).toEqual([header(older, readAt - 300000, 8, '98'), header(session, readAt, 2, '5.9'), '98%', '98%']);
+    expect([card.querySelector('[data-context-session]')?.getAttribute('data-context-session'), card.querySelector('[data-context-percent]')?.textContent, card.querySelector('[data-context-reading] time')?.getAttribute('datetime')]).toEqual([older, '98%', new Date(readAt - 300000).toISOString()]);
+    await turn('widget:u');
+    expect([card.dataset.view, card.querySelector('[data-context-percent]')?.textContent, picker().value]).toEqual(['detail', '98%', older]);
+    await choose(picker(), session);
+    expect([figureOf('widget:u'), figureOf('widget:f'), figureOf('widget:t'), card.querySelector('[data-context-percent]')?.textContent]).toEqual([header(session, readAt, 2, '5.9'), '5.9%', '5.9%', '5.9%']);
+    expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
+  });
+
+  it('shows separate reported token components, calls and sessions even with no crossing receipts, and refuses the old combined scalar as formula input', async () => {
+    const card = await reportedUsage([components()], fedUsage({ shows: 'tokens/day', faces: ['tokens/day'] }, [formulaWidget('widget:f')], [link('widget:u', 'widget:f')]));
+    const words = ['New input500 tokens reported', 'Output20 tokens reported', 'Cache written100 tokens reported', 'Cache read58,195 tokens reported · 1 call reported none'];
+    expect(Array.from(card.querySelectorAll('[data-token-component]')).map((row) => row.textContent)).toEqual(words);
+    expect(card.querySelector('[data-token-counts]')?.textContent).toBe('2 calls · 1 session');
+    expect(figureOf('widget:u')).toBe('New input: 500 tokens reported · Output: 20 tokens reported · Cache written: 100 tokens reported · Cache read: 58,195 tokens reported · 1 call reported none · 2 calls · 1 session · period start not reported');
+    expect([card.textContent?.includes('177,540'), figureOf('widget:f')]).toEqual([false, 'Nothing reported']);
+    await turn('widget:u');
+    expect(Array.from(card.querySelectorAll('[data-token-agent="' + SCRIBE + '"][data-token-period="day"] [data-token-component]')).map((row) => row.textContent)).toEqual(words);
+    expect(card.querySelector('[data-token-period="day"] [data-token-counts]')?.textContent).toBe('2 calls · 1 session');
+  });
+
+  it('names an undeclared model window with the retained reading time and later empty calls, without guessing a percentage', async () => {
+    const reading = context(58795, { model: 'undeclared-model', window_tokens: null, figure: null, unavailable: 'no context window is declared for model undeclared-model' });
+    const card = await reportedUsage([reading], fedUsage({ faces: ['context_percent/'], look: 'dial' }, [formulaWidget('widget:f')], [link('widget:u', 'widget:f')]));
+    expect(figureOf('widget:u')).toBe('undeclared-model window not declared · session ' + session + ' · read ' + clockMs(readAt) + ' · 2 calls reported none');
+    expect([card.querySelector('[data-context-agent] b')?.textContent, card.querySelector('[data-context-tokens]')?.textContent]).toEqual(['undeclared-model window not declared', '58,795 tokens reported']);
+    expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
+    expect(card.querySelector('[data-context-unavailable]')?.textContent).toBe('Scribe: no context window is declared for model undeclared-model');
+    expect([card.querySelector('[data-context-percent]'), card.querySelector('.canvas-dial'), figureOf('widget:f')]).toEqual([null, null, 'Nothing reported']);
+  });
+
+  it('names missing token components and missing call counts instead of using the old scalar as a default', async () => {
+    const card = await reportedUsage([used('tokens', 'day', 177540)], fedUsage({ shows: 'tokens/day', faces: ['tokens/day'] }));
+    expect(figureOf('widget:u')).toBe('Token components not reported; the combined figure does not identify the components');
+    expect([card.querySelector('[data-token-unavailable]')?.textContent, card.querySelector('[data-token-counts]')?.textContent]).toEqual(['Token components not reported; the combined figure does not identify the components', 'Call and session counts not reported']);
+    expect([card.querySelector('[data-token-component]'), card.textContent?.includes('177,540')]).toEqual([null, false]);
+  });
+
+  it('combines reported scalar dollars because token components cannot supply one scalar, preserving every formula and wiring choice', async () => {
+    const dollars = (id: string, y: number) => ({ id, kind: 'usage', shows: 'dollars/day', x: 700, y, w: 340, h: 250 });
     start({
-      widgets: [tokens('widget:s', 100), tokens('widget:c', 150), { id: 'widget:g', kind: 'goals', x: 700, y: 200, w: 340, h: 190 }, { id: 'widget:f', kind: 'formula', x: 1100, y: 100, w: 320, h: 150 }, { id: 'widget:t', kind: 'formula', shows: 'highest', x: 1100, y: 300, w: 320, h: 150 },
+      widgets: [dollars('widget:s', 100), dollars('widget:c', 150), { id: 'widget:g', kind: 'goals', x: 700, y: 200, w: 340, h: 190 }, { id: 'widget:f', kind: 'formula', x: 1100, y: 100, w: 320, h: 150 }, { id: 'widget:t', kind: 'formula', shows: 'highest', x: 1100, y: 300, w: 320, h: 150 },
         { id: 'widget:m', kind: 'formula', x: 1100, y: 500, w: 320, h: 150 }, { id: 'widget:n', kind: 'formula', x: 1100, y: 600, w: 320, h: 150 }],
       // One usage widget is fed by Scribe; the other, fed by no line and in no box, counts every agent.
       links: [{ id: 'l1', from: 'agent:' + SCRIBE, to: 'widget:s' }, { id: 'l3', from: 'widget:s', to: 'widget:f' }, { id: 'l4', from: 'widget:f', to: 'widget:c' },
@@ -232,25 +291,23 @@ describe('Widgets on the canvas', () => {
         // A formula feeds another only by a line drawn from it: the second is fed by the first, and never the first by the second.
         { id: 'l5', from: 'widget:f', to: 'widget:t' }],
     });
-    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('tokens', 'day', 120000)]) }, [COURIER]: { usage: usage(COURIER, [used('tokens', 'day', 30000)]) } })) });
+    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('dollars', 'day', 120)]) }, [COURIER]: { usage: usage(COURIER, [used('dollars', 'day', 30)]) } })) });
     const card = (id: string) => $('[data-widget="' + id + '"]') as HTMLElement;
     const figure = (id: string) => card(id).querySelector('.canvas-widget-figure')?.textContent;
-    // Fed whichever way the line was drawn; it adds until the person chooses another way.
-    expect([card('widget:f').getAttribute('aria-label'), figure('widget:f'), figure('widget:t')]).toEqual(['Formula of 2 inputs', '270,000 tokens', '270,000 tokens']);
-    // Tokens and a count of goals are not one number; a formula nothing feeds says so.
+    expect([card('widget:f').getAttribute('aria-label'), figure('widget:f'), figure('widget:t')]).toEqual(['Formula of 2 inputs', '$270', '$270']);
+    // Dollars and a count of goals are not one number; a formula nothing feeds says so.
     expect([figure('widget:m'), figure('widget:n'), card('widget:n').getAttribute('aria-label')]).toEqual(['Mixed units', 'No input', 'Formula of 0 inputs']);
-    // It has no medium face: its button opens it out to what feeds it, then its settings.
     await click(card('widget:f').querySelector('[data-act="widget-view"]'));
     expect(card('widget:f').dataset.view).toBe('detail');
-    expect($$('[data-widget="widget:f"] tr[data-input]').map((row) => row.textContent)).toEqual(['Usage of Scribe120,000 tokens today', 'Usage of Every agent150,000 tokens today']);
-    expect($('[data-widget="widget:f"] tr[data-result]')?.textContent).toBe('Sum270,000 tokens');
+    expect($$('[data-widget="widget:f"] tr[data-input]').map((row) => row.textContent)).toEqual(['Usage of Scribe$120 today', 'Usage of Every agent$150 today']);
+    expect($('[data-widget="widget:f"] tr[data-result]')?.textContent).toBe('Sum$270');
     await click(card('widget:f').querySelector('[data-act="widget-view"]'));
     expect($$('[data-widget="widget:f"] [data-variant]').map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['Sum', 'true'], ['Average', 'false'], ['Highest', 'false'], ['Lowest', 'false'], ['How many', 'false']]);
     expect([$('[data-widget="widget:f"] [data-face]'), $('[data-widget="widget:f"] a[href]')]).toEqual([null, null]);
     await click($('[data-widget="widget:f"] [data-variant="average"]'));
-    expect([figure('widget:f'), figure('widget:t'), kept().widgets.find((each) => each.id === 'widget:f')?.shows]).toEqual(['135,000 tokens', '135,000 tokens', 'average']);
+    expect([figure('widget:f'), figure('widget:t'), kept().widgets.find((each) => each.id === 'widget:f')?.shows]).toEqual(['$135', '$135', 'average']);
     await click($('[data-widget="widget:f"] [data-variant="lowest"]'));
-    expect(figure('widget:f')).toBe('120,000 tokens');
+    expect(figure('widget:f')).toBe('$120');
     await click($('[data-widget="widget:f"] [data-variant="count"]'));
     expect(figure('widget:f')).toBe('2');
     // No widget beside an agent's window offers a formula: it is fed by widgets, not by an agent.
@@ -259,30 +316,25 @@ describe('Widgets on the canvas', () => {
   });
 
   it('says by name what could not be read, and that a kind is not known', async () => {
-    start({ widgets: [{ id: 'widget:b', kind: 'weather', x: 700, y: 520, w: 340, h: 180, view: 'detail' }] });
-    await mount('#/canvas?view=canvas', routes);
+    await canvas({ widgets: [{ id: 'widget:b', kind: 'weather', x: 700, y: 520, w: 340, h: 180, view: 'detail' }] });
     expect(widget('weather')?.textContent).toContain('This page does not know a widget of the kind “weather”.');
     document.body.innerHTML = '';
-    start({ widgets: [{ id: 'widget:a', kind: 'budget', x: 700, y: 300, w: 340, h: 170 }] });
-    await mount('#/canvas?view=canvas', { ...routes, '/dashboard': refused(503, 'DashboardUnavailable', 'the dashboard is closed') });
+    await canvas({ widgets: [{ id: 'widget:a', kind: 'budget', x: 700, y: 300, w: 340, h: 170 }] }, { '/dashboard': refused(503, 'DashboardUnavailable', 'the dashboard is closed') });
     expect(widget('budget')?.querySelector('.canvas-widget-figure')?.textContent).toBe('DashboardUnavailable');
     expect(text()).not.toContain('No limit');
   });
 
   it('gives a box and a note the next colour each time their dot is pressed, and keeps it', async () => {
-    start({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }], notes: [{ id: 'note:a', text: 'Ask', x: 900, y: 100, w: 260, h: 180, colour: 'grey' }] });
-    await mount('#/canvas?view=canvas', routes);
+    await canvas({ groups: [{ id: 'group:a', label: 'Iridium', x: 100, y: 100, w: 700, h: 500 }], notes: [{ id: 'note:a', text: 'Ask', x: 900, y: 100, w: 260, h: 180, colour: 'grey' }] });
     const keptMarks = () => JSON.parse(localStorage.getItem('lys.canvas') ?? '{}') as { groups: { colour?: string }[]; notes: { colour?: string }[] };
     await click($('.canvas-group [data-act="colour"]'));
     expect([keptMarks().groups[0].colour, ($('.canvas-group') as HTMLElement).style.getPropertyValue('--tint')]).toEqual(['green', '#74b584']);
-    // After the last colour comes Lys's own again: no colour is kept.
     await click($('.canvas-note [data-act="colour"]'));
     expect(keptMarks().notes[0].colour).toBeUndefined();
   });
 });
 
 describe('Typing to several agents at once', () => {
-  /** Writes into the form's one field, the way typing does. */
   const write = (value: string) => act(async () => {
     const field = $('.canvas-together textarea') as HTMLTextAreaElement;
     Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(field, value);
@@ -295,12 +347,10 @@ describe('Typing to several agents at once', () => {
       (sent[session] ??= []).push((body as { data: number[] }).data);
       return ok({ session, answer: { kind: 'delivered', session }, receipt: { index: 7 } });
     }) });
-    start();
-    await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session) });
+    await canvas({}, { '/runtime/live': ok({ sessions: [running, other], unanswered: [] }), ...input(session), ...input(other.session) });
     const bar = (id: string) => $('[data-node="session:' + id + '"] .session-canvas-bar');
     const hold = (target: Element | null) => act(async () => { target?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, metaKey: true, clientX: 300, clientY: 210 })); });
     expect($('.canvas-together')).toBeNull();
-    // A press on a window's bar with Command held chooses it; the form says who it types to, and the window shows it is chosen.
     await hold(bar(session));
     expect([$('.canvas-together')?.getAttribute('aria-label'), $('[data-node="' + node + '"]')?.className.includes('together')]).toEqual(['Type to 1 agent', true]);
     await click($('[data-act="together-all"]'));
@@ -311,7 +361,6 @@ describe('Typing to several agents at once', () => {
     const words = Array.from(new TextEncoder().encode('Run the tests.'));
     expect(sent).toEqual({ [session]: [words, [13]], [other.session]: [words, [13]] });
     expect([$('.canvas-together [role="status"]')?.textContent, ($('.canvas-together textarea') as HTMLTextAreaElement).value]).toEqual(['Typed to 2 agents.', '']);
-    // One left out is not typed to; pressed again with Command held, a window leaves; Done puts the form away.
     await click($('[data-together="session:' + other.session + '"] button'));
     expect($$('[data-together]').map((each) => each.textContent + ', ' + each.querySelector('button')?.getAttribute('aria-label'))).toEqual(['Scribe, Leave Scribe out']);
     await hold(bar(session));
@@ -335,8 +384,7 @@ describe('Typing to several agents at once', () => {
 
 describe('The window in front', () => {
   it('stands over a line\'s own handle, so the add button under a short line is the one pressed', async () => {
-    start();
-    await mount('#/canvas?view=canvas', routes);
+    await canvas();
     const window = $('.session-canvas-node.sessions') as HTMLElement;
     expect(window.style.zIndex).toBe('2');
     await pointer($('.session-canvas-node.sessions h3'), 'pointerdown', 300, 240);
@@ -344,7 +392,6 @@ describe('The window in front', () => {
     // The line to the new widget is 48 long and its handle sits at its middle, where the column of add buttons is; the handle's layer is 4.
     expect($('.canvas-link-remove')).not.toBeNull();
     expect(Number(window.style.zIndex)).toBeGreaterThan(4);
-    // Pressed again, the button adds a second widget and the first keeps its line.
     await click($('[data-add-widget="usage"]'));
     expect($$('[data-widget]')).toHaveLength(2);
     expect($$('.canvas-link-remove')).toHaveLength(2);
@@ -353,8 +400,7 @@ describe('The window in front', () => {
 
 describe('Looking closer', () => {
   it('brings the view in to a window when its bar is double-pressed, and goes back to the view before when it is double-pressed again', async () => {
-    start();
-    await mount('#/canvas?view=canvas', routes);
+    await canvas();
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
@@ -377,20 +423,17 @@ describe('Looking closer', () => {
   });
 
   it('brings a whole box into view when its bar is double-pressed, and everything on the canvas when the canvas itself is', async () => {
-    start({ groups: [{ id: 'group:a', label: 'Iridium', x: 200, y: 200, w: 440, h: 100 }] });
-    await mount('#/canvas?view=canvas', routes);
+    await canvas({ groups: [{ id: 'group:a', label: 'Iridium', x: 200, y: 200, w: 440, h: 100 }] });
     const surface = $('.session-canvas-scroll') as HTMLElement;
     Object.defineProperty(surface, 'clientWidth', { configurable: true, value: 1008 });
     Object.defineProperty(surface, 'clientHeight', { configurable: true, value: 800 });
     const drawing = $('.session-canvas') as HTMLElement;
     const before = drawing.style.transform;
     const twice = (on: Element | null) => act(async () => { on?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); });
-    // The box is 440 wide: it fills the view at twice its size, its middle in the middle. Double-pressed again, the view is as it was.
     await twice($('.canvas-group-bar'));
     expect(drawing.style.transform).toBe('translate(-336px, -72px) scale(2)');
     await twice($('.canvas-group-bar'));
     expect(drawing.style.transform).toBe(before);
-    // A double press in the label is for its words, not for the view.
     await twice($('.canvas-group-bar input'));
     expect(drawing.style.transform).toBe(before);
     // The canvas itself: everything on it in the middle of the view; and back. With the resource's card, which stands from 1,100 to 1,320 across at the top, everything is 1,120 by 300 from (200, 0): it and its margin fit the 1,008 of the view at 1,008 / 1,184.
@@ -419,32 +462,24 @@ describe('A widget under the hand', () => {
   const small = { id: 'widget:s', kind: 'usage', x: 700, y: 600, w: 248, h: 34 };
 
   it('is moved by its rows as by its bar when it is opened out, and the canvas stays where it is', async () => {
-    start({ widgets: [opened] });
-    await mount('#/canvas?view=canvas', routes);
-    const [surface, drawing, widget] = [$('.session-canvas-scroll'), $('.session-canvas') as HTMLElement, $('[data-widget="widget:w"]') as HTMLElement];
+    await canvas({ widgets: [opened] });
+    const [drawing, widget] = [$('.session-canvas') as HTMLElement, $('[data-widget="widget:w"]') as HTMLElement];
     const before = drawing.style.transform;
     expect([widget.style.left, widget.style.top]).toEqual(['700px', '300px']);
-    await pointer($('[data-widget="widget:w"] .canvas-widget-body'), 'pointerdown', 800, 420);
-    await pointer(surface, 'pointermove', 860, 450);
-    await pointer(surface, 'pointerup', 860, 450);
+    await dragOn($('[data-widget="widget:w"] .canvas-widget-body'), [800, 420], [860, 450]);
     expect([widget.style.left, widget.style.top]).toEqual(['760px', '330px']);
     expect(drawing.style.transform).toBe(before);
-    // Locked, it stays, and the drag is the canvas's as it was before.
     await click($('[data-widget="widget:w"] [data-act="widget-lock"]'));
-    await pointer($('[data-widget="widget:w"] .canvas-widget-body'), 'pointerdown', 800, 420);
-    await pointer(surface, 'pointermove', 830, 440);
-    await pointer(surface, 'pointerup', 830, 440);
+    await dragOn($('[data-widget="widget:w"] .canvas-widget-body'), [800, 420], [830, 440]);
     expect([widget.style.left, widget.style.top]).toEqual(['760px', '330px']);
     expect(drawing.style.transform).not.toBe(before);
   });
 
   it('is marked as the one chosen when it is pressed, which stands it and its remove control in front of its neighbours', async () => {
-    start({ widgets: [opened, small] });
-    await mount('#/canvas?view=canvas', routes);
-    const [surface, above, below] = [$('.session-canvas-scroll'), $('[data-widget="widget:w"]') as HTMLElement, $('[data-widget="widget:s"]') as HTMLElement];
+    await canvas({ widgets: [opened, small] });
+    const [above, below] = [$('[data-widget="widget:w"]') as HTMLElement, $('[data-widget="widget:s"]') as HTMLElement];
     expect([above.classList.contains('chosen'), below.classList.contains('chosen')]).toEqual([false, false]);
-    await pointer($('[data-widget="widget:s"] .canvas-widget-bar'), 'pointerdown', 760, 617);
-    await pointer(surface, 'pointerup', 760, 617);
+    await tapOn($('[data-widget="widget:s"] .canvas-widget-bar'), 760, 617);
     expect([above.classList.contains('chosen'), below.classList.contains('chosen')]).toEqual([false, true]);
     expect($('[data-widget="widget:s"] [data-act="remove-widget"]')).not.toBeNull();
     expect($('[data-widget="widget:w"] [data-act="remove-widget"]')).toBeNull();
@@ -461,7 +496,6 @@ describe('What a widget counts', () => {
   it('is every agent with no line and no box, the box it sits in, or exactly what its lines join it to', () => {
     expect(scopeOf(there, [], [box], windows, rows)).toEqual({ rows, whose: 'Every agent', everyone: true });
     expect(scopeOf({ ...there, x: 200, y: 200 }, [], [box], windows, rows)).toMatchObject({ rows: [rows[0]], whose: 'Iridium: 1 agent', everyone: false });
-    // A line from a window, by the name it has now or the agent's own; a line to a box counts the agents in the box.
     expect(scopeOf(there, [{ id: 'l', from: 'session:2', to: 'widget:w' }], [box], windows, rows)).toMatchObject({ rows: [rows[1]], whose: 'Courier' });
     expect(scopeOf(there, [{ id: 'l', from: 'widget:w', to: 'agent:' + SCRIBE }, { id: 'm', from: 'session:2', to: 'widget:w' }], [box], windows, rows)).toMatchObject({ rows: [rows[0], rows[1]], whose: 'Scribe, Courier' });
     expect(scopeOf(there, [{ id: 'l', from: 'group:a', to: 'widget:w' }], [box], windows, rows)).toMatchObject({ rows: [rows[0]], whose: 'Iridium: 1 agent' });
@@ -473,10 +507,8 @@ describe('What a widget counts', () => {
     const pill = (id: string, x: number, y: number) => ({ id, kind: 'goals', x, y, w: 340, h: 190 });
     const open = { id: 'open', kind: 'usage', x: 100, y: 100, w: 340, h: 200, view: 'detail' as const };
     const places = (widgets: Parameters<typeof stood>[0]) => stood(widgets).map((each) => [each.id, each.y, each.h]);
-    // Two pills stacked under an opened widget go below it, the second below the first; one beside it stays.
     expect(places([open, pill('a', 100, 144), pill('b', 100, 188), pill('beside', 500, 144), pill('above', 100, 40)])).toEqual([
       ['open', 100, 200], ['a', 310, 34], ['b', 354, 34], ['beside', 144, 34], ['above', 40, 34]]);
-    // As pills, each stands where the person put it, even one laid over another.
     expect(places([{ ...open, view: undefined }, pill('a', 100, 110)])).toEqual([['open', 100, 34], ['a', 110, 34]]);
   });
 

@@ -45,7 +45,7 @@ mod runner;
 pub(crate) use runner::enforced;
 #[cfg(test)]
 use runner::keep_with_runner;
-use runner::run;
+pub(crate) use runner::{keep_start, run};
 
 use std::str::FromStr;
 use std::sync::Arc;

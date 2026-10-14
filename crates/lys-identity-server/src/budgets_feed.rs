@@ -386,7 +386,7 @@ pub fn convert(
         Some(context) => context_figure(record, context, windows, &mut unavailable)?,
         None => None,
     };
-    let usage = Usage {
+    let mut usage = Usage {
         event: format!("native:{machine}:{}", record.id),
         agent: agent.to_owned(),
         at_ms,
@@ -416,6 +416,7 @@ pub fn convert(
         }),
         ..Usage::default()
     };
+    usage.clear_unobserved_windows();
     crate::budgets_enforce::checked(&usage)?;
     Ok(usage)
 }

@@ -12,7 +12,7 @@ use std::sync::Mutex;
 #[path = "terminal_tests.rs"]
 mod terminal_tests;
 
-pub(super) fn keep_start(state: &AppState, report: Report) -> Result<Tracked, ServerError> {
+pub(crate) fn keep_start(state: &AppState, report: Report) -> Result<Tracked, ServerError> {
     let network = state
         .network
         .as_ref()
@@ -45,7 +45,7 @@ pub(super) fn keep_with_runner(
 }
 
 /// A replay requires the recorded runner even though its launch is already kept.
-pub(super) async fn run(
+pub(crate) async fn run(
     state: &Arc<AppState>,
     view: Value,
     admitted_by: &str,

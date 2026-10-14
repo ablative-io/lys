@@ -9,7 +9,7 @@
 mod controls;
 pub use controls::run_on_runner;
 mod starting;
-pub(crate) use starting::run_resuming;
+pub(crate) use starting::{launch_session, run_resuming};
 #[path = "runner_sessions_refused.rs"]
 mod refused;
 use refused::{record_refused, refused_before, started_nothing};
@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use axum::http::HeaderMap;
 use lys_identity::grants::{Action, ExerciseRequest, Resource, Route};
-use lys_identity::start::Given;
+use lys_identity::start::{Given, LaunchRecord};
 use lys_identity::{AgentId, IdentityId};
 use lys_runner::{Act, Answer, Ended, EndedHow, Launch};
 use serde_json::{Value, json};
@@ -359,101 +359,125 @@ pub fn keep_act(state: &AppState, act: RunnerAct) -> Result<ActReceipt, ServerEr
 /// names at a usage limit, and nothing is run on a machine that names none.
 pub struct DirectoryLauncher(pub Arc<AppState>);
 
-/// The session a launch record's start runs as: the same each time the
-/// record is run, so a start sent again finds the session already held.
-pub(crate) fn launch_session(record: &str) -> String {
-    let digest = Sha256::digest(format!("lys-identity/launch-session/v1\n{record}"));
-    format!("op-{}", &hex(&digest)[..32])
+/// Replay only the full launch that this exact signed record admitted.
+fn retained_record(
+    state: &AppState,
+    record: &LaunchRecord,
+    session: &str,
+) -> Result<Option<Value>, ServerError> {
+    with_runtime(state, |store| {
+        let Some(tracked) = store.session(session) else {
+            return Ok(None);
+        };
+        let first = tracked
+            .first()
+            .ok_or_else(|| ServerError::RuntimeReportReused {
+                operation: session.to_owned(),
+            })?;
+        if tracked.agent.as_deref() != Some(record.agent.as_str())
+            || tracked.machine != record.machine
+            || first.operation != session
+        {
+            return Err(ServerError::RuntimeReportReused {
+                operation: session.to_owned(),
+            });
+        }
+        let view = first.launch.clone().ok_or_else(|| {
+            starting::record_unproved("the prior start has no saved launch template")
+        })?;
+        if !starting::matches_record(&view, record) {
+            return Err(ServerError::RuntimeReportReused {
+                operation: session.to_owned(),
+            });
+        }
+        Ok(Some(view))
+    })
 }
 
-/// Keep that `driven` is starting from launch record `record`, once.
 fn record_starting(
     state: &AppState,
     driven: &Driven,
-    record: &str,
+    record: &LaunchRecord,
     caller: &str,
-) -> Result<(), ServerError> {
-    if state.runtime.is_none() {
-        return Ok(());
+    view: Value,
+) -> Result<Value, ServerError> {
+    if let Some(kept) = retained_record(state, record, &driven.session)? {
+        return Ok(kept);
     }
-    with_runtime(state, |store| {
-        if store.session(&driven.session).is_some() {
-            return Ok(());
-        }
-        store
-            .report(Report {
-                operation: driven.session.clone(),
-                session: driven.session.clone(),
-                agent: Some(driven.agent.clone()),
-                machine: driven.machine.clone(),
-                state: Reported::Starting,
-                what: format!("start given from launch record {record}"),
-                confirmation: String::new(),
-                reported_by: caller.to_owned(),
-                at: now(),
-                launch: None,
-            })
-            .map(drop)
-    })
+    let tracked = crate::launch_api::keep_start(
+        state,
+        Report {
+            operation: driven.session.clone(),
+            session: driven.session.clone(),
+            agent: Some(driven.agent.clone()),
+            machine: driven.machine.clone(),
+            state: Reported::Starting,
+            what: format!("start given from launch record {}", record.id),
+            confirmation: String::new(),
+            reported_by: caller.to_owned(),
+            at: now(),
+            launch: Some(view),
+        },
+    )?;
+    tracked
+        .first()
+        .and_then(|first| first.launch.clone())
+        .ok_or_else(|| starting::record_unproved("the admitted start has no saved launch template"))
 }
 
 impl Launcher for DirectoryLauncher {
     fn launch<'a>(&'a self, given: &'a Given, caller: &'a str) -> LaunchFuture<'a> {
-        Box::pin(async move {
-            let record = &given.record;
-            if let Err(refused) = crate::cord_api::refuse_start(&self.0) {
-                return Some(Err(refused));
-            }
-            let runner = match machine_runner(&self.0, &record.machine) {
-                Ok(Some(runner)) => runner,
-                Ok(None) => return None,
-                Err(refused) => return Some(Err(refused)),
-            };
-            let driven = Driven {
-                session: launch_session(&record.id),
-                agent: record.agent.clone(),
-                machine: record.machine.clone(),
-                runner,
-            };
-            let policy = match crate::agent_policy_api::launch_policy(&self.0, &record.agent) {
-                Ok(policy) => policy,
-                Err(refused) => return Some(Err(refused)),
-            };
-            let runtime = match crate::network_api::with_network(&self.0, |store| {
-                store
-                    .machine(&record.machine)
-                    .and_then(|machine| machine.runtime.clone())
-                    .ok_or(ServerError::MachineWithoutRuntime)
-            }) {
-                Ok(runtime) => runtime,
-                Err(refused) => return Some(Err(refused)),
-            };
-            let launch = match crate::provisioning_api::with_provisioning(&self.0, |store| {
-                crate::launch_record_config::build(
-                    store,
-                    record,
-                    driven.session.clone(),
-                    &runtime,
-                    policy,
-                    self.0.model_proxy.as_deref(),
-                )
-            }) {
-                Ok(launch) => launch,
-                Err(refused) => return Some(Err(refused)),
-            };
-            let pending = match self.0.runners.begin_start(&record.machine, &driven.session) {
-                Ok(pending) => pending,
-                Err(refused) => return Some(Err(refused)),
-            };
-            if let Err(refused) = record_starting(&self.0, &driven, &record.id, caller) {
-                return Some(Err(refused));
-            }
-            let result =
-                run_on_runner(&self.0, (&record.agent, &record.machine, caller), launch).await;
-            drop(pending);
-            Some(result)
-        })
+        Box::pin(starting::launch_given(&self.0, given, caller))
     }
+}
+
+/// Only the proxy's per-run key may differ from the signed Codex argument.
+fn proxy_argument(given: &str, wanted: &str, proxy: &str, run: &str) -> Result<bool, ServerError> {
+    let prefix = "model_providers.lys=";
+    let Some(setting) = given.strip_prefix(prefix) else {
+        return Ok(false);
+    };
+    if !wanted.starts_with(prefix) {
+        return Ok(false);
+    }
+    let setting: toml::Table =
+        toml::from_str(&format!("provider = {setting}")).map_err(|error| {
+            ServerError::LaunchUnrenderable {
+                reason: format!("the signed Codex provider setting is invalid TOML: {error}"),
+            }
+        })?;
+    let base = setting
+        .get("provider")
+        .and_then(|value| value.get("base_url"))
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| ServerError::LaunchUnrenderable {
+            reason: "the signed Codex provider setting names no base URL".to_owned(),
+        })?;
+    let Some(old_run) = base
+        .split_once("://")
+        .and_then(|(_, rest)| rest.split_once('/'))
+        .and_then(|(_, path)| path.split('/').next())
+        .filter(|run| lys_home::proxy::usage::is_run_key(run))
+    else {
+        return Ok(false);
+    };
+    if lys_home::harness::rendering::openai_base(proxy, Some(old_run)).as_deref() != Some(base) {
+        return Ok(false);
+    }
+    let replacement =
+        lys_home::harness::rendering::openai_base(proxy, Some(run)).ok_or_else(|| {
+            ServerError::LaunchUnrenderable {
+                reason: "the Codex model proxy has no scheme and host".to_owned(),
+            }
+        })?;
+    let quote = |value: &str| {
+        serde_json::to_string(value).map_err(|error| ServerError::LaunchUnrenderable {
+            reason: error.to_string(),
+        })
+    };
+    let original = quote(base)?;
+    Ok(given.matches(&original).count() == 1
+        && given.replacen(&original, &quote(&replacement)?, 1) == wanted)
 }
 
 /// A start owned by the agent's responsible person, so the runner admits

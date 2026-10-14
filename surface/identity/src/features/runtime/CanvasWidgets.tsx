@@ -11,6 +11,8 @@ import { refusedPart } from '../dashboard/contract';
 import { budgetPart, draftsPart, goalsPart, requestsPart } from '../dashboard/Widgets';
 import { tightest } from '../dashboard/words';
 import type { Part } from '../dashboard/Widgets';
+import { WidgetUsageReadings, supportsUsageReading, usageSummary } from '../budgets/WidgetUsageReadings';
+import type { SessionSelection } from '../budgets/WidgetUsageReadings';
 import { clockMs } from '../file/time';
 import { THIS, amount } from '../usage/budgetWords';
 import { tracking } from '../usage/contract';
@@ -42,7 +44,7 @@ const full = (percent: number): number => Math.max(0, Math.min(100, percent));
 export function Dial({ percent, face, children }: { percent: number; face?: 'mid' | 'large'; children?: ReactNode }) {
   const [size, r, stroke] = face === 'large' ? [132, 56, 10] : face === 'mid' ? [84, 35, 7] : [18, 7, 3];
   const round = 2 * Math.PI * r;
-  return <span className={'canvas-dial' + (face ? ' ' + face : '') + (percent >= 100 ? ' full' : '')} role="img" aria-label={Math.round(percent) + '%'}>
+  return <span className={'canvas-dial' + (face ? ' ' + face : '') + (percent >= 100 ? ' full' : '')} role="img" aria-label={percent.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%'}>
     <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="canvas-dial-track" />
       <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="canvas-dial-level" strokeDasharray={`${round * full(percent) / 100} ${round}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
@@ -89,23 +91,26 @@ export interface Held extends Part {
   /** Its one figure as a number, when it has one: what a formula it feeds works on. Several accounts' windows feed their highest. */
   value?: Value;
 }
-type Chosen = Pick<Widget, 'shows' | 'faces' | 'look'>;
+type Chosen = Pick<Widget, 'shows' | 'faces' | 'look'> & SessionSelection;
 
 /**
  * What the agents used. Small, it is one figure: the one the person chose, or the first reported. Medium, it is the
- * chosen figures side by side. Large, it is every figure once, added over the agents or at its highest, and each
- * account's windows. Nothing unreported is shown as zero.
+ * chosen figures side by side. Context stays per session and tokens stay in their reported components. Other
+ * figures are added over the agents or shown at their highest, beside each account's windows.
  */
-function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
-  const [lines, accounts] = [summed(scope.rows), accountsOf(scope.rows)];
+function usagePart(scope: Scope, { shows, faces, look, selected, select }: Chosen): Held {
+  const [allLines, accounts] = [summed(scope.rows), accountsOf(scope.rows)];
+  const lines = allLines.filter((line) => line.unit !== 'context_percent' && line.unit !== 'tokens'
+    && !(line.unit === 'plan_percent' && line.period === 'five_hour'));
   const unread = scope.rows.filter((row) => refusedPart(row.usage));
   const silent = scope.rows.filter((row) => !refusedPart(row.usage) && !tracking(row.usage).complete);
-  const context = lines.find((line) => line.unit === 'context_percent' && line.figure !== null);
   const several = scope.rows.length !== 1;
   const reporting = scope.rows.length - silent.length - unread.length;
-  const tokens = lines.find((line) => line.unit === 'tokens' && line.period === 'day' && line.figure !== null);
-  const count = context?.figure != null ? amount('context_percent', context.figure) + ' context' : tokens?.figure != null ? amount('tokens', tokens.figure) + ' today'
-    : !reporting ? 'No usage yet' : reporting + ' of ' + scope.rows.length + ' reporting';
+  const current = usageSummary(scope.rows, 'context_percent/', selected);
+  const daily = usageSummary(scope.rows, 'tokens/day', selected);
+  const specific = shows ? usageSummary(scope.rows, shows, selected) : null;
+  const count = !reporting ? 'No usage yet' : current?.percent !== undefined ? current.figure
+    : daily?.figure ?? current?.figure ?? reporting + ' of ' + scope.rows.length + ' reporting';
   const read = (key: string) => figuresOf(key, lines, accounts, several);
   const small = shows ? read(shows) : null;
   const levels = small?.flatMap((each) => each.percent ?? []) ?? [];
@@ -114,24 +119,35 @@ function usagePart(scope: Scope, { shows, faces, look }: Chosen): Held {
   const face = medium.reduce((sum, each) => sum + Math.max(1, each.held.length), 0) === 1 ? 'large' : 'mid';
   const lineOf = (key: string) => lines.find((each) => each.unit + '/' + (each.period ?? '') === key);
   const why = (key: string) => lineOf(key)?.missing.join('\n');
+  const readings = (keys: string[]) => <WidgetUsageReadings rows={scope.rows} keys={keys} selected={selected} select={select}
+    renderLevel={(percent, display) => look === 'dial' ? <Dial percent={percent} face={face}><b>{display}</b></Dial>
+      : <><b>{display}</b>{look === 'bar' ? bar(percent, display) : null}</>} />;
+  const provider = accounts.some((account) => account.windows.some((window) => window.duration_minutes === 300));
+  const periods = [...new Set(scope.rows.flatMap((row) => refusedPart(row.usage) ? [] : (row.usage.figures ?? [])
+    .filter((used) => used.unit === 'tokens' && used.period !== null).map((used) => used.period!)))];
+  const details = scope.rows.length ? ['context_percent/', ...periods.filter((period) => period !== 'five_hour' || provider)
+    .map((period) => 'tokens/' + period), 'window/300'] : [];
   // The usage of one agent opens on its model calls, each of which can be read whole; of several, on the list to choose from.
-  return { label: 'Usage', href: '#/canvas?view=proxy' + (several ? '' : '&agent=' + encodeURIComponent(scope.rows[0].agent.id)), count, ...(small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
-    percent: small ? (levels.length ? Math.max(...levels) : undefined) : context?.figure ?? undefined,
-    value: small ? (small.length ? { amount: Math.max(...small.map((each) => each.value.amount)), unit: small[0].value.unit } : undefined)
-      : context?.figure != null ? { amount: context.figure, unit: 'context_percent' } : tokens?.figure != null ? { amount: tokens.figure, unit: 'tokens' } : undefined,
-    levelled: medium.some((each) => each.held.some((held) => held.percent !== null)),
+  return { label: 'Usage', href: '#/canvas?view=proxy' + (several ? '' : '&agent=' + encodeURIComponent(scope.rows[0].agent.id)), count,
+    ...(specific ? { figure: specific.figure } : small ? { figure: small.length ? small.map((each) => each.figure).join(', ') + small[0].tail : 'Not reported' } : {}),
+    percent: specific ? specific.percent : small ? (levels.length ? Math.max(...levels) : undefined) : current?.percent,
+    value: specific ? specific.value : small ? (small.length ? { amount: Math.max(...small.map((each) => each.value.amount)), unit: small[0].value.unit } : undefined) : current?.value,
+    levelled: medium.some((each) => each.key === 'context_percent/' ? current?.percent !== undefined : each.held.some((held) => held.percent !== null)),
     faces: !scope.rows.length ? <p className="dim canvas-stat-none">No agent is counted here.</p>
       : !medium.length ? <p className="dim canvas-stat-none">No figure is chosen for this face.</p>
-      : <div className="canvas-faces">{medium.flatMap(({ key, held }) => held.length ? held.map((each) => stat(each, look, face))
+      : <div className="canvas-faces">{medium.flatMap(({ key, held }) => supportsUsageReading(key)
+        ? [<div className={'canvas-stat ' + face + (look && (key === 'context_percent/' || key === 'window/300') ? ' ' + look : '')} key={key} data-stat={key}>{readings([key])}</div>]
+        : held.length ? held.map((each) => stat(each, look, face))
         : [<div className={'canvas-stat none ' + face} key={key} data-stat={key} title={why(key)}><b>{partly(lineOf(key))?.reported ?? 'Not reported'}</b><span className="sec">{names[key] ?? key}{partly(lineOf(key)) ? ', ' + partly(lineOf(key))!.rest : ''}</span></div>])}</div>,
     body: <table className="dash-table"><tbody>
+      {details.length ? <tr data-usage-readings><td colSpan={2}>{readings(details)}</td></tr> : null}
       {lines.map((line) => <tr key={line.unit + '/' + line.period} data-figure={line.unit} data-period={line.period ?? 'now'}>
         <td>{FIGURE[line.unit]} {line.period ? THIS[line.period] : 'now'}{several && level(line.unit) ? ', highest' : ''}</td>
         <td className="sec">{line.figure === null ? <span className="dim" title={line.missing.join('\n')} data-partial={partly(line) ? 'true' : undefined}>{partly(line) ? partly(line)!.reported + ', ' + partly(line)!.rest : 'Not reported'}</span> : <>
           {level(line.unit) ? bar(line.figure, amount(line.unit, line.figure)) : null}{amount(line.unit, line.figure)}</>}
           {several && line.figure !== null && line.missing.length ? <span className="dim" title={line.missing.join('\n')}> ({line.reported} of {line.reported + line.missing.length} reporting)</span> : null}</td>
       </tr>)}
-      {accounts.flatMap((account) => account.windows.map((each) => <tr key={account.account + '/' + each.duration_minutes} data-account={account.account}>
+      {accounts.flatMap((account) => account.windows.filter((each) => each.duration_minutes !== 300).map((each) => <tr key={account.account + '/' + each.duration_minutes} data-account={account.account}>
         <td>{account.account}, {windowWords(each.duration_minutes)}</td>
         <td className="sec">{bar(each.used_percent, amount('plan_percent', each.used_percent) + ' used')}{amount('plan_percent', each.used_percent)} used, resets {clockMs(each.resets_at_ms)}</td>
       </tr>))}
@@ -174,7 +190,8 @@ export function partOf(kind: string, scope: Scope, board: Board, chosen: Chosen 
 const LEVELS: ReadonlySet<string> = new Set(['context_percent', 'plan_percent', 'percent']);
 /** A combined figure in words: an amount in its own unit's words, a count as its number. */
 const said = (value: Value): string => value.unit === 'count' ? value.amount.toLocaleString('en-AU', { maximumFractionDigits: 1 })
-  : value.unit === 'percent' ? Math.round(value.amount) + '%' : amount(value.unit as Measure, value.amount);
+  : value.unit === 'percent' ? Math.round(value.amount) + '%' : value.unit === 'context_percent'
+    ? value.amount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%' : amount(value.unit as Measure, value.amount);
 
 /** A widget that feeds a formula: what it is, whose it is, its figure in words and as a number. */
 interface Input { id: string; label: string; whose: string; figure: ReactNode; value?: Value }
@@ -193,7 +210,7 @@ function formulaPart(by: string, inputs: Input[]): Held {
 }
 
 /** Everything on the surface a widget's figure can come from. */
-export interface Surface { widgets: Widget[]; links: Link[]; groups: Group[]; windows: AgentWindow[]; board: Board }
+export interface Surface { widgets: Widget[]; links: Link[]; groups: Group[]; windows: AgentWindow[]; board: Board; sessionSelections?: Record<string, SessionSelection> }
 /** A widget as it stands: whose it is in words, and what it holds; nothing held for a kind this page does not know. */
 export interface Standing { whose: string; part: Held | null }
 
@@ -205,7 +222,7 @@ export interface Standing { whose: string; part: Held | null }
 export function heldOf(widget: Widget, on: Surface, within: ReadonlySet<string> = new Set()): Standing {
   if (KINDS[widget.kind]?.takes !== 'widgets') {
     const scope = scopeOf(widget, on.links, on.groups, on.windows, on.board.rows);
-    return { whose: scope.whose, part: partOf(widget.kind, scope, on.board, widget) };
+    return { whose: scope.whose, part: partOf(widget.kind, scope, on.board, { ...widget, ...on.sessionSelections?.[widget.id] }) };
   }
   const inside = new Set([...within, widget.id]);
   const inputs = on.links.flatMap((link): Input[] => {
