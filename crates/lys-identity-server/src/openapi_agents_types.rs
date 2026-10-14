@@ -3,7 +3,7 @@
 
 use lys_openapi::Api;
 
-use crate::agent_app_pass::AppPassAsked;
+use crate::agent_app_pass::{AppPassAsked, AppPassRevoked};
 use crate::openapi_table::{GET, POST};
 use crate::openapi_types::Entry;
 use crate::provider::AgentAppPass;
@@ -90,6 +90,12 @@ pub(crate) fn agents(api: &mut Api) -> Vec<Entry> {
             Some(item.clone()),
         ),
         (POST, "/schedules/{id}/stop", Some(stop), Some(item)),
+        (
+            POST,
+            "/agents/{id}/pass/revoke",
+            Some(api.schema::<AppPassAsked>()),
+            Some(api.schema::<AppPassRevoked>()),
+        ),
         (
             POST,
             "/agents/{id}/pass",

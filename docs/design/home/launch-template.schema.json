@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ablative-io/lys/docs/design/home/launch-template.schema.json",
-  "title": "Claude Code launch template",
-  "description": "One JSON object a home keeps by its SHA-256 and renders into the files a Claude Code launch needs (HOME-002 R1). Nothing in it is interpreted, expanded or executed; the transcript slot is filled by resuming the rendered file by path with --fork-session.",
+  "title": "Harness launch template",
+  "description": "One JSON object a home keeps by its SHA-256 and renders into the files the selected harness launch needs (HOME-002 R1). Nothing in it is interpreted, expanded or executed; Claude Code fills the transcript slot by resuming the rendered file by path with --fork-session.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -13,10 +13,10 @@
   "properties": {
     "harness": {
       "description": "The harness this template renders for.",
-      "const": "claude-code"
+      "enum": ["claude-code", "codex"]
     },
     "flags": {
-      "description": "The extra Claude Code arguments the launch line carries, in order.",
+      "description": "The extra arguments for the selected harness that the launch line carries, in order.",
       "type": "array",
       "items": {
         "type": "string"

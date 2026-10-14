@@ -307,6 +307,12 @@ pub(crate) fn approved_view(record: &ProductDraftRecord) -> ApprovedDraftView {
             action: created.target.action.clone(),
         },
         request_digest: hex(&created.request_digest),
+        approved_by: record
+            .approvals
+            .iter()
+            .map(|(approval, _)| approval.approver.to_string())
+            .collect(),
+        mode: created.mode.as_str().to_owned(),
         words: created.words.clone(),
     }
 }

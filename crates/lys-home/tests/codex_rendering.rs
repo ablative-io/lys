@@ -413,40 +413,8 @@ fn codex_skills_and_secret_handles_keep_their_hashes_and_bindings() -> TestResul
     Ok(())
 }
 
-#[test]
-fn codex_refuses_wake_channels_and_colliding_command_variables() -> TestResult {
-    let mut fields = fields()?;
-    fields.mcp_servers.push(LaunchMcp {
-        name: "fixture".to_owned(),
-        transport: Transport::Http {
-            url: "https://example.test/mcp".to_owned(),
-        },
-        channel: Channel::Wake,
-    });
-    let error = render(&fields, &[], &permissions("read-only"), &[])
-        .err()
-        .ok_or("wake silently dropped")?;
-    assert_eq!(error.member, "mcp_servers");
-    fields.mcp_servers[0].channel = Channel::Off;
-    fields.mcp_servers[0].transport = Transport::Stdio {
-        program: "/opt/fixture/mcp".to_owned(),
-        args: vec![],
-        cwd: None,
-        env: vec![EnvText {
-            name: "TOKEN".to_owned(),
-            text: "literal".to_owned(),
-        }],
-        handles: vec![HandleEnv {
-            name: "TOKEN".to_owned(),
-            handle_id: "handle-fixture".to_owned(),
-        }],
-    };
-    let error = render(&fields, &[], &permissions("read-only"), &[])
-        .err()
-        .ok_or("variable silently overwritten")?;
-    assert_eq!(error.member, "mcp_servers");
-    Ok(())
-}
+#[path = "codex_rendering/channels.rs"]
+mod channels;
 
 #[test]
 fn codex_is_given_the_model_proxy_as_a_provider_over_http_streams_with_its_run_key() -> TestResult {

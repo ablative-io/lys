@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 
 #[cfg(feature = "http")]
 use crate::Client;
-use crate::{Error, Target};
+use crate::{Error, Mode, Target};
 
 /// A held act, whose words are immutable bytes rather than reserialized JSON.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +45,10 @@ pub struct ApprovedDraft {
     pub target: Target,
     /// The digest of the exact prepared words.
     pub request_digest: String,
+    /// Every approver of this immutable draft and request digest, in recorded order.
+    pub approved_by: Vec<String>,
+    /// The granting receipt's required approval mode.
+    pub mode: Mode,
     /// The exact prepared words.
     pub words: String,
 }
@@ -195,6 +199,7 @@ pub fn execute_once<E: Executor>(
     draft: &ApprovedDraft,
     executor: &mut E,
 ) -> Result<Execution, ExecuteError<E::Error>> {
+    approval(draft).map_err(ExecuteError::Contract)?;
     validate(
         &draft.grant,
         &draft.target,
@@ -225,6 +230,19 @@ pub fn execute_once<E: Executor>(
         )));
     }
     Ok(receipt)
+}
+
+fn approval(draft: &ApprovedDraft) -> Result<(), Error> {
+    let distinct: std::collections::BTreeSet<_> = draft.approved_by.iter().collect();
+    if !matches!(
+        (draft.mode, draft.approved_by.len()),
+        (Mode::ByDraft, 1) | (Mode::ByTwo, 2)
+    ) || distinct.len() != draft.approved_by.len()
+        || draft.approved_by.iter().any(String::is_empty)
+    {
+        return Err(Error::Invalid("draft approval mode or approvers differ"));
+    }
+    Ok(())
 }
 
 fn validate(grant: &str, target: &Target, digest: &str, words: &str) -> Result<(), Error> {
@@ -377,6 +395,7 @@ impl Client {
         }
         let mut ids = std::collections::BTreeSet::new();
         for draft in &page.drafts {
+            approval(draft)?;
             validate(
                 &draft.grant,
                 &draft.target,

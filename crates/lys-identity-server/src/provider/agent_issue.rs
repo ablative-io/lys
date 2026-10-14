@@ -13,9 +13,9 @@
 //! other is refused `audience_not_approved`, carrying the apps' own words.
 //!
 //! The pass lives the provider's `pass_seconds` and no longer. No refresh
-//! token is issued: the agent asks again. As a machine's is, the pass is
-//! kept nowhere, so Lys's own routes that take a bearer pass refuse it, and
-//! products verify it offline with lys-pass against `/oauth/jwks`.
+//! token is issued: the agent asks again. Its digest is retained for issuer
+//! admission and audience revocation. Products verifying offline against
+//! the published keys still admit a signed copy until its expiry.
 //!
 //! The apps lock is taken and released before the grants are read; no
 //! provider lock is held under either.
@@ -27,6 +27,7 @@ use sha2::{Digest as _, Sha256};
 
 use super::endpoints::{apps, provider};
 use super::exchange_timing::{Act, Timing};
+use super::held;
 use super::rights_claim::pass;
 use crate::apps_binding::sign_in_app;
 use crate::error::ServerError;
@@ -55,19 +56,7 @@ pub(crate) fn agent_app_pass(
 ) -> Result<AgentAppPass, ServerError> {
     let mut timing = Timing::new("agent", app);
     let provider = provider(state)?;
-    let audience = timing.measure(Act::IsLive, || {
-        let mut apps = apps(state)?;
-        apps.settle()?;
-        let audience = sign_in_app(apps.held(), app)
-            .map_err(|error| AppPassError::AudienceNotApproved {
-                audience: app.to_owned(),
-                reason: error.to_string(),
-            })?
-            .registered
-            .app
-            .clone();
-        Ok::<_, ServerError>(audience)
-    })?;
+    let audience = timing.measure(Act::IsLive, || approved_audience(state, app))?;
     let at = now();
     let issued = timing.measure(Act::Pass, || {
         pass(
@@ -78,12 +67,39 @@ pub(crate) fn agent_app_pass(
             false,
         )
     })?;
+    held(&provider.agent_tokens)?.issue(&issued.token, agent, &audience, issued.expires_at, at)?;
     timing.cache(issued.cache_hit);
     Ok(timing.measure(Act::Issue, || AgentAppPass {
         pass: issued.token,
         expires_at: issued.expires_at,
         audience,
     }))
+}
+
+/// The currently approved audience, shared by issue and revoke.
+pub(super) fn approved_audience(state: &AppState, app: &str) -> Result<String, ServerError> {
+    let mut apps = apps(state)?;
+    apps.settle()?;
+    Ok(sign_in_app(apps.held(), app)
+        .map_err(|error| AppPassError::AudienceNotApproved {
+            audience: app.to_owned(),
+            reason: error.to_string(),
+        })?
+        .registered
+        .app
+        .clone())
+}
+
+/// Remove every retained pass for this agent and approved audience.
+pub(crate) fn revoke(
+    state: &AppState,
+    agent: AgentId,
+    app: &str,
+) -> Result<(String, usize), ServerError> {
+    let provider = provider(state)?;
+    let audience = approved_audience(state, app)?;
+    let removed = held(&provider.agent_tokens)?.revoke(agent, &audience)?;
+    Ok((audience, removed))
 }
 
 /// Snapshot only the agent's current signing certificates, releasing their store before decoding.

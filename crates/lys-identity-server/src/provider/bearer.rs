@@ -80,6 +80,10 @@ fn retained_holder(
 ) -> Result<IdentityId, ServerError> {
     let provider = provider(state)?;
     let at = now();
+    if let IdentityId::Agent(agent) = identity_id(&verified.claims().sub)? {
+        held(&provider.agent_tokens)?.admits(pass, agent, audience, at)?;
+        return Ok(IdentityId::Agent(agent));
+    }
     let session = {
         let tokens = held(&provider.tokens)?;
         let kept = tokens.get(&hex(&Sha256::digest(pass.as_bytes())), at)?;

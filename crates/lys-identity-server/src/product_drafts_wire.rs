@@ -78,6 +78,10 @@ pub struct ApprovedDraftView {
     pub target: ProductTarget,
     /// SHA-256 of the words, in lowercase hex.
     pub request_digest: String,
+    /// Every person whose approval is bound to this draft's immutable request.
+    pub approved_by: Vec<String>,
+    /// The held grant's approval mode.
+    pub mode: String,
     /// The exact words.
     pub words: String,
 }

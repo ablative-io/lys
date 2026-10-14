@@ -164,7 +164,7 @@ pub(crate) fn render(program: &str, text: &str, mode: InstructionsMode) -> Resul
 fn server_values(servers: &[LaunchMcp]) -> serde_json::Map<String, Value> {
     let mut values = serde_json::Map::new();
     for server in servers {
-        let value = match &server.transport {
+        let mut value = match &server.transport {
             Transport::Http { url } => json!({"url": url}),
             Transport::Stdio {
                 program,
@@ -189,6 +189,7 @@ fn server_values(servers: &[LaunchMcp]) -> serde_json::Map<String, Value> {
                 value
             }
         };
+        value["channel"] = json!(server.channel);
         values.insert(server.name.clone(), value);
     }
     values

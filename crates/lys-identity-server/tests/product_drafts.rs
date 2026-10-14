@@ -132,6 +132,24 @@ async fn by_two_waits_for_two_distinct_approvers_and_the_holder_is_refused() -> 
     assert_eq!(page["drafts"][0]["id"], draft);
     assert_eq!(page["drafts"][0]["words"], WORDS);
     assert_eq!(page["drafts"][0]["grant"], grant.as_str());
+    assert_eq!(page["drafts"][0]["mode"], "by_two");
+    assert_eq!(page["drafts"][0]["request_digest"], request_digest(WORDS));
+    let people = ok(get(
+        &table.service,
+        "/product-drafts",
+        Auth::Cookie(&table.admin),
+    )
+    .await?)?;
+    let approvals = people["drafts"][0]["approvals"]
+        .as_array()
+        .ok_or("approvals")?;
+    let expected: Vec<Value> = approvals
+        .iter()
+        .map(|approval| approval["by"].clone())
+        .collect();
+    assert_eq!(page["drafts"][0]["approved_by"], json!(expected));
+    assert_eq!(expected.len(), 2);
+
     Ok(())
 }
 

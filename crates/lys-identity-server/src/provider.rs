@@ -57,6 +57,7 @@ mod token_store;
 use token_store::Tokens;
 
 mod agent_issue;
+mod agent_tokens;
 mod bearer;
 mod client_auth;
 mod endpoints;
@@ -73,7 +74,7 @@ mod rights_batch_tests;
 pub(crate) mod rights_cache;
 mod rights_cached;
 mod rights_claim;
-pub(crate) use agent_issue::{AgentAppPass, agent_app_pass};
+pub(crate) use agent_issue::{AgentAppPass, agent_app_pass, revoke as revoke_agent_app_pass};
 pub(crate) use bearer::personal_actor;
 pub(crate) use bearer::{pass_holder, presented_pass, product_person};
 pub use endpoints::{api_keys, routes};
@@ -208,6 +209,7 @@ pub struct OpenIdProvider {
     rights_seen: AtomicUsize,
     codes: Mutex<HashMap<String, Grant>>,
     tokens: Mutex<Tokens>,
+    agent_tokens: Mutex<agent_tokens::Passes>,
 }
 
 fn unavailable(reason: impl Into<String>) -> ServerError {
@@ -284,6 +286,10 @@ impl OpenIdProvider {
                 token_store::dropped_words(tokens.dropped(), tokens.file())
             );
         }
+        let agent_tokens = agent_tokens::Passes::open(
+            settings.key_file.with_extension("agent-passes.json"),
+            now(),
+        )?;
         Ok(Self {
             issuer,
             keys: Mutex::new(keys),
@@ -293,6 +299,7 @@ impl OpenIdProvider {
             rights_seen: AtomicUsize::new(0),
             codes: Mutex::new(HashMap::new()),
             tokens: Mutex::new(tokens),
+            agent_tokens: Mutex::new(agent_tokens),
         })
     }
 

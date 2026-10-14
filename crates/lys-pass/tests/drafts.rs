@@ -39,6 +39,8 @@ fn retry_after_acknowledgment_loss_does_not_execute_again() -> Result<(), Box<dy
         target: Target::new("sample.file", "held", "write")?,
         request_digest: lys_pass::drafts::request_digest("prepared"),
         words: "prepared".to_owned(),
+        approved_by: vec!["person-1".to_owned()],
+        mode: lys_pass::Mode::ByDraft,
     };
     let mut product = Product::default();
     let first = execute_once(&draft, &mut product)?;
@@ -106,7 +108,7 @@ async fn runner_pulls_approved_drafts_and_records_once_after_receipt_retry()
                     .is_some_and(|line| line.contains(path))
             );
             let body = if path.contains('?') {
-                serde_json::json!({"drafts":[{"id":"draft","app":"sample","grant":"grant","target":{"kind":"sample.file","id":"held","action":"write"},"request_digest":digest,"words":"prepared"}],"total":1,"next":null}).to_string()
+                serde_json::json!({"drafts":[{"id":"draft","app":"sample","grant":"grant","target":{"kind":"sample.file","id":"held","action":"write"},"request_digest":digest,"words":"prepared","approved_by":["person-1"],"mode":"by_draft"}],"total":1,"next":null}).to_string()
             } else {
                 "{}".to_owned()
             };

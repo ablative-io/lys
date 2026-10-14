@@ -47,7 +47,7 @@ use lys_identity::grants::GrantId;
 use lys_identity::grants::admission::effective;
 use lys_identity::projection::Projection;
 use lys_identity::{AgentId, IdentityId, LifecycleState};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 use crate::error_app_pass::AppPassError;
@@ -78,13 +78,17 @@ enum Proof {
 
 /// The agents' pass route.
 pub(crate) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/pass", post(pass))
+    Router::new()
+        .route("/agents/{id}/pass", post(pass))
+        .route("/agents/{id}/pass/revoke", post(revoke))
 }
 
 /// Whether `path` is an agent's ask for its pass, which this route judges
 /// alone (`route_actions::admit` lets a run pass through to it).
 pub(crate) fn asks_for_pass(path: &str) -> bool {
-    path.strip_prefix("/agents/")
+    path.strip_suffix("/revoke")
+        .unwrap_or(path)
+        .strip_prefix("/agents/")
         .and_then(|rest| rest.strip_suffix("/pass"))
         .is_some_and(|id| !id.is_empty() && !id.contains('/'))
 }
@@ -114,6 +118,50 @@ async fn pass(
     };
     eprintln!("{}", issued_line(agent, &issued.audience, proof));
     Ok(Json(issued))
+}
+
+/// Issuer revocation, with the limit of offline verification stated by name.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub(crate) struct AppPassRevoked {
+    /// The agent whose retained passes were removed.
+    agent: String,
+    /// The approved app audience.
+    audience: String,
+    /// How many retained passes issuer admission no longer accepts.
+    revoked: usize,
+    /// Offline copies cannot be recalled by an issuer-side operation.
+    offline_refusal: &'static str,
+}
+
+async fn revoke(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    OriginalUri(uri): OriginalUri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Json<AppPassRevoked>, ServerError> {
+    let agent = AgentId::from_str(&id)?;
+    if !headers.contains_key(crate::agent_pass::HEADER) {
+        return Err(unproven(
+            "audience pass revocation requires the agent's run pass (lys-agent-pass) and seat proof",
+        ));
+    }
+    proved(&state, &headers, agent, ("POST", uri.path(), &body))?;
+    let asked: AppPassAsked =
+        serde_json::from_slice(&body).map_err(|error| ServerError::RequestMalformed {
+            reason: format!("the pass revocation request does not read: {error}"),
+        })?;
+    let (audience, revoked) = tokio::task::spawn_blocking(move || {
+        crate::provider::revoke_agent_app_pass(&state, agent, &asked.audience)
+    })
+    .await
+    .map_err(|error| unavailable(format!("the pass revocation stopped: {error}")))??;
+    Ok(Json(AppPassRevoked {
+        agent: agent.to_string(),
+        audience,
+        revoked,
+        offline_refusal: "offline_pass_revocation_unsupported",
+    }))
 }
 
 /// What a request with no proof is told to bring.
@@ -283,6 +331,8 @@ mod tests {
     #[test]
     fn only_an_agents_pass_path_is_its_ask() {
         assert!(asks_for_pass("/agents/agent-1/pass"));
+        assert!(asks_for_pass("/agents/agent-1/pass/revoke"));
+        assert!(!asks_for_pass("/agents/agent-1/calls/pass/revoke"));
         assert!(!asks_for_pass("/agents//pass"));
         assert!(!asks_for_pass("/agents/agent-1/start"));
         assert!(!asks_for_pass("/agents/agent-1/calls/pass"));

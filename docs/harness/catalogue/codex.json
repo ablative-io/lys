@@ -59,7 +59,8 @@
       "working_directory": true,
       "handle_variables": true,
       "channel_policies": [
-        "off"
+        "off",
+        "wake"
       ]
     },
     "rendering_contract": "codex/template-v1"

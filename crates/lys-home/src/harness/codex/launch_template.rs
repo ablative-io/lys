@@ -92,8 +92,11 @@ fn checked(template: &Template) -> Result<(), String> {
         if !plain(&server.name) || !names.insert(&server.name) {
             return Err("mcp_servers: names must be plain and distinct".to_owned());
         }
-        if server.channel != Channel::Off {
-            return Err("mcp_servers: wake channels are unsupported".to_owned());
+        if server.channel == Channel::Wake && matches!(server.transport, Transport::Http { .. }) {
+            return Err(format!(
+                "mcp_servers: server `{}`: wake requires stdio; HTTP wake is unsupported by the declared Codex contract",
+                server.name,
+            ));
         }
         match &server.transport {
             Transport::Http { url }

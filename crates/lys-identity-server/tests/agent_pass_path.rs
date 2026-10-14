@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::response::IntoResponse;
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_core::Ed25519Identity;
@@ -49,7 +50,43 @@ impl Held {
     async fn open() -> TestResult<Self> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
-        let broker = Router::new().fallback(|| async { axum::Json(json!({"handles": []})) });
+        let custody = identity_contract::app_custody::start().await?;
+        let broker = Router::new()
+            .route(
+                "/_lys/apps/{*path}",
+                axum::routing::post(
+                    move |axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
+                          headers: axum::http::HeaderMap,
+                          body: axum::body::Bytes| {
+                        let custody = custody.clone();
+                        async move {
+                            match reqwest::Client::new()
+                                .post(format!("{custody}{}", uri.path()))
+                                .headers(headers)
+                                .body(body)
+                                .send()
+                                .await
+                            {
+                                Ok(answer) => {
+                                    let status = answer.status();
+                                    match answer.bytes().await {
+                                        Ok(bytes) => (status, bytes).into_response(),
+                                        Err(error) => {
+                                            (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
+                                                .into_response()
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
+                                        .into_response()
+                                }
+                            }
+                        }
+                    },
+                ),
+            )
+            .fallback(|| async { axum::Json(json!({"handles": []})) });
         let broker = tokio::spawn(async move { axum::serve(listener, broker).await });
         let dir = tempfile::tempdir()?;
         let program = dir.path().join("seat");
@@ -75,8 +112,15 @@ impl Held {
             None,
             move |config| {
                 config.runner_socket = Some(adjusted);
+                config.provider = Some(lys_identity_server::provider::ProviderSettings {
+                    key_file: config.log_dir.with_file_name("provider.key"),
+                    code_seconds: 60,
+                    pass_seconds: 300,
+                    rights_bytes: None,
+                });
             },
             move |config| {
+                std::fs::write(config.log_dir.with_file_name("provider.key"), [6u8; 32])?;
                 let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let runner = Runner::open(&Options {
@@ -358,3 +402,6 @@ async fn stop_api_a_failed_pass_end_still_keeps_the_stop_and_reports_the_failure
     );
     Ok(())
 }
+
+#[path = "agent_pass_path/revoke.rs"]
+mod revoke;

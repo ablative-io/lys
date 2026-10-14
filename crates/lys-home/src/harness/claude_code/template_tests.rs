@@ -150,7 +150,11 @@ fn the_schema_file_names_exactly_the_slots_the_parser_accepts() {
         assert!(!required.contains(field), "{field}");
     }
     assert_eq!(schema["additionalProperties"], json!(false));
-    assert_eq!(schema["properties"]["harness"]["const"], "claude-code");
+    assert_eq!(
+        schema["properties"]["harness"]["enum"],
+        json!(["claude-code", "codex"])
+    );
+    assert!(schema["properties"]["harness"].get("const").is_none());
     assert_eq!(
         slots["properties"]["transcript"]["properties"]["fill"]["const"],
         "resume-by-path"

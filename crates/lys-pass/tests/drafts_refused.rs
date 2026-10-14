@@ -20,6 +20,8 @@ fn approved() -> ApprovedDraft {
         },
         request_digest: request_digest("prepared"),
         words: "prepared".to_owned(),
+        approved_by: vec!["person-1".to_owned()],
+        mode: lys_pass::Mode::ByDraft,
     }
 }
 
