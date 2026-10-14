@@ -67,6 +67,9 @@ impl SpiceDb {
             &json!({"consistency": consistency, "relationshipFilter": filter}),
         )?;
         if status != 200 {
+            if reads_nothing_of_a_kind_never_written(filter, status, &body) {
+                return Ok((BTreeSet::new(), None));
+            }
             return Err(unavailable(format!(
                 "the relationships could not be read: {body}"
             )));
@@ -255,3 +258,49 @@ impl SpiceDb {
         }
     }
 }
+
+/// The kind the engine says it holds no definition for, when `status` and
+/// `body` are that refusal: `SpiceDB` answers 400 with the reason
+/// `ERROR_REASON_UNKNOWN_DEFINITION` and the kind's name in its metadata,
+/// under `error` on its HTTP door and at the top on its gRPC one.
+pub(super) fn undefined_kind(status: u16, body: &str) -> Option<String> {
+    if status != 400 {
+        return None;
+    }
+    let refusal: Value = serde_json::from_str(body).ok()?;
+    let details = refusal["error"]["details"]
+        .as_array()
+        .or_else(|| refusal["details"].as_array())?;
+    details
+        .iter()
+        .find(|detail| detail["reason"] == "ERROR_REASON_UNKNOWN_DEFINITION")
+        .and_then(|detail| detail["metadata"]["definition_name"].as_str())
+        .map(str::to_owned)
+}
+
+/// Whether a read refused with `status` and `body` read a kind the engine
+/// holds no definition for because nothing of that kind was ever written.
+/// A kind is declared to the engine with the first relationship written of
+/// it (`SpiceDb::write`), so the first read of a kind, before any grant on
+/// one, meets no definition: that is an empty read, not an outage. Only the
+/// kind the filter asks for is taken so; a scoped engine names it under
+/// its prefix, so the name is matched whole or after its `/`.
+pub(super) fn reads_nothing_of_a_kind_never_written(
+    filter: &Value,
+    status: u16,
+    body: &str,
+) -> bool {
+    let Some(asked) = filter["resourceType"].as_str() else {
+        return false;
+    };
+    undefined_kind(status, body).is_some_and(|named| {
+        named == asked
+            || named
+                .strip_suffix(asked)
+                .is_some_and(|prefix| prefix.ends_with('/'))
+    })
+}
+
+#[cfg(test)]
+#[path = "reads_tests.rs"]
+mod tests;
