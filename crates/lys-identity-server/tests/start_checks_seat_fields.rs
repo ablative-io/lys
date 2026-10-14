@@ -68,7 +68,7 @@ fn start_checks_carries_every_reviewed_seat_field() -> Result<(), Box<dyn Error>
             version: &version,
             skills: &[],
             policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
         },
         &[],
     )?;
@@ -108,7 +108,7 @@ fn start_checks_carries_profile_level_seat_fields_and_refuses_conflicting_sessio
                 version: &version,
                 skills: &[],
                 policy: None,
-                model_proxy: None,
+                model_proxy: Some("http://127.0.0.1:18484"),
             },
             &[],
         );
@@ -123,5 +123,36 @@ fn start_checks_carries_profile_level_seat_fields_and_refuses_conflicting_sessio
             assert_eq!(serde_json::to_value(answer?.seat)?, seat);
         }
     }
+    Ok(())
+}
+
+#[test]
+fn a_claude_profile_without_model_proxy_refuses_before_it_can_render_a_launch()
+-> Result<(), Box<dyn Error>> {
+    let catalogue: Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    let version: Version = serde_json::from_value(
+        json!({"number":1,"operation":"profile","set_by":"person","set_at":1,"settings":{
+            "model_access":["model-a"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"",
+            "permissions":{"default_mode":"plan"},"harness":{"name":"fixture","program":"/opt/fixture/claude","package":"fixture","description":catalogue["description"]}
+        }}),
+    )?;
+    let error = fields(
+        &Start {
+            agent: "agent",
+            session: "session",
+            machine: "computer",
+            runtime: "/opt/fixture/lys",
+            version: &version,
+            skills: &[],
+            policy: None,
+            model_proxy: None,
+        },
+        &[],
+    )
+    .err()
+    .ok_or("an unproxied model launch rendered")?;
+    assert_eq!(error.name(), "model_proxy_unset");
     Ok(())
 }

@@ -59,6 +59,10 @@ async fn stop_refuses_an_exit_answer_without_reap_evidence() -> Result<(), Box<d
                     sessions: Vec::new(),
                 },
                 Act::GrantChannel => Answer::GrantChannel,
+                Act::ControlStatus { session } => Answer::ControlStatus {
+                    session,
+                    control: None,
+                },
                 Act::Owned => Answer::Owned {
                     owners: Vec::new(),
                     unreachable: Vec::new(),

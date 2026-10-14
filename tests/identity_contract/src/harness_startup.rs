@@ -248,7 +248,7 @@ impl Service {
             provider: None,
             setup: None,
             password_policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484".to_owned()),
             proxy_dir: None,
             surface_dir: None,
             runner_socket: None,

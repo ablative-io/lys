@@ -1,8 +1,12 @@
 #![cfg(test)]
 //! A person's ordinary Stop ends the run and permits a fresh Start without a lifecycle transition.
 
+#[path = "support/runner_lifetime.rs"]
+mod runner_lifetime;
 #[path = "support/runner_start.rs"]
 pub mod support;
+use runner_lifetime::Lifetime;
+use std::sync::atomic::Ordering;
 
 use std::error::Error;
 use std::io::{BufRead, BufReader, Write};
@@ -53,12 +57,19 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
     let socket = table.dir.path().join("session-stop.sock");
     let listener = UnixListener::bind(&socket)?;
     let key = table.server_key.public_key_bytes();
+    let lifetime = Lifetime::new(&socket);
+    let ended = lifetime.signal();
     let responding = std::thread::spawn(move || -> Result<(usize, usize), String> {
         let result = (|| -> Result<(usize, usize), Box<dyn Error>> {
             let (mut starts, mut ends) = (0, 0);
+            let mut native: std::collections::BTreeMap<String, String> =
+                std::collections::BTreeMap::new();
             let mut channels = Vec::new();
-            while starts == 0 || ends == 0 {
+            loop {
                 let (stream, _) = listener.accept()?;
+                if ended.load(Ordering::Acquire) {
+                    break;
+                }
                 let greeting = Greeting::fresh(&"a".repeat(32));
                 let mut writer = &stream;
                 writeln!(writer, "{}", greeting.line())?;
@@ -70,6 +81,9 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
                     other => other,
                 };
                 let answer = match requested {
+                    Act::Status { session } => {
+                        runner_lifetime::status(native.keys(), session.as_deref())
+                    }
                     Act::End { session } => {
                         ends += 1;
                         Answer::Ended {
@@ -85,6 +99,15 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
                         }
                     }
                     Act::Start { launch, .. } => {
+                        native.insert(
+                            launch.session.clone(),
+                            launch
+                                .arguments
+                                .windows(2)
+                                .find(|pair| pair[0] == "--session-id" || pair[0] == "--resume")
+                                .map(|pair| pair[1].clone())
+                                .ok_or("start has no native id")?,
+                        );
                         starts += 1;
                         Answer::Started {
                             qualification: None,
@@ -92,6 +115,9 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
                             pid: 42,
                             started_at: 3,
                         }
+                    }
+                    Act::Liveness { session } => {
+                        runner_lifetime::liveness(&native, session.as_deref())
                     }
                     Act::Owned => Answer::Owned {
                         owners: Vec::new(),
@@ -117,7 +143,11 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
             }
             Ok((starts, ends))
         })();
-        result.map_err(|error| error.to_string())
+        let result = result.map_err(|error| error.to_string());
+        if let Err(error) = &result {
+            eprintln!("stop/start stand-in failed: {error}");
+        }
+        result
     });
     let machine = table
         .machine(
@@ -166,6 +196,7 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
         .await?;
     assert_eq!(status, 200, "{stops}");
     assert_eq!(stops["stops"], json!([]));
+    lifetime.finish()?;
     assert_eq!(
         responding
             .join()

@@ -146,6 +146,7 @@ pub(crate) const PROFILE_REVIEW: &[&str] = &[
 
 /// A start and the status read that settles an already-held session.
 pub(crate) const START_RUNNER: &[&str] = &[
+    "model_proxy_unset",
     "account_handle_unheld",
     "account_provider_mismatch",
     "SecretsUnavailable",
@@ -185,6 +186,7 @@ pub(crate) const START_RUNNER: &[&str] = &[
 
 /// An operator restart shares the start and runner's named refusals.
 pub(crate) const RESTART: &[&str] = &[
+    "model_proxy_unset",
     "account_handle_unheld",
     "account_provider_mismatch",
     "AgentHasNoPolicy",

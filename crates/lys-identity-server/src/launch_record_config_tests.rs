@@ -14,7 +14,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
 
 #[test]
-fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Box<dyn Error>> {
+fn a_launch_record_requires_a_proxy_then_writes_the_pass_into_the_seat_config()
+-> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let program = dir.path().join("seat with spaces");
     std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
@@ -40,7 +41,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
             version: &version,
             skills: &[],
             policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
         },
         &[],
     )?;
@@ -74,7 +75,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
             "session-fixture".to_owned(),
             "sh",
             None,
-            None
+            Some("http://127.0.0.1:18484")
         ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
@@ -87,7 +88,7 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
             "session-fixture".to_owned(),
             "sh",
             None,
-            None
+            Some("http://127.0.0.1:18484")
         ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
@@ -100,21 +101,29 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
             "session-fixture".to_owned(),
             "sh",
             None,
-            None
+            Some("http://127.0.0.1:18484")
         ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
-    let launch = build(
+    let missing = build(
         &store,
         &record,
         "session-fixture".to_owned(),
         "sh",
         None,
         None,
+    )
+    .err()
+    .ok_or("an unproxied model launch was accepted")?;
+    assert_eq!(missing.name(), "model_proxy_unset");
+    let launch = build(
+        &store,
+        &record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        Some("http://127.0.0.1:18484/anthropic"),
     )?;
-    if launch.environment.contains_key("ANTHROPIC_BASE_URL") {
-        return Err("a start without a model proxy forced a base URL".into());
-    }
     let proxy = "http://127.0.0.1:18484/anthropic";
     let proxied = build(
         &store,
@@ -140,17 +149,22 @@ fn a_launch_record_start_writes_the_pass_into_the_seat_config() -> Result<(), Bo
     {
         return Err("the run's base URL is not the model proxy under its run key".into());
     }
-    let allowed = ["ANTHROPIC_BASE_URL", "LYS_RUN", "LYS_PROVISIONING_VERSION"];
-    let only_these = proxied
-        .environment
-        .keys()
-        .filter(|name| !launch.environment.contains_key(*name))
-        .all(|name| allowed.contains(&name.as_str()));
-    if !only_these || proxied.arguments != launch.arguments {
-        return Err(
-            "the model proxy forced more on the run than its base URL and its run key".into(),
-        );
+    assert_eq!(
+        proxied.environment.keys().collect::<Vec<_>>(),
+        launch.environment.keys().collect::<Vec<_>>()
+    );
+    for (name, value) in &launch.environment {
+        if !["ANTHROPIC_BASE_URL", "LYS_RUN", "LYS_LAUNCH_TEMPLATE"].contains(&name.as_str()) {
+            assert_eq!(
+                proxied.environment.get(name),
+                Some(value),
+                "proxy changed {name}"
+            );
+        }
     }
+    assert_eq!(proxied.program, launch.program);
+    assert_eq!(proxied.arguments, launch.arguments);
+    assert!(proxied.environment.contains_key("ANTHROPIC_BASE_URL"));
     let again = build(
         &store,
         &record,
@@ -229,7 +243,7 @@ fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result
                 version: &version,
                 skills: &[],
                 policy: None,
-                model_proxy: None,
+                model_proxy: Some("http://127.0.0.1:18484"),
             },
             &[],
         )?;
@@ -257,7 +271,14 @@ fn both_launch_owners_carry_controls_from_the_exact_reviewed_version() -> Result
         )?;
         store.set("agent", 0, version)?;
         store.set("agent", 1, later)?;
-        let launch = build(&store, &record, "session".to_owned(), "sh", None, None)?;
+        let launch = build(
+            &store,
+            &record,
+            "session".to_owned(),
+            "sh",
+            None,
+            Some("http://127.0.0.1:18484"),
+        )?;
         let view = json!({"agent":"agent","session":"session","directory":"/","provisioning_version":1,
             "template":rendered.template,"template_sha256":rendered.template_sha256,"handles":[]});
         let kept = crate::launch_api::kept_launch(&store, &view)?;
@@ -296,7 +317,7 @@ fn a_start_again_record_with_a_legacy_pin_uses_the_current_command() -> Result<(
             version: &version,
             skills: &[],
             policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
         },
         &[],
     )?;
@@ -317,12 +338,27 @@ fn a_start_again_record_with_a_legacy_pin_uses_the_current_command() -> Result<(
     let mut store = ProvisioningStore::open(&directory.path().join("profiles.json"))?;
     store.set("agent", 0, version)?;
     assert_eq!(
-        build(&store, &record, "session".to_owned(), "sh", None, None)?.program,
+        build(
+            &store,
+            &record,
+            "session".to_owned(),
+            "sh",
+            None,
+            Some("http://127.0.0.1:18484")
+        )?
+        .program,
         "claude"
     );
     record.executable = "/opt/forks/claude-fork".to_owned();
     assert!(matches!(
-        build(&store, &record, "session".to_owned(), "sh", None, None),
+        build(
+            &store,
+            &record,
+            "session".to_owned(),
+            "sh",
+            None,
+            Some("http://127.0.0.1:18484")
+        ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
     Ok(())

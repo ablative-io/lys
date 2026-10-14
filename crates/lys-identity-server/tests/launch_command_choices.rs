@@ -66,7 +66,7 @@ fn both_installed_codex_commands_are_choices_in_standard_order() -> TestResult {
 }
 
 #[test]
-fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult {
+fn choosing_cdx_preserves_native_flags_and_adds_the_launch_scoped_proxy() -> TestResult {
     let directory = tempfile::tempdir()?;
     executable(directory.path(), "codex")?;
     executable(directory.path(), "cdx")?;
@@ -85,16 +85,24 @@ fn choosing_cdx_executes_its_path_with_the_codex_flags_unchanged() -> TestResult
             version: &version,
             skills: &[],
             policy: None,
-            model_proxy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
         },
         &[],
     )?;
     let launch = from_template(&version, &rendered.template, &rendered.template_sha256)?;
+    let run = launch.environment.get("LYS_RUN").ok_or("no proxy run")?;
+    let provider = format!(
+        "model_providers.lys={{name=\"OpenAI through Lys\",base_url=\"http://127.0.0.1:18484/{run}/openai/v1\",wire_api=\"responses\",requires_openai_auth=true,supports_websockets=false}}"
+    );
     let expected = [
         "--model",
         "gpt-6.1-sol",
         "-c",
         "notify=[\"$LYS_PROGRAM\", \"runner\", \"notify\", \"--socket\", \"$LYS_RUNNER_SOCKET\"]",
+        "-c",
+        provider.as_str(),
+        "-c",
+        "model_provider=\"lys\"",
         "-c",
         "sandbox_workspace_write.network_access=false",
         "-c",

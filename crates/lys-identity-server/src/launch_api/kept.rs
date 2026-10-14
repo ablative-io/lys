@@ -143,7 +143,7 @@ mod tests {
                     version: &version,
                     skills: &[],
                     policy: None,
-                    model_proxy: None,
+                    model_proxy: Some("http://127.0.0.1:18484"),
                 },
                 &[],
             )?;

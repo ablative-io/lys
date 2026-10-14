@@ -348,7 +348,25 @@ async fn a_runner_on_a_second_machine_dials_in_and_starts_the_agent() -> TestRes
         socket: socket.clone(),
         authority: None,
     };
-    std::thread::spawn(move || dial.bridge());
+    let (ended, mut left) = tokio::sync::oneshot::channel();
+    std::thread::spawn(move || {
+        let result = dial.bridge();
+        if ended.send(result).is_err() {
+            eprintln!("dial fixture caller ended");
+        }
+    });
+    let readiness = format!("/network/machines/{machine}/runner");
+    loop {
+        let read = table.service.get(&readiness, Some(&table.ada));
+        let answer = tokio::select! {
+            answer = read => answer?,
+            result = &mut left => return Err(format!("the bridge ended before its readiness answer: {:?}", result?).into()),
+        };
+        assert_eq!(answer.0, 200, "{}", answer.1);
+        if answer.1["answers"] == true {
+            break;
+        }
+    }
 
     let (status, started) = table.start(&table.agent(), &start_body(&machine)?).await?;
     assert_eq!(status, 200, "{started}");

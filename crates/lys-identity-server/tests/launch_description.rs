@@ -28,7 +28,7 @@ fn version(name: &str) -> Result<Version, serde_json::Error> {
 }
 
 #[test]
-fn changing_only_a_complete_descriptions_name_keeps_the_render_byte_identical()
+fn changing_a_descriptions_name_keeps_rendering_identical_except_for_launch_scoped_proxy_keys()
 -> Result<(), Box<dyn Error>> {
     let first = version("First recorded name")?;
     let second = version("A completely different name")?;
@@ -42,16 +42,47 @@ fn changing_only_a_complete_descriptions_name_keeps_the_render_byte_identical()
                 version,
                 skills: &[],
                 policy: None,
-                model_proxy: None,
+                model_proxy: Some("http://127.0.0.1:18484"),
             },
             &[],
         )
     };
     let first = render_version(&first)?;
     let second = render_version(&second)?;
-    assert_eq!(first.template, second.template);
-    assert_eq!(first.template_sha256, second.template_sha256);
-    assert_eq!(first.command, second.command);
+    let normalized = |template: &str| -> Result<Value, Box<dyn Error>> {
+        let mut value: Value = serde_json::from_str(template)?;
+        let env = value["slots"]["env"]
+            .as_object_mut()
+            .ok_or("no environment")?;
+        let run = env["LYS_RUN"].as_str().ok_or("no run")?.to_owned();
+        assert_eq!(
+            env["ANTHROPIC_BASE_URL"],
+            format!("http://127.0.0.1:18484/{run}")
+        );
+        env.insert("LYS_RUN".to_owned(), json!("launch-key"));
+        env.insert(
+            "ANTHROPIC_BASE_URL".to_owned(),
+            json!("http://127.0.0.1:18484/launch-key"),
+        );
+        Ok(value)
+    };
+    assert_eq!(normalized(&first.template)?, normalized(&second.template)?);
+    for (version, rendered) in [
+        (&version("First recorded name")?, &first),
+        (&version("A completely different name")?, &second),
+    ] {
+        lys_identity_server::launch_template::from_template(
+            version,
+            &rendered.template,
+            &rendered.template_sha256,
+        )?;
+    }
+    let normalized_command = |rendered: &lys_identity_server::launch_template::Rendered| -> Result<String, Box<dyn Error>> {
+        let value: Value = serde_json::from_str(&rendered.template)?;
+        let run = value["slots"]["env"]["LYS_RUN"].as_str().ok_or("no run")?;
+        Ok(rendered.command.replace(run, "launch-key").replace(&rendered.template_sha256, "template-hash"))
+    };
+    assert_eq!(normalized_command(&first)?, normalized_command(&second)?);
     Ok(())
 }
 
@@ -73,7 +104,7 @@ fn an_unknown_rendering_contract_is_refused_by_identifier() -> Result<(), Box<dy
         version: &version,
         skills: &[],
         policy: None,
-        model_proxy: None,
+        model_proxy: Some("http://127.0.0.1:18484"),
     };
     let error = render(&start, &[])
         .err()
