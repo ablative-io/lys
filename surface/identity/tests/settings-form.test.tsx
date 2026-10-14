@@ -10,7 +10,7 @@ const machine = { id: 'op-' + '1'.repeat(32), name: 'This computer', runtime: 'r
 const description = { models: { minimum: 1, maximum: null, further_encoding: { kind: 'delimited', separator: ',' } }, permissions: { modes: ['default', 'acceptEdits'], rule_forms: ['tool_specifier'] }, mcp: { transports: ['stdio', 'http'], working_directory: false, handle_variables: true, channel_policies: ['off', 'wake'] }, rendering_contract: 'claude-code/template-v1' };
 const program = { name: 'Claude Code', line: 'Read and change code', models: [{ id: 'default', label: 'Default for this account' }, { id: 'opus', label: 'Opus' }], modes: [{ id: 'default', meaning: 'Asks before changes' }, { id: 'acceptEdits', meaning: 'Allows edits' }], description, builds: [{ name: 'Installed copy', program: '/opt/bin/claude', package: 'claude', from: 'profile' }] };
 const harness = { name: program.name, description, program: '/opt/bin/claude', package: 'claude' };
-const profile = { version: 1, operation: 'op-' + 'a'.repeat(32), harness, model_access: ['default'], permissions: { default_mode: 'default', allow: ['Read'], ask: ['Edit'], deny: ['Bash(rm:*)'], additional_directories: ['/srv/kept'] }, instructions: '', tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Kept service', url: 'http://localhost:6010' }], note: 'Kept', set_by: ADA, set_at: 1, reviewed_by: ADA, session: null };
+const profile = { working_folder: '/srv', version: 1, operation: 'op-' + 'a'.repeat(32), harness, model_access: ['default'], permissions: { default_mode: 'default', allow: ['Read'], ask: ['Edit'], deny: ['Bash(rm:*)'], additional_directories: ['/srv/kept'] }, instructions: '', tools: ['reader'], skills: ['review'], mcp_servers: [{ name: 'Kept service', url: 'http://localhost:6010' }], note: 'Kept', set_by: ADA, set_at: 1, reviewed_by: ADA, session: null };
 const answer = (kept: unknown) => ({ agent: SCRIBE, profile: kept, versions: [], enforced: false });
 const button = () => document.querySelector<HTMLButtonElement>('section[aria-label="Settings of this agent"] button[type="submit"]');
 const field = (name: string) => document.querySelector<HTMLSelectElement>('select[name="' + name + '"]');
@@ -19,11 +19,30 @@ function routes(kept: unknown = null): Record<string, Route> {
     ['POST ' + path]: (body) => { const draft = body as Record<string, unknown>; const latest = { ...draft, version: Number(draft.from_version) + 1, set_by: ADA, set_at: 1, reviewed_by: null, session: null }; return ok({ ...answer(latest), recorded: { operation: draft.operation, version: Number(draft.from_version) + 1 } }); },
   };
 }
-const open = (extra: Record<string, Route>) => mount('#/file/' + SCRIBE + '/provisioning', extra);
+async function open(extra: Record<string, Route>, chooseFolder = true) {
+  const result = await mount('#/file/' + SCRIBE + '/provisioning', { ...extra,
+    ['POST /network/machines/' + machine.id + '/folders']: ok({ machine: machine.id, under: '/srv', folders: [] }) });
+  const chooser = result.container.querySelector<HTMLButtonElement>('button[aria-label="Choose a folder"]');
+  if (chooseFolder && chooser && !chooser.disabled) {
+    await click(chooser);
+    await click(result.container.querySelector('button[aria-label="Work in srv"]'));
+    expect(result.container.querySelector('.works-in code')?.textContent).toBe('/srv');
+    // Folder reads arrange a valid profile before measuring the save action.
+    result.posted.length = 0;
+  }
+  return result;
+}
 beforeEach(() => sessionStorage.clear());
 
 /** The settings form saves what it shows as one request and never approves or starts; starting is the front page's. */
 describe('The settings form', () => {
+  it('refuses a profile save until its working folder is named', async () => {
+    const { posted } = await open(routes(), false);
+    expect(button()?.disabled).toBe(true);
+    expect(text()).toContain("WorkingFolderUnnamed: the launch names no working folder and the agent's profile has no working_folder; name one on the launch or set the agent's default");
+    await click(button());
+    expect(posted).toEqual([]);
+  });
   it('defaults to a reported command while retaining uninstalled program descriptions', async () => {
     const codex = { ...program, name: 'Codex', description: { ...description, rendering_contract: 'codex/template-v1' }, builds: [{ name: 'Installed cdx', program: 'cdx', package: 'cdx 1', from: 'runner' }] };
     const descriptions = [{ ...program, builds: [] }, codex];
@@ -124,7 +143,7 @@ describe('The settings form', () => {
     expect(document.querySelector('input[name="program-path"]')).toBeNull();
   });
   it('offers known values with defaults, no required text and one submit button', async () => {
-    const { posted } = await open(routes());
+    const { posted } = await open(routes(), false);
     expect(field('program')?.value).toBe('Claude Code');
     expect(field('model')?.value).toBe('default');
     expect(document.querySelector<HTMLInputElement>('input[name="permission-mode"]:checked')?.value).toBe('default');
@@ -140,7 +159,7 @@ describe('The settings form', () => {
     const { posted } = await open(routes());
     await click(button());
     expect(posted.map((entry) => entry.path)).toEqual([path]);
-    expect(posted[0].body).toMatchObject({ from_version: 0, model_access: ['default'], permissions: { default_mode: 'default' }, harness, instructions: '', tools: [], skills: [], mcp_servers: [] });
+    expect(posted[0].body).toMatchObject({ working_folder: '/srv', from_version: 0, model_access: ['default'], permissions: { default_mode: 'default' }, harness, instructions: '', tools: [], skills: [], mcp_servers: [] });
     expect(text()).toContain('Saved.');
     expect(document.querySelector('section[aria-label="Settings of this agent"] a[href="#/file/' + SCRIBE + '"]')).not.toBeNull();
   });

@@ -22,7 +22,10 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
   saved?: () => void;
 }) {
   return <ProfileFields profile={profile} choices={choices} canChoose={!readOnly} agent={id} firstRun={Boolean(saved) && !profile?.harness} folderFirst={Boolean(saved)} render={(fields, settings, refusal) => <section className="card" aria-label="Settings of this agent">
-    {fields}<SaveSettings agent={id} profile={profile} settings={settings} refusal={refusal} canSave={!readOnly} people={people} machines={choices.machines} saved={saved} />
+    {fields}<SaveSettings agent={id} profile={profile} settings={settings}
+      refusal={refusal || (typeof settings.working_folder === 'string' && settings.working_folder.trim() ? ''
+        : "WorkingFolderUnnamed: the launch names no working folder and the agent's profile has no working_folder; name one on the launch or set the agent's default")}
+      canSave={!readOnly} people={people} machines={choices.machines} saved={saved} />
   </section>} />;
 }
 

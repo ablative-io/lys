@@ -73,7 +73,7 @@ describe('The folder an agent works in', () => {
 
 describe('Managed controls in the saved setup', () => {
   it('leaves an old setup manual and sends only an explicit choice to require controls', async () => {
-    const initial = { ...profile, session: null };
+    const initial = { ...profile, working_folder: '/Users/ada/Developer/receipts', session: null };
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
       ...routes, [path]: ok({ ...answer, profile: initial }),
       '/harnesses': ok({ programs: [{ name: 'Claude Code', line: 'Installed',
@@ -96,7 +96,7 @@ describe('Managed controls in the saved setup', () => {
     expect((button('Save these settings') as HTMLButtonElement)?.disabled).toBe(false);
     await click(button('Save these settings'));
     expect(posted.filter((entry) => entry.path === path)).toHaveLength(1);
-    expect(posted.find((entry) => entry.path === path)?.body).toMatchObject({ session: { requires_controls: true } });
+    expect(posted.find((entry) => entry.path === path)?.body).toMatchObject({ working_folder: initial.working_folder, session: { requires_controls: true } });
     expect(text()).toContain('Saved.');
   });
   it('shows a saved managed choice without changing it', async () => {
