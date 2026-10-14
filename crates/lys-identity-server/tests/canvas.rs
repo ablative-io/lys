@@ -53,6 +53,7 @@ fn arrangement(x: f64) -> Value {
             {"id": "widget:c", "kind": "usage", "faces": ["dollars/day", "window/10080"], "view": "faces", "x": 820.0, "y": 140.0, "w": 340.0, "h": 120.0},
             {"id": "widget:d", "kind": "usage", "faces": [], "x": 820.0, "y": 190.0, "w": 340.0, "h": 120.0},
         ],
+        "operations": {"view": "tree", "selected": "seat:one", "pane_width": 320.0},
     })
 }
 
@@ -108,6 +109,22 @@ async fn a_persons_canvas_is_kept_whole_for_them_and_is_theirs_alone() -> Result
         ok(get(&service, "/canvas", Auth::Cookie(&ada)).await?)?["arrangement"],
         arrangement(100.0)
     );
+
+    // A page that has not been to the Operations page sends no `operations`, and is answered none.
+    let mut untouched = arrangement(105.0);
+    untouched
+        .as_object_mut()
+        .expect("an object")
+        .remove("operations");
+    let kept = ok(put(
+        &service,
+        "/canvas",
+        Auth::Cookie(&ada),
+        &json!({"arrangement": untouched}),
+    )
+    .await?)?;
+    assert_eq!(kept["arrangement"], untouched);
+    assert!(kept["arrangement"].get("operations").is_none(), "{kept}");
 
     // Kept again and again, a person still has one file, and nothing is left beside it.
     for x in [110.0, 120.0, 130.0] {
@@ -256,6 +273,13 @@ async fn what_cannot_be_kept_is_refused_by_name_and_changes_nothing() -> Result 
     drawn["widgets"][0]["look"] = json!("pie");
     let mut kindless = arrangement(1.0);
     kindless["widgets"][1] = json!({"id": "widget:b", "x": 1.0, "y": 1.0, "w": 1.0, "h": 1.0});
+    // An Operations page in a view there is not, with a member nobody declared, or with no view at all.
+    let mut unviewed = arrangement(1.0);
+    unviewed["operations"]["view"] = json!("list");
+    let mut overfull = arrangement(1.0);
+    overfull["operations"]["sidebar"] = json!(true);
+    let mut viewless = arrangement(1.0);
+    viewless["operations"] = json!({"selected": null, "pane_width": 320.0});
     for body in [
         json!({"arrangement": unknown}),
         json!({"arrangement": worded}),
@@ -263,12 +287,46 @@ async fn what_cannot_be_kept_is_refused_by_name_and_changes_nothing() -> Result 
         json!({"arrangement": viewed}),
         json!({"arrangement": drawn}),
         json!({"arrangement": kindless}),
+        json!({"arrangement": unviewed}),
+        json!({"arrangement": overfull}),
+        json!({"arrangement": viewless}),
         json!({}),
     ] {
         refused(
             &put(&service, "/canvas", Auth::Cookie(&ada), &body).await?,
             400,
             "RequestMalformed",
+        )?;
+    }
+    // A tree too narrow or too wide to use, and a chosen seat with no name: refused in words, on the canvas and on a layout alike.
+    let mut narrow = arrangement(1.0);
+    narrow["operations"]["pane_width"] = json!(199.0);
+    let mut wide = arrangement(1.0);
+    wide["operations"]["pane_width"] = json!(641.0);
+    let mut nameless = arrangement(1.0);
+    nameless["operations"]["selected"] = json!("  ");
+    for arrangement in [narrow, wide, nameless] {
+        refused(
+            &put(
+                &service,
+                "/canvas",
+                Auth::Cookie(&ada),
+                &json!({"arrangement": arrangement}),
+            )
+            .await?,
+            400,
+            "CanvasRefused",
+        )?;
+        refused(
+            &post(
+                &service,
+                "/canvas/layouts",
+                Auth::Cookie(&ada),
+                &json!({"name": "Wide", "arrangement": arrangement}),
+            )
+            .await?,
+            400,
+            "CanvasRefused",
         )?;
     }
     assert_eq!(

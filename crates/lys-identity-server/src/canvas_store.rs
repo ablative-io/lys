@@ -182,8 +182,69 @@ pub struct Link {
     pub to_side: Option<Side>,
 }
 
+/// The view the Operations page is in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+#[schema(as = CanvasOperationsView)]
+pub enum OperationsView {
+    /// The network: every computer, its agents and their seats, as a tree
+    /// beside the chosen seat's terminal.
+    Tree,
+    /// The canvas: the windows and marks arranged on the board.
+    Canvas,
+    /// The sessions: the running list and the seats, as lists.
+    Sessions,
+}
+
+/// The width the network tree may be kept at, in pixels: about a fifth of a
+/// screen, never so narrow that names are cut nor so wide that the terminal
+/// beside it is.
+pub const PANE_WIDTH: std::ops::RangeInclusive<f64> = 200.0..=640.0;
+
+/// How the Operations page was left: which view, which seat is chosen in
+/// the tree, and how wide the tree is. Kept with the arrangement so it is
+/// the same on any computer the person signs in at.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = CanvasOperations)]
+pub struct Operations {
+    /// The view the page is in.
+    pub view: OperationsView,
+    /// The seat chosen in the tree, by its name on the page; null for none.
+    #[serde(default)]
+    pub selected: Option<String>,
+    /// The width of the network tree, in pixels, within [`PANE_WIDTH`].
+    pub pane_width: f64,
+}
+
+impl Operations {
+    /// Refuses, in words, what cannot be kept: a pane width that is not a
+    /// finite number within [`PANE_WIDTH`], or a chosen seat with no name.
+    pub fn checked(&self) -> Result<(), ServerError> {
+        let refused = |words: String| ServerError::Canvas(CanvasError::Refused { words });
+        if !self.pane_width.is_finite() || !PANE_WIDTH.contains(&self.pane_width) {
+            return Err(refused(format!(
+                "the network tree's width {} is outside {} to {} pixels: keep it within them",
+                self.pane_width,
+                PANE_WIDTH.start(),
+                PANE_WIDTH.end()
+            )));
+        }
+        if self
+            .selected
+            .as_deref()
+            .is_some_and(|seat| seat.trim().is_empty())
+        {
+            return Err(refused(
+                "the chosen seat has no name: name it, or choose none with null".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Everything a person arranged: where each window sits, which terminals
-/// are open, and what they drew.
+/// are open, what they drew, and how they left the Operations page.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = CanvasArrangement)]
@@ -205,6 +266,19 @@ pub struct Arrangement {
     /// The widgets.
     #[serde(default)]
     pub widgets: Vec<Widget>,
+    /// How the Operations page was left; absent until the person changed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operations: Option<Operations>,
+}
+
+impl Arrangement {
+    /// Refuses, in words, what cannot be kept as it is.
+    pub fn checked(&self) -> Result<(), ServerError> {
+        match &self.operations {
+            Some(operations) => operations.checked(),
+            None => Ok(()),
+        }
+    }
 }
 
 /// A layout saved by name.

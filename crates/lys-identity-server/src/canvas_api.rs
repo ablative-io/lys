@@ -1,5 +1,6 @@
 //! A person's canvas: where they put each agent's window on the Running
-//! page, the boxes, notes and lines they drew there, and every layout they
+//! page, the boxes, notes and lines they drew there, how they left the
+//! Operations page (its view, chosen seat and tree width), and every layout they
 //! saved by name (Tom, 4 October 2026: "This is on a per user thing…
 //! every layout has to be saveable"). It is kept for the person, so it is
 //! the same on any computer they sign in at, and it is theirs alone: each
@@ -131,6 +132,7 @@ async fn keep(
     given: Result<Json<KeepBody>, JsonRejection>,
 ) -> Result<Json<Canvas>, ServerError> {
     let given = body(given)?;
+    given.arrangement.checked()?;
     let person = owner(&state, &headers)?;
     let kept = state.canvas.change(person, |canvas| {
         canvas.arrangement = Some(given.arrangement);
@@ -146,6 +148,7 @@ async fn save(
 ) -> Result<Json<LayoutsView>, ServerError> {
     let given = body(given)?;
     let name = layout_name(&given.name)?;
+    given.arrangement.checked()?;
     let person = owner(&state, &headers)?;
     let kept = state.canvas.change(person, |canvas| {
         let layout = Layout {
