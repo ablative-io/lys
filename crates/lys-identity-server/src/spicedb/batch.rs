@@ -110,6 +110,9 @@ impl SpiceDb {
         at: u64,
         consistency: &Value,
     ) -> Result<BTreeMap<Permission, Result<bool, GrantError>>, GrantError> {
+        if questions.is_empty() {
+            return Ok(BTreeMap::new());
+        }
         let kinds = self.kinds()?;
         let mut checks = BTreeMap::new();
         let mut sent = Vec::new();

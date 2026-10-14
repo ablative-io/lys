@@ -106,66 +106,34 @@ fn prepare_reach(
     );
     measured.questions.set(asked.len());
     measured.batches.set(0);
-    let batch = if asked.is_empty() {
+    if asked.is_empty() {
         *measured.reason.borrow_mut() = Some("no carried actions on visible grants".to_owned());
-        None
-    } else {
-        let covered = asked
-            .keys()
-            .map(|(holder, resource, _)| (*holder, resource.clone()))
-            .collect();
-        let questions = asked.keys().cloned().collect();
-        match engine
-            .read_batch(stamp.revision(), covered, &questions, at)
-            .and_then(|batch| {
-                // A partial bulk answer is discarded before an independently certified read.
-                if let Some(error) = batch
-                    .checks
-                    .values()
-                    .find_map(|answer| answer.as_ref().err())
-                {
-                    return Err(error.clone());
-                }
-                Ok(batch)
-            }) {
-            Ok(batch) => {
-                measured.batches.set(1);
-                *measured.reason.borrow_mut() = None;
-                Some(batch)
-            }
-            Err(error) => {
-                *measured.reason.borrow_mut() = Some(error.to_string());
-                None
-            }
-        }
-    };
-    let mut prepared = match batch {
-        Some(batch) => {
-            let (subject, resource, _) =
-                asked
-                    .keys()
-                    .next()
-                    .ok_or_else(|| GrantError::PermissionEngineUnavailable {
-                        reason: "the reach batch has no question for its frame".to_owned(),
-                    })?;
-            whole_reach(stamp, batch, *subject, resource)?
-        }
-        None => preparation::from_batch(engine, stamp, asked, at, None)?,
-    };
-    prepared.reads_elapsed_ms = started.elapsed().as_millis();
-    // Reach explains from relationships, as before. Name an unavailable ancillary
-    // permission check rather than silently treating it as an answered question.
-    if let Some(error) = prepared
-        .checks
-        .values()
-        .find_map(|answer| answer.as_ref().err())
-    {
-        let mut reason = measured.reason.borrow_mut();
-        *reason = Some(match reason.as_ref() {
-            Some(batch) => format!("{batch}; unbatched permission check: {error}"),
-            None => format!("unbatched permission check: {error}"),
-        });
+        let mut prepared = preparation::from_batch(engine, stamp, asked, at, None)?;
+        prepared.reads_elapsed_ms = started.elapsed().as_millis();
+        return Ok(prepared);
     }
+    let covered = asked
+        .keys()
+        .map(|(holder, resource, _)| (*holder, resource.clone()))
+        .collect();
+    let (subject, resource, _) =
+        asked
+            .keys()
+            .next()
+            .ok_or_else(|| GrantError::PermissionEngineUnavailable {
+                reason: "the reach reading has no question for its frame".to_owned(),
+            })?;
+    // Explanations use relationships alone; unrelated permission answers cannot invalidate this snapshot.
+    let batch = engine
+        .read_batch(stamp.revision(), covered, &BTreeSet::new(), at)
+        .map_err(|error| {
+            *measured.reason.borrow_mut() = Some(error.to_string());
+            error
+        })?;
+    measured.batches.set(1);
+    *measured.reason.borrow_mut() = None;
+    let mut prepared = whole_reach(stamp, batch, *subject, resource)?;
+    prepared.reads_elapsed_ms = started.elapsed().as_millis();
     Ok(prepared)
 }
 

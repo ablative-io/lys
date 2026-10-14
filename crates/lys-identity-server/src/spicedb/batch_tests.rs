@@ -91,6 +91,14 @@ async fn answer(State(gateway): State<Gateway>, uri: Uri, Json(body): Json<Value
 }
 
 async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error>> {
+    exercise_given(reply, scope, false).await
+}
+
+async fn exercise_given(
+    reply: Reply,
+    scope: Option<&str>,
+    relationships_only: bool,
+) -> Result<(), Box<dyn Error>> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
     let heard = Arc::new(Mutex::new(Vec::new()));
@@ -126,10 +134,14 @@ async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error
     let requested = resource.clone();
     let read = Action::new("read")?;
     let write = Action::new("write")?;
-    let checks = BTreeSet::from([
-        (subject, resource.clone(), read.clone()),
-        (subject, resource.clone(), write.clone()),
-    ]);
+    let checks = if relationships_only {
+        BTreeSet::new()
+    } else {
+        BTreeSet::from([
+            (subject, resource.clone(), read.clone()),
+            (subject, resource.clone(), write.clone()),
+        ])
+    };
     let result = tokio::task::spawn_blocking(move || {
         super::super::Relationships::SpiceDb(engine).read_batch(
             9,
@@ -143,7 +155,7 @@ async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error
         .map_err(|()| "gateway ended before shutdown")?;
     worker.await??;
     let batch = result?;
-    if matches!(reply, Reply::Missing | Reply::Wrong | Reply::BrokenExport) {
+    if !relationships_only && matches!(reply, Reply::Missing | Reply::Wrong | Reply::BrokenExport) {
         assert!(matches!(
             batch,
             Err(GrantError::PermissionEngineUnavailable { .. })
@@ -158,6 +170,21 @@ async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error
             .any(|row| row.resource.kind == "notes.doc" && row.resource.id == "one")
     );
     assert!(!reading.iter().any(|row| row.resource.id == "foreign"));
+    if relationships_only {
+        assert!(batch.checks.is_empty());
+        let heard = heard.lock().map_err(|error| error.to_string())?;
+        assert_eq!(
+            heard.len(),
+            2,
+            "one certification and one export; reach needs no permission or schema reads"
+        );
+        assert!(
+            heard
+                .iter()
+                .all(|(path, _)| path.starts_with("/v1/relationships/"))
+        );
+        return Ok(());
+    }
     if matches!(reply, Reply::Error) {
         assert!(matches!(
             batch.checks[&(subject, resource.clone(), read.clone())],
@@ -182,6 +209,12 @@ async fn exercise(reply: Reply, scope: Option<&str>) -> Result<(), Box<dyn Error
         "one marker certification, one export, one schema read, one bulk check"
     );
     Ok(())
+}
+
+#[tokio::test]
+async fn relationship_only_reach_never_asks_permission_checks_that_cannot_affect_its_explanation()
+-> Result<(), Box<dyn Error>> {
+    exercise_given(Reply::Wrong, None, true).await
 }
 
 #[tokio::test]

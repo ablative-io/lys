@@ -150,33 +150,30 @@ async fn reach_memo_explains_each_carried_question_once_across_duplicate_resourc
 }
 
 #[tokio::test]
-async fn reach_unavailable_batch_answers_all_questions_and_names_the_unbatched_reason() -> TestResult
-{
+async fn reach_unavailable_relationship_snapshot_refuses_without_serial_engine_fan_out()
+-> TestResult {
     let fixture = Fixture::new(4, 3).await?;
-    let body = fixture.body();
-    let (reference, _) = read(&fixture, body.clone()).await?;
-    let Json(reference) = reference?;
     let calls = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&calls);
     fixture.on_read(ReadHook(Box::new(move |_, _| {
-        if counted.fetch_add(1, Ordering::SeqCst) == 0 {
-            Err(GrantError::PermissionEngineUnavailable {
-                reason: "reach fixture batch unavailable".to_owned(),
-            })
-        } else {
-            Ok(())
-        }
+        counted.fetch_add(1, Ordering::SeqCst);
+        Err(GrantError::PermissionEngineUnavailable {
+            reason: "reach fixture batch unavailable".to_owned(),
+        })
     })))?;
-    let (answer, lines) = read(&fixture, body.clone()).await?;
-    let Json(answer) = answer?;
-    assert_eq!(answer.resources, reference.resources);
-    assert_eq!(answer.resources, fixture.expected(&body));
-    assert_eq!(answer.revision, reference.revision);
-    assert!(answer.degraded.is_none(), "{answer:?}");
+    let (answer, lines) = read(&fixture, fixture.body()).await?;
+    let error = answer
+        .err()
+        .ok_or("uncertified reach was answered as complete")?;
+    assert!(
+        error
+            .to_string()
+            .contains("reach fixture batch unavailable")
+    );
     assert_eq!(
         calls.load(Ordering::SeqCst),
-        16,
-        "one failed batch and one read per holder/resource"
+        1,
+        "one snapshot request; no serial repair or permission fan-out"
     );
     let line = log(&lines)?;
     assert_eq!(field(line, "batches")?, 0);
