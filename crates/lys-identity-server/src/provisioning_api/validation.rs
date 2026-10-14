@@ -141,11 +141,14 @@ pub(crate) fn folder(name: &str, given: String) -> Result<String, ServerError> {
     Ok(given)
 }
 
-/// The declared build, refused when its program is not an absolute path or
-/// it names no package to verify the program against.
+/// The declared build, refused when its program is neither a plain command
+/// the computer resolves at every start (`claude`, `codex`, `cdx`) nor an
+/// absolute path, or it names no package to verify the program against.
 fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
-    if !declared.program.starts_with('/') || declared.program.contains('\0') {
-        return Err(malformed("harness.program is not an absolute path"));
+    if !lys_home::harness::rendering_launch::command_or_absolute_path(&declared.program) {
+        return Err(malformed(
+            "harness.program is not a plain command name or an absolute path",
+        ));
     }
     if declared.name.trim().is_empty() {
         return Err(malformed("harness.name is empty"));

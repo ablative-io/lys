@@ -81,7 +81,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
             .is_some_and(|words| words.contains("claude version 2.1.300")
                 && words.contains("codex version 0.161.0-alpha.3"))
     );
-    body["harness"]["program"] = json!("/chosen/bin/claude");
+    body["harness"]["program"] = json!("claude");
     body["model_access"] = json!([description["models"][0]["id"]]);
     unreadable.send(true)?;
     let (status, refused) = service.post(&route, Some(&cookie), &body).await?;
@@ -99,7 +99,7 @@ async fn a_chosen_computers_catalogue_and_profile_use_only_its_reported_programm
     assert_eq!(status, 200);
     assert_eq!(
         profile["profile"]["harness"]["program"],
-        "/chosen/bin/claude"
+        "claude"
     );
     Ok(())
 }
