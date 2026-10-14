@@ -25,6 +25,7 @@ import './session-canvas.css';
 import './canvas-marks.css';
 
 import { CLOSED, OPENED, SMALLEST, lineBetween, placed } from './canvas-place';
+import { fitCanvasBox, useCanvasFit } from './canvas-fit';
 import { Act } from '../../shell/Act';
 export type { Box } from './canvas-marks';
 export { lineBetween, placed } from './canvas-place';
@@ -104,6 +105,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   const windows = graph.nodes.flatMap((node) => node.session?.agent && boxes[node.id] ? [{ id: node.id, agent: node.session.agent, box: boxes[node.id] }] : []);
   const drag = useRef<Drag | null>(null);
   const surface = useRef<HTMLDivElement>(null);
+  useCanvasFit(surface, boxes, setView);
   /** Where a thing on the surface is: a window, a box or a note; a line's end kept under an agent's name is that agent's window. */
   // Widgets where they stand now: one opened out moves those under it down for as long as it is open.
   const widgets = useMemo(() => stood(marks.widgets), [marks.widgets]);
@@ -147,7 +149,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
       if (theirs) changed();
     }
     setFront(id);
-    setView((now) => { const k = zoomOf(now); return { x: element.clientWidth / 2 - (box.x + box.w / 2) * k, y: element.clientHeight / 2 - (box.y + box.h / 2) * k, k }; });
+    if (element.clientWidth && element.clientHeight) setView(now => fitCanvasBox(box, element, Math.min(1, zoomOf(now))));
   };
 
   // On arriving, and again when the route names another agent: that agent's terminal is open, at the open size, in the middle of the view.
@@ -398,6 +400,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
   };
   const toggle = (id: string) => {
     const opening = !open.has(id);
+    if (opening) { show(id); return; }
     setOpen((now) => { const next = new Set(now); if (opening) next.add(id); else next.delete(id); return next; });
     const [w, h] = opening ? OPENED : CLOSED;
     setMoved((all) => ({ ...all, [id]: { ...boxes[id], w, h } }));

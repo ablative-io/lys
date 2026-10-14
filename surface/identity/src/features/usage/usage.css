@@ -24,8 +24,12 @@
 .usage-add-row > [role="status"], .usage-add-row > [role="alert"], .usage-add-row > p { grid-column: 1 / -1; }
 .usage-add-row select, .usage-add-row input, .usage-add-row textarea { width: 100%; }
 .usage form.usage-edit { display: block; margin: 0; }
-.usage-amount { display: flex; align-items: center; gap: 8px; }
-.usage-amount > * { flex: 1 1 0; min-width: 0; }
+.usage-amount { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.usage-amount > * { flex: 1 0 12ch; min-width: 12ch; }
+.table-scroll .usage-list, .table-scroll .teams-table { table-layout: auto; }
+.usage-list select, .teams-table select { min-width: 20ch; }
+.usage-budgets { margin-top: 12px; }
+.agent-team { display: inline-flex; align-items: center; gap: 8px; margin-right: 12px; }
 .usage-table label.tick { margin: 0 0 6px; }
 .usage-add-row input[type=checkbox] { width: auto; }
 /* A table's own last row adding one: each control in its column's cell, belonging to a form kept beside the table. */

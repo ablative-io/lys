@@ -28,6 +28,12 @@ export function entries(view: PeopleView): Entry[] {
   return [...people, ...agents];
 }
 
+export function visibleEntries(view: PeopleView, retired = false): Entry[] {
+  const all = entries(view);
+  const owners = new Set(all.filter(entry => entry.kind === 'agent' && entry.state !== 'retired').map(entry => entry.person?.id));
+  return all.filter(entry => retired || entry.state !== 'retired' || entry.kind === 'person' && owners.has(entry.id));
+}
+
 /** The file number of an identity: the kind's letter (A an agent, S a service account, whose id begins `op-`, P a person) and the head of the enduring id. */
 export const fileNo = (id: string): string => {
   const hex = id.slice(id.indexOf('-') + 1);

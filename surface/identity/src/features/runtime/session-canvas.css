@@ -82,6 +82,8 @@
 .session-canvas-page > .head:has(button) h1 { display: none; }
 .session-canvas-page .canvas-side { position: relative; }
 /* With nothing running there is no canvas: that is said at the top left. */
-.session-canvas-page .canvas-side > .running-list { position: absolute; top: 12px; left: 14px; z-index: 6; }
+.session-canvas-page .canvas-side > .running-list { position: static; margin: 0 12px 12px; }
+.session-canvas-page .canvas-side:has(> .seats) { overflow: auto; padding: 12px; }
+.operations-swap.listing-swap { position: static; transform: none; align-self: center; flex: none; margin: 12px; max-width: calc(100% - 24px); overflow-x: auto; }
 .session-canvas-page .session-canvas-strip { position: absolute; top: 10px; left: 12px; z-index: 5; margin: 0; max-width: min(640px, 60%); flex-direction: column; align-items: flex-start; }
 .session-canvas-page .canvas-side > .session-canvas-scroll { margin-top: 0; border: 0; border-radius: 0; }

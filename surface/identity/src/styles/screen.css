@@ -62,6 +62,8 @@ td { padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); white-spa
 .table-scroll { min-width: 0; min-height: 0; max-width: 100%; overflow: auto; overscroll-behavior: contain; }
 .table-scroll > table { width: max-content; min-width: 100%; }
 .table-scroll td { max-width: 42ch; }
+.record-name { display: inline-block; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.seg button { white-space: nowrap; }
 .listing > .table-scroll { flex: 1; }
 thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-base); }
 tbody tr[data-href] { cursor: pointer; }

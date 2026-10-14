@@ -235,9 +235,9 @@ export function CanvasDock({ graph, show, tool, setTool, picking, panel, setPane
   // The panel, and what has to be said, stand by the bar they belong to: the widgets and a held tool by the drawing bar, the rest by the tools.
   const owner: Bar = panel === 'widgets' || (tool && !panel) ? 'draw' : 'find';
   return <>
-  {CORNERS.filter((corner) => Object.values(corners).includes(corner)).map((corner) => <div key={corner} className="canvas-corner" data-corner={corner}>
+  <div className="canvas-bars">{CORNERS.filter((corner) => Object.values(corners).includes(corner)).map((corner) => <div key={corner} className="canvas-corner" data-corner={corner}>
     {(Object.keys(bars) as Bar[]).filter((bar) => corners[bar] === corner).map((bar) => bars[bar])}
-  </div>)}
+  </div>)}</div>
   {dragging ? CORNERS.map((corner) => <span key={corner} className="canvas-corner-offer" data-corner={corner} aria-hidden="true" />) : null}
   <div className="canvas-dock" data-corner={corners[owner]}>
     <div className="canvas-dock-says">

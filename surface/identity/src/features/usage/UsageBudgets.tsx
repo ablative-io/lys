@@ -10,6 +10,7 @@ import { answeredNo } from '../../kept';
 import { plain, reasons } from './reasons';
 import type { Named } from './reasons';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
 
 /** `name` is the holder's name, said wherever the service's words carry its identifier. */
 type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void; name?: string };
@@ -49,7 +50,6 @@ export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
   </section>;
 }
 
-const COLUMNS = ['38%', '17%', '18%', '15%', '12%'];
 
 type FormProps = { budgets: BudgetsView; busy: boolean; save: (body: BudgetBody) => Promise<void> };
 
@@ -71,10 +71,9 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
     void save({ limits, warn_at: warning === '' ? null : Number(warning), version: budgets.version });
   };
   return <form aria-label="Edit budget limits" className="usage-edit" onSubmit={(event) => { event.preventDefault(); submit(); }}>
-    <table className="usage-list usage-table">
+    <TableScroll label="Budget limits"><table className="usage-list usage-table">
       {/* The rows say each limit and its act; that the first reached acts first is said nowhere else, so once, here. */}
       {budgets.limits.length > 1 ? <caption className="usage-caption">Each limit acts on its own: whichever is reached first acts first.</caption> : null}
-      <colgroup>{COLUMNS.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>
       <thead><tr><th>Spend at most</th><th>Used</th><th>When it's hit</th><th>Where it stands</th><th>Change</th></tr></thead>
       <tbody>
         {budgets.limits.map((limit, index) => {
@@ -99,7 +98,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
           <input name="warn_at" aria-labelledby="warn-at-words" type="number" min={0} max={100} step="any" value={warning} disabled={busy} onChange={(event) => setWarning(event.target.value)} /></div></td>
         <td colSpan={2}><Act symbol="save" name="Save these limits" word="Save" tone="primary" type="submit" disabled={busy || !valid} /></td>
       </tr> : null}{add}</tfoot>
-    </table>
+    </table></TableScroll>
   </form>;
 }
 

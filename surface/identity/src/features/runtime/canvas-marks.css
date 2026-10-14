@@ -27,6 +27,12 @@
 /* The bars: small bars of symbols in the corners of the canvas, each moved by its grip to the corner the person wants it in. The one panel opens beside the bar it belongs to. Nothing here blocks the surface. */
 .canvas-corner { position: absolute; z-index: 8; display: flex; align-items: center; gap: 14px; max-width: calc(100% - 24px); pointer-events: none; }
 .canvas-corner > * { pointer-events: auto; }
+.canvas-bars { display: contents; }
+@container surface (max-width: 600px) {
+  .canvas-bars { position: absolute; z-index: 8; bottom: 12px; left: 12px; right: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+  .canvas-bars .canvas-corner { position: static; max-width: 100%; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .canvas-dock[data-corner] { left: 12px; right: 12px; top: auto; bottom: 148px; max-width: calc(100% - 24px); }
+}
 .canvas-corner[data-corner^="top"], .canvas-corner-offer[data-corner^="top"] { top: 12px; }
 .canvas-corner[data-corner^="bottom"], .canvas-corner-offer[data-corner^="bottom"] { bottom: 12px; }
 .canvas-corner[data-corner$="left"], .canvas-corner-offer[data-corner$="left"], .canvas-dock[data-corner$="left"] { left: 12px; }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { api, request } from '../api';
-import { entries } from '../features/people/directory';
+import { visibleEntries } from '../features/people/directory';
 import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
@@ -52,7 +52,7 @@ export function Palette() {
     input.current?.focus();
     let live = true;
     api.people().then(
-      (answer) => live && setIds(entries(answer)),
+      (answer) => live && setIds(visibleEntries(answer)),
       () => live && setIds([]),
     );
     request<{ sessions: typeof running }>('/runtime/live').then(

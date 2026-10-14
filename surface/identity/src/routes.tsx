@@ -6,12 +6,9 @@ import { SecretsPage } from './features/secrets/SecretsPage';
 import { Reviews } from './features/reviews/Reviews';
 import { Requests } from './features/requests/Requests';
 import { Navigate, Route, Routes, useParams } from 'react-router';
-import { Access } from './features/access/Access';
-import { IdentityFile } from './features/file/IdentityFile';
 import { You } from './features/me/You';
 import { Dashboard } from './features/dashboard/Dashboard';
 import { Drafts } from './features/drafts/Drafts';
-import { Settings } from './features/settings/Settings';
 import { People } from './features/people/People';
 import { AddAgent } from './features/people/AddAgent';
 import { AddPerson } from './features/people/AddPerson';
@@ -20,6 +17,8 @@ import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
 import { Apps } from './features/apps/Apps';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
+import { NotFound } from './shell/NotFound';
+import { AccessRoute, FileRoute, OneStart, PeopleRoute, SettingsRoute } from './shell/RouteChecks';
 
 /** Every screen and tab has its own address (conformance 9.1). */
 export function AppRoutes() {
@@ -42,7 +41,7 @@ export function AppRoutes() {
       <Route path="/usage/:agent?" element={<UsageMoved />} />
       <Route path="/canvas/:agent?" element={<SessionCanvas />} />
       <Route path="/team/:agent?" element={<OneStart />} />
-      <Route path="/people/view/:view" element={<People />} />
+      <Route path="/people/view/:view" element={<PeopleRoute />} />
       <Route path="/people/:agent" element={<People />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests" element={<Requests />} />
@@ -50,13 +49,14 @@ export function AppRoutes() {
       <Route path="/people/new" element={<AddPerson />} />
       <Route path="/people" element={<People />} />
       <Route path="/file/:id/start" element={<OneStart />} />
-      <Route path="/file/:id/:tab?" element={<IdentityFile />} />
+      <Route path="/file/:id/:tab?" element={<FileRoute />} />
+      <Route path="/" element={<Dashboard />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/me" element={<You />} />
       <Route path="/account/:id" element={<AccountMoved />} />
-      <Route path="/settings/:sec?" element={<Settings />} />
-      <Route path="/access/:mode?/:arg?" element={<Access />} />
-      <Route path="*" element={<Dashboard />} />
+      <Route path="/settings/:sec?" element={<SettingsRoute />} />
+      <Route path="/access/:mode?/:arg?" element={<AccessRoute />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
@@ -74,8 +74,3 @@ function AccountMoved() {
 }
 
 /** An agent has one start: on the Overview of its own page. Older addresses for it arrive there. */
-function OneStart() {
-  const { id, agent } = useParams();
-  const named = id ?? agent;
-  return <Navigate replace to={named ? '/file/' + encodeURIComponent(named) : '/dashboard'} />;
-}

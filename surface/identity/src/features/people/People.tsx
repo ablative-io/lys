@@ -15,7 +15,7 @@ import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { useShell } from '../../shell/ShellContext';
 import type { KindFilter } from '../../shell/ShellContext';
 import { DirectoryGate as Gate, problemWords } from './Words';
-import { entries, needsNewPerson } from './directory';
+import { entries, needsNewPerson, visibleEntries } from './directory';
 import type { Entry } from './directory';
 import { readTeams } from '../teams/Teams';
 import { Reach, readDirectoryReach } from './reach';
@@ -72,7 +72,7 @@ type Row = Entry & { agents: Entry[] };
 
 /** Retired records are left out until asked for. A retired person whose agents are not retired stays listed: those agents have no one answering. */
 function rowsOf(view: PeopleView, kind: KindFilter, retired: boolean): Row[] {
-  const all = entries(view).filter((x) => retired || x.state !== 'retired' || (x.kind === 'person' && entries(view).some((agent) => agent.kind === 'agent' && agent.person?.id === x.id && agent.state !== 'retired')));
+  const all = visibleEntries(view, retired);
   const agentsOf = (id: string) => all.filter((x) => x.kind === 'agent' && x.person?.id === id);
   if (kind === 'agent') return all.filter((x) => x.kind === 'agent').map((x) => ({ ...x, agents: [] }));
   return all.filter((x) => x.kind === 'person').map((x) => ({ ...x, agents: kind === 'person' ? [] : agentsOf(x.id) }));

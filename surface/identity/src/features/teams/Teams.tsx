@@ -14,6 +14,7 @@ import type { Team, TeamChanged } from './contract';
 import type { MeView, PeopleView } from '../../generated';
 import { subtree, treeOrder } from '../../shell/org';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
 /** The organisation's teams, as /teams serves them, parent and lead included. */
 export async function readTeams(): Promise<Team[]> {
   return (await request<{ teams: Team[] }>('/teams')).teams;
@@ -64,12 +65,12 @@ function TeamList({ initial, me, people }: { initial: Team[]; me: MeView; people
     </div>
     <div className="body halves">
       <div className="pane">
-        <table className="teams-table usage-table">
-          <thead><tr><th>Team</th><th>Part of</th><th>Lead</th><th>Holds</th><th>Change</th></tr></thead>
+        <TableScroll label="Teams"><table className="teams-table usage-table">
+          <thead><tr><th>Team</th><th>Part of</th><th>Lead</th><th>Holds with subteams</th><th>Change</th></tr></thead>
           <tbody>{shown.map(({ team: each, depth }) => <TeamRow key={each.id + ':' + revision} team={each} depth={depth} teams={teams} current={each.id === team?.id && !creating} manages={manages(each)} person={me.person.id} login={me.signed_in}
             name={name} holds={size(teams, each.id, people)} pick={() => { setPicked(each.id); setCreating(false); }} changed={changed} />)}
             {teams.length && !shown.length ? <tr><td colSpan={5} className="dim">{needle ? 'No team matches that search.' : 'Every team is retired.'}</td></tr> : null}</tbody>
-        </table>
+        </table></TableScroll>
         {teams.length ? null : <p className="dim">No teams yet. A team is how Lys groups people and their agents: create the first one.</p>}
       </div>
       <div className="pane">

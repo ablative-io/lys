@@ -87,7 +87,7 @@ function Operations({ keeping }: { keeping: Keeping }) {
     sending.current = sending.current.then(() => keepOperations(next)).then(() => setFailure(null), (error: unknown) => setFailure(saidOfKeeping(error)));
   };
   return <>
-    <nav className="operations-swap" aria-label="Operations views">
+    <nav className={'operations-swap' + (proxy || view === 'sessions' ? ' listing-swap' : '')} aria-label="Operations views">
       {(['tree', 'canvas', 'sessions'] as const).map((each) => <a key={each} href={'#/canvas?view=' + each} aria-current={!proxy && view === each ? 'page' : undefined}
         onClick={(event) => {
           event.preventDefault();

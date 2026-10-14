@@ -12,6 +12,8 @@ import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
 import { OwnedList } from './Owned';
 import { clockMs } from '../file/time';
+import { TableScroll } from '../../shell/Listing';
+import { RecordName, useRecordNames } from '../../shell/RecordName';
 
 const STATE_WORDS: Record<SeatState, string> = {
   'online-working': 'Online, working',
@@ -52,14 +54,16 @@ export function Seats() {
 }
 
 function SeatTable({ answer }: { answer: SeatList }) {
+  const names = useRecordNames();
   return <>
+    {names.status === 'refused' ? <Unread refused={names.refused} what="Agent and computer names" /> : null}
     {answer.runner === 'unknown' ? <p className="why-not" role="status">
       <b>Runner unknown</b> <span className="sec">{answer.reason ?? 'The service gave no reason.'}</span> Every state below is unknown: nothing is known to be online or offline.
     </p> : null}
-    {answer.seats.length ? <table>
+    {answer.seats.length ? <TableScroll label="Seats"><table>
       <thead><tr><th>Seat</th><th>Agent</th><th>Computer</th><th>State</th><th>Session</th><th>Acts</th></tr></thead>
-      <tbody>{answer.seats.map((seat) => <SeatRow key={seat.name} seat={seat} />)}</tbody>
-    </table> : <p className="note">No seat is registered. A seat is recorded with <span className="mono">lys seat add</span>.</p>}
+      <tbody>{answer.seats.map((seat) => <SeatRow key={seat.name} seat={seat} names={names.status === 'ok' ? names.data : new Map()} />)}</tbody>
+    </table></TableScroll> : <p className="note">No seat is registered. A seat is recorded with <span className="mono">lys seat add</span>.</p>}
   </>;
 }
 
@@ -70,7 +74,7 @@ const DOING_WORDS: Record<Doing, { word: string; symbol: 'start' | 'stop' | 'aga
   restart: { word: 'Restart', symbol: 'again' },
 };
 
-function SeatRow({ seat }: { seat: SeatView }) {
+function SeatRow({ seat, names }: { seat: SeatView; names: Map<string, string> }) {
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<{ doing: Doing; refused: Refused } | null>(null);
   const [done, setDone] = useState('');
@@ -103,12 +107,12 @@ function SeatRow({ seat }: { seat: SeatView }) {
   const midTurn = refusal && refusal.doing !== 'start' && refusal.refused.refusal.refusal === 'seat_turn_in_progress' ? refusal.doing : null;
   return <tr data-seat={seat.name} data-state={seat.state}>
     <td>{seat.name}</td>
-    <td className="mono">{seat.agent}</td>
-    <td>{seat.machine}</td>
+    <td><RecordName id={seat.agent} name={names.get(seat.agent)} /></td>
+    <td><RecordName id={seat.machine} name={names.get(seat.machine)} /></td>
     <td>{STATE_WORDS[seat.state]}<p className="note">{seat.last_signal_at === undefined || seat.last_signal_at === null ? 'No signal seen' : 'Last signal ' + clockMs(seat.last_signal_at)}</p></td>
-    <td>{seat.session ? <span className="mono">{seat.session}</span> : <span className="dim">None</span>}</td>
+    <td>{seat.session ? <RecordName id={seat.session} name={seat.name + ' session'} /> : <span className="dim">None</span>}</td>
     <td>
-      {(['start', 'stop', 'restart'] as const).map((doing) => <Act key={doing} symbol={DOING_WORDS[doing].symbol} name={DOING_WORDS[doing].word + ' ' + seat.name} word={DOING_WORDS[doing].word} className="small" disabled={busy} onClick={() => { void act(doing, false); }} />)}
+      {(['start', 'stop', 'restart'] as const).filter(doing => doing === 'start' || seat.state !== 'offline' && seat.state !== 'not-seen').map((doing) => <Act key={doing} symbol={DOING_WORDS[doing].symbol} name={DOING_WORDS[doing].word + ' ' + seat.name} word={DOING_WORDS[doing].word} className="small" disabled={busy} onClick={() => { void act(doing, false); }} />)}
       {midTurn ? <p className="why-not">A turn is in progress. {midTurn === 'stop' ? 'Stopping' : 'Restarting'} anyway ends it mid-turn.
         <Act symbol={DOING_WORDS[midTurn].symbol} name={DOING_WORDS[midTurn].word + ' ' + seat.name + ' anyway'} word={DOING_WORDS[midTurn].word + ' anyway'} tone="danger" className="small" disabled={busy} onClick={() => { void act(midTurn, true); }} />
       </p> : null}
@@ -152,14 +156,16 @@ function SendBox({ seat }: { seat: SeatView }) {
 }
 
 function Unregistered({ sessions }: { sessions: UnregisteredSession[] }) {
-  return sessions.length ? <table aria-label="Seen but unregistered">
+  const names = useRecordNames();
+  const name = (id: string) => names.status === 'ok' ? names.data.get(id) : undefined;
+  return sessions.length ? <TableScroll label="Seen but unregistered"><table aria-label="Seen but unregistered">
     <thead><tr><th>Session</th><th>Computer</th><th>Agent</th><th>Process</th><th>Started</th></tr></thead>
     <tbody>{sessions.map((entry) => <tr key={entry.session} data-unregistered={entry.session}>
-      <td className="mono">{entry.session}</td>
-      <td>{entry.machine}</td>
-      <td>{entry.agent ? <span className="mono">{entry.agent}</span> : <span className="dim">No agent named</span>}</td>
+      <td><RecordName id={entry.session} /></td>
+      <td><RecordName id={entry.machine} name={name(entry.machine)} /></td>
+      <td>{entry.agent ? <RecordName id={entry.agent} name={name(entry.agent)} /> : <span className="dim">No agent named</span>}</td>
       <td className="mono">{entry.pid}</td>
       <td>{clockMs(entry.started_at)}</td>
     </tr>)}</tbody>
-  </table> : <p className="note">No runner holds a session for no seat.</p>;
+  </table></TableScroll> : <p className="note">No runner holds a session for no seat.</p>;
 }

@@ -196,7 +196,9 @@ export const lastUsedText = (g: Grant): string => {
 };
 
 /** A grant's window as its effective end stands: `27 Sep to 4 Oct`, or `from 27 Sep, no end`. */
-export const windowText = (g: Grant): string => (g.effective_ends_at === null ? `from ${day(g.window.starts_at)}, no end` : `${day(g.window.starts_at)} to ${day(g.effective_ends_at)}`);
+export const windowText = (g: Grant): string => g.window.starts_at === 0
+  ? 'no start, ' + (g.effective_ends_at === null ? 'no end' : 'until ' + day(g.effective_ends_at))
+  : g.effective_ends_at === null ? `from ${day(g.window.starts_at)}, no end` : `${day(g.window.starts_at)} to ${day(g.effective_ends_at)}`;
 
 /**
  * Each relation the service's model defines, with the actions it carries, widest

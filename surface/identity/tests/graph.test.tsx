@@ -1,6 +1,6 @@
 /** The graph draws permission answers, preserves visibility and never exercises grants. */
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, serve, text } from './harness';
+import { $, $$, click, mount, serve, text } from './harness';
 import { reachMap } from '../src/features/grants/check';
 import { OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
@@ -13,6 +13,7 @@ const noHolders = (body: unknown) => ok({ revision: 7, resources: (body as { res
 describe('Identity graph', () => {
   it('draws every identity and resource, the recorded grants and who answers to whom', async () => {
     const app = await mount('#/graph');
+    await click($$('button').find(button => button.textContent === 'Show retired') ?? null);
     const labels = $$('g.gn').map((node) => node.getAttribute('aria-label'));
     for (const name of ['Ada (test person)', 'Scribe', 'Courier', 'Archivist', 'Bea (test person)', 'Reviewer', 'Lamplighter', 'identity', 'ledger']) expect(labels).toContain(name);
     expect(titles('grant')).toEqual(['Ada (test person): everything here on project identity', 'Ada (test person): View this resource on project ledger', 'Scribe: View this resource on project identity']);

@@ -8,6 +8,7 @@
 .usage-table.grant-cols { table-layout: auto; width: 100%; }
 .grant-cols td { overflow-wrap: break-word; word-break: normal; hyphens: none; }
 .grant-cols .g-tight { white-space: nowrap; }
+.grant-cols td[data-col="Allows"], .grant-cols td[data-col="Window"] { white-space: nowrap; }
 .grant-cols .chain { gap: 4px; }
 .grant-cols .chain .pill { white-space: nowrap; margin: 1px 0; }
 .grant-cols .g-change { display: flex; flex-wrap: wrap; gap: 6px; }
