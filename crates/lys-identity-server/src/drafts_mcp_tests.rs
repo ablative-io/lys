@@ -25,10 +25,16 @@ async fn a_draft_made_through_mcp_keeps_the_signed_message_as_its_evidence() -> 
         .json()
         .await?;
     assert_eq!(
-        answer["result"]["structuredContent"]["status"], 200,
+        crate::mcp_test_answer::body(&answer["result"])["status"],
+        200,
         "{answer}"
     );
-    assert!(answer["result"]["receipt"].is_object(), "{answer}");
+    let receipt: Value = serde_json::from_str(
+        answer["result"]["content"][0]["text"]
+            .as_str()
+            .ok_or("MCP content names no receipt")?,
+    )?;
+    assert!(receipt["receipt"].is_object(), "{answer}");
     let mut directory = table.directory()?;
     let held = directory
         .projection()?

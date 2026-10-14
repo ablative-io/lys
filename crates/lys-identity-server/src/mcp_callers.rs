@@ -88,6 +88,6 @@ pub(crate) async fn rendered(
     };
     let answer = serde_json::json!({"status":status.as_u16(),"body":body});
     Ok(
-        serde_json::json!({"isError":!status.is_success(),"content":[{"type":"text","text":answer.to_string()}],"structuredContent":answer}),
+        serde_json::json!({"isError":!status.is_success(),"content":[{"type":"text","text":answer.to_string()}]}),
     )
 }

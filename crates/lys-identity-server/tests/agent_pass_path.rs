@@ -7,6 +7,9 @@
 #[path = "support/harness_description.rs"]
 mod harness_description;
 
+#[path = "../src/mcp_test_answer.rs"]
+mod mcp_answer;
+
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
@@ -277,7 +280,8 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         .await?;
     assert_eq!(status, 200, "{inside}");
     assert_eq!(
-        inside["result"]["structuredContent"]["status"], 200,
+        mcp_answer::body(&inside["result"])["status"],
+        200,
         "{inside}"
     );
     eprintln!("proof: inside its grant, POST /identities/{{person}}/profile answered 200");
@@ -291,9 +295,10 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
             call(format!("/identities/{other}/profile")),
         )
         .await?;
-    let refusal = &outside["result"]["structuredContent"]["body"];
+    let refusal = &mcp_answer::body(&outside["result"])["body"];
     assert_ne!(
-        outside["result"]["structuredContent"]["status"], 200,
+        mcp_answer::body(&outside["result"])["status"],
+        200,
         "{outside}"
     );
     eprintln!(

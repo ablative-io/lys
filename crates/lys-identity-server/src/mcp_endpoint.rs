@@ -19,6 +19,15 @@ mod run_refusal;
 pub(crate) use run_refusal::run_refusals;
 
 #[cfg(test)]
+#[path = "mcp_endpoint_contract_tests.rs"]
+mod contract_tests;
+#[cfg(test)]
+#[path = "mcp_endpoint_receipt_tests.rs"]
+mod receipt_tests;
+#[cfg(test)]
+#[path = "mcp_endpoint_test_support.rs"]
+mod test_support;
+#[cfg(test)]
 #[path = "mcp_endpoint_tests.rs"]
 mod tests;
 
@@ -330,7 +339,8 @@ fn initialize(params: &Value) -> ResultValue {
         "2025-11-25"
     };
     Ok(
-        json!({"protocolVersion":version, "capabilities":{"tools":{}}, "serverInfo":{"name":"lys", "version":env!("CARGO_PKG_VERSION")}}),
+        json!({"protocolVersion":version, "capabilities":{"tools":{}}, "serverInfo":{"name":"lys", "version":env!("CARGO_PKG_VERSION")},
+            "instructions":"Call what-can-I-do first with {} to read this connection's declared routes and live grants. Use read for a route's reading, change for an admitted change, and drafts to record or decide a draft. These tools apply each HTTP route's authority and validation; a listed route alone never grants authority."}),
     )
 }
 
@@ -343,10 +353,13 @@ fn tools(id: &Value, params: &Value) -> Response {
             "this tool list has no continuation cursor",
         );
     }
-    let schema = json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST","PUT","PATCH","DELETE"]},"path":{"type":"string","description":"An absolute local HTTP path, including its query."},"body":{}},"required":["method","path"],"additionalProperties":false});
-    let tools = TOOLS.map(
-        |(name, description)| json!({"name":name, "description":description, "inputSchema":schema}),
-    );
+    let schemas = [
+        json!({"type":"object","properties":{},"required":[],"additionalProperties":false}),
+        json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST"],"default":"GET"},"path":{"type":"string","description":"An absolute local read route, including its query."},"body":{}},"required":["path"],"additionalProperties":false}),
+        json!({"type":"object","properties":{"method":{"type":"string","enum":["POST","PUT","PATCH","DELETE"]},"path":{"type":"string","description":"An absolute local change route."},"body":{}},"required":["method","path"],"additionalProperties":false}),
+        json!({"type":"object","properties":{"method":{"type":"string","enum":["GET","POST"],"default":"GET"},"path":{"type":"string","pattern":"^/drafts(?:/|\\?|$)","description":"A declared draft route."},"body":{}},"required":["path"],"additionalProperties":false}),
+    ];
+    let tools: Vec<_> = TOOLS.into_iter().zip(schemas).map(|((name, description), schema)| json!({"name":name, "description":description, "inputSchema":schema})).collect();
     Json(Envelope(
         json!({"jsonrpc":"2.0", "id":id, "result":{"tools":tools}}),
     ))

@@ -1,5 +1,8 @@
 #![cfg(test)]
 //! Grant header admission preserves the ordinary route holding checks.
+#[path = "../src/mcp_test_answer.rs"]
+mod mcp_answer;
+
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
@@ -195,7 +198,8 @@ impl Fixture {
         body: Value,
         cookie: bool,
     ) -> TestResult<(u16, Value)> {
-        let mut request = self.client.post(format!("{}/mcp",self.service.base)).header("content-type","application/json").header("accept","application/json, text/event-stream").header(lys_identity_server::grant_tokens::HEADER,token).json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"change","arguments":{"method":method,"path":path,"body":body}}}));
+        let tool = if method == "GET" { "read" } else { "change" };
+        let mut request = self.client.post(format!("{}/mcp",self.service.base)).header("content-type","application/json").header("accept","application/json, text/event-stream").header(lys_identity_server::grant_tokens::HEADER,token).json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":tool,"arguments":{"method":method,"path":path,"body":body}}}));
         if cookie {
             request = request.header("cookie", &self.cookie);
         }
@@ -215,13 +219,18 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
         || -> TestResult<Value> { Ok(json!({"operation":operation()?,"display_name":"Changed"})) };
     let (status, answer) = fixture.call(&writer, "POST", &path, body()?, false).await?;
     assert_eq!(status, 200);
-    assert_eq!(answer["result"]["structuredContent"]["status"], 200);
+    assert_eq!(mcp_answer::body(&answer["result"])["status"], 200);
+    let receipt: Value = serde_json::from_str(
+        answer["result"]["content"][0]["text"]
+            .as_str()
+            .ok_or("receipt is not carried in MCP content")?,
+    )?;
     assert!(
-        answer["result"]["receipt"].is_object(),
+        receipt["receipt"].is_object(),
         "a change through MCP is answered with its receipt: {answer}"
     );
     assert!(
-        answer["result"].get("asked").is_none(),
+        mcp_answer::body(&answer["result"]).get("asked").is_none(),
         "a made change is a receipt, not an ask: {answer}"
     );
     let (status, answer) = fixture
@@ -235,18 +244,19 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
         .await?;
     assert_eq!(status, 200);
     assert_eq!(
-        answer["result"]["structuredContent"]["body"]["refusal"],
+        mcp_answer::body(&answer["result"])["body"]["refusal"],
         "GrantTokenScopeMismatch"
     );
     assert!(
-        answer["result"].get("receipt").is_none() && answer["result"].get("asked").is_none(),
+        mcp_answer::body(&answer["result"]).get("receipt").is_none()
+            && mcp_answer::body(&answer["result"]).get("asked").is_none(),
         "a call refused before it is kept keeps nothing: {answer}"
     );
     let reader = fixture.token(&fixture.person, "beta").await?;
     let (status, answer) = fixture.call(&reader, "POST", &path, body()?, false).await?;
     assert_eq!(status, 200);
     assert_eq!(
-        answer["result"]["structuredContent"]["body"]["refusal"],
+        mcp_answer::body(&answer["result"])["body"]["refusal"],
         "GrantTokenScopeMismatch"
     );
     let (_, current) = fixture.service.get("/me", Some(&fixture.cookie)).await?;
@@ -255,7 +265,8 @@ async fn mcp_grant_token_acts_only_on_its_resource_and_action() -> TestResult {
 }
 
 #[tokio::test]
-async fn mcp_grant_token_refuses_an_undeclared_route() -> TestResult {
+async fn mcp_read_with_a_grant_token_refuses_an_undeclared_route_after_schema_validation()
+-> TestResult {
     let fixture = Fixture::new(false, false).await?;
     let token = fixture.token(&fixture.person, "alpha").await?;
     let (status, answer) = fixture
@@ -263,7 +274,7 @@ async fn mcp_grant_token_refuses_an_undeclared_route() -> TestResult {
         .await?;
     assert_eq!(status, 200);
     assert_eq!(
-        answer["result"]["structuredContent"]["body"]["refusal"],
+        mcp_answer::body(&answer["result"])["body"]["refusal"],
         "TokenScopeUndeclared"
     );
     Ok(())
@@ -314,7 +325,7 @@ async fn mcp_grant_token_refuses_a_person_holder() -> TestResult {
         .await?;
     assert_eq!(status, 200);
     assert_eq!(
-        answer["result"]["structuredContent"]["body"]["refusal"],
+        mcp_answer::body(&answer["result"])["body"]["refusal"],
         "TokenHolderNotAgent"
     );
     Ok(())
@@ -334,7 +345,7 @@ async fn refusal_names_nearest_grant_holder_then_root() -> TestResult {
         )
         .await?;
     assert_eq!(status, 200);
-    let refusal = &answer["result"]["structuredContent"]["body"];
+    let refusal = &mcp_answer::body(&answer["result"])["body"];
     assert_eq!(refusal["refusal"], "GrantTokenScopeMismatch");
     assert_eq!(
         refusal["can_grant"],
@@ -362,7 +373,7 @@ async fn refusal_names_root_when_chain_holds_no_requested_grant() -> TestResult 
         )
         .await?;
     assert_eq!(status, 200);
-    let refusal = &answer["result"]["structuredContent"]["body"];
+    let refusal = &mcp_answer::body(&answer["result"])["body"];
     assert_eq!(refusal["refusal"], "GrantTokenScopeMismatch");
     assert_eq!(
         refusal["can_grant"],

@@ -9,18 +9,20 @@ use sha2::{Digest, Sha256};
 use std::error::Error;
 
 #[tokio::test]
-async fn an_empty_connected_app_discovers_nothing_on_any_path() -> Result<(), Box<dyn Error>> {
+async fn an_empty_connected_app_names_unscoped_route_rules_without_claiming_resource_grants()
+-> Result<(), Box<dyn Error>> {
     let (service, cookie) = service().await?;
     let (_, tokens) = connected(&service, &cookie).await?;
     let token = tokens["access_token"].as_str().ok_or("no access token")?;
-    for path in ["/openapi.json", "/grants", "/path-that-does-not-exist"] {
+    {
+        let arguments = json!({});
         let response = client()?
             .post(format!("{}/mcp", service.base))
             .header("accept", "application/json, text/event-stream")
             .bearer_auth(token)
             .json(
                 &json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-                    "name": "what-can-I-do", "arguments": {"method": "GET", "path": path}
+                    "name": "what-can-I-do", "arguments": arguments
                 }}),
             )
             .send()
@@ -29,12 +31,28 @@ async fn an_empty_connected_app_discovers_nothing_on_any_path() -> Result<(), Bo
         let answer: Value = response.json().await?;
         let result = &answer["result"];
         assert_eq!(result["isError"], false, "{answer}");
-        assert_eq!(result["structuredContent"]["status"], 200, "{answer}");
-        let body = &result["structuredContent"]["body"];
-        assert_eq!(body["routes"], json!([]), "{answer}");
+        assert_eq!(
+            crate::mcp_test_answer::body(result)["status"],
+            200,
+            "{answer}"
+        );
+        let body = &crate::mcp_test_answer::body(result)["body"];
+        let routes = body["routes"].as_array().ok_or("no route inventory")?;
+        for path in ["/me", "/drafts", "/dashboard"] {
+            let route = routes
+                .iter()
+                .find(|route| route["path"] == path)
+                .ok_or("an unscoped route was omitted")?;
+            assert!(route["rule"]["authentication"].is_array());
+            assert!(
+                route.get("resource").is_none(),
+                "a route rule is not a resource grant"
+            );
+        }
         assert_eq!(body["resources"], json!([]), "{answer}");
         assert_eq!(
-            body["message"], "nothing: connect again and tick what the app may do",
+            body["message"],
+            "This connection has no resource grants. The listed routes apply their own authentication, role and input rules; listing them grants no authority.",
             "{answer}"
         );
     }
@@ -125,14 +143,14 @@ async fn consent_groups_duplicate_grants_by_resource_and_says_what_an_empty_choi
         .bearer_auth(access)
         .json(
             &json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-                "name": "what-can-I-do", "arguments": {"method": "GET", "path": "/unknown"}
+                "name": "what-can-I-do", "arguments": {}
             }}),
         )
         .send()
         .await?;
     assert_eq!(response.status(), 200);
     let answer: Value = response.json().await?;
-    let discovered = &answer["result"]["structuredContent"]["body"];
+    let discovered = &crate::mcp_test_answer::body(&answer["result"])["body"];
     assert_eq!(answer["result"]["isError"], false, "{answer}");
     assert_eq!(
         discovered["resources"],

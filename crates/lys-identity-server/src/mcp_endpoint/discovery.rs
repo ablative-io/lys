@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 
 use super::{Endpoint, ResultValue};
 use crate::error::ServerError;
-use crate::grants::{Decision, Judged, allowed, decide, with_grants};
+use crate::grants::{Decision, Judged, allowed, decide};
 use crate::routes::AppState;
 
 pub(super) async fn answer(
@@ -36,19 +36,18 @@ pub(super) async fn answer(
     } else {
         None
     };
+    let started = std::time::Instant::now();
     let reading = async {
         let holder = token
             .map(|principal| principal.holder)
             .or(signer)
             .or_else(|| app.map(|(agent, _)| *agent))
             .or(crate::agent_pass::holder(state, headers)?);
-        with_grants(state, |mut judged| {
+        let identity = |judged: &Judged<'_>| -> Result<(IdentityId, bool), ServerError> {
             let (holder, administrator) = if let Some(agent) = holder {
                 (IdentityId::Agent(agent), false)
             } else {
-                let actor = state
-                    .sessions
-                    .actor(crate::routes::cookie_header(headers))?;
+                let actor = crate::routes::signed_in(state, headers)?;
                 (
                     IdentityId::Person(crate::read_api::own_person(judged.directory, &actor)?),
                     state.admission.is_administrator(judged.directory, &actor)?,
@@ -57,37 +56,63 @@ pub(super) async fn answer(
             let refused = || ServerError::NotAdmitted {
                 reason: "the connection's holder is not an active directory identity",
             };
-            let record = judged.directory.record(holder).ok_or_else(&refused)?;
-            if record.state() != LifecycleState::Active {
+            if judged
+                .directory
+                .record(holder)
+                .ok_or_else(&refused)?
+                .state()
+                != LifecycleState::Active
+            {
                 return Err(refused());
             }
-            inventory(
-                state,
-                &mut judged,
-                holder,
-                token.map(|principal| principal.grant),
-                administrator,
-            )
-        })
+            Ok((holder, administrator))
+        };
+        let only = token.map(|principal| principal.grant);
+        crate::grants_reads::with_pass_grants(
+            state,
+            crate::session::now(),
+            None,
+            true,
+            |judged| {
+                let (holder, _) = identity(judged)?;
+                questions(state, judged, holder, only)
+            },
+            |mut judged| {
+                let (holder, administrator) = identity(&judged)?;
+                let placements = judged.apps.held().placements.len();
+                inventory(state, &mut judged, holder, only, administrator)
+                    .map(|answer| (answer, placements))
+            },
+        )
     };
     let read = match token {
         Some(principal) => crate::agent_signature::token_scoped(principal, reading).await,
         None => reading.await,
     };
     let response = match read {
-        Ok(inventory) => Json(inventory).into_response(),
+        Ok((inventory, placements)) => {
+            let answer_bytes = serde_json::to_vec(&inventory)
+                .map_err(|error| {
+                    (
+                        -32603,
+                        format!("the discovery answer cannot be encoded: {error}"),
+                    )
+                })?
+                .len();
+            tracing::info!(target: "lys_identity_server::passfast", placements, elapsed_ms = started.elapsed().as_millis(), answer_bytes, "MCP discovery");
+            Json(inventory).into_response()
+        }
         Err(error) => error.into_response(),
     };
     crate::mcp_callers::rendered(response).await
 }
 
-fn inventory(
+fn questions(
     state: &AppState,
-    judged: &mut Judged<'_>,
+    judged: &Judged<'_>,
     holder: IdentityId,
     only: Option<lys_identity::grants::GrantId>,
-    administrator: bool,
-) -> Result<Value, ServerError> {
+) -> Result<Vec<ExerciseRequest>, ServerError> {
     let mut candidates: BTreeSet<Resource> = judged
         .grants
         .book()
@@ -101,8 +126,7 @@ fn inventory(
         }
     }
     let model = state.grant_setup.model()?;
-    let at = crate::session::now();
-    let mut resources: BTreeMap<Resource, BTreeSet<Action>> = BTreeMap::new();
+    let mut requests = Vec::new();
     for resource in candidates {
         let actions: BTreeSet<Action> = match model.kinds().get(resource.kind()) {
             Some(kind) => kind.actions.clone(),
@@ -112,25 +136,36 @@ fn inventory(
                 .collect(),
         };
         for action in actions {
-            let request = ExerciseRequest {
+            requests.push(ExerciseRequest {
                 caller: holder,
                 route: Route::Api,
                 resource: resource.clone(),
-                action: action.clone(),
-            };
-            if allowed(decide(judged, &request, at, None, Decision::Explain))? {
-                resources
-                    .entry(resource.clone())
-                    .or_default()
-                    .insert(action);
-            }
+                action,
+            });
+        }
+    }
+    Ok(requests)
+}
+
+fn inventory(
+    state: &AppState,
+    judged: &mut Judged<'_>,
+    holder: IdentityId,
+    only: Option<lys_identity::grants::GrantId>,
+    administrator: bool,
+) -> Result<Value, ServerError> {
+    let at = crate::session::now();
+    let mut resources: BTreeMap<Resource, BTreeSet<Action>> = BTreeMap::new();
+    for request in questions(state, judged, holder, only)? {
+        if allowed(decide(judged, &request, at, None, Decision::Explain))? {
+            resources
+                .entry(request.resource)
+                .or_default()
+                .insert(request.action);
         }
     }
     let mut routes = BTreeMap::new();
-    for row in crate::openapi_table::TABLE
-        .iter()
-        .filter(|row| row.5.is_some())
-    {
+    for row in crate::openapi_table::TABLE {
         let admin_only = row.4.iter().any(|set| {
             *set == crate::openapi_refusals::ADMIN || *set == crate::openapi_refusals::ADMIN_BODY
         }) && !row.4.contains(&crate::openapi_refusals::GRANT_ASKED)
@@ -139,6 +174,13 @@ fn inventory(
                 .iter()
                 .any(|auth| matches!(auth, lys_openapi::Auth::AgentSignature));
         if admin_only && !administrator {
+            continue;
+        }
+        if row.5.is_none() {
+            routes.insert((row.0.word(), row.1, String::new(), String::new()), json!({
+                "method": row.0.word().to_ascii_uppercase(), "path": row.1,
+                "rule": { "description": row.2, "authentication": row.3.iter().map(|auth| format!("{auth:?}")).collect::<Vec<_>>(), "refusals": row.4 },
+            }));
             continue;
         }
         for (resource, actions) in &resources {
@@ -167,7 +209,7 @@ fn inventory(
         }
     }
     let message = if resources.is_empty() {
-        "nothing: connect again and tick what the app may do"
+        "This connection has no resource grants. The listed routes apply their own authentication, role and input rules; listing them grants no authority."
     } else {
         "This connection may use the listed resources and actions."
     };

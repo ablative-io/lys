@@ -247,11 +247,26 @@ impl Kept {
     ) -> Result<(), ServerError> {
         if made {
             hold.made(&self.ask)?;
-            result["receipt"] = self.leaf;
         } else {
             hold.refused(self.ask, self.leaf.clone(), self.logs, self.at)?;
-            result["asked"] = self.leaf;
         }
+        let text =
+            result["content"][0]["text"]
+                .as_str()
+                .ok_or_else(|| ServerError::ConfigInvalid {
+                    reason: "the MCP result has no JSON text to carry its kept leaf".to_owned(),
+                })?;
+        let mut answer: Value =
+            serde_json::from_str(text).map_err(|error| ServerError::ConfigInvalid {
+                reason: format!("the MCP result cannot carry its kept leaf: {error}"),
+            })?;
+        let fields = answer
+            .as_object_mut()
+            .ok_or_else(|| ServerError::ConfigInvalid {
+                reason: "the MCP answer is not an object that can carry its kept leaf".to_owned(),
+            })?;
+        fields.insert(if made { "receipt" } else { "asked" }.to_owned(), self.leaf);
+        result["content"][0]["text"] = Value::String(answer.to_string());
         Ok(())
     }
 }

@@ -1,6 +1,9 @@
 #![cfg(test)]
 //! A grant token discovers only its bound authority, even when its agent holds more.
 
+#[path = "../src/mcp_test_answer.rs"]
+mod mcp_answer;
+
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -9,7 +12,7 @@ use identity_contract::harness::ADMINISTRATOR;
 use serde_json::{Value, json};
 
 #[tokio::test]
-async fn a_token_discovers_its_one_grant_without_borrowing_a_broader_grant()
+async fn a_token_discovers_its_one_grant_and_unscoped_rules_without_borrowing_a_broader_grant()
 -> Result<(), Box<dyn Error>> {
     let (service, seeded) = seeded().await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -56,7 +59,7 @@ async fn a_token_discovers_its_one_grant_without_borrowing_a_broader_grant()
         .header("lys-grant-token", token)
         .json(
             &json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-                "name": "what-can-I-do", "arguments": {"method": "GET", "path": "/undeclared"}
+                "name": "what-can-I-do", "arguments": {}
             }}),
         )
         .send()
@@ -64,18 +67,28 @@ async fn a_token_discovers_its_one_grant_without_borrowing_a_broader_grant()
     assert_eq!(response.status(), 200);
     let answer: Value = response.json().await?;
     assert_eq!(answer["result"]["isError"], false, "{answer}");
-    let inventory = &answer["result"]["structuredContent"]["body"];
+    let inventory = &mcp_answer::body(&answer["result"])["body"];
     assert_eq!(
         inventory["resources"],
         json!([{"kind": "person", "id": "all", "actions": ["read"]}]),
         "{answer}"
     );
+    let routes = inventory["routes"].as_array().ok_or("no routes")?;
+    assert!(routes.iter().any(|route| route.get("resource").is_some()));
     assert!(
-        inventory["routes"]
-            .as_array()
-            .ok_or("no routes")?
+        routes
             .iter()
+            .filter(|route| route.get("resource").is_some())
             .all(|route| route["action"] == "read")
+    );
+    assert!(routes.iter().any(|route| route["path"] == "/me"));
+    assert!(
+        routes
+            .iter()
+            .filter(|route| route.get("resource").is_none())
+            .all(
+                |route| route.get("action").is_none() && route["rule"]["authentication"].is_array()
+            )
     );
     Ok(())
 }

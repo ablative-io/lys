@@ -269,9 +269,14 @@ async fn a_pass_exercises_get_and_head_and_refuses_a_revoked_grant_and_an_ungran
     assert_eq!(response.status().as_u16(), 200);
     let body: Value = response.json().await?;
     assert_eq!(body["result"]["isError"], true, "{body}");
-    assert_eq!(body["result"]["structuredContent"]["status"], 403, "{body}");
     assert_eq!(
-        body["result"]["structuredContent"]["body"]["refusal"], "NotHeld",
+        crate::mcp_test_answer::body(&body["result"])["status"],
+        403,
+        "{body}"
+    );
+    assert_eq!(
+        crate::mcp_test_answer::body(&body["result"])["body"]["refusal"],
+        "NotHeld",
         "{body}"
     );
     assert_eq!(pinned_at(&pin)?, before);

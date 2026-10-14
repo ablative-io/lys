@@ -1,6 +1,9 @@
 #![cfg(test)]
 //! Alarm routes retain their records and scope them to the caller.
 
+#[path = "../src/mcp_test_answer.rs"]
+mod mcp_answer;
+
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity_server::dashboard_api::alarms::{AlarmStore, Observation, ProxyEvidence};
@@ -146,7 +149,7 @@ async fn alarm_mcp_pass_reads_only_its_own_agents_alarms() -> TestResult {
     assert!(!response.headers().contains_key("www-authenticate"));
     let answer: Value = response.json().await?;
     assert_eq!(answer["result"]["isError"], false, "{answer}");
-    let result = &answer["result"]["structuredContent"];
+    let result = &mcp_answer::body(&answer["result"]);
     assert_eq!(result["status"], 200, "{answer}");
     let alarms = result["body"]["alarms"]
         .as_array()

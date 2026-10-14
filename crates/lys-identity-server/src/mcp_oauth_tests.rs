@@ -160,10 +160,11 @@ async fn an_approved_app_acts_as_its_own_agent_never_as_the_person() -> Result<(
     let access = tokens["access_token"].as_str().ok_or("no access token")?;
     let called: Value = tree(&service, access).await?.json().await?;
     assert_eq!(
-        called["result"]["structuredContent"]["status"], 200,
+        crate::mcp_test_answer::body(&called["result"])["status"],
+        200,
         "{called}"
     );
-    let root = &called["result"]["structuredContent"]["body"]["root"];
+    let root = &crate::mcp_test_answer::body(&called["result"])["body"]["root"];
     assert_eq!(root["name"], "Notes", "{called}");
     let (_, own) = service.get("/tree", Some(&cookie)).await?;
     assert_ne!(root["id"], own["root"]["id"], "the app acted as the person");
