@@ -153,12 +153,14 @@ impl Sessions {
                 "the proxied Claude session's source no longer names its proxy run",
             ));
         }
-        if source
+        if let Some(previous) = source
             .native_conversation
             .as_deref()
-            .is_some_and(|previous| previous != claude)
+            .filter(|previous| *previous != claude)
         {
-            tracing::info!(session = id, previous = ?source.native_conversation, native = claude, "terminal native conversation changed");
+            crate::error::said(&format!(
+                "native_conversation_changed: terminal session {id} changed from {previous} to {claude}"
+            ));
         }
         source.native_conversation = Some(claude.to_owned());
         append(
