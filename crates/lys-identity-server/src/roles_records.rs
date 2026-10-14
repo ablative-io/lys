@@ -104,6 +104,7 @@ pub struct Holding {
 
 impl Holding {
     /// `ended`, `lapsed` or `holding`, as it stands at `at`.
+    #[must_use]
     pub fn state(&self, at: u64) -> &'static str {
         if self.ended.is_some() {
             "ended"
@@ -131,11 +132,13 @@ pub struct Role {
 
 impl Role {
     /// The number of the latest version.
+    #[must_use]
     pub fn latest(&self) -> u32 {
         self.versions.last().map_or(0, |version| version.number)
     }
 
     /// The version numbered `number`.
+    #[must_use]
     pub fn version(&self, number: u32) -> Option<&Version> {
         self.versions
             .iter()
@@ -143,6 +146,7 @@ impl Role {
     }
 
     /// The last holding of `holder`.
+    #[must_use]
     pub fn holding(&self, holder: &str) -> Option<&Holding> {
         self.holdings
             .iter()

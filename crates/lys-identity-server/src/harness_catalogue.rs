@@ -130,6 +130,11 @@ pub struct Catalogue {
 
 impl Catalogue {
     /// Read the descriptions embedded in the service binary before serving.
+    ///
+    /// # Errors
+    /// Refuses embedded description bytes that cannot be read as programme
+    /// choices, invalid capabilities or repeated programme names and rendering
+    /// contracts.
     pub fn embedded() -> Result<Self, ServerError> {
         Self::read(&[
             (
@@ -144,6 +149,11 @@ impl Catalogue {
     }
 
     /// Parse named source files through the same boundary used at startup.
+    ///
+    /// # Errors
+    /// Refuses malformed description bytes, empty sources, invalid programme
+    /// commands, models, modes or capability declarations, invalid published
+    /// source addresses, or repeated programme names and rendering contracts.
     pub fn read(sources: &[(&str, &str)]) -> Result<Self, ServerError> {
         let mut programs: Vec<ProgramView> = Vec::new();
         for &(file, text) in sources {

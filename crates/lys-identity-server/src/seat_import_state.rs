@@ -154,6 +154,7 @@ pub struct Operation {
 
 impl Operation {
     /// `completed`, `stopped` or `in_progress`.
+    #[must_use]
     pub fn state(&self) -> &'static str {
         if self.completed.is_some() {
             "completed"
@@ -165,6 +166,7 @@ impl Operation {
     }
 
     /// The step kept under `step`.
+    #[must_use]
     pub fn step(&self, step: &str) -> Option<&Step> {
         self.steps.iter().find(|kept| kept.step == step)
     }
@@ -190,11 +192,13 @@ pub struct Journal {
 
 impl Journal {
     /// The import `operation`.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<&Operation> {
         self.operations.get(operation)
     }
 
     /// The import reserved under `key`, while it is not stopped.
+    #[must_use]
     pub fn keyed(&self, key: &str) -> Option<&Operation> {
         self.keys
             .get(key)
@@ -202,6 +206,7 @@ impl Journal {
     }
 
     /// The seat's latest import.
+    #[must_use]
     pub fn latest(&self, seat: &str) -> Option<&Operation> {
         self.latest
             .get(seat)
@@ -209,6 +214,7 @@ impl Journal {
     }
 
     /// The seat's selected import: its latest completed one.
+    #[must_use]
     pub fn selected(&self, seat: &str) -> Option<&Operation> {
         self.selected
             .get(seat)
@@ -216,6 +222,7 @@ impl Journal {
     }
 
     /// Every import neither completed nor stopped, by operation id.
+    #[must_use]
     pub fn open(&self) -> Vec<String> {
         self.latest
             .values()

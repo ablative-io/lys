@@ -14,6 +14,7 @@ const SECRET_WORDS: [&str; 8] = [
     "cookie",
 ];
 /// Whether a variable, header, flag or query name names a secret.
+#[must_use]
 pub fn secret_name(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
     SECRET_WORDS.iter().any(|word| lower.contains(word))
@@ -22,6 +23,7 @@ pub fn secret_name(name: &str) -> bool {
 /// Whether `text` is shaped as a secret wherever it is written: a private
 /// key, a bearer or basic credential, or an address carrying a user part or
 /// a secret-named query value.
+#[must_use]
 pub fn secret_value(text: &str) -> bool {
     let lower = text.to_ascii_lowercase();
     lower.contains("-----begin")

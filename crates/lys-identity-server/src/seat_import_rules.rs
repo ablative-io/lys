@@ -35,6 +35,7 @@ const OBSERVATIONS: [&str; 10] = [
 
 /// Whether an apply may carry out `entry`'s change as Lys behaviour: never
 /// for a rule transfer, nor for any change that says it is not executable.
+#[must_use]
 pub fn executable_in_lys(entry: &DestinationEntry) -> bool {
     entry.record_kind != RULE_TRANSFER
         && entry.change.get("executable") != Some(&Value::Bool(false))

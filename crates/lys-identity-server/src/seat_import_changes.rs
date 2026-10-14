@@ -207,6 +207,11 @@ pub(crate) fn parsed(destination: &DestinationEntry) -> Result<Change, SeatImpor
 /// Refuse a destination whose change does not read as its kind, names an
 /// agent other than the seat's own `agent`, enables a delivery or exceeds
 /// a plan bound.
+///
+/// # Errors
+/// Refuses an unsupported or malformed destination, a foreign agent,
+/// removing a variable, enabling a delivery or a context policy without a
+/// Lys owner.
 pub fn checked(destination: &DestinationEntry, agent: &str) -> Result<(), Refusal> {
     let at = member(destination);
     let refusal = |name: &str, detail: String| Refusal {
@@ -293,6 +298,7 @@ fn schedule_checked(
 
 /// The owner revision a destination is bound to: destinations sharing one
 /// key share one revision counter, and are bound one after another.
+#[must_use]
 pub fn revision_key(destination: &DestinationEntry) -> String {
     match parsed(destination) {
         Ok(Change::Profile(_)) => "profile".to_owned(),

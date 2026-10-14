@@ -124,6 +124,7 @@ pub enum Harness {
 
 impl Harness {
     /// The harness's name as a plan says it.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::Claude => "claude",
@@ -132,6 +133,7 @@ impl Harness {
     }
 
     /// The rendering contract a build of this harness is declared under.
+    #[must_use]
     pub fn rendering_contract(self) -> &'static str {
         match self {
             Self::Claude => "claude-code/template-v1",

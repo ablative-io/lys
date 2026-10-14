@@ -8,6 +8,10 @@ use std::collections::BTreeSet;
 /// Read every source the manifest declares for its seat at one instant and
 /// assemble the plan, refusals and all; nothing is sent, started, stopped
 /// or changed.
+///
+/// # Errors
+/// Refuses an unknown seat, unavailable responsible people or profile,
+/// or a store read needed to bind the plan that fails.
 pub async fn gather(manifest: &Manifest, state: &AppState) -> Result<Plan, ServerError> {
     let seat = crate::seats_api::seat(state, &manifest.seat)?;
     let people = crate::seats_api::responsible(state, &BTreeSet::from([seat.added.agent.clone()]))?;
@@ -62,6 +66,10 @@ pub async fn gather(manifest: &Manifest, state: &AppState) -> Result<Plan, Serve
 
 /// [`gather`], refused `import_plan_refused` naming every refusal when the
 /// plan holds one or reads a source incompletely.
+///
+/// # Errors
+/// Refuses seat and profile gathering failures or a plan carrying a
+/// member refusal or incomplete source read.
 pub async fn build(manifest: &Manifest, state: &AppState) -> Result<Plan, ServerError> {
     let plan = gather(manifest, state).await?;
     confirmable(&plan)?;
@@ -69,6 +77,9 @@ pub async fn build(manifest: &Manifest, state: &AppState) -> Result<Plan, Server
 }
 
 /// Refuse `plan` when it holds a refusal.
+///
+/// # Errors
+/// Refuses a plan carrying any member refusal or incomplete source read.
 pub fn confirmable(plan: &Plan) -> Result<(), ServerError> {
     if plan.refusals.is_empty() {
         Ok(())

@@ -110,6 +110,7 @@ pub struct Sorted {
 }
 
 /// A refusal named `name` for `member`.
+#[must_use]
 pub fn refusal(name: &str, member: &str, detail: &str) -> Refusal {
     Refusal {
         name: name.to_owned(),
@@ -119,11 +120,13 @@ pub fn refusal(name: &str, member: &str, detail: &str) -> Refusal {
 }
 
 /// A fragment holding nothing.
+#[must_use]
 pub fn empty_fragment() -> Fragment {
     Fragment::default()
 }
 
 /// The SHA-256 of `bytes`, as lowercase hex.
+#[must_use]
 pub fn sha256_hex(bytes: &[u8]) -> String {
     crate::routes::hex(&Sha256::digest(bytes))
 }
@@ -332,6 +335,7 @@ impl Sorted {
 /// build declared the version declares none, and the plan says a person must
 /// declare one. Plan assembly binds the seat's agent and the profile's
 /// expected revision; nothing here reads the store.
+#[must_use]
 pub fn map_profile(
     seat: &str,
     harness: Harness,

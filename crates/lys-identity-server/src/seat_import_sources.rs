@@ -106,6 +106,7 @@ impl Kind {
 /// named; the destination declares the build `declared` names, the one the
 /// seat's own profile version declares. Reads nothing the manifest does not
 /// declare and writes nothing.
+#[must_use]
 pub fn read_files(manifest: &Manifest, declared: Option<&DeclaredHarness>) -> Fragment {
     read_files_with_session(manifest, declared, None)
 }
@@ -379,6 +380,7 @@ pub use credentials::{secret_name, secret_value};
 /// The Claude `settings.json` document sorted; `replaced` names the
 /// environment entries Lys replaces: the monitor address the manifest names
 /// and the prefixes it declares.
+#[must_use]
 pub fn claude_settings(source_id: &str, document: &Value, replaced: Replaced<'_>) -> Sorted {
     let mut sorted = Sorted::new(source_id);
     scan(&mut sorted, document, "", "", "");
@@ -412,6 +414,7 @@ pub fn claude_settings(source_id: &str, document: &Value, replaced: Replaced<'_>
 }
 
 /// The Claude `mcp.json` document sorted.
+#[must_use]
 pub fn claude_mcp(source_id: &str, document: &Value) -> Sorted {
     let mut sorted = Sorted::new(source_id);
     scan(&mut sorted, document, "", "", "");
@@ -434,6 +437,7 @@ pub fn claude_mcp(source_id: &str, document: &Value) -> Sorted {
 
 /// The Claude `system-prompt.md` text sorted: the profile's instructions,
 /// appended to the harness's own prompt as the file was.
+#[must_use]
 pub fn claude_prompt(source_id: &str, text: &str) -> Sorted {
     let mut sorted = Sorted::new(source_id);
     if text.to_ascii_lowercase().contains("-----begin") {
@@ -445,6 +449,7 @@ pub fn claude_prompt(source_id: &str, text: &str) -> Sorted {
 }
 
 /// A Codex `<name>-channels.config.toml` profile, read as JSON, sorted.
+#[must_use]
 pub fn codex_profile(source_id: &str, document: &Value) -> Sorted {
     let mut sorted = Sorted::new(source_id);
     scan(&mut sorted, document, "", "", "");

@@ -30,6 +30,9 @@ use cache::Screens;
 pub const PAGE: &str = "index.html";
 
 /// `api` under `/api`, and the screens in `dir` at the root.
+///
+/// # Errors
+/// Refuses a screen directory whose installed assets cannot be loaded.
 pub fn serving(dir: &Path, api: Router) -> Result<Router, ServerError> {
     let installed = Arc::new(Screens::load(dir)?);
     let screens = Router::new()
@@ -122,6 +125,7 @@ fn answer(screens: &Screens, relative: &Path, headers: &HeaderMap) -> Response {
 }
 
 /// The media type by the file's extension.
+#[must_use]
 pub fn content_type(path: &Path) -> &'static str {
     match path.extension().and_then(|ext| ext.to_str()) {
         Some("html") => "text/html; charset=utf-8",
@@ -140,6 +144,7 @@ pub fn content_type(path: &Path) -> &'static str {
 
 /// Hashed assets are kept for a year; the page and everything else are
 /// asked for again each time.
+#[must_use]
 pub fn cache_control(path: &Path) -> &'static str {
     if path.starts_with("assets") {
         "public, max-age=31536000, immutable"

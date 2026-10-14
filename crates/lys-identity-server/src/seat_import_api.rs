@@ -157,6 +157,7 @@ pub(crate) fn types(api: &mut lys_openapi::Api) -> Vec<Entry> {
 }
 
 /// `operation`'s receipt, naming `writes` made by this request.
+#[must_use]
 pub fn receipt(operation: &Operation, writes: u64) -> SeatImportReceipt {
     let plan = &operation.reserved.plan;
     SeatImportReceipt {

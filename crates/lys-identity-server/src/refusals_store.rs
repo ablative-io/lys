@@ -36,6 +36,7 @@ pub struct FeedRead {
 }
 
 /// The key a refusal is kept once under.
+#[must_use]
 pub fn key(record: &RefusalRecord) -> String {
     format!("{}\n{}", record.source, record.attempt)
 }
@@ -54,11 +55,13 @@ impl Refusals {
     }
 
     /// Whether `record` is kept already.
+    #[must_use]
     pub fn holds(&self, record: &RefusalRecord) -> bool {
         self.kept.contains(&key(record))
     }
 
     /// `agent`'s refusals, newest first.
+    #[must_use]
     pub fn of_agent(&self, agent: &str) -> Vec<RefusalRecord> {
         self.records
             .iter()

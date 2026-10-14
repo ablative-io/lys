@@ -234,6 +234,7 @@ impl Clone for Profile {
 
 impl Profile {
     /// The number of the latest version.
+    #[must_use]
     pub fn latest(&self) -> u32 {
         self.versions.last().map_or(0, |version| version.number)
     }

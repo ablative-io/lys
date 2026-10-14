@@ -21,6 +21,7 @@ pub struct ProfileParts {
 
 impl ProfileParts {
     /// Whether no source contributed a member.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.models.is_empty()
             && self.instructions.is_none()

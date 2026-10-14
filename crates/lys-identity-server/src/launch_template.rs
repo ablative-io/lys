@@ -90,6 +90,11 @@ pub fn handle_variable(secret: &str, taken: &mut BTreeSet<String>) -> String {
 
 /// Render `start` with the agent's `handles`: the template the home checks
 /// and keeps by hash, and the native process inputs a runner is given.
+///
+/// # Errors
+/// Refuses invalid launch fields, permissions or policy rules the declared
+/// harness cannot represent, or template rendering and process reconstruction
+/// failures.
 pub fn render(start: &Start<'_>, handles: &[HandleName]) -> Result<Rendered, ServerError> {
     let unrenderable = |reason: String| ServerError::LaunchUnrenderable { reason };
     let fields = fields(start, handles)?;
@@ -197,6 +202,7 @@ pub fn launch_command(program: &str) -> String {
 }
 
 /// Display the deterministic process inputs before the runner binds locations.
+#[must_use]
 pub fn command(
     launch: &lys_home::harness::rendering_launch::Launch,
     sha256: &str,

@@ -103,6 +103,7 @@ fn facts(state: &AppState, seat: &str) -> Result<SeatFacts, Refusal> {
 /// The seat's credential references from `facts`: `handles` is the approved
 /// broker's handle record (none when no broker can be asked) and `owner` is
 /// the user a seat-identity file must belong to.
+#[must_use]
 pub fn read_references_from(
     manifest: &Manifest,
     facts: &SeatFacts,
@@ -181,6 +182,10 @@ fn seat_file(
 /// Whether the file at `path` is usable, read from its metadata alone: a
 /// regular file, not a link, mode 0600, owned by `owner`. The file is never
 /// opened.
+///
+/// # Errors
+/// Refuses unreadable metadata, a symlink or nonregular file, mode other
+/// than 0600 or an owner other than the approved user.
 pub fn usable(path: &Path, owner: u32) -> Result<(), String> {
     let metadata = fs::symlink_metadata(path).map_err(|error| match error.kind() {
         ErrorKind::NotFound => "the file is missing".to_owned(),

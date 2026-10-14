@@ -90,6 +90,10 @@ impl<'a> Owners<'a> {
     }
 
     /// The revision `destination`'s owner holds now, for `agent`'s seat.
+    ///
+    /// # Errors
+    /// Refuses a malformed destination or an unavailable, poisoned or unsettled
+    /// owner store needed to read its current revision.
     pub fn revision(
         &self,
         destination: &DestinationEntry,
@@ -299,6 +303,9 @@ pub enum Point<'a> {
 /// What an apply tells at each [`Point`]; an error ends the apply there.
 pub trait Signal {
     /// `point` was reached.
+    ///
+    /// # Errors
+    /// Returns the observer's refusal to stop the apply at this progress point.
     fn reached(&self, point: Point<'_>) -> Result<(), ServerError>;
 }
 
@@ -322,6 +329,7 @@ pub struct Applied {
 }
 
 /// The stable id of the operation's `index`th step.
+#[must_use]
 pub fn step_id(operation: &str, index: usize) -> String {
     format!("{operation}/{index:04}")
 }
@@ -366,6 +374,11 @@ fn kept_operation(imports: &SeatImports, operation: &str) -> Result<Operation, S
 
 /// Apply the reserved import `operation` to `owners`, from its first step
 /// not yet kept; a completed import answers as kept and writes nothing.
+///
+/// # Errors
+/// Refuses an unknown or stopped import, a failed caller fence, malformed
+/// or unbound destinations, moved revisions, owner readback or write failures,
+/// failed progress signals or journal writes that cannot be kept.
 pub fn apply(
     imports: &SeatImports,
     owners: &Owners<'_>,
