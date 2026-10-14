@@ -12,6 +12,9 @@ use std::sync::Arc;
 use lys_core::Ed25519Identity;
 use lys_runner::{Act, Answer, Client, EndedHow, Launch, Options, Runner};
 
+#[path = "exit_reap_evidence.rs"]
+mod exit_reap_evidence;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 /// The session under test.
