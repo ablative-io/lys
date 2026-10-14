@@ -54,6 +54,7 @@ impl Sessions {
                 let mut table = self.lock()?;
                 if let Some(session) = table.sessions.get_mut(id) {
                     session.guard.idle = false;
+                    session.guard.boundary_observed = true;
                 }
                 append(&mut table, id, vec![boundary("turn_start", None)], None)?;
                 Ok("a turn began".to_owned())

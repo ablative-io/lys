@@ -117,6 +117,7 @@ impl Sessions {
                 leader: None,
                 cwd,
                 idle: true,
+                boundary_observed: false,
             },
             follower: None,
             pending_status: None,

@@ -82,7 +82,7 @@ pub(crate) fn accept(
             OperationRequest::WakeUp { compaction, .. } => {
                 format!("wake_up compaction={compaction}; accepted")
             }
-            _ if session.guard.tracking.is_some()
+            _ if (session.guard.tracking.is_some() || session.guard.boundary_observed)
                 && !session.guard.idle
                 && operation.request != OperationRequest::Stop =>
             {

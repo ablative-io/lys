@@ -21,6 +21,8 @@ pub struct Guard {
     pub cwd: String,
     /// Whether it is between turns, as its harness last said.
     pub idle: bool,
+    /// A verified hook supplied a turn boundary even without a transcript tracker.
+    pub boundary_observed: bool,
 }
 
 impl Guard {

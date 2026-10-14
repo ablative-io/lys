@@ -5,6 +5,10 @@ use crate::session::{Table, now_ms};
 use std::sync::mpsc;
 use std::time::Duration;
 
+#[cfg(test)]
+#[path = "boundary_tests.rs"]
+mod tests;
+
 pub(super) fn wait_start(table: &Table, operation: &str) -> Option<u64> {
     let held = table.operations.get(operation)?;
     if held.request == "wake_up" {
@@ -30,10 +34,11 @@ pub(super) fn arm(table: &mut Table, operation: &str) -> Result<(), RunnerError>
         .get(operation)
         .ok_or_else(|| unavailable("boundary operation disappeared"))?;
     if held.state != OperationState::Accepted
-        || table
-            .sessions
-            .get(&held.session)
-            .is_none_or(|session| session.managed.is_none() && session.guard.tracking.is_none())
+        || table.sessions.get(&held.session).is_none_or(|session| {
+            session.managed.is_none()
+                && session.guard.tracking.is_none()
+                && !session.guard.boundary_observed
+        })
     {
         return Ok(());
     }
@@ -98,7 +103,10 @@ pub(super) fn arm(table: &mut Table, operation: &str) -> Result<(), RunnerError>
 
 pub(super) fn note_at(table: &Table, id: &str, operation: &str, now: u64) -> Option<String> {
     let busy = table.sessions.get(id).is_some_and(|session| {
-        (session.managed.is_some() || session.guard.tracking.is_some()) && !session.guard.idle
+        (session.managed.is_some()
+            || session.guard.tracking.is_some()
+            || session.guard.boundary_observed)
+            && !session.guard.idle
     });
     if !busy {
         return Some("being typed".to_owned());
