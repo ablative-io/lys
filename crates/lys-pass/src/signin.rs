@@ -258,7 +258,7 @@ impl SignIn {
             .send()
             .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
-        read_token(response).await
+        read_token(response, &fields).await
     }
 
     async fn verified(&self, answer: TokenResponse, now: u64) -> Result<SignedIn, Error> {

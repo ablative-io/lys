@@ -11,6 +11,15 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
+### Fixed — `lys-pass` 0.3.3
+
+- Live clients take the Lys origin. Provider routes use `/oauth/`; permission
+  checks and product drafts use `/api/`. A mounted input such as `/api/` is
+  refused as `lys_origin_required`, so products use one origin client.
+- Unexpected token refusals retain the HTTP status and a plain refusal name
+  under `lys_could_not_be_asked`, including non-JSON answers. Response bodies
+  and credentials are never included in those errors.
+
 ### Changed — `lys-identity` and grant answers
 
 - `Permit` adds the public `degraded` field, an optional shared original

@@ -116,7 +116,7 @@ impl Client {
         };
         let response = self
             .http
-            .post(self.endpoint("grants/check/batch")?)
+            .post(self.api_endpoint("grants/check/batch")?)
             .bearer_auth(pass)
             .json(&body)
             .send()

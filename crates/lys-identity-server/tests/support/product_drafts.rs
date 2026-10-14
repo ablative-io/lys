@@ -125,6 +125,19 @@ impl Table {
         Ok(table)
     }
 
+    /// Serve the installed origin layout and keep direct API helpers on its mount.
+    pub async fn public_client(&mut self) -> Result<lys_pass::Client, Box<dyn Error>> {
+        let screens = self.service.dir.path().join("screens");
+        std::fs::create_dir(&screens)?;
+        std::fs::write(screens.join("index.html"), "<title>Fixture Lys</title>")?;
+        self.service
+            .restart_adjusted(move |config| config.surface_dir = Some(screens))
+            .await?;
+        let origin = reqwest::Url::parse(&self.service.base)?;
+        self.service.base.push_str("/api");
+        Ok(lys_pass::Client::new(reqwest::Client::new(), origin)?)
+    }
+
     /// A root grant of `editor` on `fixture_notes.doc:id` to `holder` in `mode`.
     pub async fn root(
         &self,
@@ -165,11 +178,14 @@ impl Table {
         use sha2::Digest;
         const BACK: &str = "https://app.example.test/signed-in";
         const VERIFIER: &str = "a-product-draft-verifier-of-enough-length-0123456789-ab";
+        let origin = reqwest::Url::parse(&self.service.base)?
+            .origin()
+            .ascii_serialization();
         let challenge = URL_SAFE_NO_PAD.encode(sha2::Sha256::digest(VERIFIER.as_bytes()));
         let answer = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()?
-            .get(format!("{}/oauth/authorize", self.service.base))
+            .get(format!("{origin}/oauth/authorize"))
             .query(&[
                 ("client_id", NOTES),
                 ("redirect_uri", BACK),
@@ -193,7 +209,7 @@ impl Table {
             .ok_or("the app is given a code")?;
         let secret = identity_contract::app_custody::secret();
         let token: Value = reqwest::Client::new()
-            .post(format!("{}/oauth/token", self.service.base))
+            .post(format!("{origin}/oauth/token"))
             .header(
                 reqwest::header::AUTHORIZATION,
                 format!("Basic {}", STANDARD.encode(format!("{NOTES}:{secret}"))),

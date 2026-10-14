@@ -280,7 +280,7 @@ impl Client {
         }
         let response = self
             .http
-            .post(self.endpoint("product-drafts")?)
+            .post(self.api_endpoint("product-drafts")?)
             .bearer_auth(pass)
             .json(draft)
             .send()
@@ -308,7 +308,7 @@ impl Client {
         if connector_pass.is_empty() || app.is_empty() {
             return Err(Error::Invalid("draft connector or app is missing"));
         }
-        let mut url = self.endpoint("product-drafts")?;
+        let mut url = self.api_endpoint("product-drafts")?;
         url.query_pairs_mut()
             .append_pair("app", app)
             .append_pair("state", "approved");
@@ -369,7 +369,7 @@ impl Client {
         if draft.id.is_empty() {
             return Err(Error::Invalid("draft id is missing"));
         }
-        let mut url = self.endpoint("product-drafts/")?;
+        let mut url = self.api_endpoint("product-drafts/")?;
         url.path_segments_mut()
             .map_err(|()| Error::Invalid("issuer cannot hold draft paths"))?
             .pop_if_empty()

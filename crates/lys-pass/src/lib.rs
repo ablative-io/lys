@@ -75,6 +75,20 @@ pub enum Error {
     /// A live response is outside the permission contract.
     #[error("Lys could not be asked: {0}")]
     CannotAsk(&'static str),
+    /// The token route answered outside its refusal contract.
+    #[error("Lys could not be asked: token route answered {status}{suffix}", suffix = .refusal.as_deref().map_or_else(String::new, |name| format!(" {name}")))]
+    CannotAskToken {
+        /// The HTTP status the route answered.
+        status: u16,
+        /// A plain refusal name, when its body carried one.
+        refusal: Option<String>,
+        /// A failure reading the answer, without the response body.
+        #[source]
+        cause: Option<Box<dyn std::error::Error + Send + Sync>>,
+    },
+    /// A live client needs the Lys origin, without an API mount or other path.
+    #[error("lys_origin_required: the Lys client needs an origin without an API mount or path")]
+    LysOriginRequired,
     /// A supplied endpoint is malformed.
     #[error("endpoint_refused")]
     Url(#[from] url::ParseError),
@@ -112,7 +126,10 @@ impl Error {
             Self::Json(_) | Self::Invalid(_) => "contract_refused",
             Self::RightsOutsideAudience => "rights_outside_audience",
             Self::Truncated(_) => "rights_truncated",
-            Self::Transport(_) | Self::CannotAsk(_) => "lys_could_not_be_asked",
+            Self::Transport(_) | Self::CannotAsk(_) | Self::CannotAskToken { .. } => {
+                "lys_could_not_be_asked"
+            }
+            Self::LysOriginRequired => "lys_origin_required",
             Self::Url(_) => "endpoint_refused",
             Self::Binding { name, .. } => name,
             Self::TokenRefused { name, .. } => name,
@@ -130,8 +147,9 @@ pub struct Client {
 
 #[cfg(feature = "http")]
 impl Client {
-    /// Use the product's configured transport and trusted Lys issuer.
-    pub fn new(http: Http, mut issuer: Url) -> Result<Self, Error> {
+    /// Use the product's configured transport and trusted Lys origin.
+    /// Provider routes live at its root; product API routes live under `/api`.
+    pub fn new(http: Http, issuer: Url) -> Result<Self, Error> {
         if !matches!(issuer.scheme(), "http" | "https")
             || issuer.host_str().is_none()
             || !issuer.username().is_empty()
@@ -141,14 +159,18 @@ impl Client {
         {
             return Err(Error::Invalid("issuer is not an HTTP origin"));
         }
-        if !issuer.path().ends_with('/') {
-            issuer.set_path(&format!("{}/", issuer.path()));
+        if issuer.path() != "/" {
+            return Err(Error::LysOriginRequired);
         }
         Ok(Self { http, issuer })
     }
 
     fn endpoint(&self, relative: &str) -> Result<Url, Error> {
         Ok(self.issuer.join(relative)?)
+    }
+
+    fn api_endpoint(&self, relative: &str) -> Result<Url, Error> {
+        self.endpoint(&format!("api/{relative}"))
     }
 
     /// Fetch the issuer's current keyset explicitly; offline checks never fetch.
@@ -234,7 +256,7 @@ impl Client {
             .send()
             .await
             .map_err(|error| Error::Transport(Box::new(error)))?;
-        read_token(response).await
+        read_token(response, form).await
     }
 }
 
@@ -270,21 +292,47 @@ fn bound(answer: TokenResponse) -> Result<TokenResponse, Error> {
 /// refusal without a name is not a contract answer, and neither carries the
 /// response body into an error.
 #[cfg(feature = "http")]
-pub(crate) async fn read_token(response: reqwest::Response) -> Result<TokenResponse, Error> {
-    if !response.status().is_success() {
-        let refused: TokenRefusal = response
-            .json()
+pub(crate) async fn read_token(
+    response: reqwest::Response,
+    form: &[(&str, &str)],
+) -> Result<TokenResponse, Error> {
+    let status = response.status();
+    if !status.is_success() {
+        let bytes = response
+            .bytes()
             .await
-            .map_err(|error| Error::Transport(Box::new(error)))?;
-        if refused.error.is_empty()
-            || refused.refusal.is_empty()
-            || refused.reason != refused.error_description
+            .map_err(|error| Error::CannotAskToken {
+                status: status.as_u16(),
+                refusal: None,
+                cause: Some(Box::new(error.without_url())),
+            })?;
+        if let Ok(refused) = serde_json::from_slice::<TokenRefusal>(&bytes)
+            && !refused.error.is_empty()
+            && !refused.refusal.is_empty()
+            && refused.reason == refused.error_description
+            && !contains_credentials(&refused.refusal, form)
+            && !contains_credentials(&refused.error_description, form)
         {
-            return Err(Error::CannotAsk("token refusal has no name"));
+            return Err(Error::TokenRefused {
+                name: refused.refusal,
+                reason: refused.error_description,
+            });
         }
-        return Err(Error::TokenRefused {
-            name: refused.refusal,
-            reason: refused.error_description,
+        let refusal = serde_json::from_slice::<RouteRefusal>(&bytes)
+            .ok()
+            .and_then(|body| body.refusal)
+            .filter(|name| {
+                name.len() <= 128
+                    && !contains_credentials(name, form)
+                    && name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+                    && name
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            });
+        return Err(Error::CannotAskToken {
+            status: status.as_u16(),
+            refusal,
+            cause: None,
         });
     }
     let answer: TokenResponse = response
@@ -295,6 +343,17 @@ pub(crate) async fn read_token(response: reqwest::Response) -> Result<TokenRespo
         return Err(Error::CannotAsk("invalid token response"));
     }
     Ok(answer)
+}
+
+#[cfg(feature = "http")]
+fn contains_credentials(text: &str, form: &[(&str, &str)]) -> bool {
+    form.iter().any(|(name, value)| {
+        matches!(
+            *name,
+            "client_secret" | "refresh_token" | "code" | "code_verifier"
+        ) && !value.is_empty()
+            && text.contains(*value)
+    })
 }
 
 /// Borrowed authorization-code exchange inputs, never retained by the client.
@@ -339,4 +398,10 @@ struct TokenRefusal {
     error_description: String,
     refusal: String,
     reason: String,
+}
+
+#[cfg(feature = "http")]
+#[derive(Deserialize)]
+struct RouteRefusal {
+    refusal: Option<String>,
 }

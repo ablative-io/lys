@@ -99,7 +99,7 @@ async fn a_product_refusal_is_posted_as_its_own_name_and_reason()
         .await?;
     let (head, body) = server.await??;
     assert!(
-        head.starts_with("POST /product-drafts/draft/refused-on-execution "),
+        head.starts_with("POST /api/product-drafts/draft/refused-on-execution "),
         "{head}"
     );
     assert_eq!(

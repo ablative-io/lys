@@ -113,7 +113,7 @@ async fn live_batch_preserves_held_mode_holder_and_revision()
     assert_eq!(answer.results[0].mode, Some(lys_pass::Mode::ByTwo));
     assert!(!answer.results[0].allowed);
     let request = server.await??;
-    assert!(request.starts_with("POST /grants/check/batch "));
+    assert!(request.starts_with("POST /api/grants/check/batch "));
     assert!(
         request
             .to_ascii_lowercase()

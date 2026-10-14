@@ -310,7 +310,7 @@ fn paged(page: &Value) -> Result<Paged, Box<dyn std::error::Error>> {
 /// remain, and zero refused. lys-pass follows the connector's cursor.
 #[tokio::test]
 async fn both_views_answer_the_callers_page_and_a_next_cursor() -> TestResult {
-    let table = Table::set().await?;
+    let mut table = Table::set().await?;
     let mut made = Vec::new();
     for words in [WORDS, "{\"stop\":\"seat-8\"}", "{\"stop\":\"seat-9\"}"] {
         let draft = drafted(&table, "by_draft", words).await?;
@@ -341,10 +341,7 @@ async fn both_views_answer_the_callers_page_and_a_next_cursor() -> TestResult {
     let (ids, next, total) = paged(&ok(one)?)?;
     assert_eq!((ids.as_slice(), total), (&made[..1], 3), "one of three");
     let next = next.ok_or("a cursor while more remain")?;
-    let client = lys_pass::Client::new(
-        reqwest::Client::new(),
-        reqwest::Url::parse(&table.service.base)?,
-    )?;
+    let client = table.public_client().await?;
     let rest = client
         .approved_drafts(&table.notes, NOTES, Some(&next))
         .await?;
@@ -386,7 +383,7 @@ impl Executor for Ledger {
 /// credential, which does not hold her grant, or a forged pass, it is refused.
 #[tokio::test]
 async fn lys_pass_hands_off_and_runs_approved_drafts_against_the_real_routes() -> TestResult {
-    let table = Table::set().await?;
+    let mut table = Table::set().await?;
     let grant = table.bea_holds("1", "by_draft").await?;
     let held = DraftRequest {
         operation: "product-op-7".to_owned(),
@@ -397,10 +394,7 @@ async fn lys_pass_hands_off_and_runs_approved_drafts_against_the_real_routes() -
     };
     let made = ok(create(&table, &table.bea, &serde_json::to_value(&held)?).await?)?;
     let draft = made["draft"].as_str().ok_or("a draft id")?.to_owned();
-    let client = lys_pass::Client::new(
-        reqwest::Client::new(),
-        reqwest::Url::parse(&table.service.base)?,
-    )?;
+    let client = table.public_client().await?;
     let judgment = lys_pass::deliberate::CheckAnswer {
         allowed: false,
         grant: Some(grant.clone()),
