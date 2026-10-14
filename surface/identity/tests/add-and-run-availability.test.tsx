@@ -1,4 +1,3 @@
-import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Machine } from '../src/features/network/contract';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
@@ -107,7 +106,7 @@ describe('Add-agent runner availability', () => {
     expect(posted.filter((entry) => entry.path === '/agents')).toEqual([]);
   });
 
-  it('blocks the form only when no computer is confirmed and names every computer and its distinct answer', async () => {
+  it('keeps plain Add enabled when no computer is confirmed, blocks only the run, and names every computer and its distinct answer', async () => {
     const laptop = computer('a', 'Away laptop');
     const terminal = computer('b', 'Ward terminal');
     const laptopReason = 'The laptop runner has no bridge holder.';
@@ -125,12 +124,11 @@ describe('Add-agent runner availability', () => {
     expect(form(container).querySelector('[role="alert"]')).not.toBeNull();
     expect(offered(container)).not.toContain(laptop.id);
     expect(offered(container)).not.toContain(terminal.id);
-    expect(submit(container).disabled).toBe(true);
-    await click(submit(container));
-    await act(async () => {
-      form(container).dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-    await settle();
+    // Registering now and starting later never waits on a runner: only Add and run is withheld.
+    expect(submit(container).textContent).toBe('Add');
+    expect(submit(container).getAttribute('aria-label')).toBe('Add agent');
+    expect(submit(container).disabled).toBe(false);
+    expect(form(container).textContent).not.toContain('Add and run');
     expect(posted.filter((entry) => entry.path === '/agents')).toEqual([]);
   });
 
@@ -157,10 +155,17 @@ describe('Add-agent runner availability', () => {
 
       localReply.answer(confirmed(local));
       await settle();
-      expect(form(container).textContent).toContain('Computer: ' + local.name);
+      // The first runner to answer is offered, never chosen for the person: other runners have not answered yet.
+      expect(offered(container)).toEqual(['', local.id]);
+      expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe('');
+      expect(form(container).textContent).not.toContain('Computer: ' + local.name);
       expect(form(container).textContent).not.toContain(local.name + ': asking its runner…');
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
       expect(form(container).textContent).toContain(terminal.name + ': asking its runner…');
+      await type(form(container).querySelector('input[name="display_name"]'), 'Clover from the first answer');
+      expect(submit(container).disabled).toBe(true);
+      expect(form(container).textContent).toContain('Choose the computer this agent runs on.');
+      await choose(form(container).querySelector('select[name="computer"]'), local.id);
       await ready(container, 'Clover from the first answer');
       expect(submit(container).disabled).toBe(false);
 
@@ -262,7 +267,8 @@ describe('Add-agent runner availability', () => {
       expect(requests).toContain('/harnesses');
       expect(requests).toContain(runnerPath(local));
       expect(requests).toContain(runnerPath(laptop));
-      expect(form(container).textContent).toContain('Computer: ' + local.name);
+      expect(offered(container)).toEqual(['', local.id]);
+      expect(form(container).textContent).not.toContain('Computer: ' + local.name);
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
       expect(form(container).querySelector('select[name="program"]')).toBeNull();
       expect(submit(container).disabled).toBe(true);
@@ -272,6 +278,7 @@ describe('Add-agent runner availability', () => {
       await settle();
       expect(form(container).querySelector<HTMLInputElement>('input[name="display_name"]')?.value).toBe('Clover waiting for programmes');
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
+      await choose(form(container).querySelector('select[name="computer"]'), local.id);
       await click(form(container).querySelector('button[aria-label="Choose a folder"]'));
       await click(form(container).querySelector('button[aria-label="Work in srv"]'));
       expect(submit(container).disabled).toBe(false);
@@ -285,6 +292,23 @@ describe('Add-agent runner availability', () => {
       laptopReply.answer(refused(503, 'RunnerUnreachable', reason));
       await settle();
     }
+  });
+
+  it('runs on the computer of a copy picked from its group, and the computer choice follows it', async () => {
+    const frontDesk = computer('a', 'Front desk');
+    const local = computer('b', 'Own computer');
+    const { container } = await mount('#/agents/new', routes([frontDesk, local]));
+    expect(offered(container)).toEqual(['', frontDesk.id, local.id]);
+    expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe('');
+    const copies = form(container).querySelector<HTMLSelectElement>('select[name="build"]');
+    const group = [...(copies?.querySelectorAll('optgroup') ?? [])].find((entry) => entry.label === local.name);
+    const option = group?.querySelector('option');
+    if (!option) throw new Error('The Own computer copy is missing');
+    await choose(copies, option.value);
+    expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe(local.id);
+    await ready(container, 'Clover on the picked computer');
+    expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe(local.id);
+    expect(submit(container).disabled).toBe(false);
   });
 
   it('keeps the name, chosen folder and explicit computer choice when a later runner refuses', async () => {

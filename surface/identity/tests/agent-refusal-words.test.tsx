@@ -97,6 +97,18 @@ describe('agent page refusal wording', () => {
     expect(problemWords(new Refused(409, { refusal: 'FutureAgentRule', reason: '' }))).toBe('Lys refused without explaining why.');
   });
 
+  it('never answers an empty sentence and never calls a stopped request a refusal', () => {
+    for (const problem of [new Error(''), '', '   ', new Refused(0, { refusal: '', reason: '' })]) {
+      const words = problemWords(problem);
+      expect(words.trim()).not.toBe('');
+      expect(words).not.toContain('Lys refused');
+    }
+    const aborted = new Error('This operation was aborted'); aborted.name = 'AbortError';
+    expect(problemWords(aborted)).toBe('The request was stopped before Lys answered. Check whether it was carried out, then try again.');
+    expect(problemWords('AbortError: The operation was aborted.')).toBe('The request was stopped before Lys answered. Check whether it was carried out, then try again.');
+    expect(problemWords('TypeError: Failed to fetch')).not.toContain('Lys refused');
+  });
+
   it('does not treat inherited object members as refusal sentences', () => {
     expect(refusalWords('toString')).toBeUndefined();
     expect(problemWords(new Refused(409, { refusal: 'constructor', reason: 'this computer cannot be chosen' }))).toBe('Lys refused: this computer cannot be chosen');

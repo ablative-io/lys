@@ -9,7 +9,7 @@ import { entries } from '../people/directory';
 import { readRoles } from '../roles/AssignedRoles';
 import type { Role } from '../roles/contract';
 import { changedFrom, profileRequest } from '../runtime/start-requests';
-import { DirectoryGate as Gate, ErrorWords } from '../people/Words';
+import { DirectoryGate as Gate, ErrorWords, refusalCode } from '../people/Words';
 import type { ProvisioningProfile } from './Provisioning';
 import { Act } from '../../shell/Act';
 
@@ -120,7 +120,8 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
     {brief && !changed && !pending ? null : <>
     <Act symbol="save" name={busy ? 'Saving…' : label} word={busy ? 'Saving…' : 'Save'} tone="primary" type="submit" disabled={busy || Boolean(why)} />
     {why && !(saved && !changed && why === 'Nothing has changed.') ? <>
-      <ErrorWords problem={why} />
+      {/* A coded refusal keeps its details; a plain reason (nothing changed, reading, an administrator's setting) is a sentence, not an error. */}
+      {refusalCode(why) ? <ErrorWords problem={why} /> : <p className="why-not">{why}</p>}
       {starting && !pending && !initial.error ? <p><a href={'#/file/' + encodeURIComponent(agent)}>Go to {name}</a></p> : null}
     </> : null}
     </>}

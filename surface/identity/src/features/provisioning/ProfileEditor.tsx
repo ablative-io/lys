@@ -30,7 +30,7 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
   </section>} />;
 }
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, render }: {
   /** Only the model and the computer are shown; everything else is kept as saved. */
   brief?: boolean;
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
@@ -40,14 +40,19 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   computer?: string; canChoose?: boolean;
   /** The agent these settings belong to, when it exists; the rules its policy forces are shown for it. */
   agent?: string;
+  /** The agent runs on a computer not added yet: no runner can report its copies, so the copies Lys lists are offered. */
+  newComputer?: boolean;
+  /** Told the computer of a copy picked from another computer's group, so the screen around it runs the agent there. */
+  pin?: (machine: string) => void;
   render: (fields: ReactNode, settings: Record<string, unknown>, refusal: string) => ReactNode;
 }) {
   const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
-  const preferred = runsOn || computer;
+  // The screen's computer, when it names one, wins over a copy picked earlier from another computer's group.
+  const preferred = computer || runsOn;
   const machines = usable(choices.machines);
   const { catalogues, pending: readingCopies } = useProfileCopies(machines, preferred);
   const catalogue = preferred ? catalogues.find((entry) => entry.machine.id === preferred) : undefined;
-  const available = preferred ? catalogue?.programs ?? [] : machines.length === 1 && catalogues.length === 1 ? catalogues[0].programs : choices.programs ?? [];
+  const available = preferred && !newComputer ? catalogue?.programs ?? [] : machines.length === 1 && catalogues.length === 1 ? catalogues[0].programs : choices.programs ?? [];
   const workspaceMode = (entry: typeof available[number] | undefined) => entry?.modes.find((mode) => mode.id === 'workspace-only' || mode.id === 'workspace-write')?.id ?? '';
   const initialProgram = firstRun ? available.find((entry) => entry.builds.length > 0 && workspaceMode(entry)) ?? available[0] : available.length === 1 ? available[0] : undefined;
   const [programName, setProgram] = useState(profile?.harness?.name ?? initialProgram?.name ?? '');
@@ -70,9 +75,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [plugins, setPlugins] = useState(profile?.plugins ?? []);
   const [servers, setServers] = useState(profile?.mcp_servers ?? []);
   const [requiresControls, setRequiresControls] = useState(profile?.session?.requires_controls ?? false);
-  const groups = catalogues.map((entry) => ({ machine: entry.machine, builds: entry.programs.find((entry) => entry.name === programName)?.builds ?? [] }));
-  const copies = groups.flatMap((group) => group.builds.map((copy) => ({ ...copy, machine: group.machine.id,
-    value: preferred || machines.length === 1 ? copyValue(copy) : group.machine.id + '\n' + copyValue(copy) })));
+  const aggregate = newComputer;
+  const groups = (aggregate ? [] : catalogues).map((entry) => ({ machine: entry.machine, builds: entry.programs.find((entry) => entry.name === programName)?.builds ?? [] }));
+  const copies = aggregate ? (program?.builds ?? []).map((copy) => ({ ...copy, machine: '', value: copyValue(copy) }))
+    : groups.flatMap((group) => group.builds.map((copy) => ({ ...copy, machine: group.machine.id,
+      value: preferred || machines.length === 1 ? copyValue(copy) : group.machine.id + '\n' + copyValue(copy) })));
   const builds = copies;
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
   const heldCopy = (copies: typeof builds) => heldBuild ? copies.find((entry) => entry.program === heldBuild.program && entry.package === heldBuild.package)
@@ -80,8 +87,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [build, setBuild] = useState(heldBuild ? 'another' : '');
   const [programPath, setProgramPath] = useState(heldBuild?.program ?? '');
   useEffect(() => {
-    if (readingCopies || !catalogues.length) return;
-    const scoped = preferred || machines.length === 1;
+    if (readingCopies || !catalogues.length && !aggregate) return;
+    const scoped = aggregate || preferred || machines.length === 1;
     const next = available.find((entry) => entry.name === programName) ?? available.find((entry) =>
       catalogues.some((catalogue) => catalogue.programs.some((reported) => reported.name === entry.name && reported.builds.length > 0))) ?? available[0];
     if (!programName && next) {
@@ -98,14 +105,15 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const selectedProgram = selected && launchCommand(selected.program);
   let refusal = '';
   if (!preferred && choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
-  else if (preferred && !machines.some((entry) => entry.id === preferred)) refusal = 'Choose a computer that is still in use and has a connected runner.';
+  else if (!aggregate && preferred && !machines.some((entry) => entry.id === preferred)) refusal = 'Choose a computer that is still in use and has a connected runner.';
   else if (readingCopies) refusal = preferred ? 'Reading this computer’s programs.' : 'Reading the computers’ installed programs.';
   else if (catalogue?.failed) refusal = 'Lys could not read this computer’s installed programs. Check its runner before choosing a copy.';
-  else if (!preferred && catalogues.some((entry) => entry.failed)) refusal = 'Choose a computer whose installed programs Lys could read.';
+  else if (!aggregate && !preferred && catalogues.some((entry) => entry.failed)) refusal = 'Choose a computer whose installed programs Lys could read.';
   else if (catalogue?.problem && !selectedProgram?.startsWith('/')) refusal = problemWords(catalogue.problem);
   else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
   else if (!selected) refusal = build === 'another' ? PROGRAM_RULE : builds.length === 0
-    ? (preferred || machines.length === 1 ? program.name + ' is not installed on this computer.'
+    ? (aggregate ? 'Lys lists no installed copy of ' + program.name + '. Choose Another command or program and give its full path.'
+      : preferred || machines.length === 1 ? program.name + ' is not installed on this computer.'
       : machines.length ? 'No computer reported an installed copy of ' + program.name + '.'
         : 'No computer with a connected runner is available to report installed copies of ' + program.name + '.')
       + (program.not_found ? ' ' + problemWords(program.not_found) : '')
@@ -145,8 +153,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = available.find((entry) => entry.name === event.target.value);
       setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next), ...(permissions.additional_directories ? { additional_directories: permissions.additional_directories } : {}) }); setPrompt(firstRun ? firstPrompt(next) : strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
-      const nextCopies = catalogues.flatMap((catalogue) => catalogue.programs.find((entry) => entry.name === next?.name)?.builds ?? []);
-      setBuild((preferred || machines.length === 1) && (firstRun ? nextCopies.length > 0 : nextCopies.length === 1) ? copyValue(nextCopies[0]) : '');
+      const nextCopies = aggregate ? next?.builds ?? [] : catalogues.flatMap((catalogue) => catalogue.programs.find((entry) => entry.name === next?.name)?.builds ?? []);
+      setBuild((aggregate || preferred || machines.length === 1) && (firstRun ? nextCopies.length > 0 : nextCopies.length === 1) ? copyValue(nextCopies[0]) : '');
       setProgramPath('');
     }}>
       {!available.some((entry) => entry.name === programName) ? <option value={programName}>{programName || 'Choose a program'}</option> : null}
@@ -154,9 +162,9 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     </select></label>
     {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => {
       const chosen = copies.find((entry) => entry.value === event.target.value);
-      if (chosen) { setRunsOn(chosen.machine); setBuild(copyValue(chosen)); setProgramPath(''); }
+      if (chosen) { if (chosen.machine) { setRunsOn(chosen.machine); pin?.(chosen.machine); } setBuild(copyValue(chosen)); setProgramPath(''); }
       else setBuild(event.target.value);
-    }}><option value="">Choose an installed copy</option>{groups.filter((group) => group.builds.length > 0).map((group) => <optgroup key={group.machine.id} label={group.machine.name}>{copies.filter((copy) => copy.machine === group.machine.id).map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>)}</optgroup>)}<option value="another">Another command or program…</option></select></label> : null}
+    }}><option value="">Choose an installed copy</option>{aggregate ? copies.map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>) : null}{groups.filter((group) => group.builds.length > 0).map((group) => <optgroup key={group.machine.id} label={group.machine.name}>{copies.filter((copy) => copy.machine === group.machine.id).map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>)}</optgroup>)}<option value="another">Another command or program…</option></select></label> : null}
     <ProfileCopiesProblems catalogues={catalogues} />
     {program?.not_found && !builds.length ? <div className="wide"><ErrorWords problem={program.not_found} /></div> : null}
     {build === 'another' ? <label className="field">Command or program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}

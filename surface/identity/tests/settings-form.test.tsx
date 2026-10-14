@@ -207,6 +207,12 @@ describe('The settings form', () => {
     const { posted } = await open(routes(profile));
     expect(button()?.disabled).toBe(true);
     expect(text()).toContain('Nothing has changed.');
+    // A plain reason is a sentence beside the button, never an error with details.
+    const reason = [...document.querySelectorAll('.save-settings .why-not')].find((entry) => entry.textContent === 'Nothing has changed.');
+    expect(reason?.tagName).toBe('P');
+    expect(reason?.getAttribute('role')).toBeNull();
+    expect([...document.querySelectorAll('.save-settings [role="alert"]')].some((entry) => entry.textContent?.includes('Nothing has changed.'))).toBe(false);
+    expect(document.querySelector('.save-settings details')).toBeNull();
     await click(button());
     expect(posted).toEqual([]);
   });

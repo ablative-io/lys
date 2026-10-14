@@ -177,11 +177,23 @@ function problemParts(problem: unknown): { code: string; reason: string; detail:
   return { code, reason, detail };
 }
 
+/** The refusal name a problem carries, or empty when it is a plain sentence. */
+export const refusalCode = (problem: unknown): string => problemParts(problem).code;
+
+const STOPPED = 'The request was stopped before Lys answered. Check whether it was carried out, then try again.';
+const UNEXPLAINED = 'Something went wrong and no reason was given. Try again; if it happens again, ask the administrator to check Lys.';
+/** Names the browser gives its own failures: never a refusal from Lys, so never shown as one. */
+const BROWSER_FAILURES = new Set(['Error', 'TypeError', 'RangeError', 'ReferenceError', 'SyntaxError', 'NetworkError', 'DOMException', 'NotAllowedError', 'InvalidStateError']);
+
 export function problemWords(problem: unknown): string {
   const { code, reason } = problemParts(problem);
+  const name = typeof problem === 'object' && problem !== null && 'name' in problem ? String(problem.name) : '';
+  if (name === 'AbortError' || name === 'TimeoutError' || code === 'AbortError' || code === 'TimeoutError') return STOPPED;
   if (code && Object.hasOwn(REFUSALS, code)) return REFUSALS[code];
+  if (code && BROWSER_FAILURES.has(code)) return UNEXPLAINED;
   if (code) return reason.trim() ? 'Lys refused: ' + reason : 'Lys refused without explaining why.';
-  return reason;
+  // Never an empty sentence: callers read the words as the sign that something failed.
+  return reason.trim() ? reason : UNEXPLAINED;
 }
 
 export function ErrorWords({ problem }: { problem: unknown }) {

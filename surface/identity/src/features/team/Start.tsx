@@ -5,6 +5,7 @@ import { allowedToRun } from '../network/allowed';
 import type { Machine, NetworkView } from '../network/contract';
 import { NetworkRead } from '../network/shared-read';
 import type { Entry } from '../people/directory';
+import { ErrorWords, problemWords } from '../people/Words';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotStart } from '../runtime/CannotStart';
@@ -147,8 +148,9 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
   }, [load]);
 
   if (load.status === 'loading') return wanted.current ? <p role="status" className="team-start-line">Starting {name}…</p> : null;
-  if (load.status === 'refused') return <div className="team-start" role="alert">
-    <p className="team-start-line">Lys could not read what {name} needs to start. {load.refused.message} <small className="refusal-name">{load.refused.refusal.refusal}</small></p>
+  if (load.status === 'refused') return <div className="team-start">
+    <p className="team-start-line">Lys could not read what {name} needs to start.</p>
+    <ErrorWords problem={load.refused} />
     <div className="team-start-acts"><Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={() => setRound((value) => value + 1)} /></div>
   </div>;
   const stopped = refusal ?? known;
@@ -162,9 +164,13 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
     {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => {
       const unavailable = data?.availability[computer.id];
+      const detail = unavailable ? unavailable.refusal + ': ' + unavailable.reason : '';
       return <div key={computer.id}>
         <Act symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void run(computer.id); }} />
-        {unavailable ? <p role="alert">On {computer.name}: {unavailable.reason} <small className="refusal-name">{unavailable.refusal}</small></p> : null}
+        {unavailable ? <div className="why-not" role="alert" title={detail}>
+          <p>On {computer.name}: {problemWords(new Refused(0, unavailable))}</p>
+          <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{detail}</p></details>
+        </div> : null}
       </div>;
     })}</div> : null}
     {!stopped && !noProgram && choices.length === 1 ? <p className="dim team-start-where">On {choices[0].name}, in the folder {profile?.working_folder}.</p> : null}
