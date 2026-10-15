@@ -14,6 +14,7 @@ import { appKind, appKindProblem, givenOnText, grantNo, nameOf, passText, relati
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
+import { CambiumFirst, anyAppResource } from './CambiumFirst';
 
 const DAY = 86400;
 
@@ -259,6 +260,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
           : !carried.length ? <div className="note">{noActions}{heldWords ? <div>{heldWords}</div> : null}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
         <div className="note">{app ? 'Each choice gives exactly the actions shown.' : 'Each ticked action is given on its own; an agent is never given a wider relation.'}</div>
+        {anyAppResource(w.list.grants.map((grant) => grant.resource)) ? null : <CambiumFirst />}
       </div> : <div className="field">
         <label>Relation</label>
         <div>

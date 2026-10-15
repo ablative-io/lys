@@ -128,7 +128,8 @@ describe('Directory mutations', () => {
     await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
     await choose(page.querySelector('select[name="relation"]'), 'viewer');
     await choose(page.querySelector('select[name="kind"]'), 'project');
-    await fill(page, 'resource', 'integration-check');
+    await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
+    await fill(page, 'resource_id', 'integration-check');
     const checks = page.querySelectorAll('input[type="checkbox"]');
     await click(checks[1]);
     await submit(page);

@@ -134,11 +134,42 @@ describe('Add a person in one act', () => {
     expect(document.querySelector('[aria-label="Refused receipt"]')).toBeNull();
     expect(entry.textContent).toContain('IdentityNotActive');
   });
+  it('adds a person with no access when none is chosen, sending no grant, and says so', async () => {
+    const noGrant = (body: unknown) => {
+      const answer = admitted(body);
+      return ok({ ...answer, grant: null, receipt: { ...answer.receipt, completed: ['register', 'account', 'bind', 'activate'], logged: answer.receipt.logged.filter((leaf) => leaf.step !== 'grant') } });
+    };
+    const { entry, posted } = await form({ 'POST /people/admit': noGrant });
+    expect((entry.querySelector('select[name="kind"]') as HTMLSelectElement).value).toBe('');
+    expect(entry.querySelector('select[name="kind"] option[value=""]')?.textContent).toBe('No access yet');
+    expect(entry.querySelector('select[name="resource"]')).toBeNull();
+    expect(entry.textContent).toContain('Give them access to');
+    await type(entry.querySelector('input[name="given_name"]'), 'Care');
+    await type(entry.querySelector('input[name="family_name"]'), 'Helper');
+    await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
+    expect(entry.querySelector('button[type="submit"]')?.hasAttribute('disabled')).toBe(false);
+    await submit(entry);
+    expect(posted.map((call) => call.path)).toEqual(['/people/admit']);
+    expect('grant' in (posted[0]?.body as Record<string, unknown>)).toBe(false);
+    const receipt = document.querySelector('[aria-label="Receipt"]');
+    expect(receipt?.textContent).toContain('They have no access yet');
+  });
+
+  it('says resources and what they may do in words, never raw relation lists', async () => {
+    const { entry } = await form({});
+    await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+    const names = [...entry.querySelectorAll('select[name="resource"] option')].map((option) => option.textContent);
+    expect(names.slice(1)).toEqual(['a workspace, ward-3', 'a workspace, ward-7']);
+    const relations = [...entry.querySelectorAll('select[name="relation"] option')].map((option) => option.textContent ?? '');
+    expect(relations.some((words) => words.includes(' · '))).toBe(false);
+    expect(entry.textContent).toContain('As');
+  });
+
   it('offers as a first grant only the kinds and resources Lys lists, never a person or an agent', async () => {
     const { entry } = await form({});
     const kinds = [...entry.querySelectorAll('select[name="kind"] option')].map((option) => option.getAttribute('value'));
     expect(kinds).toEqual(['', 'place', 'workspace']);
-    expect(entry.querySelector('select[name="resource"]')?.hasAttribute('disabled')).toBe(true);
+    expect(entry.querySelector('select[name="resource"]')).toBeNull();
     await choose(entry.querySelector('select[name="kind"]'), 'workspace');
     const ids = [...entry.querySelectorAll('select[name="resource"] option')].map((option) => option.getAttribute('value'));
     expect(ids).toEqual(['', 'ward-3', 'ward-7']);

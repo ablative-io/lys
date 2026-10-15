@@ -8,6 +8,11 @@ import { field, RecordedForm } from '../people/RecordedForm';
 import { ErrorWords } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { MODE_HINTS, MODES, modeWords } from './mode-words';
+import { actionWords } from './action-words';
+import { resourceNames, resourceWords } from '../people/agent-resource-names';
+
+/** The resource choice that opens a box for an id Lys holds no grant on yet. */
+const BY_ID = '\u0000by-id';
 
 /**
  * The kinds a resource may be: each approved app's schema kinds under its name, then Lys's own kinds already held.
@@ -40,7 +45,12 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
   const [kind, setKind] = useState('');
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
+  const [which, setWhich] = useState('');
   const roles = rolesOf(kinds, kind);
+  const names = resourceNames(people, [], null);
+  const known = resources.filter((resource) => resource.kind === kind).sort((a, b) => a.id.localeCompare(b.id));
+  // With none of this kind known to Lys, the only way to name one is by its id.
+  const chosenWhich = known.length ? which : BY_ID;
   return <RecordedForm name="root-grant" title="Issue root grant" submitLabel="Issue" drawn={{ symbol: 'add', word: 'Issue' }} done={done} change={(data) => {
     const relation = role || field(data, 'relation');
     const actions = role ? roles[role] : model.relations[relation];
@@ -51,23 +61,25 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
     if (expires !== null && !Number.isFinite(expires)) throw new Error('Enter a valid expiry');
     return { path: '/grants/roots', body: {
       route: 'browser', holder: field(data, 'holder'),
-      resource: { kind: chosen, id: field(data, 'resource') }, relation,
+      resource: { kind: chosen, id: field(data, 'resource') === BY_ID ? field(data, 'resource_id') : field(data, 'resource') }, relation,
       pass_on: data.get('delegate') === 'on' ? { kind: 'to', actions, recipients: ['agent'] } : { kind: 'use_only' },
       window: { starts_at: Math.floor(Date.now() / 1000), ends_at: expires },
       mode: field(data, 'mode'),
     } };
   }}>
-    <p className="note">Only the directory's root authority may issue this grant. It is given to a person, who may pass it to their agents only if you allow it here.</p>
+    <p className="note">You are giving this to a person; they can pass it to their agents if you tick this.</p>
     <div className="field">Holder<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
-    <label className="field">Kind of thing<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); }}>
+    <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); }}>
       <option value="" disabled>Choose a kind</option>
       {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each}>{each}</option>)}</optgroup>)}
     </select></label>
-    <label className="field">Which one<input name="resource" required list="root-ids" autoComplete="off" /></label>
-    <datalist id="root-ids">{resources.filter((resource) => resource.kind === kind).map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} />)}</datalist>
-    <label className="field">Relation<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose a relation</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>
-    <label className="field">Mode<select name="mode" required value={mode} onChange={(event) => setMode(event.target.value)}>{MODES.map((each) => <option key={each} value={each}>{modeWords(each)}</option>)}</select>
-      <span className="hint">{MODE_HINTS[mode as keyof typeof MODE_HINTS] ?? ''}</span></label>
+    <label className="field">Which one<select name="resource" required value={chosenWhich} disabled={!kind} onChange={(event) => setWhich(event.target.value)}>
+      <option value="" disabled>{kind ? 'Choose one' : 'Choose a kind first'}</option>
+      {known.map((resource) => <option key={resource.id} value={resource.id}>{resourceWords(resource, names).words}</option>)}
+      <option value={BY_ID}>Another one, by its id in its app</option>
+    </select></label>
+    {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /></label> : null}
+    <label className="field">As<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
     {Object.keys(roles).length ? <label className="field">Role<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
       <option value="">No role: the relation above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}
@@ -75,6 +87,10 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
     <div className="field">May pass on<label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
     <div className="field">Expires (your local time)<div className="expires"><input name="expires" type="datetime-local" aria-label="Expires" required={!noExpiry} disabled={noExpiry} />
       <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> no expiry</label></div></div>
+    <details className="field"><summary>More</summary>
+      <label className="field">Mode<select name="mode" required value={mode} onChange={(event) => setMode(event.target.value)}>{MODES.map((each) => <option key={each} value={each}>{modeWords(each)}</option>)}</select>
+        <span className="hint">{MODE_HINTS[mode as keyof typeof MODE_HINTS] ?? ''}</span></label>
+    </details>
   </RecordedForm>;
 }
 

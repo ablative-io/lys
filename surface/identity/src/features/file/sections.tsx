@@ -27,6 +27,7 @@ import type { FileData } from './IdentityFile';
 import { clock } from './time';
 import './file.css';
 import { Act } from '../../shell/Act';
+import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
 
 function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
@@ -106,6 +107,7 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
       </div>
       {giving && passable.length ? <ActPanel label="Give" opener={giving} close={() => setGiving(null)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(null)} /></ActPanel> : null}
       <GrantTable w={w} grants={held} done={reload} give={false} />
+      {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <CambiumFirst /> : null}
       {mineToGive && !passable.length ? (
         <div style={{ marginTop: 12 }}>
           <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>

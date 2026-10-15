@@ -827,7 +827,7 @@ describe('Issue root grant is one row (walk of 4 Oct)', () => {
     const form = $('.act-panel.issue-root form[aria-label="Issue root grant"]');
     expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
     const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
-    expect(fields).toEqual(['Holder', 'Kind of thing', 'Which one', 'Relation', 'Mode', 'May pass on', 'Expires (your local time)']);
+    expect(fields).toEqual(['Holder', 'Give them access to', 'Which one', 'As', 'May pass on', 'Expires (your local time)', 'More']);
     expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Issue');
   });
 });

@@ -49,9 +49,11 @@ pub(crate) struct AdmitBody {
     family_name: Option<String>,
     /// The email their issuer account is found or made by.
     email: String,
-    /// Their first root grant.
+    /// Their first root grant, if any. An install with nothing to grant yet
+    /// admits a person with no access; the grant step is then not run.
+    #[serde(default)]
     #[schema(inline)]
-    grant: FirstGrant,
+    grant: Option<FirstGrant>,
 }
 
 /// The first root grant: use only, from now, with no end.
@@ -126,8 +128,8 @@ pub struct Admitted {
     pub person: String,
     /// Their subject at the issuer.
     pub subject: String,
-    /// Their first grant.
-    pub grant: String,
+    /// Their first grant, when one was asked for.
+    pub grant: Option<String>,
     /// What the act did.
     #[schema(inline)]
     pub receipt: AdmitReceipt,
@@ -198,7 +200,8 @@ fn checked(
     Ok((asked, operation, email, issuer))
 }
 
-/// POST /people/admit: the five steps, in order, as one act.
+/// POST /people/admit: the five steps, in order, as one act; the last,
+/// the first grant, only when one was asked for.
 pub(crate) async fn admit(
     State(state): State<Shared>,
     headers: HeaderMap,
@@ -248,7 +251,7 @@ async fn steps(
     headers: &HeaderMap,
     act: &Act<'_>,
     receipt: &mut AdmitReceipt,
-) -> Result<(String, String, String), (&'static str, ServerError)> {
+) -> Result<(String, String, Option<String>), (&'static str, ServerError)> {
     let Act {
         asked,
         operation,
@@ -316,15 +319,18 @@ async fn steps(
     .map_err(at(activate))?;
     receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
 
+    let Some(first) = asked.grant.as_ref() else {
+        return Ok((person, subject, None));
+    };
     let granted = crate::grants::issue_root(
         State(Arc::clone(state)),
         headers.clone(),
         body(json!({
             "operation": derived(operation, grant),
-            "route": asked.grant.route,
+            "route": first.route,
             "holder": person,
-            "resource": asked.grant.resource,
-            "relation": asked.grant.relation,
+            "resource": first.resource,
+            "relation": first.relation,
             "pass_on": {"kind": "use_only"},
             "window": {"starts_at": 0, "ends_at": null},
         }))
@@ -333,7 +339,7 @@ async fn steps(
     .await
     .map_err(at(grant))?;
     receipt.done(grant, Some(("grants", granted.0.index)));
-    Ok((person, subject, granted.0.grant))
+    Ok((person, subject, Some(granted.0.grant)))
 }
 
 #[cfg(test)]
@@ -351,6 +357,51 @@ mod tests {
         assert_ne!(
             derived(&operation, "register"),
             derived(&OperationId::from_bytes([8; 16]), "register")
+        );
+    }
+
+    #[test]
+    fn a_person_is_admitted_with_no_first_grant_when_none_is_asked() {
+        let asked: AdmitBody = serde_json::from_value(json!({
+            "operation": "op-00000000000000000000000000000000",
+            "display_name": "Care Helper",
+            "email": "helper@example.test",
+        }))
+        .expect("a body without a grant is whole");
+        assert!(asked.grant.is_none());
+        let nulled: AdmitBody = serde_json::from_value(json!({
+            "operation": "op-00000000000000000000000000000000",
+            "display_name": "Care Helper",
+            "email": "helper@example.test",
+            "grant": null,
+        }))
+        .expect("a null grant is no grant");
+        assert!(nulled.grant.is_none());
+    }
+
+    #[test]
+    fn a_first_grant_when_asked_is_still_read_whole() {
+        let asked: AdmitBody = serde_json::from_value(json!({
+            "operation": "op-00000000000000000000000000000000",
+            "display_name": "Care Helper",
+            "email": "helper@example.test",
+            "grant": {"route": "browser", "resource": {"kind": "workspace", "id": "ward-7"}, "relation": "editor"},
+        }))
+        .expect("a body with a grant is whole");
+        let grant = asked.grant.expect("the grant is kept");
+        assert_eq!(
+            (grant.resource.kind.as_str(), grant.relation.as_str()),
+            ("workspace", "editor")
+        );
+        let wrong = serde_json::from_value::<AdmitBody>(json!({
+            "operation": "op-00000000000000000000000000000000",
+            "display_name": "Care Helper",
+            "email": "helper@example.test",
+            "grant": {"route": "browser", "resource": {"kind": "workspace", "id": "ward-7"}},
+        }));
+        assert!(
+            wrong.is_err(),
+            "a grant without its relation is still refused"
         );
     }
 }

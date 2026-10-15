@@ -5,13 +5,18 @@ import { sendKept } from '../../kept';
 import { fullName } from './person-name';
 import { DirectoryGate, ErrorWords } from './Words';
 import { identity } from '../access/Resources';
+import { actionWords } from '../grants/action-words';
+import { resourceNames, resourceWords } from './agent-resource-names';
+import type { PeopleView } from '../../generated';
+import type { Team } from '../teams/contract';
 import type { ResourcesView } from '../access/Resources';
 import './add-agent.css';
 import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
 
 /** Adding a person is one act, POST /people/admit: register them, make their sign-in account at the issuer by
- * email, bind it, activate them and issue their first grant. The answer is one receipt naming each step and the log
+ * email, bind it, activate them and, when one is chosen, issue their first grant. A fresh install has nothing to
+ * grant yet, so "No access yet" is the default and no grant is sent. The answer is one receipt naming each step and the log
  * leaf it was recorded at; asking again with the saved request answers the same receipt and makes nothing twice. */
 /** A saved request: `name` is the name people see, made from `given` and `family`; a request saved before the two
  * were asked for apart carries `name` alone. */
@@ -34,19 +39,22 @@ function restored(key: string): PendingPerson | null {
   const unreadable = new Error('The saved request cannot be read. Check whether the person was added before submitting another request.');
   if (!object(value)) throw unreadable;
   const [name, email, kind, id, relation, operation] = ['name', 'email', 'kind', 'id', 'relation', 'operation'].map((each) => filled(value, each));
-  if (!name || !email || !kind || !id || !relation || !operation || !/^op-[0-9a-f]{32}$/.test(operation)) throw unreadable;
+  // A saved request either names a whole first grant or none at all.
+  const granting = Boolean(kind || id || relation);
+  if (!name || !email || !operation || !/^op-[0-9a-f]{32}$/.test(operation) || (granting && !(kind && id && relation))) throw unreadable;
   const [given, family] = [filled(value, 'given'), filled(value, 'family')];
-  return { name, email, kind, id, relation, operation, ...(given && family ? { given, family } : {}) };
+  return { name, email, kind: kind ?? '', id: id ?? '', relation: relation ?? '', operation, ...(given && family ? { given, family } : {}) };
 }
 
 /** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named. */
-function confirmed(answer: unknown, operation: string): Admitted {
+function confirmed(answer: unknown, operation: string, granting: boolean): Admitted {
+  const steps = granting ? STEPS : STEPS.filter((step) => step !== 'grant');
   const unconfirmed = new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm this person was added. The original request is saved.' });
   if (!object(answer) || typeof answer.person !== 'string' || !/^person-[0-9a-f]{32}$/.test(answer.person) || !object(answer.receipt)) throw unconfirmed;
   const receipt = answer.receipt;
   const logged = receipt.logged;
   if (receipt.operation !== operation || receipt.person !== answer.person || (receipt.failed !== null && receipt.failed !== undefined)
-    || !Array.isArray(receipt.completed) || receipt.completed.join(' ') !== STEPS.join(' ') || !Array.isArray(logged)
+    || !Array.isArray(receipt.completed) || receipt.completed.join(' ') !== steps.join(' ') || !Array.isArray(logged)
     || !logged.every((leaf: unknown) => object(leaf) && typeof leaf.step === 'string' && typeof leaf.log === 'string'
       && typeof leaf.index === 'number' && Number.isSafeInteger(leaf.index) && leaf.index >= 0)) throw unconfirmed;
   return { person: answer.person, logged: logged as Logged[] };
@@ -79,12 +87,14 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
 }
 
 function Receipt({ admitted }: { admitted: Admitted }) {
+  const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
   return <section aria-label="Receipt" className="note">
     <p>Added. One act, recorded as:</p>
     <ul>
       {admitted.logged.map((leaf) => <li key={leaf.log + leaf.index}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log leaf {leaf.index}</li>)}
       <li>Sign-in account: the issuer account for their email, found or made there; the issuer keeps that record</li>
     </ul>
+    {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
     <a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a>
   </section>;
 }
@@ -105,7 +115,10 @@ function grantable(view: ResourcesView): Map<string, string[]> {
   return new Map([...kinds].sort(([a], [b]) => a.localeCompare(b)).map(([kind, ids]) => [kind, ids.sort()]));
 }
 
-function PersonForm({ person, model, resources }: { person: string; model: GrantModel; resources: ResourcesView }) {
+/** A kind said as words: an app's `app.kind` reads as two words, underscores as spaces. */
+const kindWords = (kind: string) => kind.replaceAll('_', ' ').replaceAll('.', ' ');
+
+function PersonForm({ person, model, resources, names }: { person: string; model: GrantModel; resources: ResourcesView; names: Map<string, string> }) {
   const choices = grantable(resources);
   const key = 'lys.add-person.' + person;
   const [saved] = useState(() => {
@@ -125,7 +138,10 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
   // A saved request is sent again as it was saved, whatever the fields now hold.
-  const complete = pending !== null || Object.values(asking).every((value) => value.trim());
+  // The first grant is optional; when a kind is chosen, the resource and how they hold it must be chosen too.
+  const granting = Boolean(asking.kind);
+  const complete = pending !== null || ([asking.given, asking.family, asking.email].every((value) => value.trim())
+    && (!granting || Boolean(asking.id && asking.relation)));
   const set = (field: keyof typeof asking) => (event: { target: { value: string } }) => setAsking({ ...asking, [field]: event.target.value });
   const locked = busy || pending !== null || Boolean(saved.error);
   const submit = async () => {
@@ -134,14 +150,15 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
     try {
       const given = asking.given.trim();
       const family = asking.family.trim();
-      const asked: PendingPerson = pending ?? { ...asking, name: fullName(given, family), given, family, email: asking.email.trim(), operation: operationId() };
+      const asked: PendingPerson = pending ?? { ...asking, ...(granting ? {} : { kind: '', id: '', relation: '' }), name: fullName(given, family), given, family, email: asking.email.trim(), operation: operationId() };
+      const first = Boolean(asked.kind && asked.id && asked.relation);
       const answer = await sendKept(key, asked, async () => {
         setPending(asked);
         return confirmed(await request<unknown>('/people/admit', {
           operation: asked.operation, display_name: asked.name,
           ...(asked.given && asked.family ? { given_name: asked.given, family_name: asked.family } : {}), email: asked.email,
-          grant: { route: 'browser', resource: { kind: asked.kind, id: asked.id }, relation: asked.relation },
-        }), asked.operation);
+          ...(first ? { grant: { route: 'browser', resource: { kind: asked.kind, id: asked.id }, relation: asked.relation } } : {}),
+        }), asked.operation, first);
       }, false);
       setPending(null); setAdmitted(answer);
     } catch (error) { setFailure(error); }
@@ -156,20 +173,22 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
         <label className="field">Last name<input name="family_name" autoComplete="family-name" required value={asking.family} disabled={locked} onChange={set('family')} /></label>
       </>}
     <label className="field">Email<input name="email" type="email" autoComplete="email" value={asking.email} disabled={locked} onChange={set('email')} /></label>
-    <p className="note">Their first grant: what they may use from the start. More can be given from Access later.</p>
-    <label className="field">Kind of thing<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '' })}>
-      <option value="" disabled>Choose a kind</option>
-      {[...choices.keys()].map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+    <label className="field">Give them access to<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '', relation: '' })}>
+      <option value="">No access yet</option>
+      {[...choices.keys()].map((kind) => <option key={kind} value={kind}>{kindWords(kind)}</option>)}
     </select></label>
-    <label className="field">Which one<select name="resource" value={asking.id} disabled={locked || !asking.kind} onChange={set('id')}>
-      <option value="" disabled>{asking.kind ? 'Choose one' : 'Choose a kind first'}</option>
-      {(choices.get(asking.kind) ?? []).map((id) => <option key={id} value={id}>{id}</option>)}
-    </select></label>
-    {choices.size ? null : <p className="note">No resource is visible to you yet: <a href="#/resources">Resources</a> lists what can be granted.</p>}
-    <label className="field">Relation<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
-      <option value="" disabled>Choose a relation</option>
-      {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}
-    </select></label>
+    {choices.size ? <p className="note">Optional. More can be given from Access later.</p>
+      : <p className="note">Nothing can be given yet, so they start with no access. Connect an app on <a href="#/apps">Apps</a>; what it shares appears here and on Access once it is approved.</p>}
+    {granting ? <>
+      <label className="field">Which one<select name="resource" value={asking.id} disabled={locked} onChange={set('id')}>
+        <option value="" disabled>Choose one</option>
+        {(choices.get(asking.kind) ?? []).map((id) => <option key={id} value={id}>{resourceWords({ kind: asking.kind, id }, names).words}</option>)}
+      </select></label>
+      <label className="field">As<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
+        <option value="" disabled>Choose what they may do</option>
+        {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: asking.kind, id: asking.id }, actions)}</option>)}
+      </select></label>
+    </> : null}
     <Act symbol="add" name={busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'} word={busy ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={busy || !complete || Boolean(saved.error)} />
     {pending ? <p role="status">This request has no confirmed answer yet. Its original details are saved; trying again checks the same request.</p> : null}
     {failure ? <Failure failure={failure} operation={pending?.operation} /> : null}
@@ -178,11 +197,13 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
 
 export function AddPerson() {
   const load = useLoad(async () => {
-    const [me, people, model, resources] = await Promise.all([api.me(), api.people(), api.model(), request<ResourcesView>('/resources')]);
-    return { me, people, model, resources };
+    const [me, people, model, resources, teams] = await Promise.all([api.me(), api.people(), api.model(), request<ResourcesView>('/resources'),
+      // Team names only make the choices readable; without them a team is said by its kind and id.
+      request<{ teams: Team[] }>('/teams').then((answer) => answer.teams, () => [] as Team[])]);
+    return { me, people, model, resources, names: resourceNames(people as PeopleView, teams, null) };
   }, 'add-person');
-  return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory and choose the access they begin with." />
+  return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory. Access is optional; they can start with none." />
     <DirectoryGate load={load} title="Add a person" ok={(data) => data.people.scope === 'directory'
-      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} /> : <p>Only the Lys administrator can add people.</p>} />
+      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} names={data.names} /> : <p>Only the Lys administrator can add people.</p>} />
   </div>;
 }

@@ -306,6 +306,12 @@ describe('The saved control transport', () => {
       expect(text()).toContain(required ? 'Managed controls are required' : 'Notices use the terminal');
       expect(text()).toContain('No managed adapter is qualified');
       if (required) expect(text()).toContain('control_adapter_unqualified');
+      // The plain sentence is what shows; the codes sit folded in a details line, and the managed block only when asked for.
+      const shownWords = [...document.querySelectorAll('.usage-controls-plain > p')].map((p) => p.textContent ?? '').join(' ');
+      expect(shownWords).not.toMatch(/control_adapter_unqualified|No boundary is assumed/);
+      expect(document.querySelector('.usage-controls-plain details')?.hasAttribute('open')).toBe(false);
+      if (!required) expect(shownWords).toContain("Automatic context reminders aren't available for this program yet.");
+      expect(document.querySelector('section[aria-label="Managed controls"]') !== null).toBe(required);
       expect(posted).toEqual([]);
       unmountAll(); document.body.innerHTML = '';
     }
@@ -322,6 +328,7 @@ async function managedControlView(control: unknown, receipts: unknown[], extra: 
     ['/agents/' + SCRIBE + '/control-sessions']: ok({ agent: SCRIBE, sessions: [session], after: null }),
     ['/runtime/sessions/' + session + '/controls']: ok({ session, control }),
     ['/runtime/sessions/' + session + '/control-receipts']: ok({ session, receipts, after: null }),
+    ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, profile: { session: { requires_controls: true } } }),
     ...extra,
   };
   const posted: { path: string; body: unknown }[] = [];
@@ -448,5 +455,39 @@ describe('running session control readback', () => {
       expect(requests).toContain('/runtime/sessions/session-old/control-receipts');
       expect(requests.some((path) => path.endsWith('/runtime/sessions'))).toBe(false);
     } finally { await act(async () => root.unmount()); container.remove(); }
+  });
+});
+
+describe('An agent\'s spending limit', () => {
+  it('sets a dollar limit over a period with one save, and it is the budget at once', async () => {
+    const routes = keeping();
+    const { posted } = await mount(file, routes);
+    const limit = 'form[aria-label="Spending limit"]';
+    expect($(limit)).not.toBeNull();
+    await type(limit + ' input[name="spending_amount"]', '25');
+    await choose($(limit + ' select[name="spending_period"]'), 'week');
+    await click($(limit + ' button[type="submit"]'));
+    const put = posted.filter((call) => call.path === 'PUT ' + budgets);
+    expect(put).toHaveLength(1);
+    expect((put[0]?.body as BudgetBody).limits).toEqual([{ unit: 'dollars', amount: 25, period: 'week', act: 'stop' }]);
+    expect(text()).toContain('Spending limit set: $25 a week. It applies now.');
+    expect(($(limit + ' input[name="spending_amount"]') as HTMLInputElement | null)?.value).toBe('25');
+  });
+
+  it('changes the existing dollar limit in place and keeps every other limit', async () => {
+    const dollars: Budget = { holder, measure: 'dollars', limit: 10, period: { length: 'day', zone: 'UTC' }, act: 'tell', version: 1, by: SCRIBE, at: 1790000000 };
+    const routes = { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens, dollars])) };
+    let sent: BudgetBody | null = null;
+    routes['PUT ' + budgets] = (body) => { sent = body as BudgetBody; return ok({ ...budgetsView(holder, [tokens, dollars]), limits: sent.limits, version: sent.version + 1 }); };
+    await mount(file, routes);
+    const limit = 'form[aria-label="Spending limit"]';
+    expect(($(limit + ' input[name="spending_amount"]') as HTMLInputElement | null)?.value).toBe('10');
+    await type(limit + ' input[name="spending_amount"]', '40');
+    await click($(limit + ' button[type="submit"]'));
+    expect(sent).not.toBeNull();
+    const limits = (sent as unknown as BudgetBody).limits;
+    expect(limits).toHaveLength(2);
+    expect(limits[0]).toMatchObject({ unit: 'tokens', amount: 1000 });
+    expect(limits[1]).toMatchObject({ unit: 'dollars', amount: 40, period: 'day', act: 'tell', zone: 'UTC' });
   });
 });

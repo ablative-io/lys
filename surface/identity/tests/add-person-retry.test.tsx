@@ -46,8 +46,11 @@ describe('Add a person', () => {
   it('has the name, the email and the first grant, and one Add button', async () => {
     const { entry } = await form({});
     for (const name of ['given_name', 'family_name', 'email']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
-    for (const name of ['kind', 'resource']) expect(entry.querySelector(`select[name="${name}"]`)).not.toBeNull();
-    expect(entry.querySelector('select[name="relation"]')).not.toBeNull();
+    // The first grant is optional: "No access yet" until a kind is chosen, then which one and as what.
+    expect(entry.querySelector('select[name="kind"]')).not.toBeNull();
+    expect(entry.querySelector('select[name="resource"]')).toBeNull();
+    await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+    for (const name of ['resource', 'relation']) expect(entry.querySelector(`select[name="${name}"]`)).not.toBeNull();
     const add = entry.querySelector('button[type="submit"]');
     expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add person', 'Add']);
   });

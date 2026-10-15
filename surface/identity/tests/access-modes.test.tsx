@@ -46,8 +46,9 @@ async function fillIn(page: Element, kind: string, id: string, mode: string) {
   await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
   await choose(page.querySelector('select[name="relation"]'), 'viewer');
   await choose(page.querySelector('select[name="kind"]'), kind);
-  const input = page.querySelector<HTMLInputElement>('input[name="resource"]');
-  if (!input) throw new Error('No resource input');
+  await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
+  const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
+  if (!input) throw new Error('No resource id input');
   input.value = id;
   await choose(page.querySelector('select[name="mode"]'), mode);
   const checks = page.querySelectorAll('input[type="checkbox"]');
@@ -123,9 +124,12 @@ describe('The kind of thing is picked from the app schemas', () => {
   it('offers the ids Lys already holds for the chosen kind', async () => {
     await mount('#/access/issue', apps);
     await choose($('select[name="kind"]'), 'project');
-    expect($$('#root-ids option').map((option) => option.getAttribute('value')).sort()).toEqual(['identity', 'ledger']);
+    expect($$('select[name="resource"] option').map((option) => option.getAttribute('value'))).toEqual(['', 'identity', 'ledger', '\u0000by-id']);
+    expect($('input[name="resource_id"]')).toBeNull();
     await choose($('select[name="kind"]'), 'notes.doc');
-    expect($$('#root-ids option')).toHaveLength(0);
+    // None of this kind is known to Lys, so the only choice is naming one by its id.
+    expect(($('select[name="resource"]') as HTMLSelectElement | null)?.value).toBe('\u0000by-id');
+    expect($('input[name="resource_id"]')).not.toBeNull();
   });
 });
 

@@ -7,6 +7,7 @@ import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
 import { UsageBudgets } from './UsageBudgets';
+import { SpendingLimit } from './SpendingLimit';
 import { UsageGoals } from './UsageGoals';
 import { Words } from './Words';
 import { Variables } from './Variables';
@@ -33,8 +34,8 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
     const tracked = tracking(usage);
     return <div className="usage">
-      <ControlSetup agent={agent} />
-      <ManagedControls agent={agent} name={name} />
+      <SpendingLimit key={budgets.version} budgets={budgets} changed={changed} />
+      <ControlSetup agent={agent} name={name} />
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
@@ -68,15 +69,25 @@ export function TeamUsage({ team, name }: { team: string; name?: string }) {
   </>} /></div>;
 }
 
-/** The saved setup chooses the next start; a running session is never moved by a read. */
-function ControlSetup({ agent }: { agent: string }) {
+/** A plain sentence with the service's own words, codes included, kept folded beneath it for whoever needs them. */
+function Plain({ words, detail }: { words: string; detail: string }) {
+  return <div role="status" className="usage-controls-plain"><p>{words}</p><details><summary>Details</summary><p className="dim">{detail}</p></details></div>;
+}
+
+/** The saved setup chooses the next start; a running session is never moved by a read. Managed controls are shown only when the
+ * setup asks for them; otherwise one plain sentence says reminders are not available, and the code stays folded. */
+function ControlSetup({ agent, name }: { agent: string; name?: string }) {
   const load = useLoad(async () => {
     const answer = await request<ProvisioningAnswer>('/agents/' + encodeURIComponent(agent) + '/provisioning');
     const required = answer.profile?.session?.requires_controls;
     if (answer.agent !== agent || (required !== undefined && typeof required !== 'boolean')) throw new Error('ControlSetupUnreadable: the saved setup did not name this agent and its control requirement.');
     return required === true;
   }, 'control-setup:' + agent);
-  return <Gate load={load} title="Control setup" renderError={(failure) => <p role="status">Control setup unavailable: {failure.refusal.refusal}: {failure.message}</p>} ok={(required) => <p role="status">{required ? 'Managed controls are required by the saved setup. No managed adapter is qualified; starts are refused (control_adapter_unqualified).' : 'Notices use the terminal. No managed adapter is qualified.'}</p>} />;
+  return <Gate load={load} title="Control setup" renderError={(failure) => <Plain words="Automatic context reminders could not be read for this agent." detail={'Control setup unavailable: ' + failure.refusal.refusal + ': ' + failure.message} />}
+    ok={(required) => required ? <>
+      <Plain words="This agent's setup asks for automatic context reminders, which aren't available for this program yet, so it will not start until its setup is changed." detail="Managed controls are required by the saved setup. No managed adapter is qualified; starts are refused (control_adapter_unqualified)." />
+      <ManagedControls agent={agent} name={name} />
+    </> : <Plain words="Automatic context reminders aren't available for this program yet." detail="Notices use the terminal. No managed adapter is qualified." />} />;
 }
 
 function controlFailure(failure: Refused) { return <p role="status">{failure.refusal.refusal}: {failure.message}</p>; }
@@ -118,7 +129,7 @@ export function SessionControls({ session }: { session: string }) {
 }
 
 function CurrentControlState({ control }: { control: CurrentControl | null }) {
-  if (control === null) return <p role="status">Managed control channel unavailable. No boundary is assumed.</p>;
+  if (control === null) return <Plain words="Automatic context reminders aren't connected for this session." detail="Managed control channel unavailable. No boundary is assumed." />;
   const phase = { unknown: 'Boundary unknown; no idle boundary is proved', idle: 'Idle boundary', reserved: 'Next turn reserved', active: 'Active turn', closed: 'Managed channel closed' }[control.phase];
   const context = control.context;
   const words = context === null ? 'Context decision not yet received' : context.state === 'released' ? 'Normal input permitted' : context.state === 'compact' ? 'Compaction authorised; completion not yet proved' : context.state === 'held' ? 'Held: ' + context.reason.replaceAll('_', ' ') : 'Authority unavailable: ' + context.reason.replaceAll('_', ' ');
