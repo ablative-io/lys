@@ -206,12 +206,14 @@ pub struct PasswordPolicy {
 }
 
 impl Default for PasswordPolicy {
-    /// Lys's own policy, from NIST SP 800-63B-4 section 3.1.1.2 for a
-    /// password that is the only factor: at least 15 characters, up to 64
-    /// allowed, and no rule on which kinds of character it holds.
+    /// Lys's own policy: at least 8 characters, up to 64 allowed, and no
+    /// rule on which kinds of character it holds. Tom, 15 Oct 2026: fifteen
+    /// characters cannot be remembered without writing them down; NIST
+    /// SP 800-63B-4 allows 8 where a second factor or sign-in provider is
+    /// available, as Google sign-in is here.
     fn default() -> Self {
         Self {
-            length_min: 15,
+            length_min: 8,
             length_max: 64,
             lower_case: None,
             upper_case: None,

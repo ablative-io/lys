@@ -246,8 +246,8 @@ fn lys_owns_the_password_policy_and_a_configured_one_is_taken_whole() -> Result<
             absent.password_policy.length_min,
             absent.password_policy.length_max
         ),
-        (15, 64),
-        "Lys's own policy, NIST SP 800-63B-4 3.1.1.2"
+        (8, 64),
+        "Lys's own policy: eight characters at least (Tom, 15 Oct 2026)"
     );
     let text = format!(
         "{EXAMPLE}\n[password_policy]\nlength_min = 12\nlength_max = 48\ndigits = 2\nnot_recently_used = 4\n"
