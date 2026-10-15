@@ -23,7 +23,6 @@ export const STANDING: Record<string, number> = {
   'features/runtime/CanvasSurface.tsx': 5,
   'features/settings/Settings.tsx': 4,
   'features/teams/Teams.tsx': 1,
-  'shell/Explain.tsx': 1,
   'shell/Listing.tsx': 2,
   'shell/Picker.tsx': 1,
   'shell/Rail.tsx': 1,

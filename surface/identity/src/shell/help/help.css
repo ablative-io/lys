@@ -1,0 +1,23 @@
+/* The page help, after liminal's console help layer (theme §3, §10), in Lys's own tokens: the page dims, each
+   region is outlined, a numbered glass callout sits beside it, and a glass panel holds the keys. */
+.help-layer { position: fixed; inset: 0; z-index: 25; }
+.help-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); }
+.help-reg { position: fixed; pointer-events: none; border: 1.5px dashed var(--accent); border-radius: var(--radius-md); box-shadow: 0 0 0 4px rgba(212, 151, 90, .08); }
+.help-call { position: fixed; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 10px 12px; box-shadow: var(--shadow-lg); font-size: 12px; line-height: 1.5; animation: land .3s var(--spring); }
+.help-call-t { display: flex; gap: 8px; align-items: center; font-weight: 500; color: var(--text-primary); margin-bottom: 4px; }
+.help-call-d { color: var(--text-secondary); }
+.help-n { flex: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); color: #17110b; font: 600 10px "JetBrains Mono", ui-monospace, monospace; display: grid; place-items: center; }
+.help-keys { position: fixed; right: 16px; bottom: 16px; width: 320px; max-height: calc(100vh - 32px); overflow: auto; background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 10px 12px; box-shadow: var(--shadow-lg); font-size: 12px; outline: none; }
+.help-keys-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.help-keys-head b { font-weight: 600; font-size: 13px; }
+.help-kt { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
+.help-kt-row { display: contents; }
+.help-kt dt { font: 11px "JetBrains Mono", ui-monospace, monospace; color: var(--accent); white-space: nowrap; }
+.help-kt dd { margin: 0; color: var(--text-secondary); }
+.help-keys-foot { margin-top: 10px; display: flex; justify-content: flex-end; }
+/* The full help's sheet. */
+.help-track + .help-track { margin-top: 10px; }
+.help-sheet-track { font-size: 11px !important; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted) !important; margin-bottom: 6px !important; }
+.help-steps { margin: 4px 0 12px; padding-left: 18px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; }
+.help-steps a { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .help-call { animation: none; } }

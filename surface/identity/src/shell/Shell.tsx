@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { Dock } from './Dock';
-import { Explain } from './Explain';
 import { Palette } from './Palette';
 import { Rail } from './Rail';
 import { Upgraded } from './Upgraded';
 import { useShell } from './ShellContext';
 import { useShellKeys } from './keys';
+import { PageHelp } from './help/PageHelp';
 
 export function Shell({ children }: { children: ReactNode }) {
   const shell = useShell();
@@ -25,7 +25,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className={'toast' + (shell.toastShown ? ' show' : '')} id="toast" role="status">
         {shell.toastText}
       </div>
-      {shell.explaining ? <Explain /> : null}
+      {shell.explaining && !shell.signedOut ? <PageHelp /> : null}
     </>
   );
 }

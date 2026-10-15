@@ -30,9 +30,8 @@ const STATE = /aria-pressed=|aria-expanded=|aria-checked=|role="(menuitem|tab|ra
 /** A list entry: its words are the thing chosen, a name from data and never a verb. */
 const CHOICE = /data-choice=""/;
 /** The drawn controls a screen owns, each already a symbol with its own spoken name: the canvas's bar grip, its
- *  symbol buttons, colour swatches, the cross on a note, a line and a widget, a widget's turn; explain mode's
- *  numbered markers; the rail's places. */
-const OWN = /className=(?:"|\{')(?:canvas-bar-grip|canvas-symbol|canvas-swatch|canvas-mark-remove|canvas-widget-turn|canvas-widget-remove|xm|rb)\b/;
+ *  symbol buttons, colour swatches, the cross on a note, a line and a widget, a widget's turn; the rail's places. */
+const OWN = /className=(?:"|\{')(?:canvas-bar-grip|canvas-symbol|canvas-swatch|canvas-mark-remove|canvas-widget-turn|canvas-widget-remove|rb)\b/;
 
 /** Every bare button outside the control, as its source from `<button` to its end or to the next button, with
  *  those that are acts picked out. A button written `<button ... />` ends where the next one starts. */

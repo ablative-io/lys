@@ -1,0 +1,140 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { useLocation } from 'react-router';
+import { Act } from '../Act';
+import { useShell } from '../ShellContext';
+import { ANY_PAGE, PAGES, RAIL_REGION, pageKeyOf } from './pages';
+import type { Region } from './pages';
+import { CALL_W, onScreen, place } from './place';
+import type { Box } from './place';
+import { SHELL_SHORTCUTS, goShortcuts } from './shortcuts';
+import './help.css';
+
+interface Placed {
+  n: number;
+  region: Region;
+  box: Box;
+}
+
+/** The first on-screen element of each region, numbered in the page's order; regions not on screen are skipped. */
+function measure(regions: readonly Region[]): Placed[] {
+  const out: Placed[] = [];
+  for (const region of regions) {
+    const el = [...document.querySelectorAll(region.sel)].find((e) => !e.closest('#helpLayer') && onScreen(e.getBoundingClientRect(), innerWidth, innerHeight));
+    if (!el) continue;
+    out.push({ n: out.length + 1, region, box: el.getBoundingClientRect() });
+  }
+  return out;
+}
+
+/**
+ * The page help (liminal's help layer): the page dims, each region of the page on screen is outlined with a
+ * numbered callout beside it, and a panel lists the keys that work here. ? or ⌘/ shows and hides it; Esc, the
+ * close button or a click on the dim closes it, and the click never presses what is underneath. "Full help" opens
+ * the help dock on this page's sheet.
+ */
+export function PageHelp() {
+  const shell = useShell();
+  const { pathname } = useLocation();
+  const help = PAGES[pageKeyOf(pathname)] ?? ANY_PAGE;
+  const [placed, setPlaced] = useState<Placed[]>([]);
+  const [heights, setHeights] = useState<readonly number[]>([]);
+  const [minX, setMinX] = useState(0);
+  const [layout, setLayout] = useState(0);
+  const calls = useRef<(HTMLDivElement | null)[]>([]);
+  const panel = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    setPlaced(measure([...help.regions, RAIL_REGION]));
+    setMinX(document.getElementById('screen')?.getBoundingClientRect().left ?? 0);
+  }, [help, layout]);
+
+  // Each callout is drawn hidden first, measured, then placed by its own height before it is seen.
+  useLayoutEffect(() => {
+    const hs = placed.map((_, i) => calls.current[i]?.getBoundingClientRect().height ?? 0);
+    if (hs.length !== heights.length || hs.some((h, i) => h !== heights[i])) setHeights(hs);
+  }, [placed, heights]);
+
+  // Layout is re-measured on its own signals, never on a timer: a ResizeObserver on the page and on every element a
+  // region stands on, and one animation frame after the screen's content changes (a list arriving), it scrolls or
+  // the window resizes, which move regions without resizing them.
+  useEffect(() => {
+    let frame = 0;
+    const remeasure = () => setLayout((n) => n + 1);
+    const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(remeasure);
+    const observe = () => {
+      if (!resizes) return;
+      resizes.disconnect();
+      resizes.observe(document.documentElement);
+      for (const region of [...help.regions, RAIL_REGION]) {
+        for (const el of document.querySelectorAll(region.sel)) if (!el.closest('#helpLayer')) resizes.observe(el);
+      }
+    };
+    const nextFrame = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => { frame = 0; observe(); remeasure(); });
+    };
+    const changes = new MutationObserver((records) => {
+      if (records.some((r) => !(r.target instanceof Element && r.target.closest('#helpLayer')))) nextFrame();
+    });
+    observe();
+    changes.observe(document.body, { childList: true, subtree: true, characterData: true });
+    addEventListener('resize', nextFrame);
+    addEventListener('scroll', nextFrame, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      resizes?.disconnect();
+      changes.disconnect();
+      removeEventListener('resize', nextFrame);
+      removeEventListener('scroll', nextFrame, true);
+    };
+  }, [help]);
+
+  useEffect(() => { panel.current?.focus(); }, []);
+
+  const dismiss = (event: MouseEvent) => {
+    event.stopPropagation();
+    event.preventDefault();
+    shell.explainOff();
+  };
+  const full = () => {
+    shell.explainOff();
+    shell.showHelp(help.topic || null);
+  };
+  const bounds = { minX, width: innerWidth, height: innerHeight };
+
+  return (
+    <section id="helpLayer" className="help-layer" aria-label={'Help: ' + help.title}>
+      <div className="help-dim" data-help-dim="" onClick={dismiss} />
+      {placed.map(({ n, region, box }) => (
+        <div key={n + region.sel}>
+          <div className="help-reg" data-help-region={region.title} style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />
+          <div
+            ref={(el) => { calls.current[n - 1] = el; }}
+            className="help-call"
+            data-help-call={n}
+            style={heights[n - 1] === undefined ? { width: CALL_W, left: 0, top: 0, visibility: 'hidden' } : { width: CALL_W, ...place(region, box, heights[n - 1] ?? 0, bounds) }}
+          >
+            <div className="help-call-t"><span className="help-n">{n}</span>{region.title}</div>
+            <div className="help-call-d">{region.text}</div>
+          </div>
+        </div>
+      ))}
+      <div className="help-keys" role="dialog" aria-label={'Keys for ' + help.title} tabIndex={-1} ref={panel}>
+        <div className="help-keys-head">
+          <b>{help.title}</b>
+          <Act symbol="close" name="Close help" hint="Close help (Esc)" className="small quiet" data-help-close="" onClick={shell.explainOff} />
+        </div>
+        {help === ANY_PAGE ? <p className="dim">This page has no numbered notes; Full help explains every screen.</p> : null}
+        <dl className="help-kt">
+          {[...help.keys, ...SHELL_SHORTCUTS, ...goShortcuts()].map(([k, d]) => (
+            <div key={k} className="help-kt-row"><dt>{k}</dt><dd>{d}</dd></div>
+          ))}
+        </dl>
+        <div className="help-keys-foot">
+          <Act symbol="help" name="Full help" hint="Every topic: getting started, how each screen works, and what to do when something isn’t working" word="Full help" tone="primary" data-help-full="" onClick={full} />
+        </div>
+      </div>
+    </section>
+  );
+}

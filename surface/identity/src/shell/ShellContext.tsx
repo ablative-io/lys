@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { pref, setPref } from './prefs';
+import { readHelpUrl, writeHelpUrl } from './help/url';
+import type { HelpUrlState } from './help/url';
 
 export type DockMode = 'help' | null;
 
@@ -13,15 +15,19 @@ export interface Shell {
   setDockSide: (side: 'left' | 'right') => void;
   setLabels: (on: boolean) => void;
   toggleDockSide: () => void;
+  /** Whether the full help is open, as the address's `topic` says. */
   dockMode: DockMode;
   toggleDock: (mode: Exclude<DockMode, null>) => void;
   /** Open the dock on a panel, leaving it open if it already shows that panel. */
   openDock: (mode: Exclude<DockMode, null>) => void;
   closeDock: () => void;
+  /** The full help's open sheet, or null for its index. */
   helpSel: string | null;
+  /** Open the full help on a sheet, or on its index when `id` is null. */
   showHelp: (id: string | null) => void;
   paletteOpen: boolean;
   openPalette: () => void;
+  /** The page help (the numbered layer) is showing, as the address's `help=1` says. */
   explaining: boolean;
   explainOn: () => void;
   explainOff: () => void;
@@ -65,10 +71,32 @@ function returnFocus(opener: Element | null) {
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [labels, setLabelsState] = useState(pref('labels', 'icons') === 'labels');
   const [dockRight, setDockRight] = useState(pref('dock', 'left') === 'right');
-  const [dockMode, setDockMode] = useState<DockMode>(() => { const saved = pref('dock-panel', ''); return saved === 'help' ? saved : null; });
-  const [helpSel, setHelpSel] = useState<string | null>(null);
+  // The help's state is the address's (help/url.ts), so a help page can be linked and survives a reload.
+  const [help, setHelpState] = useState<HelpUrlState>(readHelpUrl);
+  const helpNow = useRef(help);
+  helpNow.current = help;
+  const setHelp = useCallback((change: (was: HelpUrlState) => HelpUrlState) => {
+    const next = change(helpNow.current);
+    helpNow.current = next;
+    writeHelpUrl(next);
+    setHelpState(next);
+  }, []);
+  // Back and Forward, or an address typed over this one, carry their own help.
+  useEffect(() => {
+    const follow = () => {
+      const now = readHelpUrl();
+      const was = helpNow.current;
+      if (now.page === was.page && now.topic === was.topic) return;
+      helpNow.current = now;
+      setHelpState(now);
+    };
+    window.addEventListener('popstate', follow);
+    return () => window.removeEventListener('popstate', follow);
+  }, []);
+  const dockMode: DockMode = help.topic === null ? null : 'help';
+  const helpSel = help.topic === null || help.topic === 'index' ? null : help.topic;
+  const explaining = help.page;
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [explaining, setExplaining] = useState(false);
   const [toastText, setToastText] = useState('');
   const [toastShown, setToastShown] = useState(false);
   const [rows, setRows] = useState<string[]>([]);
@@ -94,34 +122,27 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     () => setDockSide(pref('dock', 'left') === 'left' ? 'right' : 'left'),
     [setDockSide],
   );
-  const toggleDock = useCallback((mode: Exclude<DockMode, null>) => {
-    setDockMode((was) => {
-      const next = was === mode ? null : mode;
-      setPref('dock-panel', next || '');
-      return next;
-    });
-    setHelpSel(null);
-  }, []);
-  const openDock = useCallback((mode: Exclude<DockMode, null>) => {
-    setPref('dock-panel', mode);
-    setDockMode(mode);
-  }, []);
+  // Help is the dock's only panel, so the panel asked for is always Help.
+  const toggleDock = useCallback((_mode: Exclude<DockMode, null>) => {
+    setHelp((was) => ({ ...was, topic: was.topic === null ? 'index' : null }));
+  }, [setHelp]);
+  const openDock = useCallback((_mode: Exclude<DockMode, null>) => {
+    setHelp((was) => ({ ...was, topic: was.topic ?? 'index' }));
+  }, [setHelp]);
   const closeDock = useCallback(() => {
-    setPref('dock-panel', '');
-    setDockMode(null);
-  }, []);
+    setHelp((was) => ({ ...was, topic: null }));
+  }, [setHelp]);
   const showHelp = useCallback((id: string | null) => {
-    setPref('dock-panel', 'help');
-    setDockMode('help');
-    setHelpSel(id);
-  }, []);
+    setHelp((was) => ({ ...was, topic: id ?? 'index' }));
+  }, [setHelp]);
   const explainOff = useCallback(() => {
     if (!state.current.explaining) return;
-    setExplaining(false);
+    state.current = { ...state.current, explaining: false };
+    setHelp((was) => ({ ...was, page: false }));
     const back = explainOpener.current;
     explainOpener.current = null;
     queueMicrotask(() => returnFocus(back));
-  }, []);
+  }, [setHelp]);
   const closeAll = useCallback(() => {
     explainOff();
     if (state.current.paletteOpen) {
@@ -137,8 +158,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     }
     explainOpener.current = opener.current || document.activeElement;
     opener.current = null;
-    setExplaining(true);
-  }, []);
+    state.current = { ...state.current, explaining: true };
+    setHelp((was) => ({ ...was, page: true }));
+  }, [setHelp]);
   const openPalette = useCallback(() => {
     opener.current = document.activeElement;
     setPaletteOpen(true);

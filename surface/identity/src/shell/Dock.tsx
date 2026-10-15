@@ -1,66 +1,6 @@
-import { useEffect, useState } from 'react';
-import { CONCEPTS } from './concepts';
-import type { Concept } from './concepts';
-import { keyable } from './keyable';
+import { useEffect } from 'react';
 import { useShell } from './ShellContext';
-import { Act } from './Act';
-
-function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
-  const shell = useShell();
-  return (
-    <div className="concept" data-help={concept.id} {...keyable(() => shell.showHelp(concept.id))}>
-      <div className="t">{concept.t}</div>
-      {brief ? null : <div className="s">{concept.s}</div>}
-    </div>
-  );
-}
-
-function HelpPanel() {
-  const shell = useShell();
-  const [query, setQuery] = useState('');
-  const chosen = shell.helpSel ? CONCEPTS.find((c) => c.id === shell.helpSel) : undefined;
-  const q = query.toLowerCase();
-  const found = CONCEPTS.filter((c) => (c.t + ' ' + c.s + ' ' + c.body).toLowerCase().includes(q));
-  return (
-    <div className="dock-in">
-      <div className="dock-head">
-        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {chosen ? (
-            <Act symbol="back" name="Back" className="small quiet" data-help="" onClick={() => shell.showHelp(null)} />
-          ) : null}
-          <b style={{ fontWeight: 600 }}>{chosen ? chosen.t : 'Help'}</b>
-        </span>
-        <span style={{ display: 'flex', gap: 4 }}>
-          <Act symbol="help" name="Explain this screen" hint="Number everything on this screen (?)" word="Explain" data-act="explain" onClick={shell.explainOn} />
-          <Act symbol="close" name="Close" className="small quiet" data-dockbtn-close="" onClick={shell.closeDock} />
-        </span>
-      </div>
-      <div className="dock-body">
-        {chosen ? (
-          <>
-            <div className="sheet">
-              <p style={{ color: 'var(--text-primary)' }}>{chosen.s}</p>
-              <p>{chosen.body}</p>
-            </div>
-            <div className="section-h">Read next</div>
-            {CONCEPTS.filter((c) => c.id !== chosen.id)
-              .slice(0, 3)
-              .map((c) => (
-                <ConceptRow key={c.id} concept={c} brief />
-              ))}
-          </>
-        ) : (
-          <>
-            <input className="search" id="helpQ" placeholder="Search help…" value={query} onChange={(e) => setQuery(e.target.value)} />
-            <div id="helpList" style={{ marginTop: 8 }}>
-              {found.length ? found.map((c) => <ConceptRow key={c.id} concept={c} />) : <div className="dim">Nothing matches.</div>}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+import { HelpDock } from './help/HelpDock';
 
 export function Dock() {
   const shell = useShell();
@@ -76,7 +16,7 @@ export function Dock() {
   }, [shell.dockMode, shell.explaining, shell.paletteOpen, shell.closeDock]);
   return (
     <aside className={'dock' + (shell.dockMode === 'help' ? ' open' : '')} id="dock" aria-label="Help">
-      {shell.dockMode === 'help' ? <HelpPanel /> : null}
+      {shell.dockMode === 'help' ? <HelpDock /> : null}
     </aside>
   );
 }

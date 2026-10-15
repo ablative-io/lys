@@ -37,7 +37,7 @@ export function useShellKeys(): void {
     let pendingG = false;
     let pendingTimer: ReturnType<typeof setTimeout> | undefined;
 
-    // Help first, in the capture phase, so explain mode owns Escape and ?.
+    // Help first, in the capture phase, so the page help owns Escape, ? and ⌘/ while it shows.
     const help = (e: KeyboardEvent) => {
       const { shell: s } = live.current;
       if (s.explaining && e.key === 'Escape') {
@@ -45,8 +45,8 @@ export function useShellKeys(): void {
         s.explainOff();
         return;
       }
-      if (typing(e.target)) return;
-      if (e.key === '?') {
+      if (typing(e.target) || s.signedOut) return;
+      if (e.key === '?' || ((e.metaKey || e.ctrlKey) && e.key === '/')) {
         e.preventDefault();
         if (s.explaining) s.explainOff();
         else s.explainOn();
