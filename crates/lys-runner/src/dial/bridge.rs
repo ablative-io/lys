@@ -8,6 +8,12 @@ use super::{Dial, Signer, control_request, dispatch, reconnect};
 use crate::error::RunnerError;
 use crate::protocol::{Answer, reply_line};
 
+#[derive(Default)]
+struct Stopping {
+    state: AtomicBool,
+    retry: reconnect::RetryWait,
+}
+
 struct Lane {
     signer: Arc<Signer>,
     local: Arc<Mutex<BTreeMap<String, crate::client::Closer>>>,
@@ -17,8 +23,11 @@ fn stopped() -> RunnerError {
     RunnerError::refused("runner_dial_stopped", "the dial bridge has ended")
 }
 
-fn stop(lanes: &[Lane], stopping: &AtomicBool) {
-    stopping.store(true, Ordering::Release);
+fn stop(lanes: &[Lane], stopping: &Stopping) {
+    stopping.state.store(true, Ordering::Release);
+    if let Err(error) = stopping.retry.stop() {
+        crate::error::said(&error.to_string());
+    }
     for lane in lanes {
         if let Err(error) = lane.signer.channel.close() {
             crate::error::said(&error.to_string());
@@ -45,7 +54,7 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
             local: Arc::default(),
         },
     ];
-    let stopping = AtomicBool::new(false);
+    let stopping = Stopping::default();
     let disconnected = Arc::new(AtomicBool::new(false));
     let finished_reply = Arc::new(AtomicBool::new(false));
     let dispatch = Mutex::new(dispatch::Dispatch::new());
@@ -118,7 +127,7 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
 fn poll(
     dial: &Dial,
     lane: &Lane,
-    stopping: &AtomicBool,
+    stopping: &Stopping,
     disconnected: &Arc<AtomicBool>,
     dispatch: &Mutex<dispatch::Dispatch>,
     failures: &mpsc::Sender<Result<(), RunnerError>>,
@@ -126,36 +135,49 @@ fn poll(
 ) -> Result<(), RunnerError> {
     let signer = &lane.signer;
     let epoch = || {
-        if stopping.load(Ordering::Acquire) {
+        if stopping.state.load(Ordering::Acquire) {
             Err(stopped())
         } else {
             signer.epoch()
         }
     };
-    let mut current = reconnect::ready(epoch, disconnected, reconnect::pause)?;
+    let mut current = reconnect::ready(epoch, disconnected, |delay| stopping.retry.wait(delay))?;
     loop {
-        if stopping.load(Ordering::Acquire) {
+        if stopping.state.load(Ordering::Acquire) {
             return Err(stopped());
         }
         let mut connection = crate::client::connect(&dial.socket)?;
         let registration = Held::new(&lane.local, connection.closer()?)?;
         let greeting = connection.greeting_line()?;
         let (ticket, request_line) = loop {
-            if stopping.load(Ordering::Acquire) {
+            if stopping.state.load(Ordering::Acquire) {
                 return Err(stopped());
             }
-            let answer = signer.next(&current, &greeting);
-            if stopping.load(Ordering::Acquire) {
+            let mut refresh = false;
+            let answer = reconnect::ready(
+                || {
+                    if stopping.state.load(Ordering::Acquire) {
+                        return Err(stopped());
+                    }
+                    if refresh {
+                        current = reconnect::ready(epoch, disconnected, |delay| {
+                            stopping.retry.wait(delay)
+                        })?;
+                    }
+                    let answer = signer.next(&current, &greeting);
+                    refresh = matches!(&answer, Err(RunnerError::Unreachable { .. }));
+                    answer
+                },
+                disconnected,
+                |delay| stopping.retry.wait(delay),
+            );
+            if stopping.state.load(Ordering::Acquire) {
                 return Err(stopped());
             }
             match answer {
                 Err(RunnerError::DialStale { .. }) => {
-                    current = reconnect::ready(epoch, disconnected, reconnect::pause)?;
-                }
-                Err(RunnerError::Unreachable { .. }) => {
-                    reconnect::disconnected(disconnected);
-                    reconnect::pause();
-                    current = reconnect::ready(epoch, disconnected, reconnect::pause)?;
+                    current =
+                        reconnect::ready(epoch, disconnected, |delay| stopping.retry.wait(delay))?;
                 }
                 answer => break answer?,
             }
