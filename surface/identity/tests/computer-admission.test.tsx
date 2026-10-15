@@ -56,9 +56,19 @@ function plain(code: string, words: string) {
   for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
   expect(face.textContent).not.toContain(code);
   expect(face.textContent).toContain(words);
+  // The code is in a folded Error details line, never on the face.
+  expect(details?.closest('details')?.hasAttribute('open')).toBe(false);
 }
 
 describe('Choosing where an agent can run', () => {
+  it('tells an administrator to choose which agents may run, never that changes are not served', async () => {
+    await open();
+    const section = $('[aria-label="Where can Scribe run?"]');
+    expect(section?.textContent).toContain('Choose which agents may run on this computer.');
+    expect(section?.textContent).not.toContain('does not serve');
+    expect(section?.textContent).not.toContain('An administrator changes computer permissions.');
+  });
+
   it('lists every in-use computer by name, leaves retired computers out and explains one without a runtime', async () => {
     const { posted, requests } = await open(service({ '/network': ok({ machines: [machine, { ...machine, id: 'op-' + '2'.repeat(32), name: 'Second computer', may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }, { ...machine, id: 'op-' + '3'.repeat(32), name: 'No runtime', runtime: null }, { ...machine, id: 'op-' + '4'.repeat(32), name: 'Retired computer', state: 'retired' }], reports_served: true }) }));
     expect($('[aria-label="Where can Scribe run?"]')?.textContent).toContain('Ward computer');
@@ -77,9 +87,13 @@ describe('Choosing where an agent can run', () => {
     { name: 'absent', schema: ok({ openapi: '3.1.0', paths: {} }) },
     { name: 'malformed', schema: ok({ paths: { '/network/machines/{id}/agents': { post: {} } } }) },
     { name: 'unavailable', schema: refused(503, 'SchemaUnavailable', 'The served schema could not be read') },
-  ])('says the service does not serve it and sends no tick when the served route is $name', async ({ schema }) => {
+  ])('points to Network, never a dead end, and sends no tick when the served route is $name', async ({ schema, name }) => {
     const { posted } = await open(service({ '/surface-contract': schema }));
-    expect($('[aria-label="Where can Scribe run?"]')?.textContent).toContain('does not serve changes to a computer’s permissions');
+    const section = $('[aria-label="Where can Scribe run?"]');
+    expect(section?.textContent).not.toContain('does not serve');
+    expect(section?.textContent).toContain('Choose which agents may run on this computer.');
+    if (name === 'absent') expect(section?.querySelector('a[href="#/network"]')).not.toBeNull();
+    else expect(section?.querySelector('details .refusal-name')).not.toBeNull();
     expect(tick().disabled).toBe(true);
     await change();
     expect(posted).toEqual([]);
@@ -121,7 +135,7 @@ describe('Choosing where an agent can run', () => {
     const routes = service({ ['POST ' + path]: refused(503, 'NetworkUnavailable', 'The change outcome is unknown') });
     const first = await open(routes); await change();
     expect(sessionStorage.getItem(key)).not.toBeNull();
-    plain('NetworkUnavailable', 'Lys could not confirm this computer permission.');
+    plain('NetworkUnavailable', 'Ask the administrator to check the service.');
     const original = first.posted[0]; routes['POST ' + path] = (body) => ok(receipt(body as Body, false));
     const next = await remount(routes);
     const retry = [...document.querySelectorAll('button')].find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Check computer permission');
@@ -149,7 +163,7 @@ describe('Choosing where an agent can run', () => {
     expect(document.body.textContent).toContain('MachineAdmissionReceiptMismatch');
     expect(tick().checked).toBe(false);
     expect(sessionStorage.getItem(key)).not.toBeNull();
-    plain('MachineAdmissionReceiptMismatch', 'Lys could not confirm this computer permission.');
+    plain('MachineAdmissionReceiptMismatch', 'The answer did not confirm this computer permission.');
   });
 
   it('names corrupt retained permission state and sends no replacement request', async () => {
@@ -159,7 +173,7 @@ describe('Choosing where an agent can run', () => {
     expect(tick().disabled).toBe(true);
     await change();
     expect(posted).toEqual([]);
-    plain('PendingMachineAdmissionUnreadable', 'Lys could not read the saved computer permission.');
+    plain('PendingMachineAdmissionUnreadable', 'The saved computer permission cannot be read.');
   });
 
   it('blocks a second tick while its first change is being sent', async () => {

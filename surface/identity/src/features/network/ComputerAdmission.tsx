@@ -7,6 +7,7 @@ import { confirmAdmission, machineAdmissionServed, savedAdmissions } from './mac
 import type { MachineAdmission, PendingAdmissions } from './machine-admission';
 import { keepRecord, releaseRecord } from '../../kept';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 export function ComputerAdmission({ agent, name, person, admin, machines, roles, changed }: {
   agent: string; name: string; person: string; admin: boolean; machines: Machine[]; roles: Role[]; changed: (machine: Machine) => void;
@@ -15,11 +16,11 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
   const key = 'lys.pending.machine-agents.' + person + '.' + agent;
   const [initial] = useState(() => {
     try { return { pending: savedAdmissions(key, agent), error: '' }; }
-    catch (error) { return { pending: {}, error: error instanceof Refused ? error.refusal.refusal + ': ' + error.message : 'PendingMachineAdmissionUnreadable: ' + String(error) }; }
+    catch (error) { return { pending: {}, error: error instanceof Refused ? error : new Refused(0, { refusal: 'PendingMachineAdmissionUnreadable', reason: 'The saved computer permission cannot be read. ' + String(error) }) }; }
   });
   const [pending, setPending] = useState<PendingAdmissions>(initial.pending);
   const retained = useRef<PendingAdmissions>(initial.pending);
-  const [failure, setFailure] = useState(initial.error);
+  const [failure, setFailure] = useState<unknown>(initial.error);
   const [busy, setBusy] = useState<string[]>([]);
   const working = useRef(new Set<string>());
   const [adding, setAdding] = useState(false);
@@ -33,13 +34,13 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
   };
   const send = async (machine: string, body: MachineAdmission) => {
     if (!admin || !served || initial.error || working.current.has(machine)) return;
-    working.current.add(machine); setBusy([...working.current]); setFailure('');
+    working.current.add(machine); setBusy([...working.current]); setFailure(null);
     try {
       keep({ ...retained.current, [machine]: body });
       const answer = await request<unknown>('/network/machines/' + encodeURIComponent(machine) + '/agents', body);
       const current = confirmAdmission(answer, machine, body, person);
       const next = { ...retained.current }; delete next[machine]; keep(next); changed(current);
-    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    } catch (error) { setFailure(error); }
     finally { working.current.delete(machine); setBusy([...working.current]); }
   };
   const retry = (machine: string) => <Act symbol="again" name="Check computer permission" word="Check" disabled={!admin || !served || Boolean(initial.error) || busy.includes(machine)} onClick={() => void send(machine, pending[machine])} />;
@@ -56,10 +57,10 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
         {pending[machine.id] ? <div><p>This computer permission has no confirmed answer. Its original request is kept.</p>{retry(machine.id)}</div> : null}
       </div>;
     })}
-    {!served ? <p className="hint">This service does not serve changes to a computer’s permissions.</p> : null}
-    {!admin ? <p className="hint">An administrator changes computer permissions.</p> : null}
-    {capability.status === 'refused' ? <><p role="alert">Lys could not read the computer permission route.</p><p><small className="refusal-name">{capability.refused.refusal.refusal}: {capability.refused.message}</small></p></> : null}
-    {failure ? <><p role="alert">{initial.error ? 'Lys could not read the saved computer permission.' : 'Lys could not confirm this computer permission.'}</p><p><small className="refusal-name">{failure}</small></p></> : null}
+    {computers.length ? <p className="hint">{admin ? 'Choose which agents may run on this computer.' : 'Choose which agents may run on this computer: an administrator makes the change.'}</p> : null}
+    {capability.status === 'ok' && !capability.data ? <p className="hint">This version of Lys changes which agents may run on a computer from Network. <a href="#/network">Open Network</a></p> : null}
+    {capability.status === 'refused' ? <ErrorWords problem={capability.refused} /> : null}
+    {failure ? <ErrorWords problem={failure} /> : null}
     {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>A retained permission names a computer outside this list: {machine}.</p>{retry(machine)}</div>)}
     {notice ? <p role="status">{notice}</p> : null}
     {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <Act symbol="add" name="Add this computer" word="Add" onClick={() => setAdding(true)} /> : null}

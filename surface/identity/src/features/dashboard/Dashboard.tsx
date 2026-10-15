@@ -23,6 +23,8 @@ import '../runtime/terminal.css';
 import { Gate, SignIn } from '../signin/Gate';
 import type { Team } from '../teams/contract';
 import { AgentTree, RunningNow, entryOf, liveOf, whereOf } from './AgentTree';
+import { GettingStarted, readStanding } from './GettingStarted';
+import type { Standing } from './GettingStarted';
 import type { Asked, RowContext } from './AgentTree';
 import { orRefused } from './board';
 import { readDashboard, refusedPart } from './contract';
@@ -35,21 +37,22 @@ import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { Alarms } from './Alarms';
 
-interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
+interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
 type Read = Ready | { kind: 'registered' };
 
 async function readPage(): Promise<Read> {
   const me = await api.me();
   if (me.person.state === 'registered') return { kind: 'registered' };
-  const { answer, teams, cord, requests, drafts } = await readTogether({
+  const { answer, teams, cord, requests, drafts, standing } = await readTogether({
+    standing: readStanding(),
     requests: orRefused<AccessRequest[]>(request<{ requests: AccessRequest[] }>('/requests').then((list) => list.requests), 'RequestsUnreadable'),
     drafts: orRefused(readDrafts('waiting'), 'DraftsUnreadable'),
     cord: readCord(),
     answer: readDashboard(),
     teams: request<{ teams: Team[] }>('/teams').then((list) => list.teams, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'TeamsUnreadable', reason: String(problem) })),
   });
-  return { kind: 'active', me, answer, teams, cord, requests, drafts };
+  return { kind: 'active', me, answer, teams, cord, requests, drafts, standing };
 }
 
 /**
@@ -109,6 +112,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
   };
   const listed = { running: every.flatMap(liveOf).length, unread: every.filter((row) => refusedPart(row.sessions)).length };
   return <><CordLine cord={data.cord} changed={reload} listed={listed} /><div className="dash-body">
+    <GettingStarted person={data.me.person.id} agents={rows.length} standing={data.standing} reread={reload} />
     <section className="you-panel dash-agents" aria-label="Agents">
       <div className="section-h"><span>Agents</span></div>
       {data.teams instanceof Refused ? <p className="why-not">Teams cannot be read, so your agents are listed without their teams. <small className="refusal-name">{data.teams.refusal.refusal}</small></p> : null}

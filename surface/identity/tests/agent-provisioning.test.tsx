@@ -136,7 +136,7 @@ describe('The folder an agent works in', () => {
 });
 
 describe('Managed controls in the saved setup', () => {
-  it('leaves an old setup manual and sends only an explicit choice to require controls', async () => {
+  it('does not offer the controls requirement while no adapter is qualified, and leaves an old setup manual', async () => {
     const initial = { ...profile, working_folder: '/Users/ada/Developer/receipts', session: null };
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
       ...routes, [path]: ok({ ...answer, profile: initial }),
@@ -153,14 +153,14 @@ describe('Managed controls in the saved setup', () => {
         return ok({ ...answer, profile: saved, recorded: { operation: given.operation, version: 2 } });
       },
     });
-    const field = document.querySelector<HTMLInputElement>('input[name="requires_controls"]');
-    expect(field).not.toBeNull(); expect(field?.checked).toBe(false);
+    // No managed adapter is reported qualified, so the requirement is not offered: an old setup stays manual.
+    expect(document.querySelector('input[name="requires_controls"]')).toBeNull();
     expect(posted).toEqual([]);
-    await click(field);
-    expect((button('Save these settings') as HTMLButtonElement)?.disabled).toBe(false);
     await click(button('Save these settings'));
     expect(posted.filter((entry) => entry.path === path)).toHaveLength(1);
-    expect(posted.find((entry) => entry.path === path)?.body).toMatchObject({ working_folder: initial.working_folder, session: { requires_controls: true } });
+    const sent = posted.find((entry) => entry.path === path)?.body as { session?: { requires_controls?: boolean } | null; working_folder?: string };
+    expect(sent.working_folder).toBe(initial.working_folder);
+    expect(sent.session?.requires_controls).toBeUndefined();
     expect(text()).toContain('Saved.');
   });
   it('shows a saved managed choice without changing it', async () => {

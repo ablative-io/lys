@@ -144,6 +144,18 @@ describe('Add and run on the first computer', () => {
     expect(posted.find((entry) => entry.path === prefix + '/provisioning')?.body).toMatchObject({ harness: { program: 'claude' } });
   });
 
+  it('starts a new computer’s name as the name this computer gives itself, and keeps it editable', async () => {
+    const server = service();
+    server.routes['/network'] = ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' });
+    const { posted } = await open(server.routes);
+    const field = $('[name="computer_name"]') as HTMLInputElement;
+    expect(field.value).toBe('Ada’s MacBook Pro');
+    expect(field.disabled).toBe(false);
+    await type(field, 'Ward computer');
+    expect(field.value).toBe('Ward computer');
+    expect(posted).toEqual([]);
+  });
+
   it('requires the empty computer name and offered choices before enabling its one button', async () => {
     const { posted, requests } = await open(service().routes);
     const button = $('form button[type="submit"]') as HTMLButtonElement;
@@ -168,7 +180,8 @@ describe('Add and run on the first computer', () => {
     await type($('[name="display_name"]'), 'Clover');
     expect($('[name="computer_name"]')).toBeNull();
     expect($('form button[type="submit"]')?.textContent).not.toContain('and run');
-    expect(document.body.textContent).toContain('Front desk runs only the agents named when it was added. To add and run from here, add this computer again in Network with a role, then retire Front desk.');
+    expect(document.body.textContent).toContain('Choose which agents may run on Front desk in Network, then start Clover from its page.');
+    expect(document.body.textContent).not.toContain('retire Front desk');
     expect($('a[href="#/network"]')).not.toBeNull();
     expect(posted).toEqual([]);
     await submit();
@@ -189,7 +202,7 @@ describe('Add and run on the first computer', () => {
     await type($('[name="display_name"]'), 'Clover');
     expect($('[name="computer_name"]')).toBeNull();
     expect($('form button[type="submit"]')?.textContent).not.toContain('and run');
-    expect(document.body.textContent).toContain("Lys cannot confirm what Front desk's roles grant, so it won't give one to Clover. Add the agent here, then start it from its page once it is admitted to Front desk.");
+    expect(document.body.textContent).toContain('Choose which agents may run on Front desk in Network, then start Clover from its page.');
     expect(document.body.textContent).not.toContain('Front desk runs only the agents named');
     expect(posted).toEqual([]);
     await submit();
@@ -312,18 +325,37 @@ describe('Add and run on an existing computer', () => {
     expect(posted).toEqual([]);
   });
 
-  it('names an unavailable workspace setting instead of starting an unrestricted program', async () => {
+  it('falls back to the program’s own default mode with a plain note when it has no folder-only mode', async () => {
     const server = service(undefined, 'running', [existingComputer()]);
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }] }] });
     const { posted } = await open(server.routes);
-    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(document.body.textContent).toContain('This program has no setting that keeps it to its own folder with internet off.');
+    // First run is never blocked on the folder-only mode: the program's default is chosen and said, not hidden.
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that keeps it to its own folder with the internet off, so it starts in its own default mode (All access). You can change this under More settings.');
+    expect(document.body.textContent).not.toContain('This program has no setting that keeps it to its own folder');
     expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
-    expect(document.body.textContent).not.toContain('Works in its own folder; no internet.');
-    // Nothing is folded away anywhere in the form.
-    expect(document.querySelector('form details')).toBeNull();
-    await submit();
+    // The note is on the face of the form, never folded under More settings.
+    expect($('form details .first-run-mode')).toBeNull();
     expect(posted).toEqual([]);
+  });
+
+  it('asks a first agent only its name, program, folder and computer; the rest is folded under More settings', async () => {
+    await open(service(undefined, 'running', [existingComputer()]).routes);
+    const more = $('form details.more-settings');
+    expect(more?.querySelector('summary')?.textContent).toBe('More settings');
+    expect(more?.hasAttribute('open')).toBe(false);
+    const face = $('form[aria-label="Add an agent"]')?.cloneNode(true) as HTMLElement;
+    for (const folded of face.querySelectorAll('details.more-settings')) folded.remove();
+    const asked = [...face.querySelectorAll('input, select, textarea')].map((field) => field.getAttribute('name')).filter(Boolean);
+    expect(asked).toEqual(['display_name', 'program']);
+    expect(face.textContent).toContain('Computer: Front desk');
+    expect(face.textContent).toContain('No folder chosen yet.');
+    // The found copy is chosen for the person: no path is asked.
+    expect(face.querySelector('.first-run-copy')?.textContent).toBe('Lys found Care program on this computer and uses /opt/bin/care.');
+    expect(face.querySelector('[name="program-path"], [name="build"]')).toBeNull();
+    for (const name of ['answers_to', 'team', 'model', 'build', 'prompt']) expect(more?.querySelector('[name="' + name + '"]')).not.toBeNull();
+    // No managed adapter is reported qualified, so the controls requirement is not offered and stays off.
+    expect(document.querySelector('[name="requires_controls"]')).toBeNull();
   });
 
   it('keeps both capabilities unknown when their single schema read fails', async () => {

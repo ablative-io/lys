@@ -4,7 +4,10 @@ import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { $, serve } from './harness';
-import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, ARCHIVIST, COURIER, SCRIBE, SERVICE, ok, refused } from './fixtures';
+
+/** Ada's own agents not retired: an administrator's computer is added for them. */
+const OWN_AGENTS = [SCRIBE, COURIER, ARCHIVIST];
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 
@@ -74,12 +77,27 @@ function plain(code: string) {
   const face = document.body.cloneNode(true) as HTMLElement;
   for (const detail of face.querySelectorAll('.refusal-name')) detail.remove();
   expect(face.textContent).not.toContain(code);
-  expect(face.textContent).toContain('Lys could not confirm this computer addition.');
+  // The person reads the reason; the code waits in a folded Error details line.
+  expect(details?.closest('details')?.hasAttribute('open')).toBe(false);
+  expect(face.textContent?.trim()).not.toBe('');
 }
 
 const legacy: NameMachine = { operation: 'op-' + 'c'.repeat(32), name: 'Earlier computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [SCRIBE], may_run_roles: ['role-one'], may_reach: ['mcp.example.test'] };
 
 describe('Naming the computer Lys runs on', () => {
+  it('starts with the name this computer gives itself, editable, and only for this computer', async () => {
+    const routes = service();
+    routes['/network'] = ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' });
+    const { posted } = await open(routes);
+    const input = $('form[aria-label="Add a computer"] [name="name"]') as HTMLInputElement | null;
+    expect(input?.value).toBe('Ada’s MacBook Pro');
+    expect(input?.disabled).toBe(false);
+    const another = [...document.querySelectorAll('button')].find((entry) => entry.textContent === 'Another computer');
+    await act(async () => { another?.click(); });
+    expect(($('form[aria-label="Add a computer"] [name="name"]') as HTMLInputElement | null)?.value).toBe('');
+    expect(posted).toEqual([]);
+  });
+
   it('asks only its name and explains why it starts empty', async () => {
     const { posted } = await open(service());
     const form = $('form[aria-label="Add a computer"]');
@@ -100,11 +118,11 @@ describe('Naming the computer Lys runs on', () => {
     expect(posted).toEqual([]);
   });
 
-  it('names a computer without granting any agent, role or host and checks its local runner', async () => {
+  it('names a computer for the administrator’s own agents, with no role or host, and checks its local runner', async () => {
     const { posted } = await open(service());
     await submit();
     expect(posted).toHaveLength(2);
-    expect(posted[0].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Ward computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] });
+    expect(posted[0].body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Ward computer', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: OWN_AGENTS, may_run_roles: [], may_reach: [] });
     const id = (posted[0].body as NameMachine).operation;
     expect(posted[1]).toEqual({ path: '/network/machines/' + id + '/runner', body: { runner: { kind: 'lys' } } });
     expect(sessionStorage.getItem(pendingKey)).toBeNull();

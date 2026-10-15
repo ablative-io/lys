@@ -177,7 +177,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
         selected={selected?.machine.id ?? null} select={(computer) => setPicked(computer.machine.id)} open={(computer) => setPicked(computer.machine.id)}
         foot={<>
           {connecting?.at === 'row' ? <ConnectRow connecting={connecting} connect={connectHere} done={done} width={columns.length} /> : null}
-          <AddComputerRow person={me.person.id} agents={admin ? [] : people.people.find((person) => person.id === me.person.id)?.agents.map((agent) => agent.id) ?? []} selfService={!admin} changed={changed} name={name} connect={connect} />
+          <AddComputerRow person={me.person.id} agents={people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state !== 'retired').map((agent) => agent.id) ?? []} selfService={!admin} changed={changed} name={name} connect={connect} />
         </>}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />

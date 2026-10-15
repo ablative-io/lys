@@ -14,6 +14,8 @@ use std::ops::Bound;
 
 #[path = "network_api/access.rs"]
 mod access;
+#[path = "network_api/host_name.rs"]
+mod host_name;
 #[path = "network_api/personal.rs"]
 mod personal;
 #[path = "network_api/writes.rs"]
@@ -85,6 +87,10 @@ pub struct NetworkView {
     /// Whether this service keeps runtime reports. While it does not, no
     /// machine has a last report.
     pub reports_served: bool,
+    /// The name the computer this service runs on gives itself (on macOS its
+    /// Computer Name, otherwise its host name), offered as the name of this
+    /// computer when it is added; absent when the system names none.
+    pub host_name: Option<String>,
     /// Counters and continuation, absent when no query was supplied.
     #[serde(flatten)]
     pub page: Option<crate::list_page::Totals>,
@@ -289,6 +295,12 @@ async fn list(
     query: crate::list_page::Input,
 ) -> Result<Json<NetworkView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
+    // The first read asks the system once, off the async workers and outside every store lock;
+    // a failed read offers no name, and the person types one.
+    let host_name = tokio::task::spawn_blocking(host_name::read)
+        .await
+        .ok()
+        .flatten();
     with_directory(&state, |directory| {
         let directory = directory.projection()?;
         crate::caller_admission::active_caller(directory, &actor)?;
@@ -339,6 +351,7 @@ async fn list(
             Ok(Json(NetworkView {
                 machines,
                 reports_served: state.runtime.is_some(),
+                host_name: host_name.clone(),
                 page: totals,
             }))
         })

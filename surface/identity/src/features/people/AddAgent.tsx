@@ -59,7 +59,13 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   const [pending, setPending] = useState(saved.pending);
   const [walk, setWalk] = useState(saved.walk);
   const [selectedGrants, setSelectedGrants] = useState(restored?.grants.map((entry) => entry.source + ':' + entry.relation + (entry.resource.kind.includes('.') ? ':' + entry.actions[0] : '')) ?? []);
-  const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : '');
+  // A new computer is this one: its name starts as the name the computer gives itself, and stays editable.
+  const [computerName, setComputerName] = useState(saved.walk?.placement.kind === 'new' ? saved.walk.placement.machine.body.name : runOptions.network?.host_name ?? '');
+  const [namedComputer, setNamedComputer] = useState(Boolean(saved.walk));
+  const hostName = runOptions.network?.host_name ?? '';
+  useEffect(() => {
+    if (!namedComputer && hostName && !computerName) setComputerName(hostName);
+  }, [namedComputer, hostName, computerName]);
   // Lys cannot tell which computer this browser is on, so no runner is chosen for being first to answer: a computer is
   // chosen for the person only when every runner has answered and exactly one is confirmed; otherwise the choice is theirs.
   const asking = runOptions.runners.some((entry) => entry.state === 'asking');
@@ -163,6 +169,9 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       <input name="display_name" value={name} autoFocus autoComplete="off" disabled={locked} onChange={(event) => { setName(event.target.value); setAutomaticName(false); setRefusal(null); }} aria-invalid={taken ? true : undefined} aria-describedby={taken ? 'add-agent-duplicate' : undefined} />
     </label>
     {duplicate ? <p className="why-not" id="add-agent-duplicate" role="alert">{duplicate}</p> : null}
+  </>;
+  // Who it answers to, its access and its team: asked on a first run only under More settings, with their defaults kept.
+  const moreRegistration = <>
     <label className="field">Who this agent answers to<select name="answers_to" value={person} disabled={locked} onChange={(event) => { setPerson(event.target.value); setSelectedGrants([]); if (automaticName) setName(defaultName(people, event.target.value)); }}>
       {shownTargets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
       {!shownTargets.some((entry) => entry.id === person) ? <option value={person} disabled>{chosen ? chosen.display_name + ' · ' + chosen.state : 'Reporting target unavailable'}</option> : null}
@@ -184,18 +193,17 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
       {activeTeams.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select></label>
   </>;
+  const firstRunForm = onePress && Boolean(runOptions.choices);
   const renderForm = (fields: ReactNode, settings?: Record<string, unknown>, profileProblem = '') => <form className="add-agent" aria-label="Add an agent" onSubmit={(event) => { void submit(event, settings, profileProblem); }}>
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
       <div className={fields ? 'add-agent-two' : undefined}>
-        <div>{registrationFields}
-        {onePress || runOptions.runners.length ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? sole ? <p>Computer: {sole.name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => setComputerName(event.target.value)} /><span className="hint">Type a name for this computer.</span></label> : null}
+        <div>{registrationFields}{firstRunForm ? null : moreRegistration}
+        {onePress || runOptions.runners.length ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? sole ? <p>Computer: {sole.name}</p> : <label className="field">Computer<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => { setNamedComputer(true); setComputerName(event.target.value); }} /><span className="hint">{hostName ? 'The name this computer gives itself; change it if you like.' : 'Type a name for this computer.'}</span></label> : null}
         </div>
         {fields ? <div>{fields}</div> : null}
       </div>
     </fieldset>
-    {!walk && capability.machineAdmission === false ? inUse.map((machine) => <p key={machine.id}>{machine.may_run_roles?.length
-      ? "Lys cannot confirm what " + machine.name + "'s roles grant, so it won't give one to " + (name.trim() || 'this agent') + '. Add the agent here, then start it from its page once it is admitted to ' + machine.name + '.'
-      : machine.name + ' runs only the agents named when it was added. To add and run from here, add this computer again in Network with a role, then retire ' + machine.name + '.'}</p>) : null}
+    {!walk && capability.machineAdmission === false ? inUse.map((machine) => <p key={machine.id}>Choose which agents may run on {machine.name} in <a href={'#/network?computer=' + encodeURIComponent(machine.id)}>Network</a>, then start {name.trim() || 'this agent'} from its page.</p>) : null}
     {hold ? <ErrorWords problem={hold} /> : null}
     {inUse.length && (!onePress || hold || runOptions.runners.some((entry) => entry.state === 'unavailable')) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
     {capability.problem ? <><p>The service’s registration choices could not be read. You can add an agent under You only.</p><ErrorWords problem={capability.problem} /></> : !capability.answersTo ? <p>This service can register an agent under You only.</p> : null}
@@ -214,7 +222,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''}
-    newComputer={walk ? walk.placement.kind === 'new' : !inUse.length}
+    newComputer={walk ? walk.placement.kind === 'new' : !inUse.length} more={moreRegistration}
     pin={walk ? undefined : (machine) => { if (runOptions.computers.some((entry) => entry.id === machine)) setComputer(machine); }} render={renderForm} /> : renderForm(null);
 }
 

@@ -5,9 +5,10 @@
  */
 import { useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
-import { operationId, Refused, request } from '../../api';
+import { api, operationId, Refused, request, useLoad } from '../../api';
 import { confirmRunner, matchesMachine, savedMachine } from './contract';
-import type { Machine, PendingMachine } from './contract';
+import type { Machine, NetworkView, PendingMachine } from './contract';
+import { ErrorWords } from '../people/Words';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { askJoinCode, joinFailure } from './JoinCode';
 import type { Connecting, JoinCode } from './JoinCode';
@@ -32,6 +33,22 @@ export async function recordComputer(initial: PendingMachine, person: string, ke
 
 export const validComputerName = (name: string): boolean => Boolean(name) && !/[\u0000-\u001f\u007f]/.test(name);
 
+/**
+ * The agents a person's computer is added for: their own, every one not retired. A computer lists the agents that may
+ * run on it by id (the server keeps no rule for "the owner's agents"), so the person's own agents are named when it is
+ * added, and each agent added later is allowed on the computer it is added to run on.
+ */
+export async function ownAgentIds(person: string): Promise<string[]> {
+  const people = await api.people();
+  return (people.people.find((entry) => entry.id === person)?.agents ?? []).filter((agent) => agent.state !== 'retired').map((agent) => agent.id);
+}
+
+/** The name the computer Lys runs on gives itself, offered as this computer's name; empty until read or when it names none. */
+export function useHostName(): string {
+  const load = useLoad(() => request<NetworkView>('/network'), 'host-name');
+  return load.status === 'ok' ? load.data.host_name ?? '' : '';
+}
+
 type Adding = { person: string; agent?: string; agents?: string[]; changed: (message: string, machine: Machine) => void };
 type Remote = { remote?: boolean; connect?: (next: Connecting) => void };
 
@@ -40,16 +57,18 @@ function useAddition({ person, agent, agents = [], changed, remote = false, conn
   const key = 'lys.pending.machine.' + person;
   const [restored] = useState(() => {
     try { return { pending: savedMachine(key), error: '' }; }
-    catch (error) { return { pending: null, error: error instanceof Refused ? error.refusal.refusal + ': ' + error.message : 'PendingMachineUnreadable: ' + String(error) }; }
+    catch (error) { return { pending: null, error: error instanceof Refused ? error : new Refused(0, { refusal: 'PendingMachineUnreadable', reason: 'The saved computer addition cannot be read. ' + String(error) }) }; }
   });
   const [pending, setPending] = useState(restored.pending);
-  const [failure, setFailure] = useState(restored.error);
+  // What failed: the service's refusal, shown in its own words with the code folded away; or what to type, said plainly.
+  const [failure, setFailure] = useState<unknown>(restored.error);
+  const [invalid, setInvalid] = useState('');
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const keep = (next: PendingMachine) => { keepRecord(key, { version: 1, ...next }); setPending(next); };
   const send = async (initial: PendingMachine, retry = false) => {
     if (working.current || restored.error) return;
-    working.current = true; setBusy(true); setFailure('');
+    working.current = true; setBusy(true); setFailure(null); setInvalid('');
     let current = initial;
     try {
       const machine = await recordComputer(initial, person, (next) => { current = next; keep(next); });
@@ -65,22 +84,23 @@ function useAddition({ person, agent, agents = [], changed, remote = false, conn
       if (!retry && current.phase === 'machine' && answeredNo(error) && error instanceof Refused && error.refusal.refusal !== 'Unanswered') {
         releaseRecord(key); setPending(null);
       }
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      setFailure(error);
     }
     finally { working.current = false; setBusy(false); }
   };
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); if (pending || working.current || restored.error) return;
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
-    if (!validComputerName(name)) { setFailure('Give this computer a name, without control characters.'); return; }
-    if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure('AgentIdentifierMalformed: the agent for this addition could not be read.'); return; }
+    if (!validComputerName(name)) { setInvalid('Give this computer a name, without control characters.'); return; }
+    if (agent !== undefined && !/^agent-[0-9a-f]{32}$/.test(agent)) { setFailure(new Refused(0, { refusal: 'AgentIdentifierMalformed', reason: 'The agent for this addition could not be read.' })); return; }
     void send({ body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: agent ? [agent] : agents, may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null, ...(remote ? { remote: true as const } : {}) });
   };
   const blocked = busy || pending !== null || Boolean(restored.error);
   /** How the addition stands: kept and unconfirmed, with its check, or why it failed. */
   const standing = <>
     {pending ? <div role="status"><p>Adding {pending.body.name} is not confirmed. Its original request is kept.</p><Act symbol="again" name="Check whether it was added" word="Check" disabled={busy} onClick={() => void send(pending, true)} /></div> : null}
-    {failure ? <><p className="why-not" role="alert">Lys could not confirm this computer addition.</p><p><small className="refusal-name">{failure}</small></p></> : null}
+    {invalid ? <p className="why-not" role="alert">{invalid}</p> : null}
+    {failure ? <ErrorWords problem={failure} /> : null}
   </>;
   return { submit, blocked, standing, pendingRemote: pending?.remote === true };
 }
@@ -88,10 +108,11 @@ function useAddition({ person, agent, agents = [], changed, remote = false, conn
 /** Adding the computer an agent is to run on, where no computer is in use yet: its name, and the button. */
 export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel: () => void }) {
   const { submit, blocked, standing } = useAddition({ person, agent, changed });
+  const host = useHostName();
   return <form className="recorded-form" aria-label="Add a computer" onSubmit={submit}>
     <h2>Add this computer</h2>
     <fieldset disabled={blocked} style={{ border: 0, padding: 0, margin: 0 }}>
-      <label className="field">Name<input name="name" /></label>
+      <label className="field">Name<input key={host} name="name" defaultValue={host} /></label>
       <div className="chain"><Act symbol="add" name="Add this computer" word="Add" tone="primary" type="submit" /><Act symbol="close" name="Cancel" word="Cancel" onClick={cancel} /></div>
     </fieldset>
     {standing}
@@ -108,8 +129,11 @@ export function AddComputerRow({ person, agents, changed, name, connect, selfSer
   // A kept addition is finished as it was begun, whatever is chosen now.
   const where = pendingRemote ? 'another' : chosen;
   const id = 'add-computer-' + person.replace(/[^A-Za-z0-9_-]/g, '_');
+  const host = useHostName();
+  // This computer starts with the name it gives itself; another computer's name is the person's to type.
+  const offered = where === 'this' ? host : '';
   return <tr className="listing-add" data-add="computer">
-    <td><form id={id} aria-label="Add a computer" onSubmit={submit}><input ref={name} name="name" aria-label="Name of the computer to add" placeholder="Name" disabled={blocked} /></form></td>
+    <td><form id={id} aria-label="Add a computer" onSubmit={submit}><input key={where + ':' + offered} ref={name} name="name" aria-label="Name of the computer to add" placeholder="Name" defaultValue={offered} disabled={blocked} /></form></td>
     <td>{standing}</td>
     <td><div className="seg" role="group" aria-label="Which computer">
       {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>

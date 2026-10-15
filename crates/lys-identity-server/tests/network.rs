@@ -52,7 +52,21 @@ async fn the_administrator_names_and_retires_machines_and_admitted_people_read_t
     assert_eq!(status, 401, "{none}");
     let (status, empty) = service.get("/network", Some(&bea)).await?;
     assert_eq!(status, 200, "{empty}");
-    assert_eq!(empty, json!({ "machines": [], "reports_served": true }));
+    assert_eq!(empty["machines"], json!([]), "{empty}");
+    assert_eq!(empty["reports_served"], true, "{empty}");
+    // This computer's own name is offered for its addition: a non-empty name, or null where the system names none.
+    assert!(
+        empty["host_name"].is_null()
+            || empty["host_name"]
+                .as_str()
+                .is_some_and(|name| !name.is_empty()),
+        "{empty}"
+    );
+    assert_eq!(
+        empty.as_object().map(serde_json::Map::len),
+        Some(3),
+        "{empty}"
+    );
 
     let mut body = build_box(&operation);
     let admitted = seeded.people[1]

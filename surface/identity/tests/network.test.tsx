@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, click, mount, settle, text, unmountAll } from './harness';
-import { ADA, BEA, ME, OWN, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, ARCHIVIST, BEA, COURIER, ME, OWN, REVIEWER, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 import { refreshLive } from '../src/live';
@@ -183,13 +183,14 @@ describe('Network', () => {
     expect($('input[name="kind"]')).toBeNull(); expect($('input[type="radio"]')).toBeNull();
     expect($('[name="hosts"]')).toBeNull();
     input('name', 'Lab'); await submit();
-    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] } });
+    expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Lab', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [SCRIBE, COURIER, ARCHIVIST], may_run_roles: [], may_reach: [] } });
   });
-  it('adds this computer with its own runner and grants no agent or role from the global page', async () => {
+  it('adds this computer with its own runner for the administrator’s own agents, and no role, from the global page', async () => {
     const { posted } = await adding(naming());
     input('name', 'Lab'); await submit();
     expect($('input[aria-label="Add an agent"]')).toBeNull();
-    expect(posted[0].body).toMatchObject({ runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [] });
+    // Ada's own agents not retired may run on it; another person's agent and any role are never granted here.
+    expect(posted[0].body).toMatchObject({ runtime: 'lys-runner', slots: 0, may_run: [SCRIBE, COURIER, ARCHIVIST], may_run_roles: [] });
     const id = (posted[0].body as NameMachine).operation;
     expect(posted[1]).toEqual({ path: '/network/machines/' + id + '/runner', body: { runner: { kind: 'lys' } } });
   });

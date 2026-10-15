@@ -116,7 +116,7 @@ describe('The settings form', () => {
     const service = routes();
     const { posted } = await open(service);
     const copies = field('build');
-    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another command or program…');
+    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another program (type its command)…');
     await choose(copies, 'another');
     const input = document.querySelector('input[name="program-path"]');
     expect(input).not.toBeNull();
@@ -134,7 +134,7 @@ describe('The settings form', () => {
     const service = routes();
     const { posted } = await open(service);
     const copies = field('build');
-    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another command or program…');
+    expect([...copies?.options ?? []].at(-1)?.textContent).toBe('Another program (type its command)…');
     await choose(copies, 'another');
     const input = document.querySelector('input[name="program-path"]');
     expect(input).not.toBeNull();

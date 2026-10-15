@@ -6,7 +6,8 @@ export interface Machine {
   may_run: AgentSummary[]; may_run_roles?: string[]; may_reach: string[]; named_by: string; named_at: number;
   state: 'in_use' | 'retired'; retired_at: number | null; last_report_at: number | null;
 }
-export interface NetworkView { machines: Machine[]; reports_served: boolean }
+/** host_name: the name the computer Lys runs on gives itself, offered as this computer's name; null when it names none. */
+export interface NetworkView { machines: Machine[]; reports_served: boolean; host_name?: string | null }
 export interface NameMachine {
   operation: string; name: string; kind: string; runtime: string | null;
   slots: number; may_run: string[]; may_run_roles?: string[]; may_reach: string[];

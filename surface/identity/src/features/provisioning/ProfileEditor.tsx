@@ -30,7 +30,7 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
   </section>} />;
 }
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, more, render }: {
   /** Only the model and the computer are shown; everything else is kept as saved. */
   brief?: boolean;
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
@@ -44,6 +44,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   newComputer?: boolean;
   /** Told the computer of a copy picked from another computer's group, so the screen around it runs the agent there. */
   pin?: (machine: string) => void;
+  /** Further choices of the screen around, shown with this form's own under More settings on a first run. */
+  more?: ReactNode;
   render: (fields: ReactNode, settings: Record<string, unknown>, refusal: string) => ReactNode;
 }) {
   const [runsOn, setRunsOn] = useState(profile?.runs_on ?? '');
@@ -54,11 +56,13 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const catalogue = preferred ? catalogues.find((entry) => entry.machine.id === preferred) : undefined;
   const available = preferred && !newComputer ? catalogue?.programs ?? [] : machines.length === 1 && catalogues.length === 1 ? catalogues[0].programs : choices.programs ?? [];
   const workspaceMode = (entry: typeof available[number] | undefined) => entry?.modes.find((mode) => mode.id === 'workspace-only' || mode.id === 'workspace-write')?.id ?? '';
-  const initialProgram = firstRun ? available.find((entry) => entry.builds.length > 0 && workspaceMode(entry)) ?? available[0] : available.length === 1 ? available[0] : undefined;
+  // A first run takes a program the computer already found (by the login's PATH), never asking for a path.
+  const initialProgram = firstRun ? available.find((entry) => entry.builds.length > 0 && workspaceMode(entry)) ?? available.find((entry) => entry.builds.length > 0) ?? available[0] : available.length === 1 ? available[0] : undefined;
   const [programName, setProgram] = useState(profile?.harness?.name ?? initialProgram?.name ?? '');
   const program = available.find((entry) => entry.name === programName);
   const [model, setModel] = useState(profile?.model_access[0] ?? (strict && program?.models.length !== 1 ? '' : program?.models[0]?.id ?? ''));
-  const firstMode = (entry: typeof program) => firstRun ? workspaceMode(entry) : strict && entry?.modes.length !== 1 ? '' : entry?.modes[0]?.id ?? '';
+  // A first run keeps the program to its folder where it can; where it cannot, it starts in the program's own default mode.
+  const firstMode = (entry: typeof program) => firstRun ? workspaceMode(entry) || (entry?.modes[0]?.id ?? '') : strict && entry?.modes.length !== 1 ? '' : entry?.modes[0]?.id ?? '';
   const firstPrompt = (entry: typeof program) => entry?.instructions_modes?.includes('keep') ? 'keep' : entry?.instructions_modes?.includes('append') ? 'append' : '';
   // The whole of what the agent may do: the mode, the three rule lists and the extra folders. The mode is one member of it.
   const [permissions, setPermissions] = useState<PermissionsValue>(() => ({ ...profile?.permissions, default_mode: profile?.permissions?.default_mode ?? firstMode(program) }));
@@ -112,7 +116,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (catalogue?.problem && !selectedProgram?.startsWith('/')) refusal = problemWords(catalogue.problem);
   else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
   else if (!selected) refusal = build === 'another' ? PROGRAM_RULE : builds.length === 0
-    ? (aggregate ? 'Lys lists no installed copy of ' + program.name + '. Choose Another command or program and give its full path.'
+    ? (aggregate ? 'Lys did not find ' + program.name + ' on this computer. Install it and open this page again, or choose “Another program” and type the command you use to start it.'
       : preferred || machines.length === 1 ? program.name + ' is not installed on this computer.'
       : machines.length ? 'No computer reported an installed copy of ' + program.name + '.'
         : 'No computer with a connected runner is available to report installed copies of ' + program.name + '.')
@@ -120,7 +124,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     : 'Choose an installed copy of ' + program.name + '.';
   else if (preferred && !selectedProgram?.startsWith('/') && !builds.some((entry) => launchCommand(entry.program) === selectedProgram)) refusal = 'This computer did not report ' + launchCommand(selected.program) + '. ' + PROGRAM_RULE;
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
-  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? 'This program has no setting that keeps it to its own folder with internet off.' : 'Choose a mode this program lists.';
+  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? program.name + ' lists no mode Lys can start it in.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
   else if (prompt === 'replace' && !instructions.trim()) refusal = 'Type the prompt this agent uses instead, or choose another prompt setting.';
   else if (choices.skills && skills.some((name) => !choices.skills?.includes(name))) refusal = 'Lys keeps no skill named ' + skills.find((name) => !choices.skills?.includes(name)) + '. Remove it from this agent’s skills.';
@@ -148,8 +152,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
       {runsOn && !machines.some((entry) => entry.id === runsOn) ? <option value={runsOn}>A computer Lys no longer lists</option> : null}
       {machines.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
     </select></label>;
-  const fields = <div className="form-grid">
-    {folderFirst ? where : null}
+  const programField = <>
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = available.find((entry) => entry.name === event.target.value);
       setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next), ...(permissions.additional_directories ? { additional_directories: permissions.additional_directories } : {}) }); setPrompt(firstRun ? firstPrompt(next) : strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
@@ -160,20 +163,25 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
       {!available.some((entry) => entry.name === programName) ? <option value={programName}>{programName || 'Choose a program'}</option> : null}
       {available.map((entry) => <option key={entry.name} value={entry.name}>{entry.name}</option>)}
     </select></label>
+  </>;
+  const copyField = <>
     {program ? <label className="field">Installed copy this agent uses<select name="build" value={build} onChange={(event) => {
       const chosen = copies.find((entry) => entry.value === event.target.value);
       if (chosen) { if (chosen.machine) { setRunsOn(chosen.machine); pin?.(chosen.machine); } setBuild(copyValue(chosen)); setProgramPath(''); }
       else setBuild(event.target.value);
-    }}><option value="">Choose an installed copy</option>{aggregate ? copies.map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>) : null}{groups.filter((group) => group.builds.length > 0).map((group) => <optgroup key={group.machine.id} label={group.machine.name}>{copies.filter((copy) => copy.machine === group.machine.id).map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>)}</optgroup>)}<option value="another">Another command or program…</option></select></label> : null}
+    }}><option value="">Choose an installed copy</option>{aggregate ? copies.map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>) : null}{groups.filter((group) => group.builds.length > 0).map((group) => <optgroup key={group.machine.id} label={group.machine.name}>{copies.filter((copy) => copy.machine === group.machine.id).map((entry) => <option key={entry.value} value={entry.value}>{entry.name} — {launchCommand(entry.program)}</option>)}</optgroup>)}<option value="another">Another program (type its command)…</option></select></label> : null}
     <ProfileCopiesProblems catalogues={catalogues} />
     {program?.not_found && !builds.length ? <div className="wide"><ErrorWords problem={program.not_found} /></div> : null}
-    {build === 'another' ? <label className="field">Command or program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /></label> : null}
+    {build === 'another' ? <label className="field">Command or program path<input name="program-path" value={programPath} onChange={(event) => setProgramPath(event.target.value)} /><span className="hint">Only needed when Lys did not find the program itself. Type the command you use to start it in Terminal, such as claude, or its full path, such as /opt/homebrew/bin/claude.</span></label> : null}
+  </>;
+  const restFields = <>
     {modelField}
     {computerField}
     {firstRun && profile && !program?.modes.some((entry) => entry.id === mode) ? <p>The saved program settings are kept for this request.</p> : null}
     <Permissions key={programName} agent={agent} program={program} value={permissions} change={setPermissions} tools={tools} computers={machines} computer={preferred} />
     <div className="wide"><ModeWords program={program} mode={mode} sentencesOnly /></div>
-    <label className="field"><span>Require automatic context and reminder controls</span><input type="checkbox" name="requires_controls" checked={requiresControls} disabled={!canChoose} onChange={(event) => setRequiresControls(event.target.checked)} /><span className="hint">Starts are refused until this program’s managed adapter is qualified.</span></label>
+    {/* No program's managed adapter is reported qualified here, so the requirement is offered only where it is already set, to be turned off. */}
+    {profile?.session?.requires_controls ? <label className="field"><span>Require automatic context and reminder controls</span><input type="checkbox" name="requires_controls" checked={requiresControls} disabled={!canChoose} onChange={(event) => setRequiresControls(event.target.checked)} /><span className="hint">Starts are refused until this program’s managed adapter is qualified.</span></label> : null}
     <ToolsNamed value={tools} change={setTools} />
     <PluginsNamed value={plugins} change={setPlugins} machine={preferred ?? ''} machineName={preferred ? machines.find((entry) => entry.id === preferred)?.name ?? preferred : ''} />
     <McpServers key={'servers:' + programName} program={program?.name ?? ''} transports={program?.description?.mcp?.transports} value={servers} change={setServers} />
@@ -181,6 +189,26 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <label className="field">System prompt this agent uses<select name="prompt" value={prompt} onChange={(event) => { const value = event.target.value; if (value === 'keep' || value === 'append' || value === 'replace') { setPrompt(value); setPromptChanged(true); } }}>{!supported.some((entry) => entry === prompt) ? <option value="">Choose a prompt</option> : null}{supported.map((entry) => <option key={entry} value={entry}>{entry === 'keep' ? "Keep the program’s own prompt" : entry === 'append' ? "Add to the program’s prompt" : "Replace the program’s prompt"}</option>)}</select></label>
     {prompt ? <p className="dim prompt-words">{promptWords(prompt, prompt === 'keep' ? '' : instructions)}</p> : null}
     {prompt && prompt !== 'keep' ? <label className="field wide">{prompt === 'replace' ? 'Prompt this agent uses instead' : 'Words added to this agent’s prompt'}<span className="hint">Optional.</span><textarea name="instructions" rows={4} value={instructions} onChange={(event) => setInstructions(event.target.value)} /></label> : null}
+  </>;
+  // A first run asks only what it must: the program (its found copy chosen for the person) and the folder; the rest waits under More settings.
+  const found = firstRun && build !== 'another' && builds.some((entry) => entry.value === build) ? selected : undefined;
+  const fallbackMode = firstRun && program && !workspaceMode(program) ? program.modes.find((entry) => entry.id === mode) : undefined;
+  const fields = firstRun ? <div className="form-grid">
+    {folderFirst ? where : null}
+    {programField}
+    {found ? <p className="wide first-run-copy">Lys found {program?.name} on this computer and uses <code>{launchCommand(found.program)}</code>.</p> : copyField}
+    {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that keeps it to its own folder with the internet off, so it starts in its own default mode ({fallbackMode.meaning}). You can change this under More settings.</p> : null}
+    {folderFirst ? null : where}
+    <details className="wide more-settings"><summary>More settings</summary><div className="form-grid">
+      {found ? copyField : null}
+      {restFields}
+      {more}
+    </div></details>
+  </div> : <div className="form-grid">
+    {folderFirst ? where : null}
+    {programField}
+    {copyField}
+    {restFields}
     {folderFirst ? null : where}
   </div>;
   return render(brief ? <div className="form-grid">{modelField}{computerField}</div> : fields, settings, refusal);

@@ -188,7 +188,7 @@ export async function firstRunChoices(capability: AddAndRunCapability, publish?:
   try {
     const answer = await request<unknown>('/network');
     if (!isRecord(answer) || !Array.isArray(answer.machines) || !answer.machines.every(readableMachine) || typeof answer.reports_served !== 'boolean') throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name readable computers and their admission rules.' });
-    network = { machines: answer.machines, reports_served: answer.reports_served };
+    network = { machines: answer.machines, reports_served: answer.reports_served, host_name: typeof answer.host_name === 'string' && answer.host_name.trim() ? answer.host_name : null };
     const inUse = network.machines.filter((machine) => machine.state === 'in_use');
     if (!inUse.length) return { choices: await readChoices(network), network, computers: [], runners, loading: false, problem: null };
     if (capability.machineAdmission !== true) return { choices: null, network, computers: [], runners, loading: false, problem: capability.admissionProblem };
