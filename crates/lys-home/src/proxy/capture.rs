@@ -33,6 +33,13 @@ use crate::proxy::link::{KeyScanner, Link};
 use crate::record::call::CallStatus;
 use crate::record::call::captured::{CaptureTiming, Seen, Side};
 
+#[derive(Debug, Default, PartialEq, Eq)]
+enum CaptureProgress {
+    #[default]
+    Capturing,
+    Finished,
+}
+
 /// What a call knows while it passes.
 #[derive(Debug, Default)]
 struct CallState {
@@ -43,7 +50,7 @@ struct CallState {
     journal_failed: bool,
     reader: Option<Reader>,
     stream: bool,
-    finished: bool,
+    progress: CaptureProgress,
     last_arrival: Option<Instant>,
     pending_bytes: u64,
     seen: Seen,
@@ -144,7 +151,7 @@ impl Call {
     fn request_ended(&self) {
         let link = self
             .with(|s| {
-                if s.finished {
+                if s.progress == CaptureProgress::Finished {
                     return None;
                 }
                 if let Some(spool) = &mut s.request {
@@ -180,10 +187,10 @@ impl Call {
         let duration_ms =
             u64::try_from(ended_at.duration_since(self.started).as_millis()).unwrap_or(u64::MAX);
         let job = self.with(|s| {
-            if s.finished {
+            if s.progress == CaptureProgress::Finished {
                 return None;
             }
-            s.finished = true;
+            s.progress = CaptureProgress::Finished;
             let mut timing = CaptureTiming::interrupted(self.open.admission_ns);
             timing.pending_bytes = s.pending_bytes;
             timing.drain_ns = s.last_arrival.map_or(0, |at| {
