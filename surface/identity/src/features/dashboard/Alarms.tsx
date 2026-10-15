@@ -27,7 +27,7 @@ function shownAlarm(reported: Alarm, local: Alarm | undefined): Alarm {
 }
 
 export function Alarms(props: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
-  return <><SecurityEvents /><SessionAlarms {...props} /></>;
+  return <><SessionAlarms {...props} /><SecurityEvents /></>;
 }
 
 function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
@@ -58,7 +58,7 @@ function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
   const recovered = reported.filter((alarm, index) => alarm.cleared_at === null && rows[index].cleared_at !== null).length;
   const count = refusedPart(summary) ? '?' : all === null ? summary.open_count - recovered
     : rows.filter((alarm) => alarm.cleared_at === null).length;
-  return <section className="dash-widget" aria-label="Alarms">
+  return <section className="dash-widget dash-alarms" aria-label="Alarms">
     <div className="section-h"><span>Alarms</span><b className="dash-count">{count}</b>
       {!refusedPart(summary) && all === null ? <Act symbol="more" name="Show all" word="Show all" onClick={() => void readAll()} /> : null}</div>
     <div className="you-scroll">

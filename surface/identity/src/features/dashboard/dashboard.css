@@ -3,7 +3,9 @@
 .dash-page > .head { flex: none; margin-bottom: 8px; }
 .dash-body { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(260px, 1fr) auto; gap: 20px 24px; }
 /* The widgets: one row of cards under the agents, each scrolling inside itself. */
-.dash-widgets { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; align-items: start; }
+.dash-widgets { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
+/* An alarm's explanation keeps the full width while the other widgets retain their columns. */
+.dash-alarms { grid-column: 1 / -1; }
 .dash-widget { min-width: 0; max-height: 300px; }
 .dash-widget td { overflow-wrap: normal; }
 .dash-widget .section-h { flex-wrap: wrap; }

@@ -35,7 +35,11 @@ async function show() {
   const answer = { ...dashboard(), alarms };
   answer.agents = answer.agents.map((row) => ([SCRIBE, COURIER].includes(row.agent.id) ? { ...row, agent: { ...row.agent, display_name: 'Claude Code (lys)' } } : row));
 
-  serve({ ...SERVICE, '/dashboard': ok(answer) });
+  serve({
+    ...SERVICE,
+    '/dashboard': ok(answer),
+    '/security-events': ok({ administrator: true, events: [{ id: 'event-1', kind: 'password_reset_completed', at: 100, detail: 'The password reset completed.' }] }),
+  });
   style = document.createElement('style');
   style.textContent = ['features/dashboard/dashboard.css', 'styles/screen.css'].map((path) => readFileSync(new URL('../src/' + path, import.meta.url), 'utf8')).join('\n');
   document.head.appendChild(style);
@@ -62,7 +66,11 @@ it('W6 gives the alarm text room beside its acknowledgement control', async () =
   await show();
   const widgets = $('.dash-widgets');
   if (!widgets) throw new Error('Dashboard widgets did not render');
-  expect(getComputedStyle(widgets).gridTemplateColumns).toBe('repeat(auto-fit, minmax(min(100%, 360px), 1fr))');
+  expect(getComputedStyle(widgets).gridTemplateColumns).toBe('repeat(auto-fit, minmax(min(100%, 260px), 1fr))');
+  const alarms = $('section[aria-label="Alarms"]');
+  if (!alarms) throw new Error('Alarms did not render');
+  expect(getComputedStyle(alarms).gridColumn).toBe('1 / -1');
+  expect(widgets.firstElementChild).toBe(alarms);
   expect($('[data-alarm] td:first-child')?.textContent).toContain('Its model calls are not going through Lys, so its use is not counted');
   expect($('[data-alarm] button[aria-label="Acknowledge"]')).not.toBeNull();
 });
