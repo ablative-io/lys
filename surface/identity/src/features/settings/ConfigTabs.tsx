@@ -1,6 +1,6 @@
-/** Configuration is one page. Its views are tabs, each with its own address: how this service runs, the services and sign-in providers it uses, and the apps that sign in with it. */
+/** Configuration views have their own addresses for the person's account and the service's settings. */
 export const CONFIG_TABS: [string, string, string][] = [
-  ['settings', 'This service', '#/settings'], ['connections', 'Services and sign-in providers', '#/connections'], ['apps', 'Apps', '#/apps'],
+  ['account', 'Your account', '#/settings/account'], ['settings', 'This service', '#/settings'], ['connections', 'Services and sign-in providers', '#/connections'], ['apps', 'Apps', '#/apps'],
 ];
 
 export function ConfigTabs({ on }: { on: string }) {

@@ -45,6 +45,7 @@ async function railDecision(place: Place): Promise<void> {
 }
 
 function placeOf(pathname: string): Place | null {
+  if (pathname === '/settings/account') return null;
   const view = pathname.split('/')[1];
   if (view === 'file' || view === 'agents' || view === 'service-accounts') return 'people';
   if (['resources', 'requests', 'reviews', 'model'].includes(view)) return 'access';

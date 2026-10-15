@@ -1,6 +1,6 @@
 /**
  * A Lys account's email, password and sign-in, changed on Lys screens and
- * carried out by the service: a person's own account on the You screen,
+ * carried out by the service: a person's own account in Settings,
  * confirmed by their password, and anyone's for the administrator.
  * Passwords are sent once and never shown or kept on the page.
  */
@@ -12,7 +12,10 @@ import './recorded-form.css';
 import { Act } from '../../shell/Act';
 import type { SymbolName } from '../../shell/symbols';
 
-interface AccountView { email: string | null; enabled: boolean }
+interface AccountView {
+  email: string | null;
+  enabled: boolean;
+}
 
 type Status = { kind: 'done'; words: string } | { kind: 'refused'; words: string } | null;
 
@@ -22,26 +25,42 @@ function useAccount(path: string) {
   useEffect(() => {
     let live = true;
     request<AccountView>(path).then(
-      (answer) => { if (live) setAccount(answer); },
-      (failure: unknown) => { if (live) setUnavailable(reasonOf(failure)); },
+      (answer) => {
+        if (live) setAccount(answer);
+      },
+      (failure: unknown) => {
+        if (live) setUnavailable(reasonOf(failure));
+      },
     );
-    return () => { live = false; };
+    return () => {
+      live = false;
+    };
   }, [path]);
   return { account, setAccount, unavailable };
 }
 
 /** One change of an account: a form whose fields are read on submit and cleared after. */
-function Change({ label, submit, children, action, row, symbol = 'save', word = 'Save', tone = 'plain' }: {
+function Change({
+  label,
+  submit,
+  children,
+  action,
+  saved,
+  cancel,
+  symbol = 'save',
+  word = 'Save',
+  tone = 'plain',
+}: {
   label: string;
   submit: (form: FormData) => Promise<string>;
   children: ReactNode;
   action: string;
+  saved?: (words: string) => void;
+  cancel?: () => void;
   /** How the act is drawn: its symbol and the one word beside it. A change that saves what was typed is drawn as a save. */
   symbol?: SymbolName;
   word?: string;
   tone?: 'plain' | 'danger';
-  /** What this change is of, when the form is one row of a table of changes: its fields then sit in a line, with the button at the row's end. */
-  row?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
@@ -54,34 +73,46 @@ function Change({ label, submit, children, action, row, symbol = 'save', word = 
     try {
       const words = await submit(new FormData(element));
       element.reset();
-      setStatus({ kind: 'done', words });
+      if (saved) saved(words);
+      else setStatus({ kind: 'done', words });
     } catch (failure) {
       setStatus({ kind: 'refused', words: failure instanceof Error && !('refusal' in failure) ? failure.message : reasonOf(failure) });
     } finally {
       setBusy(false);
     }
   }
-  const said = <>
-    {status?.kind === 'done' ? <p role="status">{status.words}</p> : null}
-    {status?.kind === 'refused' ? <p role="alert" className="why-not">{status.words}</p> : null}
-  </>;
-  if (row) return <form className="recorded-form account-row" role="row" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
-    <span className="account-row-of" role="rowheader">{row}</span>
-    <div className="account-row-fields" role="cell">{children}{said}</div>
-    <span role="cell"><Act symbol={symbol} name={busy ? 'Saving…' : action} word={busy ? 'Saving…' : word} tone={tone} type="submit" disabled={busy} /></span>
-  </form>;
-  return <form className="recorded-form" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
-    {children}
-    {said}
-    <Act symbol={symbol} name={busy ? 'Saving…' : action} word={busy ? 'Saving…' : word} tone={tone} type="submit" disabled={busy} />
-  </form>;
+  const said = (
+    <>
+      {status?.kind === 'done' ? <p role="status">{status.words}</p> : null}
+      {status?.kind === 'refused' ? (
+        <p role="alert" className="why-not">
+          {status.words}
+        </p>
+      ) : null}
+    </>
+  );
+  return (
+    <form className="recorded-form" aria-label={label} onSubmit={send} aria-busy={busy} noValidate>
+      {children}
+      {said}
+      <Act symbol={symbol} name={busy ? 'Saving…' : action} word={busy ? 'Saving…' : word} tone={tone} type="submit" disabled={busy} />
+      {cancel ? (
+        <>
+          {' '}
+          <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={cancel} />
+        </>
+      ) : null}
+    </form>
+  );
 }
 
 function Field({ id, label, type = 'text', autoComplete }: { id: string; label: string; type?: string; autoComplete: string }) {
-  return <div className="field">
-    <label htmlFor={id}>{label}</label>
-    <input id={id} name={id} type={type} autoComplete={autoComplete} required />
-  </div>;
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <input id={id} name={id} type={type} autoComplete={autoComplete} required />
+    </div>
+  );
 }
 
 const text = (form: FormData, name: string) => String(form.get(name) ?? '');
@@ -92,58 +123,148 @@ function samePasswords(form: FormData): string {
   return password;
 }
 
-/** The signed-in person's own Lys account, on the You screen. */
-export function OwnAccount({ readOnly = false }: { readOnly?: boolean }) {
+/** The sign-in address links to the account settings without mounting credential fields. */
+export function OwnAccount() {
+  const { account, unavailable } = useAccount('/me/account');
+  return (
+    <div className="card" id="lys-account">
+      <p className="note">
+        {unavailable || (account ? `You sign in with ${account.email ?? 'your email'}.` : 'Reading your sign-in address…')} <a href="#/settings/account">Change in Settings</a>
+      </p>
+    </div>
+  );
+}
+
+/** Credential fields exist only for the change the person has requested. */
+export function AccountSettings() {
   const { account, setAccount, unavailable } = useAccount('/me/account');
-  if (unavailable) return <div className="card" id="lys-account"><h2>Your Lys account</h2><p className="note">{unavailable}</p></div>;
-  return <div className="card" id="lys-account">
-    <h2>Your Lys account</h2>
-    <p className="note">You sign in to Lys with {account?.email ?? 'your email'}.</p>
-    {readOnly ? null : <div className="account-rows" role="table" aria-label="Changes to your Lys account"><Change row="Email" label="Change your email" action="Change email" submit={async (form) => {
-      const changed = await request<AccountView>('/me/account/email', { email: text(form, 'account-email').trim(), password: text(form, 'account-password') });
-      setAccount(changed);
-      return `You now sign in with ${changed.email ?? 'your new email'}.`;
-    }}>
-      <Field id="account-email" label="New email" type="email" autoComplete="email" />
-      <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />
-    </Change>
-    <Change row="Password" label="Change your password" action="Change password" submit={async (form) => {
-      await request<AccountView>('/me/account/password', { current: text(form, 'account-current-password'), password: samePasswords(form) });
-      return 'Your password is changed.';
-    }}>
-      <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
-      <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
-      <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-    </Change></div>}
-  </div>;
+  const [changing, setChanging] = useState<'email' | 'password' | null>(null);
+  const [notice, setNotice] = useState('');
+  function saved(words: string) {
+    setChanging(null);
+    setNotice(words);
+  }
+  function open(change: 'email' | 'password') {
+    setNotice('');
+    setChanging(change);
+  }
+  return (
+    <section aria-label="Your account">
+      <h2>Your account</h2>
+      {unavailable ? (
+        <p role="alert" className="why-not">
+          {unavailable}
+        </p>
+      ) : (
+        <>
+          {notice ? <p role="status">{notice}</p> : null}
+          <div className="set-row">
+            <div>
+              <div>Email</div>
+              <div className="d">{account ? `You sign in with ${account.email ?? 'your email'}.` : 'Reading your sign-in address…'}</div>
+            </div>
+            <Act symbol="edit" name="Change email" word="Change email" disabled={!account || changing !== null} onClick={() => open('email')} />
+          </div>
+          {changing === 'email' ? (
+            <Change
+              label="Change your email"
+              action="Save email"
+              saved={saved}
+              cancel={() => setChanging(null)}
+              submit={async (form) => {
+                const changed = await request<AccountView>('/me/account/email', { email: text(form, 'account-email').trim(), password: text(form, 'account-password') });
+                setAccount(changed);
+                return `You now sign in with ${changed.email ?? 'your new email'}.`;
+              }}
+            >
+              <Field id="account-email" label="New email" type="email" autoComplete="email" />
+              <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />
+            </Change>
+          ) : null}
+          <div className="set-row">
+            <div>
+              <div>Password</div>
+              <div className="d">Choose a new password to sign in to Lys.</div>
+            </div>
+            <Act symbol="edit" name="Change password" word="Change password" disabled={!account || changing !== null} onClick={() => open('password')} />
+          </div>
+          {changing === 'password' ? (
+            <Change
+              label="Change your password"
+              action="Save password"
+              saved={saved}
+              cancel={() => setChanging(null)}
+              submit={async (form) => {
+                await request<AccountView>('/me/account/password', { current: text(form, 'account-current-password'), password: samePasswords(form) });
+                return 'Your password is changed.';
+              }}
+            >
+              <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
+              <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
+              <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
+            </Change>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
 }
 
 /** A person's Lys account, as the administrator changes it. */
 export function PersonAccount({ id }: { id: string }) {
   const path = '/directory/people/' + encodeURIComponent(id) + '/account';
   const { account, setAccount, unavailable } = useAccount(path);
-  if (unavailable) return <section className="card" aria-label="Lys account"><h2>Lys account</h2><p className="note">{unavailable}</p></section>;
-  return <section className="card" aria-label="Lys account">
-    <h2>Lys account</h2>
-    <p className="note">{account ? `Signs in with ${account.email ?? 'no email'}. Sign-in is ${account.enabled ? 'enabled' : 'disabled'}.` : 'Reading the account…'}</p>
-    <Change label="Change this person's email" action="Change email" submit={async (form) => {
-      const changed = await request<AccountView>(path + '/email', { email: text(form, 'account-email').trim() });
-      setAccount(changed);
-      return `They now sign in with ${changed.email ?? 'the new email'}.`;
-    }}>
-      <Field id="account-email" label="New email" type="email" autoComplete="off" />
-    </Change>
-    <Change label="Reset this person's password" action="Reset password" symbol="again" word="Reset" submit={async (form) => {
-      await request<AccountView>(path + '/password', { password: samePasswords(form) });
-      return 'The new password signs them in; the old one no longer does.';
-    }}>
-      <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
-      <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-    </Change>
-    {account ? <Change label={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} action={account.enabled ? 'Disable sign-in' : 'Enable sign-in'} symbol={account.enabled ? 'suspend' : 'start'} word={account.enabled ? 'Disable' : 'Enable'} tone={account.enabled ? 'danger' : 'plain'} submit={async () => {
-      const changed = await request<AccountView>(path + '/enabled', { enabled: !account.enabled });
-      setAccount(changed);
-      return changed.enabled ? 'They can sign in again.' : 'They can no longer sign in.';
-    }}><p className="note">{account.enabled ? 'Disabling stops this person signing in at their next sign-in.' : 'Enabling lets this person sign in again.'}</p></Change> : null}
-  </section>;
+  if (unavailable)
+    return (
+      <section className="card" aria-label="Lys account">
+        <h2>Lys account</h2>
+        <p className="note">{unavailable}</p>
+      </section>
+    );
+  return (
+    <section className="card" aria-label="Lys account">
+      <h2>Lys account</h2>
+      <p className="note">{account ? `Signs in with ${account.email ?? 'no email'}. Sign-in is ${account.enabled ? 'enabled' : 'disabled'}.` : 'Reading the account…'}</p>
+      <Change
+        label="Change this person's email"
+        action="Change email"
+        submit={async (form) => {
+          const changed = await request<AccountView>(path + '/email', { email: text(form, 'account-email').trim() });
+          setAccount(changed);
+          return `They now sign in with ${changed.email ?? 'the new email'}.`;
+        }}
+      >
+        <Field id="account-email" label="New email" type="email" autoComplete="off" />
+      </Change>
+      <Change
+        label="Reset this person's password"
+        action="Reset password"
+        symbol="again"
+        word="Reset"
+        submit={async (form) => {
+          await request<AccountView>(path + '/password', { password: samePasswords(form) });
+          return 'The new password signs them in; the old one no longer does.';
+        }}
+      >
+        <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
+        <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
+      </Change>
+      {account ? (
+        <Change
+          label={account.enabled ? 'Disable sign-in' : 'Enable sign-in'}
+          action={account.enabled ? 'Disable sign-in' : 'Enable sign-in'}
+          symbol={account.enabled ? 'suspend' : 'start'}
+          word={account.enabled ? 'Disable' : 'Enable'}
+          tone={account.enabled ? 'danger' : 'plain'}
+          submit={async () => {
+            const changed = await request<AccountView>(path + '/enabled', { enabled: !account.enabled });
+            setAccount(changed);
+            return changed.enabled ? 'They can sign in again.' : 'They can no longer sign in.';
+          }}
+        >
+          <p className="note">{account.enabled ? 'Disabling stops this person signing in at their next sign-in.' : 'Enabling lets this person sign in again.'}</p>
+        </Change>
+      ) : null}
+    </section>
+  );
 }

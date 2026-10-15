@@ -15,7 +15,7 @@ export function AccessRoute() {
 }
 export function SettingsRoute() {
   const { sec = "" } = useParams();
-  return ["", "layout", "signin", "directory", "permissions", "secrets", "runtimes", "models", "storage"].includes(
+  return ["", "account", "layout", "signin", "directory", "permissions", "secrets", "runtimes", "models", "storage"].includes(
     sec,
   ) ? (
     <Settings />

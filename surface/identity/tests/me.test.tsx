@@ -103,8 +103,8 @@ describe('Personal scope', () => {
     expect(document.querySelector('.you-account.grid2')).toBeNull();
     expect(document.querySelector('.you-holds-scroll table[aria-label="Grants"]')).not.toBeNull();
     expect([...document.querySelectorAll('.you-holds-scroll thead th')].map((th) => th.textContent)).toEqual(['Grant', 'Allows', 'Relation', 'On', 'Path to a person', 'May pass on', 'Window', 'Last used', 'Mode', 'Change']);
-    // Each change of the account is one row: what it changes, its fields, its button.
-    expect([...document.querySelectorAll('#lys-account .account-row')].map((row) => row.querySelector('[role="rowheader"]')?.textContent + ': ' + row.querySelectorAll('input').length + ' fields, ' + row.querySelector('button')?.getAttribute('aria-label') + ', drawn ' + row.querySelector('button')?.textContent)).toEqual(['Email: 2 fields, Change email, drawn Save', 'Password: 3 fields, Change password, drawn Save']);
+    expect(document.querySelectorAll('input[type="password"]').length).toBe(0);
+    expect(document.querySelector('#lys-account a')?.getAttribute('href')).toBe('#/settings/account');
     expect(document.querySelector('.you-account-row #signin-identities')).not.toBeNull();
     // A person ends their other sign-ins here.
     expect(document.querySelector('.you-account-row section[aria-label="Your signed-in sessions"]')).not.toBeNull();

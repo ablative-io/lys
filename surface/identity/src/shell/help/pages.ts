@@ -349,7 +349,8 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Configuration',
     topic: 'apps.configuration',
     regions: [
-      { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'This service, Services and sign-in providers (Google sign-in is added there), and Apps.', at: 'below' },
+      { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'Your account changes your sign-in email and password. This service shows startup settings; Services and sign-in providers adds providers such as Google; Apps lists connected apps.', at: 'below' },
+      { sel: '[aria-label="Your account"]', title: 'Your account', text: 'Choose Change email or Change password to open an empty form. Save applies the change and closes the form; Cancel closes it without saving.', at: 'right' },
       { sel: '#screen .card.pane h2:first-of-type', title: 'Layout', text: 'Which side the menu and Help sit on, and whether the menu shows a name beside every icon (Icons or Labels). These are yours, for this browser.', at: 'right' },
       { sel: '.model-windows', title: 'Model context windows', text: 'How many tokens each model’s context holds, which Lys needs to work out an agent’s % of context. Side work marks a model whose calls are not an agent’s own context. Add a model by the name its calls use.', at: 'right' },
       { sel: '.facts', title: 'Settings in effect', text: 'What this Lys is running with: sign-in provider and session length, where permissions are checked, secret storage, machine and settings records, the running build, and how records are stored and signed. Read here; set at install or upgrade.', at: 'left' },
@@ -370,7 +371,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'You',
     topic: 'start.sign-in',
     regions: [
-      { sel: '#lys-account, [aria-label="Lys account"]', title: 'Your Lys account', text: 'Your sign-in email and password. Change email and Change password take effect at once; the old password stops working.', at: 'right' },
+      { sel: '#lys-account', title: 'Your sign-in', text: 'Your sign-in email. Change in Settings opens Your account in Settings, where you can change your email or password.', at: 'right' },
       { sel: '[aria-label="Your signed-in sessions"]', title: 'Your sessions', text: 'Every browser you are signed in from, this one first, with when each started and expires. Sign out ends this one; End signs another browser out.', at: 'below' },
       { sel: '[aria-label="What you hold"]', title: 'What you hold', text: 'The access you hold, named by what it is on and what it lets you do. What you may pass on to your agents is marked.', at: 'left' },
     ],

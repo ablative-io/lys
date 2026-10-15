@@ -51,7 +51,7 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
 }
 
 /**
- * Your account first: the account's changes as rows, the signed-in sessions, and the short records, each as tall as
+ * Your account first: the sign-in address, the signed-in sessions, and the short records, each as tall as
  * its content needs. Under it, what you hold spans the page's width. Every row of What you hold is yours and stands,
  * so neither is said again on each row.
  * Secrets have their own place on the rail, so they are not repeated here; service accounts are linked from here
@@ -132,7 +132,7 @@ function Registered({ me }: { me: MeView }) {
     <div className="page fill">
       <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." />
       <div className="pane">
-        <OwnAccount readOnly />
+        <OwnAccount />
         <section className="card" aria-label="Your signed-in sessions">
           <h2>Your signed-in sessions</h2>
           <SessionList person="" />

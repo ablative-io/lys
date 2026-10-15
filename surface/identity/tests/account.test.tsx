@@ -1,7 +1,7 @@
 /** A Lys account's email, password and sign-in are changed on Lys screens, through the service (DIRECTORY-047 R5). */
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, settle, text } from './harness';
+import { $, $$, mount, settle, text, click } from './harness';
 import { ADA, SERVICE, ok, refused } from './fixtures';
 
 async function fill(form: string, values: Record<string, string>) {
@@ -25,17 +25,19 @@ const ACCOUNT = '/directory/people/' + ADA + '/account';
 
 describe('Your Lys account', () => {
   it('changes your email, confirmed by your password', async () => {
-    const { posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true }) });
-    expect(text()).toContain('You sign in to Lys with ada@example.test.');
+    const { posted } = await mount('#/settings/account', { ...SERVICE, 'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true }) });
+    expect(text()).toContain('You sign in with ada@example.test.');
+    await click($('button[aria-label="Change email"]'));
     await fill('Change your email', { 'account-email': ' ada@lovelace.test ', 'account-password': 'Analytical-Engine-1843' });
     await submit('Change your email');
     expect(posted).toEqual([{ path: '/me/account/email', body: { email: 'ada@lovelace.test', password: 'Analytical-Engine-1843' } }]);
     expect(text()).toContain('You now sign in with ada@lovelace.test.');
-    expect(($('input[name="account-password"]') as HTMLInputElement | null)?.value).toBe('');
+    expect($('input[name="account-password"]')).toBeNull();
   });
 
   it('refuses two different new passwords before sending anything', async () => {
-    const { posted } = await mount('#/me?tab=account', SERVICE);
+    const { posted } = await mount('#/settings/account', SERVICE);
+    await click($('button[aria-label="Change password"]'));
     await fill('Change your password', { 'account-current-password': 'Old-Password-12345', 'account-new-password': 'New-Password-12345', 'account-new-password-again': 'New-Password-12346' });
     await submit('Change your password');
     expect(posted).toEqual([]);
@@ -46,7 +48,7 @@ describe('Your Lys account', () => {
 describe("The administrator's account screen", () => {
   it('resets a password and disables sign-in, each through the service', async () => {
     let enabled = true;
-    const { posted } = await mount('#/account/' + ADA, {
+    const { posted } = await mount('#/file/' + ADA + '/credentials', {
       ...SERVICE,
       [ACCOUNT]: ok({ email: 'ada@example.test', enabled: true }),
       ['POST ' + ACCOUNT + '/password']: ok({ email: 'ada@example.test', enabled: true }),
@@ -69,7 +71,7 @@ describe("The administrator's account screen", () => {
   });
 
   it("names the service's refusal in Lys words", async () => {
-    await mount('#/account/' + ADA, {
+    await mount('#/file/' + ADA + '/credentials', {
       ...SERVICE,
       [ACCOUNT]: ok({ email: 'ada@example.test', enabled: true }),
       ['POST ' + ACCOUNT + '/email']: refused(400, 'AccountRefused', 'AccountRefused: an account with that email already exists'),

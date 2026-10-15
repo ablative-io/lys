@@ -37,7 +37,8 @@ export const START: Seed[] = [
     ],
     steps: [
       { text: 'Sign in with your password or with Google.' },
-      { text: 'Check your account and sessions on You.', href: '#/me', link: 'Open You' }
+      { text: 'Change your sign-in email or password in Settings.', href: '#/settings/account', link: 'Your account' },
+      { text: 'Check your signed-in sessions on You.', href: '#/me', link: 'Open You' }
     ],
     related: ['start.google', 'trouble.signin', 'people.kind'],
   },

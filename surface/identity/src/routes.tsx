@@ -55,7 +55,7 @@ export function AppRoutes() {
       <Route path="/" element={<Dashboard />} />
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/me" element={<You />} />
-      <Route path="/account/:id" element={<AccountMoved />} />
+      <Route path="/account/:id" element={<Navigate replace to="/settings/account" />} />
       <Route path="/settings/:sec?" element={<SettingsRoute />} />
       <Route path="/access/:mode?/:arg?" element={<AccessRoute />} />
       <Route path="*" element={<NotFound />} />
@@ -67,12 +67,6 @@ export function AppRoutes() {
 function UsageMoved() {
   const { agent } = useParams();
   return <Navigate replace to={agent ? '/file/' + encodeURIComponent(agent) + '/budgets' : '/people'} />;
-}
-
-/** A person's Lys account is on the Credentials tab of their own page. */
-function AccountMoved() {
-  const { id = '' } = useParams();
-  return <Navigate replace to={'/file/' + encodeURIComponent(id) + '/credentials'} />;
 }
 
 /** An agent has one start: on the Overview of its own page. Older addresses for it arrive there. */
