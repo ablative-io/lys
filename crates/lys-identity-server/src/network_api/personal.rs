@@ -87,9 +87,23 @@ pub(crate) fn computer_owner(
     actor: &lys_identity::Actor,
     id: &str,
 ) -> Result<String, ServerError> {
-    let administrator = crate::routes::is_administrator(state, actor)?;
-    let by = with_directory(state, |directory| {
-        Ok(own_person(directory.projection()?, actor)?.to_string())
+    let (administrator, by) = with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let administrator = state.admission.is_administrator(projection, actor)?;
+        let by = if administrator {
+            match projection.person_for(actor.binding()) {
+                Some(person) => person.to_string(),
+                // A first-run administrator has a login before a person is registered.
+                None => serde_json::to_string(&crate::read_api::login(actor.binding())).map_err(
+                    |error| ServerError::DirectoryUnavailable {
+                        reason: format!("the administrator's login could not be recorded: {error}"),
+                    },
+                )?,
+            }
+        } else {
+            own_person(projection, actor)?.to_string()
+        };
+        Ok((administrator, by))
     })?;
     with_network(state, |store| {
         let machine = store.machine(id).ok_or(ServerError::MachineUnknown)?;

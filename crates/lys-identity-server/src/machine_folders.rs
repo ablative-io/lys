@@ -9,8 +9,8 @@
 //! folder the person picks there. The answer waits for the person; a cancel
 //! is the runner's `folder_choice_cancelled`.
 //!
-//! The computer's owner or an administrator asks either: whoever may save
-//! an agent's settings on it (`not_your_computer` for anyone else). The
+//! The computer's owner, an administrator, or an agent exercising the
+//! machine's read grant asks either (`not_your_computer` for other people). The
 //! machine must be kept (`MachineUnknown`) and name a runner
 //! (`runner_absent`); a folder the runner cannot read, or a dialog it cannot
 //! show, is the runner's own refusal, by its name.
@@ -88,6 +88,33 @@ fn runner_of(
     })
 }
 
+fn folder_reader(
+    state: &Arc<AppState>,
+    actor: &lys_identity::Actor,
+    headers: &HeaderMap,
+    id: &str,
+) -> Result<(), ServerError> {
+    if headers.contains_key(crate::agent_pass::HEADER)
+        || crate::agent_signature::relayed_agent().is_some()
+    {
+        // Ingress already exercised this machine's read grant for the verified agent.
+        crate::routes::with_directory(state, |directory| {
+            match crate::caller_admission::active_caller(directory.projection()?, actor)? {
+                lys_identity::IdentityId::Agent(_) => Ok(()),
+                _ => Err(ServerError::NoPerson),
+            }
+        })?;
+        return with_network(state, |store| {
+            let machine = store.machine(id).ok_or(ServerError::MachineUnknown)?;
+            if machine.retired.is_some() {
+                return Err(ServerError::MachineRetired);
+            }
+            Ok(())
+        });
+    }
+    crate::network_api::computer_owner(state, actor, id).map(|_| ())
+}
+
 async fn choose_folder(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -95,7 +122,7 @@ async fn choose_folder(
     given: Result<Json<ChooseFolderBody>, JsonRejection>,
 ) -> Result<Json<FolderChosenView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::network_api::computer_owner(&state, &actor, &id)?;
+    folder_reader(&state, &actor, &headers, &id)?;
     let Json(body) = given.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
@@ -126,7 +153,7 @@ async fn folders(
     given: Result<Json<FoldersBody>, JsonRejection>,
 ) -> Result<Json<FoldersView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::network_api::computer_owner(&state, &actor, &id)?;
+    folder_reader(&state, &actor, &headers, &id)?;
     let Json(body) = given.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
@@ -154,3 +181,7 @@ async fn folders(
 #[cfg(test)]
 #[path = "machine_folders_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "lysfix_srv_folder_tests.rs"]
+mod lysfix_srv_folder_tests;
