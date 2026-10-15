@@ -188,6 +188,8 @@ impl Render for Fixed {
 pub struct Recorder {
     /// The compose environment at each application, in order.
     pub applied: Vec<String>,
+    /// How many times the new build was settled: the sign-in service given what the install declares.
+    pub settled: usize,
 }
 
 impl Engine for Recorder {
@@ -195,6 +197,12 @@ impl Engine for Recorder {
         let environment = std::fs::read_to_string(state(layout).join("compose.env"));
         self.applied.push(environment.unwrap_or_default());
         say("compose applied");
+        Ok(())
+    }
+
+    fn settle(&mut self, _layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        self.settled += 1;
+        say("settled");
         Ok(())
     }
 }

@@ -136,6 +136,11 @@ pub trait Engine {
     /// Brings the compose services to the definition now in place,
     /// making every service again from it, and waits for them ready.
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
+    /// Once the new build is running: writes what `deployment.toml` declares
+    /// to the sign-in service, as an install does, so an upgrade never leaves
+    /// the sign-in service on the policy of an earlier build. On 15 Oct 2026
+    /// a lowered password length stayed at the old fifteen through an upgrade.
+    fn settle(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
 }
 
 /// The compose services through `docker compose`, every one made again from
@@ -149,6 +154,17 @@ impl Engine for Compose {
         services::compose_recreate(layout, &config)?;
         services::wait_ready(layout, &config, say)?;
         say("compose services on their rendered definition and ready");
+        Ok(())
+    }
+
+    fn settle(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+        let policy = &config.password_policy;
+        super::configure::apply_password_policy(&config)?;
+        say(&format!(
+            "password policy on the sign-in service: {} to {} characters, as deployment.toml declares",
+            policy.length_min, policy.length_max
+        ));
         Ok(())
     }
 }
@@ -378,6 +394,17 @@ pub fn upgrade(
     let Err(failure) = result else {
         let record = record_build(layout, &names, say)?;
         Intent::clear(layout)?;
+        // After the record is written and the fence cleared: a refusal here never leaves an unfinished upgrade.
+        parts.engine.settle(layout, say).map_err(|error| {
+            refuse(
+                ErrorKind::UpgradeFailed,
+                "settle",
+                "password_policy",
+                format!(
+                    "the new build is running, but the sign-in service did not take Lys's password policy: {error}"
+                ),
+            )
+        })?;
         return Ok(record);
     };
     say(&format!("upgrade failed: {failure}"));

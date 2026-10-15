@@ -52,6 +52,8 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
         render: &render,
     };
     let record = upgrade(&scratch.layout, &new, None, &mut parts, &mut |_| {})?;
+    // The sign-in service is given what the install declares once the new build runs, once.
+    assert_eq!(engine.settled, 1);
     assert_eq!(record.clients, next.releases);
     assert_eq!(client_releases(&scratch.layout)?, next.releases);
     assert_eq!(
@@ -79,6 +81,9 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
         render: &render,
     };
     assert!(upgrade(&scratch.layout, &failing, None, &mut parts, &mut |_| {}).is_err());
+    // A build that was put back is never settled: the one settling is the successful upgrade above, and the
+    // sign-in service keeps the policy of the build that runs.
+    assert_eq!(engine.settled, 1);
     for (platform, release) in client_releases(&scratch.layout)? {
         assert_eq!(release.commit, B);
         assert_eq!(
