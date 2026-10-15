@@ -23,6 +23,31 @@ use crate::runner_api::{
 };
 use crate::runner_bytes_api::{InputBytesBody, ReadBytesBody};
 
+/// Public help answers only the configured administrator's contact.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+struct SignInHelpView {
+    administrator: Option<AdministratorContact>,
+}
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+struct AdministratorContact {
+    name: String,
+    email: Option<String>,
+}
+
+/// A runner's failure to answer is carried in the successful record read.
+#[derive(serde::Serialize, utoipa::ToSchema)]
+struct RunnerStatusView {
+    machine: String,
+    runner: Option<crate::runner_client::RunnerRecord>,
+    answers: Option<bool>,
+    joining: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    refusal: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reason: Option<String>,
+}
+
 /// The runner routes' entries.
 pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     let empty = api.schema::<Empty>();
@@ -35,6 +60,18 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     routes.extend(session_operations(api, empty));
     routes.extend(runner_connections(api));
     routes.extend(joining_and_receipts(api));
+    routes.push((
+        GET,
+        "/sign-in/help",
+        None,
+        Some(api.schema::<SignInHelpView>()),
+    ));
+    routes.push((
+        GET,
+        "/agents/{id}/start-command",
+        Some(api.schema::<crate::launch_api::ordinary::PreviewQuery>()),
+        Some(api.schema::<crate::launch_api::ordinary::PreviewView>()),
+    ));
     routes
 }
 
@@ -223,7 +260,12 @@ fn runner_connections(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::list_page::ListQuery>()),
             None,
         ),
-        (GET, "/network/machines/{id}/runner", None, None),
+        (
+            GET,
+            "/network/machines/{id}/runner",
+            None,
+            Some(api.schema::<RunnerStatusView>()),
+        ),
         (
             POST,
             "/network/machines/{id}/runner",

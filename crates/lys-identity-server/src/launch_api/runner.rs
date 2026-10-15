@@ -174,11 +174,28 @@ fn remember_native_in(
     store.report(report).map(drop)
 }
 
+/// Whether the start's own arguments continue a conversation the person named
+/// in the agent's settings ("Continue an existing conversation"), as
+/// `--resume <id>`, `--resume=<id>` or `-r <id>`. Such a start is not a fresh
+/// one: the runner proves that conversation's transcript, or starts a new one
+/// and says so when the computer has none.
+fn names_a_conversation(arguments: &[String]) -> bool {
+    arguments.iter().any(|argument| {
+        matches!(
+            argument
+                .split_once('=')
+                .map_or(argument.as_str(), |(flag, _)| flag),
+            "--resume" | "-r"
+        )
+    })
+}
+
 fn fresh_terminal_conversation(
     launch: &mut lys_runner::Launch,
     resume: Option<&str>,
 ) -> Result<(), ServerError> {
     let terminal = resume.is_none()
+        && !names_a_conversation(&launch.arguments)
         && launch
             .config
             .as_ref()

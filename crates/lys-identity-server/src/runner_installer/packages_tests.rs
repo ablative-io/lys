@@ -10,8 +10,8 @@ use std::process::Command;
 #[cfg(target_os = "macos")]
 use super::run_tool;
 use super::{
-    LINUX_INSTALL, MAC_POSTINSTALL, Pending, arch, deb, lipo_command, pending_bytes,
-    pkgbuild_command, private_file, productbuild_command, version,
+    LINUX_INSTALL, MAC_POSTINSTALL, Pending, arch, deb, pending_bytes, pkgbuild_command,
+    private_file, productbuild_command, version,
 };
 
 const COMMIT: &str = "0123456789abcdef";
@@ -551,28 +551,8 @@ fn args(command: &Command) -> Vec<&std::ffi::OsStr> {
 }
 
 #[test]
-fn macos_commands_preserve_paths_and_select_both_architectures() {
+fn macos_commands_preserve_paths() {
     let root = Path::new("/private/tmp/package fixture");
-    let lipo = lipo_command(
-        &root.join("arm64/lys"),
-        &root.join("x86_64/lys"),
-        &root.join("payload/lys"),
-    );
-    assert_eq!(lipo.get_program(), "/usr/bin/lipo");
-    assert_eq!(
-        args(&lipo),
-        [
-            "-create",
-            "-arch",
-            "arm64",
-            "/private/tmp/package fixture/arm64/lys",
-            "-arch",
-            "x86_64",
-            "/private/tmp/package fixture/x86_64/lys",
-            "-output",
-            "/private/tmp/package fixture/payload/lys"
-        ]
-    );
     let version = format!("{}+g01234567", env!("CARGO_PKG_VERSION"));
     let pkg = pkgbuild_command(root, &version);
     assert_eq!(pkg.get_program(), "/usr/bin/pkgbuild");

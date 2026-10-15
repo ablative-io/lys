@@ -66,16 +66,30 @@ struct Binaries {
     containment: Vec<u8>,
 }
 
+fn stage_client(
+    folder: &Path,
+    name: &str,
+    bytes: &[u8],
+) -> Result<std::path::PathBuf, ServerError> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let path = folder.join(name);
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o700)
+        .open(&path)
+        .map_err(|error| refused("installer_build_failed", format!("staging {name}: {error}")))?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|error| refused("installer_build_failed", format!("staging {name}: {error}")))?;
+    Ok(path)
+}
+
 enum Held {
-    Macos {
-        arm: Binaries,
-        intel: Binaries,
-        commit: String,
-    },
-    Linux {
-        binaries: Binaries,
-        commit: String,
-    },
+    Macos { arm: Binaries, commit: String },
+    Linux { binaries: Binaries, commit: String },
 }
 
 fn held(root: &Path, kind: Kind) -> Result<Held, ServerError> {
@@ -96,14 +110,7 @@ fn held(root: &Path, kind: Kind) -> Result<Held, ServerError> {
     match kind {
         Kind::Macos => {
             let (arm, commit) = load("aarch64-apple-darwin")?;
-            let (intel, intel_commit) = load("x86_64-apple-darwin")?;
-            if commit != intel_commit {
-                return Err(refused(
-                    "clients_unreadable",
-                    "the Apple and Intel Mac clients were built from different commits",
-                ));
-            }
-            Ok(Held::Macos { arm, intel, commit })
+            Ok(Held::Macos { arm, commit })
         }
         Kind::Deb | Kind::Arch => {
             let (binaries, commit) = load("x86_64-unknown-linux-gnu")?;
@@ -126,42 +133,15 @@ impl Held {
                 )
             })?;
         let write = |name: &str, bytes: &[u8]| -> Result<std::path::PathBuf, ServerError> {
-            use std::io::Write;
-            use std::os::unix::fs::OpenOptionsExt;
-            let path = staged.path().join(name);
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o700)
-                .open(&path)
-                .map_err(|error| {
-                    refused("installer_build_failed", format!("staging {name}: {error}"))
-                })?;
-            file.write_all(bytes)
-                .and_then(|()| file.sync_all())
-                .map_err(|error| {
-                    refused("installer_build_failed", format!("staging {name}: {error}"))
-                })?;
-            Ok(path)
+            stage_client(staged.path(), name, bytes)
         };
         match (kind, self) {
-            (Kind::Macos, Self::Macos { arm, intel, commit }) => {
-                let (arm_lys, arm_entry) = (
-                    write("arm-lys", &arm.lys)?,
-                    write("arm-lys-containment-entry", &arm.containment)?,
+            (Kind::Macos, Self::Macos { arm, commit }) => {
+                let (lys, entry) = (
+                    write("lys", &arm.lys)?,
+                    write("lys-containment-entry", &arm.containment)?,
                 );
-                let (intel_lys, intel_entry) = (
-                    write("intel-lys", &intel.lys)?,
-                    write("intel-lys-containment-entry", &intel.containment)?,
-                );
-                packages::macos_pkg(
-                    pending,
-                    &arm_lys,
-                    &arm_entry,
-                    &intel_lys,
-                    &intel_entry,
-                    commit,
-                )
+                packages::macos_pkg(pending, &lys, &entry, commit)
             }
             (Kind::Deb, Self::Linux { binaries, commit }) => {
                 let (lys, entry) = (

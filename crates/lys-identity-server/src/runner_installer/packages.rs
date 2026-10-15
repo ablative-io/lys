@@ -359,18 +359,6 @@ fn private_file(path: &Path, bytes: &[u8], mode: u32) -> Result<(), ServerError>
         .map_err(|error| refused("installer_staging_failed", error))
 }
 
-fn lipo_command(arm: &Path, intel: &Path, output: &Path) -> Command {
-    let mut command = Command::new("/usr/bin/lipo");
-    command
-        .args(["-create", "-arch", "arm64"])
-        .arg(arm)
-        .args(["-arch", "x86_64"])
-        .arg(intel)
-        .arg("-output")
-        .arg(output);
-    command
-}
-
 fn pkgbuild_command(root: &Path, version: &str) -> Command {
     let mut command = Command::new("/usr/bin/pkgbuild");
     command
@@ -439,17 +427,16 @@ fn run_tool(mut command: Command, name: &str) -> Result<(), ServerError> {
     Ok(())
 }
 
+/// The Mac installer carries the Apple silicon build only: Apple stopped selling Intel Macs years ago (Tom, 15 Oct).
 pub(crate) fn macos_pkg(
     pending: &Pending,
-    arm_lys: &Path,
-    arm_entry: &Path,
-    intel_lys: &Path,
-    intel_entry: &Path,
+    lys: &Path,
+    entry: &Path,
     commit: &str,
 ) -> Result<Vec<u8>, ServerError> {
     let version = version(commit, "+")?;
     let pending = pending_bytes(pending)?;
-    for name in ["lipo", "pkgbuild", "productbuild"] {
+    for name in ["pkgbuild", "productbuild"] {
         let path = format!("/usr/bin/{name}");
         let metadata = fs::metadata(&path).map_err(|error| {
             refused(
@@ -468,12 +455,7 @@ pub(crate) fn macos_pkg(
         .prefix("lys-runner-package-")
         .tempdir()
         .map_err(|error| refused("installer_staging_failed", error))?;
-    let result = build_macos(
-        directory.path(),
-        &pending,
-        [(arm_lys, intel_lys), (arm_entry, intel_entry)],
-        &version,
-    );
+    let result = build_macos(directory.path(), &pending, [lys, entry], &version);
     let cleanup = directory
         .close()
         .map_err(|error| refused("installer_cleanup_failed", error));
@@ -490,7 +472,7 @@ pub(crate) fn macos_pkg(
 fn build_macos(
     root: &Path,
     pending: &[u8],
-    binaries: [(&Path, &Path); 2],
+    binaries: [&Path; 2],
     version: &str,
 ) -> Result<Vec<u8>, ServerError> {
     let payload = root.join("payload/Library/Application Support/Lys");
@@ -512,9 +494,9 @@ fn build_macos(
         0o755,
     )?;
     private_file(&payload.join("runner-pending.json"), pending, 0o600)?;
-    for ((arm, intel), name) in binaries.into_iter().zip(["lys", "lys-containment-entry"]) {
+    for (source, name) in binaries.into_iter().zip(["lys", "lys-containment-entry"]) {
         let output = payload.join(name);
-        run_tool(lipo_command(arm, intel, &output), "lipo")?;
+        fs::copy(source, &output).map_err(|error| refused("installer_staging_failed", error))?;
         fs::set_permissions(output, fs::Permissions::from_mode(0o755))
             .map_err(|error| refused("installer_staging_failed", error))?;
     }

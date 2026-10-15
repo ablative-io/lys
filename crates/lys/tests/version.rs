@@ -63,12 +63,22 @@ const STAMPED: [&str; 4] = ["lys", "lys-identity-server", "lys-secrets", "lys-ho
 
 #[test]
 fn every_stamped_crate_carries_the_same_build_script() -> TestResult {
+    // The stamp's logic lives in one shared file, byte-identical in every stamped crate; each crate's build.rs calls
+    // it (the CLI's also compiles its device-owner presence helper first).
     let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-    let ours = std::fs::read(crates.join("lys").join("build.rs"))?;
+    let ours = std::fs::read(crates.join("lys").join("build").join("provenance.rs"))?;
     let mut compared = 0;
     for name in STAMPED {
-        let theirs = std::fs::read(crates.join(name).join("build.rs"))?;
-        assert_eq!(theirs, ours, "{name}/build.rs differs from lys/build.rs");
+        let theirs = std::fs::read(crates.join(name).join("build").join("provenance.rs"))?;
+        assert_eq!(
+            theirs, ours,
+            "{name}/build/provenance.rs differs from lys/build/provenance.rs"
+        );
+        let script = std::fs::read_to_string(crates.join(name).join("build.rs"))?;
+        assert!(
+            script.contains("provenance::main()"),
+            "{name}/build.rs does not call the shared provenance"
+        );
         compared += 1;
     }
     assert_eq!(compared, STAMPED.len());

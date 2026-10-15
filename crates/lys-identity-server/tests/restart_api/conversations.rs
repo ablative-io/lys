@@ -11,6 +11,8 @@ const NATIVE: &str = "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee";
 
 #[derive(Default)]
 struct Computer {
+    expected_caller: String,
+    callers: Vec<String>,
     launches: Vec<Launch>,
     ended: BTreeSet<String>,
     selected_before_end: bool,
@@ -18,6 +20,13 @@ struct Computer {
 
 fn reply(computer: &mut Computer, act: Act) -> Result<Answer, Box<dyn Error>> {
     Ok(match act {
+        Act::AsCaller { caller, done } => {
+            if caller != computer.expected_caller {
+                return Err("the start did not name the agent's responsible person".into());
+            }
+            computer.callers.push(caller);
+            reply(computer, *done)?
+        }
         Act::Start { launch, .. } => {
             let answer = Answer::Started {
                 session: launch.session.clone(),
@@ -54,6 +63,10 @@ fn reply(computer: &mut Computer, act: Act) -> Result<Answer, Box<dyn Error>> {
             }
             Answer::Liveness { sessions }
         }
+        Act::ControlStatus { session } => Answer::ControlStatus {
+            session,
+            control: None,
+        },
         Act::End { session } => {
             computer.ended.insert(session.clone());
             Answer::Ended {
@@ -95,7 +108,16 @@ fn reply(computer: &mut Computer, act: Act) -> Result<Answer, Box<dyn Error>> {
             words: "this fixture keeps no feed".to_owned(),
             oldest: None,
         },
-        other => return Err(format!("unexpected runner request: {other:?}").into()),
+        Act::GrantChannel => Answer::Refused {
+            refusal: "grant_channel_unheld".to_owned(),
+            words: "this fixture holds no tool judge channel".to_owned(),
+            oldest: None,
+        },
+        other => {
+            let kind = serde_json::to_value(other)?;
+            let kind = kind.get("act").and_then(Value::as_str).unwrap_or("unknown");
+            return Err(format!("unexpected runner request: {kind}").into());
+        }
     })
 }
 
@@ -129,6 +151,21 @@ async fn serve(
     }
 }
 
+async fn posted(held: &Held, path: &str, body: &Value) -> Result<Value, Box<dyn Error>> {
+    let (status, answer) = held.service.post(path, Some(&held.ada), body).await?;
+    if status != 200 {
+        let refusal = answer
+            .get("refusal")
+            .and_then(Value::as_str)
+            .unwrap_or("unnamed refusal");
+        return Err(format!(
+            "the fixture request {path} was refused with status {status}: {refusal}"
+        )
+        .into());
+    }
+    Ok(answer)
+}
+
 async fn resumes(harness: &str, flag: &str) -> TestResult {
     let held = Held::open().await?;
     let mut declared = harness_description::declared();
@@ -137,26 +174,42 @@ async fn resumes(harness: &str, flag: &str) -> TestResult {
         declared["description"]["models"]["maximum"] = json!(1);
         declared["description"]["models"]["further_encoding"] = json!({"kind":"array"});
         declared["description"]["rendering_contract"] = json!("codex/template-v1");
+        declared["description"]["permissions"]["modes"] = json!(["workspace-write"]);
+        declared["description"]["permissions"]["rule_forms"] = json!([]);
     }
+    let mode = if harness == "codex" {
+        "workspace-write"
+    } else {
+        "plan"
+    };
     held.ok(&format!("/agents/{}/provisioning", held.agent()), &json!({
         "operation": operation()?, "from_version": 1, "working_folder": "/tmp",
         "model_access": ["model"], "tools": [], "skills": [], "mcp_servers": [],
-        "instructions": "", "note": "", "permissions": {"default_mode":"plan"}, "harness": declared,
+        "instructions": "", "note": "", "permissions": {"default_mode":mode}, "harness": declared,
     })).await?;
     held.review(2).await?;
     let socket = held.dir.path().join("conversation.sock");
     let listener = tokio::net::UnixListener::bind(&socket)?;
-    let computer = Arc::new(Mutex::new(Computer::default()));
+    let computer = Arc::new(Mutex::new(Computer {
+        expected_caller: held.seeded.people[0].id.to_string(),
+        ..Computer::default()
+    }));
     let answering = Arc::clone(&computer);
     let server = held.key.public_key_bytes();
     let task = tokio::spawn(serve(listener, answering, server));
     let result = async {
-        held.ok(
+        posted(
+            &held,
             &format!("/network/machines/{}/runner", held.machine),
             &json!({"runner":{"kind":"socket","path":socket}}),
         )
         .await?;
-        let before = held.start().await?;
+        let before = posted(
+            &held,
+            &format!("/agents/{}/start-command", held.agent()),
+            &json!({"operation": operation()?, "machine": held.machine}),
+        )
+        .await?;
         let preview_path = format!(
             "/agents/{}/start-command?machine={}",
             held.agent(),
@@ -174,15 +227,16 @@ async fn resumes(harness: &str, flag: &str) -> TestResult {
             .map_err(|error| error.to_string())?
             .selected_before_end = false;
         let path = format!("/agents/{}/restart", held.agent());
-        let after = held.ok(&path, &request).await?;
+        let after = posted(&held, &path, &request).await?;
         assert_eq!(after["conversation"], NATIVE);
         assert_eq!(after["directory"], "/tmp");
         assert_ne!(after["session"], before["session"]);
-        let repeated = held.ok(&path, &request).await?;
+        let repeated = posted(&held, &path, &request).await?;
         assert_eq!(repeated["session"], after["session"]);
         let computer = computer.lock().map_err(|error| error.to_string())?;
         assert!(computer.selected_before_end);
         assert_eq!(computer.launches.len(), 2);
+        assert_eq!(computer.callers.len(), 2);
         assert!(
             computer.launches[1]
                 .arguments

@@ -287,9 +287,13 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
     let operation = OperationId::generate()?.to_string();
     let mut bad_email = admit(&operation, "alpha");
     bad_email["email"] = json!("not-an-email");
-    let mut no_grant = admit(&OperationId::generate()?.to_string(), "alpha");
-    no_grant.as_object_mut().ok_or("an object")?.remove("grant");
-    for body in [bad_email, no_grant] {
+    let mut invalid = vec![bad_email];
+    for member in ["operation", "display_name", "email"] {
+        let mut body = admit(&OperationId::generate()?.to_string(), "alpha");
+        body.as_object_mut().ok_or("an object")?.remove(member);
+        invalid.push(body);
+    }
+    for body in invalid {
         let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
         assert_eq!(status, 400, "{refused}");
         assert_eq!(refused["refusal"], "RequestMalformed", "{refused}");
@@ -301,5 +305,13 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
     }
     assert_eq!(accounts_for(&rauthy, BEA)?, 0);
     assert_eq!(people(&service, &ada).await?, before);
+    let mut no_grant = admit(&OperationId::generate()?.to_string(), "alpha");
+    no_grant.as_object_mut().ok_or("an object")?.remove("grant");
+    let (status, admitted) = service.post("/people/admit", Some(&ada), &no_grant).await?;
+    assert_eq!(status, 200, "{admitted}");
+    assert!(admitted["grant"].is_null(), "{admitted}");
+    assert_eq!(admitted["receipt"]["completed"], json!(&STEPS[..4]));
+    assert_eq!(accounts_for(&rauthy, BEA)?, 1);
+    assert_eq!(people(&service, &ada).await?, before + 1);
     Ok(())
 }

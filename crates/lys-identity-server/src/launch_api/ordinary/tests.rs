@@ -308,7 +308,8 @@ fn no_known_conversation_uses_the_new_folder_instead_of_refusing_an_old_folder_c
     );
     let chosen = prior(&held, Harness::ClaudeCode, Some(CURRENT_FOLDER))?;
     assert_eq!(chosen.native, None);
-    assert_eq!(chosen.directory, None);
+    assert_eq!(chosen.directory.as_deref(), Some(PRIOR_FOLDER));
+    assert_ne!(chosen.directory.as_deref(), Some(CURRENT_FOLDER));
     Ok(())
 }
 
@@ -388,6 +389,7 @@ fn a_codex_thread_report_survives_runtime_replay_after_the_process_ends() -> Res
     let reopened = crate::runtime_state::Held::decode(&runtime.encode()?)?;
     let selected = latest(&reopened.sessions, AGENT, MACHINE, OPERATION)
         .ok_or("the ended Codex session was lost")?;
+    assert!(selected.stopped());
     assert_eq!(
         prior(selected, Harness::Codex, None)?.native.as_deref(),
         Some(UUID)

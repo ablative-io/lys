@@ -56,6 +56,22 @@ fn executable(path: &Path) -> Result<bool, String> {
     }
 }
 
+/// `path` with its `.` and `..` parts resolved by their words, without reading the file system: `/a/b/../c` is `/a/c`.
+/// A `..` at the root stays at the root.
+fn lexical(path: &Path) -> PathBuf {
+    let mut resolved = PathBuf::new();
+    for part in path.components() {
+        match part {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                resolved.pop();
+            }
+            other => resolved.push(other.as_os_str()),
+        }
+    }
+    resolved
+}
+
 pub(crate) fn resolve_in(program: &str, search: &OsStr) -> Result<Option<PathBuf>, String> {
     if !lys_home::harness::rendering_launch::command_or_absolute_path(program) {
         return Err(lys_home::harness::rendering_launch::PROGRAM_RULE.to_owned());
@@ -71,7 +87,9 @@ pub(crate) fn resolve_in(program: &str, search: &OsStr) -> Result<Option<PathBuf
         };
     }
     for directory in std::env::split_paths(search).filter(|directory| directory.is_absolute()) {
-        let candidate = directory.join(program);
+        // A login PATH may name a folder through `..` (Omarchy writes `~/.local/share/../bin`); the path reported for
+        // a program is the folder resolved by its words, so every reader sees one plain absolute path.
+        let candidate = lexical(&directory).join(program);
         if executable(&candidate)? {
             return Ok(Some(candidate));
         }
@@ -95,6 +113,30 @@ pub(crate) fn selected(
 mod tests {
     use super::read_login_path;
     use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn a_login_path_folder_named_through_dot_dot_reports_its_plain_path()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let bin = root.path().join("bin");
+        std::fs::create_dir_all(&bin)?;
+        std::fs::create_dir_all(root.path().join("share"))?;
+        let program = bin.join("walker");
+        std::fs::write(&program, "#!/bin/sh\n")?;
+        std::fs::set_permissions(
+            &program,
+            std::os::unix::fs::PermissionsExt::from_mode(0o755),
+        )?;
+        let search = std::ffi::OsString::from(root.path().join("share").join("..").join("bin"));
+        let found = super::resolve_in("walker", &search)?.ok_or("walker was not found")?;
+        assert_eq!(found, program);
+        assert!(
+            !found.to_string_lossy().contains(".."),
+            "{}",
+            found.display()
+        );
+        Ok(())
+    }
 
     #[test]
     fn each_login_path_read_uses_the_current_shell_report() -> Result<(), Box<dyn std::error::Error>>

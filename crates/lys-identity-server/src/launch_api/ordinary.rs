@@ -170,8 +170,10 @@ fn prior(
     }
     let native = if started(tracked) && view.is_some() {
         let observed = tracked.reports.iter().rev().find(|report| {
-            report.state != crate::runtime_state::Reported::Starting
-                && report.reported_by == format!("the runner of machine {}", tracked.machine)
+            matches!(
+                report.state,
+                crate::runtime_state::Reported::Running | crate::runtime_state::Reported::StopAsked
+            ) && report.reported_by == format!("the runner of machine {}", tracked.machine)
                 && report.confirmation == "the runner identified the native conversation"
         });
         observed

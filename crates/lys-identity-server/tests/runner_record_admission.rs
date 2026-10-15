@@ -25,27 +25,31 @@ async fn another_member_cannot_read_or_probe_a_runner_record()
         })
         .await?;
     let id = OperationId::generate()?.to_string();
-    let (status, _) = service.post("/network/machines", Some(&admin), &json!({
+    let (status, answer) = service.post("/network/machines", Some(&admin), &json!({
         "operation": id, "name": "Administrator computer", "kind": "Computer",
         "runtime": "lys-runner", "slots": 0, "may_run": [], "may_run_roles": [], "may_reach": [],
     })).await?;
-    assert_eq!(status, 200);
+    assert_eq!(status, 200, "{answer}");
     let path = format!("/network/machines/{id}/runner");
     let (status, answer) = service.get(&path, Some(&member)).await?;
     assert_eq!(status, 403);
     assert_eq!(answer["refusal"], "not_your_computer");
     assert!(answer.get("runner").is_none());
     assert!(answer.get("joining").is_none());
-    assert_eq!(service.get(&path, Some(&admin)).await?.0, 200);
-    assert_eq!(service.get(&path, None).await?.0, 401);
+    let (status, answer) = service.get(&path, Some(&admin)).await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, answer) = service.get(&path, None).await?;
+    assert_eq!(status, 401, "{answer}");
     let own = OperationId::generate()?.to_string();
-    let (status, _) = service.post("/network/machines", Some(&member), &json!({
+    let (status, answer) = service.post("/network/machines", Some(&member), &json!({
         "operation": own, "name": "Member computer", "kind": "Computer",
         "runtime": "lys-runner", "slots": 0, "may_run": [], "may_run_roles": [], "may_reach": [],
     })).await?;
-    assert_eq!(status, 200);
+    assert_eq!(status, 200, "{answer}");
     let own_path = format!("/network/machines/{own}/runner");
-    assert_eq!(service.get(&own_path, Some(&member)).await?.0, 200);
-    assert_eq!(service.get(&own_path, Some(&admin)).await?.0, 200);
+    let (status, answer) = service.get(&own_path, Some(&member)).await?;
+    assert_eq!(status, 200, "{answer}");
+    let (status, answer) = service.get(&own_path, Some(&admin)).await?;
+    assert_eq!(status, 200, "{answer}");
     Ok(())
 }

@@ -128,14 +128,41 @@ fn a_fresh_codex_terminal_keeps_its_launch_without_guessing_a_native_thread_id()
 }
 
 #[test]
-fn a_template_resume_conflicts_with_a_fresh_start_and_is_refused_without_mutation() -> Result {
-    for argument in ["--resume", "--resume=another-id", "-r"] {
+fn a_conversation_named_in_the_settings_is_continued_not_refused_and_gets_no_fresh_identity()
+-> Result {
+    for named in [
+        vec!["--resume", SELECTED_UUID],
+        vec!["--resume=aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee"],
+        vec!["-r", SELECTED_UUID],
+    ] {
+        let mut launch = launch("claude_code", false)?;
+        launch
+            .arguments
+            .extend(named.iter().map(|word| (*word).to_owned()));
+        let before = launch.clone();
+        fresh_terminal_conversation(&mut launch, None)?;
+        assert_eq!(
+            launch, before,
+            "{named:?} was changed or given a fresh conversation"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_continue_or_fork_argument_is_still_refused_without_mutation() -> Result {
+    for argument in [
+        "--continue",
+        "-c",
+        "--fork-session",
+        "--no-session-persistence",
+    ] {
         let mut launch = launch("claude_code", false)?;
         launch.arguments.push(argument.to_owned());
         let before = launch.clone();
         let error = fresh_terminal_conversation(&mut launch, None)
             .err()
-            .ok_or("a template resume silently replaced the fresh conversation")?;
+            .ok_or("a conflicting conversation argument was accepted")?;
         assert_eq!(error.name(), "pty_conversation_conflict");
         assert_eq!(launch, before);
     }

@@ -19,6 +19,9 @@ use serde_json::Value;
 mod unnamed;
 use unnamed::{NO_BODY, OPEN_ANSWERS};
 
+#[path = "shared/openapi_sources.rs"]
+mod test_sources;
+
 /// A route as `method path`.
 type Declared = BTreeSet<(String, String)>;
 
@@ -253,35 +256,40 @@ async fn every_entry_is_served_by_the_running_service() -> TestResult {
 
 /// Every test source the refusals are produced in.
 fn test_sources() -> Result<String, Box<dyn Error>> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut text = String::new();
-    for dir in [
-        root.join("tests"),
-        root.join("tests/shared"),
-        root.join("../../tests/identity_contract/tests"),
-        root.join("src"),
-    ] {
-        for entry in std::fs::read_dir(&dir)? {
-            let path = entry?.path();
-            let is_openapi = path.file_name().is_some_and(|name| name == "openapi.rs");
-            // Under src only the route test modules count, never the code
-            // that names a refusal.
-            let is_test = !path.starts_with(root.join("src"))
-                || path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .is_some_and(|name| name.ends_with("_tests.rs"));
-            if path.extension().is_some_and(|extension| extension == "rs") && !is_openapi && is_test
-            {
-                text.push_str(&std::fs::read_to_string(&path)?);
-            }
-        }
-    }
-    Ok(text)
+    test_sources::read(Path::new(env!("CARGO_MANIFEST_DIR")))
 }
 
-#[test]
-fn every_refusal_the_document_names_is_produced_by_a_test() -> TestResult {
+#[tokio::test]
+async fn every_refusal_the_document_names_is_produced_by_a_test() -> TestResult {
+    let planted = r##"
+        const PRODUCTION_ONLY: &str = "production-only";
+        #[cfg(test)]
+        mod tests {
+            #[test]
+            fn produces() { assert_eq!("produced", r#"} raw string"#); }
+        }
+        const AFTER_TESTS: &str = "after-tests";
+    "##;
+    let extracted = test_sources::inline_tests(planted)?;
+    assert!(extracted.contains("produced"));
+    assert!(!extracted.contains("production-only"));
+    assert!(!extracted.contains("after-tests"));
+    let service = Service::start().await?;
+    for (query, refusal) in [
+        ("error=access_denied", "SignInCancelled"),
+        ("error=Disabled", "AccountDisabled"),
+        (
+            "error=invalid_request&error_description=User%20not%20found",
+            "NotAdmittedYet",
+        ),
+    ] {
+        let (status, answer) = service.get(&format!("/callback?{query}"), None).await?;
+        assert_eq!(status, 400);
+        assert_eq!(answer["refusal"], refusal);
+    }
+    let (status, help) = service.get("/sign-in/help", None).await?;
+    assert_eq!(status, 200);
+    assert!(help.get("administrator").is_some());
     let document = document()?;
     let named: BTreeSet<String> = document["paths"]
         .as_object()
@@ -327,13 +335,22 @@ fn every_route_names_the_types_it_takes_and_answers() -> TestResult {
             let at = format!("{method} {path}");
             served.insert(at.clone());
             let answer = reference(operation, "/responses/200/content/application~1json/schema");
+            let binary = operation["responses"]["200"]["content"]
+                .as_object()
+                .is_some_and(|content| {
+                    content.iter().any(|(media, body)| {
+                        media != "application/json"
+                            && body["schema"]["type"] == "string"
+                            && body["schema"]["format"] == "binary"
+                    })
+                });
             if open.contains(at.as_str()) {
                 assert!(
-                    answer.is_none(),
+                    answer.is_none() && !binary,
                     "{at} names the answer {answer:?}: take it out of OPEN_ANSWERS"
                 );
             } else {
-                assert!(answer.is_some(), "{at} names no answer schema");
+                assert!(answer.is_some() || binary, "{at} names no answer schema");
                 answers += 1;
             }
             if method != "post" && method != "put" {
