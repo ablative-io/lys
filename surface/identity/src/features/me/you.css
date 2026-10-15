@@ -62,7 +62,11 @@
 .you-sessions-scroll th,
 .you-sessions-scroll td {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.you-sessions-scroll th:first-child {
+  width: 45%;
 }
 .you-sessions-scroll th:last-child {
   width: 3.5rem;
@@ -72,7 +76,7 @@
 }
 .you-sessions-scroll td .note {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .you-sessions-scroll td .act {
   width: 32px;

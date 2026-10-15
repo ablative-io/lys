@@ -1,4 +1,10 @@
-/* Long action lists and references must share the available width with the other grant facts. */
+/*
+ * A grant's columns fit what they hold (Tom, 4 Oct 2026): nothing breaks inside a word
+ * and the table never scrolls sideways. Grant and Relation are narrow and never wrap;
+ * the On reference and the path to a person take the room, wrapping only where a
+ * reference has its own breaks (after . : _ - /) or between names.
+ */
+/* Columns size to what they hold, not eleven equal shares. */
 .usage-table.grant-cols,
 .grant-cols .table-scroll > table {
   table-layout: auto;
@@ -6,16 +12,19 @@
 }
 .grant-cols th,
 .grant-cols td {
+  padding: 8px 7px;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   word-break: normal;
   hyphens: none;
 }
-.grant-cols th {
-  overflow-wrap: normal;
+.grant-cols td[data-col='Grant'],
+.grant-cols td[data-col='Relation'] {
+  width: 1%;
+  white-space: nowrap;
 }
 .grant-cols .g-tight {
-  white-space: normal;
+  white-space: nowrap;
 }
 .grant-actions {
   display: flex;
@@ -30,7 +39,7 @@
 }
 .grant-cols .chain .pill {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   margin: 1px 0;
 }
 .grant-cols .g-change {
@@ -47,7 +56,7 @@
   grid-template-columns: max-content minmax(0, 1fr);
 }
 .grant-facts dd {
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
 }
 .grant-acts {
   display: flex;

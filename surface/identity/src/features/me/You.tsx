@@ -2,7 +2,7 @@
 import { useRef, useState } from 'react';
 import { api, useLoad } from '../../api';
 import type { AgentSummary, Login, MeView } from '../../generated';
-import { GrantTable } from '../grants/GrantTable';
+import { breakable, GrantTable } from '../grants/GrantTable';
 import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { Gate } from '../signin/Gate';
@@ -44,7 +44,7 @@ function SignInIdentity({ login, current }: { login: Login; current: boolean }) 
   return (
     <div className="row">
       <span>
-        {providerName(login.provider)} <span className="note">{current ? 'signs you in · this session' : 'signs you in'}</span>
+        {breakable(providerName(login.provider))} <span className="note">{current ? 'signs you in · this session' : 'signs you in'}</span>
       </span>
     </div>
   );

@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { You } from '../src/features/me/You';
 import { App } from '../src/App';
+import { breakable } from '../src/features/grants/GrantTable';
 import type { SessionView } from '../src/features/sessions/Sessions';
 import { GRANTS, ME, MODEL, SERVICE, ok } from './fixtures';
 import { serve } from './harness';
@@ -61,6 +62,21 @@ async function showYou(): Promise<void> {
   expect(document.querySelectorAll('.you-sessions tbody tr')).toHaveLength(2);
 }
 
+function expectWordBoundaries(): void {
+  const cells = document.querySelectorAll<HTMLElement>('.grant-cols td');
+  expect(cells.length).toBeGreaterThan(0);
+  for (const cell of cells) {
+    const css = getComputedStyle(cell);
+    expect(css.overflowWrap, cell.dataset.col).toBe('normal');
+    expect(css.wordBreak, cell.dataset.col).toBe('normal');
+  }
+  for (const column of ['Grant', 'Relation']) {
+    expect(getComputedStyle(element(`td[data-col="${column}"]`)).whiteSpace, column).toBe('nowrap');
+  }
+  expect(getComputedStyle(element('.g-tight')).whiteSpace).toBe('nowrap');
+  expect(getComputedStyle(element('.chain .pill')).overflowWrap).toBe('normal');
+}
+
 describe('LYSWALK layout contracts', () => {
   it('W1 wraps all 25 actions and grant facts on Access and You', async () => {
     location.hash = '#/access';
@@ -71,11 +87,26 @@ describe('LYSWALK layout contracts', () => {
     expect(getComputedStyle(element('td[data-col="Window"]')).whiteSpace).not.toBe('nowrap');
     expect(getComputedStyle(element('.grant-cols table')).width).toBe('100%');
     expect(getComputedStyle(element('.grant-cols th')).overflowWrap).toBe('normal');
+    expectWordBoundaries();
     await showYou();
+    expectWordBoundaries();
     for (const column of ['Allows', 'Window', 'Last used', 'May pass on']) {
       expect(getComputedStyle(element(`td[data-col="${column}"]`)).whiteSpace, column).not.toBe('nowrap');
     }
     expect(getComputedStyle(element('.g-change')).flexWrap).toBe('wrap');
+  });
+
+  it('breaks references only after their own dot colon underscore hyphen and slash', async () => {
+    const reference = 'project:alpha.beta_gamma-delta/epsilon';
+    await act(async () => root.render(<span data-reference>{breakable(reference)}</span>));
+    const shown = element('[data-reference]');
+    expect(shown.textContent).toBe(reference);
+    const breaks = [...shown.querySelectorAll('wbr')];
+    expect(breaks).toHaveLength(5);
+    expect(breaks.map((br) => br.previousSibling?.textContent)).toEqual(['project:', 'alpha.', 'beta_', 'gamma-', 'delta/']);
+    expect(breaks.every((br) => /[.:_/-]$/.test(br.previousSibling?.textContent ?? ''))).toBe(true);
+    await act(async () => root.render(<span data-reference>{breakable('unbrokenword')}</span>));
+    expect(element('[data-reference]').querySelectorAll('wbr')).toHaveLength(0);
   });
 
   it('W2 fits the sessions table and keeps both end-session controls visible', async () => {
@@ -93,7 +124,10 @@ describe('LYSWALK layout contracts', () => {
     }
     for (const cell of document.querySelectorAll<HTMLElement>('.you-sessions td')) {
       expect(getComputedStyle(cell).whiteSpace).not.toBe('nowrap');
+      expect(getComputedStyle(cell).overflowWrap).toBe('normal');
+      expect(getComputedStyle(cell).wordBreak).not.toBe('break-all');
     }
+    expect(getComputedStyle(element('.you-sessions td .note')).overflowWrap).toBe('normal');
   });
 
   it('W3 sizes every account card to its content without a private scrollbar', async () => {
