@@ -57,7 +57,7 @@ it('C737 draws the tree before the live sessions are read, marks a seatless agen
   let host = await tree();
   await settle();
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(1);
-  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('Running sessions could not be read: Lys could not read or change this agent’s sessions.');
+  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('Running sessions could not be read: Lys could not reach this agent’s sessions just now.');
   expect(host.querySelector('.network-list')?.textContent).not.toContain('RuntimeUnavailable');
   expect(host.querySelectorAll('.network-list p')).toHaveLength(0);
   await act(async () => { root.unmount(); });
