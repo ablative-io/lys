@@ -5,7 +5,7 @@
 //! last good entry, the read-only refusals, and a real process kill inside an
 //! append that reopens at the pin with nothing adopted.
 
-use std::io::{Seek, SeekFrom, Write};
+use std::io::{BufRead, BufReader, Seek, SeekFrom, Write};
 use std::path::Path;
 
 use super::*;
@@ -291,8 +291,8 @@ fn an_unexpected_entry_among_the_segments_is_corrupt_and_a_dot_name_is_ignored()
 
 /// The writer the kill test runs in a second process: it appends acts of
 /// many leaves to the store at `dir` until it is killed.
-fn kill_writer(dir: &Path) -> ! {
-    let mut store = FileLeafStore::open(dir).unwrap();
+fn kill_writer(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    let mut store = FileLeafStore::open(dir)?;
     let mut frontier = Frontier::new();
     let mut index = 0u64;
     loop {
@@ -305,8 +305,13 @@ fn kill_writer(dir: &Path) -> ! {
             tree_size: frontier.size(),
             root: frontier.root(),
         };
-        store.append(index, &borrowed, pin).unwrap();
+        store.append(index, &borrowed, pin)?;
         index += 64;
+        if index == 256 {
+            let mut stdout = std::io::stdout().lock();
+            writeln!(stdout, "APPEND_READY")?;
+            stdout.flush()?;
+        }
     }
 }
 
@@ -320,9 +325,10 @@ fn big_leaf(index: u64) -> Vec<u8> {
 }
 
 #[test]
-fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
+fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted()
+-> Result<(), Box<dyn std::error::Error>> {
     if let Some(dir) = std::env::var_os(WRITER_DIR) {
-        kill_writer(Path::new(&dir));
+        return kill_writer(Path::new(&dir));
     }
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("store");
@@ -333,22 +339,30 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
         .arg("file::tests::a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted")
         .arg("--nocapture")
         .env(WRITER_DIR, &dir)
-        .stdout(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
         .unwrap();
-    // Kill once real acts have landed and another is in flight. A writer
-    // that exits on its own is named; a slow one is waited for.
-    loop {
-        let len = std::fs::metadata(&segment).map_or(0, |meta| meta.len());
-        if len > 12 * 1024 * 1024 {
-            break;
+    let stdout = child.stdout.take().ok_or("writer stdout missing")?;
+    let mut lines = BufReader::new(stdout).lines();
+    let ready = loop {
+        match lines.next() {
+            Some(Ok(line)) if line.split_whitespace().last() == Some("APPEND_READY") => {
+                break Ok(());
+            }
+            Some(Ok(_)) => {}
+            Some(Err(error)) => break Err(error.to_string()),
+            None => break Err("writer closed stdout before append readiness".to_owned()),
         }
-        if let Some(status) = child.try_wait().unwrap() {
-            panic!("the writer exited on its own with {status} after {len} bytes");
+    };
+    if let Err(error) = ready {
+        if child.try_wait()?.is_none() {
+            child.kill()?;
         }
-        std::thread::sleep(std::time::Duration::from_millis(5));
+        child.wait()?;
+        return Err(error.into());
     }
+    assert!(std::fs::metadata(&segment)?.len() > 12 * 1024 * 1024);
     child.kill().unwrap();
     child.wait().unwrap();
     let len_at_kill = std::fs::metadata(&segment).unwrap().len();
@@ -388,6 +402,7 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted() {
         None => assert_eq!(after, len_at_kill),
     }
     store.audit_leaves().unwrap();
+    Ok(())
 }
 
 /// One leaf offered at `index` behind `frontier`, as a writer whose view of
