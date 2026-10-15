@@ -44,6 +44,7 @@ pub enum HandleAnswer {
 
 impl HandleAnswer {
     /// The refusal this answer is, when it carried a credential value.
+    #[must_use]
     pub fn refusal(&self) -> Option<Refusal> {
         match self {
             Self::ValueInAnswer { record, field } => Some(Refusal::CredentialValueInAnswer {
@@ -65,6 +66,12 @@ pub trait HandleRecords {
 
 /// Its virtual credentials are valid: the valid credential ids to hand on,
 /// or the refusal. Fails only when the record could not be read at all.
+///
+/// # Errors
+/// - `StartError::Unavailable` if the handle record cannot be read.
+/// - The inner result returns `Refusal::VirtualCredentialsNotValid` if no valid credential is held.
+/// - The inner result returns `Refusal::CheckRecordMissing` if the handle record is absent.
+/// - The inner result returns `Refusal::CredentialValueInAnswer` if the answer exposes a credential value.
 pub fn check(
     records: &dyn HandleRecords,
     agent: &str,

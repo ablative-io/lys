@@ -27,6 +27,10 @@ pub trait ProfileReviews {
 }
 
 /// Its profile version is reviewed: passes only on a review on record.
+///
+/// # Errors
+/// - `Refusal::CheckRecordMissing` if the review record is absent.
+/// - `Refusal::ProfileVersionNotReviewed` if the record holds no review of this version.
 pub fn check(reviews: &dyn ProfileReviews, profile_version: &str) -> Result<(), Refusal> {
     match reviews.review(profile_version) {
         None => Err(Check::ProfileVersionIsReviewed.record_missing()),

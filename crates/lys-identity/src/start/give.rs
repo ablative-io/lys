@@ -77,11 +77,13 @@ pub struct Given {
 
 impl Given {
     /// The working directory the command runs in.
+    #[must_use]
     pub fn working_directory(&self) -> &str {
         &self.record.working_directory
     }
 
     /// The start as the JSON body the route answers.
+    #[must_use]
     pub fn to_json(&self) -> String {
         let mut out = String::from("{\"command\":");
         json_string(&mut out, &self.command);
@@ -133,6 +135,23 @@ pub fn record_json(out: &mut String, record: &LaunchRecord) {
 }
 
 /// Give a start for the request `members` name, as `caller`, at `now`.
+///
+/// # Errors
+/// - `StartError::Refused` containing `Refusal::StartFieldNotAllowed` if the request names an extra member.
+/// - `StartError::Refused` containing `Refusal::StartMemberMissing` if a required request member is absent or empty.
+/// - `StartError::Refused` containing `Refusal::AgentUnknown` if the requested agent is not registered.
+/// - `StartError::Refused` containing `Refusal::StartRightMissing` if the caller lacks start authority.
+/// - `StartError::Refused` containing `Refusal::StartUnconfirmed` if another start for the agent still stands.
+/// - `StartError::Refused` containing `Refusal::AgentNotActive` if the agent is not active.
+/// - `StartError::Refused` containing `Refusal::ProfileVersionNotReviewed` if the requested version has no recorded review.
+/// - `StartError::Refused` containing `Refusal::MachineNotAllowedForRole` if no held role permits this machine.
+/// - `StartError::Refused` containing `Refusal::VirtualCredentialsNotValid` if no held credential is valid.
+/// - `StartError::Refused` containing `Refusal::EgressNotReachable` if the machine cannot reach a required destination.
+/// - `StartError::Refused` containing `Refusal::CheckRecordMissing` if a start check lacks its required record.
+/// - `StartError::Refused` containing `Refusal::CredentialValueInAnswer` if the handle answer exposes a credential value.
+/// - `StartError::Refused` containing `Refusal::ProfileVersionFieldMissing` if the profile omits executable, arguments or working directory.
+/// - `StartError::Refused` containing `Refusal::CommandValueOutsideGrammar` if an assigned id or credential list violates its grammar.
+/// - `StartError::Unavailable` if the handle record, secure random source or launch log cannot be read or written.
 pub fn give<S, I>(
     store: &mut LaunchRecords<S>,
     owners: &Owners<'_>,
@@ -151,6 +170,21 @@ where
 /// Give a start again from the kept launch record `source`, as `caller`, at
 /// `now`: a new record with its own id, naming `source` as the record it
 /// was copied from.
+///
+/// # Errors
+/// - `StartError::Refused` containing `Refusal::AgentUnknown` if the requested agent is not registered.
+/// - `StartError::Refused` containing `Refusal::StartRightMissing` if the caller lacks start authority.
+/// - `StartError::Refused` containing `Refusal::StartUnconfirmed` if another start for the agent still stands.
+/// - `StartError::Refused` containing `Refusal::AgentNotActive` if the agent is not active.
+/// - `StartError::Refused` containing `Refusal::ProfileVersionNotReviewed` if the requested version has no recorded review.
+/// - `StartError::Refused` containing `Refusal::MachineNotAllowedForRole` if no held role permits this machine.
+/// - `StartError::Refused` containing `Refusal::VirtualCredentialsNotValid` if no held credential is valid.
+/// - `StartError::Refused` containing `Refusal::EgressNotReachable` if the machine cannot reach a required destination.
+/// - `StartError::Refused` containing `Refusal::CheckRecordMissing` if a start check lacks its required record.
+/// - `StartError::Refused` containing `Refusal::CredentialValueInAnswer` if the handle answer exposes a credential value.
+/// - `StartError::Refused` containing `Refusal::CommandValueOutsideGrammar` if an assigned id or credential list violates its grammar.
+/// - `StartError::Unavailable` if the handle record, secure random source or launch log cannot be read or written.
+/// - `StartError::LaunchRecordUnknown` if the source launch record is absent.
 pub fn give_again<S: LeafStore>(
     store: &mut LaunchRecords<S>,
     owners: &Owners<'_>,

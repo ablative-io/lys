@@ -27,6 +27,7 @@ pub struct StartRequest {
 
 impl StartRequest {
     /// The request naming these three.
+    #[must_use]
     pub fn new(agent: &str, profile_version: &str, machine: &str) -> Self {
         Self {
             agent: agent.to_owned(),
@@ -38,6 +39,10 @@ impl StartRequest {
     /// Parse a request from its members, each a name and a value. Any member
     /// beside the three is refused first, naming it; then any of the three
     /// that is absent or empty.
+    ///
+    /// # Errors
+    /// - `Refusal::StartFieldNotAllowed` if a member is outside agent, profile version and machine.
+    /// - `Refusal::StartMemberMissing` if any required member is absent or empty.
     pub fn from_members<I>(members: I) -> Result<Self, Refusal>
     where
         I: IntoIterator<Item = (String, String)>,
@@ -63,16 +68,19 @@ impl StartRequest {
     }
 
     /// The agent named.
+    #[must_use]
     pub fn agent(&self) -> &str {
         &self.agent
     }
 
     /// The profile version named.
+    #[must_use]
     pub fn profile_version(&self) -> &str {
         &self.profile_version
     }
 
     /// The machine named.
+    #[must_use]
     pub fn machine(&self) -> &str {
         &self.machine
     }
@@ -94,6 +102,9 @@ pub trait AgentRecords {
 }
 
 /// Resolve `agent` to its enduring record, or refuse it as `agent_unknown`.
+///
+/// # Errors
+/// - `Refusal::AgentUnknown` if no registered agent record exists for the id.
 pub fn resolve(records: &dyn AgentRecords, agent: &str) -> Result<AgentRecord, Refusal> {
     records.agent(agent).ok_or_else(|| Refusal::AgentUnknown {
         agent: agent.to_owned(),

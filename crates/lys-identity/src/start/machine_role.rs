@@ -28,6 +28,10 @@ pub trait RoleMachines {
 
 /// The machine is allowed for the role: passes when a role `agent` holds
 /// may run on `machine`.
+///
+/// # Errors
+/// - `Refusal::CheckRecordMissing` if the role-machine record is absent.
+/// - `Refusal::MachineNotAllowedForRole` if no held role permits the requested machine.
 pub fn check(records: &dyn RoleMachines, agent: &str, machine: &str) -> Result<(), Refusal> {
     let Some(roles) = records.roles(agent) else {
         return Err(Check::MachineIsAllowedForRole.record_missing());

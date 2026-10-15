@@ -42,6 +42,7 @@ impl Check {
     ];
 
     /// The check's name, in words.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::AgentIsActive => "the agent is active",
@@ -53,6 +54,7 @@ impl Check {
     }
 
     /// The card that makes the record the check reads.
+    #[must_use]
     pub fn card(self) -> &'static str {
         match self {
             Self::AgentIsActive => "DIRECTORY-003",
@@ -63,6 +65,7 @@ impl Check {
     }
 
     /// The refusal for this check's record not existing.
+    #[must_use]
     pub fn record_missing(self) -> Refusal {
         Refusal::CheckRecordMissing {
             check: self,
@@ -82,6 +85,7 @@ pub struct CheckReport {
 
 impl CheckReport {
     /// Whether the check passed.
+    #[must_use]
     pub fn passed(&self) -> bool {
         self.refusal.is_none()
     }
@@ -92,6 +96,7 @@ impl CheckReport {
     }
 
     /// The result in words, naming the check.
+    #[must_use]
     pub fn words(&self) -> String {
         match &self.refusal {
             None => format!("{}: passed", self.check.name()),
@@ -112,11 +117,13 @@ pub struct Checked {
 
 impl Checked {
     /// Whether every check passed.
+    #[must_use]
     pub fn passed(&self) -> bool {
         self.reports.iter().all(CheckReport::passed)
     }
 
     /// The refusal of every check that did not pass, in order.
+    #[must_use]
     pub fn refusals(&self) -> Vec<Refusal> {
         self.reports
             .iter()
@@ -127,6 +134,9 @@ impl Checked {
 
 /// Run all five checks for `request` of `agent`, each against its owner's
 /// record. Fails only when a record could not be read at all.
+///
+/// # Errors
+/// - `StartError::Unavailable` if the handle record cannot be read; ordinary check refusals are retained in the returned reports.
 pub fn run(
     owners: &Owners<'_>,
     agent: &str,

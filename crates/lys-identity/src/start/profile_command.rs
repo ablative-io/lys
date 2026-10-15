@@ -39,6 +39,9 @@ pub struct ProfileCommand {
 
 /// Read the command fields of `profile_version`, refusing by name the first
 /// one its record does not hold.
+///
+/// # Errors
+/// - `Refusal::ProfileVersionFieldMissing` if the profile lacks its executable, arguments or working directory.
 pub fn read(
     records: &dyn ProfileVersionRecords,
     profile_version: &str,

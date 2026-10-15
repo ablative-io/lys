@@ -65,6 +65,9 @@ pub struct LaunchRecord {
 
 /// A new launch record id: `launch-` and 32 lowercase hex digits from the
 /// secure random source.
+///
+/// # Errors
+/// - `StartError::Unavailable` if the operating system cannot fill the identifier bytes.
 pub fn new_launch_record_id() -> Result<String, StartError> {
     let bytes = random_bytes().map_err(|error| StartError::Unavailable {
         reason: error.to_string(),
@@ -87,6 +90,7 @@ fn texts(out: &mut Vec<u8>, items: &[String]) {
 
 impl LaunchRecord {
     /// The canonical body: a map of keys 1 to 12, as IDENTITY-EVENTS.md gives them.
+    #[must_use]
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::new();
         map(&mut out, 12);
@@ -259,6 +263,9 @@ impl LaunchEvent {
 
 /// Verify `message` against the directory service's public key and read the
 /// event it carries. Every failure is the one refusal, whatever it was.
+///
+/// # Errors
+/// Returns the string refusal `the message is not a launch event this service signed` for malformed or noncanonical CBOR, an unsupported envelope or version, an invalid launch id, or a signature that does not verify.
 pub fn verify_launch_event(message: &[u8], service_key: &[u8; 32]) -> Result<LaunchEvent, String> {
     let refused = || REFUSED.to_owned();
     let Value::Tag(COSE_SIGN1_TAG, inner) = cbor(message)? else {

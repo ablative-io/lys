@@ -120,6 +120,7 @@ pub const REFUSAL_NAMES: [&str; 14] = [
 
 impl Refusal {
     /// The refusal's stable name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         let index = match self {
             Self::StartFieldNotAllowed { .. } => 0,
@@ -141,6 +142,7 @@ impl Refusal {
     }
 
     /// The refusal as the JSON object the route answers inside a list.
+    #[must_use]
     pub fn to_json(&self) -> String {
         let mut out = String::from("{\"refusal\":");
         json_string(&mut out, self.name());
@@ -252,6 +254,7 @@ pub enum StartError {
 
 impl StartError {
     /// The error as the JSON body the route answers.
+    #[must_use]
     pub fn to_json(&self) -> String {
         match self {
             Self::Refused(refused) => refused.to_json(),
@@ -261,6 +264,7 @@ impl StartError {
     }
 
     /// The refusals, when this error is a refusal.
+    #[must_use]
     pub fn refused(&self) -> Option<&Refused> {
         match self {
             Self::Refused(refused) => Some(refused),
@@ -299,11 +303,13 @@ pub struct Refused {
 
 impl Refused {
     /// Whether one of the refusals has `name`.
+    #[must_use]
     pub fn names(&self, name: &str) -> bool {
         self.refusals.iter().any(|refusal| refusal.name() == name)
     }
 
     /// The refusal as the JSON body the route answers.
+    #[must_use]
     pub fn to_json(&self) -> String {
         let mut out = String::from("{\"refused\":[");
         for (at, refusal) in self.refusals.iter().enumerate() {

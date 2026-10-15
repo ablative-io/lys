@@ -32,6 +32,7 @@ pub struct Withdrawal {
 
 impl Withdrawal {
     /// The canonical body: a map of keys 1 to 4, as IDENTITY-EVENTS.md gives them.
+    #[must_use]
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::new();
         map(&mut out, 4);
@@ -69,6 +70,11 @@ impl Withdrawal {
 /// Withdraw the launch record `launch_record` as `caller` at `now`, and
 /// answer its state after: withdrawn, or running with the withdrawal beside
 /// it when its report has arrived.
+///
+/// # Errors
+/// - `StartError::LaunchRecordUnknown` if the requested launch record is absent.
+/// - `StartError::Refused` with `AgentUnknown` if the record names an unknown agent, or `StartRightMissing` if the caller cannot withdraw it.
+/// - `StartError::Unavailable` if settling or appending the launch-log withdrawal fails.
 pub fn withdraw<S: LeafStore>(
     store: &mut LaunchRecords<S>,
     owners: &Owners<'_>,

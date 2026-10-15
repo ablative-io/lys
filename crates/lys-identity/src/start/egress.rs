@@ -27,6 +27,10 @@ pub trait EgressLists {
 }
 
 /// The machine may reach what the profile needs.
+///
+/// # Errors
+/// - `Refusal::CheckRecordMissing` if the egress list or profile requirements are absent.
+/// - `Refusal::EgressNotReachable` if the machine cannot reach every required destination.
 pub fn check(
     needs: &dyn ProfileNeeds,
     lists: &dyn EgressLists,

@@ -18,6 +18,10 @@ pub trait Lifecycles {
 }
 
 /// The agent is active: passes only when `agent`'s recorded state is active.
+///
+/// # Errors
+/// - `Refusal::CheckRecordMissing` if no lifecycle record exists.
+/// - `Refusal::AgentNotActive` if the recorded state is registered, suspended or retired.
 pub fn check(lifecycles: &dyn Lifecycles, agent: &str) -> Result<(), Refusal> {
     match lifecycles.state(agent) {
         None => Err(Check::AgentIsActive.record_missing()),

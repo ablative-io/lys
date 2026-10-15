@@ -36,6 +36,9 @@ pub struct Grammars {
 }
 
 /// Refuse the first assignment of `record` whose value is outside its grammar.
+///
+/// # Errors
+/// - `Refusal::CommandValueOutsideGrammar` if the agent, launch or credential assignment violates its id grammar, or the credential list is empty.
 pub fn check_grammar(record: &LaunchRecord, grammars: Grammars) -> Result<(), Refusal> {
     let outside = |assignment: &'static str| Refusal::CommandValueOutsideGrammar { assignment };
     if !(grammars.agent_id)(&record.agent) {
@@ -74,6 +77,7 @@ pub fn render(record: &LaunchRecord) -> String {
 
 /// `word` as one POSIX shell word: bare when every character is one no shell
 /// treats specially, and otherwise single-quoted, each `'` written `'\''`.
+#[must_use]
 pub fn shell_quote(word: &str) -> String {
     let bare = |c: char| c.is_ascii_alphanumeric() || "_@%+=:,./-".contains(c);
     if !word.is_empty() && word.chars().all(bare) {

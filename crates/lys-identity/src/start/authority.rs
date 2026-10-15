@@ -29,6 +29,9 @@ pub struct Admitted {
 }
 
 /// Admit `caller` for `agent`, or refuse them as `start_right_missing`.
+///
+/// # Errors
+/// - `Refusal::StartRightMissing` if the caller is neither an administrator nor an admitted responsible person.
 pub fn admit(
     admission: &dyn Admission,
     caller: &str,
