@@ -123,9 +123,10 @@ fn prepare_reach(
             .ok_or_else(|| GrantError::PermissionEngineUnavailable {
                 reason: "the reach reading has no question for its frame".to_owned(),
             })?;
-    // Explanations use relationships alone; unrelated permission answers cannot invalidate this snapshot.
+    let questions = asked.keys().cloned().collect();
+    // Carried answers share the exported graph's certified snapshot in one bulk call.
     let batch = engine
-        .read_batch(stamp.revision(), covered, &BTreeSet::new(), at)
+        .read_batch(stamp.revision(), covered, &questions, at)
         .inspect_err(|error| {
             *measured.reason.borrow_mut() = Some(error.to_string());
         })?;
