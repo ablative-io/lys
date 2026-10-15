@@ -30,7 +30,7 @@
 //! install writes it to the sign-in service and into the directory service's
 //! configuration, so what the screens show is what is enforced.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use base64::Engine;
@@ -143,6 +143,34 @@ pub(super) fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
 /// each agent the service starts in its own pseudo-terminal, on a Unix socket
 /// in the run folder, acting only on the service key's requests. It is never
 /// restarted here, since a restart ends every session it holds.
+/// Places the runner, `lys`, in the install's `bin/` from the build folder
+/// `source` names, with its containment helper beside it when that folder
+/// holds one, and says what was placed. The runner is started from `bin/`
+/// only: a runner started from the build folder re-executes itself from
+/// there for every seat it owns, and `lys identity start` found no `bin/lys`
+/// after a fresh install on 15 Oct 2026. Answers whether the helper was placed.
+pub(super) fn place_runner(
+    layout: &Layout,
+    source: &dyn Fn(&str) -> IdentityResult<PathBuf>,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<bool> {
+    swap::ensure_bin(layout)?;
+    swap::place_binary(&source("lys")?, &layout.bin_dir(), "lys")?;
+    say(&format!("lys placed in {}", layout.bin_dir().display()));
+    let helper = "lys-containment-entry";
+    let companion = source(helper)?;
+    if companion.is_file() {
+        swap::place_binary(&companion, &layout.bin_dir(), helper)?;
+        say(&format!("{helper} placed in {}", layout.bin_dir().display()));
+        return Ok(true);
+    }
+    say(&format!(
+        "{helper} is not in the build folder beside lys, so it was not placed: contained seats need it in {}",
+        layout.bin_dir().display()
+    ));
+    Ok(false)
+}
+
 pub(super) fn start_runner(
     layout: &Layout,
     key: &Arc<Ed25519Identity>,
@@ -472,10 +500,13 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     if emitter.is_json() {
         emitter.field("build", "build", build);
     }
-    start_runner(&layout, &key, &sibling("lys")?, &mut |line| {
+    place_runner(&layout, &sibling, &mut |line| {
         emitter.note(line);
     })?;
-    proxy::start(&layout, ports, &sibling("lys")?, &mut |line| {
+    start_runner(&layout, &key, &layout.binary("lys"), &mut |line| {
+        emitter.note(line);
+    })?;
+    proxy::start(&layout, ports, &layout.binary("lys"), &mut |line| {
         emitter.note(line);
     })?;
     let address = ports::PersonAddress::load(&layout, ports)?;
