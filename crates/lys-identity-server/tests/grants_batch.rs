@@ -254,6 +254,10 @@ async fn the_administrator_is_allowed_on_every_resource_of_an_app_with_no_grant_
     assert_eq!(results[0]["allowed"], true, "{answer}");
     assert_eq!(results[0]["via"], "administrator", "{answer}");
     assert_eq!(results[0]["mode"], "outright", "{answer}");
+    // The shape every app's client accepts for an outright yes: a non-empty receipt and no refusal.
+    assert_eq!(results[0]["grant"], "administrator", "{answer}");
+    assert!(results[0]["refusal"].is_null(), "{answer}");
+    assert_eq!(results[1]["grant"], "administrator", "{answer}");
     assert_eq!(results[1]["allowed"], true, "{answer}");
     // Everyone else still needs a grant, and a kind the app never declared is still refused, administrator or not.
     assert_eq!(results[2]["allowed"], false, "{answer}");

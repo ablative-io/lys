@@ -225,7 +225,9 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
     if request.caller == IdentityId::Person(judged.root) {
         return CheckAnswer {
             allowed: true,
-            grant: None,
+            // An outright yes always names its receipt (lys-pass refuses one that does not); here the receipt is
+            // the administrator's own standing.
+            grant: Some(ADMINISTRATOR.to_owned()),
             path: Vec::new(),
             via: Some(ADMINISTRATOR.to_owned()),
             refusal: None,
