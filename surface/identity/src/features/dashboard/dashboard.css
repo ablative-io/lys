@@ -3,13 +3,18 @@
 .dash-page > .head { flex: none; margin-bottom: 8px; }
 .dash-body { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(260px, 1fr) auto; gap: 20px 24px; }
 /* The widgets: one row of cards under the agents, each scrolling inside itself. */
-.dash-widgets { grid-column: 1 / -1; min-height: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
+.dash-widgets { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
 .dash-widget { min-width: 0; max-height: 300px; }
 .dash-widget td { overflow-wrap: normal; }
 .dash-widget .section-h { flex-wrap: wrap; }
 .dash-body > * { min-width: 0; }
-.you-tree td:nth-child(1), .you-tree td:nth-child(2), .you-tree td:nth-child(4) { white-space: nowrap; }
-.you-tree { min-width: max-content; }
+/* Names and where each runs stay on one line; a budget or goals line wraps inside its own column, each limit on a line
+   of its own, so the Goals column is never pushed out of the panel. The table scrolls sideways only when even that
+   cannot fit, as on a phone. */
+.you-tree td:nth-child(1), .you-tree td:nth-child(2) { white-space: nowrap; }
+.you-tree { min-width: 640px; }
+.you-tree td.you-budget { min-width: 22ch; max-width: 46ch; }
+.you-tree td.you-goals { min-width: 14ch; max-width: 30ch; }
 /* Narrow: the panels stack. The query is on the dashboard's own width (the nearest container, .dash-page), never the
    window's, so the full help docked beside it at 1280 stacks them too. Getting started keeps its whole height there:
    as a .you-panel it would otherwise shrink to nothing and spill over the Agents table and the lists. */
@@ -42,6 +47,16 @@
 .dash-table .dash-num { width: 1%; min-width: 3ch; white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 .dash-table a { color: var(--text-primary); }
 .dash-table .you-act { text-align: right; white-space: nowrap; }
+.dash-table .dash-line { display: block; }
+.dash-table .dash-due { text-align: right; min-width: 10ch; }
+/* A part that could not be read: its plain words, pressed to open what it means and the Error details. */
+.dash-unread { display: block; }
+.dash-unread > summary { cursor: pointer; list-style: none; }
+.dash-unread > summary::-webkit-details-marker { display: none; }
+.dash-unread > summary::after { content: " (why)"; color: var(--text-muted); }
+.dash-unread[open] > summary::after { content: ""; }
+.dash-unread > .why-not { margin-top: 4px; white-space: normal; max-width: 44ch; }
+.you-agent .dash-unread { display: inline-block; margin-left: 8px; }
 .dash-table .you-asked td { padding: 4px 12px 14px; }
 .dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46cqw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
 /* While the picture is shown the widgets' row is as tall as the picture and ends to its left, so it covers no row and no control. */
@@ -94,3 +109,16 @@
 /* Getting started takes a whole row above the panels, so its form never runs under them. */
 .dash-body > .getting-started { grid-column: 1 / -1; flex: none; min-height: auto; }
 .dash-body:has(> .getting-started) { grid-template-rows: auto minmax(260px, 1fr) auto; }
+/* On a phone the agents table never scrolls sideways: each agent becomes a small card of its own, its name and acts on
+   the first line, where it runs, its limits and its goals on lines under it, each said by name. */
+@container (max-width: 640px) {
+  .you-tree { min-width: 0; }
+  .you-tree thead { display: none; }
+  .you-tree tr[data-href] { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-bottom: 1px solid var(--border-subtle); }
+  .you-tree tr[data-href] td { display: block; min-width: 0; max-width: none; white-space: normal; }
+  .you-tree tr[data-href] td.you-act { grid-column: 2; grid-row: 1; }
+  .you-tree tr[data-href] td:not(:first-child):not(.you-act) { grid-column: 1 / -1; padding-top: 0; padding-left: 28px; }
+  .you-tree td.you-budget::before { content: "Budget: "; color: var(--text-muted); }
+  .you-tree td.you-goals::before { content: "Goals: "; color: var(--text-muted); }
+  .dash-agents { flex: none; }
+}

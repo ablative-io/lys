@@ -31,7 +31,7 @@ export const BUDGETS: Seed[] = [
     id: 'budgets.goals',
     title: 'Goals',
     summary: 'What an agent is working towards, with a deadline and where it stands.',
-    body: ['Goals sit on the agent’s Limits and goals tab. Only open goals can be changed.'],
+    body: ['Goals sit on the agent’s Limits and goals tab. Type a goal in the table’s last row and press Enter or Set; a deadline is optional. Only open goals can be changed: reword one where it stands, or switch it off.'],
     steps: [],
     related: ['budgets.limit', 'budgets.controls'],
   },
@@ -40,7 +40,8 @@ export const BUDGETS: Seed[] = [
     title: 'Schedules, variables and controls',
     summary: 'What is sent to an agent on a schedule, the values it is given, and requests sent to its session.',
     body: [
-      'Schedules lists what is sent to the agent and when; Variables the values set for it. Managed controls send a request to a running session; a recorded admission confirms the program received it, not that a goal was completed.',
+      'Messages it is sent lists what Lys sends the agent at each moment, such as when its context fills; choose Its own words to change one for this agent, and Preview to see it without sending.',
+      'Schedules lists what is sent to the agent and when; Variables the values kept for it, each until removed or until a time you choose. Managed controls send a request to a running session; a recorded admission confirms the program received it, not that a goal was completed.',
     ],
     steps: [],
     related: ['budgets.goals'],

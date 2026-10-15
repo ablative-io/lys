@@ -26,27 +26,36 @@ const CONTEXT_ACTS: Record<Limit['act'], string> = { compact: 'compacts', notice
 function contextWords(row: DashboardAgent, limit: Limit): string {
   const reading = contextPresentation([row]);
   const current = reading && reading.figure !== null ? reading.display + ' now'
-    : !reading || reading.display === 'Not reported' ? 'not reported'
+    : !reading || reading.display === 'Not reported' ? 'not reported yet'
     : reading.display.toLowerCase() + (reading.unavailable.length ? ': ' + reading.unavailable.join('; ') : '');
   return CONTEXT_ACTS[limit.act] + ' at ' + amount(limit.unit, limit.amount) + ' · ' + current;
 }
 
+/**
+ * A line of the agents table or a widget: its words, each limit or goal on a line of its own, or the part the service
+ * could not read. A refused part carries its refusal for the Error details fold; its name is never the words.
+ */
+export interface Line { words: string; lines: string[]; refused: PartRefused | null }
+
+const said = (lines: string[]): Line => ({ words: lines.join(' · '), lines, refused: null });
+const unread = (part: PartRefused, what: string): Line => ({ words: what + ' could not be read', lines: [what + ' could not be read'], refused: part });
+
 /** Each limit with its reading, tightest first; context names the budget's act separately from current usage. */
-export function budgetLine(row: DashboardAgent): { words: string; refused: boolean } {
+export function budgetLine(row: DashboardAgent): Line {
   const { budget, usage } = row;
-  if (refusedPart(budget)) return { words: budget.refusal, refused: true };
-  if (refusedPart(usage)) return { words: usage.refusal, refused: true };
-  if (!budget.limits.length) return { words: 'No limit', refused: false };
+  if (refusedPart(budget)) return unread(budget, 'Its limits');
+  if (refusedPart(usage)) return unread(usage, 'Its use');
+  if (!budget.limits.length) return said(['No limit']);
   const order = budget.limits.map((_, index) => index).sort((left, right) => nearness(budget, right) - nearness(budget, left));
-  return { words: order.map((index) => budget.limits[index].unit === 'context_percent' ? contextWords(row, budget.limits[index])
-    : usedAgainst(budget, index) ?? limitWords(budget.limits[index]) + ', nothing reported yet').join(' · '), refused: false };
+  return said(order.map((index) => budget.limits[index].unit === 'context_percent' ? contextWords(row, budget.limits[index])
+    : usedAgainst(budget, index) ?? limitWords(budget.limits[index]) + ', nothing reported yet'));
 }
 
 /** Open goals with the next deadline, missed ones, or that there is none: "2 open, next due 6 Oct", "1 missed", "No goal". */
-export function goalsLine(goals: GoalsView | PartRefused): { words: string; refused: boolean } {
-  if (refusedPart(goals)) return { words: goals.refusal, refused: true };
+export function goalsLine(goals: GoalsView | PartRefused): Line {
+  if (refusedPart(goals)) return unread(goals, 'Its goals');
   const items = goals.goals.filter((item) => item.goal.active);
-  if (!items.length) return { words: 'No goal', refused: false };
+  if (!items.length) return said(['No goal']);
   const open = items.filter((item) => item.standing === 'open');
   const missed = items.filter((item) => item.standing === 'missed').length;
   const due = open.flatMap((item) => item.goal.deadline === null ? [] : [item.goal.deadline]).sort((a, b) => a - b)[0];
@@ -54,7 +63,7 @@ export function goalsLine(goals: GoalsView | PartRefused): { words: string; refu
     ...(open.length ? [open.length + ' open' + (due === undefined ? '' : ', next due ' + day(due))] : []),
     ...(missed ? [missed + ' missed'] : []),
   ];
-  if (parts.length) return { words: parts.join(', '), refused: false };
+  if (parts.length) return said([parts.join(', ')]);
   const met = items.filter((item) => item.standing === 'met').length;
-  return { words: met ? counted(met, 'met') : 'None open', refused: false };
+  return said([met ? counted(met, 'met') : 'None open']);
 }

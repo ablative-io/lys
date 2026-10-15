@@ -30,7 +30,7 @@ export const PEOPLE: Seed[] = [
     summary: 'Everything about one agent, in tabs: Overview, Settings, Access, Limits and goals, Sessions, Credentials, Record.',
     body: [
       'Overview says who it answers to, its teams and state, and is where Start is. Settings holds its program, model, computer, folder and prompt. Access is what it may reach. Limits and goals holds its spending limit, budget and goals.',
-      'Sessions lists its runs and memory; Credentials its credentials and certificates; Record every change to it, kept append-only. Keys 1 to 7 switch tabs, and every tab has its own address.',
+      'Sessions lists its runs and memory; Credentials its credentials and certificates; Record every change to it, with a signed proof of each. Keys 1 to 7 switch tabs, and every tab has its own address.',
       'A person’s page has the same tabs without Settings.',
     ],
     steps: [],
@@ -57,7 +57,7 @@ export const PEOPLE: Seed[] = [
     summary: 'Your agents, what waits for you and what is running now.',
     body: [
       'Getting started shows what a new Lys still needs, in order, until every step is done: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; "Not this one" counts as an answer.',
-      'Agents lists yours by team, with where each runs, its budget and its goals. Waiting for you counts requests to decide, drafts to approve and reviews due, each linked to its list. Running now lists live sessions; Stop all, beside its heading, stops every agent at once and asks why first.',
+      'Agents lists yours by team, with where each runs, its budget and its goals; Start, Watch and Stop sit in each row. A part that could not be read says so in words; press them to see why. Waiting for you counts requests to decide, drafts to approve and reviews due, each linked to its list. Running now lists live sessions; Stop all, beside its heading, stops every agent at once and asks why first.',
       'Choose a running agent to watch it in a small picture over the corner, or open it full size in Operations.',
     ],
     steps: [

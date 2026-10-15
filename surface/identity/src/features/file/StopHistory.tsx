@@ -2,7 +2,7 @@
 import { Refused, request, useLoad } from '../../api';
 import { DirectoryGate as Gate } from '../people/Words';
 import { clock } from './time';
-import { IdentityName } from '../people/Words';
+import { ErrorWords, IdentityName } from '../people/Words';
 
 interface StopRecord {
   agent: string;
@@ -45,13 +45,23 @@ function readStops(answer: unknown, id: string): StopRecord[] {
   throw new Refused(200, { refusal: 'StopHistoryUnreadable', reason: 'The saved-stop answer did not name this agent and a valid, distinct outcome for each operation.' });
 }
 
-function Identifiers({ values, empty }: { values: string[]; empty: string }) {
-  return values.length ? <ul>{values.map((value) => <li key={value} className="mono">{value}</li>)}</ul> : <span>{empty}</span>;
+/** How many were recorded; the identifiers themselves are kept under the stop's technical details, for whoever checks the record. */
+function Counted({ values, one, many, empty }: { values: string[]; one: string; many: string; empty: string }) {
+  return <span>{values.length ? values.length + ' ' + (values.length === 1 ? one : many) : empty}</span>;
+}
+
+/** The stop's request and every identifier it names, folded: a person reads the counts above; someone checking the record opens this. */
+function Technical({ stop }: { stop: StopRecord }) {
+  const named: [string, string[]][] = [['Certificates', stop.certificates_withdrawn], ['Credentials', stop.credentials_ended ?? []], ['Sessions', stop.sessions_asked]];
+  return <details className="note"><summary>Technical details</summary>
+    <p>Request <span className="mono">{stop.operation}</span></p>
+    {named.filter(([, values]) => values.length).map(([what, values]) => <p key={what}>{what}: <span className="mono">{values.join(', ')}</span></p>)}
+  </details>;
 }
 
 export function StopHistory({ id }: { id: string }) {
   const load = useLoad(async () => readStops(await request<unknown>('/agents/' + encodeURIComponent(id) + '/stops'), id), 'stop-history:' + id);
-  return <section aria-label="Emergency-stop history">
+  return <section aria-label="Emergency-stop history" className="stop-history">
     <div className="head"><div><h2>Emergency-stop history</h2><p>Saved outcomes of earlier stops. These do not describe the agent’s current state.</p></div></div>
     <Gate load={load} title="Emergency-stop history" ok={(stops) => stops.length ? stops.map((stop) => <article className="card" key={stop.operation}>
       <h3>{stop.done ? 'Stop recorded' : 'Stop requested — outcome not confirmed'}</h3><p>{stop.reason}</p>
@@ -60,14 +70,14 @@ export function StopHistory({ id }: { id: string }) {
         <dt>Requested by</dt><dd><IdentityName id={stop.by} /></dd>
         {stop.done ? <>
         <dt>Authority after this stop</dt><dd>Suspended</dd>
-        <dt>Certificates withdrawn</dt><dd><Identifiers values={stop.certificates_withdrawn} empty="None recorded for this stop." /></dd>
-        <dt>Credentials ended</dt><dd>{stop.credentials_ended === null ? <span role="status">Not confirmed: {stop.credentials_refused}</span> : <Identifiers values={stop.credentials_ended} empty="None recorded for this stop." />}</dd>
-        <dt>Sessions asked to end</dt><dd><Identifiers values={stop.sessions_asked} empty="None recorded for this stop." /></dd>
+        <dt>Certificates withdrawn</dt><dd><Counted values={stop.certificates_withdrawn} one="certificate" many="certificates" empty="None recorded for this stop." /></dd>
+        <dt>Credentials ended</dt><dd>{stop.credentials_ended === null ? <div role="status"><p className="why-not">Not confirmed by the credential service.</p>{stop.credentials_refused ? <ErrorWords problem={stop.credentials_refused} /> : null}</div> : <Counted values={stop.credentials_ended} one="credential" many="credentials" empty="None recorded for this stop." />}</dd>
+        <dt>Sessions asked to end</dt><dd><Counted values={stop.sessions_asked} one="session" many="sessions" empty="None recorded for this stop." /></dd>
         </> : null}
       </dl>
       {!stop.done ? <p role="status">The request was saved, but its outcome has not been recorded. This does not confirm suspension, certificate withdrawal, credential expiry or a session ending. Keep the original request when checking its outcome.</p> : null}
       <p className="note">An end request does not confirm a session stopped. <a href={'#/file/' + encodeURIComponent(id) + '/sessions'}>Check runtime reports</a>.</p>
-      <p className="note">Request <span className="mono">{stop.operation}</span></p>
+      <Technical stop={stop} />
     </article>) : <div className="card"><p>No emergency-stop requests have been recorded for this agent.</p></div>} />
   </section>;
 }

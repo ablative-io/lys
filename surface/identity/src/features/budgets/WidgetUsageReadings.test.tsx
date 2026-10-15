@@ -43,7 +43,7 @@ describe('Context session choices on the canvas usage widget', () => {
     expect(host.querySelector('time')?.getAttribute('datetime')).toBe(new Date(at).toISOString());
     expect(host.querySelector('[data-context-tokens]')?.textContent).toBe('58,795 tokens reported of the declared 1,000,000 tokens window');
     expect(host.querySelector('select')?.getAttribute('aria-label')).toBe('Context session for Agent');
-    expect(host.textContent).toContain('2 calls reported none');
+    expect(host.textContent).toContain('2 calls gave no context figure');
   });
 
   it('allows the person to pick another named live session and shows that session reading instead of a maximum', async () => {
@@ -53,7 +53,7 @@ describe('Context session choices on the canvas usage widget', () => {
     expect(host.querySelector('[data-context-session]')?.getAttribute('data-context-session')).toBe(older.session);
     expect(host.querySelector('[data-context-percent]')?.textContent).toBe('98%');
     expect(host.querySelector('time')?.getAttribute('datetime')).toBe(new Date(older.read_at_ms!).toISOString());
-    expect(host.textContent).toContain('8 calls reported none');
+    expect(host.textContent).toContain('8 calls gave no context figure');
   });
 
   it('names an ended picked session on reload of usage instead of switching the person selection silently', async () => {
@@ -100,7 +100,7 @@ describe('Token classes and provider windows on the canvas usage widget', () => 
       context: { session: 'fresh-live', read_at_ms: null, reported_none: 1, completed_call: false, model, context_tokens: null, window_tokens: null } };
     const host = await render(<ContextReadings rows={[row('Agent', [waiting])]} />);
     expect(host.querySelector('b')?.textContent).toBe('No messages yet');
-    expect(host.textContent).toContain('session fresh-live');
+    expect(host.textContent).toContain('current session');
     expect(host.textContent).not.toContain('context counters not reported');
   });
 
@@ -119,7 +119,7 @@ describe('Token classes and provider windows on the canvas usage widget', () => 
     for (const section of host.querySelectorAll('[data-token-agent]')) {
       expect(Array.from(section.querySelectorAll('th')).map((each) => each.textContent)).toEqual(['New input', 'Output', 'Cache written', 'Cache read']);
       expect(section.querySelector('[data-token-counts]')?.textContent).toBe('2 calls · 1 session');
-      expect(section.querySelector('[data-token-component="cache_read_tokens"]')?.textContent).toContain('58,195 tokens reported · 1 call reported none');
+      expect(section.querySelector('[data-token-component="cache_read_tokens"]')?.textContent).toContain('58,195 tokens reported · 1 call gave no figure');
     }
     expect(host.textContent).not.toContain('177,540');
   });
@@ -143,7 +143,7 @@ describe('Token classes and provider windows on the canvas usage widget', () => 
   it('names an invalid provider level instead of inventing or clamping its window percentage', async () => {
     const account = { account: 'org', at_ms: at, windows: [{ duration_minutes: 300, used_percent: 130, resets_at_ms: at + 18_000_000 }] };
     const host = await render(<WidgetUsageReadings rows={[row('Agent', [], [account])]} keys={['window/300']} />);
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('ProviderWindowUnreadable: the reported account, level or time is invalid');
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('The 5-hour window could not be read: the reported account, level or time is invalid');
     expect(host.querySelector('[data-provider-window]')).toBeNull();
   });
 

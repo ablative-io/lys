@@ -29,7 +29,10 @@ describe('Agent credential handles', () => {
       ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: SCRIBE, handles: [{ id: 'public-handle-id', secret: 'calendar', max_uses: 10, used: 3, not_after_ms: 1990000000000, dropped: false, spend_cap: null, settled: 0, parent: null, value: 'never-print-value', token: 'never-print-token' }] }),
     });
     expect(requests).toContain('/secrets/handles?holder=' + SCRIBE);
-    expect(text()).toContain('public-handle-id'); expect(text()).toContain('3 of 10 uses'); expect(text()).toContain('Never shown');
+    // The handle's identifier is a reference for whoever checks the record: kept on the row, never on its face.
+    const row = document.querySelector('tr[title="Handle public-handle-id"]');
+    expect(row?.textContent).toContain('3 of 10'); expect(row?.textContent).not.toContain('public-handle-id');
+    expect(text()).toContain('never the secret itself');
     expect(text()).not.toContain('never-print'); expect(posted).toEqual([]);
   });
   it('names a broker refusal instead of showing an empty handle list', async () => {
@@ -38,7 +41,7 @@ describe('Agent credential handles', () => {
   });
   it('refuses a handles answer naming a different holder', async () => {
     await mount('#/file/' + SCRIBE + '/credentials', { ...SERVICE, ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: ADA, handles: [] }) });
-    expect(text()).toContain('did not answer handles'); expect(text()).not.toContain('No handles visible');
+    expect(text()).toContain('did not answer this agent’s handles'); expect(text()).not.toContain('No handles visible');
   });
 });
 

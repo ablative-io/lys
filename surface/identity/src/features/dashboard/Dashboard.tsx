@@ -36,6 +36,7 @@ import { BudgetWidget, DraftsWidget, GoalsWidget, RequestsWidget } from './Widge
 import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { Alarms } from './Alarms';
+import { Unread } from './Unread';
 
 interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
@@ -88,8 +89,8 @@ function WaitingTable({ waiting }: { waiting: Waiting }) {
       : WAITING.map(([key, words, href]) => {
         const count = waiting[key];
         return <tr key={key} data-waiting={key}>
-          <td className="dash-num">{refusedPart(count) ? <small className="refusal-name why-not" title={count.reason}>{count.refusal}</small> : count}</td>
-          <td><a href={href}>{count === 1 ? singular(words) : words}</a></td>
+          <td className="dash-num">{refusedPart(count) ? '?' : count}</td>
+          <td><a href={href}>{count === 1 ? singular(words) : words}</a>{refusedPart(count) ? <Unread part={count} words="How many could not be read" /> : null}</td>
         </tr>;
       })}</tbody>
   </table>;
@@ -115,7 +116,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
     <GettingStarted person={data.me.person.id} agents={rows.length} standing={data.standing} reread={reload} />
     <section className="you-panel dash-agents" aria-label="Agents">
       <div className="section-h"><span>Agents</span></div>
-      {data.teams instanceof Refused ? <p className="why-not">Teams cannot be read, so your agents are listed without their teams. <small className="refusal-name">{data.teams.refusal.refusal}</small></p> : null}
+      {data.teams instanceof Refused ? <Unread part={data.teams} words="Teams could not be read, so your agents are listed without their teams." /> : null}
       <div className="you-scroll"><AgentTree branches={treeOf(data.me, rows, teams).branches} context={context} /></div>
     </section>
     <div className="dash-side">

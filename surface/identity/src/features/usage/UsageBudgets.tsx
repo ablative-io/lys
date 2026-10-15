@@ -11,6 +11,7 @@ import { plain, reasons } from './reasons';
 import type { Named } from './reasons';
 import { Act } from '../../shell/Act';
 import { TableScroll } from '../../shell/Listing';
+import { ErrorWords } from '../people/Words';
 
 /** `name` is the holder's name, said wherever the service's words carry its identifier. */
 type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void; name?: string };
@@ -18,23 +19,23 @@ type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: strin
 export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
   const holder: Named = { id: budgets.holder.id, name: name ?? 'this ' + budgets.holder.kind };
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<unknown>(null);
   const [done, setDone] = useState(false);
   const [uncertain, setUncertain] = useState(false);
   const working = useRef(false);
   const locked = useRef(false);
   const save = async (body: BudgetBody) => {
     if (working.current || locked.current) return;
-    working.current = true; setBusy(true); setFailure('');
+    working.current = true; setBusy(true); setFailure(null);
     try {
       const answer = await request<unknown>('/budgets/' + budgets.holder.kind + '/' + encodeURIComponent(budgets.holder.id), body, 'PUT');
-      if (!confirmsBudget(answer, body, budgets.holder)) throw new Error('BudgetAnswerUnconfirmed: the answer did not confirm every limit and its version. Reload the saved budget before another change.');
+      if (!confirmsBudget(answer, body, budgets.holder)) throw new Refused(200, { refusal: 'BudgetAnswerUnconfirmed', reason: 'the answer did not confirm every limit and its version' });
       locked.current = true; setDone(true); changed('Budget kept as version ' + (body.version + 1) + '.');
     } catch (error) {
       if (!answeredNo(error)) {
         locked.current = true; setUncertain(true);
       }
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      setFailure(error);
     } finally { working.current = false; setBusy(false); }
   };
   const blocked = busy || done || uncertain;
@@ -45,8 +46,8 @@ export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
     {add.form}
     {reasons(budgets.unavailable, holder, missing).map((words) => <p key={words} className="usage-reason">{words}</p>)}
     {busy ? <p role="status">Sending; not yet confirmed.</p> : null}
-    {failure ? <p role="alert" className="why-not">{failure}</p> : null}
-    {uncertain ? <p role="status">The saved budget must be reloaded before another change; this answer is unconfirmed.</p> : null}
+    {failure ? <>{uncertain ? null : <p role="alert" className="why-not">The budget was not saved.</p>}<ErrorWords problem={failure} /></> : null}
+    {uncertain ? <p role="status">Whether the budget was saved is not confirmed. Reload the page to see the saved budget before changing it again.</p> : null}
   </section>;
 }
 

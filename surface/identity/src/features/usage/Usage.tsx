@@ -16,6 +16,7 @@ import { tracking } from './contract';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { BudgetsView, GoalsView, SchedulesView, UsageView, VariablesRead, WordsForAgent } from './contract';
 import './usage.css';
+import { ErrorWords } from '../people/Words';
 
 /** `name` is the agent's name, said in place of its identifier wherever the service's words carry it. */
 export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
@@ -39,18 +40,23 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
       <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
-      {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <p className="dim" role="status">The words could not be read: {words.refused}</p>}
-      {'held' in variables ? <Variables agent={agent} variables={variables.held} changed={changed} /> : <p className="dim" role="status">The variables could not be read: {variables.refused}</p>}
-      {'held' in schedules ? <Schedules agent={agent} schedules={schedules.held.schedules} changed={changed} /> : <p className="dim" role="status">The schedules could not be read: {schedules.refused}</p>}
+      {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <PanelUnread what="The messages this agent is sent" problem={words.refused} />}
+      {'held' in variables ? <Variables agent={agent} variables={variables.held} changed={changed} /> : <PanelUnread what="The variables" problem={variables.refused} />}
+      {'held' in schedules ? <Schedules agent={agent} schedules={schedules.held.schedules} changed={changed} /> : <PanelUnread what="The schedules" problem={schedules.refused} />}
     </div>;
   }} /></>;
 }
 
 /** One of the three AGENTS-001 panels: what it read, or why it could not, so a service without that owner still shows the budgets and goals. */
-type Panel<T> = { held: T } | { refused: string };
+type Panel<T> = { held: T } | { refused: unknown };
 
 function panel<T>(read: Promise<T>): Promise<Panel<T>> {
-  return read.then((held) => ({ held }), (error: unknown) => ({ refused: error instanceof Error ? error.message : String(error) }));
+  return read.then((held) => ({ held }), (error: unknown) => ({ refused: error }));
+}
+
+/** A panel that could not be read: what it is in plain words, with the service's code kept under Error details. */
+function PanelUnread({ what, problem }: { what: string; problem: unknown }) {
+  return <section className="card" role="status"><p className="why-not">{what} could not be read.</p><ErrorWords problem={problem} /></section>;
 }
 
 /** A team's limits and goals: the same two tables as an agent's. A team's use is read with its limits. */
@@ -90,7 +96,7 @@ function ControlSetup({ agent, name }: { agent: string; name?: string }) {
     </> : <Plain words="Automatic context reminders aren't available for this program yet." detail="Notices use the terminal. No managed adapter is qualified." />} />;
 }
 
-function controlFailure(failure: Refused) { return <p role="status">{failure.refusal.refusal}: {failure.message}</p>; }
+function controlFailure(failure: Refused) { return <ErrorWords problem={failure} />; }
 
 /** Session and operation pages follow the existing change signal and advance only on a person's action. */
 export function ManagedControls({ agent, name }: { agent: string; name?: string }) {
@@ -161,7 +167,7 @@ function ControlOperations({ page }: { page: ControlReceiptsPage }) {
 
 function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
   const [recorded, setRecorded] = useState<PublicControlReceipt | null>(null);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const attempt = useRef<{ operation: string; choice: 'seen' | 'not_seen' } | null>(null);
   const sending = useRef(false);
@@ -169,12 +175,12 @@ function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
   const decide = async (choice: 'seen' | 'not_seen') => {
     if (sending.current || (attempt.current && attempt.current.choice !== choice)) return;
     attempt.current ??= { operation: operationId(), choice };
-    sending.current = true; setBusy(true); setFailure('');
+    sending.current = true; setBusy(true); setFailure(null);
     try {
       setRecorded(await controls.decide(current, attempt.current.operation, choice));
       refreshLive();
     } catch (error) {
-      setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
+      setFailure(error);
     } finally { sending.current = false; setBusy(false); }
   };
   const personal = current.reconciled?.decision;
@@ -183,7 +189,7 @@ function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
     {current.state === 'uncertain' || current.reference?.prior ? <p>Possible prior delivery{current.reference?.prior ? ': ' + current.reference.prior : ''}. It will not be resent automatically.</p> : null}
     <p>{current.admitted ? 'Matching harness admission recorded.' : 'Matching harness admission not recorded.'}</p>
     {personal ? <p>Person recorded {personal.choice.replaceAll('_', ' ')}{personal.choice === 'resent' ? ' under occurrence ' + personal.occurrence : ''}. The harness outcome remains {controlOutcome(current)}.</p> : null}
-    {failure ? <p role="status">{failure} Keep this decision when retrying; its response is unconfirmed.</p> : null}
+    {failure ? <div role="status"><ErrorWords problem={failure} /><p>Keep this decision when retrying; its answer is not confirmed.</p></div> : null}
     {current.state === 'uncertain' && !personal ? <div className="control-actions">
       <Act symbol="approve" name="Record seen" word="Seen" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'seen')} onClick={() => void decide('seen')} />
       <Act symbol="decline" name="Record not seen" word="Unseen" disabled={busy || (attempt.current !== null && attempt.current.choice !== 'not_seen')} onClick={() => void decide('not_seen')} />
@@ -195,7 +201,7 @@ function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
 
 function ResendOptions({ receipt, disabled, recorded }: { receipt: PublicControlReceipt; disabled: boolean; recorded: (receipt: PublicControlReceipt) => void }) {
   const [lookup, setLookup] = useState<ResendLookup | null>(null);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [session, setSession] = useState(receipt.session);
   const [attempted, setAttempted] = useState(false);
@@ -203,17 +209,17 @@ function ResendOptions({ receipt, disabled, recorded }: { receipt: PublicControl
   const sending = useRef(false);
   const open = async () => {
     if (sending.current || disabled) return;
-    sending.current = true; setBusy(true); setFailure('');
+    sending.current = true; setBusy(true); setFailure(null);
     try { setLookup(await controls.resendLookup(receipt)); }
-    catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    catch (error) { setFailure(error); }
     finally { sending.current = false; setBusy(false); }
   };
   const send = async () => {
     if (sending.current || disabled || !lookup || !session.trim()) return;
     request.current ??= lookup.occurrence ?? { operation: operationId(), session: session.trim() };
-    sending.current = true; setBusy(true); setAttempted(true); setFailure('');
+    sending.current = true; setBusy(true); setAttempted(true); setFailure(null);
     try { recorded(await controls.resend(receipt, request.current)); refreshLive(); }
-    catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    catch (error) { setFailure(error); }
     finally { sending.current = false; setBusy(false); }
   };
   return <div className="control-resend">
@@ -225,6 +231,6 @@ function ResendOptions({ receipt, disabled, recorded }: { receipt: PublicControl
       <label>Intended session <input aria-label="Intended resend session" value={session} disabled={busy || attempted} onChange={(event) => setSession(event.target.value)} /></label>
       <Act symbol={attempted ? 'retry' : 'send'} name={attempted ? 'Retry the same resend request' : 'Send a new occurrence'} word={attempted ? 'Retry' : 'Send'} disabled={disabled || busy || !session.trim()} onClick={() => void send()} />
     </>}
-    {failure ? <p role="status">{failure}{attempted ? ' Its answer is unconfirmed. Keep the same occurrence when retrying.' : ''}</p> : null}
+    {failure ? <div role="status"><ErrorWords problem={failure} />{attempted ? <p>Its answer is not confirmed. Keep the same occurrence when retrying.</p> : null}</div> : null}
   </div>;
 }

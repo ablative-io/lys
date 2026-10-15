@@ -11,9 +11,10 @@ export function NotFound({ children }: { children?: ReactNode }) {
           <p className="sub">{children ?? "There is no page at this address."}</p>
         </div>
       </div>
-      <p className="code">{address.pathname + address.search}</p>
-      <p>
-        <a href="#/people/view/agents">Open the agents list</a>
+      <p className="note">The address asked for was {address.pathname + address.search}. It may be from an old link.</p>
+      <p className="chain">
+        <a className="btn" href="#/dashboard">Go to the Dashboard</a>
+        <a className="btn" href="#/people/view/agents">Open the agents list</a>
       </p>
     </div>
   );

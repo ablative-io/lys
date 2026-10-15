@@ -11,6 +11,7 @@ import type { AccessRequest } from '../requests/contract';
 import { refusedPart } from './contract';
 import type { DashboardAgent } from './contract';
 import { budgetLine, tightest } from './words';
+import { Unread } from './Unread';
 
 /** One widget: a titled card, how many it holds, and where its whole list lives. */
 function Widget({ label, count, href, children }: { label: string; count: ReactNode; href: string; children: ReactNode }) {
@@ -25,13 +26,16 @@ export interface Part { label: string; count: ReactNode; href: string; body: Rea
 const part = (label: string, count: ReactNode, href: string, body: ReactNode): Part => ({ label, count, href, body });
 const card = (made: Part) => <Widget label={made.label} count={made.count} href={made.href}>{made.body}</Widget>;
 
-function Unread({ what, refused }: { what: string; refused: Refused }) {
-  return <p className="why-not" role="alert">{what} could not be read. <small className="refusal-name" title={refused.refusal.reason}>{refused.refusal.refusal}</small></p>;
+function Unreadable({ what, refused }: { what: string; refused: Refused }) {
+  return <div role="alert"><Unread part={refused} words={what + ' could not be read.'} /></div>;
 }
+
+/** An agent's name linked to its Limits and goals tab, where its budget and goals are changed. */
+const limitsOf = (row: DashboardAgent) => <a href={'#/file/' + encodeURIComponent(row.agent.id) + '/budgets'}>{row.agent.display_name}</a>;
 
 /** The requests still waiting, the ones this person may decide first, each said by who asked, for what and why. */
 export function requestsPart({ requests, me }: { requests: AccessRequest[] | Refused; me: string }) {
-  if (requests instanceof Refused) return part("Requests", "?", "#/requests", <><Unread what="Requests" refused={requests} /></>);
+  if (requests instanceof Refused) return part("Requests", "?", "#/requests", <Unreadable what="Requests" refused={requests} />);
   const mine = (entry: AccessRequest) => entry.can_decide ?? entry.approvers.some((each) => each.id === me);
   const waiting = requests.filter((entry) => entry.state === 'waiting').sort((left, right) => Number(mine(right)) - Number(mine(left)) || left.asked_at - right.asked_at);
   return part("Requests", waiting.length, "#/requests", <>
@@ -48,7 +52,7 @@ export function requestsPart({ requests, me }: { requests: AccessRequest[] | Ref
 
 /** The drafts agents prepared for this person to approve, each said by the agent, what it would do and the agent's note. */
 export function draftsPart({ drafts }: { drafts: Draft[] | Refused }) {
-  if (drafts instanceof Refused) return part("Drafts", "?", "#/access/drafts", <><Unread what="Drafts" refused={drafts} /></>);
+  if (drafts instanceof Refused) return part("Drafts", "?", "#/access/drafts", <Unreadable what="Drafts" refused={drafts} />);
   return part("Drafts", drafts.length, "#/access/drafts", <>
     <table className="dash-table"><tbody>
       {drafts.map((draft) => <tr key={draft.id} data-draft="waiting">
@@ -73,11 +77,11 @@ export function budgetPart({ rows }: { rows: DashboardAgent[] }) {
   return part("Budget", reached ? reached + ' at limit' : known.length + ' limited', "#/people", <>
     <table className="dash-table"><tbody>
       {limited.map(({ row, near, line }) => <tr key={row.agent.id} data-budget={row.agent.id}>
-        <td className="dash-name">{row.agent.display_name}</td>
-        <td className="sec">{line.refused ? <small className="refusal-name why-not">{line.words}</small> : <>
+        <td className="dash-name">{limitsOf(row)}</td>
+        <td className="sec">{line.refused ? <Unread part={line.refused} words={line.words} /> : <>
           <span className="dash-bar" role="img" aria-label={near < 0 ? 'Nothing reported yet' : Math.round(near * 100) + '% of the nearest limit'}>
             <span className={near >= 1 ? 'full' : ''} style={{ width: Math.max(0, Math.min(1, near)) * 100 + '%' }} /></span>
-          {line.words}</>}</td>
+          {line.lines.map((each, index) => <span className="dash-line" key={index}>{each}</span>)}</>}</td>
       </tr>)}
       {free ? <tr className="empty"><td className="dim" colSpan={2}>{limited.length ? free + (free === 1 ? ' other agent has' : ' other agents have') + ' no limit.' : 'No agent has a limit.'}</td></tr> : null}
     </tbody></table>
@@ -97,12 +101,12 @@ export function goalsPart({ rows }: { rows: DashboardAgent[] }) {
   return part("Goals", open + ' open' + (missed ? ', ' + missed + ' missed' : ''), "#/people", <>
     <table className="dash-table"><tbody>
       {goals.map(({ row, item }) => <tr key={row.agent.id + '/' + item.goal.id} data-goal={item.standing}>
-        <td>{row.agent.display_name}</td>
+        <td>{limitsOf(row)}</td>
         <td className="sec">{item.goal.words}</td>
-        <td className="sec you-act">{STANDING[item.standing]}{item.goal.deadline === null ? '' : ', due ' + day(item.goal.deadline)}</td>
+        <td className="sec dash-due">{STANDING[item.standing]}{item.goal.deadline === null ? '' : ', due ' + day(item.goal.deadline)}</td>
       </tr>)}
-      {unread.map((row) => <tr key={row.agent.id} data-goal="unread"><td>{row.agent.display_name}</td>
-        <td className="why-not" colSpan={2}>Its goals could not be read. {refusedPart(row.goals) ? <small className="refusal-name">{row.goals.refusal}</small> : null}</td></tr>)}
+      {unread.map((row) => <tr key={row.agent.id} data-goal="unread"><td>{limitsOf(row)}</td>
+        <td colSpan={2}>{refusedPart(row.goals) ? <Unread part={row.goals} words="Its goals could not be read" /> : null}</td></tr>)}
       {goals.length || unread.length ? null : <tr className="empty"><td className="dim">No goal is set.</td></tr>}
     </tbody></table>
   </>);

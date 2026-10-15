@@ -2,6 +2,8 @@ import type { DashboardAgent } from '../dashboard/contract';
 import { refusedPart } from '../dashboard/contract';
 import { clockMs } from '../file/time';
 import { amount } from '../usage/budgetWords';
+import { Refused } from '../../api';
+import { problemWords } from '../people/Words';
 import type { Length, Used } from '../usage/contract';
 
 export interface TokenComponent {
@@ -41,7 +43,7 @@ const namedCount = (value: number, one: string): string => value + ' ' + one + (
 
 export function componentWords(component: TokenComponent): string {
   return (component.reported === null ? 'Not reported' : amount('tokens', component.reported) + ' reported')
-    + (component.missing_calls ? ' · ' + namedCount(component.missing_calls, 'call') + ' reported none' : '');
+    + (component.missing_calls ? ' · ' + namedCount(component.missing_calls, 'call') + ' gave no figure' : '');
 }
 
 function componentsGap(tokens: TokenComponents): string | null {
@@ -65,21 +67,21 @@ export function tokenPresentations(rows: DashboardAgent[], period: Length): Toke
   return rows.map((row) => {
     const base: TokenPresentation = { agent: row.agent.id, name: row.agent.display_name, period, since_ms: null,
       components: [], counts: 'Call and session counts not reported', unavailable: null, empty: null };
-    if (refusedPart(row.usage)) return { ...base, unavailable: row.usage.refusal + ': ' + row.usage.reason };
+    if (refusedPart(row.usage)) return { ...base, unavailable: 'Its use could not be read. ' + problemWords(new Refused(0, row.usage)) };
     const figures = row.usage.figures;
     if (figures !== undefined && (!Array.isArray(figures) || figures.some((used) => !used || typeof used !== 'object'))) {
-      return { ...base, unavailable: 'TokenComponentsUnreadable: the reported figures are not a list of usage records' };
+      return { ...base, unavailable: 'Token figures could not be used: the reported figures are not a list of usage records' };
     }
     const readings = (row.usage.figures ?? []).filter((used) => used.unit === 'tokens' && used.period === period) as TokensUsed[];
     if (!readings.length) return { ...base, unavailable: 'Token components not reported for this period' };
-    if (readings.length !== 1) return { ...base, unavailable: 'TokenComponentsUnreadable: more than one component report was returned for the period' };
+    if (readings.length !== 1) return { ...base, unavailable: 'Token figures could not be used: more than one component report was returned for the period' };
     const used = readings[0];
     if (!used.tokens || typeof used.tokens !== 'object') return { ...base, unavailable: 'Token components not reported; the combined figure does not identify the components' };
     const gap = componentsGap(used.tokens);
-    if (gap) return { ...base, unavailable: 'TokenComponentsUnreadable: ' + gap };
+    if (gap) return { ...base, unavailable: 'Token figures could not be used: ' + gap };
     if (used.since_ms !== null && (!Number.isSafeInteger(used.since_ms) || !Number.isFinite(new Date(used.since_ms).getTime())
       || (period === 'five_hour' && used.since_ms % 18_000_000 !== 0))) {
-      return { ...base, unavailable: 'TokenComponentsUnreadable: the reported period start is invalid' };
+      return { ...base, unavailable: 'Token figures could not be used: the reported period start is invalid' };
     }
     const tokens = used.tokens;
     const counts = namedCount(tokens.calls, 'call') + ' · ' + namedCount(tokens.sessions, 'session')

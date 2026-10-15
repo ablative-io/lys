@@ -10,3 +10,5 @@
 /* Credentials: certificates and handles are both cards with the same heading; each certificate is a part of its card. */
 .certificates .certificate { border-top: 1px solid var(--border-subtle); padding-top: 12px; margin-top: 12px; }
 .certificates .certificate h3 .refusal-name { margin-left: 6px; font-weight: 400; }
+/* The emergency-stop history stands apart from the record's cards above it. */
+.stop-history { margin-top: 24px; }

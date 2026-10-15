@@ -13,7 +13,7 @@ import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
 import { api, Refused, request, useLoad } from '../../api';
 import type { MeView, ReceiptAnswer } from '../../generated';
-import { IdentityName } from '../people/Words';
+import { IdentityName, STATUS } from '../people/Words';
 import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
@@ -40,21 +40,15 @@ function Profile({ data }: { data: FileData }) {
         <div className="card">
           <dl className="facts">
             <dt>Kind</dt>
-            <dd><span className={'kind ' + x.kind}>{x.kind}</span></dd>
-            <dt>Answers to</dt>
-            <dd>
-              {x.person ? (
-                <>
-                  <Pill x={x.person} /> <span className="note">decides renewal and retirement; a transfer is its own act</span>
-                </>
-              ) : (
-                <span className="dim">A person answers for themselves</span>
-              )}
-            </dd>
+            <dd>{x.kind === 'agent' ? 'Agent' : 'Person'}</dd>
+            {x.person ? <>
+              <dt>Answers to</dt>
+              <dd><Pill x={x.person} /> <span className="note">decides when its access is renewed or retired</span></dd>
+            </> : null}
             <dt>Teams</dt>
             <dd><TeamsOf id={x.id} /></dd>
-            <dt>State</dt>
-            <dd>{x.state} <span className="note">· authority only; it does not say anything is running</span></dd>
+            <dt>Access</dt>
+            <dd>{STATUS[x.state] ?? x.state}</dd>
           </dl>
         </div>
         {x.kind === 'person' ? <AgentsOf name={x.display_name} agents={agents} /> : null}
@@ -77,7 +71,7 @@ function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }
       {shown.length ? shown.map((a) => (
         <div className="row" key={a.id}>
           <a href={'#/file/' + a.id} style={{ textDecoration: 'none' }}>{a.display_name}</a>
-          <span><span className={'dot s-' + a.state} /><span className="dim">{a.state}</span></span>
+          <span><span className={'dot s-' + a.state} /><span className="dim">{STATUS[a.state] ?? a.state}</span></span>
         </div>
       )) : <div className="dim">{agents.length ? 'Every agent answering to ' + firstName(name) + ' is retired.' : 'None yet.'}</div>}
     </div>
@@ -187,8 +181,8 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
     <div className="grid2">
       <div>
         <div className="card">
-          <h2>Lifecycle</h2>
-          <div className="sec" style={{ marginBottom: 10 }}>registered → active ⇄ suspended → retired</div>
+          <h2>What changed</h2>
+          <div className="sec" style={{ marginBottom: 10 }}>Every change to this record, oldest first, and who made it.</div>
           {receipts.length ? (
             <div className="timeline">
               {receipts.map((r, i) => (
@@ -208,14 +202,14 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
       </div>
       <div>
         <div className="card">
-          <h2>Evidence</h2>
-          <div className="sec">Every change to this file is kept as an append-only entry, for when you need it.</div>
+          <h2>Proof of each change</h2>
+          <div className="sec">Lys signs every change and keeps it for good, so it can be checked later. You only need these if someone asks for proof.</div>
           {receipts.map((r) => (
             <div className="row" style={{ padding: '5px 0' }} key={r.receipt.log.index}>
-              <a href={'/api/receipts/' + r.receipt.log.index} className="mono">entry #{r.receipt.log.index}</a>
+              <a href={'/api/receipts/' + r.receipt.log.index} download={'lys-change-' + r.receipt.log.index + '.json'}>Download proof of change {r.receipt.log.index}</a>
+              <span className="dim">{clock(r.receipt.actor.authenticated_at)}</span>
             </div>
           ))}
-          {receipts.length ? <div className="note" style={{ marginTop: 6 }}>Each entry is the signed receipt, the log checkpoint and its inclusion proof.</div> : null}
         </div>
       </div>
     </div>

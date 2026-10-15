@@ -19,6 +19,9 @@ import '../team/team.css';
 import { refusedPart } from './contract';
 import type { DashboardAgent } from './contract';
 import { budgetLine, goalsLine } from './words';
+import type { Line } from './words';
+import { Unread } from './Unread';
+import { STATUS } from '../people/Words';
 import { Act } from '../../shell/Act';
 
 /**
@@ -104,27 +107,30 @@ export function AskedRow({ entry, place, context, columns }: { entry: Entry; pla
   </td></tr>;
 }
 
-function Refusal({ name }: { name: string }) { return <small className="refusal-name why-not">{name}</small>; }
-
-function Cell({ line }: { line: { words: string; refused: boolean } }) {
-  return <td className="sec you-where">{line.refused ? <Refusal name={line.words} /> : line.words}</td>;
+/** A budget or goals cell: each limit or goal on its own line, or in plain words that it could not be read. */
+function Cell({ line, kind }: { line: Line; kind: 'budget' | 'goals' }) {
+  return <td className={'sec you-where you-' + kind}>{line.refused ? <Unread part={line.refused} words={line.words} />
+    : line.lines.map((each, index) => <span className="dash-line" key={index}>{each}</span>)}</td>;
 }
+
+/** What the Running cell says of an agent that is not running: why, in the directory's own words for its state. */
+const idle = (state: string): string => state === 'active' ? 'Not running' : STATUS[state] ?? 'Not running';
 
 /** One agent's row where it is listed: `place` tells this listing from its others. */
 function AgentRow({ entry, level, place, open, context }: { entry: Entry; level: number; place: string; open: (id: string) => void; context: RowContext }) {
   const row = context.rows.get(entry.id);
   const live = liveOf(row);
   const asked = context.asked;
-  const sessionsRefused = row && refusedPart(row.sessions) ? row.sessions.refusal : null;
-  const teamsRefused = row && refusedPart(row.teams) ? row.teams.refusal : null;
+  const sessionsRefused = row && refusedPart(row.sessions) ? row.sessions : null;
+  const teamsRefused = row && refusedPart(row.teams) ? row.teams : null;
   return <>
     <tr data-href={'#/file/' + entry.id} {...keyable(() => open(entry.id))}>
       <td style={depth(level)} className="you-agent"><span className={'dot ' + (live.length ? 's-active' : 's-retired')} aria-label={sessionsRefused ? 'not known' : live.length ? 'running' : 'not running'} />{entry.display_name}
-        {teamsRefused ? <> <span className="sec">teams:</span> <Refusal name={teamsRefused} /></> : null}</td>
-      <td className="sec you-where">{sessionsRefused ? <Refusal name={sessionsRefused} />
+        {teamsRefused ? <Unread part={teamsRefused} words="Its teams could not be read" /> : null}</td>
+      <td className="sec you-where">{sessionsRefused ? <Unread part={sessionsRefused} words="Not known" />
         : live.length ? live.map((session) => <span className="dash-line" key={session.session}>{whereOf(session)}</span>)
-        : entry.state === 'active' ? 'not running' : entry.state}</td>
-      {row ? <><Cell line={budgetLine(row)} /><Cell line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
+        : idle(entry.state)}</td>
+      {row ? <><Cell kind="budget" line={budgetLine(row)} /><Cell kind="goals" line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
       <td className="you-act">{sessionsRefused ? null
         : live.length ? live.map((session) => <RunningActs key={session.session} entry={entry} session={session} context={context} place={place} />)
         : asked?.agent === entry.id && asked.what !== 'stop' ? null : <RowStart entry={entry} ask={context.ask} place={place} stopped={context.stopped} />}</td>
@@ -172,7 +178,7 @@ export function AgentTree({ branches, context }: { branches: Branch[]; context: 
     <tbody>
       {context.rows.size
         ? <AgentRows branches={branches} level={0} place="tree" folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} context={context} />
-        : <tr><td colSpan={COLUMNS} className="dim">You have no agents.</td></tr>}
+        : <tr><td colSpan={COLUMNS} className="dim">You have no agents yet. <a href="#/agents/new">Add an agent</a></td></tr>}
     </tbody>
   </table>;
 }
@@ -194,7 +200,7 @@ export function RunningNow({ rows, context, first = null }: { rows: DashboardAge
       </Fragment>;
     }) : unread.length ? null : <tr className="empty"><td className="dim">Nothing is running.</td></tr>}
     {unread.map(({ entry, refusal }) => <tr key={entry.id} data-unread={entry.id}>
-      <td>{entry.display_name}</td><td className="why-not" colSpan={2} title={refusal.reason}>Whether it is running could not be read. <Refusal name={refusal.refusal} /></td>
+      <td>{entry.display_name}</td><td colSpan={2}><Unread part={refusal} words="Whether it is running could not be read" /></td>
     </tr>)}</tbody>
   </table>;
 }

@@ -37,9 +37,10 @@ function element<T extends HTMLElement>(selector: string): T {
 }
 
 async function input(selector: string, value: string): Promise<void> {
-  const found = element<HTMLInputElement>(selector);
+  const found = element<HTMLInputElement | HTMLTextAreaElement>(selector);
+  const prototype = found instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
   await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(found, value);
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(found, value);
     found.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
@@ -57,8 +58,8 @@ async function choose(selector: string, value: string): Promise<void> {
 }
 
 const edit = 'form[aria-label="Edit budget limits"]';
-const words = 'form[aria-label="Reword goal ' + goal.goal.id + '"]';
-const active = 'input[aria-label="Goal active ' + goal.goal.id + '"]';
+const words = 'form[aria-label="Reword the goal “' + goal.goal.words + '”"]';
+const active = 'input[aria-label="The goal “' + goal.goal.words + '” is active"]';
 
 describe('Usage port', () => {
   it('edits money and minutes while retaining every independent action, zone and other limit', async () => {
@@ -114,6 +115,7 @@ describe('Usage port', () => {
     await click(edit + ' button[type="submit"]');
     expect(changed).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('BudgetAnswerUnconfirmed');
+    expect(document.querySelector('.usage-budgets .why-not p')?.textContent).toBe('Lys answered, but did not confirm every limit. Reload the page to see the saved budget before changing it again.');
     expect(element<HTMLButtonElement>(edit + ' button[type="submit"]').disabled).toBe(true);
     expect(element<HTMLButtonElement>('tr[data-add="budget"] button[type="submit"]').disabled).toBe(true);
   });
@@ -171,11 +173,11 @@ describe('Usage port', () => {
     const changed = vi.fn();
     serve({ ['POST /goals/' + goal.goal.id + '/words']: (body) => ok({ ...goal, goal: { ...goal.goal, words: (body as { words: string }).words } }) }, posted);
     await render(<UsageGoals agent={SCRIBE} goals={[goal, other]} changed={changed} />);
-    await input(words + ' input[name="words"]', '  Keep all records available  ');
+    await input(words + ' textarea[name="words"]', '  Keep all records available  ');
     await click('button[form="reword-' + goal.goal.id + '"]');
     expect(posted).toEqual([{ path: '/goals/' + goal.goal.id + '/words', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), words: 'Keep all records available' } }]);
     expect(changed).toHaveBeenCalledWith('Goal reworded.');
-    expect([...document.querySelectorAll<HTMLInputElement>('input[name=\"words\"]')].map((each) => each.defaultValue)).toContain(other.goal.words);
+    expect([...document.querySelectorAll<HTMLTextAreaElement>('textarea[name=\"words\"]')].map((each) => each.defaultValue)).toContain(other.goal.words);
   });
 
   it.each([false, true])('switches goal activity to %s with an independent recorded operation', async (next) => {
@@ -194,7 +196,7 @@ describe('Usage port', () => {
     const changed = vi.fn();
     serve({ ['POST /goals/' + goal.goal.id + '/words']: refused(403, 'NotPermitted', 'The goal cannot be changed by this caller') });
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
-    await input(words + ' input[name="words"]', 'Changed words');
+    await input(words + ' textarea[name="words"]', 'Changed words');
     await click('button[form="reword-' + goal.goal.id + '"]');
     expect(document.body.textContent).toContain('NotPermitted');
     expect(changed).not.toHaveBeenCalled();
@@ -206,7 +208,7 @@ describe('Usage port', () => {
     const changed = vi.fn();
     serve({ ['POST /goals/' + goal.goal.id + '/words']: refused(503, 'GoalsUnavailable', 'The answer is unknown') }, posted);
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
-    await input(words + ' input[name="words"]', 'Keep records available');
+    await input(words + ' textarea[name="words"]', 'Keep records available');
     await click('button[form="reword-' + goal.goal.id + '"]');
     expect(posted).toHaveLength(1);
     expect(changed).not.toHaveBeenCalled();
@@ -224,7 +226,7 @@ describe('Usage port', () => {
     const changed = vi.fn();
     serve({ ['POST /goals/' + goal.goal.id + '/words']: ok({ ...other, goal: { ...other.goal, words: 'Changed words' } }) });
     await render(<UsageGoals agent={SCRIBE} goals={[goal]} changed={changed} />);
-    await input(words + ' input[name="words"]', 'Changed words');
+    await input(words + ' textarea[name="words"]', 'Changed words');
     await click('button[form="reword-' + goal.goal.id + '"]');
     expect(changed).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain('The answer did not confirm this recorded change');

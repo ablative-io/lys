@@ -20,8 +20,8 @@ export function PersonCredentials({ id }: { id: string }) {
         <RecordedForm name="bind-login" title="Bind a sign-in identity" heading="Connect a sign-in account" description="Connect this person's directory record to their account with a sign-in provider." submitLabel="Connect sign-in" drawn={{ symbol: 'add', word: 'Connect' }} done={() => setRevision((value) => value + 1)}
           change={(form) => ({ path: '/people/' + encodeURIComponent(id) + '/logins', body: { issuer: String(form.get('issuer') ?? '').trim(), subject: String(form.get('subject') ?? '').trim() } })}>
           <div className="form-grid">
-            <label className="field">Issuer URL<input name="issuer" required /></label>
-            <label className="field">Account subject<input name="subject" required /></label>
+            <label className="field wide">Sign-in provider’s address (issuer URL)<input name="issuer" type="url" inputMode="url" placeholder="https://accounts.google.com" autoComplete="off" spellCheck={false} required /></label>
+            <label className="field wide">Account identifier at that provider (subject)<input name="subject" autoComplete="off" spellCheck={false} required /></label>
             <p className="note">Use the provider's exact subject identifier, not the person's name or email address.</p>
           </div>
         </RecordedForm>

@@ -110,7 +110,7 @@ describe('Managed controls on the agent file', () => {
       expect(view.container.querySelector<HTMLInputElement>('input[name="amount-0"]')?.value).toBe('80');
       expect(view.container.querySelector<HTMLSelectElement>('select[name="act-0"]')?.value).toBe('compact');
       expect(words(view.container)).toContain('85% of 80% now');
-      expect(view.container.querySelector<HTMLInputElement>('section[aria-label="Goals"] input[name="words"]')?.value).toBe('Keep the service available');
+      expect(view.container.querySelector<HTMLTextAreaElement>('section[aria-label="Goals"] textarea[name="words"]')?.value).toBe('Keep the service available');
       expect(words(view.container)).toContain('Held: delivery uncertain');
       expect(words(view.container)).not.toContain('Compaction confirmed');
     } finally { await view.close(); }

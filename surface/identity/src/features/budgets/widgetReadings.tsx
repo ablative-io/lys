@@ -44,7 +44,7 @@ export interface ContextPresentation {
   live_sessions: SessionContext[];
 }
 
-const calls = (count: number): string => count + (count === 1 ? ' call' : ' calls') + ' reported none';
+const calls = (count: number): string => count + (count === 1 ? ' call' : ' calls') + ' gave no context figure';
 const instant = (at: unknown): at is number => typeof at === 'number' && Number.isSafeInteger(at)
   && Number.isFinite(new Date(at).getTime());
 const count = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
@@ -61,7 +61,7 @@ function metadataGap(reading: ContextReading): string | null {
 
 function unreadable(reason: string): ContextPresentation {
   return { figure: null, display: 'Context unreadable', read_at_ms: null, reported_none: null,
-    words: 'ContextReadUnreadable: ' + reason, unavailable: [reason], session: null, model: null,
+    words: 'The context reading could not be used: ' + reason, unavailable: [reason], session: null, model: null,
     context_tokens: null, window_tokens: null, live_sessions: [] };
 }
 
@@ -129,9 +129,10 @@ export function contextPresentation(rows: DashboardAgent[], selectedSession?: st
     && (used.unavailable === 'context_percent was not reported' || used.unavailable?.startsWith('context counters not reported:'));
   const missing = missingDisplay(used);
   const missingWindow = missing === 'Not reported' && windowTokens === null && (contextTokens !== null || used.figure !== null);
-  const words = [session === null ? 'current session not reported' : 'session ' + session,
+  // A session is named by which it is, never by its identifier: the picker beside the reading tells sessions apart.
+  const words = [session === null ? 'current session not reported' : selectedSession !== undefined && session !== metadata?.session ? 'chosen session' : 'current session',
     readAt !== null ? 'read ' + clockMs(readAt) : contextTokens !== null || used.figure !== null ? 'read time not reported' : '',
-    noMessages ? '' : reading ? calls(reading.reported_none) : 'count of calls that reported none not reported',
+    noMessages ? '' : reading ? calls(reading.reported_none) : 'how many calls gave no context figure is not reported',
     contextTokens === null && used.figure !== null ? 'context tokens not reported' : '',
     missingWindow ? 'declared context window not reported' : '']
     .filter(Boolean).join(' · ');

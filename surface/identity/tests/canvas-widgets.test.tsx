@@ -161,7 +161,7 @@ describe('Widgets on the canvas', () => {
     const card = widget('usage') as HTMLElement;
     const turn = async (times = 1) => { for (let at = 0; at < times; at++) await click(card.querySelector('[data-act="widget-view"]')); };
     const figure = () => card.querySelector('.canvas-widget-figure')?.textContent;
-    expect([card.getAttribute('aria-label'), card.dataset.view, figure()]).toEqual(['Usage of Scribe', 'pill', '43% context · session ' + session + ' · read ' + clockMs(readAt) + ' · 0 calls reported none']);
+    expect([card.getAttribute('aria-label'), card.dataset.view, figure()]).toEqual(['Usage of Scribe', 'pill', '43% context · current session · read ' + clockMs(readAt) + ' · 0 calls gave no context figure']);
     expect(card.querySelector('.canvas-widget-body')).toBeNull();
     await turn();
     expect([card.dataset.view, card.style.width, card.style.height]).toEqual(['faces', '340px', '']);
@@ -235,14 +235,16 @@ describe('Widgets on the canvas', () => {
       [link('agent:' + SCRIBE, 'widget:v'), link('widget:u', 'widget:f'), link('widget:f', 'widget:t')]);
     const card = await reportedUsage([current, components()], source, { '/runtime/live': ok({ sessions: [running, { ...running, session: older }], unanswered: [] }) });
     const picker = () => card.querySelector('select[aria-label="Context session for Scribe"]') as HTMLSelectElement;
-    const header = (id: string, at: number, none: number, percent: string) => percent + '% context · session ' + id + ' · read ' + clockMs(at) + ' · ' + none + ' calls reported none';
+    // The session is said by which it is, never by its identifier; the picker names each session by its number and model.
+    const header = (id: string, at: number, none: number, percent: string) => percent + '% context · ' + (id === session ? 'current' : 'chosen') + ' session · read ' + clockMs(at) + ' · ' + none + ' calls gave no context figure';
     expect([figureOf('widget:u'), figureOf('widget:v'), figureOf('widget:f'), figureOf('widget:t')]).toEqual([header(session, readAt, 2, '5.9'), header(session, readAt, 2, '5.9'), '5.9%', '5.9%']);
-    expect(Array.from(picker().options).map((option) => [option.value, option.textContent])).toEqual([[older, older + ', ' + model], [session, session + ' (current), ' + model]]);
+    expect(Array.from(picker().options).map((option) => [option.value, option.textContent])).toEqual([[older, 'Session 1, ' + model], [session, 'Session 2 (current), ' + model]]);
+    expect(Array.from(picker().options).map((option) => option.textContent).join(' ')).not.toMatch(/op-[0-9a-f]{32}/);
     expect(picker().value).toBe(session);
     expect([card.querySelector('[data-context-percent]')?.textContent, card.querySelector('.canvas-widget-bar .canvas-dial')?.getAttribute('aria-label')]).toEqual(['5.9%', '5.9%']);
     expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
     expect(card.querySelector('[data-context-tokens]')?.textContent).toBe('58,795 tokens reported of the declared 1,000,000 tokens window');
-    expect(card.querySelector('[data-context-reading]')?.textContent).toContain('2 calls reported none');
+    expect(card.querySelector('[data-context-reading]')?.textContent).toContain('2 calls gave no context figure');
     await choose(picker(), older);
     expect([figureOf('widget:u'), figureOf('widget:v'), figureOf('widget:f'), figureOf('widget:t')]).toEqual([header(older, readAt - 300000, 8, '98'), header(session, readAt, 2, '5.9'), '98%', '98%']);
     expect([card.querySelector('[data-context-session]')?.getAttribute('data-context-session'), card.querySelector('[data-context-percent]')?.textContent, card.querySelector('[data-context-reading] time')?.getAttribute('datetime')]).toEqual([older, '98%', new Date(readAt - 300000).toISOString()]);
@@ -255,10 +257,10 @@ describe('Widgets on the canvas', () => {
 
   it('shows separate reported token components, calls and sessions even with no crossing receipts, and refuses the old combined scalar as formula input', async () => {
     const card = await reportedUsage([components()], fedUsage({ shows: 'tokens/day', faces: ['tokens/day'] }, [formulaWidget('widget:f')], [link('widget:u', 'widget:f')]));
-    const words = ['New input500 tokens reported', 'Output20 tokens reported', 'Cache written100 tokens reported', 'Cache read58,195 tokens reported · 1 call reported none'];
+    const words = ['New input500 tokens reported', 'Output20 tokens reported', 'Cache written100 tokens reported', 'Cache read58,195 tokens reported · 1 call gave no figure'];
     expect(Array.from(card.querySelectorAll('[data-token-component]')).map((row) => row.textContent)).toEqual(words);
     expect(card.querySelector('[data-token-counts]')?.textContent).toBe('2 calls · 1 session');
-    expect(figureOf('widget:u')).toBe('New input: 500 tokens reported · Output: 20 tokens reported · Cache written: 100 tokens reported · Cache read: 58,195 tokens reported · 1 call reported none · 2 calls · 1 session · period start not reported');
+    expect(figureOf('widget:u')).toBe('New input: 500 tokens reported · Output: 20 tokens reported · Cache written: 100 tokens reported · Cache read: 58,195 tokens reported · 1 call gave no figure · 2 calls · 1 session · period start not reported');
     expect([card.textContent?.includes('177,540'), figureOf('widget:f')]).toEqual([false, 'Nothing reported']);
     await turn('widget:u');
     expect(Array.from(card.querySelectorAll('[data-token-agent="' + SCRIBE + '"][data-token-period="day"] [data-token-component]')).map((row) => row.textContent)).toEqual(words);
@@ -268,7 +270,7 @@ describe('Widgets on the canvas', () => {
   it('names an undeclared model window with the retained reading time and later empty calls, without guessing a percentage', async () => {
     const reading = context(58795, { model: 'undeclared-model', window_tokens: null, figure: null, unavailable: 'no context window is declared for model undeclared-model' });
     const card = await reportedUsage([reading], fedUsage({ faces: ['context_percent/'], look: 'dial' }, [formulaWidget('widget:f')], [link('widget:u', 'widget:f')]));
-    expect(figureOf('widget:u')).toBe('undeclared-model window not declared · session ' + session + ' · read ' + clockMs(readAt) + ' · 2 calls reported none');
+    expect(figureOf('widget:u')).toBe('undeclared-model window not declared · current session · read ' + clockMs(readAt) + ' · 2 calls gave no context figure');
     expect([card.querySelector('[data-context-agent] b')?.textContent, card.querySelector('[data-context-tokens]')?.textContent]).toEqual(['undeclared-model window not declared', '58,795 tokens reported']);
     expect(card.querySelector('[data-context-reading] time')?.getAttribute('datetime')).toBe(new Date(readAt).toISOString());
     expect(card.querySelector('[data-context-unavailable]')?.textContent).toBe('Scribe: no context window is declared for model undeclared-model');
@@ -322,7 +324,9 @@ describe('Widgets on the canvas', () => {
     expect(widget('weather')?.textContent).toContain('This page does not know a widget of the kind “weather”.');
     document.body.innerHTML = '';
     await canvas({ widgets: [{ id: 'widget:a', kind: 'budget', x: 700, y: 300, w: 340, h: 170 }] }, { '/dashboard': refused(503, 'DashboardUnavailable', 'the dashboard is closed') });
-    expect(widget('budget')?.querySelector('.canvas-widget-figure')?.textContent).toBe('DashboardUnavailable');
+    // The pill says it plainly; the refusal by name is only in the opened widget's Error details.
+    expect(widget('budget')?.querySelector('.canvas-widget-figure')?.textContent).toBe('Not readable');
+    expect(widget('budget')?.textContent).not.toContain('DashboardUnavailable');
     expect(text()).not.toContain('No limit');
   });
 

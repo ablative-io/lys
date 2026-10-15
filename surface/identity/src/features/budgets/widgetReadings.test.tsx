@@ -37,7 +37,7 @@ describe('Current live-session context readings', () => {
     const reading = contextPresentation([row('Agent', [context(5)])]);
     expect(reading).toEqual({ figure: 5.8795, display: '5.9%', session, model, context_tokens: 58_795,
       window_tokens: 1_000_000, live_sessions: [], read_at_ms: at, reported_none: 2,
-      words: 'session ' + session + ' · read ' + clockMs(at) + ' · 2 calls reported none', unavailable: [] });
+      words: 'current session · read ' + clockMs(at) + ' · 2 calls gave no context figure', unavailable: [] });
     const host = rendered(reading);
     expect(host.textContent).toBe(reading?.words);
     expect(host.querySelector('time')?.getAttribute('datetime')).toBe(new Date(at).toISOString());
@@ -55,13 +55,13 @@ describe('Current live-session context readings', () => {
   it('uses only the explicitly picked live session, including its own reading time and later empty calls', () => {
     const reading = contextPresentation([row('Agent', [context(5, { context: { ...current, live_sessions: [older, current] } })])], older.session);
     expect(reading).toMatchObject({ session: older.session, figure: 98, display: '98%', read_at_ms: older.read_at_ms,
-      reported_none: 8, words: 'session older-session · read ' + clockMs(at - 600_000) + ' · 8 calls reported none' });
+      reported_none: 8, words: 'chosen session · read ' + clockMs(at - 600_000) + ' · 8 calls gave no context figure' });
   });
 
   it('names a picked session that ended instead of silently switching to another session', () => {
     const reading = contextPresentation([row('Agent', [context(5, { context: { ...current, live_sessions: [current] } })])], older.session);
     expect(reading).toMatchObject({ session: older.session, figure: null, display: 'Context unreadable',
-      words: 'ContextReadUnreadable: the selected session is no longer live' });
+      words: 'The context reading could not be used: the selected session is no longer live' });
   });
 
   it('keeps context per session across agents instead of adding percentages or taking their maximum', () => {
@@ -87,7 +87,7 @@ describe('Current live-session context readings', () => {
 
   it('says No messages yet because the selected session has not completed its first context reading', () => {
     expect(contextPresentation([row('Agent', [context(null)])])).toMatchObject({ session, figure: null,
-      display: 'No messages yet', read_at_ms: null, words: 'session current-session' });
+      display: 'No messages yet', read_at_ms: null, words: 'current session' });
   });
 
   it('retains side-work and oversized-context reasons rather than calling their models undeclared', () => {
@@ -104,7 +104,7 @@ describe('Current live-session context readings', () => {
 
   it('names a missing read time rather than using the latest usage-call timestamp', () => {
     const reading = contextPresentation([row('Agent', [context(5, { context: { ...current, read_at_ms: null, reported_none: 0 } })])]);
-    expect(reading?.words).toBe('session current-session · read time not reported · 0 calls reported none');
+    expect(reading?.words).toBe('current session · read time not reported · 0 calls gave no context figure');
     expect(rendered(reading).querySelector('time')).toBeNull();
   });
 
@@ -112,7 +112,7 @@ describe('Current live-session context readings', () => {
     const scalar: Used = { unit: 'context_percent', period: null, since_ms: null, figure: 5, unavailable: null };
     const reading = contextPresentation([row('Agent', [scalar])]);
     expect(reading).toMatchObject({ figure: 5, display: '5%', read_at_ms: null, reported_none: null, context_tokens: null, window_tokens: null,
-      words: 'current session not reported · read time not reported · count of calls that reported none not reported · context tokens not reported · declared context window not reported' });
+      words: 'current session not reported · read time not reported · how many calls gave no context figure is not reported · context tokens not reported · declared context window not reported' });
     expect(rendered(reading).textContent).toBe(reading?.words);
     expect(contextPresentation([])).toBeNull();
   });
@@ -127,15 +127,15 @@ describe('Current live-session context readings', () => {
   it('names invalid provenance without substituting zero for a missing call count', () => {
     const reading = contextPresentation([row('Agent', [context(5, { context: { ...current, reported_none: -1 } })])]);
     expect(reading).toMatchObject({ figure: null, display: 'Context unreadable', reported_none: null,
-      words: 'ContextReadUnreadable: the count of calls that reported no context is invalid' });
+      words: 'The context reading could not be used: the count of calls that reported no context is invalid' });
     expect(rendered(reading).textContent).not.toContain('0 calls');
   });
 
   it('names a reading beyond its declared window and percentages beyond 100 instead of rendering valid context', () => {
     expect(contextPresentation([row('Agent', [context(101)])])).toMatchObject({ figure: null,
-      words: 'ContextReadUnreadable: the context percentage is invalid' });
+      words: 'The context reading could not be used: the context percentage is invalid' });
     expect(contextPresentation([row('Agent', [context(5, { context: { ...current, window_tokens: 100 } })])]))
-      .toMatchObject({ figure: null, words: 'ContextReadUnreadable: the reported context is larger than the declared window' });
+      .toMatchObject({ figure: null, words: 'The context reading could not be used: the reported context is larger than the declared window' });
   });
 
   it('names actual side-work raw input without incorrectly calling its declared side-work model undeclared', () => {

@@ -8,6 +8,8 @@ import type { Length } from '../usage/contract';
 import { ContextReadingNote, contextPresentation } from './widgetReadings';
 import { tokenPresentations, tokenSummary } from './tokenReadings';
 import './widgetReadings.css';
+import { Refused } from '../../api';
+import { ErrorWords } from '../people/Words';
 
 export interface SessionSelection {
   selected?: Record<string, string>;
@@ -19,7 +21,7 @@ interface LevelRenderer { renderLevel?: (percent: number, display: string) => Re
 export function ContextReadings({ rows, selected, select, renderLevel }: { rows: DashboardAgent[] } & SessionSelection & LevelRenderer) {
   const [choices, setChoices] = useState<Record<string, string>>({});
   return <>{rows.map((row) => {
-    if (refusedPart(row.usage)) return <p className="why-not" key={row.agent.id}>{row.agent.display_name}: {row.usage.refusal}: {row.usage.reason}</p>;
+    if (refusedPart(row.usage)) return <div key={row.agent.id}><p className="why-not">The use of {row.agent.display_name} could not be read.</p><ErrorWords problem={new Refused(0, row.usage)} /></div>;
     const chosen = selected !== undefined ? selected[row.agent.id] : choices[row.agent.id];
     const reading = contextPresentation([row], chosen);
     if (!reading) return <section className="canvas-stat none" key={row.agent.id} data-context-agent={row.agent.id}><b>Not reported</b><span className="sec">Context of {row.agent.display_name}</span></section>;
@@ -37,9 +39,9 @@ export function ContextReadings({ rows, selected, select, renderLevel }: { rows:
       {reading.live_sessions.length > 1 || chosen !== undefined ? <label className="sec" onPointerDown={(event) => event.stopPropagation()}>
         Showing session <select aria-label={'Context session for ' + row.agent.display_name} value={chosen ?? current?.session ?? ''}
           onChange={(event) => { const session = event.target.value; if (select) select(row.agent.id, session); else setChoices((now) => ({ ...now, [row.agent.id]: session })); }}>
-          {chosen !== undefined && !listed ? <option value={chosen}>{chosen} (no longer live)</option> : null}
+          {chosen !== undefined && !listed ? <option value={chosen} title={chosen}>A session that has ended</option> : null}
           {chosen === undefined && current?.session === null ? <option value="">Current session not reported</option> : null}
-          {reading.live_sessions.map((each) => <option key={each.session} value={each.session}>{each.session}{each.session === current?.session ? ' (current)' : ''}{each.model ? ', ' + each.model : ''}</option>)}
+          {reading.live_sessions.map((each, index) => <option key={each.session} value={each.session} title={each.session}>{'Session ' + (index + 1)}{each.session === current?.session ? ' (current)' : ''}{each.model ? ', ' + each.model : ''}</option>)}
         </select></label> : null}
       {reading.unavailable.length ? <span className="dim" data-context-unavailable>{reading.unavailable.join('; ')}</span> : null}
     </section>;
@@ -80,9 +82,9 @@ function providerGaps(rows: DashboardAgent[]): string[] {
   return rows.flatMap((row) => {
     if (refusedPart(row.usage)) return [];
     const figures = row.usage.figures ?? [];
-    if (!Array.isArray(figures) || figures.some((used) => !used || typeof used !== 'object')) return [row.agent.display_name + ': ProviderWindowUnreadable: the reported figures are not a list of usage records'];
+    if (!Array.isArray(figures) || figures.some((used) => !used || typeof used !== 'object')) return [row.agent.display_name + ': the 5-hour window could not be read: the reported figures are not a list of usage records'];
     return figures.filter((used) => used?.unit === 'plan_percent' && used.period === 'five_hour' && used.figure === null)
-      .map((used) => row.agent.display_name + ': ' + (used.unavailable ? readableResets(used.unavailable) : 'ProviderWindowUnreadable: the reason was not reported'));
+      .map((used) => row.agent.display_name + ': ' + (used.unavailable ? readableResets(used.unavailable) : 'the 5-hour window could not be read, and no reason was given'));
   });
 }
 
@@ -97,16 +99,16 @@ export function WidgetUsageReadings({ rows, keys, selected, select, renderLevel 
       const windows = new Map<string, { account: string; at_ms: number; used_percent: number; resets_at_ms: number }>();
       for (const row of rows) if (!refusedPart(row.usage)) {
         const accounts = row.usage.accounts ?? [];
-        if (!Array.isArray(accounts)) return <p className="why-not" key={key} role="alert">ProviderWindowUnreadable: the reported accounts are not a list</p>;
+        if (!Array.isArray(accounts)) return <p className="why-not" key={key} role="alert">The 5-hour window could not be read: the reported accounts are not a list</p>;
         for (const account of accounts) {
-          if (!account || !Array.isArray(account.windows)) return <p className="why-not" key={key} role="alert">ProviderWindowUnreadable: the reported windows are not a list</p>;
+          if (!account || !Array.isArray(account.windows)) return <p className="why-not" key={key} role="alert">The 5-hour window could not be read: the reported windows are not a list</p>;
           for (const each of account.windows) {
-            if (!each) return <p className="why-not" key={key} role="alert">ProviderWindowUnreadable: a reported window is absent</p>;
+            if (!each) return <p className="why-not" key={key} role="alert">The 5-hour window could not be read: a reported window is absent</p>;
             if (each.duration_minutes !== 300) continue;
             if (typeof account.account !== 'string' || !account.account.length || !Number.isFinite(each.used_percent) || each.used_percent < 0 || each.used_percent > 100
               || !Number.isSafeInteger(account.at_ms) || !Number.isFinite(new Date(account.at_ms).getTime())
               || !Number.isSafeInteger(each.resets_at_ms) || !Number.isFinite(new Date(each.resets_at_ms).getTime())) {
-              return <p className="why-not" key={key} role="alert">ProviderWindowUnreadable: the reported account, level or time is invalid</p>;
+              return <p className="why-not" key={key} role="alert">The 5-hour window could not be read: the reported account, level or time is invalid</p>;
             }
             const held = windows.get(account.account);
             if (!held || held.at_ms < account.at_ms) windows.set(account.account, { account: account.account, at_ms: account.at_ms, ...each });

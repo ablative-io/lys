@@ -49,7 +49,21 @@ const contextFigure = (figure: number | null, unavailable: string | null = null)
 });
 const names = () => $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
 const rowOf = (name: string) => $$('tr[data-href]').find((tr) => tr.querySelector('td')?.textContent === name) ?? null;
-const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map((td) => td.textContent);
+/**
+ * What a person reads in an element: a part that could not be read by its plain words alone (what it means and its
+ * refusal code stay folded under them), and the limits or goals of a cell, each on its own line, read as one line.
+ */
+const face = (element: Element | null | undefined): string => {
+  if (!element) return '';
+  const copy = element.cloneNode(true) as Element;
+  for (const fold of copy.querySelectorAll('.dash-unread > :not(summary)')) fold.remove();
+  const lines = [...copy.querySelectorAll('.dash-line')];
+  for (const line of lines.slice(0, -1)) line.append(' · ');
+  return copy.textContent ?? '';
+};
+/** The refusal code a folded part keeps under Error details, out of sight until opened. */
+const folded = (element: Element | null | undefined): string => element?.querySelector('.dash-unread details .refusal-name')?.textContent ?? '';
+const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map(face);
 
 describe('The Dashboard is the front page', () => {
   it('is the rail\'s second entry, after Operations, and #/ lands on it', async () => {
@@ -100,8 +114,12 @@ describe('The Dashboard is the front page', () => {
       [ARCHIVIST]: { budget: { refusal: 'BudgetsUnavailable', reason: 'the budgets store is closed' } },
     })) });
     expect(cells('Scribe').slice(2, 4)).toEqual(['900 tokens of 1,000 tokens today · $100 of $500 this week', '2 open, next due 6 Oct, 1 missed']);
-    expect(cells('Courier').slice(1, 4)).toEqual(['registered', 'UsageUnavailable', '1 missed']);
-    expect(cells('Archivist').slice(1, 4)).toEqual(['suspended', 'BudgetsUnavailable', 'No goal']);
+    // A part that could not be read says so in plain words; its refusal is kept under Error details, never on the face.
+    expect(cells('Courier').slice(1, 4)).toEqual(['Awaiting activation', 'Its use could not be read', '1 missed']);
+    expect(cells('Archivist').slice(1, 4)).toEqual(['Access suspended', 'Its limits could not be read', 'No goal']);
+    expect(folded(rowOf('Courier')?.querySelectorAll('td')[2])).toBe('UsageUnavailable: the usage store is closed');
+    expect(folded(rowOf('Archivist')?.querySelectorAll('td')[2])).toBe('BudgetsUnavailable: the budgets store is closed');
+    for (const name of ['Courier', 'Archivist']) expect(cells(name).join(' ')).not.toMatch(/Unavailable/);
     for (const name of ['Courier', 'Archivist']) expect(rowOf(name)?.querySelectorAll('td')[2].textContent).not.toMatch(/\b0\b|No limit/);
     // One read: no agent's usage, goals or budgets is asked for on its own.
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
@@ -112,9 +130,9 @@ describe('The Dashboard is the front page', () => {
     const { requests } = await mount('#/', { ...routes, '/dashboard': ok(dashboard({
       [SCRIBE]: { budget: compactBudget(), usage: { ...scribeUsage, used: compactBudget().used } },
     })) });
-    expect(cells('Scribe')[2]).toBe('compacts at 40% · not reported');
+    expect(cells('Scribe')[2]).toBe('compacts at 40% · not reported yet');
     expect(rowOf('Scribe')?.textContent).not.toContain('40% of its context');
-    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · not reported');
+    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · not reported yet');
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
     expect(requests.filter((path) => /\/usage|\/budgets/.test(path))).toEqual([]);
   });
@@ -176,7 +194,9 @@ describe('The Dashboard is the front page', () => {
     // Budget: the part that could not be read first, by its name; then the agent nearest its limit; the rest counted once.
     expect(widget('Budget')?.querySelector('.dash-count')?.textContent).toBe('1 limited');
     expect([...(widget('Budget')?.querySelectorAll('tr[data-budget]') ?? [])].map((tr) => tr.getAttribute('data-budget'))).toEqual([ARCHIVIST, SCRIBE]);
-    expect(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]')?.textContent).toBe('ArchivistBudgetsUnavailable');
+    expect(face(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]'))).toBe('ArchivistIts limits could not be read');
+    expect(folded(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]'))).toBe('BudgetsUnavailable: the budgets store is closed');
+    expect(widget('Budget')?.querySelector('tr[data-budget="' + SCRIBE + '"] a')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/budgets');
     expect(widget('Budget')?.querySelector('tr[data-budget="' + SCRIBE + '"] .dash-bar')?.getAttribute('aria-label')).toBe('90% of the nearest limit');
     expect(widget('Budget')?.querySelector('tr.empty')?.textContent).toBe('1 other agent has no limit.');
     // Goals: missed first, then open by deadline, then met; an agent whose goals could not be read is named.
@@ -185,14 +205,18 @@ describe('The Dashboard is the front page', () => {
     const goals = widget('Goals')?.textContent ?? '';
     expect(goals.indexOf('due 6 Oct')).toBeGreaterThan(-1);
     expect(goals.indexOf('due 6 Oct')).toBeLessThan(goals.indexOf('due 9 Oct'));
-    expect(widget('Goals')?.querySelector('tr[data-goal="unread"]')?.textContent).toBe('ArchivistIts goals could not be read. GoalsUnavailable');
+    expect(face(widget('Goals')?.querySelector('tr[data-goal="unread"]'))).toBe('ArchivistIts goals could not be read');
+    expect(folded(widget('Goals')?.querySelector('tr[data-goal="unread"]'))).toBe('GoalsUnavailable: the goals store is closed');
     expect(unreachable()).toEqual([]);
   });
 
   it('says a widget whose own read was refused by the refusal name, with the rest of the Dashboard still shown', async () => {
     await mount('#/', { ...routes, '/requests': { status: 503, body: { refusal: 'RequestsUnavailable', reason: 'the requests store is closed' } }, '/drafts?state=waiting': { status: 503, body: { refusal: 'DraftsUnavailable', reason: 'closed' } } });
-    expect($('section.dash-widget[aria-label="Requests"]')?.textContent).toContain('Requests could not be read. RequestsUnavailable');
-    expect($('section.dash-widget[aria-label="Drafts"]')?.textContent).toContain('Drafts could not be read. DraftsUnavailable');
+    expect(face($('section.dash-widget[aria-label="Requests"]'))).toContain('Requests could not be read.');
+    expect(face($('section.dash-widget[aria-label="Requests"]'))).not.toContain('RequestsUnavailable');
+    expect(folded($('section.dash-widget[aria-label="Requests"]'))).toBe('RequestsUnavailable: the requests store is closed');
+    expect(face($('section.dash-widget[aria-label="Drafts"]'))).toContain('Drafts could not be read.');
+    expect(folded($('section.dash-widget[aria-label="Drafts"]'))).toBe('DraftsUnavailable: closed');
     expect($('section.dash-widget[aria-label="Requests"] .dash-count')?.textContent).toBe('?');
     expect(rowOf('Scribe')).not.toBeNull();
     expect($('section.dash-widget[aria-label="Budget"] tr.empty')?.textContent).toBe('No agent has a limit.');
@@ -311,7 +335,7 @@ describe('What the Dashboard reads, as the service answers it', () => {
     const { posted } = await mount('#/', { ...routes, ...terminalOf(OTHER),
       '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [running, session(OTHER, SCRIBE, 'Shed')] } })),
       ['POST /runtime/sessions/' + OTHER + '/end']: ok({ session: OTHER, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
-    expect([...(rowOf('Scribe')?.querySelectorAll('.dash-line') ?? [])].map((line) => line.textContent)).toEqual(['on Lab', 'on Shed']);
+    expect([...(rowOf('Scribe')?.querySelectorAll('td')[1].querySelectorAll('.dash-line') ?? [])].map((line) => line.textContent)).toEqual(['on Lab', 'on Shed']);
     expect([...(rowOf('Scribe')?.querySelectorAll('.dash-acts') ?? [])].map((acts) => acts.getAttribute('data-session'))).toEqual([LIVE, OTHER]);
     expect($$('section[aria-label="Running now"] tr[data-running]').map((tr) => [tr.dataset.running, tr.textContent?.includes('on Shed')])).toEqual([[LIVE, false], [OTHER, true]]);
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="watch"]`) ?? null);
@@ -333,15 +357,18 @@ describe('What the Dashboard reads, as the service answers it', () => {
       [SCRIBE]: { sessions: { refusal: 'RuntimeUnavailable', reason: 'no reports store' } },
       [COURIER]: { teams: { refusal: 'TeamsUnavailable', reason: 'the teams store is closed' } },
     })) });
-    expect(cells('Scribe')[1]).toBe('RuntimeUnavailable');
+    expect(cells('Scribe')[1]).toBe('Not known');
+    expect(folded(rowOf('Scribe')?.querySelectorAll('td')[1])).toBe('RuntimeUnavailable: no reports store');
     expect(rowOf('Scribe')?.querySelector('[data-act="start"], [data-act="stop"], [data-act="watch"]')).toBeNull();
     expect(cells('Scribe')[2]).toBe('No limit');
-    const courier = [...($(`tr[data-href="#/file/${COURIER}"]`)?.querySelectorAll('td') ?? [])].map((td) => td.textContent);
-    expect(courier.slice(0, 2)).toEqual(['Courier teams: TeamsUnavailable', 'registered']);
+    const courier = [...($(`tr[data-href="#/file/${COURIER}"]`)?.querySelectorAll('td') ?? [])].map(face);
+    expect(courier.slice(0, 2)).toEqual(['CourierIts teams could not be read', 'Awaiting activation']);
+    expect(folded($(`tr[data-href="#/file/${COURIER}"] td`))).toBe('TeamsUnavailable: the teams store is closed');
     // An agent whose sessions could not be read is not counted as stopped: Running now names it and never says nothing runs.
     const panel = $('section[aria-label="Running now"]');
     expect(panel?.textContent).not.toContain('Nothing is running.');
-    expect(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]')?.textContent).toBe('ScribeWhether it is running could not be read. RuntimeUnavailable');
+    expect(face(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]'))).toBe('ScribeWhether it is running could not be read');
+    expect(folded(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]'))).toBe('RuntimeUnavailable: no reports store');
     expect(rowOf('Scribe')?.querySelector('.dot')?.getAttribute('aria-label')).toBe('not known');
   });
 
@@ -349,8 +376,10 @@ describe('What the Dashboard reads, as the service answers it', () => {
     await mount('#/', { ...routes, '/dashboard': ok(dashboard({}, { requests: { refusal: 'RequestsUnavailable', reason: 'closed' } as unknown as number, drafts: 0, reviews: 0 })) });
     const rows = $$('tr[data-waiting]');
     expect(rows.map((tr) => [tr.querySelector('.dash-num')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
-      ['RequestsUnavailable', '#/requests'], ['0', '#/access/drafts'], ['0', '#/reviews'],
+      ['?', '#/requests'], ['0', '#/access/drafts'], ['0', '#/reviews'],
     ]);
+    expect(face(rows[0])).toBe('?requests to decideHow many could not be read');
+    expect(folded(rows[0])).toBe('RequestsUnavailable: closed');
     expect(text()).not.toContain('Nothing is waiting.');
   });
 

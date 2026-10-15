@@ -66,7 +66,7 @@ function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
         : <table className="dash-table"><tbody>{rows.map((alarm) => {
           return <tr key={alarm.id} data-alarm={alarm.id}>
             <td>{agents.find((row) => row.agent.id === alarm.agent)?.agent.display_name ?? 'Agent name unavailable'}
-              <div className="sec">{alarm.kind === 'seat_stalled' ? 'Seat stopped signalling' : 'Session has no proxy usage'}</div>
+              <div className="sec">{alarm.kind === 'seat_stalled' ? 'Stopped reporting in: it may be stuck' : 'Its model calls are not going through Lys, so its use is not counted'}</div>
               <div className="note">{alarm.detail}</div></td>
             <td className="you-act">{alarm.cleared_at !== null ? 'Cleared' : alarm.acknowledged_by ? <span title={alarm.acknowledged_by}>Acknowledged</span>
               : <Act symbol="approve" name="Acknowledge" word="Acknowledge" disabled={busy !== null} onClick={() => void acknowledge(alarm)} />}</td>

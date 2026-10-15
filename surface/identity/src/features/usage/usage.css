@@ -53,3 +53,8 @@
 /* The spending limit: its heading on its own line, the amount, period and Save under it, the note under those. */
 .usage form.usage-spending { display: block; }
 .usage-amount > span { flex: none; min-width: 0; }
+/* Save beside the amount and period keeps its own width; only the amount and the period stretch. */
+.usage-amount > button { flex: none; min-width: 0; }
+.usage-sent { margin: 0; padding-left: 0; list-style: none; }
+.usage-confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.usage-table .why-not { margin: 0; }

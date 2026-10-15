@@ -112,7 +112,7 @@ describe("An agent's file", () => {
     expect(steps.map((s) => s.querySelector('.when')?.textContent)).toEqual(['22 Sep 09:14', '22 Sep 09:20']);
     expect(steps[0].textContent).toContain('registered, under its person');
     expect(steps[1].classList.contains('now')).toBe(true);
-    expect($$('.card a.mono').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
+    expect($$('.card a[download]').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
   });
 
   it('says what each record line changed, from and to, read from the signed event, and names an earlier issuer’s sign-in', async () => {

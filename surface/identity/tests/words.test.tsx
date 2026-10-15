@@ -49,7 +49,7 @@ function keeping(stale = false): Record<string, Route> {
     ['POST /words/preview']: (body) => {
       const given = body as { slot: string; agent: string; numbers: Record<string, string> };
       expect(given.agent).toBe(SCRIBE);
-      return ok({ slot: given.slot, text: '[Lys context watch] rendered at ' + given.numbers.context_percent, source: 'built_in', contributed: [], missing: [] });
+      return ok({ slot: given.slot, text: '[Lys context watch] rendered at ' + given.numbers.context_percent + '; ' + given.numbers.compaction, source: 'built_in', contributed: [], missing: [] });
     },
     [variables]: () => ok(map),
     ['POST ' + variables]: (body) => {
@@ -74,6 +74,13 @@ function keeping(stale = false): Record<string, Route> {
   };
 }
 
+/** Write into a box that grows, as a person would. */
+async function write(box: Element | null, value: string): Promise<void> {
+  if (!(box instanceof HTMLTextAreaElement)) throw new Error('no text box');
+  const { act } = await import('react');
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set?.call(box, value); box.dispatchEvent(new Event('input', { bubbles: true })); });
+}
+
 async function submit(form: string): Promise<void> {
   const found = $('form[aria-label="' + form + '"]');
   await click(found?.querySelector('button[type="submit"]') ?? $('button[type="submit"][form="' + found?.id + '"]'));
@@ -82,24 +89,25 @@ async function submit(form: string): Promise<void> {
 describe('Words, variables and schedules on the agent file', () => {
   it('shows the five slots resolved, saves an agent-layer warning from revision 0, and previews it', async () => {
     const mounted = await mount(file, keeping());
-    expect($('section[aria-label="Words"]')).not.toBeNull();
-    const heads = [...document.querySelectorAll('section[aria-label="Words"] thead th')].map((th) => th.textContent);
-    expect(heads).toEqual(['Slot', 'What the agent is sent', 'From', "This agent's layer"]);
-    expect(document.querySelectorAll('section[aria-label="Words"] tbody tr')).toHaveLength(5);
+    expect($('section[aria-label="Messages it is sent"]')).not.toBeNull();
+    const heads = [...document.querySelectorAll('section[aria-label="Messages it is sent"] thead th')].map((th) => th.textContent);
+    expect(heads).toEqual(['Message', 'What the agent is sent', 'Comes from', 'Set for this agent']);
+    expect(document.querySelectorAll('section[aria-label="Messages it is sent"] tbody tr')).toHaveLength(5);
     expect(text()).toContain('Not set: the profile names the command.');
 
     const form = $('form[aria-label="Set the context warning words"]');
     const kind = form?.querySelector('select');
     if (!kind) throw new Error('no kind select');
     await (await import('./harness')).choose(kind, 'text');
-    await type(form?.querySelector('input[name="text"]') ?? null, '[Lys context watch] Scribe, at {{context_percent}} percent.');
+    // The agent's own words are a message, so they are written in a box that grows, never a one-line field.
+    await write(form?.querySelector('textarea[name="text"]') ?? null, '[Lys context watch] Scribe, at {{context_percent}} percent.');
     await submit('Set the context warning words');
     const saved = mounted.posted.find((post) => post.path === words + '/context_warning');
     expect(saved?.body).toEqual({ setting: { kind: 'text', text: '[Lys context watch] Scribe, at {{context_percent}} percent.' }, revision: 0 });
     expect(text()).toContain('Context warning words saved.');
 
-    await click($('button[aria-label="Preview the context_warning words"]'));
-    expect($('[aria-label="Preview of context_warning"]')?.textContent).toBe('[Lys context watch] rendered at 50');
+    await click($('button[aria-label="Preview the context warning words"]'));
+    expect($('[aria-label="Preview of the context warning words"]')?.textContent).toBe('[Lys context watch] rendered at 20; compaction is at 40% (400,000 tokens)');
     expect(mounted.posted.filter((post) => post.path === '/words/preview')).toHaveLength(1);
     unmountAll();
   });
@@ -108,10 +116,10 @@ describe('Words, variables and schedules on the agent file', () => {
     await mount(file, keeping(true));
     const form = $('form[aria-label="Set the context warning words"]');
     await (await import('./harness')).choose(form?.querySelector('select') ?? null, 'text');
-    await type(form?.querySelector('input[name="text"]') ?? null, 'Late words.');
+    await write(form?.querySelector('textarea[name="text"]') ?? null, 'Late words.');
     await submit('Set the context warning words');
-    expect(text()).toContain('words_stale');
-    expect(text()).toContain('revision 1, not 0');
+    // The refusal is said in words on the face; its name and the service's reason are kept under Error details.
+    expect(document.querySelector('form[aria-label="Set the context warning words"] [role="alert"] details .refusal-name')?.textContent).toBe('words_stale: agent/context_warning is at revision 1, not 0');
     unmountAll();
   });
 

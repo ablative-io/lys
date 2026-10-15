@@ -94,7 +94,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
             {agent ? (x.state === 'active' ? null : <p className="sec">{x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}</p>)
               : person ? <p className="sec">Answers to <Pill x={person} /></p> : null}
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div className="head-actions">
             {ACTIONS[x.state].includes('activate') ? <Act symbol="start" name={ACTION.activate} word={ACTION_SHORT.activate} tone="primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')} /> : null}
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
             <HeadMenu chosen={changing} choose={(act) => setChanging(changing === act ? null : act)}
@@ -146,7 +146,8 @@ export function IdentityFile() {
       <div className="page">
         <h1>Not found</h1>
         <p className="sub">This person or agent is not in the directory, or is not among the records you can see. Ask the administrator to check your access.</p>
-        <ErrorWords problem={load.refused} /><p className="note mono">{id}</p>
+        <ErrorWords problem={load.refused} />
+        <p><a href="#/people">Open People and agents</a></p>
       </div>
     );
   }

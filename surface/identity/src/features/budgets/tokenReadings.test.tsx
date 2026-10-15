@@ -32,8 +32,8 @@ describe('Per-agent token component reports', () => {
   it('keeps component subtotals and missing calls independently rather than hiding the reported part', () => {
     const tokens = { ...components(), input_tokens: { reported: 100, missing_calls: 2 }, cache_read_tokens: { reported: null, missing_calls: 2 } };
     const reading = tokenPresentations([row('Agent', tokens)], 'day')[0];
-    expect(reading.components.find((each) => each.key === 'input_tokens')?.words).toBe('100 tokens reported · 2 calls reported none');
-    expect(reading.components.find((each) => each.key === 'cache_read_tokens')?.words).toBe('Not reported · 2 calls reported none');
+    expect(reading.components.find((each) => each.key === 'input_tokens')?.words).toBe('100 tokens reported · 2 calls gave no figure');
+    expect(reading.components.find((each) => each.key === 'cache_read_tokens')?.words).toBe('Not reported · 2 calls gave no figure');
     expect(reading.components.find((each) => each.key === 'output_tokens')?.words).toBe('20 tokens reported');
   });
 
@@ -41,7 +41,7 @@ describe('Per-agent token component reports', () => {
     const tokens = { ...components(0), output_tokens: { reported: null, missing_calls: 2 } };
     const reading = tokenPresentations([row('Agent', tokens)], 'day')[0];
     expect(reading.components[0].words).toBe('0 tokens reported');
-    expect(reading.components[1].words).toBe('Not reported · 2 calls reported none');
+    expect(reading.components[1].words).toBe('Not reported · 2 calls gave no figure');
   });
 
   it('keeps agents and their counts separate rather than adding unrelated session usage', () => {
@@ -62,18 +62,18 @@ describe('Per-agent token component reports', () => {
 
   it('names an invalid reported component or missing-call count rather than turning it into zero', () => {
     const negative = tokenPresentations([row('Agent', components(-1))], 'day')[0];
-    expect(negative.unavailable).toBe('TokenComponentsUnreadable: New input has an invalid reported token count');
+    expect(negative.unavailable).toBe('Token figures could not be used: New input has an invalid reported token count');
     expect(negative.components).toEqual([]);
     const missing = { ...components(), input_tokens: { reported: 1, missing_calls: -1 } };
     expect(tokenPresentations([row('Agent', missing)], 'day')[0].unavailable)
-      .toBe('TokenComponentsUnreadable: New input has an invalid missing-call count');
+      .toBe('Token figures could not be used: New input has an invalid missing-call count');
   });
 
   it('names contradictory call and session counts and separately names calls with no session', () => {
     const tokens = { ...components(), calls: 3, sessions: 1, calls_without_session: 1 };
     expect(tokenPresentations([row('Agent', tokens)], 'day')[0].counts).toBe('3 calls · 1 session · 1 call named no session');
     expect(tokenPresentations([row('Agent', { ...tokens, sessions: 3 })], 'day')[0].unavailable)
-      .toBe('TokenComponentsUnreadable: the recorded session count exceeds calls with a session');
+      .toBe('Token figures could not be used: the recorded session count exceeds calls with a session');
   });
 });
 
@@ -96,6 +96,6 @@ describe('Five-hour component reports', () => {
     if (!('refusal' in missing.usage)) missing.usage.figures![0].since_ms = null;
     expect(tokenSummary([missing], 'five_hour')).toContain('period start not reported');
     expect(fiveHourPresentation([row('Agent', components(), 'five_hour', at + 1)])[0].unavailable)
-      .toBe('TokenComponentsUnreadable: the reported period start is invalid');
+      .toBe('Token figures could not be used: the reported period start is invalid');
   });
 });

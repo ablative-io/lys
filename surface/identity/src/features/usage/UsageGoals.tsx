@@ -11,6 +11,8 @@ import { Act } from '../../shell/Act';
 type Props = { agent: string; kind?: 'agent' | 'team'; goals: GoalItem[]; changed: (words: string) => void };
 
 const STANDING = { open: 'Open', met: 'Met', missed: 'Missed', dropped: 'Dropped' };
+/** What kind of thing each row is, as a person says it. */
+const KIND = { goal: 'Goal', expectation: 'Expectation', deliverable: 'Deliverable' };
 
 const COLUMNS = ['12%', '44%', '20%', '10%', '14%'];
 
@@ -46,12 +48,14 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
   const valid = next.length > 0 && !/\p{Cc}/u.test(next);
   const form = 'reword-' + goal.id;
   return <tr>
-    <td>{goal.kind}</td>
+    <td>{KIND[goal.kind] ?? 'Goal'}</td>
     <td>
-      <form id={form} aria-label={'Reword goal ' + goal.id} onSubmit={(event) => {
+      <form id={form} aria-label={'Reword the goal “' + goal.words + '”'} onSubmit={(event) => {
         event.preventDefault(); if (!blocked && valid && next !== goal.words) reword.submit({ operation: operationId(), words: next });
       }}>
-        <input name="words" aria-label={'Words of goal ' + goal.id} value={words} required disabled={blocked} onChange={(event) => setWords(event.target.value)} />
+        {/* The whole goal is shown, however long: the box grows with its words. Enter saves; Shift and Enter starts a new line. */}
+        <textarea name="words" className="usage-grow" rows={1} aria-label="The goal’s words" value={words} required disabled={blocked} onChange={(event) => setWords(event.target.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} />
         {words !== goal.words ? <div className="note">Saved words: {goal.words}</div> : null}
         <ChangeStatus change={reword} />
       </form>
@@ -59,7 +63,7 @@ function GoalRow({ agent, item, changed }: { agent: string; item: GoalItem; chan
     <td>{goal.deadline === null ? 'No deadline' : clock(goal.deadline)}</td>
     <td>{STANDING[item.standing]}</td>
     <td>
-      <label className="tick">Active<input type="checkbox" aria-label={'Goal active ' + goal.id} checked={goal.active} disabled={blocked}
+      <label className="tick">Active<input type="checkbox" aria-label={'The goal “' + goal.words + '” is active'} checked={goal.active} disabled={blocked}
         onChange={(event) => { if (!blocked) activity.submit({ operation: operationId(), active: event.target.checked }); }} /></label>
       <Act symbol="edit" name="Reword this goal" word="Reword" type="submit" form={form} disabled={blocked || !valid || next === goal.words} />
       <ChangeStatus change={activity} />
@@ -84,7 +88,7 @@ function useSetGoal({ agent, kind, changed }: { agent: string; kind: 'agent' | '
   };
   const form = <form id={id} aria-label="Set a goal" className="usage-add-form" onSubmit={(event) => { event.preventDefault(); submit(); }} />;
   const row = <tr className="usage-add-line" data-add="goal">
-    <td>goal</td>
+    <td>{KIND.goal}</td>
     <td><textarea form={id} name="words" className="usage-grow" aria-label={'What the ' + kind + ' is reminded of'} rows={1} value={words} required disabled={change.blocked} placeholder="Type a goal and press Enter" onChange={(event) => setWords(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} /></td>
     <td><input form={id} name="deadline" aria-label="Deadline, empty for none" type="datetime-local" value={deadline} disabled={change.blocked} onChange={(event) => setDeadline(event.target.value)} /></td>
     <td><ChangeStatus change={change} /></td>

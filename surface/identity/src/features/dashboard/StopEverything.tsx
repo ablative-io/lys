@@ -11,6 +11,7 @@ import { useRoleChange } from '../roles/useRoleChange';
 import { PULL, RELEASE, pullSentences, stoppedLine } from './cord';
 import type { CordResult, CordView, Listed } from './cord';
 import { Act } from '../../shell/Act';
+import { Unread } from './Unread';
 
 const PULL_KEY = 'lys.pending.stop-everything';
 const RELEASE_KEY = 'lys.pending.stop-everything.release';
@@ -57,7 +58,7 @@ export function StopEverythingRow({ columns, close, changed }: { columns: number
 /** The one line across the top while everything is stopped; the administrator may let agents start again from it. */
 export function CordLine({ cord, changed, listed }: { cord: CordView | Refused; changed: () => void; listed: Listed }) {
   if (cord instanceof Refused) {
-    return <p className="why-not dash-cord-line" role="alert">Lys could not say whether everything is stopped. <small className="refusal-name">{cord.refusal.refusal}</small></p>;
+    return <div className="dash-cord-line" role="alert"><Unread part={cord} words="Lys could not say whether everything is stopped." /></div>;
   }
   if (!cord.pulled) return null;
   return <div className="dash-cord-line" role="alert">

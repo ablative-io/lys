@@ -14,23 +14,25 @@ describe('Handle withdrawal', () => {
     await click(button('End handle')); expect(posted).toEqual([]);
     await click(button('Confirm end handle'));
     expect(posted).toMatchObject([{ path: '/secrets/drop', body: { handle, operation: expect.stringMatching(/^op-/) } }]);
-    expect(text()).toContain('Use stopped at this broker'); expect(text()).toContain('asked, not yet confirmed'); expect(text()).not.toContain('confirmed by the provider');
+    expect(text()).toContain('The handle has ended: the agent can no longer use the secret through Lys.'); expect(text()).toContain('was asked, and has not confirmed yet'); expect(text()).not.toContain('confirmed it withdrew it too');
+    // Nothing on the receipt is an identifier or an inner outcome name.
+    expect(document.querySelector('section[role="status"]')?.textContent).not.toMatch(/op-[0-9a-f]{32}|Outcome: ended/);
   });
   it('retries the same operation after a lost reply and remount', async () => {
     const first = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': refused(503, 'SecretsUnavailable', 'Unknown outcome') });
     await click(button('End handle')); await click(button('Confirm end handle'));
     unmountAll(); document.body.innerHTML = '';
     const next = await mount('#/file/' + SCRIBE + '/credentials', { ...routes, ['/secrets/handles?holder=' + SCRIBE]: ok({ holder: SCRIBE, handles: [{ id: handle, secret: 'calendar', used: 0, max_uses: 4, not_after_ms: 1990000000000, dropped: true, spend_cap: null, settled: 0, parent: null }] }), 'POST /secrets/drop': receipt });
-    await click(button('Check whether Lys saved it')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('Use stopped at this broker');
+    await click(button('Check whether Lys saved it')); expect(next.posted).toEqual(first.posted); expect(text()).toContain('The handle has ended');
   });
   it('does not accept a receipt for another handle', async () => {
     await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': (body) => ok({ ...(body as Record<string, unknown>), handle: 'wrong', outcome: 'ended', ended: [], stopped_here: true, upstream: 'not_asked' }) });
     await click(button('End handle')); await click(button('Confirm end handle'));
-    expect(text()).toContain('original request is retained'); expect(text()).not.toContain('Use stopped at this broker');
+    expect(text()).toContain('original request is retained'); expect(text()).not.toContain('The handle has ended');
   });
   it('shows the named authority refusal with no success', async () => {
     await mount('#/file/' + SCRIBE + '/credentials', { ...routes, 'POST /secrets/drop': refused(403, 'NotPersonActedFor', 'Only the person acted for may end this handle') });
     await click(button('End handle')); await click(button('Confirm end handle'));
-    expect(text()).toContain('NotPersonActedFor'); expect(text()).not.toContain('Use stopped at this broker'); expect(sessionStorage.length).toBe(0);
+    expect(text()).toContain('NotPersonActedFor'); expect(text()).not.toContain('The handle has ended'); expect(sessionStorage.length).toBe(0);
   });
 });

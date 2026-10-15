@@ -21,7 +21,9 @@ describe('Saved emergency-stop history', () => {
   });
   it('shows the original broker refusal and never calls unconfirmed credentials ended', async () => {
     await mount(route, { ...SERVICE, [path]: ok({ stops: [{ ...stop, credentials_ended: null, credentials_refused: 'BrokerUnavailable: connection refused' }] }) });
-    expect(text()).toContain('Not confirmed: BrokerUnavailable: connection refused');
+    // Not confirmed is said in words; the broker's refusal is kept under Error details, never on the face.
+    expect(text()).toContain('Not confirmed by the credential service.');
+    expect(document.querySelector('[aria-label="Emergency-stop history"] [role="status"] details .refusal-name')?.textContent).toBe('BrokerUnavailable: connection refused');
     expect(text()).not.toContain('handle-ended'); expect(text()).not.toContain(empty);
   });
   it('shows an interrupted request without claiming any effects completed', async () => {

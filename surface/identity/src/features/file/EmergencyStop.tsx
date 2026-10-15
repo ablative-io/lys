@@ -4,6 +4,7 @@ import { operationId } from '../../api';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 /** The answer of `POST /agents/{id}/stop`. */
 export interface StopAnswer {
@@ -34,9 +35,8 @@ export function StopReceipt({ answer }: { answer: StopAnswer }) {
   return <div className="card" role="status" aria-label="Agent suspension recorded">
     <p>The agent’s access is suspended.</p>
     <p>Certificates withdrawn: {answer.certificates_withdrawn.length}.</p>
-    {answer.credentials_ended !== null ? <p>Credentials ended at the credential service: {answer.credentials_ended.length}.</p> : <div className="why-not" role="alert"><p>The credential service did not confirm that credentials ended. Open the Credentials tab and end them after the service answers.</p><p><small className="refusal-name">{answer.credentials_refused}</small></p></div>}
+    {answer.credentials_ended !== null ? <p>Credentials ended at the credential service: {answer.credentials_ended.length}.</p> : <div role="alert"><p className="why-not">The credential service did not confirm that credentials ended. Open the Credentials tab and end them after the service answers.</p>{answer.credentials_refused ? <ErrorWords problem={answer.credentials_refused} /> : null}</div>}
     <p>Sessions asked to end: {answer.sessions_asked.length}. Confirmed stopped by their runtime: {confirmed.length}. Other sessions remain unconfirmed; open the Sessions tab to read their reports.</p>
-    {refused.length ? <p role="alert">A runtime could not complete {refused.length} end request(s). Ask the administrator to check the session error details.</p> : null}
-    <p className="refusal-name">Request {answer.operation}</p>
+    {refused.length ? <p role="alert">{refused.length === 1 ? 'One session could not be asked to end.' : refused.length + ' sessions could not be asked to end.'} Open the Sessions tab to see them, and ask the administrator to check those computers.</p> : null}
   </div>;
 }
