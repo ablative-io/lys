@@ -9,7 +9,9 @@
 //! placed under another, is decided as `/grants/which` decides it
 //! (`grants::decide`, which walks the placement reach), so a product never
 //! recomputes a reach it cannot see. One right is one resource, one grant
-//! and its mode, with every action that grant permits there.
+//! and its mode, with every action that grant permits there. The administrator
+//! instead carries all declared actions on every known resource, under the
+//! administrator standing, coalescing any grants on the same resource.
 //!
 //! The claim is bounded by `provider.rights_bytes`: rights that would take
 //! more are left out whole and the pass says `rights_truncated`, naming the
@@ -25,7 +27,7 @@
 //! or grants that moved under the reading; the binding is signed after the
 //! pass, beside it.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use lys_identity::grants::{Action, ExerciseRequest, Grant, Mode, Resource, Route};
 use lys_identity::projection::Projection;
@@ -40,7 +42,7 @@ use crate::error::ServerError;
 use crate::error_grant_stream::GrantStreamError;
 use crate::error_provider::ProviderError;
 use crate::grants::{Judged, decide_in};
-use crate::grants_batch::unanswered;
+use crate::grants_batch::{ADMINISTRATOR, candidates, unanswered};
 use crate::routes::AppState;
 
 /// A signed pass and the instant it ends.
@@ -172,29 +174,6 @@ fn owned_by(kind: &str, app: &str) -> bool {
     kind.split_once('.').is_some_and(|(owner, _)| owner == app)
 }
 
-/// The ids of `kind` a right of `holder` may stand on: each it holds a grant
-/// on, and each placed under another resource, as `/grants/which` reads them.
-fn candidates(judged: &Judged<'_>, holder: IdentityId, kind: &str) -> BTreeSet<String> {
-    let mut ids: BTreeSet<String> = judged
-        .grants
-        .book()
-        .held_by(holder)
-        .map(|record| record.grant().resource())
-        .filter(|resource| resource.kind() == kind)
-        .map(|resource| resource.id().to_owned())
-        .collect();
-    ids.extend(
-        judged
-            .apps
-            .held()
-            .placements
-            .iter()
-            .filter(|placed| placed.child_kind == kind)
-            .map(|placed| placed.child_id.clone()),
-    );
-    ids
-}
-
 /// The pass's word for a grant's mode.
 const fn mode_of(mode: Mode) -> lys_pass::Mode {
     match mode {
@@ -245,10 +224,26 @@ pub(super) fn rights(
     // decides: every decision is made at the same revision, and the log is
     // not settled again for each candidate and action.
     let revision = judged.grants.read_stamp(required)?.revision();
-    let mut found: BTreeMap<(String, String, String), (lys_pass::Mode, Vec<String>)> =
-        BTreeMap::new();
+    let mut found = EffectiveRights::new();
     for (kind, actions) in kinds {
         for id in candidates(judged, holder, &kind) {
+            if holder == IdentityId::Person(judged.root) && !actions.is_empty() {
+                // Standing subsumes any real grants on the same resource, keeping one full right.
+                found.insert(
+                    (kind.clone(), id, ADMINISTRATOR.to_owned()),
+                    (
+                        lys_pass::Mode::Outright,
+                        actions
+                            .iter()
+                            .map(|action| action.as_str().to_owned())
+                            .collect(),
+                    ),
+                );
+                paths
+                    .entry(ADMINISTRATOR.to_owned())
+                    .or_insert_with(|| vec![ADMINISTRATOR.to_owned()]);
+                continue;
+            }
             let resource = Resource::new(&kind, &id)?;
             for action in &actions {
                 let request = ExerciseRequest {
@@ -295,6 +290,18 @@ pub(super) fn rights(
             }
         }
     }
+    let (read, truncated) = collected_rights(found, paths, cap)?;
+    log_reads(judged, app, truncated);
+    Ok(read)
+}
+
+type EffectiveRights = BTreeMap<(String, String, String), (lys_pass::Mode, Vec<String>)>;
+
+fn collected_rights(
+    found: EffectiveRights,
+    paths: BTreeMap<String, Vec<String>>,
+    cap: Option<usize>,
+) -> Result<(Read, bool), ServerError> {
     let rights = found
         .into_iter()
         .map(|((kind, id, grant), (mode, actions))| Right {
@@ -316,8 +323,7 @@ pub(super) fn rights(
         }
         None => false,
     };
-    log_reads(judged, app, truncated);
-    Ok(read)
+    Ok((read, truncated))
 }
 
 fn log_reads(judged: &Judged<'_>, app: &str, truncated: bool) {

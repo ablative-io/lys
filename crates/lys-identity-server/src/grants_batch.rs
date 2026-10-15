@@ -321,6 +321,44 @@ pub async fn batch(
     )
 }
 
+/// Known candidates for a holder's rights and resource pages. The administrator
+/// reaches every recorded grant resource and both ends of every placement.
+pub(crate) fn candidates<S: lys_log_store::LeafStore>(
+    judged: &Judged<'_, S>,
+    subject: IdentityId,
+    kind: &str,
+) -> BTreeSet<String> {
+    let administrator = subject == IdentityId::Person(judged.root);
+    let mut ids: BTreeSet<String> = judged
+        .grants
+        .book()
+        .held_by(subject)
+        .map(|record| record.grant().resource())
+        .filter(|resource| resource.kind() == kind)
+        .map(|resource| resource.id().to_owned())
+        .collect();
+    if administrator {
+        ids.extend(
+            judged
+                .grants
+                .book()
+                .in_app(lys_identity::grants::owner_of(kind))
+                .map(|record| record.grant().resource())
+                .filter(|resource| resource.kind() == kind)
+                .map(|resource| resource.id().to_owned()),
+        );
+    }
+    for placed in &judged.apps.held().placements {
+        if placed.child_kind == kind {
+            ids.insert(placed.child_id.clone());
+        }
+        if administrator && placed.parent_kind == kind {
+            ids.insert(placed.parent_id.clone());
+        }
+    }
+    ids
+}
+
 /// The ids of `kind` a subject may take `action` on, a page at a time.
 ///
 /// # Errors
@@ -361,23 +399,8 @@ pub async fn which(
             judged.apps.admit_action(&body.kind, action.as_str())?;
             let revision = judged.grants.read_stamp(body.at_least)?.revision();
             let mut degraded = None;
-            let mut candidates: BTreeSet<String> = judged
-                .grants
-                .book()
-                .held_by(subject)
-                .map(|record| record.grant().resource())
-                .filter(|resource| resource.kind() == body.kind)
-                .map(|resource| resource.id().to_owned())
-                .collect();
-            candidates.extend(
-                judged
-                    .apps
-                    .held()
-                    .placements
-                    .iter()
-                    .filter(|placed| placed.child_kind == body.kind)
-                    .map(|placed| placed.child_id.clone()),
-            );
+            let candidates = candidates(&judged, subject, &body.kind);
+            let administrator = subject == IdentityId::Person(judged.root);
             let after = body.after.as_deref();
             let mut ids = Vec::new();
             let mut modes = Vec::new();
@@ -386,28 +409,32 @@ pub async fn which(
                 .into_iter()
                 .filter(|id| after.is_none_or(|after| id.as_str() > after))
             {
-                let request = ExerciseRequest {
-                    caller: subject,
-                    route: Route::Api,
-                    resource: Resource::new(&body.kind, &id)?,
-                    action: action.clone(),
-                };
-                let frame = judged
-                    .prepared
-                    .ok_or_else(|| malformed("the resource question has no prepared reading"))?
-                    .frame(&judged, &request)?;
-                if degraded.is_none() {
-                    degraded = frame
-                        .degradation()
-                        .map(|held| crate::grants::DegradedView::from(held.as_ref()));
-                }
-                let right = match decide_in(&judged, &frame, &request, at) {
-                    Ok((permit, _)) => match mode_of(&judged, permit.grant) {
-                        Some(held) => held,
-                        None => continue,
-                    },
-                    Err(error) if unanswered(&error) => return Err(error.into()),
-                    Err(_) => continue,
+                let right = if administrator {
+                    Mode::Outright
+                } else {
+                    let request = ExerciseRequest {
+                        caller: subject,
+                        route: Route::Api,
+                        resource: Resource::new(&body.kind, &id)?,
+                        action: action.clone(),
+                    };
+                    let frame = judged
+                        .prepared
+                        .ok_or_else(|| malformed("the resource question has no prepared reading"))?
+                        .frame(&judged, &request)?;
+                    if degraded.is_none() {
+                        degraded = frame
+                            .degradation()
+                            .map(|held| crate::grants::DegradedView::from(held.as_ref()));
+                    }
+                    match decide_in(&judged, &frame, &request, at) {
+                        Ok((permit, _)) => match mode_of(&judged, permit.grant) {
+                            Some(held) => held,
+                            None => continue,
+                        },
+                        Err(error) if unanswered(&error) => return Err(error.into()),
+                        Err(_) => continue,
+                    }
                 };
                 if ids.len() == body.page_size {
                     more = true;

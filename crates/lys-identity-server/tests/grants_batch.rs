@@ -266,3 +266,95 @@ async fn the_administrator_is_allowed_on_every_resource_of_an_app_with_no_grant_
     assert_eq!(results[3]["refusal"], "kind_not_registered", "{answer}");
     Ok(())
 }
+
+#[tokio::test]
+async fn which_lists_every_known_administrator_resource_without_grants_with_the_same_paging()
+-> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let administrator = seeded.people[0].id.to_string();
+    let bea = seeded.people[1].id.to_string();
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let credential = registered(&service, &admin, NOTES).await?;
+    let foreign = registered(&service, &admin, identity_contract::apps::FILES).await?;
+    for (app, credential, id, restricted) in [
+        (NOTES, &credential, "a", false),
+        (NOTES, &credential, "b", true),
+        (NOTES, &credential, "c", false),
+        (identity_contract::apps::FILES, &foreign, "foreign", false),
+    ] {
+        ok(post(
+            &service,
+            &format!("/apps/{app}/placements"),
+            Auth::Bearer(credential),
+            &json!({
+                "operation": identity_contract::apps::op()?,
+                "child": {"kind": format!("{app}.channel"), "id": id},
+                "parent": {"kind": format!("{app}.workspace"), "id": "team"},
+                "restricted": restricted,
+            }),
+        )
+        .await?)?;
+    }
+    for (subject, suffix, expected) in [
+        (&administrator, "channel", vec!["a", "b", "c"]),
+        (&administrator, "workspace", vec!["team"]),
+        (&bea, "channel", vec![]),
+        (&bea, "workspace", vec![]),
+        (&agent, "channel", vec![]),
+        (&agent, "workspace", vec![]),
+    ] {
+        for action in ["read", "write"] {
+            let mut ids = Vec::new();
+            let mut after = Value::Null;
+            let mut pages = 0;
+            loop {
+                let page = ok(post(
+                    &service,
+                    "/grants/which",
+                    Auth::Bearer(&credential),
+                    &json!({"subject": subject, "kind": format!("{NOTES}.{suffix}"),
+                        "action": action, "page_size": 2, "after": after}),
+                )
+                .await?)?;
+                let listed = page["ids"].as_array().ok_or("no ids")?;
+                let modes = page["modes"].as_array().ok_or("no modes")?;
+                assert_eq!(modes.len(), listed.len());
+                assert!(modes.iter().all(|mode| mode == "outright"));
+                ids.extend(listed.iter().filter_map(Value::as_str).map(str::to_owned));
+                pages += 1;
+                after = page["next"].clone();
+                if after.is_null() {
+                    break;
+                }
+            }
+            assert_eq!(ids, expected, "{subject} {suffix} {action}");
+            assert_eq!(pages, expected.len().div_ceil(2).max(1));
+        }
+    }
+    refused(
+        &post(
+            &service,
+            "/grants/which",
+            Auth::Bearer(&credential),
+            &json!({"subject": administrator, "kind": format!("{NOTES}.undeclared"),
+                "action": "read", "page_size": 2}),
+        )
+        .await?,
+        403,
+        "kind_not_registered",
+    )?;
+    // A resource recorded only by another holder's grant is known to the administrator too.
+    let doc = format!("{NOTES}.doc");
+    ok(root(&service, &admin, &bea, (&doc, "recorded"), "reader").await?)?;
+    let page = ok(post(
+        &service,
+        "/grants/which",
+        Auth::Bearer(&credential),
+        &json!({"subject": administrator, "kind": doc, "action": "write", "page_size": 2}),
+    )
+    .await?)?;
+    assert_eq!(page["ids"], json!(["recorded"]));
+    assert_eq!(page["modes"], json!(["outright"]));
+    Ok(())
+}
