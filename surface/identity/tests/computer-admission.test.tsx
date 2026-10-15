@@ -64,7 +64,7 @@ describe('Choosing where an agent can run', () => {
   it('tells an administrator to choose which agents may run, never that changes are not served', async () => {
     await open();
     const section = $('[aria-label="Where can Scribe run?"]');
-    expect(section?.textContent).toContain('Choose which agents may run on this computer.');
+    expect(section?.textContent).toContain('Tick each computer Scribe may run on.');
     expect(section?.textContent).not.toContain('does not serve');
     expect(section?.textContent).not.toContain('An administrator changes computer permissions.');
   });
@@ -91,7 +91,7 @@ describe('Choosing where an agent can run', () => {
     const { posted } = await open(service({ '/surface-contract': schema }));
     const section = $('[aria-label="Where can Scribe run?"]');
     expect(section?.textContent).not.toContain('does not serve');
-    expect(section?.textContent).toContain('Choose which agents may run on this computer.');
+    expect(section?.textContent).toContain('Tick each computer Scribe may run on.');
     if (name === 'absent') expect(section?.querySelector('a[href="#/network"]')).not.toBeNull();
     else expect(section?.querySelector('details .refusal-name')).not.toBeNull();
     expect(tick().disabled).toBe(true);

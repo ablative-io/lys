@@ -31,7 +31,7 @@ const events = [
 describe('A call, read apart', () => {
   it('reads a request into its settings, its system prompt, its tools by name and each turn\'s pieces in order', () => {
     const went = readIn(request);
-    expect(went?.settings).toEqual([['Model', 'claude-fable-5-1'], ['Most tokens out', '32000'], ['Streamed', 'true'], ['Thinking', 'adaptive'], ['Effort', 'high']]);
+    expect(went?.settings).toEqual([['Model', 'claude-fable-5-1'], ['Most tokens out', '32000'], ['Streamed', 'yes'], ['Thinking', 'adaptive'], ['Effort', 'high']]);
     expect(went?.system.map((each) => each.text)).toEqual(['You are Scribe.', 'Be brief.']);
     expect(went?.tools).toEqual(['Bash', 'Read']);
     expect(went?.turns.map((turn) => [turn.role, turn.pieces.map((each) => each.kind)])).toEqual([['user', ['text']], ['assistant', ['thinking', 'text', 'tool']], ['user', ['result', 'other']]]);
@@ -82,24 +82,27 @@ describe('A call opened on the proxy view', () => {
     await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1', routes);
     expect($$('[data-shows]').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Read', 'true'], ['Request', null], ['Response', null], ['Headers', null]]);
     const went = $('[data-read="in"]');
-    expect(went?.querySelector('.proxy-call-line')?.textContent).toBe('Model: claude-fable-5-1 · Most tokens out: 32000 · Streamed: true · Thinking: adaptive · Effort: high');
+    expect(went?.querySelector('.proxy-call-line')?.textContent).toBe('Model: claude-fable-5-1 · Most tokens out: 32000 · Streamed: yes · Thinking: adaptive · Effort: high');
     expect(went?.querySelector('[data-part="system"] summary')?.textContent).toBe('System prompt 2 parts · 24 characters');
     expect(went?.querySelector('[data-part="tools"]')?.textContent).toBe('Tools offered 2Bash, Read');
     const turns = [...(went?.querySelectorAll('[data-part="turn"]') ?? [])] as HTMLDetailsElement[];
     expect(turns.map((each) => [each.querySelector('summary')?.textContent, each.open])).toEqual([
-      ['1. user 15 characters', false], ['2. assistant 8 characters · asks for Bash', false], ['3. user 11 characters · 1 tool result', true]]);
+      ['1. User 15 characters', false], ['2. Model 8 characters · asks for Bash', false], ['3. User 11 characters · 1 tool result', true]]);
     expect(turns[1].querySelector('[data-piece="thinking"]')?.textContent).toBe('Thinking, which the provider did not show.');
     expect(turns[1].querySelector('[data-piece="tool"]')?.textContent).toBe('Tool asked for: Bash' + JSON.stringify({ command: 'ls' }, null, 2));
     expect(turns[2].querySelector('[data-piece="result"]')?.textContent).toBe('Tool resulta.txt\nb.txt');
     const came = $('[data-read="out"]');
     expect(came?.querySelector('.proxy-words')?.textContent).toBe('Two files: a and b.');
     expect(came?.querySelector('[data-piece="tool"]')?.textContent).toBe('Tool asked for: Read' + JSON.stringify({ file_path: 'a.txt' }, null, 2));
-    expect(came?.querySelector('[data-part="stop"]')?.textContent).toBe('Stopped: tool_use');
+    expect(came?.querySelector('[data-part="stop"]')?.textContent).toBe('Stopped because it asked to use a tool.');
+    // The provider's own word stays on the line, for whoever compares it with the JSON.
+    expect(came?.querySelector('[data-part="stop"]')?.getAttribute('title')).toBe('tool_use');
   });
 
   it('says the provider\'s error by its own name for a call it refused, and points at the JSON for a shape it does not set out', async () => {
     await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c2', routes);
-    expect($('.proxy-call-line')?.textContent).toContain('unrecorded · HTTP 429');
+    expect($('.proxy-call-line')?.textContent).toContain('No complete response · HTTP 429');
+    expect($('.proxy-call-line')?.textContent).not.toContain('unrecorded');
     expect($('[data-read="out"] [data-part="error"]')?.textContent).toBe('The provider answered an error: rate_limit_error, "Error".');
     expect($('[data-read="in"] [data-part="turn"] .proxy-words')?.textContent).toBe('quota');
     await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c3', routes);

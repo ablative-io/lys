@@ -59,7 +59,8 @@ it('offers an own computer connection code and names a refused code', async () =
     { ['POST /network/machines/' + machine.id + '/join-code']: refused(403, 'not_your_computer', 'this computer belongs to someone else') });
   await click($('button[aria-label="Get a new connection code"]'));
   expect(posted.at(-1)?.path).toBe('/network/machines/' + machine.id + '/join-code');
-  expect(connections.at(-1)?.failure).toContain('not_your_computer: this computer belongs to someone else');
+  expect(connections.at(-1)?.failure).toBe('You do not manage this computer. Ask its owner or the administrator to make the change.');
+  expect(connections.at(-1)?.detail).toBe('not_your_computer: this computer belongs to someone else');
 });
 
 it('offers only the person’s own agents on their computer and sends an allowance', async () => {

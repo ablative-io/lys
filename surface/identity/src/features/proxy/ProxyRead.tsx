@@ -15,6 +15,17 @@ function Shown({ piece }: { piece: Piece }) {
   return <div className="proxy-piece" data-piece="other"><b>{piece.label}</b><Json value={piece.json} /></div>;
 }
 
+/** Who spoke a turn, in words: the user (the person or program driving the agent) or the model. */
+const ROLES: Record<string, string> = { user: 'User', assistant: 'Model', system: 'System' };
+const roleWords = (role: string): string => ROLES[role] ?? role.charAt(0).toUpperCase() + role.slice(1);
+
+/** Why the model stopped, in words. */
+const STOPS: Record<string, string> = {
+  end_turn: 'the model finished its answer', max_tokens: 'it reached the most tokens it was allowed to write', stop_sequence: 'it reached a stop sequence',
+  tool_use: 'it asked to use a tool', pause_turn: 'the provider paused a long turn', refusal: 'the model declined to answer',
+};
+export const stopWords = (stop: string): string => STOPS[stop] ?? stop.replace(/_/g, ' ');
+
 /** What a turn holds, said in a few words for its heading. */
 const holds = (pieces: Piece[]): string => {
   const [tools, results] = [pieces.filter((each) => each.kind === 'tool'), pieces.filter((each) => each.kind === 'result')];
@@ -32,14 +43,14 @@ export function ProxyRead({ request, response, unreadable }: { request: unknown;
         {went.system.length ? <details data-part="system"><summary>System prompt <span className="dim">{many(went.system.length, 'part')} · {many(chars(went.system), 'character')}</span></summary>{went.system.map((each, index) => <Shown key={index} piece={each} />)}</details> : null}
         {went.tools.length ? <details data-part="tools"><summary>Tools offered <span className="dim">{went.tools.length.toLocaleString('en-AU')}</span></summary><p className="proxy-words">{went.tools.join(', ')}</p></details> : null}
         {went.turns.map((turn, index) => <details key={index} data-part="turn" data-role={turn.role} open={index === went.turns.length - 1 || index === asked}>
-          <summary>{index + 1}. {turn.role} <span className="dim">{holds(turn.pieces)}</span></summary>{turn.pieces.map((each, at) => <Shown key={at} piece={each} />)}</details>)}
+          <summary>{index + 1}. {roleWords(turn.role)} <span className="dim">{holds(turn.pieces)}</span></summary>{turn.pieces.map((each, at) => <Shown key={at} piece={each} />)}</details>)}
       </> : <p className="dim" role="status">{request === null || request === undefined ? 'This call has no request that can be read as JSON.' + (unreadable.request ? ' ' + unreadable.request : '') : 'This request is not in a shape this view sets out. It is whole under Request.'}</p>}
     </section>
     <section data-read="out" aria-label="What came out"><h3>What came out</h3>
       {came ? <>
         {came.error ? <p className="why-not" role="status" data-part="error">The provider answered an error: {came.error.type}{came.error.message ? ', "' + came.error.message + '"' : ''}.</p> : null}
         {came.pieces.map((each, index) => <Shown key={index} piece={each} />)}
-        {came.stop ? <p className="proxy-call-line" data-part="stop">Stopped: {came.stop}</p> : null}
+        {came.stop ? <p className="proxy-call-line" data-part="stop" title={came.stop}>Stopped because {stopWords(came.stop)}.</p> : null}
         {!came.error && !came.pieces.length ? <p className="dim">The response holds no content.</p> : null}
       </> : <p className="dim" role="status">{response === null || response === undefined ? 'This call has no response that can be read as JSON.' + (unreadable.response ? ' ' + unreadable.response : '') : 'This response is not in a shape this view sets out. It is whole under Response.'}</p>}
     </section>

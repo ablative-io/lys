@@ -10,9 +10,10 @@ import { confirmRunner, matchesMachine, savedMachine } from './contract';
 import type { Machine, NetworkView, PendingMachine } from './contract';
 import { ErrorWords } from '../people/Words';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
-import { askJoinCode, joinFailure } from './JoinCode';
+import { askJoinCode, joinDetail, joinFailure } from './JoinCode';
 import type { Connecting, JoinCode } from './JoinCode';
 import { Act } from '../../shell/Act';
+import './network.css';
 
 export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
   let current = initial;
@@ -76,8 +77,9 @@ function useAddition({ person, agent, agents = [], changed, remote = false, conn
       if (current.remote) {
         let given: JoinCode | null = null;
         let failure = '';
-        try { given = await askJoinCode(machine.id); } catch (error) { failure = joinFailure(error); }
-        connect?.({ machine: machine.id, name: current.body.name, given, failure, at: 'row' });
+        let detail = '';
+        try { given = await askJoinCode(machine.id); } catch (error) { failure = joinFailure(error); detail = joinDetail(error); }
+        connect?.({ machine: machine.id, name: current.body.name, given, failure, at: 'row', ...(detail ? { detail } : {}) });
         changed(current.body.name + (given ? ' was added. Run the command below on that computer to connect it.' : ' was added. It is not connected yet.'), machine);
       } else changed(current.body.name + ' was added. Its runner is recorded.', machine);
     } catch (error) {
@@ -120,10 +122,11 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
 }
 
 /**
- * The computers table's own last row, which adds one: the name under Computer, how the addition stands under Status,
- * which computer it is in a cell of its own, the button in the last column.
+ * The computers table's own last row, which adds one. It spans the whole table, so its name box is wide enough for a
+ * computer's name and its controls are never cut off by the columns above: the name, which computer it is, and Add,
+ * with how the addition stands under them.
  */
-export function AddComputerRow({ person, agents, changed, name, connect, selfService = false }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean }) {
+export function AddComputerRow({ person, agents, changed, name, connect, selfService = false, width = 4 }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean; width?: number }) {
   const [chosen, setChosen] = useState<'this' | 'another'>(selfService ? 'another' : 'this');
   const { submit, blocked, standing, pendingRemote } = useAddition({ person, agents, changed, remote: chosen === 'another', connect });
   // A kept addition is finished as it was begun, whatever is chosen now.
@@ -133,12 +136,18 @@ export function AddComputerRow({ person, agents, changed, name, connect, selfSer
   // This computer starts with the name it gives itself; another computer's name is the person's to type.
   const offered = where === 'this' ? host : '';
   return <tr className="listing-add" data-add="computer">
-    <td><form id={id} aria-label="Add a computer" onSubmit={submit}><input key={where + ':' + offered} ref={name} name="name" aria-label="Name of the computer to add" placeholder="Name" defaultValue={offered} disabled={blocked} /></form></td>
-    <td>{standing}</td>
-    <td><div className="seg" role="group" aria-label="Which computer">
-      {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>
-        <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked || (selfService && key === 'this')} onClick={() => setChosen(key)}>{label}</button>)}
-    </div></td>
-    <td><Act symbol="add" name={where === 'another' ? 'Add and get its code' : 'Add this computer'} word="Add" tone="primary" type="submit" form={id} disabled={blocked} /></td>
+    <td colSpan={width}><div className="add-computer">
+      <form id={id} className="add-computer-name" aria-label="Add a computer" onSubmit={submit}>
+        <label className="field">Add a computer<input key={where + ':' + offered} ref={name} name="name" aria-label="Name of the computer to add" placeholder="For example, Studio Mac mini" defaultValue={offered} disabled={blocked} /></label>
+      </form>
+      <div className="add-computer-which"><div className="seg" role="group" aria-label="Which computer">
+        {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>
+          <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked || (selfService && key === 'this')}
+            title={selfService && key === 'this' ? 'Only an administrator adds the computer Lys runs on.' : undefined} onClick={() => setChosen(key)}>{label}</button>)}
+      </div></div>
+      <Act symbol="add" name={where === 'another' ? 'Add and get its code' : 'Add this computer'} word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
+      <p className="hint add-computer-hint">{where === 'another' ? 'You get a one-time code and a command to run on that computer to connect it.' : 'The computer Lys itself runs on, named as it names itself.'}{selfService ? ' Only an administrator adds the computer Lys runs on.' : ''}</p>
+    </div>
+    <div className="add-computer-standing">{standing}</div></td>
   </tr>;
 }

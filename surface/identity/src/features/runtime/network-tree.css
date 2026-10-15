@@ -45,3 +45,6 @@ details:not([open]) > .network-fold::before { content: '▸'; }
   .network-pane { width: 100%; min-height: 320px; flex: 1; padding-top: 12px; }
   .network-divider { display: none; }
 }
+/* A seat that is not running: what to do, and Start at its own size, never a bar across the pane. */
+.network-start { padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.network-start .note { margin: 0; }

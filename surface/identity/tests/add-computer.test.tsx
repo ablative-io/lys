@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { $, serve } from './harness';
+import { $, $$, serve } from './harness';
 import { ADA, ARCHIVIST, COURIER, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 /** Ada's own agents not retired: an administrator's computer is added for them. */
@@ -263,14 +263,19 @@ describe('Adding another computer', () => {
   const kept = () => Object.keys(sessionStorage).map((key) => sessionStorage.getItem(key) ?? '').join('\n');
   const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 
-  it('offers this computer or another in a cell of its own, this one chosen first', async () => {
+  it('offers this computer or another in one cell across the whole table, labelled, this one chosen first, nothing cut off by the columns', async () => {
     await open(service());
     const cells = [...($('tr[data-add="computer"]')?.children ?? [])];
-    const choice = cells[2]?.querySelector('[aria-label="Which computer"]');
+    expect(cells).toHaveLength(1);
+    expect(cells[0].getAttribute('colspan')).toBe(String($$('#screen thead th').length));
+    expect(cells[0].querySelector('label')?.textContent).toContain('Add a computer');
+    const choice = cells[0]?.querySelector('[aria-label="Which computer"]');
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
     await choose('Another computer');
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
-    expect([cells[3]?.querySelector('button')?.getAttribute('aria-label'), cells[3]?.textContent]).toEqual(['Add and get its code', 'Add']);
+    const add = cells[0].querySelector('button[type="submit"]');
+    expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add and get its code', 'Add']);
+    expect(cells[0].textContent).toContain('You get a one-time code and a command to run on that computer to connect it.');
   });
 
   it('names it, asks for its code, and shows the command and the code once, each with Copy, keeping neither', async () => {

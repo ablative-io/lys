@@ -60,15 +60,21 @@ it('C738 stops through the seat route and shows confirmed end without a terminal
   await render('first', 'online-idle', 'managed');
   await act(async () => { (document.querySelector('button[aria-label="Stop first"]') as HTMLElement).click(); });
   expect(posted.find((each) => each.path === '/seats/first/stop')?.body).toEqual({ operation: expect.any(String), force: false });
-  expect(document.body.textContent).toContain('Session session-first ended');
+  expect(document.querySelector('[role="status"]:not(.network-reason):not(.terminal-head [role="status"])')?.textContent).toBe('Stopped.');
   expect(document.querySelector('.terminal-screen')).toBeNull();
 });
 it('C738 offline and unknown leaves show their state, reason and Start without mounting a terminal', async () => {
   await render('first', 'offline');
   expect(document.querySelector('button[aria-label="Start first"]')).not.toBeNull();
+  // The pane says what to do, not just a bare button.
+  expect(document.querySelector('.network-start .note')?.textContent).toContain('is not running. Start it to watch its terminal here.');
+  expect(document.querySelector('.terminal-head [role="status"]')?.textContent).toBe('Offline');
   expect(document.querySelector('.terminal-screen')).toBeNull();
   await act(async () => { root?.render(<NetworkTreePane key="unknown" seat={seat('unknown', 'unknown') as never} name="unknown" reason="runner_unreachable: socket absent" change={vi.fn()} />); });
-  expect(document.body.textContent).toContain('runner_unreachable: socket absent');
+  // The reason is said in plain words; the service's own words, refusal name and all, stay in its title.
+  expect(document.querySelector('.network-reason')?.textContent).toBe('Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+  expect(document.querySelector('.network-reason')?.getAttribute('title')).toBe('runner_unreachable: socket absent');
+  expect(document.querySelector('.terminal-head [role="status"]')?.textContent).toBe('Unknown: its runner could not be read');
   expect(document.querySelector('.terminal-screen')).toBeNull();
   // Whether an unknown seat runs was not read: Start is offered, and the service refuses it if the seat is running.
   expect(document.querySelector('button[aria-label="Start unknown"]')).not.toBeNull();
@@ -94,17 +100,18 @@ it('C738 swaps managed streams, aborts the old read once and refuses lines from 
   expect(aborted).toHaveBeenCalledTimes(1);
   serve({ 'POST /seats/third/attach': ok({ seat: seat('third'), session: 'wrong-session', cursor: 1, ended: true, lines: [{ at: 1, kind: 'assistant', text: 'wrong output' }] }) });
   await render('third', 'online-idle', 'managed');
-  expect(document.body.textContent).toContain('SeatAttachUnreadable');
+  expect(document.body.textContent).toContain('Lys answered, but the agent\'s output could not be read. Choose the seat again to reconnect.');
   expect(document.body.textContent).not.toContain('wrong output');
 });
 it('C738 keeps the terminal while stop is unconfirmed and never invents a missing transport', async () => {
   serve({ 'POST /seats/first/stop': ok({ seat: seat('first', 'online-idle', 'managed'), session: 'session-first', ended: false }) });
   await render('first', 'online-idle', 'managed');
   await act(async () => { (document.querySelector('button[aria-label="Stop first"]') as HTMLElement).click(); });
-  expect(document.body.textContent).toContain('has not confirmed it ended');
+  expect(document.body.textContent).toContain('Asked to stop. Its computer has not yet confirmed it stopped.');
   expect(document.querySelector('[role="log"]')).not.toBeNull();
   await render('second', 'online-idle', '');
-  expect(document.body.textContent).toContain('SeatTransportUnknown');
+  expect(document.body.textContent).toContain('This seat is running, but Lys does not know how to show its terminal.');
+  expect(document.body.textContent).not.toContain('SeatTransportUnknown');
   expect(document.querySelector('.terminal-screen')).toBeNull();
   expect(document.querySelector('[role="log"]')).toBeNull();
 });

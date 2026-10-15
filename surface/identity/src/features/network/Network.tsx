@@ -2,7 +2,9 @@ import { readTogether } from '../../reads';
 /** The Network: the computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { Refused, api, request, useLoad } from '../../api';
+import { api, request, useLoad } from '../../api';
+import { readRoles } from '../roles/AssignedRoles';
+import { roleWords } from './allowed';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
 import { counted } from '../../shell/count';
@@ -31,7 +33,7 @@ import { PageHeader } from '../../shell/PageHeader';
  * just now (null when it has none) and why not, and whether a connection code for it waits to be used; or not read at
  * all, with why in `reason`.
  */
-export interface Asked { asked: 'asking' | 'answered' | 'unread'; runner: RunnerRecord | null; answers: boolean | null; refusal: string | null; reason: string | null; joining: boolean }
+export interface Asked { asked: 'asking' | 'answered' | 'unread'; runner: RunnerRecord | null; answers: boolean | null; refusal: string | null; reason: string | null; joining: boolean; problem?: unknown }
 
 /** One computer with what Lys knows of it now. */
 export interface Computer extends Asked { machine: Machine; running: RuntimeSession[] | null }
@@ -49,7 +51,7 @@ function readRunner(answer: RunnerAnswer): Asked {
 /** Ask one computer's runner, handing what is known of it to `kept`. */
 function askRunner(machine: string, signal: AbortSignal, kept: (asked: Asked) => void): void {
   request<RunnerAnswer>('/network/machines/' + encodeURIComponent(machine) + '/runner', undefined, 'POST', signal).then(readRunner).then(kept,
-    (problem: unknown) => kept({ ...ASKING, asked: 'unread', reason: problem instanceof Refused ? problem.refusal.refusal + ': ' + problem.refusal.reason : problem instanceof Error ? problem.message : String(problem) }));
+    (problem: unknown) => kept({ ...ASKING, asked: 'unread', reason: problemWords(problem), problem }));
 }
 
 /**
@@ -115,16 +117,18 @@ export function Network() {
     teams: readTeams().then((teams) => ({ teams, refused: '' }), (problem: unknown) => ({ teams: [], refused: problemWords(problem) })),
     // The machines the joins made, and what each holds (ACCESS-005 R2): the administrator's to read; anyone else is told nothing of them.
     machines: readIdentities().then((list): Machines => ({ list, refused: '' }), (problem: unknown): Machines => ({ list: [], refused: problemWords(problem) })),
+    // Roles are read only to say a role allowance by its name; a refused read leaves those rows saying "a role".
+    roles: readRoles().then((answer) => new Map(answer.roles.map((role) => [role.id, role.name])), () => new Map<string, string>()),
   }), 'network:' + revision);
   return <div className="page fill">
-    <Gate load={load} title="Network" ok={(data) => <Computers {...data} teams={data.teams.teams} teamsRefused={data.teams.refused} machines={data.machines} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
+    <Gate load={load} title="Network" ok={(data) => <Computers {...data} roleNames={data.roles} teams={data.teams.teams} teamsRefused={data.teams.refused} machines={data.machines} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
   </div>;
 }
 
 /** The machines as read for the page: every one, or none and why. */
 type Machines = { list: MachineIdentity[]; refused: string };
 
-function Computers({ computers: read, people, me, teams, teamsRefused, machines, notice, connecting, connect, refresh }: { computers: Awaited<ReturnType<typeof readComputers>>; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; machines: Machines; notice: string;
+function Computers({ computers: read, people, me, teams, teamsRefused, machines, notice, connecting, connect, refresh, roleNames }: { computers: Awaited<ReturnType<typeof readComputers>>; people: PeopleView; me: { person: { id: string } }; teams: OrgTeam[]; teamsRefused: string; machines: Machines; notice: string; roleNames: Map<string, string>;
   connecting: Connecting | null; connect: (next: Connecting | null) => void; refresh: (message: string) => void }) {
   const admin = people.scope === 'directory';
   const [whose, setWhose] = useWhose(admin);
@@ -155,7 +159,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
     { head: 'Computer', cell: (computer) => computer.machine.name },
     { head: 'Status', cell: (computer) => { const now = status(computer); return <><span className={'dot ' + (now.state === 'up' ? 's-active' : now.state === 'down' ? 's-suspended' : 's-retired')} />{now.words}</>; } },
     { head: 'Running now', cell: (computer) => computer.running === null ? <span className="dim">cannot tell</span> : computer.running.length ? counted(computer.running.length, 'agents') : <span className="dim">nothing</span> },
-    { head: 'May start here', cell: (computer) => <span className="sec">{mayStart(computer.machine)}</span> },
+    { head: 'May start here', cell: (computer) => <span className="sec">{mayStart(computer.machine, roleNames)}</span> },
   ];
   const changed = (message: string) => { refresh(message); };
   return <>
@@ -177,7 +181,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
         selected={selected?.machine.id ?? null} select={(computer) => setPicked(computer.machine.id)} open={(computer) => setPicked(computer.machine.id)}
         foot={<>
           {connecting?.at === 'row' ? <ConnectRow connecting={connecting} connect={connectHere} done={done} width={columns.length} /> : null}
-          <AddComputerRow person={me.person.id} agents={people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state !== 'retired').map((agent) => agent.id) ?? []} selfService={!admin} changed={changed} name={name} connect={connect} />
+          <AddComputerRow width={columns.length} person={me.person.id} agents={people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state !== 'retired').map((agent) => agent.id) ?? []} selfService={!admin} changed={changed} name={name} connect={connect} />
         </>}
         tools={<>
           <WhoseSelect whose={whose} set={setWhose} teams={teams} admin={admin} />
@@ -185,18 +189,18 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
           {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
         </>} />
       <div className="pane">
-        {selected ? <MachineDetail key={selected.machine.id} computer={selected} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed}
+        {selected ? <MachineDetail key={selected.machine.id} computer={selected} roleNames={roleNames} admin={admin} me={me.person.id} teams={teams} names={names} changed={changed}
           machines={admin && !machines.refused ? machines.list : null}
-          connecting={connecting} connect={connectHere} done={done} /> : computers.length ? <p className="dim">Choose a computer.</p> : null}
+          connecting={connecting} connect={connectHere} done={done} /> : computers.length ? <p className="dim">{scoped.length ? 'Choose a computer.' : 'No computer matches what is shown. Choose Everyone and All to see every computer.'}</p> : null}
       </div>
     </div>
   </>;
 }
 
 /** Who may start agents on a computer, every one named. */
-export function mayStart(machine: Machine): string {
+export function mayStart(machine: Machine, roleNames: Map<string, string> = new Map()): string {
   if (machine.runtime === null) return 'Lys does not start agents here.';
-  const roles = (machine.may_run_roles ?? []).map((role) => 'anyone holding ' + role);
+  const roles = (machine.may_run_roles ?? []).map((role) => 'anyone holding ' + roleWords(role, roleNames));
   const all = [...new Map(machine.may_run.map(agent => [agent.id, agent.display_name])).values(), ...roles];
   return all.length ? all.join(', ') : 'No agent may start here yet.';
 }

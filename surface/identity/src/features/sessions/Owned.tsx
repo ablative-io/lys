@@ -2,6 +2,8 @@
 import { send, useLoad } from '../../api';
 import { clockMs } from '../file/time';
 import { Gate } from '../signin/Gate';
+import { ErrorWords } from '../people/Words';
+import { TableScroll } from '../../shell/Listing';
 
 /** crates/lys-identity-server/src/seat_supervision.rs: OwnedSeatView and OwnedSeats. */
 export interface OwnedSeatView {
@@ -19,24 +21,24 @@ export interface OwnedSeatView {
 export interface OwnedSeats { owners: OwnedSeatView[]; runner: 'read' | 'unknown'; reason?: string }
 
 function reach(view: OwnedSeatView): string {
-  if (!view.unreachable) return 'Live: proved at the kernel';
+  if (!view.unreachable) return 'Running';
   switch (view.unreachable.why) {
-    case 'exited': return 'Unreachable: no process has the owner\'s pid';
-    case 'pid_reused': return 'Unreachable: the pid belongs to another process (' + (view.unreachable.found ?? '') + ')';
-    default: return 'Unreachable: the kernel could not be asked (' + (view.unreachable.reason ?? '') + ')';
+    case 'exited': return 'Ended: its process is gone';
+    case 'pid_reused': return 'Ended: its process number now belongs to another program' + (view.unreachable.found ? ' (' + view.unreachable.found + ')' : '');
+    default: return 'Not known: the computer could not be asked' + (view.unreachable.reason ? ' (' + view.unreachable.reason + ')' : '');
   }
 }
 
 export function OwnedList() {
   const load = useLoad(() => send<OwnedSeats>('GET', '/seats/owned'), '/seats/owned');
-  return <Gate load={load} title="the owned seats" renderError={(error) => <p role="alert" className="why-not">The owned seats could not be read: {String(error)}</p>} ok={(view) => <>
-    {view.runner === 'unknown' ? <p role="status" className="note">The runner could not be read{view.reason ? ': ' + view.reason : ''}. Every owner below is as last recorded.</p> : null}
-    {view.owners.length ? <table>
-      <thead><tr><th>Seat</th><th>Session</th><th>Generation</th><th>Build</th><th>Owner</th><th>Established</th></tr></thead>
+  return <Gate load={load} title="the owned seats" renderError={(error) => <><p className="why-not">The seat processes could not be read.</p><ErrorWords problem={error} /></>} ok={(view) => <>
+    {view.runner === 'unknown' ? <p role="status" className="note">Lys could not reach the runner{view.reason ? ': ' + view.reason : ''}. Each process below is as last recorded.</p> : null}
+    {view.owners.length ? <TableScroll label="Seat processes"><table>
+      <thead><tr><th>Seat</th><th>Session</th><th>Start number</th><th>Lys build</th><th>Process</th><th>Since</th></tr></thead>
       <tbody>{view.owners.map((owner) => <tr key={owner.session}>
         <td>{owner.seat}</td><td>{owner.session}<p className="note">Conversation {owner.conversation}</p></td><td>{owner.generation}</td><td>{owner.build}</td>
-        <td>pid {owner.owner_pid}<p className="note">{reach(owner)}</p></td><td>{clockMs(owner.established_at)}</td>
+        <td>Process {owner.owner_pid}<p className="note">{reach(owner)}</p></td><td>{clockMs(owner.established_at)}</td>
       </tr>)}</tbody>
-    </table> : <p className="note">This runner has started no seat owner.</p>}
+    </table></TableScroll> : <p className="note">No seat process has been started on this computer.</p>}
   </> } />;
 }

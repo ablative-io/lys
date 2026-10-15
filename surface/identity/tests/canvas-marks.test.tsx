@@ -244,7 +244,10 @@ describe('The canvas is the person\'s own', () => {
     expect([one.style.left, one.style.top]).toEqual(['316px', '260px']);
     expect(location.hash).toBe('#/canvas?panel=layouts');
     expect($('.canvas-pop')?.className).toContain('open');
+    // Removing a layout asks first; nothing is removed until the person confirms.
     await click($('[data-act="remove-layout"]'));
+    expect($$('.canvas-layouts tbody tr[data-layout]')).toHaveLength(1);
+    await click($('[data-act="confirm-remove-layout"]'));
     expect($$('.canvas-layouts tbody tr[data-layout]')).toHaveLength(0);
     expect(text()).toContain('No layout is saved yet.');
   });
@@ -253,7 +256,8 @@ describe('The canvas is the person\'s own', () => {
     await mount('#/canvas?view=canvas', { ...routes, '/canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
     await click($('[data-act="layouts"]'));
     expect(text()).toContain('Kept in this browser only');
-    expect(text()).toContain('CanvasUnavailable: the canvas store is not open');
+    expect(text()).toContain('Lys is not keeping your canvas, so it will not follow you to another computer. Lys could not answer: the canvas store is not open');
+    expect(text()).not.toContain('CanvasUnavailable');
     await type($('.canvas-layouts input[name="name"]'), 'Here');
     await click($('.canvas-layouts tfoot button'));
     expect($$('.canvas-layouts tbody tr[data-layout]').map((row) => row.getAttribute('data-layout'))).toEqual(['Here']);
@@ -263,8 +267,7 @@ describe('The canvas is the person\'s own', () => {
   it('says that a change was not kept when the service that keeps the canvas refuses it, with the refusal by name', async () => {
     await mount('#/canvas?view=canvas', { ...routes, '/canvas': ok({ arrangement: null, layouts: [] }), 'PUT /canvas': refused(503, 'CanvasUnavailable', 'the canvas store is not open') });
     await placeNote();
-    expect($('.canvas-dock [role="alert"]')?.textContent).toContain('The arrangement was not kept on the service.');
-    expect($('.canvas-dock [role="alert"]')?.textContent).toContain('CanvasUnavailable: the canvas store is not open');
+    expect($('.canvas-dock [role="alert"]')?.textContent).toBe('Lys did not save this arrangement, so it is kept in this browser only. Lys could not answer: the canvas store is not open');
   });
 
   it('keeps the agents behind one button: the running ones go to their windows, the others to their own pages, and a name typed finds one', async () => {

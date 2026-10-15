@@ -76,7 +76,11 @@ describe('Network', () => {
       await mount('#/network', at({ last_report_at: old }, { runner: lys, answers: false, refusal: 'runner_unreachable', reason: '/run/lys/runner.sock: connection refused' }));
       expect(shown()).toBe('Runner not answering, last heard 16 min ago');
       expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '1', '0']);
-      expect($('section[aria-label="Workshop laptop"]')?.textContent).toContain('Its runner did not answer: /run/lys/runner.sock: connection refused');
+      // The plain words lead; the runner's own reason and the refusal name stay with it, for whoever checks the computer.
+      const said = $('section[aria-label="Workshop laptop"] p[title]');
+      expect(said?.textContent).toBe('Its runner did not answer. Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+      expect(said?.getAttribute('title')).toBe('runner_unreachable: /run/lys/runner.sock: connection refused');
+      expect($('section[aria-label="Workshop laptop"]')?.textContent).not.toContain('runner_unreachable');
     });
     it('is not answering without inventing a last report when there is none', async () => {
       await mount('#/network', at({ last_report_at: null }, { runner: lys, answers: false, refusal: 'runner_not_dialled_in', reason: 'no bridge of this machine is dialled in to this server' }));
@@ -148,15 +152,18 @@ describe('Network', () => {
     const row = $('#screen .listing table > tfoot:last-child > tr:last-child');
     const heads = $$('#screen .listing thead th').map((th) => th.textContent);
     expect(heads).toEqual(['Computer', 'Status', 'Running now', 'May start here']);
+    // One cell across all four columns, so the name box is wide and the choice and Add are never cut off by the columns.
     const cells = [...(row?.children ?? [])];
-    expect(cells).toHaveLength(4);
+    expect(cells).toHaveLength(1);
+    expect(cells[0].getAttribute('colspan')).toBe('4');
     const form = cells[0].querySelector('form[aria-label="Add a computer"]');
     expect(form?.querySelector('input[name="name"]')).not.toBeNull();
-    expect(cells[1].textContent).toBe('');
-    // Which computer is a choice in a cell of its own, this one first, and no part of the form's own inputs.
-    const choice = cells[2].querySelector('[role="group"][aria-label="Which computer"]');
+    expect(form?.querySelector('label')?.textContent).toContain('Add a computer');
+    // Which computer is a choice beside the name, this one first, and no part of the form's own inputs.
+    const choice = cells[0].querySelector('[role="group"][aria-label="Which computer"]');
+    expect(form?.contains(choice ?? null)).toBe(false);
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['This computer', 'true'], ['Another computer', 'false']]);
-    expect(cells[3].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
+    expect(cells[0].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
     expect($$('form[aria-label="Add a computer"]')).toHaveLength(1);
     expect($('.recorded-form')).toBeNull();
     await click(button('Add a computer'));

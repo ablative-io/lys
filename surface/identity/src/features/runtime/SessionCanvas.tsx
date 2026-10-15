@@ -19,6 +19,8 @@ import { keepOperations, readKeeping, said, saidOfKeeping } from './canvas-kept'
 import type { Keeping, OperationsChoice } from './canvas-kept';
 import { Canvas } from './CanvasSurface';
 import { NetworkTree } from './NetworkTree';
+import { Refused } from '../../api';
+import { problemWords } from '../people/Words';
 export { lineBetween, placed } from './canvas-place';
 export type { Box } from './canvas-marks';
 export type { View } from './canvas-view';
@@ -29,7 +31,7 @@ function Unanswered({ graph, entry }: { graph: SessionGraph; entry: SessionGraph
   const agent = session?.agent ? graph.nodes.find((node) => node.session?.session === entry.session)?.title : undefined;
   const who = agent && agent !== session?.agent ? agent : session?.agent ? 'an agent outside your view' : 'a session with no agent';
   const where = session?.machine_name ?? 'its computer';
-  return <p className="why-not" role="alert">The runner on {where} did not answer for {who}. <small className="refusal-name">{entry.refusal}: {entry.reason}</small></p>;
+  return <p className="why-not" role="alert" title={entry.refusal + ': ' + entry.reason}>The runner on {where} did not answer for {who}. {problemWords(new Refused(0, { refusal: entry.refusal, reason: entry.reason }))}</p>;
 }
 
 /** The connections in words, for a reader who does not follow the lines. */
@@ -50,13 +52,13 @@ function Whole({ graph, messages, keeping, board }: { graph: SessionGraph; messa
   const whole = read ? withMessages(graph, read.messages) : graph;
   return <>
     <div className="session-canvas-strip">
-      {!graph.nodes.length ? <p className="note" role="status">No agent is running, so the canvas has no windows yet. Start a seat from the Network view and its window appears here.</p> : null}
+      {!graph.nodes.length ? <p className="note" role="status">No agent is running, so the canvas has no windows yet. Start an agent from the Network view and its window appears here.</p> : null}
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
     </div>
     {/* The connections in words are in the panel that slides out over the canvas: there for a reader who wants them, never a line across the page. */}
     <Canvas graph={whole} keeping={keeping} board={board} connections={<>
-      {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections unavailable: {messages.refused.refusal.refusal}: {messages.refused.refusal.reason}</p> : null}
+      {messages.status === 'loading' ? <p role="status">Reading message connections…</p> : messages.status === 'refused' ? <p className="why-not" role="status">Message connections could not be read. {problemWords(messages.refused)}</p> : null}
       {read ? <section className="canvas-about" aria-label="Message connections"><MessageConnections value={read} change={setLater} /></section> : null}
       <Connections graph={whole} />
     </>} />
@@ -97,8 +99,10 @@ function Operations({ keeping }: { keeping: Keeping }) {
         }}>{each === 'tree' ? 'Network' : each === 'canvas' ? 'Canvas' : 'Sessions'}</a>)}
       <a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a>
     </nav>
-    {failure ? <p className="why-not" role="alert">Your operations view was not kept on the service. {failure}</p> : null}
-    {keeping.why ? <p className="why-not" role="status">Your operations view could not be read from the service. {keeping.why}</p> : null}
+    {failure || keeping.why ? <div className="operations-notices">
+      {failure ? <p className="why-not" role="alert">Lys did not save which view you chose, so it may open on another view next time. {failure}</p> : null}
+      {keeping.why ? <p className="why-not" role="status">Lys could not read which view you last used, so it opened the first one. {keeping.why}</p> : null}
+    </div> : null}
     {proxy ? <ProxyOperations /> : view === 'tree' ? <NetworkTree agent={agent} selected={search.get('seat') ?? choice.selected} select={(selected) => {
       setSearch((now) => { const next = new URLSearchParams(now); next.set('seat', selected); return next; }, { replace: true });
       put({ ...choice, selected });

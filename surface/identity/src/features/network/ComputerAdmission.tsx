@@ -53,16 +53,17 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
         <label><input type="checkbox" value={machine.id} checked={allowed} disabled={!admin || !served || Boolean(initial.error) || busy.includes(machine.id) || Boolean(pending[machine.id]) || machine.runtime === null || via.length > 0}
           onChange={(event) => { if (!retained.current[machine.id]) void send(machine.id, { operation: operationId(), agent, allow: event.target.checked }); }} /> {machine.name}</label>
         {via.length ? <span className="hint"> allowed through role {via.join(', ')}</span> : null}
-        {machine.runtime === null ? <span className="hint"> This computer has no runtime.</span> : null}
+        {machine.runtime === null ? <span className="hint"> Lys does not start agents on this computer.</span> : null}
         {pending[machine.id] ? <div><p>This computer permission has no confirmed answer. Its original request is kept.</p>{retry(machine.id)}</div> : null}
       </div>;
     })}
-    {computers.length ? <p className="hint">{admin ? 'Choose which agents may run on this computer.' : 'Choose which agents may run on this computer: an administrator makes the change.'}</p> : null}
+    {computers.length ? <p className="hint">{admin ? 'Tick each computer ' + name + ' may run on.' : 'These are the computers ' + name + ' may run on. Only an administrator changes them.'}</p> : null}
+    {!computers.length && !admin ? <p className="hint">No computer is set up yet. Ask an administrator to add one in <a href="#/network">Network</a>.</p> : null}
     {capability.status === 'ok' && !capability.data ? <p className="hint">This version of Lys changes which agents may run on a computer from Network. <a href="#/network">Open Network</a></p> : null}
     {capability.status === 'refused' ? <ErrorWords problem={capability.refused} /> : null}
     {failure ? <ErrorWords problem={failure} /> : null}
-    {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>A retained permission names a computer outside this list: {machine}.</p>{retry(machine)}</div>)}
+    {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>An unconfirmed change names a computer that is no longer listed. Check it to see whether it was saved.</p>{retry(machine)}</div>)}
     {notice ? <p role="status">{notice}</p> : null}
-    {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <Act symbol="add" name="Add this computer" word="Add" onClick={() => setAdding(true)} /> : null}
+    {!computers.length && admin ? adding ? <AddMachine person={person} agent={agent} cancel={() => setAdding(false)} changed={(message, machine) => { setAdding(false); changed(machine); setNotice(message); setFailure(''); }} /> : <><p className="hint">No computer is set up yet. Add the computer Lys runs on so {name} can run there.</p><Act symbol="add" name="Add this computer" word="Add this computer" onClick={() => setAdding(true)} /></> : null}
   </section>;
 }

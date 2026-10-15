@@ -8,6 +8,7 @@ import type { Paged } from '../../reads';
 import { readableMachine } from '../network/contract';
 import type { Machine, NetworkView } from '../network/contract';
 import { said } from './canvas-kept';
+import { counted } from '../../shell/count';
 
 export interface TreeLeaf { seat: SeatView; name: string; reason: string | null }
 /**
@@ -34,7 +35,7 @@ function networkPage(value: NetworkView & Paged): NetworkView & Paged {
   if (!value || !Array.isArray(value.machines) || !value.machines.every((machine) => readableMachine(machine)
     && typeof machine.kind === 'string' && machine.may_run.every((agent) => typeof agent.display_name === 'string'))
     || (value.next !== undefined && value.next !== null && typeof value.next !== 'string')) {
-    throw new Error('NetworkUnreadable: the service did not answer readable machines and agent names.');
+    throw new Error('Lys answered, but its list of computers could not be read. Reload the page; if it happens again, ask the administrator to check Lys.');
   }
   return value;
 }
@@ -48,9 +49,9 @@ export async function readRunning(): Promise<RunningRead> {
   const answer = await request<{ sessions: RuntimeSession[]; unanswered: Unanswered[] }>('/runtime/live');
   if (!answer || !Array.isArray(answer.sessions) || !Array.isArray(answer.unanswered)
     || answer.sessions.some((session) => typeof session.session !== 'string' || typeof session.machine !== 'string' || session.shown === 'stopped')) {
-    throw new Error('RuntimeLiveUnreadable: the service did not answer a readable live session list.');
+    throw new Error('Lys answered, but its list of running sessions could not be read. Reload the page; if it happens again, ask the administrator to check Lys.');
   }
-  const unanswered = answer.unanswered.map((each) => each.session + ': ' + each.refusal + ': ' + each.reason).join('; ');
+  const unanswered = answer.unanswered.length ? counted(answer.unanswered.length, 'runners') + ' did not answer, so ' + (answer.unanswered.length === 1 ? 'its' : 'their') + ' sessions are not shown as running.' : '';
   return { sessions: answer.sessions, unanswered: unanswered || null };
 }
 
@@ -73,7 +74,7 @@ const givenNames = (tree: TreeRead): Record<string, string> => Object.fromEntrie
 export async function readAgentName(agent: string): Promise<{ name: string } | { reason: string }> {
   try {
     const record = await api.agent(agent);
-    if (typeof record.display_name !== 'string' || !record.display_name.trim()) throw new Error('AgentNameUnreadable: the service gave no display name.');
+    if (typeof record.display_name !== 'string' || !record.display_name.trim()) throw new Error('Lys gave this agent no name.');
     return { name: record.display_name };
   } catch (error) { return { reason: said(error) }; }
 }
@@ -141,32 +142,38 @@ export function useSeatAction(seat: SeatView, change: (seat: SeatView) => void) 
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  // The service says "Start again" in its own reason when a fresh start is what fixes it; the words shown are plain, so that is kept apart.
+  const [startAgain, setStartAgain] = useState(false);
+  // What failed, whole, for the Error details fold under the plain words.
+  const [problem, setProblem] = useState<unknown>(null);
   const [done, setDone] = useState<string | null>(null);
   const [stopEnded, setStopEnded] = useState(false);
   const run = async (act: 'start' | 'restart' | 'stop' | 'send', text?: string): Promise<boolean> => {
     if (working.current) return false;
     if (!held.current || held.current.act !== act || held.current.text !== text) held.current = { act, text, operation: operationId() };
-    working.current = true; setBusy(true); setFailure(null); setDone(null);
+    working.current = true; setBusy(true); setFailure(null); setStartAgain(false); setProblem(null); setDone(null);
     try {
       const operation = held.current.operation;
       if (act === 'start' || act === 'restart') {
         const answer = act === 'restart' ? await seats.restart(seat.name, operation, false) : await seats.start(seat.name, operation);
-        change(answer.seat); setDone('Started as session ' + answer.session + '.');
+        change(answer.seat); setDone(act === 'restart' ? 'Restarted.' : 'Started.');
       } else if (act === 'stop') {
         const answer = await seats.stop(seat.name, operation, false);
         setStopEnded(answer.ended);
-        change(answer.seat); setDone(answer.ended ? 'Session ' + answer.session + ' ended.' : 'Stop asked of session ' + answer.session + '; its runner has not confirmed it ended.');
+        change(answer.seat); setDone(answer.ended ? 'Stopped.' : 'Asked to stop. Its computer has not yet confirmed it stopped.');
       } else {
-        const answer = await seats.send(seat.name, operation, text ?? '');
-        setDone('Delivered to session ' + answer.session + ' as a user turn.');
+        await seats.send(seat.name, operation, text ?? '');
+        setDone('Sent.');
       }
       held.current = null;
       return true;
     } catch (error) {
       if (error instanceof Refused && error.status >= 400 && error.status < 500) held.current = null;
       setFailure(said(error));
+      setProblem(error);
+      setStartAgain(error instanceof Refused && error.refusal.reason.includes('Start again'));
       return false;
     } finally { working.current = false; setBusy(false); }
   };
-  return { busy, failure, done, stopEnded, run };
+  return { busy, failure, problem, startAgain, done, stopEnded, run };
 }

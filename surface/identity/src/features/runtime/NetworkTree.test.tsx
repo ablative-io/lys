@@ -37,7 +37,7 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   expect(host.querySelector('[data-machine="one"] > details > summary')?.getAttribute('title')).toBe('one · desktop');
   expect(host.textContent).not.toContain('desktop');
   expect(host.querySelector('[data-agent] > details > summary')?.getAttribute('title')).toContain('5 seats');
-  expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, pty · offline');
+  expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('aria-label')).toBe('Long display name, seat offline, Offline');
   // A tree like an editor's: names, chevrons and a dot, and nothing else in it. Reasons and Start are the terminal space's; a reason is in the row's title.
   expect(host.querySelectorAll('button, .network-reason, p')).toHaveLength(0);
   expect(host.querySelector('[data-seat="offline"] a')?.getAttribute('title')).toContain('runner_unreachable');
@@ -57,7 +57,7 @@ it('C737 draws the tree before the live sessions are read, marks a seatless agen
   let host = await tree();
   await settle();
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(1);
-  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('RuntimeUnavailable: the runtime store is closed');
+  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('Running sessions could not be read: Lys could not read or change this agent’s sessions.');
   expect(host.querySelector('.network-list')?.textContent).not.toContain('RuntimeUnavailable');
   expect(host.querySelectorAll('.network-list p')).toHaveLength(0);
   await act(async () => { root.unmount(); });
@@ -80,7 +80,7 @@ it('C737 draws the tree before the live sessions are read, marks a seatless agen
   await settle();
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(1);
   expect(row(host)?.getAttribute('data-state')).toBe('not-seen');
-  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('has not answered yet');
+  expect(row(host)?.querySelector('[title]')?.getAttribute('title')).toContain('Running sessions are still being read.');
   expect(host.querySelectorAll('.network-list p')).toHaveLength(0);
   answer(ok({ sessions: [], unanswered: [] }));
   await settle();
@@ -108,7 +108,7 @@ it('C737 reads all machine pages and refuses malformed or repeated pages', async
   serve({ '/network': ok({ machines: [machine('one')], next: 'again' }), '/network?after=again': ok({ machines: [], next: 'again' }), '/seats': ok(list) });
   await expect(readNetworkTree()).rejects.toThrow('PagingRepeated');
   serve({ '/network': ok({ machines: [{ id: 'broken' }] }), '/seats': ok(list) });
-  await expect(readNetworkTree()).rejects.toThrow('NetworkUnreadable');
+  await expect(readNetworkTree()).rejects.toThrow('Lys answered, but its list of computers could not be read.');
 });
 it('C737 renders ten machines and two hundred seats within 50 ms of React render work', async () => {
   const machines = Array.from({ length: 10 }, (_, index) => machine(String(index)));
@@ -145,8 +145,8 @@ it('C739 keeps one change with existing canvas marks and names a server refusal 
   expect(changes).toHaveLength(1);
   // No width was set by the person: the fifth of the window the tree is drawn at is what the service keeps.
   expect(changes[0].body).toEqual({ arrangement: { ...arrangement, operations: { view: 'sessions', selected: null, pane_width: fifthOf(window.innerWidth) } } });
-  expect(container.textContent).toContain('The Lys service is older than this page');
-  expect(container.textContent).toContain('unknown field operations');
+  expect(container.textContent).toContain('The Lys service is older than this page and does not keep the operations view yet: install the matching Lys.');
+  expect(container.textContent).not.toContain('unknown field operations');
   expect(localStorage.getItem('lys.canvas')).toBeNull();
 });
 it('C739 requires the service to return all three kept fields instead of assuming a save succeeded', async () => {

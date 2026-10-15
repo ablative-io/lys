@@ -1,0 +1,16 @@
+/* The Network page's own add row: one cell across the whole table, so the name box is wide and nothing is cut off. */
+.add-computer { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; }
+.add-computer .add-computer-name { flex: 1 1 260px; min-width: 0; margin: 0; }
+.add-computer .add-computer-name .field { margin: 0; }
+.add-computer .add-computer-name input { width: 100%; }
+.add-computer .add-computer-which { flex: 0 0 auto; }
+.add-computer .add-computer-hint { flex: 1 0 100%; margin: 0; }
+.add-computer-standing:empty { display: none; }
+.add-computer-standing { margin-top: 8px; }
+/* A computer's own agents: the agent and its act side by side, the label above. */
+.own-agents { margin: 8px 0 0; }
+.own-agents .own-agents-pick { margin: 0; }
+.own-agents .own-agents-act { align-self: end; }
+/* The computers table fits its half of the page: its columns wrap rather than run off the side, so May start here and the add row are always in view. */
+.table-scroll > table:has(> tfoot tr[data-add="computer"]) { width: 100%; }
+.table-scroll > table:has(> tfoot tr[data-add="computer"]) td { max-width: none; overflow-wrap: anywhere; }

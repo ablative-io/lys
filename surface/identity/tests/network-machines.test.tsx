@@ -62,8 +62,10 @@ describe('Machines on the Network screen', () => {
     expect(cards).toEqual([NOW, BEFORE]);
     expect(card(BEFORE)?.textContent).toContain('Replaced by a later join');
     expect(card(BEFORE)?.textContent).toContain('It holds no grant.');
-    expect(button('Give ' + BEFORE + ' a grant')).toBeNull();
-    expect(button('Give ' + NOW + ' a grant')).not.toBeNull();
+    // Each act names the computer, never a machine's identifier; only the machine it answers as now may be given a grant.
+    expect(card(BEFORE)?.querySelector('button[aria-label="Give Liminal node a grant"]')).toBeNull();
+    expect(card(NOW)?.querySelector('button[aria-label="Give Liminal node a grant"]')).not.toBeNull();
+    expect(text()).not.toContain('Give ' + NOW);
   });
 
   it('says a computer that never joined is no machine yet', async () => {
@@ -73,8 +75,8 @@ describe('Machines on the Network screen', () => {
 
   it('gives the machine part of a grant Ada holds through POST /grants, answering to the machine\'s own person', async () => {
     const mounted = await mount('#/network', routes([machine({ grants: [] })]));
-    await click(button('Give ' + NOW + ' a grant'));
-    const form = $('form[aria-label="Give ' + NOW + ' a grant"]');
+    await click(button('Give Liminal node a grant'));
+    const form = $('form[aria-label="Give Liminal node a grant"]');
     expect(form).not.toBeNull();
     const sources = [...(form?.querySelectorAll('select[name="source"] option') ?? [])].map((option) => option.getAttribute('value'));
     expect(sources).toEqual([toMachines.id]);
@@ -87,21 +89,21 @@ describe('Machines on the Network screen', () => {
     expect(sent?.resource).toEqual(LINK);
     expect(sent?.relation).toBe('viewer');
     expect(sent?.pass_on).toEqual({ kind: 'use_only' });
-    expect(text()).toContain('Given. ' + NOW + ' now holds viewer on link hermes-to-liminal');
+    expect(text()).toContain('Given. Liminal node now holds viewer on link hermes-to-liminal');
   });
 
   it('shows the service\'s refusal by name when the machine may not be given it', async () => {
     await mount('#/network', routes([machine({ grants: [] })], {
       'POST /grants': refused(403, 'MachineRefused', 'MachineRefused: ' + NOW + ': a machine never holds grant.delegate, which a person keeps'),
     }));
-    await click(button('Give ' + NOW + ' a grant'));
+    await click(button('Give Liminal node a grant'));
     await click(button('Give'));
     expect($('[role="alert"]')?.textContent).toContain('MachineRefused');
   });
 
   it('offers nothing to give when Ada holds no grant that may be passed on to machines', async () => {
     await mount('#/network', routes([machine({ grants: [] })], { '/grants': ok({ grants: GRANTS, revision: 7 }) }));
-    await click(button('Give ' + NOW + ' a grant'));
+    await click(button('Give Liminal node a grant'));
     expect(text()).toContain('You hold no grant that may be passed on to a machine.');
   });
 

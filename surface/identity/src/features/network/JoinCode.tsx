@@ -7,12 +7,13 @@ import { useEffect, useState } from 'react';
 import { Refused, operationId, request } from '../../api';
 import { isRecord } from './contract';
 import { Act } from '../../shell/Act';
+import { problemWords } from '../people/Words';
 
 /** A connection code as the service answers it, once. */
 export interface JoinCode { machine: string; server: string; command: string; code: string }
 
 /** Another computer being connected: its code when one was given just now, or why none was. */
-export interface Connecting { machine: string; name: string; given: JoinCode | null; failure: string; at: 'row' | 'panel' }
+export interface Connecting { machine: string; name: string; given: JoinCode | null; failure: string; at: 'row' | 'panel'; detail?: string }
 
 export function readJoinCode(value: unknown, machine: string): JoinCode {
   if (!isRecord(value) || value.machine !== machine || typeof value.server !== 'string' || typeof value.command !== 'string'
@@ -28,8 +29,10 @@ export async function askJoinCode(machine: string): Promise<JoinCode> {
   return readJoinCode(answer, machine);
 }
 
-/** Why a code was not given, in the words the add row and the panel both show. */
-export const joinFailure = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error);
+/** Why a code was not given, in the plain words the add row and the panel both show. */
+export const joinFailure = (error: unknown): string => problemWords(error);
+/** The refusal itself, for the Error details fold. */
+export const joinDetail = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : error instanceof Error ? error.message : String(error);
 
 /** Copy `text` for the person, saying whether it was copied; when the browser refuses, they are told to copy it themselves. */
 export function Copy({ text, what }: { text: string; what: string }) {
@@ -67,7 +70,7 @@ export function ClientDownload() {
   useEffect(() => {
     let current = true;
     request<Clients>('/clients').then((answer) => {
-      if (!isRecord(answer) || !isRecord(answer.platforms)) throw new Error('ClientsUnreadable: Lys did not name its held client platforms.');
+      if (!isRecord(answer) || !isRecord(answer.platforms)) throw new Error('Lys answered, but did not say which downloads it has.');
       if (current) setClients(answer);
     }).catch((error: unknown) => { if (current) setFailure(joinFailure(error)); });
     return () => { current = false; };
@@ -79,9 +82,9 @@ export function ClientDownload() {
     </select></label>
     {failure ? <p className="why-not">Lys could not read its clients. {failure}</p> : clients && platform ? release ?
       <p><a href={'/api/clients/' + encodeURIComponent(platform) + '/lys'} download="lys">Download lys for this Mac</a>
-        {' · commit ' + release.commit} {' · '}<a href={'/api/clients/' + encodeURIComponent(platform) + '/lys-containment-entry'} download="lys-containment-entry">Download its companion</a>
+{' · built from commit ' + release.commit + ' · '}<a href={'/api/clients/' + encodeURIComponent(platform) + '/lys-containment-entry'} download="lys-containment-entry">Download its companion</a>
         <span className="sec"> Keep both files together.</span></p>
-      : <p>Lys holds no client for this Mac ({platform}).</p> : null}
+      : <p>Lys has no download for {platform === 'aarch64-apple-darwin' ? 'Apple silicon' : platform === 'x86_64-apple-darwin' ? 'Intel' : 'this'} Macs yet. Ask the administrator to add one.</p> : null}
   </div>;
 }
 
@@ -89,7 +92,7 @@ export function ClientDownload() {
 export function ConnectingNow({ connecting, renew, busy, done }: { connecting: Connecting; renew: () => void; busy: boolean; done: () => void }) {
   return <>
     {connecting.given ? <JoinShown name={connecting.name} given={connecting.given} done={done} /> : null}
-    {connecting.failure ? <><p className="why-not" role="alert">Lys could not give a connection code for {connecting.name}. If one was given, it is not shown again: a new code replaces it.</p><p><small className="refusal-name">{connecting.failure}</small></p></> : null}
+    {connecting.failure ? <><p className="why-not" role="alert">Lys could not give a connection code for {connecting.name}. If one was given, it is not shown again: a new code replaces it.</p><p>{connecting.failure}</p>{connecting.detail ? <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{connecting.detail}</p></details> : null}</> : null}
     {connecting.given ? null : <Act symbol="again" name="Get a new connection code" word="New code" disabled={busy} onClick={renew} />}
   </>;
 }
@@ -101,7 +104,7 @@ export function useNewCode(machine: string, name: string, at: Connecting['at'], 
     if (busy) return;
     setBusy(true);
     try { connect({ machine, name, given: await askJoinCode(machine), failure: '', at }); }
-    catch (error) { connect({ machine, name, given: null, failure: joinFailure(error), at }); }
+    catch (error) { connect({ machine, name, given: null, failure: joinFailure(error), detail: joinDetail(error), at }); }
     finally { setBusy(false); }
   };
   return { busy, renew: () => void renew() };

@@ -14,3 +14,6 @@ export function allowedToRun(machines: Machine[], roles: Role[], agent: string):
   const held = heldRoles(roles, agent);
   return usable(machines).filter((machine) => machine.may_run.some((holder) => holder.id === agent) || Boolean(machine.may_run_roles?.some((role) => held.includes(role))));
 }
+
+/** A role by its name; a role this person may not read is "a role", never its identifier. */
+export const roleWords = (role: string, roleNames: Map<string, string>): string => roleNames.has(role) ? 'the ' + roleNames.get(role) + ' role' : 'a role';

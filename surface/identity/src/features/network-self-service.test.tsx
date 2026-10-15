@@ -84,7 +84,7 @@ it('downloads the chosen Mac client with the install commit and names a missing 
   expect(host.textContent).toContain('commit 0123456789abcdef');
   await act(async () => { choice.value = 'x86_64-apple-darwin'; choice.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(host.querySelector('a[download="lys"]')).toBeNull();
-  expect(host.textContent).toContain('Lys holds no client for this Mac');
+  expect(host.textContent).toContain('Lys has no download for Intel Macs yet. Ask the administrator to add one.');
 });
 
 it('shows a non-administrator the own-agent add row and the own-agent certificate issue act', async () => {

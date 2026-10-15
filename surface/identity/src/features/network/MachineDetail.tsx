@@ -13,6 +13,8 @@ import type { Connecting } from './JoinCode';
 import { Act } from '../../shell/Act';
 import { MachineHolders } from './MachineIdentities';
 import type { MachineIdentity } from './contract';
+import { ErrorWords, problemWords } from '../people/Words';
+import { roleWords } from './allowed';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
@@ -48,7 +50,7 @@ function reached(machine: Machine, runner: RunnerRecord | null, joining: boolean
 const connectable = ({ machine, asked, runner }: Computer): boolean =>
   machine.state === 'in_use' && machine.runtime !== null && asked === 'answered' && (runner === null || runner.kind === 'dialled');
 
-export function MachineDetail({ computer, admin, me, teams, names, changed, machines = null, connecting, connect, done }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void;
+export function MachineDetail({ computer, admin, me, teams, names, changed, machines = null, connecting, connect, done, roleNames = new Map() }: { computer: Computer; admin: boolean; me: string; teams: OrgTeam[]; names: Map<string, string>; changed: (message: string) => void; roleNames?: Map<string, string>;
   machines?: MachineIdentity[] | null; connecting: Connecting | null; connect: (next: Connecting) => void; done: () => void }) {
   const { machine, runner, running } = computer;
   const now = status(computer);
@@ -64,14 +66,14 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, mach
     <div className="section-h">May start here</div>
     {machine.runtime === null ? <p>Lys does not start agents here.</p> : <table className="usage-table" aria-label="May start here"><thead><tr><th>Who</th><th>Through</th></tr></thead><tbody>
       {[...new Map(machine.may_run.map(agent => [agent.id, agent])).values()].map((agent) => <tr key={agent.id}><td><a title={agent.id} href={'#/file/' + agent.id}>{agent.display_name}</a></td><td>Named on this computer</td></tr>)}
-      {(machine.may_run_roles ?? []).map((role) => <tr key={role}><td>Anyone holding {role}</td><td>Role</td></tr>)}
+      {(machine.may_run_roles ?? []).map((role) => <tr key={role}><td>Anyone holding {roleWords(role, roleNames)}</td><td>Their role</td></tr>)}
       {!machine.may_run.length && !(machine.may_run_roles ?? []).length ? <tr><td colSpan={2} className="dim">No agent may start here yet.</td></tr> : null}
     </tbody></table>}
     {machine.named_by === me && machine.runtime && machine.state !== 'retired' ? <OwnAgents machine={machine} me={me} changed={changed} /> : null}
     <div className="section-h">How Lys reaches it</div>
     {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner, computer.joining)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
-    {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not">Its runner did not answer: {computer.reason}</p> : null}
-    {computer.asked === 'unread' ? <p className="why-not">Lys could not ask its runner: {computer.reason}</p> : null}
+    {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not" title={(computer.refusal ? computer.refusal + ': ' : '') + computer.reason}>Its runner did not answer. {computer.refusal ? problemWords(new Refused(0, { refusal: computer.refusal, reason: computer.reason })) : computer.reason}</p> : null}
+    {computer.asked === 'unread' ? <><p className="why-not">Lys could not ask its runner whether this computer is up.</p><ErrorWords problem={computer.problem ?? computer.reason} /></> : null}
     {(admin || machine.named_by === me) && connectable(computer) ? <NewCode machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
     {machines ? <><div className="section-h">As a machine</div><MachineHolders machine={machine.id} name={machine.name} identities={machines} me={me} changed={changed} /></> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
@@ -104,18 +106,18 @@ function OwningTeam({ machine, admin, me, teams, changed }: { machine: Machine; 
 function Retire({ machine, changed }: { machine: Machine; changed: (message: string) => void }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<unknown>(null);
   const retire = async () => {
-    if (busy) return; setBusy(true); setFailure('');
+    if (busy) return; setBusy(true); setFailure(null);
     try {
       const answer = await request<Machine>('/network/machines/' + encodeURIComponent(machine.id) + '/retire', {});
       if (answer.id !== machine.id || answer.state !== 'retired') throw new Error('Retirement is not confirmed. Reload this page to see whether it was retired.');
       changed(machine.name + ' was retired.');
-    } catch (error) { setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error)); }
+    } catch (error) { setFailure(error); }
     finally { setBusy(false); }
   };
   return <div className="machine-retire" style={{ marginTop: 20 }}>{confirm ? <><p>Retire {machine.name}? No agent can be started on it afterwards. Agents already running on it keep running.</p><Act symbol="approve" name="Confirm retirement" word="Confirm" tone="danger" disabled={busy} onClick={() => void retire()} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setConfirm(false)} /></>
-    : <Act symbol="retire" name="Retire this computer" word="Retire" onClick={() => setConfirm(true)} />}{failure ? <p role="alert">{failure}</p> : null}</div>;
+    : <Act symbol="retire" name="Retire this computer" word="Retire" onClick={() => setConfirm(true)} />}{failure ? <ErrorWords problem={failure} /> : null}</div>;
 }
 
 /** The owner allows their own active agents; role allowances remain an administrator's act. */
@@ -136,16 +138,16 @@ function OwnAgents({ machine, me, changed }: { machine: Machine; me: string; cha
       && answer.machine.may_run.some((each) => each.id === body.agent) === body.allow,
     () => changed(machine.name + ' agent allowance was saved.'));
   if (load.status === 'loading') return <p role="status">Reading your agents…</p>;
-  if (load.status === 'refused') return <p role="alert">{load.refused.refusal.refusal}: {load.refused.message}</p>;
+  if (load.status === 'refused') return <><p className="why-not">Your agents could not be read, so they cannot be allowed here now.</p><ErrorWords problem={load.refused} /></>;
   if (!agent) return <p className="dim">You have no active agents to allow here.</p>;
-  return <form className="usage-add-row" aria-label="Your agents on this computer" onSubmit={(event) => {
+  return <form className="usage-add-row own-agents" aria-label="Your agents on this computer" style={{ gridTemplateColumns: 'minmax(0, 1fr) auto' }} onSubmit={(event) => {
     event.preventDefault();
     if (!change.blocked) change.submit({ operation: operationId(), agent: agent.id, allow: !allowed });
   }}>
-    <select aria-label="Agent to allow on this computer" value={agent.id} disabled={change.blocked} onChange={(event) => setChosen(event.target.value)}>
-      {agents.map((each) => <option key={each.id} value={each.id}>{each.display_name}</option>)}
-    </select>
-    <Act symbol={allowed ? 'remove' : 'add'} name={(allowed ? 'Remove ' : 'Allow ') + agent.display_name} word={allowed ? 'Remove' : 'Allow'} type="submit" disabled={change.blocked} />
+    <label className="field own-agents-pick">Your agent<select aria-label="Agent to allow on this computer" value={agent.id} disabled={change.blocked} onChange={(event) => setChosen(event.target.value)}>
+      {agents.map((each) => <option key={each.id} value={each.id}>{each.display_name}{machine.may_run.some((held) => held.id === each.id) ? ' (may start here)' : ''}</option>)}
+    </select></label>
+    <span className="own-agents-act"><Act symbol={allowed ? 'remove' : 'add'} name={(allowed ? 'Remove ' : 'Allow ') + agent.display_name} word={allowed ? 'Stop allowing here' : 'Allow here'} type="submit" disabled={change.blocked} /></span>
     <ChangeStatus change={change} />
   </form>;
 }

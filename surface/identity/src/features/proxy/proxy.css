@@ -1,5 +1,5 @@
 /* The proxy view: three columns filling the page, each scrolling in itself; the page never scrolls. */
-.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 12px; }
+.proxy-view { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(220px, .65fr) minmax(0, 1.15fr) minmax(0, 1.2fr); gap: 12px; }
 .proxy-agents td { white-space: nowrap; }
 .proxy-agents-find { display: flex; gap: 10px; align-items: center; margin: 0 0 8px; position: sticky; top: 0; background: var(--surface-card); z-index: 1; }
 .proxy-agents-find input[type="search"] { flex: 1; min-width: 0; }
@@ -43,3 +43,9 @@
 .operations-swap a:hover { color: var(--text-primary); }
 .operations-swap a[aria-current="page"] { background: var(--accent-glow, var(--surface-default)); color: var(--accent); }
 .session-canvas-page > .proxy-view { padding: 56px 12px 12px; box-sizing: border-box; height: 100%; }
+.proxy-uncopied { clear: both; margin: 0 0 6px; font-size: 12px; }
+.proxy-unread .why-not { margin: 0 0 6px; }
+/* What could not be read or kept about the operations view: below the swap bar, never under it. */
+.operations-notices { position: relative; z-index: 10; margin: 56px 16px 0; }
+.operations-notices .why-not { margin: 0 0 6px; }
+.operations-notices + .proxy-view, .operations-notices + .network-tree { padding-top: 8px; }

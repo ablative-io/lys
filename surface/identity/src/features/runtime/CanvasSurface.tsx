@@ -493,7 +493,7 @@ export function Canvas({ graph, keeping, connections, board }: { graph: SessionG
       {untidy?.at === changes ? <span role="status">Tidied. <Act symbol="revoke" name="Put it back" word="Put it back" className="small" data-act="untidy" onClick={putBack} /></span> : null}
       {unkept ? <span className="why-not" role="status">This browser will not keep the arrangement: {unkept}</span> : null}
       {missing !== null ? <span className="why-not" role="alert">No layout is saved as {missing}.</span> : null}
-      {unsent ? <span className="why-not" role="alert">The arrangement was not kept on the service. <small className="refusal-name">{unsent}</small></span> : null}
+      {unsent ? <span className="why-not" role="alert">Lys did not save this arrangement, so it is kept in this browser only. {unsent}</span> : null}
     </>} />
   </>;
 }

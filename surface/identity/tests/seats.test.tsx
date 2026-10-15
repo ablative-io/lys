@@ -57,15 +57,24 @@ describe('Seats', () => {
     expect($('tr[data-seat="gaia"]')?.textContent).toContain('Not seen');
     expect($('tr[data-seat="gaia"]')?.textContent).toContain('No signal seen');
     expect($('tr[data-seat="archie"]')?.textContent).toContain('Last signal');
-    expect(text()).toContain('Seen but unregistered');
+    expect(text()).toContain('Sessions with no seat');
     expect($('tr[data-unregistered="session-stray"]')?.textContent).toContain('4242');
-    expect(text()).not.toContain('Runner unknown');
+    expect(text()).not.toContain('every state below is unknown');
+    // A running seat offers Stop and Restart, never a second Start; a seat that is not running offers Start alone.
+    expect($('button[aria-label="Start waffles"]')).toBeNull();
+    expect($('button[aria-label="Stop waffles"]')).not.toBeNull();
+    expect($('button[aria-label="Start daisy"]')).not.toBeNull();
+    expect($('button[aria-label="Stop daisy"]')).toBeNull();
+    // The processes behind the seats are folded away for troubleshooting, closed.
+    expect($('details.seats-owners')?.hasAttribute('open')).toBe(false);
   });
 
   it('names a runner that could not be read, and shows its seats unknown, never offline or zero', async () => {
     await shown({ '/seats': ok({ seats: [seat('waffles', { state: 'unknown', last_signal_at: null })], runner: 'unknown', reason: 'runner_unreachable: the runner on machine-one did not answer' }) });
-    expect(text()).toContain('Runner unknown');
-    expect(text()).toContain('runner_unreachable: the runner on machine-one did not answer');
+    expect(text()).toContain('Lys could not reach the computers\' runners, so every state below is unknown');
+    // The service's reason is said in plain words; its own words, refusal name and all, stay in the title.
+    const reason = $('.why-not [title="runner_unreachable: the runner on machine-one did not answer"]');
+    expect(reason?.textContent).toBe(' Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
     expect($('tr[data-seat="waffles"]')?.textContent).toContain('Unknown: its runner could not be read');
     expect($('tr[data-seat="waffles"]')?.textContent).not.toContain('Offline');
     expect($('form[aria-label="Send to waffles"]')).toBeNull();
@@ -88,7 +97,8 @@ describe('Seats', () => {
     const sent = posted.find((entry) => entry.path === '/seats/waffles/send');
     expect(sent?.body).toMatchObject({ text: 'Read the brief on main.' });
     expect((sent?.body as { operation: string }).operation).toMatch(/^op-[0-9a-f]{32}$/);
-    expect($('tr[data-seat="waffles"]')?.textContent).toContain('Delivered to session session-waffles as a user turn.');
+    expect($('tr[data-seat="waffles"] [role="status"]')?.textContent).toBe('Sent to waffles.');
+    expect($('tr[data-seat="waffles"]')?.textContent).not.toContain('session-waffles as a user turn');
   });
 
   it('shows a refused send by its name and words, and offers no send box to a seat that is not running', async () => {
@@ -100,10 +110,12 @@ describe('Seats', () => {
     await type($('input[aria-label="Message for waffles"]'), 'hello');
     await settle();
     await click($('button[aria-label="Send to waffles"]'));
-    const alert = $('tr[data-seat="waffles"] [role="alert"]')?.textContent ?? '';
-    expect(alert).toContain('seat_not_running');
-    expect(alert).toContain('the seat waffles has no running session');
-    expect(text()).not.toContain('Delivered');
+    const alert = $('tr[data-seat="waffles"] [role="alert"]');
+    // Plain words first; the refusal's name and the service's words only in the closed Error details.
+    expect(alert?.querySelector('p')?.textContent).toBe('Lys refused: the seat waffles has no running session');
+    expect(alert?.querySelector('details')?.hasAttribute('open')).toBe(false);
+    expect(alert?.querySelector('details')?.textContent).toContain('seat_not_running');
+    expect(text()).not.toContain('Sent to waffles');
   });
 
   it('offers a forced stop only when the stop is refused seat_turn_in_progress, under a new operation', async () => {
@@ -125,7 +137,7 @@ describe('Seats', () => {
     expect(asked).toBe(2);
     expect(stops.map((entry) => entry.force)).toEqual([false, true]);
     expect(stops[0].operation).not.toBe(stops[1].operation);
-    expect($('tr[data-seat="waffles"]')?.textContent).toContain('Session session-waffles ended.');
+    expect($('tr[data-seat="waffles"] [role="status"]')?.textContent).toBe('Stopped.');
   });
 
   it('does not offer a forced stop for any other refusal', async () => {
@@ -145,6 +157,6 @@ describe('Seats', () => {
     });
     await click($('button[aria-label="Start gaia"]'));
     expect((posted.find((entry) => entry.path === '/seats/gaia/start')?.body as { operation: string }).operation).toMatch(/^op-[0-9a-f]{32}$/);
-    expect(text()).toContain('Started as session session-gaia.');
+    expect($('tr[data-seat="gaia"] [role="status"]')?.textContent).toBe('Started.');
   });
 });

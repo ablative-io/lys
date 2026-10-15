@@ -4,6 +4,7 @@
  * keep it, this browser keeps it instead and the page says so, with the refusal by name.
  */
 import { Refused, request } from '../../api';
+import { problemWords } from '../people/Words';
 import { readArrangement } from './canvas-marks';
 import type { Arrangement } from './canvas-marks';
 import { FIRST_OPERATIONS, forService, readOperations } from './canvas-operations';
@@ -51,8 +52,8 @@ export async function keepOperations(choice: OperationsChoice): Promise<void> {
 
 const LAYOUTS = 'lys.canvas.layouts';
 
-/** What went wrong, said with the refusal's name when the service named one. */
-export const said = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error);
+/** What went wrong, in plain words a person can act on; a refusal's name never reaches the page through here. */
+export const said = (error: unknown): string => problemWords(error);
 
 /**
  * What went wrong keeping the view, in words a person can act on. A service that does not know the `operations`
@@ -61,7 +62,7 @@ export const said = (error: unknown): string => error instanceof Refused ? error
 export function saidOfKeeping(error: unknown): string {
   const words = said(error);
   if (error instanceof Refused && error.refusal.refusal === 'RequestMalformed' && /unknown field `?operations/.test(error.refusal.reason)) {
-    return 'The Lys service is older than this page and does not keep the operations view yet: install the matching Lys. ' + words;
+    return 'The Lys service is older than this page and does not keep the operations view yet: install the matching Lys.';
   }
   return words;
 }
@@ -98,7 +99,7 @@ export async function readKeeping(): Promise<Keeping> {
     return { where: 'service', why: null, arrangement, layouts: answered(answer), operations: operationsOf(answer.arrangement) };
   } catch (error) {
     const refused = error instanceof Refused ? error.refusal : { refusal: 'Unanswered', reason: String(error) };
-    return { where: 'browser', why: refused.refusal + ': ' + refused.reason, arrangement: null, layouts: inBrowser(), operations: FIRST_OPERATIONS };
+    return { where: 'browser', why: problemWords(error instanceof Refused ? error : new Refused(0, refused)), arrangement: null, layouts: inBrowser(), operations: FIRST_OPERATIONS };
   }
 }
 

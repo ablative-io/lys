@@ -46,7 +46,7 @@ function Running({ sessions, unanswered, people, named, go }: Awaited<ReturnType
       <a href={at(entry)} aria-current={entry.agent !== null && entry.agent === shown ? 'page' : undefined} onClick={() => go?.(entry.session)}>{name(entry)}</a>
       <span className="sec">{entry.machine_name ?? entry.machine}</span>
       <Act symbol="more" name={'Read controls for ' + name(entry)} word="Controls" aria-expanded={control === entry.session} onClick={() => setControl(control === entry.session ? null : entry.session)} />
-      <span className="running-state">{silent(entry) ? <span className="why-not">Its runner did not answer; last reported {entry.last_reported}</span> : entry.shown === 'running' ? <><span className="dot s-active" />Running</> : 'Starting, not yet confirmed'}</span>
+      <span className="running-state">{silent(entry) ? <span className="why-not">Its computer did not answer, so whether it is still running is not known.</span> : entry.shown === 'running' ? <><span className="dot s-active" />Running</> : 'Starting, not yet confirmed'}</span>
     </span>)}
     {sessions.length ? null : <span className="empty dim">Nothing is running.</span>}
   </nav>{control && sessions.some((entry) => entry.session === control) ? <section className="managed-controls" aria-label="Session controls"><h3>Session controls</h3><SessionControls key={control} session={control} /></section> : null}</>;

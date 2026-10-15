@@ -48,15 +48,15 @@ describe('The proxy view in Operations', () => {
     expect($$('.proxy-view > section').map((each) => each.getAttribute('aria-label'))).toEqual(['Agents', 'Calls', 'The call']);
     // Every agent the person may see is listed, running or not; nothing is chosen yet, and each column says what to do.
     expect($('[data-agent="' + SCRIBE + '"]')?.textContent).toBe('ScribeNot running');
-    expect(text()).toContain('Choose an agent to see the model calls its runs made.');
-    expect(text()).toContain('Choose a call to see its request and its response.');
+    expect(text()).toContain('Choose an agent on the left to see the model calls it made.');
+    expect(text()).toContain('Choose an agent, then one of its calls.');
   });
 
   it('lists an agent\'s calls newest first with what each reported, never a nought for a figure not reported, and reads earlier ones when asked', async () => {
     await mount('#/canvas?view=proxy&agent=' + SCRIBE, routes);
     expect($('[data-agent="' + SCRIBE + '"]')?.getAttribute('aria-current')).toBe('true');
     const cells = (id: string) => [...($('[data-call="' + id + '"]')?.querySelectorAll('td') ?? [])].map((each) => each.textContent);
-    expect(cells('c1')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'claude-fable-5-1', 'complete', '1,200', '340', '88,000', '2.4 s']);
+    expect(cells('c1')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'claude-fable-5-1', 'Complete', '1,200', '340', '88,000', '2.4 s']);
     // A call that was not recorded is listed all the same and says how it ended; its figures are empty, not zero.
     expect(cells('c2')).toEqual([clockOf('2026-10-04T06:00:00.000Z'), 'Not readable', 'No complete response', '', '', '', '310 ms']);
     expect($('[data-call="c2"] td.why-not')?.textContent).toBe('No complete response');
@@ -72,7 +72,7 @@ describe('The proxy view in Operations', () => {
   it('shows a call whole: its request and its response as the provider\'s JSON set out to be read, and its headers with no credential\'s value', async () => {
     await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c1&shows=request', routes);
     expect($('[data-call="c1"]')?.getAttribute('aria-current')).toBe('true');
-    expect($('.proxy-call-line')?.textContent).toBe('claude-fable-5-1 · complete · HTTP 200 · 2.4 s · streamed · req_c1');
+    expect($('.proxy-call-line')?.textContent).toBe('claude-fable-5-1 · Complete · HTTP 200 · 2.4 s · streamed · Request req_c1');
     expect($('[data-json="request"]')?.textContent).toBe(JSON.stringify(request, null, 2));
     expect($$('[data-shows]').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Read', null], ['Request', 'true'], ['Response', null], ['Headers', null]]);
     // The JSON is in colour and is still the same text: a name, a quoted word and a number each in their own.
@@ -94,7 +94,7 @@ describe('The proxy view in Operations', () => {
     await click($('[data-shows="request"]'));
     await settle();
     expect(text()).toContain('This call has no request that can be read as JSON. the body is not JSON: expected value at line 1 column 1');
-    expect($('.proxy-call-line')?.textContent).toBe('Model not readable · unrecorded · 310 ms');
+    expect($('.proxy-call-line')?.textContent).toBe('Model not readable · No complete response · 310 ms');
     expect(text()).toContain('the response could not be read into parts');
     await click($('[data-shows="response"]'));
     await settle();
@@ -105,9 +105,15 @@ describe('The proxy view in Operations', () => {
     expect(text()).toContain('No response headers are on the record.');
   });
 
-  it('says by name what could not be read', async () => {
+  it('says in plain words what could not be read, with the refusal by name only in its closed Error details', async () => {
     await mount('#/canvas?view=proxy&agent=' + SCRIBE + '&call=c9', { ...routes, [calls]: refused(404, 'AgentNotVisible', 'no agent by that id is visible to you'), [calls + '/c9']: refused(404, 'CallUnknown', 'no model call by that id is kept for the agent') });
-    expect($('.proxy-view [aria-label="Calls"]')?.textContent).toBe('Its calls could not be read. AgentNotVisible');
-    expect($('.proxy-view [aria-label="The call"]')?.textContent).toBe('The call could not be read. CallUnknown');
+    const said = (column: string) => [...($('.proxy-view [aria-label="' + column + '"]')?.querySelectorAll('p:not(.refusal-name)') ?? [])].map((each) => each.textContent);
+    expect(said('Calls')).toEqual(['Its calls could not be read.', 'This agent is not among the records you can see. Ask its responsible person or the administrator.']);
+    expect(said('The call')).toEqual(['The call could not be read.', 'This model call could not be found. Open the call list again and choose a recorded call.']);
+    for (const column of ['Calls', 'The call']) {
+      const details = $('.proxy-view [aria-label="' + column + '"] details');
+      expect(details?.hasAttribute('open')).toBe(false);
+      expect(details?.textContent).toContain(column === 'Calls' ? 'AgentNotVisible' : 'CallUnknown');
+    }
   });
 });

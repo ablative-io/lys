@@ -13,7 +13,6 @@ import { entries } from '../people/directory';
 import type { Entry } from '../people/directory';
 import { clock } from '../file/time';
 import { RunningList } from './Sessions';
-import { Seats } from '../sessions/Seats';
 import type { SessionGraph } from './session-graph';
 import { said } from './canvas-kept';
 import { KINDS } from './canvas-widgets';
@@ -70,10 +69,9 @@ function Agents({ graph, show, open }: { graph: SessionGraph; show: (node: strin
     <div className="canvas-find-list">
       <RunningList named={query} go={(session) => show('session:' + session)} />
       {idle.map((each) => <a key={each.id} href={'#/file/' + each.id} data-find="idle"><span>{each.display_name}</span><span className="sec">Not running</span></a>)}
-      {refused ? <p className="why-not" role="alert">The agents that are not running could not be read. <small className="refusal-name">{refused}</small></p> : null}
+      {refused ? <p className="why-not" role="alert">The agents that are not running could not be read. {refused}</p> : null}
       {agents && !idle.length && wanted && ![...graph.nodes].some((node) => node.session && node.title.toLowerCase().includes(wanted)) ? <p className="dim">No agent by that name.</p> : null}
     </div>
-    <Seats />
   </div>;
 }
 
@@ -88,6 +86,8 @@ function Layouts({ keeping, layouts, save, remove }: {
   const [name, setName] = useState('');
   const [refused, setRefused] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Removing a saved layout cannot be undone, so it asks once before it goes.
+  const [removing, setRemoving] = useState<string | null>(null);
   const doing = (work: Promise<void>, after?: () => void) => {
     setBusy(true);
     work.then(() => { setRefused(null); after?.(); }, (error: unknown) => setRefused(said(error))).finally(() => setBusy(false));
@@ -101,7 +101,10 @@ function Layouts({ keeping, layouts, save, remove }: {
           <td><a data-act="open-layout" href={'#' + pathname + '?panel=layouts&layout=' + encodeURIComponent(layout.name)} title="Open this layout">{layout.name}</a></td><td className="sec">{clock(layout.saved_at)}</td>
           <td className="canvas-layout-acts">
             <Act symbol="save" name={'Save over ' + layout.name} word="Save over" className="small" data-act="save-over" disabled={busy} onClick={() => doing(save(layout.name))} />
-            <Act symbol="remove" name={'Remove ' + layout.name} className="small" data-act="remove-layout" disabled={busy} onClick={() => doing(remove(layout.name))} />
+            {removing === layout.name ? <>
+              <Act symbol="remove" name={'Confirm removing ' + layout.name} word="Remove" tone="danger" className="small" data-act="confirm-remove-layout" disabled={busy} onClick={() => doing(remove(layout.name), () => setRemoving(null))} />
+              <Act symbol="close" name="Keep it" word="Keep" className="small" disabled={busy} onClick={() => setRemoving(null)} />
+            </> : <Act symbol="remove" name={'Remove ' + layout.name} className="small" data-act="remove-layout" disabled={busy} onClick={() => setRemoving(layout.name)} />}
           </td></tr>)}
         {layouts.length ? null : <tr className="empty"><td colSpan={3} className="dim">No layout is saved yet.</td></tr>}
       </tbody>
@@ -112,8 +115,8 @@ function Layouts({ keeping, layouts, save, remove }: {
     </table>
     <p className="note">{keeping.where === 'service'
       ? 'Your layouts are yours: kept on the service, the same on any computer you sign in at.'
-      : <>Kept in this browser only: the service is not keeping your canvas. <small className="refusal-name">{keeping.why}</small></>}</p>
-    {refused ? <p className="why-not" role="alert">That was not done. <small className="refusal-name">{refused}</small></p> : null}
+      : <>Kept in this browser only: Lys is not keeping your canvas, so it will not follow you to another computer. {keeping.why}</>}</p>
+    {refused ? <p className="why-not" role="alert">That was not done. {refused}</p> : null}
   </>;
 }
 

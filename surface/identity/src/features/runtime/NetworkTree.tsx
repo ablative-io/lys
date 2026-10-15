@@ -10,12 +10,13 @@ import { NetworkTreePane } from './NetworkTreePane';
 import { PANE_WIDTH } from './canvas-kept';
 import { fifthOf } from './canvas-operations';
 import { NetworkAgentStart } from './NetworkAgentPane';
+import { STATE_WORDS } from '../sessions/Seats';
 import './network-tree.css';
 
 const MARKS = { 'online-idle': '●', 'online-working': '◉', offline: '○', 'not-seen': '◌', unknown: '?' };
 
-/** A seat's standing in a few words: its terminal's kind and its state. */
-const detail = (seat: SeatView): string => (seat.transport ?? 'not started') + ' · ' + seat.state;
+/** A seat's standing in a few words. */
+const detail = (seat: SeatView): string => STATE_WORDS[seat.state] ?? 'State not known';
 
 /** The one seat row: the state dot, the name, and everything else in the title. */
 function Leaf({ seat, name, reason, label, selected, select, agent }: { seat: SeatView; name: string; reason: string | null; label: string; selected: string | null; select: (seat: string) => void; agent?: string }) {
@@ -46,7 +47,7 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
     }
     const choice = AGENT_CHOICE + agent.id;
     return <li className="network-leaf network-seatless" data-agent={agent.id} data-agent-only={agent.id} data-state="not-seen" data-selected={selected === choice} role="none">
-      <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · live sessions not read: ' + unsurveyed : '')} aria-label={agent.name + ', not running'} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
+      <a href={'#/canvas?seat=' + encodeURIComponent(choice)} role="treeitem" className="network-name" data-mark={MARKS['not-seen']} title={title + ' · no seat on this computer' + (unsurveyed ? ' · ' + unsurveyed : '')} aria-label={agent.name + ', not running'} aria-current={selected === choice ? 'true' : undefined} aria-selected={selected === choice} onClick={(event) => { event.preventDefault(); select(choice); }}>{agent.name}</a>
     </li>;
   }
   const choice = AGENT_CHOICE + agent.id;
@@ -65,7 +66,7 @@ function AgentRow({ agent, selected, select, unsurveyed }: { agent: TreeAgent; s
 export function NetworkBranches({ branches: all, selected, select, unsurveyed = null }: { branches: TreeBranch[]; selected: string | null; select: (seat: string) => void; unsurveyed?: string | null }) {
   return <ul className="network-branches" role="tree" aria-label="Network machines" onKeyDown={walk}>{all.map(({ machine, agents }) => <li key={machine.id} data-machine={machine.id} role="none">
     <details open><summary role="treeitem" className="network-fold network-machine" title={machine.name + ' · ' + machine.kind}><span className="network-fold-name">{machine.name}</span></summary>
-      <ul role="group">{agents.length ? agents.map((agent) => <AgentRow key={agent.id} agent={agent} selected={selected} select={select} unsurveyed={unsurveyed} />) : <li className="dim network-empty" role="none">no agents</li>}</ul>
+      <ul role="group">{agents.length ? agents.map((agent) => <AgentRow key={agent.id} agent={agent} selected={selected} select={select} unsurveyed={unsurveyed} />) : <li className="dim network-empty" role="none">No agent may start here yet.</li>}</ul>
     </details>
   </li>)}</ul>;
 }
@@ -102,7 +103,7 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const named = useAgentNames(load.status === 'ok' ? load.data : null);
   // The live sessions arrive on their own; the tree never waits for them.
   const running = useLive(readRunning, 'operations-network-running');
-  const unsurveyed = running.status === 'ok' ? running.data.unanswered : running.status === 'refused' ? said(running.refused) : 'the live session list has not answered yet';
+  const unsurveyed = running.status === 'ok' ? running.data.unanswered : running.status === 'refused' ? 'Running sessions could not be read: ' + said(running.refused) : 'Running sessions are still being read.';
   const [changes, setChanges] = useState<Record<string, SeatView>>({});
   const [width, setWidth] = useState<number | null>(null);
   const drag = useRef<number | null>(null);
@@ -131,7 +132,7 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
   const shown = within(width ?? base);
   return <Gate load={load} title="Network tree" ok={() => <div className="network-tree" style={{ '--network-pane-width': width === null && paneWidth === null ? FIFTH : shown + 'px' } as React.CSSProperties}>
     <aside className="network-list" aria-label="Network tree"><NetworkBranches branches={all} selected={session || agentChoice ? selected : chosen?.seat.name ?? null} select={select} unsurveyed={unsurveyed} />
-      {!all.length ? <p className="note">No active machine was returned.</p> : null}
+      {!all.length ? <p className="note">No computer is in use yet. <a href="#/network?add=computer">Add a computer</a> to start agents on it.</p> : null}
     </aside>
     <div className="network-divider" role="separator" aria-label="Network tree width" aria-orientation="vertical" tabIndex={0} aria-valuenow={shown} aria-valuemin={PANE_WIDTH.least} aria-valuemax={PANE_WIDTH.most}
       onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); resize(within(base + (event.key === 'ArrowRight' ? 24 : -24))); } }}
@@ -142,6 +143,6 @@ export function NetworkTree({ selected, select, paneWidth, resize, agent }: { se
       : agentLive && agentChoice ? <section className="terminal network-terminal" aria-label={'Terminal of ' + agentChoice.each.name}><Terminal key={agentLive.session} session={agentLive.session} agent={agentChoice.each.id} machine={agentChoice.machine.name} /></section>
       : agentChoice && !chosen ? <NetworkAgentStart key={agentChoice.each.id} agent={agentChoice.each.id} name={agentChoice.each.name} reason={agentChoice.each.reason} />
       : chosen ? <NetworkTreePane key={chosen.seat.name + ':' + (chosen.seat.session ?? '')} {...chosen} change={change} />
-      : <p className="note" role="status">{selected?.startsWith(SESSION_CHOICE) ? running.status === 'ok' ? 'The selected session is not running on an active machine.' : 'Reading the live sessions for the selected session…' : selected ? 'The selected seat was not returned on an active machine.' : 'Choose a seat in the tree to watch its terminal.'}</p>}</div>
+      : <p className="note" role="status">{selected?.startsWith(SESSION_CHOICE) ? running.status === 'ok' ? 'That session is no longer running. Choose another agent in the list.' : 'Reading the running sessions…' : selected ? 'That seat is no longer listed. Choose another in the list.' : 'Choose an agent in the list to watch its terminal.'}</p>}</div>
   </div>} />;
 }

@@ -24,6 +24,7 @@ import type { Group, Link, Side, Widget } from './canvas-marks';
 import { counted } from '../../shell/count';
 import { COMBINES, KINDS, accountsOf, combined, scopeOf, summed } from './canvas-widgets';
 import type { AgentWindow, Scope, Summed, Value } from './canvas-widgets';
+import { ErrorWords } from '../people/Words';
 import '../dashboard/dashboard.css';
 
 const FIGURE: Record<Measure, string> = { context_percent: 'Context', tokens: 'Tokens', running_ms: 'Running', dollars: 'Dollars', plan_percent: 'Plan' };
@@ -156,7 +157,7 @@ function usagePart(scope: Scope, { shows, faces, look, selected, select }: Chose
         <td className="sec">{bar(each.used_percent, amount('plan_percent', each.used_percent) + ' used')}{amount('plan_percent', each.used_percent)} used, resets {clockMs(each.resets_at_ms)}</td>
       </tr>))}
       {unread.map((row) => <tr key={row.agent.id} data-usage="unread"><td>{row.agent.display_name}</td>
-        <td className="why-not">Its usage could not be read. {refusedPart(row.usage) ? <small className="refusal-name" title={row.usage.reason}>{row.usage.refusal}</small> : null}</td></tr>)}
+        <td className="why-not" title={refusedPart(row.usage) ? row.usage.refusal + ': ' + row.usage.reason : undefined}>Its usage could not be read.</td></tr>)}
       {silent.length ? <tr className="empty" data-usage="silent"><td className="dim" colSpan={2}>{several
         ? 'No usage has been reported for ' + silent.map((row) => row.agent.display_name).join(', ') + '.'
         : 'No usage has been reported for this agent yet.'}</td></tr> : null}
@@ -275,9 +276,9 @@ export function WidgetCard({ widget, held, board, morph, chosen, pick, move, lin
   const now = standing(widget);
   let body: ReactNode;
   if (board.status === 'loading') body = <p role="status">Reading…</p>;
-  else if (board.status === 'refused') body = <p className="why-not" role="alert">This could not be read. <small className="refusal-name" title={board.refused.refusal.reason}>{board.refused.refusal.refusal}</small></p>;
+  else if (board.status === 'refused') body = <ErrorWords problem={board.refused} />;
   else body = part ? part.body : <p className="why-not" role="alert">This page does not know a widget of the kind “{widget.kind}”.</p>;
-  const figure = board.status === 'refused' ? board.refused.refusal.refusal : part ? part.figure ?? part.count : board.status === 'loading' ? '…' : 'Unknown kind';
+  const figure = board.status === 'refused' ? 'Not readable' : part ? part.figure ?? part.count : board.status === 'loading' ? '…' : 'Unknown kind';
   const turned = nextView(widget.view, !!kind?.faces);
   const next = turned === 'faces' ? 'Medium face' : turned === 'detail' ? 'Large face' : turned === 'settings' ? 'Its settings' : 'Small face';
   const medium = widget.faces ?? kind?.faces ?? [];

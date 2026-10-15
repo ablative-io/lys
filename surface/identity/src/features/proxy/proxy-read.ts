@@ -34,7 +34,7 @@ const pieces = (content: unknown): Piece[] => typeof content === 'string' ? [{ k
 /** The request as it is read; null when it is not a list of messages. */
 export function readIn(request: unknown): ReadIn | null {
   if (!object(request) || !Array.isArray(request.messages)) return null;
-  const said = (name: string, value: unknown): [string, string][] => value === undefined || value === null || typeof value === 'object' ? [] : [[name, String(value)]];
+  const said = (name: string, value: unknown): [string, string][] => value === undefined || value === null || typeof value === 'object' ? [] : [[name, value === true ? 'yes' : value === false ? 'no' : String(value)]];
   const settings = [...said('Model', request.model), ...said('Most tokens out', request.max_tokens), ...said('Streamed', request.stream),
     ...said('Thinking', object(request.thinking) ? request.thinking.type : undefined), ...said('Effort', object(request.output_config) ? request.output_config.effort : undefined)];
   return {

@@ -7,6 +7,7 @@ import { api, useLoad } from '../../api';
 import type { Entry } from '../people/directory';
 import { Start } from '../team/Start';
 import { said } from './canvas-kept';
+import { problemWords } from '../people/Words';
 
 /** Who is asking, whether they may approve settings, and the agent as the directory has it. */
 async function readStart(agent: string): Promise<{ me: string; admin: boolean; entry: Entry }> {
@@ -21,8 +22,8 @@ async function readStart(agent: string): Promise<{ me: string; admin: boolean; e
 export function NetworkAgentStart({ agent, name, reason }: { agent: string; name: string; reason: string | null }) {
   const load = useLoad(() => readStart(agent), 'network-agent-start:' + agent);
   return <section className="terminal network-terminal" aria-label={'Terminal of ' + name}>
-    <header className="terminal-head"><h2 title={name}>{name}</h2><span role="status">not running</span></header>
-    {reason ? <p className="network-reason" role="status">{reason}</p> : null}
+    <header className="terminal-head"><h2 title={name}>{name}</h2><span role="status">Not running</span></header>
+    {reason ? <p className="network-reason" role="status" title={reason}>{problemWords(reason)}</p> : null}
     {load.status === 'ok' ? <Start key={agent} entry={load.data.entry} me={load.data.me} admin={load.data.admin}
       // The tree follows the service's change feed, so a started run shows up in it without a read of its own.
       changed={() => undefined}

@@ -14,8 +14,10 @@ import { OwnedList } from './Owned';
 import { clockMs } from '../file/time';
 import { TableScroll } from '../../shell/Listing';
 import { RecordName, useRecordNames } from '../../shell/RecordName';
+import { ErrorWords, problemWords } from '../people/Words';
 
-const STATE_WORDS: Record<SeatState, string> = {
+/** Each seat state in words, the same on every screen that names one. */
+export const STATE_WORDS: Record<SeatState, string> = {
   'online-working': 'Online, working',
   'online-idle': 'Online, idle',
   offline: 'Offline',
@@ -27,14 +29,14 @@ const running = (seat: SeatView) => seat.state === 'online-working' || seat.stat
 
 const refusalOf = (error: unknown): Refused => error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
 
-/** A refusal said by its name and the service's own words. */
+/** A refusal said in plain words; its name and the service's own words are in the Error details fold. */
 function Refusal({ refused }: { refused: Refused }) {
-  return <p className="why-not" role="alert"><b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span></p>;
+  return <ErrorWords problem={refused} />;
 }
 
-/** A read that was refused, said in place: what could not be read, the refusal's name and its words. Nothing is shown as empty. */
+/** A read that was refused, said in place: what could not be read, and why in plain words. Nothing is shown as empty. */
 function Unread({ refused, what }: { refused: Refused; what: string }) {
-  return <p className="why-not">{what} could not be read. <b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span></p>;
+  return <div className="seats-unread"><p className="why-not">{what} could not be read.</p><ErrorWords problem={refused} /></div>;
 }
 
 /** A refusal by name settles a change; an unreachable or unreadable answer leaves its outcome unknown, so its operation is kept for the retry. */
@@ -46,10 +48,11 @@ export function Seats() {
   return <section className="card seats" aria-label="Seats">
     <h2>Seats</h2>
     <Gate load={list} title="the seats" renderError={(refused) => <Unread refused={refused} what="The seats" />} ok={(answer) => <SeatTable answer={answer} />} />
-    <h3>Owners</h3>
-    <OwnedList />
-    <h3>Seen but unregistered</h3>
-    <Gate load={unregistered} title="the sessions held for no seat" renderError={(refused) => <Unread refused={refused} what="The sessions held for no seat" />} ok={(answer) => <Unregistered answer={answer} />} />
+    <h3>Sessions with no seat</h3>
+    <p className="note">Agent sessions a computer is running that no seat started.</p>
+    <Gate load={unregistered} title="the sessions with no seat" renderError={(refused) => <Unread refused={refused} what="The sessions with no seat" />} ok={(answer) => <Unregistered answer={answer} />} />
+    {/* The processes behind the seats are for whoever is troubleshooting a computer, so they stay folded. */}
+    <details className="seats-owners"><summary>Seat processes, for troubleshooting</summary><OwnedList /></details>
   </section>;
 }
 
@@ -58,10 +61,10 @@ function SeatTable({ answer }: { answer: SeatList }) {
   return <>
     {names.status === 'refused' ? <Unread refused={names.refused} what="Agent and computer names" /> : null}
     {answer.runner === 'unknown' ? <p className="why-not" role="status">
-      <b>Runner unknown</b> <span className="sec">{answer.reason ?? 'The service gave no reason.'}</span> Every state below is unknown: nothing is known to be online or offline.
+      Lys could not reach the computers' runners, so every state below is unknown: nothing is known to be online or offline.{answer.reason ? <span className="sec" title={answer.reason}> {problemWords(answer.reason)}</span> : null}
     </p> : null}
     {answer.seats.length ? <TableScroll label="Seats"><table>
-      <thead><tr><th>Seat</th><th>Agent</th><th>Computer</th><th>State</th><th>Session</th><th>Acts</th></tr></thead>
+      <thead><tr><th>Seat</th><th>Agent</th><th>Computer</th><th>State</th><th>Session</th><th>Actions</th></tr></thead>
       <tbody>{answer.seats.map((seat) => <SeatRow key={seat.name} seat={seat} names={names.status === 'ok' ? names.data : new Map()} />)}</tbody>
     </table></TableScroll> : <p className="note">No seat is registered. A seat is recorded with <span className="mono">lys seat add</span>.</p>}
   </>;
@@ -87,14 +90,14 @@ function SeatRow({ seat, names }: { seat: SeatView; names: Map<string, string> }
     sending.current = true; setBusy(true); setRefusal(null); setDone('');
     try {
       if (doing === 'start') {
-        const answer = await seats.start(seat.name, operation);
-        setDone('Started as session ' + answer.session + '.');
+        await seats.start(seat.name, operation);
+        setDone('Started.');
       } else if (doing === 'stop') {
         const answer = await seats.stop(seat.name, operation, force);
-        setDone(answer.ended ? 'Session ' + answer.session + ' ended.' : 'Stop asked of session ' + answer.session + '; its runner has not yet confirmed it ended.');
+        setDone(answer.ended ? 'Stopped.' : 'Asked to stop. Its computer has not yet confirmed it stopped.');
       } else {
-        const answer = await seats.restart(seat.name, operation, force);
-        setDone('Restarted as session ' + answer.session + '.');
+        await seats.restart(seat.name, operation, force);
+        setDone('Restarted.');
       }
       attempt.current = null;
       refreshLive();
@@ -112,7 +115,7 @@ function SeatRow({ seat, names }: { seat: SeatView; names: Map<string, string> }
     <td>{STATE_WORDS[seat.state]}<p className="note">{seat.last_signal_at === undefined || seat.last_signal_at === null ? 'No signal seen' : 'Last signal ' + clockMs(seat.last_signal_at)}</p></td>
     <td>{seat.session ? <RecordName id={seat.session} name={seat.name + ' session'} /> : <span className="dim">None</span>}</td>
     <td>
-      {(['start', 'stop', 'restart'] as const).filter(doing => doing === 'start' || seat.state !== 'offline' && seat.state !== 'not-seen').map((doing) => <Act key={doing} symbol={DOING_WORDS[doing].symbol} name={DOING_WORDS[doing].word + ' ' + seat.name} word={DOING_WORDS[doing].word} className="small" disabled={busy} onClick={() => { void act(doing, false); }} />)}
+      {(['start', 'stop', 'restart'] as const).filter((doing) => doing === 'start' ? !running(seat) : seat.state !== 'offline' && seat.state !== 'not-seen').map((doing) => <Act key={doing} symbol={DOING_WORDS[doing].symbol} name={DOING_WORDS[doing].word + ' ' + seat.name} word={DOING_WORDS[doing].word} className="small" disabled={busy} onClick={() => { void act(doing, false); }} />)}
       {midTurn ? <p className="why-not">A turn is in progress. {midTurn === 'stop' ? 'Stopping' : 'Restarting'} anyway ends it mid-turn.
         <Act symbol={DOING_WORDS[midTurn].symbol} name={DOING_WORDS[midTurn].word + ' ' + seat.name + ' anyway'} word={DOING_WORDS[midTurn].word + ' anyway'} tone="danger" className="small" disabled={busy} onClick={() => { void act(midTurn, true); }} />
       </p> : null}
@@ -137,10 +140,10 @@ function SendBox({ seat }: { seat: SeatView }) {
     const { operation } = attempt.current;
     sending.current = true; setBusy(true); setRefused(null); setDelivered('');
     try {
-      const answer = await seats.send(seat.name, operation, text);
+      await seats.send(seat.name, operation, text);
       attempt.current = null;
       setText('');
-      setDelivered('Delivered to session ' + answer.session + ' as a user turn.');
+      setDelivered('Sent to ' + seat.name + '.');
     } catch (error) {
       const refusal = refusalOf(error);
       if (settled(refusal)) attempt.current = null;
@@ -167,9 +170,9 @@ function Unregistered({ answer: { sessions, unanswered } }: { answer: SeatUnregi
       <td className="mono">{entry.pid}</td>
       <td>{clockMs(entry.started_at)}</td>
     </tr>)}</tbody>
-  </table></TableScroll> : <p className="note">The runners that answered reported no unregistered sessions.</p>}
-  {unanswered === undefined ? <p className="why-not">The service did not report which runners answered. The other runners' sessions remain unknown.</p>
-    : unanswered.length ? <section aria-label="Runners that did not answer"><ul>{unanswered.map((runner) =>
+  </table></TableScroll> : <p className="note">No computer that answered is running a session without a seat.</p>}
+  {unanswered === undefined ? <p className="why-not">Lys did not say which computers answered, so sessions on the others are not known.</p>
+    : unanswered.length ? <section aria-label="Runners that did not answer"><p className="why-not">These computers did not answer, so their sessions are not known:</p><ul>{unanswered.map((runner) =>
       <li key={runner.machine}><RecordName id={runner.machine} name={runner.name} />: {runner.reason}</li>)}</ul></section> : null}
   </>;
 }

@@ -112,7 +112,7 @@ describe('People and agents', () => {
   });
   it('names a refused runtime read instead of reporting zero', async () => {
     await mount('#/people', { ...SERVICE, '/runtime/sessions': refused(503, 'RuntimeUnavailable', 'No reports store') });
-    expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['—', '—']); expect(text()).toContain('RuntimeUnavailable');
+    expect($$('.stat .n').slice(3).map((entry) => entry.textContent)).toEqual(['—', '—']); expect($$('.stat .why-not').map((entry) => entry.getAttribute('title'))).toEqual(['RuntimeUnavailable: No reports store', 'RuntimeUnavailable: No reports store']); expect(text()).not.toContain('RuntimeUnavailable');
   });
   it('lists agents across the full width, with no run or terminal beside the list', async () => {
     await mount('#/people'); await click($('[data-kind="agent"]'));
