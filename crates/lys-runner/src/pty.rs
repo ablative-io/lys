@@ -78,6 +78,9 @@ fn size(columns: u16, rows: u16) -> Result<PtySize, RunnerError> {
 }
 
 /// Start `spawn` in a new pseudo-terminal of its size.
+///
+/// # Errors
+/// - `RunnerError::Refused` if the launch directory or size is invalid, or terminal creation, input/output setup, spawning or process-id acquisition fails.
 pub fn spawn(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
     spawn_with_environment(spawn, false)
 }
@@ -85,6 +88,9 @@ pub fn spawn(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
 /// Start a trusted containment helper with only the explicitly supplied
 /// environment, TERM and an empty SHELL. No inherited loader, proxy, credential or harness
 /// setting reaches its first instruction. This is not a sandbox receipt.
+///
+/// # Errors
+/// - `RunnerError::Refused` if a helper environment variable other than TERM is supplied, the launch directory or size is invalid, or terminal, descriptor, spawn or process-id setup fails.
 pub fn spawn_isolated(spawn: &Spawn<'_>) -> Result<Spawned, RunnerError> {
     for name in spawn.environment.keys() {
         if name != "TERM" {
@@ -189,6 +195,9 @@ fn spawn_with_environment(spawn: &Spawn<'_>, isolated: bool) -> Result<Spawned, 
 }
 
 /// Resize the terminal `master` holds.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `size_invalid` for a zero dimension or `resize_failed` if the terminal resize fails.
 pub fn resize(master: &dyn MasterPty, columns: u16, rows: u16) -> Result<(), RunnerError> {
     master
         .resize(size(columns, rows)?)
@@ -220,6 +229,9 @@ pub enum Left {
 /// cleanup; an absent leader does not prevent proving the remaining members.
 /// Identity verification and signalling are separate kernel operations: a
 /// process can exit and its id can be reassigned between them.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `end_failed` if the group id is invalid or the kernel exit-notification queue cannot be opened.
 pub fn end_left_group(leader: &crate::peer::Leader) -> Result<Left, RunnerError> {
     end_left_group_with(leader, test_kill_process_group)
 }
@@ -239,11 +251,13 @@ pub struct PreparedEnd {
 impl PreparedEnd {
     /// Await registered exits and clean up newcomers, without holding a session lock.
     /// A readable cancellation descriptor refuses every exit still awaited.
+    #[must_use]
     pub fn wait(mut self, cancel: Option<std::os::fd::BorrowedFd<'_>>) -> Left {
         self.plan.wait(cancel)
     }
 
     /// Refuse unconfirmed exits without blocking, for a synchronous drop path.
+    #[must_use]
     pub fn refuse(self) -> Left {
         self.plan.decline()
     }
@@ -283,6 +297,9 @@ fn group(pid: u32) -> Result<Pid, RunnerError> {
 /// End the process `pid` and everything it started in its terminal: the
 /// child leads its own session, so its process group is ended whole, at
 /// once, by a signal no process can ignore.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `end_failed` if the process id is invalid or signalling the group fails.
 pub fn end_group(pid: u32) -> Result<(), RunnerError> {
     kill_process_group(group(pid)?, Signal::KILL).map_err(|error| {
         RunnerError::refused("end_failed", format!("process group {pid}: {error}"))

@@ -59,6 +59,7 @@ pub enum Harness {
 
 impl Harness {
     /// The one adapter that reads it.
+    #[must_use]
     pub fn adapter(self) -> &'static str {
         match self {
             Self::ClaudeCode => CLAUDE_ADAPTER,
@@ -155,6 +156,9 @@ impl Tracking {
     /// The tracking, refused by name: an adapter not the harness's, a
     /// declared version it was not measured against, a declared window of no tokens, a home
     /// that is not absolute, or a pre-tool hook the harness has not.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the adapter or version is unsupported, unmeasured tracking declares measured features, the context window is empty, the home is invalid, or Codex requires an unavailable pre-tool hook.
     pub fn checked(&self) -> Result<(), RunnerError> {
         if self.adapter != self.harness.adapter() {
             return Err(unsupported(format!(
@@ -198,6 +202,9 @@ impl Tracking {
 
 /// Refuse `tracking_contract_unsupported` unless `adapter` was measured
 /// against harness `version`.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `tracking_contract_unsupported` if the adapter is unknown or its measured versions do not contain the supplied version.
 pub fn measured(adapter: &str, version: &str) -> Result<(), RunnerError> {
     let versions = MEASURED
         .iter()
@@ -326,6 +333,7 @@ pub struct Accounts<'a> {
 impl Accounts<'_> {
     /// The paying account at instant `at`, or why none is named: an instant
     /// on a move is ambiguous, and so is one after the list ran out.
+    #[must_use]
     pub fn at(&self, at: u64) -> (Option<String>, Option<String>) {
         let Some(current) = self.current else {
             return match self.declared {
@@ -349,6 +357,7 @@ impl Accounts<'_> {
 }
 
 /// The instant an RFC 3339 `timestamp` names, in milliseconds.
+#[must_use]
 pub fn instant(value: &Value) -> Option<u64> {
     let text = value.get("timestamp")?.as_str()?;
     let stamp: jiff::Timestamp = text.parse().ok()?;

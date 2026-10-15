@@ -77,6 +77,10 @@ fn boundary(name: &str, turn: Option<String>) -> Body {
 impl Sessions {
     /// Keep what session `id`'s harness signalled, answering in words what
     /// was kept.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if session locking, hook/notification validation, source binding, cursor advancement or the durable writer fails.
+    /// - `RunnerError::State` if a collected feed record cannot be encoded, read or durably appended.
     pub fn collect(
         self: &Arc<Self>,
         id: &str,
@@ -251,6 +255,7 @@ fn flushed_at(
 
 /// The directory name Claude Code keeps a working directory's sessions
 /// under: every character not an ASCII letter or digit made `-`.
+#[must_use]
 pub fn slug(cwd: &str) -> String {
     cwd.chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })

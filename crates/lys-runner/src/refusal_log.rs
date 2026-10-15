@@ -29,6 +29,7 @@ use crate::tracking_store::{Body, Commit, attempt_key};
 
 /// The attempt's identity: the harness's tool-use id when it gave one,
 /// else a digest of the call itself, so a repeat is the same attempt.
+#[must_use]
 pub fn attempt_of(session: &str, asked: &JudgeAsk) -> String {
     if let Some(attempt) = asked.attempt.as_deref().filter(|given| !given.is_empty()) {
         return format!("tool-use:{attempt}");
@@ -302,6 +303,9 @@ pub struct AuditGap {
 
 impl Sessions {
     /// The leaders of every running session, by session.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `session_table_poisoned` if the session table cannot be locked.
     pub fn leaders(&self) -> Result<BTreeMap<String, Leader>, RunnerError> {
         Ok(self
             .read_lock()?
@@ -313,6 +317,9 @@ impl Sessions {
     }
 
     /// What session `id` was started with beside its launch.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `session_table_poisoned` if the session table cannot be locked.
     pub fn guard(&self, id: &str) -> Result<Option<Guard>, RunnerError> {
         Ok(self
             .read_lock()?
@@ -322,6 +329,9 @@ impl Sessions {
     }
 
     /// Each session whose audit has a gap, and the gap.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `session_table_poisoned` if the session table cannot be locked.
     pub fn gaps(&self) -> Result<BTreeMap<String, AuditGap>, RunnerError> {
         Ok(self.read_lock()?.gaps.clone())
     }

@@ -67,6 +67,7 @@ pub struct Kept {
 
 impl Kept {
     /// The record of `sessions`, in this format.
+    #[must_use]
     pub fn new(sessions: Vec<KeptSession>) -> Self {
         Self {
             format: FORMAT.to_owned(),
@@ -93,6 +94,10 @@ fn unavailable(what: impl std::fmt::Display) -> RunnerError {
 impl StateFile {
     /// The record in `dir`, which is made, readable by its owner alone, when
     /// it does not exist.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if the state directory, lock or runner identity cannot be created, protected, opened, read or written.
+    /// - `RunnerError::StateHeld` if another process holds the directory lock.
     pub fn open(dir: &Path) -> Result<Self, RunnerError> {
         fs::create_dir_all(dir)
             .map_err(|error| unavailable(format!("making {}: {error}", dir.display())))?;
@@ -112,6 +117,7 @@ impl StateFile {
     }
 
     /// The runner's own id.
+    #[must_use]
     pub fn runner(&self) -> &str {
         &self.runner
     }
@@ -121,6 +127,9 @@ impl StateFile {
     }
 
     /// The record, empty when none was written.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if reading, JSON decoding or format migration fails, the format is unknown, or leader and responsibility records are invalid.
     pub fn read(&self) -> Result<Kept, RunnerError> {
         let bytes = match fs::read(&self.path) {
             Ok(bytes) => bytes,
@@ -181,6 +190,10 @@ impl StateFile {
     }
 
     /// Replace the record with `kept`, durably.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if record encoding or atomic durable replacement fails.
+    /// - `RunnerError::Refused` if the durable writer cannot accept or complete the replacement.
     pub fn write(&self, kept: &Kept) -> Result<(), RunnerError> {
         self.save(kept)
     }

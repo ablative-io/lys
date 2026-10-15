@@ -105,6 +105,13 @@ fn bind(path: &Path) -> Result<UnixListener, RunnerError> {
 
 impl Runner {
     /// Open the sessions `options` records and bind its socket.
+    ///
+    /// # Errors
+    /// - `RunnerError::AlreadyRunning` if a runner already answers on the socket.
+    /// - `RunnerError::Socket` if the socket cannot be removed, bound or protected.
+    /// - `RunnerError::StateHeld` if another runner holds the state directory.
+    /// - `RunnerError::State` if persisted sessions, feed or operation records cannot be read, migrated or written.
+    /// - `RunnerError::Refused` if the socket path or scrollback is invalid, durable-writer setup fails, or session-owner recovery fails.
     pub fn open(options: &Options) -> Result<Self, RunnerError> {
         refuse_live(&options.socket)?;
         let sessions = Sessions::open(&options.state, options.scrollback)?;
@@ -123,6 +130,7 @@ impl Runner {
     }
 
     /// The sessions it holds.
+    #[must_use]
     pub fn sessions(&self) -> &Arc<Sessions> {
         &self.sessions
     }
@@ -132,6 +140,11 @@ impl Runner {
     /// each exit is seen, and remove the socket. `ready` is called once the
     /// signals are held and the runner serves, so a stop asked for after it
     /// is never missed.
+    ///
+    /// # Errors
+    /// - `RunnerError::Socket` if signal/runtime setup, serving-thread join, stop signalling or socket removal fails.
+    /// - `RunnerError::Refused` if session locking, process shutdown or a durable-writer operation fails.
+    /// - `RunnerError::State` if the final session state cannot be persisted.
     pub fn serve_until_stopped(self, ready: impl FnOnce()) -> Result<(), RunnerError> {
         use tokio::signal::unix::{SignalKind, signal};
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -170,7 +183,7 @@ impl Runner {
         let (serving, name) = asked?;
         match serving.sessions().keep_for_restart(&state) {
             Ok(0) => {
-                crate::error::said(&format!("asked to stop by {name}: no session was running"))
+                crate::error::said(&format!("asked to stop by {name}: no session was running"));
             }
             Ok(kept) => crate::error::said(&format!(
                 "asked to stop by {name}: {kept} running session(s) kept; each resumes in its own conversation when the runner starts again"
@@ -189,6 +202,7 @@ impl Runner {
     }
 
     /// Serve on a thread of its own until [`Serving::stop`].
+    #[must_use]
     pub fn spawn(self) -> Serving {
         let (stop, stopped) = tokio::sync::watch::channel(false);
         let sessions = Arc::clone(&self.sessions);
@@ -317,11 +331,17 @@ fn connection_result(result: Option<Result<Result<(), RunnerError>, tokio::task:
 
 impl Serving {
     /// The sessions it holds.
+    #[must_use]
     pub fn sessions(&self) -> &Arc<Sessions> {
         &self.sessions
     }
 
     /// Stop uses its held signal channel even after the listener path disappears.
+    ///
+    /// # Errors
+    /// - `RunnerError::Socket` if joining the serving thread, sending its stop signal or removing the socket fails.
+    /// - `RunnerError::Refused` if session locking, process shutdown or a durable-writer operation fails.
+    /// - `RunnerError::State` if the final session state cannot be persisted.
     pub fn stop(self) -> Result<(), RunnerError> {
         let stopped = self.sessions.stop_all();
         let sent = self.stop.send(true);

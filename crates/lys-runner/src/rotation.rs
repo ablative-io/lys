@@ -38,6 +38,7 @@ pub enum Limit {
 
 impl Limit {
     /// The signal's name, as a move records it.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::PlanWindow => "plan_window",
@@ -104,6 +105,9 @@ impl RotationState {
     }
     /// The rotation `rotation` at its first account, refused by name when it
     /// names no account, a variable no environment can hold, or no words.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `rotation_invalid` if account handles are absent or empty, the environment variable is invalid, or a word-based limit has no nonempty words.
     pub fn new(rotation: Rotation) -> Result<Self, RunnerError> {
         let refused = |words: &str| RunnerError::refused("rotation_invalid", words);
         if rotation.accounts.is_empty() {
@@ -143,17 +147,20 @@ impl RotationState {
     }
 
     /// The environment variable the handle is set in.
+    #[must_use]
     pub fn variable(&self) -> &str {
         &self.rotation.variable
     }
 
     /// The arguments a moved session is started again with, when the
     /// rotation names any.
+    #[must_use]
     pub fn resume_arguments(&self) -> Option<&[String]> {
         (!self.rotation.resume_arguments.is_empty()).then_some(&*self.rotation.resume_arguments)
     }
 
     /// Every move made, in order.
+    #[must_use]
     pub fn moves(&self) -> &[Move] {
         &self.moves
     }
@@ -161,6 +168,7 @@ impl RotationState {
     /// Whether an exit with `status` is a usage limit: the harness's own
     /// exit status when it has that signal, or the words seen before the
     /// exit when it has none. An exit by a signal carries no status.
+    #[must_use]
     pub fn limit_at_exit(&self, status: Option<u32>) -> bool {
         match &self.rotation.limit {
             Limit::ExitStatus { status: limit } => status == Some(*limit),
@@ -170,6 +178,7 @@ impl RotationState {
 
     /// Whether `text` carries the declared words, for a harness with no
     /// signal of its own; the harness's own signal is never read from text.
+    #[must_use]
     pub fn words_in(&self, text: &str) -> bool {
         match &self.rotation.limit {
             Limit::ExitStatus { .. } | Limit::PlanWindow => false,
@@ -188,6 +197,7 @@ impl RotationState {
 
     /// Whether a live reported window carries the declared structured limit.
     /// Fractional percentages are never rounded into a full window.
+    #[must_use]
     pub fn windows_in(&self, windows: &[crate::tracking_budget::PlanWindow], now_ms: u64) -> bool {
         matches!(self.rotation.limit, Limit::PlanWindow)
             && windows.iter().any(|window| {
@@ -203,6 +213,7 @@ impl RotationState {
     }
 
     /// Whether the limit was seen and the process is being ended for it.
+    #[must_use]
     pub fn tripped(&self) -> bool {
         self.tripped
     }

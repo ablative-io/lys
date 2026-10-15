@@ -92,6 +92,7 @@ pub struct Verdict {
 
 impl Verdict {
     /// Not denied: the harness decides.
+    #[must_use]
     pub fn pass(policy_version: Option<u64>) -> Self {
         Self {
             deny: false,
@@ -104,6 +105,7 @@ impl Verdict {
     }
 
     /// Denied `refusal`, for `reason`, recorded as `audit` says.
+    #[must_use]
     pub fn denied(refusal: &str, reason: String, audit: &str) -> Self {
         Self {
             deny: true,
@@ -116,6 +118,7 @@ impl Verdict {
     }
 
     /// The verdict a kept refusal gives, recorded as `audit` says.
+    #[must_use]
     pub fn of(record: &RefusalRecord, audit: &str) -> Self {
         Self {
             deny: true,
@@ -192,6 +195,7 @@ pub struct GrantAnswer {
 impl GrantAnswer {
     /// Whether this answers `question`: the same attempt, session, policy
     /// version and rule.
+    #[must_use]
     pub fn answers(&self, question: &GrantQuestion) -> bool {
         self.attempt == question.attempt
             && self.session == question.session
@@ -219,6 +223,7 @@ fn key(question: &GrantQuestion) -> String {
 }
 
 /// Build the question for `needed` on the proved session.
+#[must_use]
 pub fn question(
     (attempt, session, agent): (&str, &str, &str),
     policy_version: u64,
@@ -238,6 +243,9 @@ pub fn question(
 /// Ask `question` of the live grant authority and wait for its answer:
 /// refused, with the reason, when no channel is attached, when the channel
 /// that took it closes first, or when the caller leaves.
+///
+/// # Errors
+/// - `RunnerError::Refused` if the session table or wait is poisoned, the caller leaves, no grant authority is attached, or the channel closes or returns an invalid answer before the question completes.
 pub fn ask(
     sessions: &Sessions,
     question: GrantQuestion,

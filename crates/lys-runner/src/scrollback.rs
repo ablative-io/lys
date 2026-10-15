@@ -21,6 +21,7 @@ pub struct Scrollback {
 impl Scrollback {
     /// An empty scrollback keeping at most `limit` bytes; a runner refuses
     /// a limit of none before any session is kept ([`crate::Sessions::open`]).
+    #[must_use]
     pub fn new(limit: usize) -> Self {
         Self {
             bytes: VecDeque::new(),
@@ -30,11 +31,13 @@ impl Scrollback {
     }
 
     /// The oldest cursor kept.
+    #[must_use]
     pub fn oldest(&self) -> u64 {
         self.oldest
     }
 
     /// The cursor after the last byte.
+    #[must_use]
     pub fn end(&self) -> u64 {
         self.oldest + self.bytes.len() as u64
     }
@@ -51,6 +54,9 @@ impl Scrollback {
 
     /// The bytes from `cursor` to the end, refused `cursor_expired` when the
     /// cursor is older than the oldest kept.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `cursor_expired` if the cursor precedes the oldest retained byte.
     pub fn from(&self, cursor: u64) -> Result<Vec<u8>, RunnerError> {
         if cursor < self.oldest {
             return Err(self.expired(cursor));
@@ -60,6 +66,7 @@ impl Scrollback {
     }
 
     /// The refusal for a read from `cursor`, older than the oldest kept.
+    #[must_use]
     pub fn expired(&self, cursor: u64) -> RunnerError {
         RunnerError::Refused {
             refusal: "cursor_expired".to_owned(),
@@ -73,6 +80,7 @@ impl Scrollback {
 
     /// The cursor the last `lines` lines begin at. A newline that ends the
     /// output does not begin a line of its own.
+    #[must_use]
     pub fn last_lines(&self, lines: u32) -> u64 {
         if lines == 0 {
             return self.end();
@@ -94,6 +102,7 @@ impl Scrollback {
     }
 
     /// The cursor the last `bytes` bytes begin at.
+    #[must_use]
     pub fn last_bytes(&self, bytes: u64) -> u64 {
         self.end().saturating_sub(bytes).max(self.oldest)
     }
@@ -101,6 +110,7 @@ impl Scrollback {
 
 /// How many bytes at the end of `bytes` begin a character they do not
 /// finish, so a read stops before them and gives them whole next time.
+#[must_use]
 pub fn unfinished(bytes: &[u8]) -> usize {
     for back in 1..=bytes.len().min(4) {
         let byte = bytes[bytes.len() - back];
@@ -120,6 +130,7 @@ pub fn unfinished(bytes: &[u8]) -> usize {
 
 /// `bytes` as text, whole characters only: the unfinished character at the
 /// end is left for the next read, and the count of bytes given is answered.
+#[must_use]
 pub fn whole_text(bytes: &[u8]) -> (String, usize) {
     let given = bytes.len() - unfinished(bytes);
     (String::from_utf8_lossy(&bytes[..given]).into_owned(), given)

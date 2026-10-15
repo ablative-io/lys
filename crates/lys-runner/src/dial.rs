@@ -106,6 +106,7 @@ pub const STALE: &str = "runner_dial_stale";
 /// The bytes a dial signature is over. The epoch and nonce are
 /// hexadecimal, so no field can carry the newline that ends the one before
 /// it, and the body is last.
+#[must_use]
 pub fn dial_signed_bytes(
     method: &str,
     route: &str,
@@ -119,17 +120,20 @@ pub fn dial_signed_bytes(
 }
 
 /// The route a machine asks for its next request on.
+#[must_use]
 pub fn next_route(machine: &str) -> String {
     format!("/runner/dial/{machine}/next")
 }
 
 /// The route the machine identity a computer's join made asks for a pass
 /// to an app on, signed as every dial is, by the key that join recorded.
+#[must_use]
 pub fn pass_route(machine: &str) -> String {
     format!("/runner/dial/{machine}/pass")
 }
 
 /// The route a machine posts the reply to a ticket on.
+#[must_use]
 pub fn reply_route(machine: &str, ticket: &str) -> String {
     format!("/runner/dial/{machine}/replies/{ticket}")
 }
@@ -169,12 +173,24 @@ struct Signer {
 impl Dial {
     /// Relay requests until the local runner ends or the server refuses this machine.
     /// A lost server connection reads a fresh epoch and reconnects without replaying a request.
+    ///
+    /// # Errors
+    /// - `RunnerError::Dial` if server/TLS setup, epoch or request decoding fails.
+    /// - `RunnerError::Unreachable` if the local runner socket fails or closes.
+    /// - `RunnerError::DialStale` if an epoch request or unrecovered signed exchange is refused as stale.
+    /// - `RunnerError::Refused` if the outbox, local controls, worker or reconnect state fails, or the server refuses admission.
     pub fn bridge(&self) -> Result<(), RunnerError> {
         bridge::run(self)
     }
 
     /// The next request for this machine and its ticket, asked with the
     /// greeting `greeting` of a connection to its runner.
+    ///
+    /// # Errors
+    /// - `RunnerError::Dial` if server/TLS setup fails, the epoch or request is not text, or the response omits its ticket.
+    /// - `RunnerError::Unreachable` if server transport fails or closes.
+    /// - `RunnerError::DialStale` if the server refuses the signed epoch.
+    /// - `RunnerError::Refused` if the server returns a named refusal or transport state cannot be held.
     pub fn next(&self, greeting: &str) -> Result<(String, String), RunnerError> {
         let signer = self.signer()?;
         let epoch = signer.epoch()?;
