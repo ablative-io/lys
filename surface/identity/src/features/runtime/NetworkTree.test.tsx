@@ -46,6 +46,13 @@ it('C737 draws every state and empty branch, excludes retired machines and names
   expect(host.querySelectorAll('details[open]')).toHaveLength(3);
   expect(host.querySelectorAll('[role="treeitem"]')).toHaveLength(9);
 });
+it('leaves retired agents out of the tree, unless something of theirs still runs there', () => {
+  const one = { ...machine('one'), may_run: [{ id: 'agent', display_name: 'Working', state: 'active' }, { id: 'gone', display_name: 'Retired', state: 'retired' }, { id: 'lingering', display_name: 'Still running', state: 'retired' }] };
+  const running = [{ machine: 'one', agent: 'lingering', session: 'op-1' }];
+  const [branch] = branches({ machines: [one] } as never, { runner: 'read', seats: [{ ...seat('held', 'offline'), agent: 'gone' }] } as never, {}, {}, running as never);
+  expect(branch.agents.map((agent) => agent.name)).toEqual(['Working', 'Still running']);
+  expect(branch.leaves).toHaveLength(0);
+});
 it('C737 draws the tree before the live sessions are read, marks a seatless agent running by its session, and keeps a refusal in the row title', async () => {
   const two = { ...machine('one'), may_run: [{ id: 'agent', display_name: 'Long display name' }, { id: 'other', display_name: 'Seatless' }] };
   const routes = { '/network': ok({ machines: [two], next: null }), '/seats': ok({ runner: 'read', seats: [seat('held', 'offline')] }) };

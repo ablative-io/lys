@@ -48,3 +48,14 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 /* A seat that is not running: what to do, and Start at its own size, never a bar across the pane. */
 .network-start { padding: 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .network-start .note { margin: 0; }
+/* The chosen agent's terminal is what Operations is for: it fills the pane's whole height and width, with one slim
+   line of name and acts above it, never a fixed-height box under a large heading. */
+.network-pane { padding: 8px; }
+.network-pane > .terminal { flex: 1; min-height: 0; margin: 0; padding: 6px; gap: 6px; border-radius: var(--radius-md); }
+.network-pane > .terminal .terminal-head { gap: 8px; }
+.network-pane > .terminal .terminal-head h2 { font-size: 14px; line-height: 20px; margin: 0; }
+.network-pane > .terminal .terminal-head .sec { margin: 0; font-size: 12px; }
+.network-pane > .terminal .terminal-head > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.network-pane > .terminal .terminal-state { margin: 0 0 0 auto; font-size: 12px; }
+.network-pane .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.network-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }

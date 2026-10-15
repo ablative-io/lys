@@ -105,8 +105,8 @@ export function useAgentNames(tree: TreeRead | null): AgentNames {
 }
 
 /**
- * The tree's branches: each computer in use, under it every agent it may run (in the service's order, once each
- * however many times the service listed it) and every agent holding a seat there, each with its seats and with the
+ * The tree's branches: each computer in use, under it every agent it may run that is not retired (in the service's
+ * order, once each however many times the service listed it; a retired one only while something of it still runs) and every agent holding a seat there, each with its seats and with the
  * sessions a runner holds for it outside any seat.
  */
 export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, names: Record<string, string> = {}, nameReasons: Record<string, string> = {}, running: RuntimeSession[] = []): TreeBranch[] {
@@ -116,8 +116,13 @@ export function branches(network: Pick<TreeRead, 'machines'>, list: SeatList, na
     if (held) held.push(seat); else byMachine.set(seat.machine, [seat]);
   }
   return network.machines.filter((machine) => machine.state !== 'retired').map((machine) => {
-    const allowed = new Map(machine.may_run.map((agent) => [agent.id, agent.display_name]));
-    const leaves: TreeLeaf[] = (byMachine.get(machine.id) ?? []).map((seat) => ({ seat,
+    // A retired agent has nothing to open: it is left out, unless something of it still runs here and needs stopping.
+    const retired = new Set(machine.may_run.filter((agent) => agent.state === 'retired').map((agent) => agent.id));
+    const stillRuns = (id: string) => running.some((session) => session.machine === machine.id && session.agent === id)
+      || (byMachine.get(machine.id) ?? []).some((seat) => seat.agent === id && online(seat));
+    const shown = (id: string) => !retired.has(id) || stillRuns(id);
+    const allowed = new Map(machine.may_run.filter((agent) => shown(agent.id)).map((agent) => [agent.id, agent.display_name]));
+    const leaves: TreeLeaf[] = (byMachine.get(machine.id) ?? []).filter((seat) => shown(seat.agent)).map((seat) => ({ seat,
       name: names[seat.agent] ?? allowed.get(seat.agent) ?? seat.agent,
       reason: [seat.reason, list.runner === 'unknown' ? list.reason ?? 'Runner unknown: no reason returned.' : null, nameReasons[seat.agent]].filter((value) => value).join('; ') || null,
     }));
