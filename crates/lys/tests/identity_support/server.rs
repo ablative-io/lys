@@ -131,7 +131,6 @@ impl LossyProxy {
     /// Starts the proxy in front of `upstream`.
     pub fn start(upstream: String, prefix: &'static str) -> TestResult<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
-        listener.set_nonblocking(true)?;
         let port = listener.local_addr()?.port();
         let stop = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&stop);
@@ -144,11 +143,15 @@ impl LossyProxy {
     /// Stops the proxy and returns how many answers it lost.
     pub fn finish(self) -> TestResult<u32> {
         self.stop.store(true, Ordering::SeqCst);
+        let wake = TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, self.port))
+            .and_then(|wake| wake.shutdown(Shutdown::Both));
         let served = self
             .handle
             .join()
             .map_err(|panic| format!("the proxy thread panicked: {panic:?}"))?;
-        Ok(served?)
+        let lost = served?;
+        wake?;
+        Ok(lost)
     }
 }
 
@@ -159,15 +162,15 @@ fn serve(
     prefix: &str,
 ) -> TestResult<u32> {
     let mut lost = 0;
-    while !stop.load(Ordering::SeqCst) {
+    loop {
         match listener.accept() {
             Ok((client, _)) => {
-                client.set_nonblocking(false)?;
+                if stop.load(Ordering::SeqCst) {
+                    break;
+                }
                 lost += forward(client, upstream, prefix, lost == 0)?;
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(20));
-            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
             Err(error) => return Err(error.into()),
         }
     }

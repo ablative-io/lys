@@ -9,7 +9,9 @@ use super::{Leave, RunnerRecord, Runners};
 use lys_core::Ed25519Identity;
 use lys_runner::{Act, RunnerError};
 use std::error::Error;
+use std::future::{Future as _, poll_fn};
 use std::sync::Arc;
+use std::task::Poll;
 
 const KEY: &str = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
 
@@ -51,11 +53,13 @@ fn a_dialled_runner_nobody_holds_is_refused_at_once_and_nothing_waits() -> Resul
 async fn a_dialled_runner_with_a_bridge_waiting_is_asked_and_its_answer_passed_on()
 -> Result<(), Box<dyn Error>> {
     let runners = runners();
-    let waiting = Arc::clone(&runners);
-    let bridge = tokio::spawn(async move { waiting.hub().next("machine").await });
-    while !runners.hub().bridged("machine")? {
-        tokio::task::yield_now().await;
-    }
+    let mut bridge = Box::pin(runners.hub().next("machine"));
+    poll_fn(|cx| {
+        assert!(bridge.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    assert!(runners.hub().bridged("machine")?);
     let asking = Arc::clone(&runners);
     let asked = tokio::task::spawn_blocking(move || {
         asking.ask(
@@ -65,7 +69,7 @@ async fn a_dialled_runner_with_a_bridge_waiting_is_asked_and_its_answer_passed_o
             &Leave::default(),
         )
     });
-    let (ticket, act) = bridge.await??;
+    let (ticket, act) = bridge.await?;
     assert!(matches!(act, Act::Liveness { session: None }));
     runners.hub().reply(
         "machine",
@@ -99,15 +103,17 @@ fn an_old_delivered_ticket_does_not_claim_the_disconnected_runner_is_still_prese
 async fn a_runner_between_two_handoffs_remains_connected_and_serves_both_requests()
 -> Result<(), Box<dyn Error>> {
     let runners = runners();
-    let waiting = Arc::clone(&runners);
-    let bridge = tokio::spawn(async move { waiting.hub().next("machine").await });
-    while !runners.hub().bridged("machine")? {
-        tokio::task::yield_now().await;
-    }
+    let mut bridge = Box::pin(runners.hub().next("machine"));
+    poll_fn(|cx| {
+        assert!(bridge.as_mut().poll(cx).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    assert!(runners.hub().bridged("machine")?);
     let first = runners
         .hub()
         .queue("machine", Act::Liveness { session: None })?;
-    let (ticket, _) = bridge.await??;
+    let (ticket, _) = bridge.await?;
     runners
         .hub()
         .reply("machine", &ticket, Ok("first".to_owned()))?;
