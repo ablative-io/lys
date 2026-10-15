@@ -142,6 +142,13 @@ describe('Lys setup page', () => {
       'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
     });
     expect($('#setup-policy')?.textContent).toBe(POLICY.words);
+    // The rule stands between the label and the field, read before anything is typed.
+    const policy = $('#setup-policy');
+    const field = $('#setup-password');
+    expect(policy?.previousElementSibling?.textContent).toBe('Password');
+    expect(policy?.nextElementSibling).toBe(field);
+    expect(field?.getAttribute('placeholder')).toBe('At least 12 characters');
+    expect(field?.getAttribute('aria-describedby')).toBe('setup-policy');
     await fill({ given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Engine-1843', confirm: 'Engine-1843' });
     await submit('Set up Lys');
     expect($('[role="alert"]')?.textContent).toBe(POLICY.words);
@@ -157,6 +164,7 @@ describe('Lys setup page', () => {
     const page = await render({ 'POST /setup/open': ok({ purpose: 'first-run', email: null, policy: null }) });
     expect($('form[aria-label="Set up Lys"]')).not.toBeNull();
     expect($('#setup-policy')).toBeNull();
+    expect($('#setup-password')?.hasAttribute('placeholder')).toBe(false);
     page.unmount();
   });
 

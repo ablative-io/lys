@@ -171,8 +171,11 @@ export function FirstRunSetup({ code: linked, done = () => location.replace(SIGN
       </div> : null}
       <div className="field">
         <label htmlFor="setup-password">Password</label>
-        <input id="setup-password" name="password" type="password" autoComplete="new-password" required disabled={busy} aria-describedby={opened.policy ? 'setup-policy' : undefined} />
+        {/* The rule is read before the field, so it is known before the first character is typed. */}
         {opened.policy ? <p id="setup-policy" className="note">{opened.policy.words}</p> : null}
+        <input id="setup-password" name="password" type="password" autoComplete="new-password" required disabled={busy}
+          placeholder={opened.policy ? `At least ${opened.policy.length_min} characters` : undefined}
+          aria-describedby={opened.policy ? 'setup-policy' : undefined} />
       </div>
       <div className="field">
         <label htmlFor="setup-confirm">Password again</label>
