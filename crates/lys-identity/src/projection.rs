@@ -55,41 +55,49 @@ pub struct Record {
 
 impl Record {
     /// How the identity is shown.
+    #[must_use]
     pub fn profile(&self) -> &Profile {
         &self.profile
     }
 
     /// The identity's lifecycle state. Recorded, never enforced.
+    #[must_use]
     pub fn state(&self) -> LifecycleState {
         self.state
     }
 
     /// An agent's current accountable person. `None` for a person.
+    #[must_use]
     pub fn responsible(&self) -> Option<PersonId> {
         self.responsible
     }
 
     /// The immediate reporting target recorded for an agent.
+    #[must_use]
     pub fn reports_to(&self) -> Option<IdentityId> {
         self.reports_to
     }
 
     /// The current gap in an agent's reporting chain, if one exists.
+    #[must_use]
     pub fn reporting_gap(&self) -> Option<ReportingGap> {
         self.reporting_gap
     }
 
     /// The logins bound to a person, in the order they were bound.
+    #[must_use]
     pub fn bindings(&self) -> &[LoginBinding] {
         &self.bindings
     }
 
     /// The login of the person who registered the identity.
+    #[must_use]
     pub fn registered_by(&self) -> &LoginBinding {
         &self.registered_by
     }
 
     /// The log indices of every event about the identity, oldest first.
+    #[must_use]
     pub fn events(&self) -> &[u64] {
         &self.events
     }
@@ -149,6 +157,10 @@ impl Projection {
     /// This never creates a login binding or changes the directory's log.
     /// The recorded owner must be a known person; retirement and suspension
     /// of that person also stop the account from exercising grants.
+    ///
+    /// # Errors
+    /// - `IdentityError::IdentityUnknown` if the account owner is not a known person.
+    /// - `IdentityError::AlreadyRegistered` if the account identity already exists.
     pub fn service_account(
         &mut self,
         id: crate::ServiceAccountId,
@@ -188,11 +200,13 @@ impl Projection {
     }
 
     /// An empty directory.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// The identity `id`, if the directory holds it.
+    #[must_use]
     pub fn record(&self, id: IdentityId) -> Option<&Record> {
         self.records
             .get(&id)
@@ -212,11 +226,13 @@ impl Projection {
     }
 
     /// The maintained number of people.
+    #[must_use]
     pub fn people_count(&self) -> usize {
         self.people.len()
     }
 
     /// The maintained number of agents answering to people.
+    #[must_use]
     pub fn people_agents_count(&self) -> usize {
         self.agent_count
     }
@@ -262,26 +278,44 @@ impl Projection {
     }
 
     /// The person a login is bound to.
+    #[must_use]
     pub fn person_for(&self, binding: &LoginBinding) -> Option<PersonId> {
         self.bindings.get(binding).copied()
     }
 
     /// The agent a login is bound to, as its own machine account.
+    #[must_use]
     pub fn agent_for(&self, binding: &LoginBinding) -> Option<AgentId> {
         self.agent_bindings.get(binding).copied()
     }
 
     /// The log index of the event an operation id made.
+    #[must_use]
     pub fn operation(&self, operation: OperationId) -> Option<u64> {
         self.operations.get(&operation).copied()
     }
 
     /// The log index of the event a link-audit source operation made.
+    #[must_use]
     pub fn link_source(&self, source_operation_id: &str) -> Option<u64> {
         self.link_sources.get(source_operation_id).copied()
     }
 
     /// Whether `event` would apply to the directory as it stands, refused by name if not.
+    ///
+    /// # Errors
+    /// - `IdentityError::OperationReused` if the operation is already recorded.
+    /// - `IdentityError::AlreadyRegistered` if a registration names an existing identity.
+    /// - `IdentityError::AlreadyBootstrapped` if setup repeats an existing login binding.
+    /// - `IdentityError::IdentityUnknown` if an identity or responsible person is absent.
+    /// - `IdentityError::BindingTaken` if a login already belongs to a person.
+    /// - `IdentityError::StateMismatch` if a transition names another current state.
+    /// - `IdentityError::LinkSourceSeen` if a link observation was already accepted.
+    /// - `IdentityError::ChangeMismatch` if a reporting change disagrees with its identity, edge or accountable person.
+    /// - `IdentityError::AnswersToUnknown` if the target is absent or is not a person or agent.
+    /// - `IdentityError::AnswersToInactive` if the immediate target is not active.
+    /// - `IdentityError::AnswersToCycle` if the reporting walk revisits an identity.
+    /// - `IdentityError::NoAccountablePerson` if the chain has a missing or inactive ancestor or no reporting edge.
     pub fn check(&self, event: &IdentityEvent) -> Result<(), IdentityError> {
         if self.operations.contains_key(&event.operation()) {
             return Err(IdentityError::OperationReused {
@@ -376,147 +410,10 @@ impl Projection {
             }
         }
     }
-
-    /// Advance the directory by the leaf `entry`, committed at log index `index`.
-    pub fn apply_entry(&mut self, entry: &Entry, index: u64) -> Result<(), IdentityError> {
-        match entry {
-            Entry::Identity(event) => self.apply(event, index),
-            Entry::Install(event) => self.apply_install(event, index),
-            Entry::Draft(event) => self.apply_draft(event, index),
-            Entry::ProductDraft(event) => self.apply_product_draft(event, index),
-        }
-    }
-
-    /// Advance the directory by `event`, committed at log index `index`.
-    pub fn apply(&mut self, event: &IdentityEvent, index: u64) -> Result<(), IdentityError> {
-        self.check(event)?;
-        let identity = event.identity();
-        Arc::make_mut(&mut self.operations).insert(event.operation(), index);
-        let registered_by = event.actor().binding().clone();
-        match event.change() {
-            Change::SetupPerson { profile } => {
-                let person = match identity {
-                    IdentityId::Person(person) => person,
-                    IdentityId::Agent(_)
-                    | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {
-                        return Err(IdentityError::ChangeMismatch {
-                            reason: "setup names a person",
-                        });
-                    }
-                };
-                let mut record = fresh(profile, None, registered_by.clone(), index);
-                record.state = LifecycleState::Active;
-                record.bindings.push(registered_by.clone());
-                Arc::make_mut(&mut self.records).insert(identity, record);
-                Arc::make_mut(&mut self.bindings).insert(registered_by, person);
-            }
-            Change::RegisterPerson { profile } => {
-                Arc::make_mut(&mut self.records)
-                    .insert(identity, fresh(profile, None, registered_by, index));
-            }
-            Change::RegisterAgent {
-                responsible,
-                profile,
-            } => {
-                let record = fresh(profile, Some(*responsible), registered_by, index);
-                self.register_reporting(identity, record, IdentityId::Person(*responsible))?;
-            }
-            Change::ReportingRegistration {
-                responsible,
-                profile,
-                reports_to,
-            } => {
-                let record = fresh(profile, Some(*responsible), registered_by, index);
-                self.register_reporting(identity, record, *reports_to)?;
-            }
-            Change::ReportsToChanged { to, .. } => {
-                self.apply_reporting_change(identity, *to, index)?;
-            }
-            Change::ChangeProfile { profile } => {
-                let record = self.held(identity)?;
-                record.profile = profile.clone();
-                record.events.push(index);
-            }
-            Change::BindLogin { binding } => {
-                let record = self.held(identity)?;
-                record.bindings.push(binding.clone());
-                record.events.push(index);
-                match identity {
-                    IdentityId::Person(person) => {
-                        Arc::make_mut(&mut self.bindings).insert(binding.clone(), person);
-                    }
-                    IdentityId::Agent(agent) => {
-                        Arc::make_mut(&mut self.agent_bindings).insert(binding.clone(), agent);
-                    }
-                    IdentityId::ServiceAccount(_) => {
-                        return Err(IdentityError::ChangeMismatch {
-                            reason: "a service account never acquires a sign-in binding",
-                        });
-                    }
-                    IdentityId::Connector(_) => {
-                        return Err(IdentityError::ChangeMismatch {
-                            reason: "a connector never acquires a sign-in binding",
-                        });
-                    }
-                    IdentityId::Machine(_) => {
-                        return Err(IdentityError::ChangeMismatch {
-                            reason: "a machine never acquires a sign-in binding",
-                        });
-                    }
-                }
-            }
-            Change::Transition { to, .. } => {
-                let record = self.held(identity)?;
-                record.state = *to;
-                record.events.push(index);
-                self.refresh_reporting_children(identity, None)?;
-            }
-            Change::AgentCall(_) => self.held(identity)?.events.push(index),
-            Change::LinkAudit(seen) => {
-                self.held(identity)?.events.push(index);
-                Arc::make_mut(&mut self.link_sources)
-                    .insert(seen.source_operation_id().to_owned(), index);
-            }
-        }
-        match identity {
-            IdentityId::Person(person) => {
-                Arc::make_mut(&mut self.people).insert(identity.to_string(), person);
-            }
-            // Only a person is indexed by name.
-            IdentityId::Agent(_)
-            | IdentityId::ServiceAccount(_)
-            | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => {}
-        }
-        Ok(())
-    }
-
-    fn held(&mut self, identity: IdentityId) -> Result<&mut Record, IdentityError> {
-        Arc::make_mut(&mut self.records)
-            .get_mut(&identity)
-            .ok_or_else(|| unknown(identity))
-    }
 }
 
-fn fresh(
-    profile: &Profile,
-    responsible: Option<PersonId>,
-    registered_by: LoginBinding,
-    index: u64,
-) -> Record {
-    Record {
-        profile: profile.clone(),
-        state: LifecycleState::Registered,
-        responsible,
-        reports_to: None,
-        reporting_gap: None,
-        bindings: Vec::new(),
-        registered_by,
-        events: vec![index],
-    }
-}
+#[path = "projection_apply.rs"]
+mod apply;
 
 #[path = "projection_state.rs"]
 pub(crate) mod state;
