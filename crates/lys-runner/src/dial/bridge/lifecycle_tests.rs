@@ -19,6 +19,8 @@ enum ReplyMode {
     Accepted,
     Refused,
     Expired,
+    Duplicate,
+    Unknown,
     Unavailable,
 }
 
@@ -36,7 +38,12 @@ struct Remote {
 
 async fn next(State(remote): State<Arc<Remote>>, body: Bytes) -> Response {
     let number = remote.polls.fetch_add(1, Ordering::AcqRel);
-    if number >= 2 {
+    let requests = if remote.mode == ReplyMode::Refused {
+        2
+    } else {
+        4
+    };
+    if number >= requests {
         let mut finished = remote.finished.subscribe();
         if finished.wait_for(|done| *done).await.is_err() {
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
@@ -65,6 +72,7 @@ async fn reply(
     Path(ticket): Path<String>,
     body: Bytes,
 ) -> Response {
+    let initial = matches!(ticket.as_str(), "0" | "1");
     let result = (|| -> Result<(), Box<dyn Error + Send + Sync>> {
         *remote
             .posted
@@ -80,8 +88,13 @@ async fn reply(
     if let Err(error) = result {
         return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response();
     }
+    if !initial {
+        return "{}".into_response();
+    }
     match remote.mode {
         ReplyMode::Expired => (StatusCode::GONE, "{\"refusal\":\"runner_reply_expired\",\"reason\":\"the caller left; do not send this reply again\"}").into_response(),
+        ReplyMode::Duplicate => (StatusCode::CONFLICT, "{\"refusal\":\"runner_reply_duplicate\",\"reason\":\"the reply was already delivered; do not send this reply again\"}").into_response(),
+        ReplyMode::Unknown => (StatusCode::NOT_FOUND, "{\"refusal\":\"runner_reply_unknown\",\"reason\":\"the ticket is unknown; do not send this reply again\"}").into_response(),
         ReplyMode::Refused => (
             StatusCode::FORBIDDEN,
             "{\"refusal\":\"fixture_reply_refused\"}",
@@ -91,6 +104,20 @@ async fn reply(
             StatusCode::SERVICE_UNAVAILABLE.into_response()
         }
         ReplyMode::Accepted => "{}".into_response(),
+    }
+}
+
+async fn answer(
+    answers: &mut mpsc::UnboundedReceiver<Answer>,
+    bridge: &mut tokio::task::JoinHandle<Result<(), crate::RunnerError>>,
+) -> Result<Answer, Box<dyn Error>> {
+    tokio::select! {
+        biased;
+        reply = answers.recv() => reply.ok_or_else(|| "the bridge did not post its answer".into()),
+        result = bridge => match result? {
+            Err(error) => Err(error.into()),
+            Ok(()) => Err("the bridge ended before its answer".into()),
+        },
     }
 }
 
@@ -141,7 +168,7 @@ async fn bridge(mode: ReplyMode) -> Result<(), Box<dyn Error>> {
         key: Arc::new(lys_core::Ed25519Identity::ephemeral()),
         authority: None,
     };
-    let bridge = tokio::task::spawn_blocking(move || dial.bridge());
+    let mut bridge = tokio::task::spawn_blocking(move || dial.bridge());
     arrivals
         .recv()
         .await
@@ -156,18 +183,18 @@ async fn bridge(mode: ReplyMode) -> Result<(), Box<dyn Error>> {
     })
     .await??;
     assert!(matches!(native, Answer::Liveness { .. }));
-    remote.release.add_permits(2);
-    let first = answers
-        .recv()
-        .await
-        .ok_or("the bridge did not post its answer")?;
-    assert!(matches!(first, Answer::Liveness { .. }));
-    if mode != ReplyMode::Refused {
-        let second = answers
-            .recv()
-            .await
-            .ok_or("the bridge did not post its second answer")?;
+    // Later tickets are accepted so a finished reply cannot disable unrelated requests.
+    for _ in 0..2 {
+        remote.release.add_permits(2);
+        let first = answer(&mut answers, &mut bridge).await?;
+        assert!(matches!(first, Answer::Liveness { .. }));
+        if mode == ReplyMode::Refused {
+            break;
+        }
+        let second = answer(&mut answers, &mut bridge).await?;
         assert!(matches!(second, Answer::Liveness { .. }));
+    }
+    if mode != ReplyMode::Refused {
         remote.finished.send(true)?;
     }
     let error = bridge
@@ -190,7 +217,7 @@ async fn bridge(mode: ReplyMode) -> Result<(), Box<dyn Error>> {
             "{error}"
         );
     } else {
-        assert_eq!(posted.len(), 2);
+        assert_eq!(posted.len(), 4);
         assert!(error.to_string().contains("fixture_finished"), "{error}");
     }
     Ok(())
@@ -210,6 +237,18 @@ async fn a_refused_reply_ends_the_bridge_without_posting_it_twice() -> Result<()
 async fn expired_replies_are_retired_once_while_other_requests_remain_usable()
 -> Result<(), Box<dyn Error>> {
     bridge(ReplyMode::Expired).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn duplicate_replies_are_retired_once_while_other_requests_remain_usable()
+-> Result<(), Box<dyn Error>> {
+    bridge(ReplyMode::Duplicate).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unknown_replies_are_retired_once_while_other_requests_remain_usable()
+-> Result<(), Box<dyn Error>> {
+    bridge(ReplyMode::Unknown).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

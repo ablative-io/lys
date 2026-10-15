@@ -4,6 +4,7 @@ use std::error::Error;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
 use std::os::unix::net::UnixListener;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Barrier, mpsc};
 
 #[test]
@@ -105,5 +106,85 @@ fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), B
     remote.join().map_err(|_| "remote fixture panicked")??;
     native.join().map_err(|_| "native fixture panicked")??;
     dir.close()?;
+    Ok(())
+}
+
+fn request(stream: &mut BufReader<std::net::TcpStream>) -> Result<String, String> {
+    let mut first = String::new();
+    stream
+        .read_line(&mut first)
+        .map_err(|error| error.to_string())?;
+    let mut length = 0;
+    loop {
+        let mut line = String::new();
+        stream
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
+        if line == "\r\n" {
+            break;
+        }
+        if line.is_empty() {
+            return Err("the request ended before its head".to_owned());
+        }
+        if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
+            length = value
+                .trim()
+                .parse::<usize>()
+                .map_err(|error| error.to_string())?;
+        }
+    }
+    let mut body = vec![0; length];
+    stream
+        .read_exact(&mut body)
+        .map_err(|error| error.to_string())?;
+    Ok(first)
+}
+
+#[test]
+fn a_lost_reply_connection_is_not_a_refusal_and_is_not_replayed() -> Result<(), Box<dyn Error>> {
+    let tcp = TcpListener::bind("127.0.0.1:0")?;
+    let server = format!("http://{}", tcp.local_addr()?);
+    let remote = std::thread::spawn(move || -> Result<(), String> {
+        for ticket in ["lost", "following"] {
+            let (stream, _) = tcp.accept().map_err(|error| error.to_string())?;
+            let mut stream = BufReader::new(stream);
+            let line = request(&mut stream)?;
+            if !line.contains(&format!("/replies/{ticket} ")) {
+                return Err("a reply was replayed instead of the next ticket".to_owned());
+            }
+            if ticket == "following" {
+                stream
+                    .get_mut()
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+                    )
+                    .map_err(|error| error.to_string())?;
+            }
+            // The first request was received, but its outcome cannot be known by the bridge.
+        }
+        Ok(())
+    });
+    let signer = super::Dial {
+        server,
+        machine: "machine".to_owned(),
+        socket: std::path::PathBuf::new(),
+        key: Arc::new(lys_core::Ed25519Identity::ephemeral()),
+        authority: None,
+    }
+    .signer()?;
+    let finished = AtomicBool::new(false);
+    let disconnected = AtomicBool::new(false);
+    super::post_reply(&signer, "epoch", "lost", "reply", &finished, &disconnected)?;
+    assert!(disconnected.load(Ordering::Acquire));
+    assert!(!finished.load(Ordering::Acquire));
+    super::post_reply(
+        &signer,
+        "epoch",
+        "following",
+        "reply",
+        &finished,
+        &disconnected,
+    )?;
+    remote.join().map_err(|_| "reply fixture panicked")??;
     Ok(())
 }
