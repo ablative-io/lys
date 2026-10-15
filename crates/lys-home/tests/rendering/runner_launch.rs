@@ -117,7 +117,7 @@ fn claude_runner_hooks_and_judge_are_installed() -> ResultTest {
     ] {
         assert_eq!(
             value["hooks"][event][0]["hooks"][0],
-            json!({"type":"command","command":HOOK,"timeout":5}),
+            json!({"type":"command","command":HOOK}),
             "{event}"
         );
         if [
