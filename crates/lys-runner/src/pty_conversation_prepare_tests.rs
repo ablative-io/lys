@@ -111,68 +111,6 @@ fn malformed_or_duplicate_explicit_native_ids_are_refused_without_fresh_replacem
     }
 }
 
-fn resume_fixture() -> Result<(tempfile::TempDir, Launch, std::path::PathBuf), Box<dyn Error>> {
-    let root = tempfile::tempdir()?;
-    let cwd = root.path().canonicalize()?;
-    let mut prepared = launch();
-    prepared.directory = cwd.display().to_string();
-    let config = cwd.join("claude-config");
-    prepared
-        .environment
-        .insert("CLAUDE_CONFIG_DIR".to_owned(), config.display().to_string());
-    prepared
-        .arguments
-        .extend(["--resume".to_owned(), UUID.to_owned()]);
-    let transcript = config
-        .join("projects")
-        .join(lys_home::harness::claude_code::projects_slug(
-            &prepared.directory,
-        ))
-        .join(format!("{UUID}.jsonl"));
-    std::fs::create_dir_all(transcript.parent().ok_or("transcript parent absent")?)?;
-    Ok((root, prepared, transcript))
-}
-
-#[test]
-fn a_named_conversation_resumes_after_its_transcript_passes_preflight() -> TestResult {
-    let (_root, mut prepared, transcript) = resume_fixture()?;
-    std::fs::write(
-        transcript,
-        serde_json::to_vec(&serde_json::json!({
-            "sessionId":UUID, "cwd":prepared.directory,
-        }))?,
-    )?;
-    let before = prepared.clone();
-    prepare(&mut prepared)?;
-    assert_eq!(prepared, before);
-    Ok(())
-}
-
-#[test]
-fn a_resume_without_a_transcript_is_refused_without_starting_fresh() -> TestResult {
-    let (_root, mut prepared, _transcript) = resume_fixture()?;
-    let before = prepared.clone();
-    let error = prepare(&mut prepared)
-        .err()
-        .ok_or("resume skipped transcript preflight")?;
-    assert_eq!(error.name(), "pty_resume_missing");
-    assert_eq!(prepared, before);
-    Ok(())
-}
-
-#[test]
-fn a_manual_terminal_resume_also_requires_preflight() -> TestResult {
-    let (_root, mut prepared, _transcript) = resume_fixture()?;
-    prepared.session = "manual-terminal".to_owned();
-    let before = prepared.clone();
-    let error = prepare(&mut prepared)
-        .err()
-        .ok_or("manual resume skipped preflight")?;
-    assert_eq!(error.name(), "pty_resume_missing");
-    assert_eq!(prepared, before);
-    Ok(())
-}
-
 #[test]
 fn generic_non_operation_runner_sessions_keep_their_terminal_arguments() -> TestResult {
     let mut prepared = launch();
@@ -190,26 +128,16 @@ fn generic_non_operation_runner_sessions_keep_their_terminal_arguments() -> Test
 }
 
 #[test]
-fn an_undeclared_harness_keeps_its_launch_and_fresh_codex_names_unproved_resume_without_guessing_an_id()
--> TestResult {
+fn an_undeclared_harness_and_a_fresh_codex_keep_their_launch_unchanged() -> TestResult {
     for harness in [None, Some(Harness::Codex)] {
         let mut prepared = launch();
         prepared
             .config
             .as_mut()
-            .ok_or("fixture config is absent")?
+            .ok_or("fixture config absent")?
             .harness = harness;
         let before = prepared.clone();
         prepare(&mut prepared)?;
-        if harness == Some(Harness::Codex) {
-            assert!(
-                prepared
-                    .environment
-                    .get("LYS_PTY_STATUS_NOTE")
-                    .is_some_and(|note| note.starts_with("resume not proven for codex "))
-            );
-            prepared.environment.remove("LYS_PTY_STATUS_NOTE");
-        }
         assert_eq!(prepared, before);
     }
     Ok(())
@@ -238,21 +166,104 @@ fn invalid_operation_ids_and_fresh_continue_fork_or_no_persistence_flags_are_ref
 }
 
 #[test]
-fn a_conversation_from_another_folder_is_refused_before_resume() -> TestResult {
-    let (root, mut prepared, transcript) = resume_fixture()?;
-    let other = root.path().join("another-folder");
-    std::fs::create_dir(&other)?;
+fn harness_resumes_without_runner_visible_transcripts_keep_every_argument() -> TestResult {
+    for harness in [Harness::ClaudeCode, Harness::Codex] {
+        let mut prepared = launch();
+        prepared
+            .config
+            .as_mut()
+            .ok_or("fixture config absent")?
+            .harness = Some(harness);
+        prepared.arguments = if harness == Harness::Codex {
+            vec![
+                "--model".into(),
+                "chosen".into(),
+                "resume".into(),
+                UUID.into(),
+            ]
+        } else {
+            vec![
+                "--model".into(),
+                "chosen".into(),
+                "--resume".into(),
+                UUID.into(),
+            ]
+        };
+        prepared
+            .environment
+            .insert("HOME".into(), "/runner-cannot-see-the-seat-home".into());
+        let before = prepared.clone();
+        prepare(&mut prepared)?;
+        assert_eq!(prepared, before, "the harness resume was replaced");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_codex_thread_from_another_folder_keeps_its_resume_arguments() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let mut prepared = launch();
+    prepared
+        .config
+        .as_mut()
+        .ok_or("fixture config absent")?
+        .harness = Some(Harness::Codex);
+    prepared.directory = root.path().display().to_string();
+    prepared.arguments = vec!["resume".into(), UUID.into()];
+    prepared
+        .environment
+        .insert("CODEX_HOME".into(), root.path().display().to_string());
+    std::fs::create_dir(root.path().join("sessions"))?;
     std::fs::write(
-        transcript,
-        serde_json::to_vec(&serde_json::json!({
-            "sessionId":UUID, "cwd":other,
-        }))?,
+        root.path()
+            .join("sessions")
+            .join(format!("rollout-{UUID}.jsonl")),
+        serde_json::to_vec(
+            &serde_json::json!({"type":"session_meta", "payload":{"id":UUID,"cwd":"/another-folder"}}),
+        )?,
     )?;
     let before = prepared.clone();
-    let error = prepare(&mut prepared)
-        .err()
-        .ok_or("resume admitted another folder")?;
-    assert_eq!(error.name(), "pty_resume_other_directory");
+    prepare(&mut prepared)?;
     assert_eq!(prepared, before);
+    Ok(())
+}
+
+#[test]
+fn fresh_codex_never_sets_a_synthetic_resume_status_note() -> TestResult {
+    let mut prepared = launch();
+    prepared
+        .config
+        .as_mut()
+        .ok_or("fixture config absent")?
+        .harness = Some(Harness::Codex);
+    let before = prepared.clone();
+    prepare(&mut prepared)?;
+    assert_eq!(
+        prepared, before,
+        "a synthetic status note changed the launch"
+    );
+    Ok(())
+}
+
+#[test]
+fn codex_resume_never_substitutes_a_fresh_launch_when_history_is_absent() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let mut prepared = launch();
+    prepared
+        .config
+        .as_mut()
+        .ok_or("fixture config absent")?
+        .harness = Some(Harness::Codex);
+    prepared.directory = root.path().display().to_string();
+    prepared
+        .environment
+        .insert("CODEX_HOME".into(), root.path().display().to_string());
+    prepared.arguments = vec!["resume".into(), UUID.into()];
+    let before = prepared.clone();
+    prepare(&mut prepared)?;
+    assert_eq!(
+        prepared, before,
+        "Codex resume was silently replaced by a fresh conversation"
+    );
     Ok(())
 }

@@ -1,6 +1,6 @@
-//! A peer restart retains a native conversation only after its transcript is proved.
+//! A peer restart retains a native conversation by passing its identity to the harness.
 
-use super::{claude_arguments, conversation_uuid, preflight};
+use super::{claude_arguments, conversation_uuid, validate_arguments};
 use crate::error::RunnerError;
 use crate::protocol::Launch;
 use crate::tracking::Harness;
@@ -61,5 +61,5 @@ pub(crate) fn prepare_restart(
         }
         None => return Ok(()),
     }
-    preflight(launch)
+    validate_arguments(launch)
 }
