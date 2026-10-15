@@ -111,31 +111,65 @@ fn malformed_or_duplicate_explicit_native_ids_are_refused_without_fresh_replacem
     }
 }
 
-#[test]
-fn a_named_conversation_goes_to_claude_code_as_resume_whether_or_not_lys_can_see_its_transcript()
--> TestResult {
-    let directory = tempfile::tempdir()?;
-    let cwd = directory.path().canonicalize()?;
+fn resume_fixture() -> Result<(tempfile::TempDir, Launch, std::path::PathBuf), Box<dyn Error>> {
+    let root = tempfile::tempdir()?;
+    let cwd = root.path().canonicalize()?;
     let mut prepared = launch();
     prepared.directory = cwd.display().to_string();
-    // Claude Code keeps its conversations where it chooses; Lys never looks, and never swaps the conversation.
-    prepared.environment.insert(
-        "CLAUDE_CONFIG_DIR".to_owned(),
-        cwd.join("nothing-here").display().to_string(),
-    );
+    let config = cwd.join("claude-config");
+    prepared
+        .environment
+        .insert("CLAUDE_CONFIG_DIR".to_owned(), config.display().to_string());
     prepared
         .arguments
         .extend(["--resume".to_owned(), UUID.to_owned()]);
+    let transcript = config
+        .join("projects")
+        .join(lys_home::harness::claude_code::projects_slug(
+            &prepared.directory,
+        ))
+        .join(format!("{UUID}.jsonl"));
+    std::fs::create_dir_all(transcript.parent().ok_or("transcript parent absent")?)?;
+    Ok((root, prepared, transcript))
+}
+
+#[test]
+fn a_named_conversation_resumes_after_its_transcript_passes_preflight() -> TestResult {
+    let (_root, mut prepared, transcript) = resume_fixture()?;
+    std::fs::write(
+        transcript,
+        serde_json::to_vec(&serde_json::json!({
+            "sessionId":UUID, "cwd":prepared.directory,
+        }))?,
+    )?;
     let before = prepared.clone();
     prepare(&mut prepared)?;
-    assert_eq!(prepared.arguments, before.arguments);
-    assert!(
-        !prepared
-            .arguments
-            .iter()
-            .any(|argument| argument == "--session-id")
-    );
-    assert_eq!(prepared.environment.get("LYS_PTY_STATUS_NOTE"), None);
+    assert_eq!(prepared, before);
+    Ok(())
+}
+
+#[test]
+fn a_resume_without_a_transcript_is_refused_without_starting_fresh() -> TestResult {
+    let (_root, mut prepared, _transcript) = resume_fixture()?;
+    let before = prepared.clone();
+    let error = prepare(&mut prepared)
+        .err()
+        .ok_or("resume skipped transcript preflight")?;
+    assert_eq!(error.name(), "pty_resume_missing");
+    assert_eq!(prepared, before);
+    Ok(())
+}
+
+#[test]
+fn a_manual_terminal_resume_also_requires_preflight() -> TestResult {
+    let (_root, mut prepared, _transcript) = resume_fixture()?;
+    prepared.session = "manual-terminal".to_owned();
+    let before = prepared.clone();
+    let error = prepare(&mut prepared)
+        .err()
+        .ok_or("manual resume skipped preflight")?;
+    assert_eq!(error.name(), "pty_resume_missing");
+    assert_eq!(prepared, before);
     Ok(())
 }
 
@@ -143,6 +177,11 @@ fn a_named_conversation_goes_to_claude_code_as_resume_whether_or_not_lys_can_see
 fn generic_non_operation_runner_sessions_keep_their_terminal_arguments() -> TestResult {
     let mut prepared = launch();
     prepared.session = "generic-runner-fixture".to_owned();
+    prepared
+        .config
+        .as_mut()
+        .ok_or("fixture config absent")?
+        .harness = None;
     prepared.arguments = vec!["-c".to_owned(), "a generic shell fixture".to_owned()];
     let before = prepared.clone();
     prepare(&mut prepared)?;
@@ -199,29 +238,21 @@ fn invalid_operation_ids_and_fresh_continue_fork_or_no_persistence_flags_are_ref
 }
 
 #[test]
-fn a_conversation_from_another_folder_is_still_resumed_by_its_id() -> TestResult {
-    let directory = tempfile::tempdir()?;
-    let cwd = directory.path().canonicalize()?;
-    let mut prepared = launch();
-    prepared.directory = cwd.display().to_string();
-    prepared.environment.insert(
-        "CLAUDE_CONFIG_DIR".to_owned(),
-        cwd.join("claude-config").display().to_string(),
-    );
-    prepared.arguments.extend([
-        "--resume".to_owned(),
-        "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee".to_owned(),
-    ]);
-    prepare(&mut prepared)?;
-    assert_eq!(
-        prepared.arguments,
-        [
-            "--model",
-            "chosen",
-            "--resume",
-            "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee"
-        ]
-    );
-    assert_eq!(prepared.environment.get("LYS_PTY_STATUS_NOTE"), None);
+fn a_conversation_from_another_folder_is_refused_before_resume() -> TestResult {
+    let (root, mut prepared, transcript) = resume_fixture()?;
+    let other = root.path().join("another-folder");
+    std::fs::create_dir(&other)?;
+    std::fs::write(
+        transcript,
+        serde_json::to_vec(&serde_json::json!({
+            "sessionId":UUID, "cwd":other,
+        }))?,
+    )?;
+    let before = prepared.clone();
+    let error = prepare(&mut prepared)
+        .err()
+        .ok_or("resume admitted another folder")?;
+    assert_eq!(error.name(), "pty_resume_other_directory");
+    assert_eq!(prepared, before);
     Ok(())
 }

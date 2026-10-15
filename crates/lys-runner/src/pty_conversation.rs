@@ -386,15 +386,12 @@ fn claude_resume(arguments: &[String]) -> Result<Option<&str>, RunnerError> {
 /// Refuses ambiguous resume arguments or unproved local identity and folder.
 pub fn preflight(launch: &Launch) -> Result<(), RunnerError> {
     match launch.config.as_ref().and_then(|config| config.harness) {
-        // Only the arguments' own shape is checked. Whether the conversation can be resumed is the program's to
-        // say: Claude Code and Codex each resume by id from wherever they keep their conversations, and say so
-        // in the terminal when they cannot. Lys never second-guesses that, and never swaps in a new conversation.
         Some(crate::tracking::Harness::ClaudeCode) => {
-            claude_resume(&launch.arguments)?;
+            if let Some(conversation) = claude_resume(&launch.arguments)? {
+                preflight_claude_resume(launch, conversation)?;
+            }
         }
-        Some(crate::tracking::Harness::Codex) => {
-            codex::requested(&launch.arguments)?;
-        }
+        Some(crate::tracking::Harness::Codex) => codex::preflight(launch)?,
         None => {}
     }
     Ok(())
@@ -407,7 +404,7 @@ pub fn preflight(launch: &Launch) -> Result<(), RunnerError> {
 /// Refuses invalid operation ids, conflicting native identities or resume proof.
 pub fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
     if !launch.session.starts_with("op-") {
-        return Ok(());
+        return preflight(launch);
     }
     let harness = launch.config.as_ref().and_then(|config| config.harness);
     if harness == Some(crate::tracking::Harness::Codex) {
@@ -418,7 +415,7 @@ pub fn prepare(launch: &mut Launch) -> Result<(), RunnerError> {
     }
     let expected = conversation_uuid(&launch.session)?;
     if claude_resume(&launch.arguments)?.is_some() {
-        return missing::claude(launch, &expected);
+        return preflight(launch);
     }
     let mut identity = None;
     for (at, argument) in launch.arguments.iter().enumerate() {
