@@ -18,7 +18,7 @@ pub(super) async fn answer(
     endpoint: &Endpoint,
     headers: &HeaderMap,
     signer: Option<AgentId>,
-    app: Option<&(AgentId, String)>,
+    app: Option<&crate::mcp_oauth::Connection>,
 ) -> ResultValue {
     let state = endpoint.state.as_ref().ok_or_else(|| {
         (
@@ -41,7 +41,7 @@ pub(super) async fn answer(
         let holder = token
             .map(|principal| principal.holder)
             .or(signer)
-            .or_else(|| app.map(|(agent, _)| *agent))
+            .or_else(|| app.map(|app| app.agent))
             .or(crate::agent_pass::holder(state, headers)?);
         let identity = |judged: &Judged<'_>| -> Result<(IdentityId, bool), ServerError> {
             let (holder, administrator) = if let Some(agent) = holder {

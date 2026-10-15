@@ -13,6 +13,22 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 
+const FORMAT: u8 = 2;
+
+fn legacy_format() -> u8 {
+    1
+}
+
+/// The person and sign-in that consented to own-view readings.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PersonReads {
+    pub(crate) person: String,
+    pub(crate) issuer: String,
+    pub(crate) subject: String,
+    pub(crate) authenticated_at: u64,
+}
+
 /// An app that registered itself to connect to Lys's MCP door.
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct App {
@@ -35,15 +51,30 @@ pub(crate) struct Issued {
     pub(crate) client_id: String,
     pub(crate) kind: Kind,
     pub(crate) expires_at: u64,
+    #[serde(default)]
+    pub(crate) person_reads: Option<PersonReads>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct Held {
+    #[serde(default = "legacy_format")]
+    format: u8,
     apps: BTreeMap<String, App>,
     /// The agent made for an app by a person's approval, by
     /// "client id, space, person id".
     connections: BTreeMap<String, String>,
     tokens: BTreeMap<String, Issued>,
+}
+
+impl Default for Held {
+    fn default() -> Self {
+        Self {
+            format: FORMAT,
+            apps: BTreeMap::new(),
+            connections: BTreeMap::new(),
+            tokens: BTreeMap::new(),
+        }
+    }
 }
 
 /// How many apps may register, how fast, and how long one waits for a
@@ -77,10 +108,27 @@ impl Store {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Held::default(),
             Err(error) => return Err(unavailable(&format!("{}: {error}", path.display()))),
         };
-        Ok(Self {
+        let mut store = Self {
             path: path.to_owned(),
             held,
-        })
+        };
+        match store.held.format {
+            1 => {
+                if store
+                    .held
+                    .tokens
+                    .values()
+                    .any(|token| token.person_reads.is_some())
+                {
+                    return Err(unavailable("an old store cannot hold person-read consent"));
+                }
+                store.held.format = FORMAT;
+                store.save()?;
+            }
+            FORMAT => {}
+            _ => return Err(unavailable("the connected-apps format is unknown")),
+        }
+        Ok(store)
     }
 
     fn save(&self) -> Result<(), ServerError> {

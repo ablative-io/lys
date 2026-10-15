@@ -13,12 +13,13 @@ use serde::Deserialize;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
+use super::consent::{Mode, answer};
 use super::{
     APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, REGISTRATION, UNNAMED, back_to, digest,
     encoded, escaped, held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
-use crate::mcp_oauth_store::{App, Kind};
+use crate::mcp_oauth_store::{App, Kind, PersonReads};
 use crate::routes::cookie_header;
 use crate::session::now;
 
@@ -201,42 +202,22 @@ button[value=approve]{{background:#1d1d1f;color:#fff;border-color:#1d1d1f}}</sty
 <p>If you connect it, Lys adds it as one of your agents. It can do only what you choose here, \
 and you can take that away or remove it at any time from your agents in Lys.</p>\
 <form method=\"post\" action=\"/oauth/mcp/consent\">\
-<input type=\"hidden\" name=\"asking\" value=\"{asking}\">{choices}\
-<p>Ticking nothing connects nothing. The app will have no permissions.</p>\
+<input type=\"hidden\" name=\"asking\" value=\"{asking}\">\
+<fieldset><legend>How may this connection act?</legend>\
+<label><input type=\"radio\" name=\"mode\" value=\"agent\" checked> Agent mode</label>\
+<p>Use only the agent permissions chosen below.</p>\
+<label><input type=\"radio\" name=\"mode\" value=\"person_reads\"> Person reads</label>\
+<p>Read who you are, your own agents, and your own directory drafts awaiting your decision \
+or raised by you. Each read is recorded with this connection, you and the route. \
+It can never decide, approve, give or sign for you. Those acts need you in Lys in the browser. \
+Product drafts cannot be read through this choice yet. Leave agent permissions unticked when choosing Person reads.</p></fieldset>\
+{choices}<p>Ticking nothing connects nothing in agent mode. The agent will have no permissions.</p>\
 <button type=\"submit\" name=\"decision\" value=\"approve\">Connect {name}</button>\
 <button type=\"submit\" name=\"decision\" value=\"refuse\">Don't connect</button>\
 </form></body></html>"
         )),
     )
         .into_response())
-}
-
-/// The approval form's answer: which approval, the decision, and each
-/// permission chosen, read in the order the form sent them.
-struct Answer {
-    asking: String,
-    decision: String,
-    grants: Vec<String>,
-}
-
-fn answer(body: &[u8]) -> Result<Answer, ServerError> {
-    let text = std::str::from_utf8(body).map_err(|_unread| malformed("an approval is a form"))?;
-    let url = reqwest::Url::parse(&format!("http://form.invalid/?{text}"))
-        .map_err(|_unread| malformed("an approval is a form"))?;
-    let (mut asking, mut decision, mut grants) = (None, None, Vec::new());
-    for (name, value) in url.query_pairs() {
-        match name.as_ref() {
-            "asking" => asking = Some(value.into_owned()),
-            "decision" => decision = Some(value.into_owned()),
-            "grant" => grants.push(value.into_owned()),
-            _ => return Err(malformed("an approval carries only its own fields")),
-        }
-    }
-    Ok(Answer {
-        asking: asking.ok_or_else(|| malformed("an approval names what it answers"))?,
-        decision: decision.ok_or_else(|| malformed("an approval carries its decision"))?,
-        grants,
-    })
 }
 
 pub(super) async fn consent(
@@ -269,6 +250,26 @@ pub(super) async fn consent(
             let person = crate::routes::with_directory(&apps.state, |directory| {
                 crate::read_api::own_person(directory.projection()?, &session.actor)
             })?;
+            let person_reads = if answer.mode == Mode::PersonReads {
+                if !answer.grants.is_empty() || asking.client_id == super::native::CLIENT {
+                    return Err(malformed(
+                        "Person reads is an app's read-only choice, without agent permissions",
+                    ));
+                }
+                if session.actor.provenance().method() != lys_identity::AuthMethod::Oidc {
+                    return Err(malformed("Person reads needs your browser sign-in"));
+                }
+                Some(PersonReads {
+                    person: person.to_string(),
+                    issuer: session.actor.binding().issuer().to_owned(),
+                    subject: session.actor.binding().subject().to_owned(),
+                    authenticated_at: session.actor.provenance().authenticated_at().ok_or_else(
+                        || malformed("Person reads needs your browser sign-in instant"),
+                    )?,
+                })
+            } else {
+                None
+            };
             let agent = if asking.client_id == super::native::CLIENT {
                 if !answer.grants.is_empty() {
                     return Err(malformed("the native client uses its person's authority"));
@@ -277,7 +278,9 @@ pub(super) async fn consent(
             } else {
                 let picked = crate::mcp_oauth_grants::chosen(&apps.state, person, &answer.grants)?;
                 let agent = apps.agent_for(&asking.client_id, &name, &session.actor)?;
-                crate::mcp_oauth_grants::pass_on(&apps.state, person, &agent, &picked)?;
+                if person_reads.is_none() {
+                    crate::mcp_oauth_grants::pass_on(&apps.state, person, &agent, &picked)?;
+                }
                 agent
             };
             let code = random()?;
@@ -293,6 +296,7 @@ pub(super) async fn consent(
                         redirect_uri: asking.redirect_uri.clone(),
                         challenge: asking.challenge.clone(),
                         expires_at: at.saturating_add(CODE_SECONDS),
+                        person_reads,
                     },
                 );
             }
@@ -387,7 +391,12 @@ fn exchange(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
     if URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes())) != held_code.challenge {
         return Err(Refusal::Grant("the verifier does not answer the challenge"));
     }
-    Ok(apps.issue(&held_code.agent, &held_code.client_id, None)?)
+    Ok(apps.issue(
+        &held_code.agent,
+        &held_code.client_id,
+        None,
+        held_code.person_reads.as_ref(),
+    )?)
 }
 
 fn refresh(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
@@ -395,7 +404,7 @@ fn refresh(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
         return Err(Refusal::Grant("a refresh carries its refresh token"));
     };
     let spent = digest(token);
-    let agent = {
+    let (agent, person_reads) = {
         let store = held(&apps.store)?;
         let issued = store
             .token(&spent, Kind::Refresh, now())
@@ -407,9 +416,14 @@ fn refresh(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
                 "the refresh token was not given to this app",
             ));
         }
-        issued.agent.clone()
+        (issued.agent.clone(), issued.person_reads.clone())
     };
-    Ok(apps.issue(&agent, &asked.client_id, Some(&spent))?)
+    Ok(apps.issue(
+        &agent,
+        &asked.client_id,
+        Some(&spent),
+        person_reads.as_ref(),
+    )?)
 }
 
 #[cfg(test)]

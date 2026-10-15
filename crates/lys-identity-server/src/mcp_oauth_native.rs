@@ -39,6 +39,9 @@ pub(super) fn session(state: &AppState, subject: &str) -> Result<Actor, ServerEr
 }
 
 pub(crate) fn actor(state: &AppState, headers: &HeaderMap) -> Result<Option<Actor>, ServerError> {
+    if let Some(actor) = crate::mcp_endpoint::reading_actor() {
+        return Ok(Some(actor));
+    }
     let Some(text) = headers
         .get(header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok())

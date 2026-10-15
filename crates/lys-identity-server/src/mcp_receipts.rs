@@ -41,6 +41,10 @@ use crate::routes::AppState;
 #[path = "mcp_receipts_tests.rs"]
 mod tests;
 
+#[path = "mcp_endpoint/read_receipts.rs"]
+mod reads;
+pub(crate) use reads::Reads;
+
 /// How a change made under a grant token is told apart from a run Lys
 /// started.
 const GRANT_TOKEN: &str = "grant-token";
@@ -250,25 +254,28 @@ impl Kept {
         } else {
             hold.refused(self.ask, self.leaf.clone(), self.logs, self.at)?;
         }
-        let text =
-            result["content"][0]["text"]
-                .as_str()
-                .ok_or_else(|| ServerError::ConfigInvalid {
-                    reason: "the MCP result has no JSON text to carry its kept leaf".to_owned(),
-                })?;
-        let mut answer: Value =
-            serde_json::from_str(text).map_err(|error| ServerError::ConfigInvalid {
-                reason: format!("the MCP result cannot carry its kept leaf: {error}"),
-            })?;
-        let fields = answer
-            .as_object_mut()
-            .ok_or_else(|| ServerError::ConfigInvalid {
-                reason: "the MCP answer is not an object that can carry its kept leaf".to_owned(),
-            })?;
-        fields.insert(if made { "receipt" } else { "asked" }.to_owned(), self.leaf);
-        result["content"][0]["text"] = Value::String(answer.to_string());
-        Ok(())
+        attach(result, if made { "receipt" } else { "asked" }, self.leaf)
     }
+}
+
+pub(crate) fn attach(result: &mut Value, name: &str, leaf: Value) -> Result<(), ServerError> {
+    let text = result["content"][0]["text"]
+        .as_str()
+        .ok_or_else(|| ServerError::ConfigInvalid {
+            reason: "the MCP result has no JSON text to carry its kept leaf".to_owned(),
+        })?;
+    let mut answer: Value =
+        serde_json::from_str(text).map_err(|error| ServerError::ConfigInvalid {
+            reason: format!("the MCP result cannot carry its kept leaf: {error}"),
+        })?;
+    let fields = answer
+        .as_object_mut()
+        .ok_or_else(|| ServerError::ConfigInvalid {
+            reason: "the MCP answer is not an object that can carry its kept leaf".to_owned(),
+        })?;
+    fields.insert(name.to_owned(), leaf);
+    result["content"][0]["text"] = Value::String(answer.to_string());
+    Ok(())
 }
 
 /// The witness of a call before it is relayed: the verified signer of the
@@ -279,14 +286,14 @@ pub(crate) fn witness(
     state: Option<&AppState>,
     parts: &Parts,
     signer: Option<AgentId>,
-    app: Option<&(AgentId, String)>,
+    app: Option<&crate::mcp_oauth::Connection>,
 ) -> Result<Option<Witness>, ServerError> {
     if signer.is_none()
-        && let Some((agent, client_id)) = app
+        && let Some(app) = app
     {
         return Ok(Some(Witness {
-            agent: *agent,
-            provenance: Provenance::by_pass(*agent, crate::mcp_oauth::LAUNCH, client_id)?,
+            agent: app.agent,
+            provenance: Provenance::by_pass(app.agent, crate::mcp_oauth::LAUNCH, &app.client_id)?,
             signature: String::new(),
         }));
     }

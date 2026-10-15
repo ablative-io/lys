@@ -2,9 +2,9 @@
 //! MCP door the way the MCP authorization specification asks: they find the
 //! door's protected-resource document, find Lys as its authorization server,
 //! register themselves, and send the person to Lys to approve them. A
-//! person's approval makes the app an agent that answers to that person, so
-//! the app holds only the grants that agent is given and never the person's
-//! own authority. Its tokens are bearer tokens for that agent alone, kept
+//! person's approval chooses the app's own agent grants or bounded readings
+//! of that person's own views. Neither choice gives the app a person's
+//! decision or signing authority. Tokens are bound to that consent, kept
 //! only as digests, an access token for an hour and a refresh token that is
 //! spent when it is used.
 
@@ -27,7 +27,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
-use crate::mcp_oauth_store::{Issued, Kind, Limits, Store};
+use crate::mcp_oauth_store::{Issued, Kind, Limits, PersonReads, Store};
 use crate::routes::{AppState, with_directory};
 use crate::session::now;
 
@@ -70,6 +70,14 @@ struct Code {
     redirect_uri: String,
     challenge: String,
     expires_at: u64,
+    person_reads: Option<PersonReads>,
+}
+
+/// The connection authenticated by one access token, with its own consent.
+pub(crate) struct Connection {
+    pub(crate) agent: AgentId,
+    pub(crate) client_id: String,
+    pub(crate) person_reads: Option<PersonReads>,
 }
 
 /// The connected-apps door.
@@ -189,10 +197,7 @@ impl Apps {
     /// The agent and app a connected app's bearer token names; none when the
     /// request carries no bearer token. A bearer token that is not a live
     /// connected-app access token is refused.
-    pub(crate) fn bearer(
-        &self,
-        headers: &HeaderMap,
-    ) -> Result<Option<(AgentId, String)>, ServerError> {
+    pub(crate) fn bearer(&self, headers: &HeaderMap) -> Result<Option<Connection>, ServerError> {
         let Some(value) = headers.get(header::AUTHORIZATION) else {
             return Ok(None);
         };
@@ -208,7 +213,11 @@ impl Apps {
             .ok_or(ServerError::Provider(ProviderError::TokenUnknown))?;
         let agent = AgentId::from_str(&issued.agent)
             .map_err(|_unread| ServerError::Provider(ProviderError::TokenUnknown))?;
-        Ok(Some((agent, issued.client_id.clone())))
+        Ok(Some(Connection {
+            agent,
+            client_id: issued.client_id.clone(),
+            person_reads: issued.person_reads.clone(),
+        }))
     }
 
     fn issue(
@@ -216,6 +225,7 @@ impl Apps {
         agent: &str,
         client_id: &str,
         spent: Option<&str>,
+        person_reads: Option<&PersonReads>,
     ) -> Result<Response, ServerError> {
         let person = if client_id == native::CLIENT {
             Some(native::person(self, agent)?)
@@ -234,6 +244,7 @@ impl Apps {
             client_id: client_id.to_owned(),
             kind,
             expires_at: at.saturating_add(seconds),
+            person_reads: person_reads.cloned(),
         };
         held(&self.store)?.issue(
             vec![

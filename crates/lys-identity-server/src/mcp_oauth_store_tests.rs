@@ -3,6 +3,7 @@
 
 use super::{App, Issued, Kind, Limits, Store};
 use crate::error::ServerError;
+use serde_json::{Value, json};
 
 const LIMITS: Limits = Limits {
     most: 3,
@@ -24,6 +25,7 @@ fn issued(kind: Kind, expires_at: u64) -> Issued {
         client_id: "client".to_owned(),
         kind,
         expires_at,
+        person_reads: None,
     }
 }
 
@@ -112,5 +114,44 @@ fn registrations_are_throttled_held_to_a_most_and_let_go_unapproved()
         "an app no one approved within its window is let go"
     );
     assert!(store.app("third").is_some() && store.app("fourth").is_some());
+    Ok(())
+}
+
+#[test]
+fn person_connection_upgrade_preserves_agent_only_legacy_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("connected-apps.json");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({
+            "apps":{}, "connections":{"client person":"agent"}, "tokens":{
+                "digest":{"agent":"agent", "client_id":"client", "kind":"Access", "expires_at":100}
+            }
+        }))?,
+    )?;
+    let store = crate::mcp_oauth_store::Store::open(&path)?;
+    assert!(
+        store
+            .token("digest", crate::mcp_oauth_store::Kind::Access, 50)
+            .is_some()
+    );
+    assert_eq!(store.connection("client", "person"), Some("agent"));
+    let migrated: Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+    assert_eq!(
+        migrated["format"], 2,
+        "legacy connected-app store was not migrated"
+    );
+    assert!(
+        migrated["tokens"]["digest"]["person_reads"].is_null(),
+        "old tokens gained person reads"
+    );
+    drop(store);
+    let reopened = crate::mcp_oauth_store::Store::open(&path)?;
+    assert!(
+        reopened
+            .token("digest", crate::mcp_oauth_store::Kind::Access, 50)
+            .is_some()
+    );
     Ok(())
 }

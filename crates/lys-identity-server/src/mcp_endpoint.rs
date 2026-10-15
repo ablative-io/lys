@@ -12,7 +12,9 @@ use crate::error::ServerError;
 
 mod call;
 mod discovery;
+mod person;
 use call::call;
+pub(crate) use person::reading_actor;
 
 #[path = "mcp_endpoint/run_refusal.rs"]
 mod run_refusal;
@@ -64,6 +66,7 @@ struct Endpoint {
     origin: String,
     apps: Option<Arc<crate::mcp_oauth::Apps>>,
     refused: crate::mcp_receipts::RefusedAsks,
+    reads: std::sync::Mutex<Option<crate::mcp_receipts::Reads>>,
 }
 
 #[cfg(test)]
@@ -95,6 +98,7 @@ fn registered(
         origin: origin.origin().ascii_serialization(),
         apps,
         refused: crate::mcp_receipts::RefusedAsks::new(),
+        reads: std::sync::Mutex::new(None),
     });
     Ok(Router::new()
         .route("/mcp", post(message).get(no_stream))
@@ -340,7 +344,7 @@ fn initialize(params: &Value) -> ResultValue {
     };
     Ok(
         json!({"protocolVersion":version, "capabilities":{"tools":{}}, "serverInfo":{"name":"lys", "version":env!("CARGO_PKG_VERSION")},
-            "instructions":"Call what-can-I-do first with {} to read this connection's declared routes and live grants. Use read for a route's reading, change for an admitted change, and drafts to record or decide a draft. These tools apply each HTTP route's authority and validation; a listed route alone never grants authority."}),
+            "instructions":"Call what-can-I-do first with {} to read this connection's consent, declared routes and live grants. Use read for a permitted view, change for an admitted agent change, and drafts for directory draft routes. Person reads permits only the consenting person's own identity, agents and directory drafts, with receipts. Decisions, approvals, giving and signing as that person need Lys in the browser. Agent-mode calls retain each HTTP route's authority and validation; a listed route alone never grants authority."}),
     )
 }
 

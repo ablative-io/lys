@@ -12,7 +12,7 @@ use crate::error::ServerError;
 use crate::routes::AppState;
 
 /// The verified signer and the connected app of one MCP message.
-pub(crate) type Callers = (Option<AgentId>, Option<(AgentId, String)>);
+pub(crate) type Callers = (Option<AgentId>, Option<crate::mcp_oauth::Connection>);
 
 /// The agent that signed this MCP message; none when it carries no
 /// signature.
@@ -44,13 +44,22 @@ pub(crate) fn signer(
 pub(crate) fn connected_app(
     apps: Option<&crate::mcp_oauth::Apps>,
     parts: &Parts,
-) -> Result<Option<(AgentId, String)>, ServerError> {
+) -> Result<Option<crate::mcp_oauth::Connection>, ServerError> {
     let Some(apps) = apps else {
         return Ok(None);
     };
     let Some(app) = apps.bearer(&parts.headers)? else {
         return Ok(None);
     };
+    if app.person_reads.is_some()
+        && (parts.headers.get_all(header::AUTHORIZATION).iter().count() != 1
+            || parts.headers.contains_key("lys-operator")
+            || parts.headers.contains_key("lys-seat"))
+    {
+        return Err(ServerError::AgentSignatureRefused {
+            reason: "a person-read connection cannot carry another credential",
+        });
+    }
     if [
         header::COOKIE,
         header::HeaderName::from_static(crate::agent_signature::HEADER),

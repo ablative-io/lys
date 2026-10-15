@@ -49,7 +49,23 @@ pub(super) async fn call(
 ) -> ResultValue {
     let (call, uri) = parsed(params)?;
     if call.name == "what-can-I-do" {
+        if let Some(app) = app.as_ref().filter(|app| app.person_reads.is_some()) {
+            return super::person::discovery(endpoint, app, message).await;
+        }
         return super::discovery::answer(endpoint, &parts.headers, signer, app.as_ref()).await;
+    }
+    if let Some(app) = app.as_ref().filter(|app| app.person_reads.is_some()) {
+        return super::person::call(
+            endpoint,
+            app,
+            super::person::Reading {
+                method: &call.arguments.method,
+                uri,
+                has_body: call.arguments.body.is_some(),
+                message,
+            },
+        )
+        .await;
     }
     dispatch(endpoint, parts, call, uri, (signer, app), message).await
 }
@@ -198,7 +214,7 @@ async fn dispatch(
         .and_then(|value| value.to_str().ok())
         .map(|header| (header.to_owned(), Arc::<[u8]>::from(message)));
     let relayed = signer
-        .or_else(|| app.as_ref().map(|(agent, _)| *agent))
+        .or_else(|| app.as_ref().map(|app| app.agent))
         .map(|agent| crate::agent_signature::Relay {
             agent,
             signed: relay_evidence,
