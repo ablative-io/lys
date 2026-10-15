@@ -63,9 +63,8 @@ pub(super) async fn rendered(
         fields.insert("action".to_owned(), json!(action.as_str()));
         fields.insert("scope_declared".to_owned(), json!(true));
         body["reason"] = json!(format!(
-            "{reason}. Required route scope: {} on {} for {method} {}.",
+            "{reason}. Required route scope: {} on {resource} for {method} {}.",
             action.as_str(),
-            resource,
             uri.path()
         ));
         // An obscured identity must not become a directory lookup through its refusal.

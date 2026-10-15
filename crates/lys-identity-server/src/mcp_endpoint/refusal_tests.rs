@@ -94,12 +94,144 @@ async fn a_scope_refused_before_relay_still_names_the_requested_route() -> Resul
     );
     let response = router.oneshot(request).await?;
     assert_eq!(response.status(), StatusCode::OK);
-    let response: Value = serde_json::from_slice(&to_bytes(response.into_body(), 65536).await?)?;
+    let response: Value = serde_json::from_slice(&to_bytes(response.into_body(), 65_536).await?)?;
     let answer = crate::mcp_test_answer::body(&response["result"]);
     assert_eq!(answer["status"], 403);
     assert_eq!(answer["body"]["refusal"], "TokenScopeUndeclared");
     assert_eq!(answer["body"]["fields"]["route"], "/security-events");
     assert_eq!(answer["body"]["fields"]["resource_kind"], "http_route");
     assert_eq!(answer["body"]["fields"]["action"], "GET");
+    Ok(())
+}
+
+fn same_admission(named: &Value, status: u16, direct: &Value) -> Result {
+    assert_eq!(named["status"], status);
+    if direct.get("refusal").is_none() {
+        assert_eq!(&named["body"], direct);
+        return Ok(());
+    }
+    let original = direct["reason"]
+        .as_str()
+        .ok_or("HTTP refusal has no reason")?;
+    assert!(
+        named["body"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.starts_with(original))
+    );
+    for (key, value) in direct.as_object().ok_or("HTTP refusal is not an object")? {
+        if key != "reason" && key != "fields" {
+            assert_eq!(&named["body"][key], value, "HTTP refusal field {key}");
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn scope_details_keep_the_http_refusal_admission() -> Result {
+    use identity_contract::harness::{ADMINISTRATOR, Service};
+    use lys_identity::{
+        Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
+    };
+    let (service, ()) = Service::start_with(|config| {
+        let administrator = Actor::new(
+            LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+            Provenance::new(AuthMethod::Oidc, 1),
+        );
+        lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+        let path = config.log_dir.clone();
+        let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
+        lys_identity::directory_migration::migrate(
+            lys_log_store::FileLeafStore::open(&path)?,
+            &key,
+        )?;
+        let mut directory = lys_identity::Directory::open(
+            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+            key,
+        )?;
+        directory.setup_person(
+            administrator.clone(),
+            OperationId::generate()?,
+            Profile::new("Owner")?,
+            1,
+        )?;
+        let (person, _) = directory.register_person(
+            administrator.clone(),
+            OperationId::generate()?,
+            Profile::new("Member")?,
+            2,
+        )?;
+        directory.bind_login(
+            administrator.clone(),
+            OperationId::generate()?,
+            person,
+            LoginBinding::new(&config.issuer, "member")?,
+            3,
+        )?;
+        directory.transition(
+            administrator,
+            OperationId::generate()?,
+            IdentityId::Person(person),
+            Transition::Activate,
+            "",
+            4,
+        )?;
+        Ok(())
+    })
+    .await?;
+    let cookie = service
+        .sign_in(identity_contract::apps::login("member"))
+        .await?;
+    let (direct_status, direct_body) = service.get("/directory/people", Some(&cookie)).await?;
+    assert_eq!(direct_status, 403, "{direct_body}");
+    let client = reqwest::Client::new();
+    let message = json!({"jsonrpc":"2.0", "id":4, "method":"tools/call", "params":{
+        "name":"read", "arguments":{"method":"GET", "path":"/directory/people"}
+    }});
+    let response = client
+        .post(format!("{}/mcp", service.base))
+        .header("accept", "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-11-25")
+        .header("cookie", &cookie)
+        .json(&message)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    let called: Value = response.json().await?;
+    assert_eq!(called["result"]["isError"], true, "{called}");
+    let named = crate::mcp_test_answer::body(&called["result"]);
+    same_admission(&named, direct_status, &direct_body)?;
+    assert_eq!(named["body"]["fields"]["resource_kind"], "person");
+    assert_eq!(named["body"]["fields"]["resource_id"], "all");
+    assert_eq!(named["body"]["fields"]["action"], "read");
+    assert_eq!(named["body"]["fields"]["route"], "/directory/people");
+    let (direct_status, direct_body) = service.get("/sessions", Some(&cookie)).await?;
+    let response: Value = client
+        .post(format!("{}/mcp", service.base))
+        .header("accept", "application/json, text/event-stream")
+        .header("mcp-protocol-version", "2025-11-25")
+        .header("cookie", &cookie)
+        .json(
+            &json!({"jsonrpc":"2.0", "id":5, "method":"tools/call", "params":{
+                "name":"read", "arguments":{"method":"GET", "path":"/sessions"}
+            }}),
+        )
+        .send()
+        .await?
+        .json()
+        .await?;
+    same_admission(
+        &crate::mcp_test_answer::body(&response["result"]),
+        direct_status,
+        &direct_body,
+    )?;
+    let response = client
+        .post(format!("{}/mcp", service.base))
+        .header("accept", "application/json, text/event-stream")
+        .json(&message)
+        .send()
+        .await?;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let response: Value = response.json().await?;
+    assert_eq!(response["refusal"], "NotSignedIn");
     Ok(())
 }
