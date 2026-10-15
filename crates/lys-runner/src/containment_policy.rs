@@ -90,6 +90,9 @@ fn host(name: &str) -> bool {
 impl NativePolicy {
     /// Validate declared inputs before encoding. Real directory objects and
     /// current privileges are checked separately at native preparation time.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if tool rules are invalid, paths are not plain or expose writable/protected/runtime overlap, hosts are not canonical, or required capabilities are missing.
     pub fn validate(&self) -> Result<(), RunnerError> {
         self.tools
             .clone()
@@ -170,6 +173,9 @@ impl NativePolicy {
 
     /// Canonical, versioned bytes. Struct fields have declared order, sets
     /// have sorted order and rule order is preserved because the judge uses it.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if policy validation fails or canonical policy bytes cannot be encoded.
     pub fn canonical(&self) -> Result<Vec<u8>, RunnerError> {
         self.validate()?;
         let mut bytes = POLICY_DOMAIN.as_bytes().to_vec();
@@ -184,6 +190,9 @@ impl NativePolicy {
     }
 
     /// Digest recomputed from all enforcement-relevant declared inputs.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if policy validation fails or canonical policy bytes cannot be encoded.
     pub fn digest(&self) -> Result<String, RunnerError> {
         Ok(hex(&Sha256::digest(self.canonical()?)))
     }
@@ -222,6 +231,9 @@ pub struct Plan {
 impl Plan {
     /// Refuse any stale, differently addressed or modified policy before
     /// native preparation. The expected binding belongs to the launch owner.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the expected audience is empty, the binding or agent/revision differs, policy validation or encoding fails, or the recomputed digest differs.
     pub fn validate(&self, expected: &Binding) -> Result<(), RunnerError> {
         for (field, value) in [
             ("runner", &expected.runner),

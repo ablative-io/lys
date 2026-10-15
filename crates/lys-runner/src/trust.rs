@@ -27,6 +27,9 @@ use crate::error::RunnerError;
 /// The configuration home the harness reads for a run with `environment`:
 /// `CLAUDE_CONFIG_DIR` when set there, else the runner's own `HOME`, which
 /// the harness inherits. Either must be absolute; neither is invented.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `trust_home_unknown` if no configuration home is available or the selected path is relative or contains control bytes.
 pub fn config_home(environment: &BTreeMap<String, String>) -> Result<PathBuf, RunnerError> {
     Ok(resolve_config_home("CLAUDE_CONFIG_DIR", None, environment)?.path)
 }
@@ -92,6 +95,7 @@ pub struct Trust {
 
 impl Trust {
     /// The record's words.
+    #[must_use]
     pub fn words(&self) -> String {
         if self.written {
             format!(
@@ -112,6 +116,9 @@ impl Trust {
 /// written to a sibling and renamed into place; a file that is not a JSON
 /// object, or whose `projects` or row is not one, is refused
 /// `trust_file_invalid` and left as it is.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `trust_file_unreadable` for read failures, `trust_file_invalid` for invalid JSON/object shapes or encoding, or `trust_file_unwritable` for directory, create, write, sync or rename failures.
 pub fn record(config_home: &Path, directory: &str) -> Result<Trust, RunnerError> {
     let file = config_home.join(FILE);
     let shown = file.display().to_string();

@@ -68,6 +68,9 @@ impl Profile {
     /// silently converted to direct network access or to a weaker host list.
     /// The terminal path must come from the runner's newly opened PTY, not a
     /// request field. Runtime reads come only from the authenticated plan.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the plan is invalid, allowed destinations require an absent hostname-egress service, or a terminal or policy path cannot be represented by the native profile.
     pub fn compile(plan: &Plan, expected: &Binding, stdio: &Stdio) -> Result<Self, RunnerError> {
         plan.validate(expected)?;
         if plan
@@ -141,6 +144,7 @@ impl Profile {
     }
 
     /// Inspect the actual source for review and native venue fixtures.
+    #[must_use]
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -148,6 +152,9 @@ impl Profile {
     /// Produce argv with a fixed sandbox entry point and no shell evaluation.
     /// The caller must independently establish native readiness, keep the
     /// writable roots held, and clear its inherited environment/descriptors.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the binding differs, the program is not an absolute UTF-8 path, or the program or an argument contains NUL.
     pub fn arguments(
         &self,
         expected: &Binding,
@@ -194,6 +201,9 @@ pub struct Roots {
 
 impl Roots {
     /// Open both roots without following any symlink in either path.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if plan validation fails or writable directories and input objects cannot be opened and checked without links or overlap.
     pub fn open(plan: &Plan, expected: &Binding) -> Result<Self, RunnerError> {
         plan.validate(expected)?;
         Ok(Self {
@@ -206,6 +216,9 @@ impl Roots {
     }
 
     /// Refuse stale preparation or replacement before issuing launch arguments.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if plan validation fails, the binding or root paths changed, or held directory or input identities cannot be verified.
     pub fn verify(&self, plan: &Plan, expected: &Binding) -> Result<(), RunnerError> {
         plan.validate(expected)?;
         if &self.binding != expected

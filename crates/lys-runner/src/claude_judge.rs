@@ -74,6 +74,9 @@ impl NativeCall {
 
 /// Decode Claude Code's hook stdin into the peer protocol. A wrong event or
 /// a missing member refuses without echoing the input.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `claude_hook_malformed` if JSON, event, required identifiers, absolute cwd or tool-input shape is invalid.
 pub fn request(stdin: &str) -> Result<PeerRequest, RunnerError> {
     let hook: NativeCall = serde_json::from_str(stdin)
         .map_err(|error| malformed(&format!("JSON schema ({:?})", error.classify())))?;
@@ -84,6 +87,13 @@ pub fn request(stdin: &str) -> Result<PeerRequest, RunnerError> {
 }
 
 /// Ask the runner on `socket` to judge the hook's stdin.
+///
+/// # Errors
+/// - `RunnerError::Unreachable` if the socket cannot be connected, cloned, read or written, or the runner closes it before replying.
+/// - `RunnerError::ReplyMalformed` if the greeting or reply is invalid, or the reply names another act.
+/// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+/// - `RunnerError::Malformed` if the peer request cannot be encoded.
+/// - `RunnerError::Refused` if hook validation fails or the runner returns a named refusal.
 pub fn ask(socket: &Path, stdin: &str) -> Result<Verdict, RunnerError> {
     exchange(socket, &request(stdin)?)
 }
@@ -91,6 +101,7 @@ pub fn ask(socket: &Path, stdin: &str) -> Result<Verdict, RunnerError> {
 /// The hook's output. Claude Code reads the same `hookSpecificOutput` shape
 /// as Codex. Malformed input, a missing runner, an unproved caller or a
 /// failed audit is a deny, never an empty answer.
+#[must_use]
 pub fn output(socket: &Path, stdin: &str) -> Value {
     match ask(socket, stdin) {
         Ok(verdict) => response(&verdict),

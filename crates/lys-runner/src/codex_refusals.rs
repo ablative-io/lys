@@ -52,11 +52,13 @@ pub struct Rejection {
 impl Rejection {
     /// Stable across replay of the same thread, turn and item. Domain and
     /// item kind participate, preventing unrelated evidence from collapsing.
+    #[must_use]
     pub fn source_id(&self) -> &str {
         &self.source_id
     }
 
     /// Plain, safe wording; it never says a person or policy denied the act.
+    #[must_use]
     pub fn summary(&self) -> &'static str {
         match self.item {
             RejectedItem::Command => "Codex rejected a command; the cause is unavailable.",
@@ -93,6 +95,9 @@ fn text<'a>(value: &'a Value, field: &str) -> Result<&'a str, RunnerError> {
 /// transport. Unrelated events answer None. Known command/file events with
 /// unknown status refuse instead of silently erasing a possible rejection.
 /// `thread` is bound by the transport owner, never read from hook stdin.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `codex_policy_contract_unsupported` if the binding, parameters, identifiers or terminal status are unsupported; with `codex_event_session_mismatch` if the event belongs to another thread.
 pub fn rejection(thread: &str, notification: &Value) -> Result<Option<Rejection>, RunnerError> {
     if notification.get("method").and_then(Value::as_str) != Some("item/completed") {
         return Ok(None);

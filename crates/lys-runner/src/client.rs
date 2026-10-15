@@ -47,11 +47,21 @@ impl Client {
     }
 
     /// Open a connection.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if connecting to or cloning the runner socket fails.
     pub fn connect(&self) -> Result<Connection, RunnerError> {
         connect(&self.socket)
     }
 
     /// Ask `act` on a connection of its own, and answer the runner's answer.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if the socket cannot be connected, cloned, read or written, or the runner closes it before replying.
+    /// - `RunnerError::ReplyMalformed` if greeting or reply JSON or the greeting identity/challenge shape is invalid.
+    /// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+    /// - `RunnerError::Refused` if the runner answers with a named refusal.
+    /// - `RunnerError::Malformed` if the act or signed request cannot be encoded.
     pub fn ask(&self, act: &Act) -> Result<Answer, RunnerError> {
         self.connect()?.ask(&self.key, act)
     }
@@ -65,6 +75,9 @@ fn unreachable(error: &std::io::Error) -> RunnerError {
 
 /// Open a connection to the runner on `socket`. Its greeting is read by
 /// [`Connection::greeting_line`], so a caller can hold its [`Closer`] first.
+///
+/// # Errors
+/// - `RunnerError::Unreachable` if connecting to or cloning the runner socket fails.
 pub fn connect(socket: &Path) -> Result<Connection, RunnerError> {
     let stream = UnixStream::connect(socket).map_err(|error| RunnerError::Unreachable {
         reason: format!("{}: {error}", socket.display()),
@@ -75,6 +88,9 @@ pub fn connect(socket: &Path) -> Result<Connection, RunnerError> {
 
 impl Connection {
     /// What closes this connection from another thread.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if the socket cannot be cloned for cancellation.
     pub fn closer(&self) -> Result<Closer, RunnerError> {
         self.stream
             .try_clone()
@@ -83,6 +99,9 @@ impl Connection {
     }
 
     /// The line the runner says first on this connection, as it came.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if reading fails or the runner closes before greeting.
     pub fn greeting_line(&mut self) -> Result<String, RunnerError> {
         let mut line = String::new();
         self.reader
@@ -98,11 +117,23 @@ impl Connection {
 
     /// The runner's greeting on this connection, refused
     /// `runner_protocol_mismatch` when it speaks another version.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if the greeting cannot be read.
+    /// - `RunnerError::ReplyMalformed` if the greeting JSON or runner/challenge shape is invalid.
+    /// - `RunnerError::ProtocolMismatch` if the runner speaks another version.
     pub fn greeting(&mut self) -> Result<Greeting, RunnerError> {
         read_greeting(&self.greeting_line()?)
     }
 
     /// Ask `act`, signed by `key` over this connection's greeting.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if the socket cannot be connected, cloned, read or written, or the runner closes it before replying.
+    /// - `RunnerError::ReplyMalformed` if greeting or reply JSON or the greeting identity/challenge shape is invalid.
+    /// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+    /// - `RunnerError::Refused` if the runner answers with a named refusal.
+    /// - `RunnerError::Malformed` if the act or signed request cannot be encoded.
     pub fn ask(mut self, key: &Ed25519Identity, act: &Act) -> Result<Answer, RunnerError> {
         let line = sign_request(key, &self.greeting()?, act)?;
         read_reply(&self.exchange(&line)?)
@@ -110,6 +141,9 @@ impl Connection {
 
     /// Send the request `line`, once the greeting is read, and answer the
     /// reply line as it came.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if writing, flushing or reading fails, or the runner closes before replying.
     pub fn exchange(mut self, line: &str) -> Result<String, RunnerError> {
         let mut writer = &self.stream;
         writer
@@ -140,6 +174,13 @@ impl Connection {
     /// Hold this connection as the grant channel, asked by `key`: refused
     /// by the runner's own name when it answers anything but
     /// `grant_channel`.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if socket I/O or cloning fails, the runner closes before replying, or it answers another act.
+    /// - `RunnerError::ReplyMalformed` if greeting or reply JSON or the greeting identity/challenge shape is invalid.
+    /// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+    /// - `RunnerError::Refused` if the runner answers with a named refusal.
+    /// - `RunnerError::Malformed` if the grant-channel request cannot be encoded.
     pub fn grant_channel(mut self, key: &Ed25519Identity) -> Result<GrantChannel, RunnerError> {
         let line = sign_request(key, &self.greeting()?, &Act::GrantChannel)?;
         let mut writer = &self.stream;
@@ -167,6 +208,10 @@ impl Connection {
 
 impl GrantChannel {
     /// The next question the runner asks; none once it closes the channel.
+    ///
+    /// # Errors
+    /// - `RunnerError::Unreachable` if the next question cannot be read.
+    /// - `RunnerError::Malformed` if a nonempty question does not decode.
     pub fn question(&mut self) -> Result<Option<GrantQuestion>, RunnerError> {
         let mut line = String::new();
         self.reader
@@ -183,6 +228,10 @@ impl GrantChannel {
     }
 
     /// Answer the question asked last.
+    ///
+    /// # Errors
+    /// - `RunnerError::Malformed` if the grant answer cannot be encoded.
+    /// - `RunnerError::Unreachable` if writing or flushing the answer fails.
     pub fn answer(&mut self, answer: &GrantAnswer) -> Result<(), RunnerError> {
         let line = serde_json::to_string(answer).map_err(|error| RunnerError::Malformed {
             reason: format!("the grant answer could not be written: {error}"),

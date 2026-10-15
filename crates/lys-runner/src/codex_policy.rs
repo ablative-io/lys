@@ -51,6 +51,9 @@ fn path_text(path: &std::path::Path) -> Result<&str, RunnerError> {
 /// plan binding and digest. The launch owner merges admitted non-policy
 /// settings, refuses widening overrides and verifies native effective config.
 /// Tool rules still require the plan's separately proved judge capability.
+///
+/// # Errors
+/// - `RunnerError::Refused` if the plan binding, policy, capabilities or digest is invalid, a path cannot be represented literally, or runtime reads overlap protected paths.
 pub fn render(plan: &Plan, expected: &Binding) -> Result<String, RunnerError> {
     plan.validate(expected)?;
     let policy = &plan.policy;

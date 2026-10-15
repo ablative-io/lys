@@ -15,12 +15,26 @@ use crate::refusals::Verdict;
 /// Ask the runner to judge native hook stdin. No claimed session is used to
 /// choose a server-side identity: the connection itself is authenticated by
 /// the runner's existing peer ancestry checks. No second collector is started.
+///
+/// # Errors
+/// - `RunnerError::Unreachable` if the socket cannot be connected, cloned, read or written, or the runner closes it before replying.
+/// - `RunnerError::ReplyMalformed` if the greeting or reply is invalid, or the reply names another act.
+/// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+/// - `RunnerError::Malformed` if the peer request cannot be encoded.
+/// - `RunnerError::Refused` if hook validation fails or the runner returns a named refusal.
 pub fn ask(socket: &Path, stdin: &str) -> Result<Verdict, RunnerError> {
     exchange(socket, &request(stdin)?)
 }
 
 /// Send one judge request over the peer socket and read its verdict. Any
 /// harness's adapter shares this one exchange.
+///
+/// # Errors
+/// - `RunnerError::Unreachable` if the socket cannot be connected, cloned, read or written, or the runner closes it before replying.
+/// - `RunnerError::ReplyMalformed` if the greeting or reply is invalid, or the reply names another act.
+/// - `RunnerError::ProtocolMismatch` if the greeting or reply uses another protocol version.
+/// - `RunnerError::Refused` if the runner answers with a named refusal.
+/// - `RunnerError::Malformed` if the peer request cannot be encoded.
 pub fn exchange(socket: &Path, request: &PeerRequest) -> Result<Verdict, RunnerError> {
     let line = serde_json::to_string(request).map_err(|error| RunnerError::Malformed {
         reason: format!("the judge request could not be encoded: {error}"),
@@ -38,6 +52,7 @@ pub fn exchange(socket: &Path, request: &PeerRequest) -> Result<Verdict, RunnerE
 /// The hook's native output, including a deny on malformed input, missing
 /// runner, unproved caller or failed audit. A failure here has no durable
 /// refusal receipt and must not be shown as a successfully recorded refusal.
+#[must_use]
 pub fn output(socket: &Path, stdin: &str) -> Value {
     match ask(socket, stdin) {
         Ok(verdict) => response(&verdict),

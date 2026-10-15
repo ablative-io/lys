@@ -76,6 +76,9 @@ fn open_directory(path: &Path) -> Result<OwnedFd, RunnerError> {
 
 impl Directory {
     /// Open the exact directory without following a symlink in any component.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `containment_directory_unavailable` if the path is not absolute, plain UTF-8, contains a link or relative component, or its directory or identity cannot be opened or read.
     pub fn open(path: &Path) -> Result<Self, RunnerError> {
         let file = std::fs::File::from(open_directory(path)?);
         let identity = identity(&file, path)?;
@@ -87,12 +90,16 @@ impl Directory {
     }
 
     /// The recorded device and inode of the held directory.
+    #[must_use]
     pub fn identity(&self) -> Identity {
         self.identity
     }
 
     /// Verify the name still resolves without links to the same held object.
     /// A rename/replacement between preparation and launch is refused by name.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `containment_directory_unavailable` if reopening or identity inspection fails, or the directory name now resolves to another object.
     pub fn verify(&self) -> Result<(), RunnerError> {
         let current = std::fs::File::from(open_directory(&self.path)?);
         if identity(&current, &self.path)? != self.identity {

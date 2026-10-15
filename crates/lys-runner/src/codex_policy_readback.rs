@@ -31,6 +31,9 @@ fn without_nulls(value: &Value) -> Value {
 /// session-owned transport which will launch the agent. Return the validated
 /// plan digest; the caller still must reject later thread/resume overrides.
 /// No source cursor or enforcement state is advanced by this function.
+///
+/// # Errors
+/// - `RunnerError::Refused` if plan validation or native representation fails, or the effective configuration differs from the admitted plan.
 pub fn verify(plan: &Plan, expected: &Binding, config: &Value) -> Result<String, RunnerError> {
     // Includes validation of native representability, not just the hash.
     render(plan, expected)?;

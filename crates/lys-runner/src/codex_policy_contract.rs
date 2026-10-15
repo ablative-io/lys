@@ -38,6 +38,7 @@ pub struct PackageIdentity {
 
 impl PackageIdentity {
     /// The actual canonical executable path whose bytes were read.
+    #[must_use]
     pub fn executable(&self) -> &Path {
         &self.executable
     }
@@ -73,6 +74,9 @@ fn digest(path: &Path) -> Result<String, RunnerError> {
 /// another platform refuses by name. This neither executes nor replaces it.
 /// The launch owner must keep these files outside agent-writable roots and
 /// bind its effective-config and native-capability probes to this identity.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `codex_policy_contract_unsupported` if package paths cannot be resolved or read, or either file digest differs from the trusted record.
 pub fn verify_package(package: &Path) -> Result<PackageIdentity, RunnerError> {
     let canonical = |relative: &str| {
         let path = package.join(relative);

@@ -108,6 +108,9 @@ pub struct Inputs {
 impl Inputs {
     /// Refuse symlinks in any input or ancestor and detect object overlap even
     /// when distinct canonical names refer to the same directory (firmlinks).
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if plan validation fails, input paths or objects cannot be opened and inspected without links, writable roots are not directories, inputs overlap them, or protected files have additional hard links.
     pub fn open(plan: &Plan, expected: &Binding) -> Result<Self, RunnerError> {
         plan.validate(expected)?;
         let writes = [
@@ -157,6 +160,9 @@ impl Inputs {
     }
 
     /// Recheck every named object and ancestor immediately before exec.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if plan validation fails, the held binding differs, or an input cannot be reopened or its identity or ancestry changed.
     pub fn verify(&self, plan: &Plan, expected: &Binding) -> Result<(), RunnerError> {
         plan.validate(expected)?;
         if &self.binding != expected {

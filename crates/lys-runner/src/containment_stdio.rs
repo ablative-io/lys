@@ -14,6 +14,9 @@ fn refused(words: impl Into<String>) -> RunnerError {
 /// A stale terminal name cannot grant another session's terminal. Every stdio
 /// descriptor must name the same character device, or each must be a pipe or
 /// socket when the runner selected pipe transport. No ordinary file qualifies.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `containment_stdio_unproved` if terminal or descriptor inspection fails, the terminal is not a character device, or inherited descriptors do not match the selected terminal or pipe/socket transport.
 pub fn verify(stdio: &Stdio) -> Result<(), RunnerError> {
     let expected_device = match stdio {
         Stdio::Pipes => None,

@@ -94,6 +94,9 @@ impl NativeCall {
 /// Decode native hook stdin into the existing peer protocol. The runner
 /// proves identity from the socket, never from the claimed session or cwd.
 /// Unknown fields and wrong events refuse without echoing their contents.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `codex_hook_malformed` if JSON, fields, event, cwd, tool input or native tool name is unsupported.
 pub fn request(stdin: &str) -> Result<PeerRequest, RunnerError> {
     let hook: NativeCall = serde_json::from_str(stdin)
         .map_err(|error| malformed(&format!("JSON schema ({:?})", error.classify())))?;
@@ -106,6 +109,7 @@ pub fn request(stdin: &str) -> Result<PeerRequest, RunnerError> {
 /// Encode the shared judge's verdict in the native control-output shape.
 /// A pass emits no permission decision. A denial always has a reason;
 /// failed audit persistence remains a denial, never an allow or empty answer.
+#[must_use]
 pub fn response(verdict: &Verdict) -> Value {
     if !verdict.deny {
         return json!({});

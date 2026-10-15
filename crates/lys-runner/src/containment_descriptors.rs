@@ -50,6 +50,9 @@ fn mark(fd: i32) -> Result<(), RunnerError> {
 /// its exec. The helper must open nothing inheritable afterwards. A live
 /// multithreaded runner is explicitly refused before its descriptors change.
 /// This function proves descriptor preparation, not native sandbox readiness.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `containment_descriptors_unavailable` if thread counting fails or is not exactly one, descriptor enumeration is invalid, or close-on-exec cannot be set and verified.
 pub fn seal_for_exec() -> Result<usize, RunnerError> {
     let count = threads()?;
     if count != 1 {

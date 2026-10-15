@@ -43,6 +43,9 @@ impl Input {
     /// Prepare an exact native command for inspection or helper exec. The
     /// helper entry point is fixed, HOME belongs to the plan, and agent
     /// variables take effect only inside the applied sandbox.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if plan or Seatbelt preparation fails, runtime reads exclude the environment helper, the program or arguments are unrepresentable, or environment variables alter the loader or admitted home.
     pub fn command(&self) -> Result<Command, RunnerError> {
         let profile = Profile::compile(&self.plan, &self.expected, &self.stdio)?;
         let environment_program = std::path::Path::new(ENV_EXECUTABLE);
@@ -115,6 +118,9 @@ impl Input {
 /// Structured input cannot supply readiness, and lowering `required` cannot
 /// bypass this check. Command preparation remains available for controlled
 /// backend probes; it is never an admitted agent launch or an enforced receipt.
+///
+/// # Errors
+/// - `RunnerError::Refused` if platform, command, stdio or held-root checks fail; after preparation it always refuses `containment_unavailable` because no bound native audit lifetime is installed.
 pub fn exec(input: &Input) -> Result<Infallible, RunnerError> {
     if !cfg!(target_os = "macos") {
         return Err(refused("Seatbelt requires a native macOS host"));
