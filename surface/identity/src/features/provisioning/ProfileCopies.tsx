@@ -4,7 +4,7 @@ import { isRecord, strings } from '../network/contract';
 import type { Machine } from '../network/contract';
 import { ErrorWords } from '../people/Words';
 import type { Program } from './choices';
-import { commandOrAbsolutePath, launchCommand } from './harness-program';
+import { commandOrAbsolutePath, launchCommand, plainPath } from './harness-program';
 
 type Computer = Pick<Machine, 'id' | 'name'>;
 export interface ComputerPrograms {
@@ -50,7 +50,16 @@ function readableProgram(value: unknown, machine: string): value is Program {
       && (copy.machine === undefined || copy.machine === machine));
 }
 
-function computerPrograms(value: unknown, machine: Computer): Program[] {
+/** A computer reports where it found each copy through its login's PATH, which may name a folder through `..`; the
+ *  copy is the same file at its plain path, so it is read at that path rather than refusing the computer's whole answer. */
+function plainCopies(value: unknown): unknown {
+  if (!isRecord(value) || !Array.isArray(value.programs)) return value;
+  return { ...value, programs: value.programs.map((program) => !isRecord(program) || !Array.isArray(program.builds) ? program
+    : { ...program, builds: program.builds.map((copy) => isRecord(copy) && typeof copy.program === 'string' ? { ...copy, program: plainPath(copy.program) } : copy) }) };
+}
+
+function computerPrograms(answer: unknown, machine: Computer): Program[] {
+  const value = plainCopies(answer);
   if (!isRecord(value) || value.machine !== undefined && value.machine !== machine.id
     || value.reason !== undefined && typeof value.reason !== 'string'
     || !Array.isArray(value.programs) || !value.programs.every((program) => readableProgram(program, machine.id))

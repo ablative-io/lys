@@ -88,6 +88,14 @@ describe('Installed copies on an agent’s Settings page', () => {
     expect(picker()?.value).toBe('claude\nclaude 2');
   });
 
+  it('reads a copy found through a login PATH folder named with .. at its plain path, keeping the computer’s programs and models', async () => {
+    const found = { ...program([copy('/home/ward/.local/share/../bin/claude', '3')]), models: [{ id: 'default', label: 'Default' }, { id: 'opus', label: 'Opus' }] };
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...routes({ ...profile, runs_on: laptop.id }), ['/harnesses?machine=' + laptop.id]: scoped(laptop, [found]) });
+    expect(text()).not.toContain('did not match that computer or the program-list format');
+    expect(picker()?.textContent).toContain('Claude Code 3');
+    expect([...field('model')!.options].map((option) => option.value)).toEqual(['default', 'opus']);
+  });
+
   it('pins a copy’s computer when a person chooses it, and saves that computer with that command', async () => {
     const result = await mount('#/file/' + SCRIBE + '/provisioning', routes());
     const selected = groups().find((group) => group.label === 'Travel laptop')?.querySelector('option');

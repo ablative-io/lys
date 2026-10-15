@@ -10,6 +10,18 @@ export function launchCommand(program: string): string {
 
 export const PROGRAM_RULE = 'Enter a plain command name (for instance cdx), or the program’s full path starting with / and ending in a file name.';
 
+/** An absolute path with its `.` and `..` parts worked out, as a login's PATH may name a folder
+ *  (`~/.local/share/../bin`); anything else is returned unchanged. */
+export function plainPath(path: string): string {
+  if (!path.startsWith('/')) return path;
+  const parts: string[] = [];
+  for (const part of path.split('/')) {
+    if (part === '' || part === '.') continue;
+    if (part === '..') parts.pop(); else parts.push(part);
+  }
+  return '/' + parts.join('/');
+}
+
 /** The form and the launch boundary accept the same plain program shapes. */
 export function commandOrAbsolutePath(program: string): boolean {
   if (!program || /[=\\\u0000-\u001f\u007f-\u009f]/.test(program)) return false;
