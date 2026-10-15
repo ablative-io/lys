@@ -202,7 +202,7 @@ export async function firstRunChoices(capability: AddAndRunCapability, publish?:
     const snapshot = (): FirstRunOptions => {
       const computers = runners.flatMap((entry) => entry.state === 'confirmed' ? [entry.machine] : []);
       const asking = runners.some((entry) => entry.state === 'asking');
-      const problem = choicesProblem ?? (computers.length || asking ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed local Lys runner.' }));
+      const problem = choicesProblem ?? (computers.length || asking ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed Lys runner, on this computer or dialled in from another.' }));
       return { choices: computers.length && choices ? { ...choices, machines: computers } : null, network, computers, runners, loading: choicesPending || !computers.length && asking, problem };
     };
     publish?.(snapshot());
@@ -213,7 +213,10 @@ export async function firstRunChoices(capability: AddAndRunCapability, publish?:
       ...eligible.map(async (machine) => {
         let answer: RunnerChoice;
         try {
-          confirmRunner(await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner'), machine.id, true);
+          const held = await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner');
+          // Lys's own runner counts, held by this install or dialled in from the computer itself; a socket Lys does not hold is not a place to start an agent.
+          confirmRunner(held, machine.id, false);
+          if (isRecord(held) && isRecord(held.runner) && held.runner.kind === 'socket') throw new Refused(200, { refusal: 'RunnerNotLys', reason: 'The computer’s runner is a socket Lys does not hold. Agents start only through Lys’s own runner, on this computer or dialled in.' });
           answer = { machine, state: 'confirmed' };
         } catch (problem) { answer = { machine, state: 'unavailable', reason: runnerProblemReason(problem) }; }
         runners = runners.map((entry) => entry.machine.id === machine.id ? answer : entry);
