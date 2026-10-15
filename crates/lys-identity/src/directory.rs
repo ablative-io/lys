@@ -48,6 +48,9 @@ mod draft;
 #[path = "directory_product_draft.rs"]
 mod product_draft;
 
+#[path = "directory_changes.rs"]
+mod changes;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 
@@ -71,11 +74,55 @@ impl<S: LeafStore> Directory<S> {
     /// Open the directory over the store `reopen` gives from its signed
     /// snapshot, reading and folding only the leaves after it. A snapshot is
     /// written every [`SNAPSHOT_EVERY`] entries.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if opening, reading or folding the log fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or cannot be verified.
+    /// - `IdentityError::DirectorySnapshotUnmigrated` if an old snapshot requires explicit migration.
+    /// - `IdentityError::OperationReused` if a replayed event repeats an operation.
+    /// - `IdentityError::AlreadyRegistered` if replay registers an identity twice.
+    /// - `IdentityError::AlreadyBootstrapped` if replay repeats setup for a bound login.
+    /// - `IdentityError::IdentityUnknown` if a replayed change names an absent identity.
+    /// - `IdentityError::BindingTaken` if replay binds one login to different people.
+    /// - `IdentityError::BindingMalformed` if an issuer move produces an invalid login binding.
+    /// - `IdentityError::StateMismatch` if a replayed transition starts from another state.
+    /// - `IdentityError::LinkSourceSeen` if replay repeats a link source operation.
+    /// - `IdentityError::ChangeMismatch` if replayed identity or reporting fields disagree.
+    /// - `IdentityError::AnswersToUnknown` if a reporting target is absent or of another kind.
+    /// - `IdentityError::AnswersToInactive` if the immediate reporting target is inactive.
+    /// - `IdentityError::AnswersToCycle` if reporting returns to an earlier identity.
+    /// - `IdentityError::NoAccountablePerson` if the reporting chain cannot reach an active person.
+    /// - `IdentityError::DraftChangeInvalid` if a replayed draft payload or decision is invalid.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names another creation.
+    /// - `IdentityError::DraftNotFound` if a replayed decision names an absent draft.
+    /// - `IdentityError::DraftNotPending` if a replayed decision is outside the draft's current state.
     pub fn open(reopen: Reopen<S>, key: Ed25519Identity) -> Result<Self, IdentityError> {
         Self::open_with(reopen, key, SNAPSHOT_EVERY)
     }
 
     /// As [`Directory::open`], writing a snapshot every `every` entries.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if opening, reading or folding the log fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or cannot be verified.
+    /// - `IdentityError::DirectorySnapshotUnmigrated` if an old snapshot requires explicit migration.
+    /// - `IdentityError::OperationReused` if a replayed event repeats an operation.
+    /// - `IdentityError::AlreadyRegistered` if replay registers an identity twice.
+    /// - `IdentityError::AlreadyBootstrapped` if replay repeats setup for a bound login.
+    /// - `IdentityError::IdentityUnknown` if a replayed change names an absent identity.
+    /// - `IdentityError::BindingTaken` if replay binds one login to different people.
+    /// - `IdentityError::BindingMalformed` if an issuer move produces an invalid login binding.
+    /// - `IdentityError::StateMismatch` if a replayed transition starts from another state.
+    /// - `IdentityError::LinkSourceSeen` if replay repeats a link source operation.
+    /// - `IdentityError::ChangeMismatch` if replayed identity or reporting fields disagree.
+    /// - `IdentityError::AnswersToUnknown` if a reporting target is absent or of another kind.
+    /// - `IdentityError::AnswersToInactive` if the immediate reporting target is inactive.
+    /// - `IdentityError::AnswersToCycle` if reporting returns to an earlier identity.
+    /// - `IdentityError::NoAccountablePerson` if the reporting chain cannot reach an active person.
+    /// - `IdentityError::DraftChangeInvalid` if a replayed draft payload or decision is invalid.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names another creation.
+    /// - `IdentityError::DraftNotFound` if a replayed decision names an absent draft.
+    /// - `IdentityError::DraftNotPending` if a replayed decision is outside the draft's current state.
     pub fn open_with(
         reopen: Reopen<S>,
         key: Ed25519Identity,
@@ -134,6 +181,10 @@ impl<S: LeafStore> Directory<S> {
 
     /// The log, for receipts and inclusion proofs, once any uncertain append
     /// is resolved.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
     pub fn log(&mut self) -> Result<&EventLog<S>, IdentityError> {
         self.settle()?;
         Ok(&self.log)
@@ -141,6 +192,10 @@ impl<S: LeafStore> Directory<S> {
 
     /// Resolve an uncertain append, and apply every leaf it adopted, before
     /// anything is answered as current.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
     pub fn settle(&mut self) -> Result<(), IdentityError> {
         if let Some(reason) = &self.broken {
             return Err(IdentityError::LogUnavailable {
@@ -165,12 +220,20 @@ impl<S: LeafStore> Directory<S> {
     }
 
     /// The identity `id` as it stands, once any uncertain append is resolved.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
     pub fn record(&mut self, id: IdentityId) -> Result<Option<Record>, IdentityError> {
         self.settle()?;
         Ok(self.projection.record(id).cloned())
     }
 
     /// The whole projection as it stands, once any uncertain append is resolved.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
     pub fn projection(&mut self) -> Result<&Projection, IdentityError> {
         self.settle()?;
         Ok(&self.projection)
@@ -282,183 +345,6 @@ impl<S: LeafStore> Directory<S> {
         )?)
     }
 
-    /// Create one active person bound to the authenticated actor in one signed leaf.
-    ///
-    /// The service must admit the configured administrator before calling this.
-    /// Retrying the same operation, login and profile returns its original receipt,
-    /// including after a new authenticated session or a reopen. It never reactivates
-    /// a person whose state was subsequently changed.
-    pub fn setup_person(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        profile: Profile,
-        recorded_at: u64,
-    ) -> Result<(PersonId, Receipt), IdentityError> {
-        self.settle()?;
-        let change = Change::SetupPerson { profile };
-        if let Some((event, receipt)) = self.answered(operation)? {
-            if event.actor().binding() == actor.binding() && event.change() == &change {
-                match event.identity() {
-                    IdentityId::Person(person) => return Ok((person, receipt)),
-                    IdentityId::Agent(_)
-                    | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {}
-                }
-            }
-            return Err(IdentityError::OperationReused {
-                operation: operation.to_string(),
-            });
-        }
-        if let Some(person) = self.projection.person_for(actor.binding()) {
-            return Err(IdentityError::AlreadyBootstrapped {
-                person: person.to_string(),
-            });
-        }
-        let person = PersonId::generate()?;
-        let event = IdentityEvent::new(
-            operation,
-            actor,
-            IdentityId::Person(person),
-            recorded_at,
-            change,
-        )?;
-        Ok((person, self.commit(event)?))
-    }
-
-    /// Register a person, answered with their new enduring id.
-    pub fn register_person(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        profile: Profile,
-        recorded_at: u64,
-    ) -> Result<(PersonId, Receipt), IdentityError> {
-        self.settle()?;
-        let change = Change::RegisterPerson { profile };
-        if let Some((IdentityId::Person(id), receipt)) =
-            self.retry(operation, &actor, None, &change)?
-        {
-            return Ok((id, receipt));
-        }
-        let id = PersonId::generate()?;
-        let event = IdentityEvent::new(
-            operation,
-            actor,
-            IdentityId::Person(id),
-            recorded_at,
-            change,
-        )?;
-        Ok((id, self.commit(event)?))
-    }
-
-    /// Register an agent under `responsible`, the person who registers it, for life.
-    ///
-    /// Nothing is started, and no login, credential, handle or certificate is issued.
-    pub fn register_agent(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        responsible: PersonId,
-        profile: Profile,
-        recorded_at: u64,
-    ) -> Result<(AgentId, Receipt), IdentityError> {
-        self.settle()?;
-        let change = Change::RegisterAgent {
-            responsible,
-            profile,
-        };
-        if let Some((IdentityId::Agent(id), receipt)) =
-            self.retry(operation, &actor, None, &change)?
-        {
-            return Ok((id, receipt));
-        }
-        let id = AgentId::generate()?;
-        let event =
-            IdentityEvent::new(operation, actor, IdentityId::Agent(id), recorded_at, change)?;
-        Ok((id, self.commit(event)?))
-    }
-
-    /// Replace an identity's display profile.
-    pub fn change_profile(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        identity: IdentityId,
-        profile: Profile,
-        recorded_at: u64,
-    ) -> Result<Receipt, IdentityError> {
-        self.change(
-            actor,
-            operation,
-            identity,
-            Change::ChangeProfile { profile },
-            recorded_at,
-        )
-    }
-
-    /// Bind a login to a person. One login names at most one person.
-    pub fn bind_login(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        person: PersonId,
-        binding: crate::binding::LoginBinding,
-        recorded_at: u64,
-    ) -> Result<Receipt, IdentityError> {
-        self.change(
-            actor,
-            operation,
-            IdentityId::Person(person),
-            Change::BindLogin { binding },
-            recorded_at,
-        )
-    }
-
-    /// Move an identity through one lifecycle transition, from the state it is in.
-    pub fn transition(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        identity: IdentityId,
-        transition: Transition,
-        reason: &str,
-        recorded_at: u64,
-    ) -> Result<Receipt, IdentityError> {
-        self.settle()?;
-        let from = match self.answered(operation)? {
-            Some((event, _)) => match event.change() {
-                Change::Transition { from, .. } => *from,
-                _ => {
-                    return Err(IdentityError::OperationReused {
-                        operation: operation.to_string(),
-                    });
-                }
-            },
-            None => self
-                .projection
-                .record(identity)
-                .ok_or_else(|| IdentityError::IdentityUnknown {
-                    identity: identity.to_string(),
-                })?
-                .state(),
-        };
-        let to = transition.target(from)?;
-        self.change(
-            actor,
-            operation,
-            identity,
-            Change::Transition {
-                transition,
-                from,
-                to,
-                reason: reason.to_owned(),
-            },
-            recorded_at,
-        )
-    }
-
     /// Commit a change the link-audit receiver built, under the retry rule.
     pub(crate) fn commit_change(
         &mut self,
@@ -474,6 +360,12 @@ impl<S: LeafStore> Directory<S> {
     /// The receipt of the event at log index `index`, built from the log:
     /// its event and root are read from the nearest checkpoint on. `None` for
     /// a leaf the directory has not folded.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if a checkpoint or stored leaf cannot be read.
+    /// - `IdentityError::LeafNotAnEvent` if the stored event cannot be verified.
+    /// - `IdentityError::InstallEntry` if the requested leaf is an install event.
+    /// - `IdentityError::DraftEntry` if the requested leaf is a draft.
     pub fn receipt_at(&self, index: u64) -> Result<Option<Receipt>, IdentityError> {
         if index >= self.folded {
             return Ok(None);

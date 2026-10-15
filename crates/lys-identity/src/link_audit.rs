@@ -23,6 +23,18 @@ use crate::receipt::Receipt;
 
 impl<S: LeafStore> Directory<S> {
     /// Accept one observation about `person` from the authenticated `source`.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::OperationReused` if the operation already names a different request.
+    /// - `IdentityError::InstallEntry` if a retried operation names an install leaf.
+    /// - `IdentityError::DraftEntry` if a retried operation names a draft leaf.
+    /// - `IdentityError::AppendRefused` if reconciliation proves this change was not committed.
+    /// - `IdentityError::LinkSourceSeen` if a source operation was accepted for another person or observation.
+    /// - `IdentityError::ReceiptInvalid` if an accepted observation has no recorded receipt.
+    /// - `IdentityError::RandomSourceUnavailable` if the new operation id cannot be generated.
+    /// - `IdentityError::IdentityUnknown` if the person is absent.
     pub fn accept_link_audit(
         &mut self,
         source: Actor,

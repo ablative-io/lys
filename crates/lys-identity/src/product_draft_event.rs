@@ -191,6 +191,7 @@ pub fn words_digest(words: &str) -> [u8; 32] {
 
 impl ProductDraftEvent {
     /// The operation this leaf records.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         match self {
             Self::Created(event) => event.operation,
@@ -202,6 +203,7 @@ impl ProductDraftEvent {
     }
 
     /// The draft a decision or close names, with the creation hash it binds.
+    #[must_use]
     pub fn decision(&self) -> Option<(OperationId, [u8; 32])> {
         match self {
             Self::Created(_) => None,
@@ -215,6 +217,7 @@ impl ProductDraftEvent {
     /// Whether `other` is the same act asked again: every member the caller
     /// chose is equal, and only the times and the session it arrived in may
     /// differ. A retry is answered as first recorded, never recorded twice.
+    #[must_use]
     pub fn same_act(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::Created(held), Self::Created(asked)) => {
@@ -259,6 +262,9 @@ impl ProductDraftEvent {
 
     /// Validate the stored shape; the server judges the grant, the caller
     /// and the approvers before an event is made.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if identifiers, app ownership, mode, request digest or decision and close operations violate the product draft contract.
     pub fn validate(&self) -> Result<(), IdentityError> {
         match self {
             Self::Created(event) => {

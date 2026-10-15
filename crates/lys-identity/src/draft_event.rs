@@ -201,6 +201,7 @@ fn evidence(actor: &Actor, proof: Option<&RequestEvidence>) -> Result<(), Identi
 
 impl DraftEvent {
     /// The operation this leaf records.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         match self {
             Self::Created(event) => event.operation,
@@ -211,6 +212,10 @@ impl DraftEvent {
     }
 
     /// Validate the stored shape; caller admission verifies authority and cryptographic evidence.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if the target, request, evidence, signature shape or decision operations violate the draft contract.
+    /// - `IdentityError::DraftHashMismatch` if a correction does not commit to its corrected creation payload.
     pub fn validate(&self) -> Result<(), IdentityError> {
         match self {
             Self::Created(event) => {
@@ -277,6 +282,7 @@ impl DraftEvent {
     }
 
     /// The immutable wire version, preserving historical creation hashes.
+    #[must_use]
     pub fn version(&self) -> u64 {
         match self {
             Self::Created(event) if event.request_signature.is_some() => 2,

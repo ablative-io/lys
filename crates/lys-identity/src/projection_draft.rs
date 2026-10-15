@@ -30,6 +30,7 @@ pub struct DraftRecord {
 
 impl DraftRecord {
     /// Whether this original still awaits a decision.
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.approved.is_none()
             && self.refused.is_none()
@@ -38,6 +39,7 @@ impl DraftRecord {
     }
 
     /// Whether the original was refused, directly or by correction.
+    #[must_use]
     pub fn is_refused(&self) -> bool {
         self.refused.is_some() || self.correction.is_some()
     }
@@ -68,6 +70,13 @@ impl Projection {
     }
 
     /// Validate a draft act before signing or appending it.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if the stored draft shape, evidence or decision is invalid.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names a different creation payload.
+    /// - `IdentityError::DraftNotFound` if the decision names no recorded draft.
+    /// - `IdentityError::DraftNotPending` if a terminal decision already exists.
+    /// - `IdentityError::OperationReused` if an event, application or correction operation is already recorded.
     pub fn check_draft(&self, event: &DraftEvent) -> Result<(), IdentityError> {
         event.validate()?;
         if let Some((draft, hash)) = event.decision() {
@@ -108,6 +117,13 @@ impl Projection {
     }
 
     /// Fold a validated committed draft entry at its directory index.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if the stored draft shape, evidence or decision is invalid.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names a different creation payload.
+    /// - `IdentityError::DraftNotFound` if the decision names no recorded draft.
+    /// - `IdentityError::DraftNotPending` if a terminal decision already exists.
+    /// - `IdentityError::OperationReused` if an event, application or correction operation is already recorded.
     pub fn apply_draft(&mut self, event: &DraftEvent, index: u64) -> Result<(), IdentityError> {
         self.check_draft(event)?;
         match event {

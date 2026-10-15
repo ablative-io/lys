@@ -42,6 +42,7 @@ pub struct ProductDraftRecord {
 
 impl ProductDraftRecord {
     /// How many distinct approvers its mode needs: one by draft, two by two.
+    #[must_use]
     pub fn needed(&self) -> usize {
         if self.created.mode == Mode::ByTwo {
             2
@@ -51,17 +52,20 @@ impl ProductDraftRecord {
     }
 
     /// Whether it has as many distinct approvals as its mode needs.
+    #[must_use]
     pub fn is_approved(&self) -> bool {
         self.refused.is_none() && self.approvals.len() >= self.needed()
     }
 
     /// Whether it still awaits approvals: neither approved nor refused.
+    #[must_use]
     pub fn is_pending(&self) -> bool {
         self.refused.is_none() && self.approvals.len() < self.needed()
     }
 
     /// Whether it still waits on someone: not refused, and not closed by
     /// its product, so an approved draft left unexecuted stays open.
+    #[must_use]
     pub fn is_open(&self) -> bool {
         self.closed.is_none() && self.refused.is_none()
     }
@@ -106,6 +110,13 @@ impl Projection {
     /// signed: a decision names a held draft by its exact hash; an approval
     /// or refusal finds it pending, and an approver approves once; a close
     /// finds it approved and not yet closed.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if the payload is invalid, an approver repeats or another app attempts to close the draft.
+    /// - `IdentityError::DraftHashMismatch` if the decision names a different creation payload.
+    /// - `IdentityError::DraftNotFound` if the decision names no recorded product draft.
+    /// - `IdentityError::DraftNotPending` if the draft cannot accept this decision or close.
+    /// - `IdentityError::OperationReused` if the event operation is already recorded.
     pub fn check_product_draft(&self, event: &ProductDraftEvent) -> Result<(), IdentityError> {
         event.validate()?;
         if self.operation(event.operation()).is_some() {
@@ -172,6 +183,13 @@ impl Projection {
     }
 
     /// Fold a validated committed product draft entry at its directory index.
+    ///
+    /// # Errors
+    /// - `IdentityError::DraftChangeInvalid` if the payload is invalid, an approver repeats or another app attempts to close the draft.
+    /// - `IdentityError::DraftHashMismatch` if the decision names a different creation payload.
+    /// - `IdentityError::DraftNotFound` if the decision names no recorded product draft.
+    /// - `IdentityError::DraftNotPending` if the draft cannot accept this decision or close.
+    /// - `IdentityError::OperationReused` if the event operation is already recorded.
     pub fn apply_product_draft(
         &mut self,
         event: &ProductDraftEvent,

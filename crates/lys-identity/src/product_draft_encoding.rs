@@ -37,6 +37,7 @@ fn opening(out: &mut Vec<u8>, fields: u64, kind: u64, operation: OperationId) {
 }
 
 /// The exact canonical COSE payload of `event`.
+#[must_use]
 pub fn encode(event: &ProductDraftEvent) -> Vec<u8> {
     let mut out = Vec::new();
     match event {
@@ -232,6 +233,13 @@ fn refused_on_execution(value: Value) -> Result<ProductDraftEvent, IdentityError
 }
 
 /// Read only the canonical encoding of a valid product draft payload.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if the CBOR shape, version, kind, grant, digest or provenance is invalid.
+/// - `IdentityError::IdentifierMalformed` if a textual operation, holder or person id is invalid.
+/// - `IdentityError::BindingMalformed` if a decoded actor login is invalid.
+/// - `IdentityError::DraftChangeInvalid` if the product draft fails its target, mode, digest or decision rules.
+/// - `IdentityError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
 pub fn decode(body: &[u8]) -> Result<ProductDraftEvent, IdentityError> {
     let value = cbor(body, "a product draft payload is a definite array")?;
     let Value::Array(items) = &value else {

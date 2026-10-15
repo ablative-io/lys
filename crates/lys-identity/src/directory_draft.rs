@@ -10,6 +10,17 @@ use lys_log_store::LeafStore;
 impl<S: LeafStore> Directory<S> {
     /// Record a creation or approval, refusing a hash mismatch before any append.
     /// A retry of the same exact payload returns its original coordinate.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::DraftChangeInvalid` if the draft payload fails validation.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names a different payload.
+    /// - `IdentityError::DraftNotFound` if a decision names an absent draft.
+    /// - `IdentityError::DraftNotPending` if a decision or close cannot be applied in the current state.
+    /// - `IdentityError::OperationReused` if an operation is already recorded for another act.
+    /// - `IdentityError::AppendRefused` if reconciliation proves the event was not committed.
+    /// - `IdentityError::AppendUncertain` if a pending log append has not been resolved.
     pub fn record_draft(&mut self, event: DraftEvent) -> Result<Coordinate, IdentityError> {
         self.settle()?;
         let operation = event.operation();

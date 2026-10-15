@@ -37,6 +37,22 @@ fn reused(operation: OperationId) -> IdentityError {
 
 impl<S: LeafStore> Directory<S> {
     /// Register beneath a person or agent after resolving its active reporting chain.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::OperationReused` if the operation already names a different request.
+    /// - `IdentityError::InstallEntry` if a retried operation names an install leaf.
+    /// - `IdentityError::DraftEntry` if a retried operation names a draft leaf.
+    /// - `IdentityError::AppendRefused` if reconciliation proves this change was not committed.
+    /// - `IdentityError::AnswersToUnknown` if a reporting target is absent or is not a person or agent.
+    /// - `IdentityError::AnswersToInactive` if the immediate target is inactive.
+    /// - `IdentityError::AnswersToCycle` if the new edge creates a cycle.
+    /// - `IdentityError::NoAccountablePerson` if the chain cannot reach an active person.
+    /// - `IdentityError::RandomSourceUnavailable` if the new agent id cannot be generated.
+    /// - `IdentityError::AlreadyRegistered` if the generated identity already exists.
+    /// - `IdentityError::IdentityUnknown` if the responsible person or reporting identity is absent.
+    /// - `IdentityError::ChangeMismatch` if a reporting edge or responsibility is invalid.
     pub fn register_reporting_agent(
         &mut self,
         actor: Actor,
@@ -120,6 +136,20 @@ impl<S: LeafStore> Directory<S> {
     }
 
     /// Change an edge and the affected subtree's responsibility in one signed leaf.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::OperationReused` if the operation already names a different request.
+    /// - `IdentityError::InstallEntry` if a retried operation names an install leaf.
+    /// - `IdentityError::DraftEntry` if a retried operation names a draft leaf.
+    /// - `IdentityError::AppendRefused` if reconciliation proves this change was not committed.
+    /// - `IdentityError::AnswersToUnknown` if a reporting target is absent or is not a person or agent.
+    /// - `IdentityError::AnswersToInactive` if the immediate target is inactive.
+    /// - `IdentityError::AnswersToCycle` if the new edge creates a cycle.
+    /// - `IdentityError::NoAccountablePerson` if the chain cannot reach an active person.
+    /// - `IdentityError::IdentityUnknown` if the moving agent or a reporting descendant is absent.
+    /// - `IdentityError::ChangeMismatch` if the current edge or responsibility is absent or inconsistent.
     pub fn change_reports_to(
         &mut self,
         actor: Actor,

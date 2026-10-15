@@ -18,16 +18,21 @@ impl OperationId {
     const PREFIX: &'static str = "op-";
 
     /// A new operation id from the secure random source.
+    ///
+    /// # Errors
+    /// - `IdentityError::RandomSourceUnavailable` if the operating system cannot fill the operation bytes.
     pub fn generate() -> Result<Self, IdentityError> {
         random_bytes().map(Self)
     }
 
     /// The operation id these bytes are, as read back from a signed event.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The operation id's bytes, as a signed event carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }

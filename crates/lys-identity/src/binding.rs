@@ -38,6 +38,9 @@ fn check_exact(
 
 impl LoginBinding {
     /// The binding of `subject` at `issuer`, refused by name if either is not exact.
+    ///
+    /// # Errors
+    /// - `IdentityError::BindingMalformed` if either member is empty, padded or contains controls, the issuer lacks an HTTP scheme, or the subject exceeds 255 bytes.
     pub fn new(issuer: &str, subject: &str) -> Result<Self, IdentityError> {
         check_exact(
             issuer,
@@ -66,11 +69,13 @@ impl LoginBinding {
     }
 
     /// The issuer, exactly as recorded.
+    #[must_use]
     pub fn issuer(&self) -> &str {
         &self.issuer
     }
 
     /// The subject, exactly as recorded.
+    #[must_use]
     pub fn subject(&self) -> &str {
         &self.subject
     }

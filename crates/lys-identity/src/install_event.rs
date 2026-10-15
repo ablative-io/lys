@@ -70,6 +70,10 @@ impl InstallEvent {
     /// The issuer move from `from` to `to`, recorded by the directory service
     /// running `build` at `recorded_at`. Its operation id is the move's own,
     /// so the same move is never recorded twice.
+    ///
+    /// # Errors
+    /// - `IdentityError::BindingMalformed` if either issuer cannot be used in a login binding.
+    /// - `IdentityError::ChangeMismatch` if the build is empty or padded, or the two issuers are equal.
     pub fn issuer_moved(
         from: &str,
         to: &str,
@@ -85,6 +89,7 @@ impl InstallEvent {
 
     /// The operation id a change is recorded under: the first 16 bytes of
     /// SHA-256 over its kind and fields, so recording it again finds it.
+    #[must_use]
     pub fn operation_of(change: &InstallChange) -> OperationId {
         let InstallChange::IssuerMoved { from, to } = change;
         let mut hasher = Sha256::new();
@@ -131,27 +136,32 @@ impl InstallEvent {
     }
 
     /// The operation id the event is recorded under.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         self.operation
     }
 
     /// The build of the directory service that recorded the event.
+    #[must_use]
     pub fn build(&self) -> &str {
         &self.build
     }
 
     /// When the service recorded the event, in seconds since the Unix epoch.
+    #[must_use]
     pub fn recorded_at(&self) -> u64 {
         self.recorded_at
     }
 
     /// The change.
+    #[must_use]
     pub fn change(&self) -> &InstallChange {
         &self.change
     }
 }
 
 /// The canonical body bytes of `event`.
+#[must_use]
 pub fn encode(event: &InstallEvent) -> Vec<u8> {
     let InstallChange::IssuerMoved { from, to } = &event.change;
     let mut out = Vec::new();
@@ -185,6 +195,12 @@ pub fn encode(event: &InstallEvent) -> Vec<u8> {
 
 /// The install event a body's bytes name, refused unless they are its
 /// canonical encoding.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if the CBOR shape, version, actor, subject or change code is invalid.
+/// - `IdentityError::BindingMalformed` if either decoded issuer cannot be used in a login binding.
+/// - `IdentityError::ChangeMismatch` if the build, issuer pair or derived operation id is invalid.
+/// - `IdentityError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
 pub fn decode(body: &[u8]) -> Result<InstallEvent, IdentityError> {
     const SHAPE: &str = "an install event is a map of keys 1 to 7";
     let [

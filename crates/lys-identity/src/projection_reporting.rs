@@ -10,6 +10,12 @@ use super::{
 
 impl Projection {
     /// Resolve a new reporting edge, naming each invalid target or chain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AnswersToUnknown` if the target is absent or is not a person or agent.
+    /// - `IdentityError::AnswersToInactive` if the immediate target is not active.
+    /// - `IdentityError::AnswersToCycle` if the reporting walk revisits an identity.
+    /// - `IdentityError::NoAccountablePerson` if the chain has a missing or inactive ancestor or no reporting edge.
     pub fn resolve_reporting(
         &self,
         target: IdentityId,

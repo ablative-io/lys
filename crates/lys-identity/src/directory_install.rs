@@ -13,6 +13,16 @@ impl<S: LeafStore> Directory<S> {
     /// Record that the issuer moved from `from` to `to`, as the service
     /// running `build` at `recorded_at`. Answers whether this call appended
     /// it: `false` when the log already holds the same move.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::BindingMalformed` if either issuer cannot form a login binding.
+    /// - `IdentityError::ChangeMismatch` if the build is invalid or the issuers are equal.
+    /// - `IdentityError::OperationReused` if the move operation is already recorded when it is checked.
+    /// - `IdentityError::BindingTaken` if the move would bind one login to different identities.
+    /// - `IdentityError::AppendRefused` if reconciliation proves the move was not committed.
+    /// - `IdentityError::AppendUncertain` if a pending log append has not been resolved.
     pub fn record_issuer_move(
         &mut self,
         from: &str,

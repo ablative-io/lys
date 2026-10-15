@@ -15,6 +15,9 @@ pub struct Profile {
 
 impl Profile {
     /// A profile showing `display_name`, refused by name if the name is not one this directory records.
+    ///
+    /// # Errors
+    /// - `IdentityError::ProfileInvalid` if the display name is blank, padded or contains a control character.
     pub fn new(display_name: &str) -> Result<Self, IdentityError> {
         if display_name.trim().is_empty() {
             return Err(IdentityError::ProfileInvalid {
@@ -37,6 +40,7 @@ impl Profile {
     }
 
     /// The display name.
+    #[must_use]
     pub fn display_name(&self) -> &str {
         &self.display_name
     }

@@ -49,6 +49,11 @@ fn rebound<T: Copy + Eq + std::fmt::Display>(
 impl Projection {
     /// Whether the install event would apply to the directory as it stands,
     /// refused by name if not.
+    ///
+    /// # Errors
+    /// - `IdentityError::OperationReused` if the move operation is already recorded.
+    /// - `IdentityError::BindingMalformed` if a moved binding is not a valid login.
+    /// - `IdentityError::BindingTaken` if moving issuers binds one login to different identities.
     pub fn check_install(&self, event: &InstallEvent) -> Result<(), IdentityError> {
         if self.operations.contains_key(&event.operation()) {
             return Err(IdentityError::OperationReused {
@@ -62,6 +67,11 @@ impl Projection {
     }
 
     /// Advance the directory by the install event, committed at log index `index`.
+    ///
+    /// # Errors
+    /// - `IdentityError::OperationReused` if the move operation is already recorded.
+    /// - `IdentityError::BindingMalformed` if a moved binding is not a valid login.
+    /// - `IdentityError::BindingTaken` if moving issuers binds one login to different identities.
     pub fn apply_install(&mut self, event: &InstallEvent, index: u64) -> Result<(), IdentityError> {
         self.check_install(event)?;
         let InstallChange::IssuerMoved { from, to } = event.change();

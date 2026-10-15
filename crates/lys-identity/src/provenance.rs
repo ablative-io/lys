@@ -59,6 +59,7 @@ pub enum Provenance {
 
 impl Provenance {
     /// Authentication by `method` at `authenticated_at`, in seconds since the Unix epoch.
+    #[must_use]
     pub fn new(method: AuthMethod, authenticated_at: u64) -> Self {
         Self::Authenticated {
             method,
@@ -68,6 +69,7 @@ impl Provenance {
 
     /// Authentication by a request `agent` signed, verified at
     /// `authenticated_at`, in seconds since the Unix epoch.
+    #[must_use]
     pub fn by_agent(agent: AgentId, authenticated_at: u64) -> Self {
         Self::new(AuthMethod::AgentSignature(agent), authenticated_at)
     }
@@ -90,6 +92,7 @@ impl Provenance {
     }
 
     /// How the actor was authenticated.
+    #[must_use]
     pub fn method(&self) -> AuthMethod {
         match self {
             Self::Authenticated { method, .. } => *method,
@@ -99,6 +102,7 @@ impl Provenance {
 
     /// The agent whose signed request authenticated the actor; none when the
     /// actor signed in themselves.
+    #[must_use]
     pub fn agent(&self) -> Option<AgentId> {
         match self.method() {
             AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => None,
@@ -107,6 +111,7 @@ impl Provenance {
     }
 
     /// The independently authenticated service account, if any.
+    #[must_use]
     pub fn service_account(&self) -> Option<ServiceAccountId> {
         match self.method() {
             AuthMethod::ServiceAccountBearer(account) => Some(account),
@@ -118,6 +123,7 @@ impl Provenance {
     }
 
     /// When the actor was authenticated, in seconds since the Unix epoch.
+    #[must_use]
     pub fn authenticated_at(&self) -> Option<u64> {
         match self {
             Self::Authenticated {
@@ -128,6 +134,7 @@ impl Provenance {
     }
 
     /// The verified launch and session, when a run pass authenticated the actor.
+    #[must_use]
     pub fn run(&self) -> Option<(&str, &str)> {
         match self {
             Self::AgentPass {
@@ -148,6 +155,7 @@ pub struct Actor {
 impl Actor {
     /// The human named by `binding`, one of their logins, authenticated as
     /// `provenance` says.
+    #[must_use]
     pub fn new(binding: LoginBinding, provenance: Provenance) -> Self {
         Self {
             binding,
@@ -157,11 +165,13 @@ impl Actor {
 
     /// The login that names the actor: the one they signed in through, or the
     /// one of theirs the service admitted their agent's signed request under.
+    #[must_use]
     pub fn binding(&self) -> &LoginBinding {
         &self.binding
     }
 
     /// How and when the actor was authenticated.
+    #[must_use]
     pub fn provenance(&self) -> &Provenance {
         &self.provenance
     }

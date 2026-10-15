@@ -48,6 +48,9 @@ pub struct LinkObservation {
 
 impl LinkObservation {
     /// The observation the source reported under `source_operation_id`.
+    ///
+    /// # Errors
+    /// - `IdentityError::ChangeMismatch` if the source operation id or observing issuer is empty.
     pub fn new(
         source_operation_id: &str,
         change: LinkChange,
@@ -75,26 +78,31 @@ impl LinkObservation {
     }
 
     /// The source's own operation id, which the receiver deduplicates on.
+    #[must_use]
     pub fn source_operation_id(&self) -> &str {
         &self.source_operation_id
     }
 
     /// Whether the login was linked or unlinked.
+    #[must_use]
     pub fn change(&self) -> LinkChange {
         self.change
     }
 
     /// The login that was linked or unlinked.
+    #[must_use]
     pub fn binding(&self) -> &LoginBinding {
         &self.binding
     }
 
     /// The issuer that observed the change.
+    #[must_use]
     pub fn observer(&self) -> &str {
         &self.observer
     }
 
     /// When the issuer observed it, in seconds since the Unix epoch.
+    #[must_use]
     pub fn observed_at(&self) -> u64 {
         self.observed_at
     }
@@ -269,6 +277,7 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
 impl IdentityEvent {
     /// Service-account provenance uses a new envelope version. Existing
     /// OIDC and agent-signature events retain their exact v1 encoding.
+    #[must_use]
     pub fn version(&self) -> u64 {
         if self.actor.provenance().service_account().is_some() {
             2
@@ -278,6 +287,11 @@ impl IdentityEvent {
     }
 
     /// The event recording `change` to `identity`, made by `actor` under `operation`.
+    ///
+    /// # Errors
+    /// - `IdentityError::ChangeMismatch` if the change does not fit the identity kind or records the wrong transition target.
+    /// - `IdentityError::TransitionRefused` if the lifecycle transition is not defined from its source state.
+    /// - `IdentityError::ReasonRequired` if suspension or retirement has no nonblank reason.
     pub fn new(
         operation: OperationId,
         actor: Actor,
@@ -296,26 +310,31 @@ impl IdentityEvent {
     }
 
     /// The operation id the caller gave the change.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         self.operation
     }
 
     /// The authenticated human who made the change, as the service attests them.
+    #[must_use]
     pub fn actor(&self) -> &Actor {
         &self.actor
     }
 
     /// The identity the change is about.
+    #[must_use]
     pub fn identity(&self) -> IdentityId {
         self.identity
     }
 
     /// When the service recorded the change, in seconds since the Unix epoch.
+    #[must_use]
     pub fn recorded_at(&self) -> u64 {
         self.recorded_at
     }
 
     /// The change.
+    #[must_use]
     pub fn change(&self) -> &Change {
         &self.change
     }

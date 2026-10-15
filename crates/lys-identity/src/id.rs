@@ -89,10 +89,12 @@ pub struct ServiceAccountId([u8; ID_LEN]);
 
 impl ServiceAccountId {
     /// The id assigned when the account was created.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
     /// The bytes recorded by the service-account creation operation.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }
@@ -122,16 +124,21 @@ impl ConnectorId {
     const PREFIX: &'static str = "connector-";
 
     /// A new identifier from the secure random source.
+    ///
+    /// # Errors
+    /// - `IdentityError::RandomSourceUnavailable` if the operating system cannot fill the identifier bytes.
     pub fn generate() -> Result<Self, IdentityError> {
         random_bytes().map(Self)
     }
 
     /// The identifier these bytes are, as read back from a signed event.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The identifier's bytes, as a signed event carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }
@@ -164,16 +171,21 @@ impl MachineId {
     const PREFIX: &'static str = "machine-";
 
     /// A new identifier from the secure random source.
+    ///
+    /// # Errors
+    /// - `IdentityError::RandomSourceUnavailable` if the operating system cannot fill the identifier bytes.
     pub fn generate() -> Result<Self, IdentityError> {
         random_bytes().map(Self)
     }
 
     /// The identifier these bytes are, as read back from a signed event.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The identifier's bytes, as a signed event carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }
@@ -197,16 +209,21 @@ impl PersonId {
     const PREFIX: &'static str = "person-";
 
     /// A new identifier from the secure random source.
+    ///
+    /// # Errors
+    /// - `IdentityError::RandomSourceUnavailable` if the operating system cannot fill the identifier bytes.
     pub fn generate() -> Result<Self, IdentityError> {
         random_bytes().map(Self)
     }
 
     /// The identifier these bytes are, as read back from a signed event.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The identifier's bytes, as a signed event carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }
@@ -216,16 +233,21 @@ impl AgentId {
     const PREFIX: &'static str = "agent-";
 
     /// A new identifier from the secure random source.
+    ///
+    /// # Errors
+    /// - `IdentityError::RandomSourceUnavailable` if the operating system cannot fill the identifier bytes.
     pub fn generate() -> Result<Self, IdentityError> {
         random_bytes().map(Self)
     }
 
     /// The identifier these bytes are, as read back from a signed event.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The identifier's bytes, as a signed event carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }

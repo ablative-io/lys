@@ -110,17 +110,23 @@ pub struct SignedEvent {
 
 impl SignedEvent {
     /// The whole `COSE_Sign1` message: the log leaf.
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
     /// What the message records.
+    #[must_use]
     pub fn entry(&self) -> &Entry {
         &self.entry
     }
 
     /// The identity event the message carries, refused by name when it
     /// records an install event instead.
+    ///
+    /// # Errors
+    /// - `IdentityError::InstallEntry` if the message records an install event.
+    /// - `IdentityError::DraftEntry` if the message records an identity or product draft.
     pub fn event(&self) -> Result<&IdentityEvent, IdentityError> {
         match &self.entry {
             Entry::Identity(event) => Ok(event),
@@ -130,6 +136,7 @@ impl SignedEvent {
     }
 
     /// SHA-256 over the body bytes, named by [`crate::encoding::PAYLOAD_COMMITMENT_HASH`].
+    #[must_use]
     pub fn payload_commitment(&self) -> [u8; 32] {
         self.commitment
     }
@@ -138,6 +145,9 @@ impl SignedEvent {
 /// Sign `event` with the directory service's key. Every event is signed
 /// whole, however large: the message is CBOR, whose every part carries its
 /// own length, so no size is refused here or when [`verify_event`] reads it.
+///
+/// # Errors
+/// This implementation is infallible; the result type is retained for callers of the signing API.
 pub fn sign_event(
     event: IdentityEvent,
     service_key: &Ed25519Identity,
@@ -149,6 +159,9 @@ pub fn sign_event(
 
 /// Sign the install event `event` with the directory service's key, as
 /// [`sign_event`] signs an identity event.
+///
+/// # Errors
+/// This implementation is infallible; the result type is retained for callers of the signing API.
 pub fn sign_install_event(
     event: InstallEvent,
     service_key: &Ed25519Identity,
@@ -174,6 +187,10 @@ fn seal(body: &[u8], media_type: &str, entry: Entry, service_key: &Ed25519Identi
 }
 
 /// Validate and sign a canonical draft payload with the directory service key.
+///
+/// # Errors
+/// - `IdentityError::DraftChangeInvalid` if the draft shape or required request signature is invalid.
+/// - `IdentityError::DraftHashMismatch` if a correction hash differs from its creation payload.
 pub fn sign_draft_event(
     event: DraftEvent,
     service_key: &Ed25519Identity,
@@ -194,6 +211,9 @@ pub fn sign_draft_event(
 }
 
 /// Validate and sign a canonical product draft payload with the directory service key.
+///
+/// # Errors
+/// - `IdentityError::DraftChangeInvalid` if the product draft fails its identifier, target, digest, mode or decision rules.
 pub fn sign_product_draft_event(
     event: ProductDraftEvent,
     service_key: &Ed25519Identity,
@@ -209,6 +229,21 @@ pub fn sign_product_draft_event(
 }
 
 /// Verify `message` against the directory service's public key and return the event it carries.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if CBOR fields, wire codes or provenance have the wrong shape.
+/// - `IdentityError::VersionUnsupported` if the event version is not supported.
+/// - `IdentityError::BindingMalformed` if an actor or changed login is invalid.
+/// - `IdentityError::ProfileInvalid` if a decoded display profile is invalid.
+/// - `IdentityError::ChangeMismatch` if a change does not fit its identity or required fields.
+/// - `IdentityError::TransitionRefused` if a decoded lifecycle transition is undefined.
+/// - `IdentityError::ReasonRequired` if a decoded suspension or retirement has no reason.
+/// - `IdentityError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
+/// - `IdentityError::IdentifierMalformed` if a draft contains an invalid textual identifier.
+/// - `IdentityError::DraftChangeInvalid` if a draft payload violates its stored-shape rules.
+/// - `IdentityError::DraftHashMismatch` if a correction hash does not match its payload.
+/// - `IdentityError::SignerMismatch` if the envelope names another service key.
+/// - `IdentityError::SignatureInvalid` if the signature has the wrong length or fails verification.
 pub fn verify_event(
     message: &[u8],
     service_key: &[u8; KEY_LEN],
@@ -325,6 +360,9 @@ fn decode_kid(protected: &[u8]) -> Result<Vec<u8>, IdentityError> {
 ///
 /// The key is held by lys-core's `Ed25519Identity`, in zeroizing memory, and
 /// never printed: its debug form is redacted.
+///
+/// # Errors
+/// - `IdentityError::KeyUnavailable` if the key file cannot be read or decoded as an Ed25519 identity.
 pub fn load_service_key(path: &std::path::Path) -> Result<Ed25519Identity, IdentityError> {
     Ed25519Identity::load(path).map_err(|error| IdentityError::KeyUnavailable {
         reason: error.to_string(),

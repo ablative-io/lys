@@ -28,6 +28,7 @@ pub enum Kind {
 
 impl Kind {
     /// The document section holding this entry kind.
+    #[must_use]
     pub fn section(self) -> &'static str {
         match self {
             Self::App => "apps",
@@ -69,6 +70,9 @@ fn invalid(entry: impl Into<String>, reason: &'static str) -> Invalid {
 }
 
 /// The entire document is parsed before the first mutation is attempted.
+///
+/// # Errors
+/// `Invalid` if JSON or section and entry shapes are invalid, names repeat, an operation is supplied, canonical encoding fails, or a reference is unknown or names a later entry; its entry and reason identify the fault.
 pub fn parse(bytes: &[u8], account: &str) -> Result<Vec<Entry>, Invalid> {
     let document: Value = serde_json::from_slice(bytes)
         .map_err(|_error| invalid("document", "expected a JSON object"))?;

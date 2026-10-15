@@ -104,6 +104,10 @@ impl<S: LeafStore> EventLog<S> {
     /// Open the log over the store `reopen` gives from its owner's snapshot,
     /// reading only the leaves after it, and hand back the snapshot's state
     /// with every event after it. A snapshot is owed every `every` entries.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if opening or reading the store or its checkpoint fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or is not a valid event signed by this service.
     pub fn open(
         reopen: Reopen<S>,
         key: &Ed25519Identity,
@@ -123,6 +127,10 @@ impl<S: LeafStore> EventLog<S> {
 
     /// Refuse the snapshot's state, which the owner could not read, by
     /// `reason`, and reopen the log from every leaf, answering every event.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if opening or reading the store or its checkpoint fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or is not a valid event signed by this service.
     pub fn refuse_state(
         &mut self,
         reason: String,
@@ -169,22 +177,35 @@ impl<S: LeafStore> EventLog<S> {
     }
 
     /// The number of leaves in the log, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
     pub fn len(&self) -> Result<u64, IdentityError> {
         Ok(self.certain()?.len())
     }
 
     /// Whether the log holds no leaf, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
     pub fn is_empty(&self) -> Result<bool, IdentityError> {
         Ok(self.certain()?.len() == 0)
     }
 
     /// The log's current size and root, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
     pub fn head(&self) -> Result<(u64, [u8; 32]), IdentityError> {
         Ok(self.certain()?.head())
     }
 
     /// The leaf bytes at `index`, if the log holds one there, read from the
     /// store, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
+    /// - `IdentityError::LogUnavailable` if the store read fails.
     pub fn leaf(&self, index: u64) -> Result<Option<Vec<u8>>, IdentityError> {
         self.certain()?.leaf(index)
     }
@@ -192,12 +213,21 @@ impl<S: LeafStore> EventLog<S> {
     /// The event at `index` with the coordinate it completed, if the log
     /// holds one there, read from the store from the nearest checkpoint and
     /// verified, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
+    /// - `IdentityError::LogUnavailable` if opening or reading the store or its checkpoint fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or is not a valid event signed by this service.
     pub fn entry(&self, index: u64) -> Result<Option<(SignedEvent, Coordinate)>, IdentityError> {
         self.certain()?.entry(index, &self.service_key)
     }
 
     /// An inclusion proof of the leaf at `index` in the log's current tree,
     /// refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
+    /// - `IdentityError::LogUnavailable` if the store read fails or the proof index is invalid.
     pub fn inclusion_proof(&self, index: u64) -> Result<InclusionProof, IdentityError> {
         self.certain()?.inclusion_proof(index)
     }
@@ -207,6 +237,10 @@ impl<S: LeafStore> EventLog<S> {
     /// A failed append may still have stored its leaf, so it is held
     /// uncertain and answered `LogUnavailable` with the store's reason; the
     /// caller resolves it with [`EventLog::reconcile`].
+    ///
+    /// # Errors
+    /// - `IdentityError::AppendUncertain` while an earlier append remains unresolved.
+    /// - `IdentityError::LogUnavailable` if the store append or durable pin fails; the append is then held uncertain.
     pub fn append(&mut self, event: &SignedEvent) -> Result<Coordinate, IdentityError> {
         let index = self.certain()?.len();
         self.ledger.append(event.bytes()).map_err(|failure| {
@@ -246,6 +280,10 @@ impl<S: LeafStore> EventLog<S> {
     /// only the leaves from its index on, and adopt every one of them. Answers
     /// `None` when nothing was held. The hold stays until every step has
     /// succeeded.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if opening or reading the store or its checkpoint fails.
+    /// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or is not a valid event signed by this service.
     pub fn reconcile(
         &mut self,
         key: &Ed25519Identity,

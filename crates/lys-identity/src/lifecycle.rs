@@ -38,6 +38,9 @@ pub enum Transition {
 
 impl Transition {
     /// The state this transition leads to from `from`, or its refusal by name.
+    ///
+    /// # Errors
+    /// - `IdentityError::TransitionRefused` if the transition is not defined from the supplied lifecycle state.
     pub fn target(self, from: LifecycleState) -> Result<LifecycleState, IdentityError> {
         match (self, from) {
             (Self::Activate, LifecycleState::Registered)
@@ -54,6 +57,7 @@ impl Transition {
     }
 
     /// Whether this transition must name the reason it was made.
+    #[must_use]
     pub fn requires_reason(self) -> bool {
         matches!(self, Self::Suspend | Self::Retire)
     }

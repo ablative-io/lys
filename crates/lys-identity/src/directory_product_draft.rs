@@ -13,6 +13,17 @@ impl<S: LeafStore> Directory<S> {
     /// The same act under the same operation, asked again at another time,
     /// returns its original coordinate; another act under that operation is
     /// refused `OperationReused`, and nothing is appended.
+    ///
+    /// # Errors
+    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
+    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
+    /// - `IdentityError::DraftChangeInvalid` if the draft payload fails validation.
+    /// - `IdentityError::DraftHashMismatch` if a decision or correction names a different payload.
+    /// - `IdentityError::DraftNotFound` if a decision names an absent draft.
+    /// - `IdentityError::DraftNotPending` if a decision or close cannot be applied in the current state.
+    /// - `IdentityError::OperationReused` if an operation is already recorded for another act.
+    /// - `IdentityError::AppendRefused` if reconciliation proves the event was not committed.
+    /// - `IdentityError::AppendUncertain` if a pending log append has not been resolved.
     pub fn record_product_draft(
         &mut self,
         event: ProductDraftEvent,

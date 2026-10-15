@@ -31,6 +31,10 @@ pub struct Receipt {
 
 impl Receipt {
     /// The receipt of `signed`, committed at `coordinate`.
+    ///
+    /// # Errors
+    /// - `IdentityError::InstallEntry` if the signed message records an install change.
+    /// - `IdentityError::DraftEntry` if the signed message records a draft.
     pub fn of(signed: &SignedEvent, coordinate: Coordinate) -> Result<Self, IdentityError> {
         let event = signed.event()?;
         Ok(Self {
@@ -45,36 +49,43 @@ impl Receipt {
     }
 
     /// The envelope version the event was signed under.
+    #[must_use]
     pub fn version(&self) -> u64 {
         self.version
     }
 
     /// The caller's operation id.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         self.operation
     }
 
     /// The actor, as the service attested them.
+    #[must_use]
     pub fn actor(&self) -> &Actor {
         &self.actor
     }
 
     /// The identity the change is about.
+    #[must_use]
     pub fn identity(&self) -> IdentityId {
         self.identity
     }
 
     /// The change kind's wire code.
+    #[must_use]
     pub fn change_kind(&self) -> u64 {
         self.change_kind
     }
 
     /// SHA-256 over the event body.
+    #[must_use]
     pub fn payload_commitment(&self) -> [u8; 32] {
         self.payload_commitment
     }
 
     /// Where the event's leaf stands in the log.
+    #[must_use]
     pub fn coordinate(&self) -> Coordinate {
         self.coordinate
     }
@@ -90,6 +101,24 @@ impl Receipt {
 /// Check `receipt` against the signed `message`, the service's public key, a
 /// checkpoint of the log (`tree_size` and `root`) and an inclusion proof of the
 /// receipt's leaf in that checkpoint.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if CBOR fields, wire codes or provenance have the wrong shape.
+/// - `IdentityError::VersionUnsupported` if the event version is not supported.
+/// - `IdentityError::BindingMalformed` if an actor or changed login is invalid.
+/// - `IdentityError::ProfileInvalid` if a decoded display profile is invalid.
+/// - `IdentityError::ChangeMismatch` if a change does not fit its identity or required fields.
+/// - `IdentityError::TransitionRefused` if a decoded lifecycle transition is undefined.
+/// - `IdentityError::ReasonRequired` if a decoded suspension or retirement has no reason.
+/// - `IdentityError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
+/// - `IdentityError::IdentifierMalformed` if a draft contains an invalid textual identifier.
+/// - `IdentityError::DraftChangeInvalid` if a draft payload violates its stored-shape rules.
+/// - `IdentityError::DraftHashMismatch` if a correction hash does not match its payload.
+/// - `IdentityError::SignerMismatch` if the envelope names another service key.
+/// - `IdentityError::SignatureInvalid` if the signature has the wrong length or fails verification.
+/// - `IdentityError::InstallEntry` if the message carries an install event.
+/// - `IdentityError::DraftEntry` if the message carries a draft.
+/// - `IdentityError::ReceiptInvalid` if receipt fields, payload or leaf hash, index or inclusion proof disagree with the signed event and checkpoint.
 pub fn verify_receipt(
     receipt: &Receipt,
     message: &[u8],

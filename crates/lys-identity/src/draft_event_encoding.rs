@@ -36,6 +36,7 @@ fn evidence(out: &mut Vec<u8>, value: Option<&RequestEvidence>) {
 }
 
 /// The exact canonical COSE payload; a creation's hash is SHA-256 of these bytes.
+#[must_use]
 pub fn encode(event: &DraftEvent) -> Vec<u8> {
     let mut out = Vec::new();
     match event {
@@ -222,6 +223,14 @@ fn approved(value: Value) -> Result<DraftEvent, IdentityError> {
 }
 
 /// Read only the canonical encoding of a validated draft payload.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if the CBOR shape, version, kind, digest or provenance is invalid.
+/// - `IdentityError::IdentifierMalformed` if a textual operation, actor, reviewer or evidence id is invalid.
+/// - `IdentityError::BindingMalformed` if a decoded actor login is invalid.
+/// - `IdentityError::DraftChangeInvalid` if draft validation refuses the target, request, evidence or decision.
+/// - `IdentityError::DraftHashMismatch` if a correction hash differs from its corrected creation.
+/// - `IdentityError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
 pub fn decode(body: &[u8]) -> Result<DraftEvent, IdentityError> {
     let value = cbor(body, "a draft payload is a definite array")?;
     let Value::Array(items) = &value else {

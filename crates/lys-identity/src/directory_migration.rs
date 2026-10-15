@@ -18,6 +18,37 @@ fn unavailable(error: impl std::fmt::Display) -> IdentityError {
 
 /// Upgrade a signed version-two snapshot before install or upgrade opens the directory.
 /// No leaf or historical receipt is rewritten; a failed snapshot write is returned.
+///
+/// # Errors
+/// - `IdentityError::LogUnavailable` if opening, reading or folding the log fails.
+/// - `IdentityError::LeafNotAnEvent` if a stored leaf is missing or cannot be verified.
+/// - `IdentityError::DirectorySnapshotUnmigrated` if an old snapshot requires explicit migration.
+/// - `IdentityError::OperationReused` if a replayed event repeats an operation.
+/// - `IdentityError::AlreadyRegistered` if replay registers an identity twice.
+/// - `IdentityError::AlreadyBootstrapped` if replay repeats setup for a bound login.
+/// - `IdentityError::IdentityUnknown` if a replayed change names an absent identity.
+/// - `IdentityError::BindingTaken` if replay binds one login to different people.
+/// - `IdentityError::BindingMalformed` if an issuer move produces an invalid login binding.
+/// - `IdentityError::StateMismatch` if a replayed transition starts from another state.
+/// - `IdentityError::LinkSourceSeen` if replay repeats a link source operation.
+/// - `IdentityError::ChangeMismatch` if replayed identity or reporting fields disagree.
+/// - `IdentityError::AnswersToUnknown` if a reporting target is absent or of another kind.
+/// - `IdentityError::AnswersToInactive` if the immediate reporting target is inactive.
+/// - `IdentityError::AnswersToCycle` if reporting returns to an earlier identity.
+/// - `IdentityError::NoAccountablePerson` if the reporting chain cannot reach an active person.
+/// - `IdentityError::DraftChangeInvalid` if a replayed draft payload or decision is invalid.
+/// - `IdentityError::DraftHashMismatch` if a decision or correction names another creation.
+/// - `IdentityError::DraftNotFound` if a replayed decision names an absent draft.
+/// - `IdentityError::DraftNotPending` if a replayed decision is outside the draft's current state.
+/// - `IdentityError::EventMalformed` if a tail event has an invalid envelope or payload shape.
+/// - `IdentityError::EventNotCanonical` if a tail event is not its canonical encoding.
+/// - `IdentityError::VersionUnsupported` if a tail event version is unsupported.
+/// - `IdentityError::IdentifierMalformed` if a tail draft contains an invalid textual id.
+/// - `IdentityError::ProfileInvalid` if a tail event contains an invalid display profile.
+/// - `IdentityError::TransitionRefused` if a tail event contains an undefined transition.
+/// - `IdentityError::ReasonRequired` if a tail suspension or retirement lacks a reason.
+/// - `IdentityError::SignerMismatch` if a tail event names another service key.
+/// - `IdentityError::SignatureInvalid` if a tail signature does not verify.
 pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, IdentityError> {
     let Some(sealed) = store.snapshot().map_err(unavailable)? else {
         return Ok(false);
