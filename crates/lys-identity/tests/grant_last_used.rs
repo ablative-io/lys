@@ -116,16 +116,24 @@ fn row_8_4_grant_last_used_a_reopen_restores_it_from_the_log() -> TestResult {
             index
         }
     );
-    let root = world
+    let held = world
         .grants
         .book()
         .grant(grant)
-        .and_then(|held| match held.source() {
-            lys_identity::grants::Source::Grant(source) => Some(source),
-            lys_identity::grants::Source::Root => None,
-        });
+        .ok_or("the delegated grant is not held")?;
+    let root = match held.source() {
+        lys_identity::grants::Source::Grant(source) => source,
+        lys_identity::grants::Source::Root => {
+            return Err("the lent grant must derive from a recorded grant, not be a root".into());
+        }
+        lys_identity::grants::Source::Administrator => {
+            return Err(
+                "administrator standing is not a recorded source grant for this loan".into(),
+            );
+        }
+    };
     assert_eq!(
-        last_use(&world, root.ok_or("no source")?)?,
+        last_use(&world, root)?,
         LastUse::NotSeen,
         "a source is not used by its descendant's use"
     );
