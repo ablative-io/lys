@@ -30,7 +30,7 @@ fn malformed(rejection: &JsonRejection) -> ServerError {
 /// Refused by name where another computer cannot reach it: an address on
 /// this computer alone, or plain http, which a dialling runner speaks only
 /// to its own computer.
-fn dial_address(redirect: &str) -> Result<String, ServerError> {
+pub(crate) fn dial_address(redirect: &str) -> Result<String, ServerError> {
     let refused = |reason: String| ServerError::from(MachineError::JoinUnreachable { reason });
     let url = reqwest::Url::parse(redirect).map_err(|error| {
         refused(format!(

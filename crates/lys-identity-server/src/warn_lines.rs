@@ -71,10 +71,14 @@ fn line(event: &Event<'_>) -> String {
     event.record(&mut fields);
     let metadata = event.metadata();
     if metadata.target() == "lys_identity_server::passfast" {
-        fields.rest.push_str(&format!(
-            " at_ms={}",
-            jiff::Timestamp::now().as_millisecond()
-        ));
+        {
+            use std::fmt::Write as _;
+            let _ = write!(
+                fields.rest,
+                " at_ms={}",
+                jiff::Timestamp::now().as_millisecond()
+            );
+        }
     }
     format!(
         "{} {}: {}{}",

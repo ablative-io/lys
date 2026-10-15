@@ -1,11 +1,11 @@
-//! A held client is served only to signed-in callers and only at its recorded digest.
+//! A held client is public and is served only at its recorded digest.
 
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
 #[tokio::test]
-async fn clients_list_download_digest_unknown_platform_and_unsigned_refusal()
+async fn public_clients_list_download_digest_and_unknown_platform()
 -> Result<(), Box<dyn std::error::Error>> {
     let bytes = b"a real downloadable fixture executable\n";
     let digest = format!("{:x}", Sha256::digest(bytes));
@@ -23,17 +23,13 @@ async fn clients_list_download_digest_unknown_platform_and_unsigned_refusal()
         }))?)?;
         Ok(folder)
     }).await?;
-    let cookie = service
-        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
-        .await?;
-    let (status, listing) = service.get("/clients", Some(&cookie)).await?;
+    let (status, listing) = service.get("/clients", None).await?;
     assert_eq!(status, 200);
     assert_eq!(listing["platforms"][platform]["commit"], commit);
     assert_eq!(listing["platforms"][platform]["files"]["lys"], digest);
     let client = reqwest::Client::new();
     let response = client
         .get(format!("{}/clients/{platform}/lys", service.base))
-        .header("cookie", &cookie)
         .send()
         .await?;
     assert_eq!(response.status(), reqwest::StatusCode::OK);
@@ -54,25 +50,23 @@ async fn clients_list_download_digest_unknown_platform_and_unsigned_refusal()
     let served = response.bytes().await?;
     assert_eq!(served.as_ref(), bytes);
     assert_eq!(format!("{:x}", Sha256::digest(&served)), digest);
-    let (status, answer) = service
-        .get("/clients/unknown-platform/lys", Some(&cookie))
-        .await?;
+    let (status, answer) = service.get("/clients/unknown-platform/lys", None).await?;
     assert_eq!(status, 409);
     assert_eq!(answer["refusal"], "client_platform_unknown");
     let (status, answer) = service
-        .get(&format!("/clients/{platform}/other"), Some(&cookie))
+        .get(&format!("/clients/{platform}/other"), None)
         .await?;
     assert_eq!(status, 409);
     assert_eq!(answer["refusal"], "client_file_unknown");
     std::fs::write(folder.join("lys"), b"changed fixture executable")?;
     let (status, answer) = service
-        .get(&format!("/clients/{platform}/lys"), Some(&cookie))
+        .get(&format!("/clients/{platform}/lys"), None)
         .await?;
     assert_eq!(status, 409);
     assert_eq!(answer["refusal"], "client_digest_mismatch");
-    let (status, answer) = service.get("/clients", None).await?;
-    assert_eq!(status, 401);
-    assert_eq!(answer["refusal"], "NotSignedIn");
+    let (status, listing) = service.get("/clients", None).await?;
+    assert_eq!(status, 200);
+    assert_eq!(listing["platforms"][platform]["commit"], commit);
     Ok(())
 }
 

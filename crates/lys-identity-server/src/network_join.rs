@@ -41,6 +41,7 @@ mod local;
 #[path = "network_join/routes.rs"]
 mod routes;
 pub(crate) use local::joined_local;
+pub(crate) use routes::dial_address;
 
 use std::fs;
 use std::io::Write;

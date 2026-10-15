@@ -8,7 +8,7 @@ import { ago } from '../file/time';
 import { counted } from '../../shell/count';
 import type { Computer } from './Network';
 import type { Machine } from './contract';
-import { NewCode } from './JoinCode';
+import { ConnectComputer } from './JoinCode';
 import type { Connecting } from './JoinCode';
 import { Act } from '../../shell/Act';
 import { MachineHolders } from './MachineIdentities';
@@ -32,7 +32,7 @@ export function status({ machine, asked, runner, answers, joining, running }: Co
   return { words: 'Runner not answering' + (machine.last_report_at === null ? '' : ', last heard ' + ago(machine.last_report_at)), state: 'down' };
 }
 
-/** Whether a computer's runner has yet to connect: a connection code waits to be used, or it joined and has never connected since. */
+/** Whether a computer's runner has yet to connect: its installer or terminal code waits, or it joined and has never connected since. */
 export const waiting = ({ runner, joining }: { runner: RunnerRecord | null; joining: boolean }): boolean =>
   joining || (runner?.kind === 'dialled' && !runner.runner);
 
@@ -40,7 +40,7 @@ export const waiting = ({ runner, joining }: { runner: RunnerRecord | null; join
 function reached(machine: Machine, runner: RunnerRecord | null, joining: boolean): string {
   if (machine.runtime === null) return 'Lys does not start agents here.';
   if (runner?.kind === 'lys') return 'This is the computer Lys runs on; Lys starts agents through its own runner.';
-  if (joining) return 'A connection code was given. Its runner connects once the command is run on that computer.';
+  if (joining) return 'Open its installer on that computer to connect it. If you chose the terminal steps, run its command instead.';
   if (runner?.kind === 'dialled') return 'Its runner connects to Lys from that computer.';
   if (runner?.kind === 'socket') return 'Lys starts agents through the runner at ' + runner.path + '.';
   return 'No runner is connected, so Lys cannot start agents here.';
@@ -74,7 +74,7 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, mach
     {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner, computer.joining)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
     {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not" title={(computer.refusal ? computer.refusal + ': ' : '') + computer.reason}>Its runner did not answer. {computer.refusal ? problemWords(new Refused(0, { refusal: computer.refusal, reason: computer.reason })) : computer.reason}</p> : null}
     {computer.asked === 'unread' ? <><p className="why-not">Lys could not ask its runner whether this computer is up.</p><ErrorWords problem={computer.problem ?? computer.reason} /></> : null}
-    {(admin || machine.named_by === me) && connectable(computer) ? <NewCode machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
+    {(admin || machine.named_by === me) && connectable(computer) ? <ConnectComputer machine={machine.id} name={machine.name} connecting={connecting?.machine === machine.id && connecting.at === 'panel' ? connecting : null} connect={connect} done={done} /> : null}
     {machines ? <><div className="section-h">As a machine</div><MachineHolders machine={machine.id} name={machine.name} identities={machines} me={me} changed={changed} /></> : null}
     <p className="sec">Websites its agents' services may connect to: {machine.may_reach.join(', ') || 'none'}.</p>
     {admin && machine.state !== 'retired' ? <Retire machine={machine} changed={changed} /> : null}

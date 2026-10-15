@@ -1,30 +1,25 @@
 //! Told when a process this runner did not spawn exits, never polled for it.
 //!
 //! macOS registers `EVFILT_PROC`/`NOTE_EXIT` on a kqueue; Linux opens a pidfd
-//! and polls it for readability. Either way the wait sleeps in the kernel until
-//! the exit or the bound, with no wake between. A process already gone, or a
-//! zombie the kernel will no longer name, answers gone at registration.
+//! and waits for readability. The kernel waits for the exit event. A process
+//! already gone, or a zombie the kernel will no longer name, answers gone at registration.
 //!
-//! The answer has three states, never two: a wait that could not be set up
+//! A wait that could not be set up
 //! is [`Exit::Unwatched`] with its cause, never read as a process still
 //! running. A bare pid can be reused, so a caller that holds a start identity
 //! re-checks it on any answer but [`Exit::Gone`].
 
-use std::time::{Duration, Instant};
-
-/// What a bounded wait on a process's exit saw.
+/// What the kernel exit watch saw.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Exit {
     /// It exited, or no process has the pid.
     Gone,
-    /// It was still running at the bound.
-    Running,
     /// The kernel could not be asked to tell its exit; the cause is said.
     Unwatched(String),
 }
 
-/// Whether `pid` exits within `within`. A pid that cannot name a process is gone.
-pub(super) fn exit_within(pid: u32, within: Duration) -> Exit {
+/// Wait until `pid` exits. A pid that cannot name a process is gone.
+pub(super) fn wait(pid: u32) -> Exit {
     let id = match i32::try_from(pid) {
         Ok(raw) if raw > 1 => match rustix::process::Pid::from_raw(raw) {
             Some(id) => id,
@@ -32,7 +27,7 @@ pub(super) fn exit_within(pid: u32, within: Duration) -> Exit {
         },
         Ok(_) | Err(_) => return Exit::Unwatched(format!("{pid} is not a process id")),
     };
-    exited(id, Instant::now() + within)
+    exited(id)
 }
 
 impl crate::protocol::Ended {
@@ -53,12 +48,12 @@ impl crate::protocol::Ended {
 }
 
 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-fn exited(_pid: rustix::process::Pid, _until: Instant) -> Exit {
+fn exited(_pid: rustix::process::Pid) -> Exit {
     Exit::Unwatched("this system has no kernel exit notice this runner uses".to_owned())
 }
 
 #[cfg(target_os = "macos")]
-fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
+fn exited(pid: rustix::process::Pid) -> Exit {
     use nix::sys::event::{EventFilter, EventFlag, FilterFlag, KEvent, Kqueue};
     let queue = match Kqueue::new() {
         Ok(queue) => queue,
@@ -89,13 +84,8 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
     }
     let mut events = [change];
     loop {
-        let left = until.saturating_duration_since(Instant::now());
-        let timeout = nix::libc::timespec {
-            tv_sec: nix::libc::time_t::try_from(left.as_secs()).unwrap_or(nix::libc::time_t::MAX),
-            tv_nsec: nix::libc::c_long::from(left.subsec_nanos()),
-        };
-        match queue.kevent(&[], &mut events, Some(timeout)) {
-            Ok(0) => return Exit::Running,
+        match queue.kevent(&[], &mut events, None) {
+            Ok(0) => return Exit::Unwatched("the exit watch ended without an event".to_owned()),
             Ok(_) => {
                 return if events[0].filter() == Ok(EventFilter::EVFILT_PROC)
                     && events[0].fflags().contains(FilterFlag::NOTE_EXIT)
@@ -105,14 +95,14 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
                     Exit::Unwatched("the kqueue answered an event that is not the exit".to_owned())
                 };
             }
-            Err(nix::errno::Errno::EINTR) if Instant::now() < until => {}
+            Err(nix::errno::Errno::EINTR) => {}
             Err(error) => return Exit::Unwatched(format!("kevent: {error}")),
         }
     }
 }
 
 #[cfg(target_os = "linux")]
-fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
+fn exited(pid: rustix::process::Pid) -> Exit {
     use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
     use std::os::fd::AsFd;
     let descriptor = match rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::empty()) {
@@ -121,13 +111,11 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
         Err(error) => return Exit::Unwatched(format!("pidfd_open: {error}")),
     };
     loop {
-        let left = until.saturating_duration_since(Instant::now());
-        let timeout = PollTimeout::try_from(left).unwrap_or(PollTimeout::MAX);
         let mut descriptors = [PollFd::new(descriptor.as_fd(), PollFlags::POLLIN)];
-        match poll(&mut descriptors, timeout) {
-            Ok(0) => return Exit::Running,
+        match poll(&mut descriptors, PollTimeout::NONE) {
+            Ok(0) => return Exit::Unwatched("the exit watch ended without an event".to_owned()),
             Ok(_) => return Exit::Gone,
-            Err(nix::errno::Errno::EINTR) if Instant::now() < until => {}
+            Err(nix::errno::Errno::EINTR) => {}
             Err(error) => return Exit::Unwatched(format!("poll on the pidfd: {error}")),
         }
     }
@@ -135,63 +123,39 @@ fn exited(pid: rustix::process::Pid, until: Instant) -> Exit {
 
 #[cfg(test)]
 mod tests {
-    use super::{Exit, exit_within};
-    use std::time::{Duration, Instant};
+    use super::{Exit, wait};
 
     #[test]
     fn exit_rejects_invalid_process_ids_as_unwatched() {
         for pid in [0, 1, u32::MAX] {
-            assert!(matches!(
-                exit_within(pid, Duration::ZERO),
-                Exit::Unwatched(_)
-            ));
+            assert!(matches!(wait(pid), Exit::Unwatched(_)));
         }
     }
 
     #[test]
-    fn an_exit_is_told_at_once_and_a_live_process_holds_to_the_bound()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let mut child = std::process::Command::new("sleep").arg("30").spawn()?;
+    fn process_exit_releases_the_kernel_watch() -> Result<(), Box<dyn std::error::Error>> {
+        let mut child = std::process::Command::new("/bin/cat")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .spawn()?;
         let pid = child.id();
-        let began = Instant::now();
-        assert_eq!(exit_within(pid, Duration::from_millis(200)), Exit::Running);
-        assert!(began.elapsed() >= Duration::from_millis(200));
-        let waiter = std::thread::spawn(move || {
-            let began = Instant::now();
-            (exit_within(pid, Duration::from_secs(10)), began.elapsed())
+        let (begun, began) = std::sync::mpsc::channel();
+        let (complete, completed) = std::sync::mpsc::channel();
+        let watcher = std::thread::spawn(move || {
+            begun.send(()).map_err(|error| error.to_string())?;
+            complete.send(wait(pid)).map_err(|error| error.to_string())
         });
+        began.recv()?;
+        assert!(matches!(
+            completed.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
         child.kill()?;
         child.wait()?;
-        let (gone, took) = match waiter.join() {
-            Ok(answer) => answer,
-            Err(payload) => std::panic::resume_unwind(payload),
-        };
-        assert_eq!(gone, Exit::Gone, "the exit was not told");
-        assert!(
-            took < Duration::from_secs(2),
-            "the exit was told after {took:?}"
-        );
-        Ok(())
-    }
-
-    /// A reaped pid is gone; if the kernel has meanwhile given the pid to
-    /// another process, the wait may run to its bound, and the pid then names
-    /// a process with another start identity, which is what a caller re-checks.
-    #[test]
-    fn a_pid_with_no_process_is_gone_without_waiting() -> Result<(), Box<dyn std::error::Error>> {
-        let mut child = std::process::Command::new("sleep").arg("30").spawn()?;
-        let pid = child.id();
-        let start = crate::peer::start_identity(pid)?;
-        child.kill()?;
-        child.wait()?;
-        let began = Instant::now();
-        match exit_within(pid, Duration::from_secs(5)) {
-            Exit::Gone => assert!(began.elapsed() < Duration::from_secs(1)),
-            other => assert!(
-                crate::peer::start_identity(pid).ok() != Some(start),
-                "pid {pid} answered {other:?} and still names the reaped process"
-            ),
-        }
+        assert_eq!(completed.recv()?, Exit::Gone);
+        watcher
+            .join()
+            .map_err(|error| format!("exit watcher panicked: {error:?}"))??;
         Ok(())
     }
 }

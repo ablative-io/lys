@@ -12,7 +12,8 @@ pub(super) async fn runner(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, ServerError> {
-    signed_in(&state, &headers)?;
+    let actor = signed_in(&state, &headers)?;
+    crate::network_api::computer_owner(&state, &actor, &id)?;
     let runner = with_network(&state, |store| {
         store.machine(&id).ok_or(ServerError::MachineUnknown)?;
         Ok(store.runner(&id).cloned())

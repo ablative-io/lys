@@ -39,7 +39,7 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
                     owners: Vec::new(),
                     unreachable: Vec::new(),
                 },
-                Act::Liveness { session: None } => Answer::Liveness {
+                Act::Liveness { .. } => Answer::Liveness {
                     sessions: Vec::new(),
                 },
                 Act::Feed { .. } => Answer::Refused {

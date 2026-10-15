@@ -1,7 +1,7 @@
-//! Observed terminal boundaries remain bounded even without transcript tracking.
+//! Observed boundaries hold input until the harness reports idle.
 
 #[test]
-fn an_observed_busy_boundary_without_tracking_arms_its_expiry_guard()
+fn an_observed_busy_boundary_without_tracking_waits_for_its_event()
 -> Result<(), Box<dyn std::error::Error>> {
     let dir = tempfile::tempdir()?;
     let sessions = crate::Sessions::open(dir.path(), 4096)?;
@@ -24,23 +24,27 @@ fn an_observed_busy_boundary_without_tracking_arms_its_expiry_guard()
         };
         let answer = super::super::accept(&mut table, operation)?;
         assert_eq!(answer.state, crate::operations::OperationState::Accepted);
-        assert!(
-            table
-                .operations
-                .boundary_waiters
-                .contains_key("boundary-notice"),
-            "an observed busy boundary was left without its expiry guard"
-        );
-        let cancel = table
-            .operations
-            .boundary_waiters
-            .remove("boundary-notice")
-            .ok_or("no waiter")?;
-        cancel.send(())?;
+        assert!(super::note(&table, "boundary").is_none());
+        table
+            .sessions
+            .get_mut("boundary")
+            .ok_or("no session")?
+            .guard
+            .idle = true;
+        assert!(super::note(&table, "boundary").is_some());
+        super::super::deliver(&mut table, "boundary");
+        drop(table);
+        let delivered =
+            sessions.until_any(&std::sync::atomic::AtomicBool::new(false), |table| {
+                table
+                    .operations
+                    .get("boundary-notice")
+                    .filter(|held| held.state == crate::operations::OperationState::Delivered)
+                    .cloned()
+            })?;
+        assert!(!delivered.words.contains("boundary_unsignalled"));
         Ok::<_, Box<dyn std::error::Error>>(())
     })();
     sessions.stop_all()?;
-    checked?;
-    dir.close()?;
-    Ok(())
+    checked
 }

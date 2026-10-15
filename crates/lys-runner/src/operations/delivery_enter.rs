@@ -1,13 +1,13 @@
-//! One shared timer queue separates terminal text from its submit key.
+//! A completed paste flush permits its submit key, with no clock involved.
 
 use super::super::{OperationOutcome, OperationState};
-use super::ENTER_AFTER_TEXT;
 use crate::error::RunnerError;
 use crate::input::Input;
 use crate::protocol::Key;
 use crate::session::Sessions;
-use std::sync::{OnceLock, Weak, mpsc};
-use std::time::Instant;
+use std::sync::Weak;
+#[cfg(test)]
+use std::sync::{OnceLock, mpsc};
 
 const WAITING: &str = "awaiting Enter after text flush";
 
@@ -15,7 +15,6 @@ struct Pending {
     owner: Weak<Sessions>,
     operation: String,
     writer: Input,
-    due: Instant,
 }
 
 pub(super) fn waiting(held: &OperationOutcome) -> bool {
@@ -27,7 +26,6 @@ pub(super) fn after_flush(owner: Weak<Sessions>, operation: String, writer: Inpu
         owner,
         operation,
         writer,
-        due: Instant::now() + ENTER_AFTER_TEXT,
     };
     if empty {
         send(&pending);
@@ -37,15 +35,7 @@ pub(super) fn after_flush(owner: Weak<Sessions>, operation: String, writer: Inpu
         super::completion::record(&pending.owner, &pending.operation, Err(error));
         return;
     }
-    let owner = Weak::clone(&pending.owner);
-    let operation = pending.operation.clone();
-    if let Err(error) = scheduler().and_then(|queue| {
-        queue
-            .send(pending)
-            .map_err(|error| RunnerError::refused("enter_timer_unavailable", error.to_string()))
-    }) {
-        super::completion::record(&owner, &operation, Err(error));
-    }
+    send(&pending);
 }
 
 fn arm(pending: &Pending) -> Result<(), RunnerError> {
@@ -71,70 +61,6 @@ fn arm(pending: &Pending) -> Result<(), RunnerError> {
     #[cfg(test)]
     pause_if_held(&pending.operation)?;
     Ok(())
-}
-
-fn scheduler() -> Result<&'static mpsc::Sender<Pending>, RunnerError> {
-    static QUEUE: OnceLock<Result<mpsc::Sender<Pending>, String>> = OnceLock::new();
-    QUEUE
-        .get_or_init(|| {
-            let (sender, receiver) = mpsc::channel();
-            std::thread::Builder::new()
-                .name("operation-enter".to_owned())
-                .spawn(move || run(&receiver))
-                .map(|worker| {
-                    drop(worker);
-                    sender
-                })
-                .map_err(|error| error.to_string())
-        })
-        .as_ref()
-        .map_err(|error| RunnerError::refused("enter_timer_unavailable", error.clone()))
-}
-
-fn run(receiver: &mpsc::Receiver<Pending>) {
-    let mut pending: Vec<Pending> = Vec::new();
-    loop {
-        let next = pending
-            .iter()
-            .enumerate()
-            .min_by_key(|(_, held)| held.due)
-            .map(|(index, _)| index);
-        let incoming = if let Some(index) = next {
-            let delay = pending[index].due.saturating_duration_since(Instant::now());
-            if delay.is_zero() {
-                send(&pending.swap_remove(index));
-                continue;
-            }
-            match receiver.recv_timeout(delay) {
-                Ok(held) => Some(held),
-                Err(mpsc::RecvTimeoutError::Timeout) => {
-                    send(&pending.swap_remove(index));
-                    continue;
-                }
-                Err(mpsc::RecvTimeoutError::Disconnected) => None,
-            }
-        } else if let Ok(held) = receiver.recv() {
-            Some(held)
-        } else {
-            crate::error::said("runner_stopping: the Enter scheduler queue disconnected");
-            None
-        };
-        if let Some(held) = incoming {
-            pending.push(held);
-        } else {
-            for held in pending {
-                super::completion::record(
-                    &held.owner,
-                    &held.operation,
-                    Err(RunnerError::refused(
-                        "runner_stopping",
-                        "the Enter scheduler ended",
-                    )),
-                );
-            }
-            return;
-        }
-    }
 }
 
 fn send(pending: &Pending) {

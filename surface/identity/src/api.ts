@@ -24,6 +24,9 @@ export class Refused extends Error {
   }
 }
 
+/** A downloaded file and the server headers that name it. */
+export interface BlobAnswer { blob: Blob; headers: Headers }
+
 async function refusalOf(response: Response): Promise<Refused> {
   try {
     const body = (await response.json()) as Partial<Refusal>;
@@ -40,14 +43,16 @@ async function refusalOf(response: Response): Promise<Refused> {
 }
 
 /** The one exchange with the service. An answer that is not a refusal and cannot be read is said, never passed on as nothing. */
-async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: unknown, signal: AbortSignal | undefined, emptyAnswers: boolean): Promise<T> {
+async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: unknown, signal: AbortSignal | undefined, emptyAnswers: boolean, readFile?: (response: Response) => Promise<T>): Promise<T> {
   let response: Response;
-  const headers: Record<string, string> = body === undefined ? { accept: 'application/json' } : { accept: 'application/json', 'content-type': 'application/json' };
+  const accept = readFile ? 'application/octet-stream' : 'application/json';
+  const headers: Record<string, string> = body === undefined ? { accept } : { accept, 'content-type': 'application/json' };
   const init: RequestInit = method === 'GET'
     ? { credentials: 'same-origin', headers }
     : { method, credentials: 'same-origin', headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) };
   try {
-    response = await fetch(API + path, { ...init, signal });
+    // A connection installer carries a one-time code, so a file answer cannot be cached.
+    response = await fetch(API + path, { ...init, signal, ...(readFile ? { cache: 'no-store' as const } : {}) });
   } catch (error) {
     throw new Refused(0, { refusal: 'ServiceUnreachable', reason: `the identity service could not be reached: ${String(error)}` });
   }
@@ -56,6 +61,9 @@ async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: u
     refusal: 'UnreadableResponse',
     reason: `the identity service answered ${response.status}, but its result could not be read; do not repeat a change whose outcome is unknown`,
   });
+  if (readFile) {
+    try { return await readFile(response); } catch { throw unreadable(); }
+  }
   let text: string;
   try { text = await response.text(); } catch { throw unreadable(); }
   if (text === '' && emptyAnswers) return null as T;
@@ -67,7 +75,11 @@ async function exchange<T>(method: 'GET' | 'POST' | 'PUT', path: string, body: u
 }
 
 /** Ask the service: a read without a body, else a change sent as `method`, POST unless named. */
-export function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal): Promise<T> {
+export function request(path: string, body: unknown, method: 'POST' | 'PUT', signal: AbortSignal | undefined, answer: 'blob'): Promise<BlobAnswer>;
+export function request<T>(path: string, body?: unknown, method?: 'POST' | 'PUT', signal?: AbortSignal): Promise<T>;
+export function request<T>(path: string, body?: unknown, method: 'POST' | 'PUT' = 'POST', signal?: AbortSignal, answer?: 'blob'): Promise<T | BlobAnswer> {
+  if (answer === 'blob') return exchange<BlobAnswer>(body === undefined ? 'GET' : method, path, body, signal, false,
+    async (response) => ({ blob: await response.blob(), headers: response.headers }));
   if (body !== undefined || signal) return exchange<T>(body === undefined ? 'GET' : method, path, body, signal, false);
   const flying = reading.get(path);
   if (flying) return flying as Promise<T>;

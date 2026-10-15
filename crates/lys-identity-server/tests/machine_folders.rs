@@ -112,9 +112,7 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
         .post(&dialog, Some(&ada), &json!({ "start": named }))
         .await?;
     refused(&dialog_unnamed, 409, "runner_absent");
-    let dialog_by_bea = service
-        .post(&dialog, Some(&bea), &json!({}))
-        .await?;
+    let dialog_by_bea = service.post(&dialog, Some(&bea), &json!({})).await?;
     refused(&dialog_by_bea, 403, "not_your_computer");
     let dialog_relative = service
         .post(&dialog, Some(&ada), &json!({ "start": "held/receipts" }))
@@ -180,11 +178,19 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
         .await?;
     assert_eq!(named_by_bea.0, 200, "{}", named_by_bea.1);
     let own_folders = service
-        .post(&format!("/network/machines/{own}/folders"), Some(&bea), &json!({ "under": named }))
+        .post(
+            &format!("/network/machines/{own}/folders"),
+            Some(&bea),
+            &json!({ "under": named }),
+        )
         .await?;
     refused(&own_folders, 409, "runner_absent");
     let own_dialog = service
-        .post(&format!("/network/machines/{own}/choose-folder"), Some(&bea), &json!({}))
+        .post(
+            &format!("/network/machines/{own}/choose-folder"),
+            Some(&bea),
+            &json!({}),
+        )
         .await?;
     refused(&own_dialog, 409, "runner_absent");
 

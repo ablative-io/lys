@@ -206,6 +206,7 @@ pub fn place_binaries(
     for name in names {
         place_binary(&from.join(name), &layout.bin_dir(), name)?;
     }
+    super::companion::place(layout, from, names)?;
     intent.done(layout, Step::BinariesPlaced)
 }
 

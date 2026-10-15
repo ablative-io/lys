@@ -274,11 +274,11 @@ describe('Adding another computer', () => {
     await choose('Another computer');
     expect([...choice?.querySelectorAll('button') ?? []].map((each) => each.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
     const add = cells[0].querySelector('button[type="submit"]');
-    expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add and get its code', 'Add']);
-    expect(cells[0].textContent).toContain('You get a one-time code and a command to run on that computer to connect it.');
+    expect([add?.getAttribute('aria-label'), add?.textContent]).toEqual(['Add this computer', 'Add']);
+    expect(cells[0].textContent).toContain('After adding it, choose its kind and download one installer to open on that computer.');
   });
 
-  it('names it, asks for its code, and shows the command and the code once, each with Copy, keeping neither', async () => {
+  it('names it, offers its installer, and only asks for a code from the terminal disclosure', async () => {
     const writes: string[] = [];
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { writes.push(value); } } });
     const { posted } = await open(remote());
@@ -286,10 +286,17 @@ describe('Adding another computer', () => {
     await submit();
     const id = (posted[0].body as NameMachine).operation;
     expect(posted[0].body).toMatchObject({ name: 'Ward computer', runtime: 'lys-runner' });
+    expect(posted).toHaveLength(1);
+    const row = $('tr[data-add="connect"]');
+    expect(row?.querySelector('button[aria-label="Download the installer for Ward computer"]')).not.toBeNull();
+    expect(row?.querySelector('[data-join="command"]')).toBeNull();
+    const disclosure = row?.querySelector('details[data-connect="terminal"]');
+    expect(disclosure?.hasAttribute('open')).toBe(false);
+    await act(async () => { (disclosure?.querySelector('summary') as HTMLElement | null)?.click(); });
+    await act(async () => { button('Get a new connection code')?.click(); });
     expect(posted[1]).toEqual({ path: '/network/machines/' + id + '/join-code', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } });
     expect(posted).toHaveLength(2);
     expect(posted.some((entry) => entry.path.endsWith('/runner'))).toBe(false);
-    const row = $('tr[data-add="connect"]');
     expect(row?.textContent).toContain('Run this on that computer. The code works once and is not shown again.');
     expect(row?.querySelector('[data-join="command"]')?.textContent).toBe(command(id));
     expect(row?.querySelector('[data-join="code"]')?.textContent).toBe(CODE);
@@ -305,7 +312,7 @@ describe('Adding another computer', () => {
     expect(document.body.textContent).not.toContain(CODE);
   });
 
-  it('keeps an unanswered naming by its operation and asks for the code only once it is confirmed', async () => {
+  it('keeps an unanswered naming by its operation and offers the installer only once it is confirmed', async () => {
     const routes = remote();
     const name = routes['POST /network/machines'];
     routes['POST /network/machines'] = refused(503, 'NetworkUnavailable', 'The outcome is unknown');
@@ -316,11 +323,11 @@ describe('Adding another computer', () => {
     expect(JSON.parse(sessionStorage.getItem(pendingKey) ?? '{}')).toMatchObject({ phase: 'machine', remote: true });
     routes['POST /network/machines'] = name;
     await retry();
-    const id = (posted[0].body as NameMachine).operation;
-    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines', '/network/machines', '/network/machines/' + id + '/join-code']);
+    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines', '/network/machines']);
     expect(posted[1].body).toEqual(posted[0].body);
     expect(sessionStorage.getItem(pendingKey)).toBeNull();
-    expect($('tr[data-add="connect"] [data-join="code"]')?.textContent).toBe(CODE);
+    expect($('tr[data-add="connect"] [data-join="code"]')).toBeNull();
+    expect($('tr[data-add="connect"] button[aria-label="Download the installer for Ward computer"]')).not.toBeNull();
   });
 
   it('offers a new code when the answer with the code is lost, and the new one replaces it', async () => {
@@ -328,8 +335,10 @@ describe('Adding another computer', () => {
     const { posted } = await open(remote(() => (body) => typeof answer === 'function' ? answer(body) : answer));
     await choose('Another computer');
     await submit();
-    expect(posted).toHaveLength(2);
     const row = $('tr[data-add="connect"]');
+    await act(async () => { (row?.querySelector('details[data-connect="terminal"] summary') as HTMLElement | null)?.click(); });
+    await act(async () => { button('Get a new connection code')?.click(); });
+    expect(posted).toHaveLength(2);
     expect(row?.textContent).toContain('If one was given, it is not shown again: a new code replaces it.');
     expect(row?.querySelector('[data-join="code"]')).toBeNull();
     const id = (posted[0].body as NameMachine).operation;

@@ -3,20 +3,7 @@
 //! runs unchanged; its existing ready callback exits before recording Started.
 //! This example is never installed and refuses roots without the proof marker.
 
-/// Share production commands with the upgrade and runner identity code.
-#[path = "upgrade_window"]
-pub mod commands {
-    #[path = "../../src/commands/error.rs"]
-    pub mod error;
-    #[path = "../../src/commands/output.rs"]
-    pub mod output;
-    #[path = "../../src/commands/runner_join.rs"]
-    pub mod runner_join;
-    #[path = "../../src/commands/started.rs"]
-    pub mod started;
-}
-#[path = "../src/identity/mod.rs"]
-pub mod identity;
+pub use lys::{commands, identity};
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

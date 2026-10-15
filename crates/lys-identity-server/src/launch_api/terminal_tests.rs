@@ -3,7 +3,7 @@
 use lys_runner::Launch;
 use serde_json::json;
 
-use super::fresh_terminal_conversation;
+use super::{fresh_terminal_conversation, remember_native_in};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -155,5 +155,71 @@ fn a_malformed_fresh_operation_refuses_without_a_default_native_identity_or_laun
         assert_eq!(error.name(), "pty_conversation_invalid");
         assert_eq!(launch, before);
     }
+    Ok(())
+}
+
+#[test]
+fn an_observed_codex_thread_is_durable_idempotent_and_preserves_the_original_admission() -> Result {
+    use crate::runtime_state::{Report, Reported};
+    use crate::runtime_store::RuntimeStore;
+    use lys_core::Ed25519Identity;
+    use std::sync::Arc;
+
+    let root = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&root.path().join("key"))?);
+    let directory = root.path().join("runtime");
+    let mut store = RuntimeStore::open(&directory, Arc::clone(&key))?;
+    let admitted = json!({"session": OPERATION, "harness": "codex", "directory": "/project", "conversation": null});
+    let mut report = Report {
+        operation: OPERATION.to_owned(),
+        session: OPERATION.to_owned(),
+        agent: Some("agent".to_owned()),
+        machine: "machine".to_owned(),
+        state: Reported::Starting,
+        what: "start admitted".to_owned(),
+        confirmation: String::new(),
+        reported_by: "person".to_owned(),
+        at: 1,
+        launch: Some(admitted.clone()),
+    };
+    store.report(report.clone())?;
+    report.operation = OTHER_OPERATION.to_owned();
+    report.state = Reported::Running;
+    report.reported_by = "the runner of machine machine".to_owned();
+    report.what = "the runner started process 42".to_owned();
+    report.launch = None;
+    store.report(report.clone())?;
+    remember_native_in(&mut store, OPERATION, UUID)?;
+    remember_native_in(&mut store, OPERATION, UUID)?;
+    assert_eq!(
+        store
+            .session(OPERATION)
+            .ok_or("session missing")?
+            .reports
+            .len(),
+        3
+    );
+    report.operation = lys_identity::OperationId::generate()?.to_string();
+    report.state = Reported::Stopped;
+    report.what = "the process exited".to_owned();
+    report.confirmation = "exit 0".to_owned();
+    store.report(report)?;
+    drop(store);
+    let reopened = RuntimeStore::open(&directory, key)?;
+    let tracked = reopened
+        .session(OPERATION)
+        .ok_or("reopened session missing")?;
+    assert!(tracked.stopped());
+    assert_eq!(
+        tracked.first().and_then(|first| first.launch.as_ref()),
+        Some(&admitted)
+    );
+    assert_eq!(
+        tracked.reports[2]
+            .launch
+            .as_ref()
+            .and_then(|view| view["native_conversation"].as_str()),
+        Some(UUID)
+    );
     Ok(())
 }

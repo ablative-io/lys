@@ -1,7 +1,6 @@
 /**
  * Naming a computer keeps its request until it is confirmed: this computer, with Lys's own runner, until both the
- * computer and its runner are; another computer until it is named, after which it is given a connection code that is
- * shown once and never kept.
+ * computer and its runner are; another computer until it is named, after which its installer can be downloaded.
  */
 import { useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
@@ -10,8 +9,7 @@ import { confirmRunner, matchesMachine, savedMachine } from './contract';
 import type { Machine, NetworkView, PendingMachine } from './contract';
 import { ErrorWords } from '../people/Words';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
-import { askJoinCode, joinDetail, joinFailure } from './JoinCode';
-import type { Connecting, JoinCode } from './JoinCode';
+import type { Connecting } from './JoinCode';
 import { Act } from '../../shell/Act';
 import './network.css';
 
@@ -75,12 +73,8 @@ function useAddition({ person, agent, agents = [], changed, remote = false, conn
       const machine = await recordComputer(initial, person, (next) => { current = next; keep(next); });
       releaseRecord(key); setPending(null);
       if (current.remote) {
-        let given: JoinCode | null = null;
-        let failure = '';
-        let detail = '';
-        try { given = await askJoinCode(machine.id); } catch (error) { failure = joinFailure(error); detail = joinDetail(error); }
-        connect?.({ machine: machine.id, name: current.body.name, given, failure, at: 'row', ...(detail ? { detail } : {}) });
-        changed(current.body.name + (given ? ' was added. Run the command below on that computer to connect it.' : ' was added. It is not connected yet.'), machine);
+        connect?.({ machine: machine.id, name: current.body.name, given: null, failure: '', at: 'row' });
+        changed(current.body.name + ' was added. Choose its kind and download its installer below.', machine);
       } else changed(current.body.name + ' was added. Its runner is recorded.', machine);
     } catch (error) {
       if (!retry && current.phase === 'machine' && answeredNo(error) && error instanceof Refused && error.refusal.refusal !== 'Unanswered') {
@@ -145,8 +139,8 @@ export function AddComputerRow({ person, agents, changed, name, connect, selfSer
           <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked || (selfService && key === 'this')}
             title={selfService && key === 'this' ? 'Only an administrator adds the computer Lys runs on.' : undefined} onClick={() => setChosen(key)}>{label}</button>)}
       </div></div>
-      <Act symbol="add" name={where === 'another' ? 'Add and get its code' : 'Add this computer'} word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
-      <p className="hint add-computer-hint">{where === 'another' ? 'You get a one-time code and a command to run on that computer to connect it.' : 'The computer Lys itself runs on, named as it names itself.'}{selfService ? ' Only an administrator adds the computer Lys runs on.' : ''}</p>
+      <Act symbol="add" name="Add this computer" word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
+      <p className="hint add-computer-hint">{where === 'another' ? 'After adding it, choose its kind and download one installer to open on that computer.' : 'The computer Lys itself runs on, named as it names itself.'}{selfService ? ' Only an administrator adds the computer Lys runs on.' : ''}</p>
     </div>
     <div className="add-computer-standing">{standing}</div></td>
   </tr>;

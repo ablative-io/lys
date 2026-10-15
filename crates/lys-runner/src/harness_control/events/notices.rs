@@ -135,10 +135,6 @@ fn managed_notice_busy_waits_for_the_matching_turn_end() -> Result {
             replay(sessions, source, &first, transport)?;
             let outcome = sessions.operate(notice("busy-notice"))?;
             assert_eq!(outcome.state, OperationState::Accepted);
-            assert!(
-                sessions.lock()?.operations.boundary_armed("busy-notice"),
-                "managed fallback was not armed"
-            );
             assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
             complete(sessions, source, &first, transport)?;
             frame(frames, transport)?;
@@ -151,57 +147,37 @@ fn managed_notice_busy_waits_for_the_matching_turn_end() -> Result {
 }
 
 #[test]
-fn managed_notice_fallback_writes_and_names_expiry_without_a_clock_wait() -> Result {
+fn a_managed_notice_waits_for_its_matching_turn_end() -> Result {
     for transport in [Transport::Claude, Transport::Codex] {
         fixture(transport, false, |sessions, source, frames, terminal| {
             sessions.operate(notice("active-notice"))?;
             let active = frame(frames, transport)?;
             delivered(sessions, "active-notice")?;
             replay(sessions, source, &active, transport)?;
-            sessions.operate(notice("expired-notice"))?;
+            sessions.operate(notice("old-notice"))?;
             let mut table = sessions.lock()?;
-            let accepted = table
-                .operations
-                .get("expired-notice")
-                .ok_or("notice missing")?
-                .at;
-            crate::operations::deliver_at(&mut table, "fixture", accepted + 1_200_000 - 1);
+            crate::operations::deliver(&mut table, "fixture");
             assert_eq!(
                 table
                     .operations
-                    .get("expired-notice")
+                    .get("old-notice")
                     .ok_or("notice missing")?
                     .state,
                 OperationState::Accepted
             );
-            crate::operations::deliver_at(&mut table, "fixture", accepted + 1_200_000);
-            assert_ne!(
-                table
-                    .operations
-                    .get("expired-notice")
-                    .ok_or("notice missing")?
-                    .state,
-                OperationState::Accepted,
-                "expired managed notice remains accepted"
-            );
             drop(table);
-            let expired = frame(frames, transport)?;
-            delivered(sessions, "expired-notice")?;
-            assert!(
-                sessions
-                    .outcome("expired-notice")?
-                    .words
-                    .contains("boundary_unsignalled wait_seconds=1200 boundary_wait=1200s")
-            );
-            replay(sessions, source, &expired, transport)?;
+            assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
             complete(sessions, source, &active, transport)?;
-            assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
-            complete(sessions, source, &expired, transport)?;
-            assert_eq!(
-                sessions.outcome("expired-notice")?.state,
-                OperationState::Confirmed
+            let next = frame(frames, transport)?;
+            delivered(sessions, "old-notice")?;
+            assert!(
+                !sessions
+                    .outcome("old-notice")?
+                    .words
+                    .contains("boundary_unsignalled")
             );
-            assert!(matches!(frames.try_recv(), Err(mpsc::TryRecvError::Empty)));
+            replay(sessions, source, &next, transport)?;
+            complete(sessions, source, &next, transport)?;
             assert_eq!(terminal.load(Ordering::SeqCst), 0);
             Ok(())
         })?;

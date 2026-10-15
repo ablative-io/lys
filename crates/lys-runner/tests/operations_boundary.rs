@@ -1,4 +1,4 @@
-//! Operations hold tracked input until a signal or the named fallback.
+//! Operations hold tracked input until the harness boundary signal.
 use super::*;
 use crate::tracking::{Harness, Tracking};
 use crate::{Launch, Sessions};
@@ -103,7 +103,7 @@ fn operations_busy_tracking_holds_delivery_until_the_boundary() -> TestResult {
     Ok(())
 }
 #[test]
-fn operations_boundary_fallback_names_the_wait_on_the_receipt() -> TestResult {
+fn an_old_operation_stays_queued_until_its_boundary_event() -> TestResult {
     let (_dir, sessions) = tracked(Harness::ClaudeCode)?;
     let mut table = sessions.lock()?;
     accept(
@@ -115,13 +115,16 @@ fn operations_boundary_fallback_names_the_wait_on_the_receipt() -> TestResult {
             },
         ),
     )?;
-    let at = table.operations.get("held").ok_or("no operation")?.at;
-    delivery::deliver_at(&mut table, "s1", at + 20 * 60 * 1000 - 1);
+    let mut old = table.operations.get("held").ok_or("no operation")?.clone();
+    old.at = 1;
+    table.operations.record(old)?;
+    deliver(&mut table, "s1");
     assert_eq!(
         table.operations.get("held").ok_or("no operation")?.state,
         OperationState::Accepted
     );
-    delivery::deliver_at(&mut table, "s1", at + 20 * 60 * 1000);
+    table.sessions.get_mut("s1").ok_or("no session")?.guard.idle = true;
+    deliver(&mut table, "s1");
     drop(table);
     let delivered = sessions.until_any(&AtomicBool::new(false), |table| {
         table
@@ -130,14 +133,7 @@ fn operations_boundary_fallback_names_the_wait_on_the_receipt() -> TestResult {
             .filter(|held| held.state == OperationState::Delivered)
             .cloned()
     })?;
-    assert!(
-        delivered.words.contains("boundary_unsignalled"),
-        "{delivered:?}"
-    );
-    assert!(
-        delivered.words.contains("wait_seconds=1200"),
-        "{delivered:?}"
-    );
+    assert!(!delivered.words.contains("boundary_unsignalled"));
     sessions.stop_all()?;
     Ok(())
 }

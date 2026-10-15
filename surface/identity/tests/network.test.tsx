@@ -258,7 +258,7 @@ describe('Another computer, connected with a code that works once', () => {
     await mount('#/network', answers);
     expect(shown()).toBe('Waiting for its runner to connect');
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '0', '0']);
-    expect(panel()?.textContent).toContain('A connection code was given.');
+    expect(panel()?.textContent).toContain('Open its installer on that computer to connect it.');
     answers[runnerPath] = ok({ machine: remote.id, runner: { kind: 'dialled', key: 'ab12cd34'.repeat(8) }, answers: false, refusal: 'runner_not_dialled_in', reason: 'this computer\'s runner is not connected to Lys right now', joining: false });
     await act(async () => { refreshLive(); });
     await settle();
@@ -282,6 +282,10 @@ describe('Another computer, connected with a code that works once', () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value: string) => { writes.push(value); } } });
     const answers = served({ runner: null, answers: null, joining: true }, { ['POST ' + codePath]: given('1'.repeat(64)) });
     const { posted } = await mount('#/network', answers);
+    const terminal = panel()?.querySelector('details[data-connect="terminal"]');
+    expect(terminal?.hasAttribute('open')).toBe(false);
+    expect(panel()?.querySelector('[data-join="code"]')).toBeNull();
+    await click(terminal?.querySelector('summary') ?? null);
     expect(panel()?.textContent).toContain('A new code replaces any code given before, and the earlier one stops working.');
     await click(button('Get a new connection code'));
     expect(posted).toEqual([{ path: codePath, body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
@@ -305,6 +309,8 @@ describe('Another computer, connected with a code that works once', () => {
 
   it('offers a code to the owner, refuses another person’s row, and never rejoins the computer Lys runs on', async () => {
     await mount('#/network', { ...served({ runner: null, answers: null, joining: true }), '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
+    expect(button('Download the installer for Workshop laptop')).not.toBeNull();
+    await click(panel()?.querySelector('details[data-connect="terminal"] summary') ?? null);
     expect(button('Get a new connection code')).not.toBeNull();
     unmountAll(); document.body.innerHTML = '';
     await mount('#/network', { ...served({ runner: null, answers: null, joining: true }), '/people': ok(OWN),

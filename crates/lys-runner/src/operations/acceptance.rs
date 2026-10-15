@@ -86,10 +86,7 @@ pub(crate) fn accept(
                 && !session.guard.idle
                 && operation.request != OperationRequest::Stop =>
             {
-                format!(
-                    "boundary_wait={}s; accepted awaiting turn boundary",
-                    crate::operations::BOUNDARY_WAIT.as_secs()
-                )
+                "accepted awaiting turn boundary".to_owned()
             }
             _ => "accepted".to_owned(),
         };
@@ -131,15 +128,6 @@ pub(crate) fn accept(
         .is_some_and(|session| session.managed.is_some())
         && operation.request != OperationRequest::Stop
     {
-        if let Err(error) = crate::operations::boundary::arm(table, &operation.operation) {
-            let refused = table.operations.set(
-                &operation.operation,
-                OperationState::Refused,
-                error.to_string(),
-            )?;
-            feed(table, &refused);
-            return Ok(refused);
-        }
         if let Err(error) = crate::harness_control::events::enqueue_operation(
             table,
             &id,
@@ -162,15 +150,6 @@ pub(crate) fn accept(
     }
     if operation.request == OperationRequest::Stop {
         return Ok(outcome);
-    }
-    if let Err(error) = crate::operations::boundary::arm(table, &operation.operation) {
-        let refused = table.operations.set(
-            &operation.operation,
-            OperationState::Refused,
-            error.to_string(),
-        )?;
-        feed(table, &refused);
-        return Ok(refused);
     }
     deliver(table, &id);
     table

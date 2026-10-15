@@ -324,3 +324,73 @@ fn an_admitted_uuid_is_not_a_remembered_conversation_until_the_runner_started_th
     assert_eq!(chosen.directory, None);
     Ok(())
 }
+
+#[test]
+fn a_failed_start_does_not_hide_the_last_successfully_started_conversation() -> Result {
+    let mut launch = view("claude-code");
+    launch["native_conversation"] = json!(UUID);
+    let successful = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(launch));
+    let mut failed = tracked("failed", Some(AGENT), MACHINE, Some(view("claude-code")));
+    failed.reports[0].state = Reported::Starting;
+    let mut stopped = failed.reports[0].clone();
+    stopped.state = Reported::Stopped;
+    failed.reports.push(stopped);
+    let sessions = [successful, failed];
+    let selected = latest(&sessions, AGENT, MACHINE, OPERATION)
+        .ok_or("the successful conversation was hidden by a failed start")?;
+    assert_eq!(selected.session, PRIOR_OPERATION);
+    assert_eq!(
+        prior(selected, Harness::ClaudeCode, None)?
+            .native
+            .as_deref(),
+        Some(UUID)
+    );
+    Ok(())
+}
+
+#[test]
+fn a_different_requested_folder_selects_a_fresh_conversation_for_each_native_harness() -> Result {
+    for (name, harness) in [
+        ("claude-code", Harness::ClaudeCode),
+        ("codex", Harness::Codex),
+    ] {
+        let mut launch = view(name);
+        launch["native_conversation"] = json!(UUID);
+        let held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(launch));
+        let selected = prior(&held, harness, Some(CURRENT_FOLDER))?;
+        assert_eq!(selected.native, None);
+        assert_eq!(selected.directory.as_deref(), Some(PRIOR_FOLDER));
+    }
+    Ok(())
+}
+
+#[test]
+fn a_codex_thread_report_survives_runtime_replay_after_the_process_ends() -> Result {
+    let mut held = tracked(PRIOR_OPERATION, Some(AGENT), MACHINE, Some(view("codex")));
+    held.reports[0].state = Reported::Starting;
+    let mut running = held.reports[0].clone();
+    running.operation = "running".to_owned();
+    running.state = Reported::Running;
+    running.launch = None;
+    held.reports.push(running.clone());
+    running.operation = "native".to_owned();
+    running.confirmation = "the runner identified the native conversation".to_owned();
+    running.launch = Some(json!({"native_conversation": UUID}));
+    held.reports.push(running.clone());
+    running.operation = "stopped".to_owned();
+    running.state = Reported::Stopped;
+    running.launch = None;
+    held.reports.push(running);
+    let mut runtime = crate::runtime_state::Held::default();
+    for report in held.reports {
+        runtime.hold(report)?;
+    }
+    let reopened = crate::runtime_state::Held::decode(&runtime.encode()?)?;
+    let selected = latest(&reopened.sessions, AGENT, MACHINE, OPERATION)
+        .ok_or("the ended Codex session was lost")?;
+    assert_eq!(
+        prior(selected, Harness::Codex, None)?.native.as_deref(),
+        Some(UUID)
+    );
+    Ok(())
+}

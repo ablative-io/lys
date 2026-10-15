@@ -14,9 +14,23 @@ use crate::cli::{JudgeHarness, RunnerCommand};
 
 use crate::commands::error::CliResult;
 
+#[path = "runner_service.rs"]
+pub(crate) mod service;
+#[path = "runner_update.rs"]
+pub(crate) mod update;
+
 /// Runs `lys runner`.
 pub fn run(command: RunnerCommand) -> CliResult<()> {
     match command {
+        RunnerCommand::Start { worker, restored } => service::start(worker, restored),
+        RunnerCommand::Install {
+            pending,
+            server,
+            machine,
+            server_ca,
+        } => service::install(pending, server, machine, server_ca),
+        RunnerCommand::Uninstall => service::uninstall(),
+        RunnerCommand::Update => update::run(),
         RunnerCommand::ManagedEntry => {
             lys_runner::harness_control::process::entry().map_err(Into::into)
         }
@@ -66,27 +80,25 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
         RunnerCommand::Judge { socket, harness } => judge(&socket, harness),
         RunnerCommand::StatusLine { socket } => status_line(&socket),
         RunnerCommand::Hook { socket, event } => {
-            lys_runner::hook_line::run(lys_runner::hook_line::Args {
+            collector_status(lys_runner::hook_line::run(lys_runner::hook_line::Args {
                 socket: &socket,
                 event: event.as_deref(),
                 stdin: &mut std::io::stdin().lock(),
                 stdout: &mut std::io::stdout().lock(),
                 stderr: &mut std::io::stderr().lock(),
-            });
-            Ok(())
+            }))
         }
         RunnerCommand::Notify {
             socket,
             notification,
-        } => {
-            lys_runner::notify_line::run(lys_runner::notify_line::Args {
+        } => collector_status(lys_runner::notify_line::run(
+            lys_runner::notify_line::Args {
                 socket: &socket,
                 notification: &notification,
                 stdout: &mut std::io::stdout().lock(),
                 stderr: &mut std::io::stderr().lock(),
-            });
-            Ok(())
-        }
+            },
+        )),
         RunnerCommand::SeatOwner {
             dir,
             server_key,
@@ -125,6 +137,18 @@ fn serve(runner: Runner, socket: &Path) -> CliResult<()> {
         context: "writing that the runner listens".to_owned(),
         source,
     })
+}
+
+fn collector_status(status: i32) -> CliResult<()> {
+    if status == 0 {
+        Ok(())
+    } else {
+        Err(RunnerError::refused(
+            "collector_exit_failed",
+            format!("the collector exited with status {status}"),
+        )
+        .into())
+    }
 }
 
 /// Runs `lys runner status-line`: one line for the harness to show. The
@@ -170,7 +194,7 @@ fn judge(socket: &Path, harness: JudgeHarness) -> CliResult<()> {
 }
 
 /// The server's public key, read from the hex in `path`.
-fn public_key(path: &Path) -> Result<[u8; 32], RunnerError> {
+pub(crate) fn public_key(path: &Path) -> Result<[u8; 32], RunnerError> {
     let text = std::fs::read_to_string(path).map_err(|error| RunnerError::Key {
         reason: format!("reading {}: {error}", path.display()),
     })?;

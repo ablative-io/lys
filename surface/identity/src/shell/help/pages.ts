@@ -234,7 +234,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
       { sel: '[aria-label="Running now"]', title: 'Running now', text: 'The agents running on the chosen computer; Watch opens each in Operations.', at: 'left' },
       { sel: '[aria-label="May start here"]', title: 'May start here', text: 'Who may start an agent on this computer and through what: a direct permission or a role. Below it, allow one of your own agents here.', at: 'left' },
       { sel: 'form[aria-label^="Team of"]', title: 'Team', text: 'The team that owns this computer; its agents may run here. Save keeps the choice.', at: 'left' },
-      { sel: '.join-code', title: 'Connection code', text: 'A one-time code for connecting this computer’s runner. It is shown once and a new code replaces any before it. Choose the platform, run the command shown on that computer, then Done.', at: 'left' },
+      { sel: '.join-code', title: 'Connect this computer', text: 'Choose what kind of computer it is, then download its installer and open that file on the computer. The installer carries a one-time connection for this computer alone, connects it, and keeps its runner starting at every login and updating itself. Each download replaces any connection given before. People who prefer a terminal can ask for a code instead.', at: 'right' },
       { sel: '.machine-retire', title: 'Retire', text: 'No agent can be started on this computer afterwards; agents already running on it keep running. Retire asks once.', at: 'left' },
       { sel: '[data-machine]', title: 'Machine identity', text: 'The runner’s own signing key and the grants held by the machine itself. Give a grant passes part of one of yours to the machine.', at: 'left' },
     ],

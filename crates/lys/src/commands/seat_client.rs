@@ -293,17 +293,14 @@ impl Server {
             &bytes,
         )?;
         if response.status == 401 {
-            let answer = match serde_json::from_slice::<Value>(&response.body) {
-                Ok(answer) => answer,
-                Err(_) => {
-                    return Err(refused(
-                        "person_pass_expired",
-                        format!(
-                            "Lys refused this terminal's sign-in (HTTP 401); its answer was not JSON; run `lys sign-in --server {}`",
-                            pass.server
-                        ),
-                    ));
-                }
+            let Ok(answer) = serde_json::from_slice::<Value>(&response.body) else {
+                return Err(refused(
+                    "person_pass_expired",
+                    format!(
+                        "Lys refused this terminal's sign-in (HTTP 401); its answer was not JSON; run `lys sign-in --server {}`",
+                        pass.server
+                    ),
+                ));
             };
             let error = server_refusal(method, path, response.status, &answer);
             let name = answer

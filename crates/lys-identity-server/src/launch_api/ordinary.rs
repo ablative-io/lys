@@ -3,7 +3,10 @@
 use std::str::FromStr;
 use std::sync::Arc;
 
-use lys_identity::OperationId;
+use axum::Json;
+use axum::extract::{Path, Query, State};
+use axum::http::HeaderMap;
+use lys_identity::{AgentId, OperationId};
 use lys_runner::RunnerError;
 use lys_runner::harness_control::Transport;
 use lys_runner::tracking::Harness;
@@ -15,6 +18,46 @@ use crate::provisioning_api::with_provisioning;
 use crate::routes::AppState;
 use crate::runtime_api::with_runtime;
 use crate::runtime_state::Tracked;
+
+#[derive(serde::Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PreviewQuery {
+    machine: String,
+}
+
+#[derive(serde::Serialize, utoipa::ToSchema)]
+pub(crate) struct PreviewView {
+    machine: String,
+    directory: Option<String>,
+}
+
+/// The last successful conversation's folder, before a person presses Start.
+pub(super) async fn preview(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(agent): Path<String>,
+    given: Result<Query<PreviewQuery>, axum::extract::rejection::QueryRejection>,
+) -> Result<Json<PreviewView>, ServerError> {
+    let actor = crate::routes::signed_in(&state, &headers)?;
+    let Query(query) = given.map_err(|error| ServerError::RequestMalformed {
+        reason: error.body_text(),
+    })?;
+    let agent = AgentId::from_str(&agent)?.to_string();
+    super::start_caller(&state, &headers, &actor, &agent)?;
+    OperationId::from_str(&query.machine)?;
+    let directory = with_runtime(&state, |store| {
+        latest(store.sessions(), &agent, &query.machine, "")
+            .and_then(|tracked| tracked.first())
+            .and_then(|first| first.launch.as_ref())
+            .filter(|view| view.get("directory").is_some())
+            .map(|view| recorded_directory(view, None))
+            .transpose()
+    })?;
+    Ok(Json(PreviewView {
+        machine: query.machine,
+        directory,
+    }))
+}
 
 fn refused(reason: &str) -> ServerError {
     RunnerError::refused(
@@ -89,6 +132,15 @@ fn latest<'a>(
         tracked.agent.as_deref() == Some(agent)
             && tracked.machine == machine
             && tracked.session != operation
+            && started(tracked)
+    })
+}
+
+fn started(tracked: &Tracked) -> bool {
+    tracked.reports.iter().any(|report| {
+        report.state == crate::runtime_state::Reported::Running
+            && report.reported_by == format!("the runner of machine {}", tracked.machine)
+            && report.what.starts_with("the runner started process ")
     })
 }
 
@@ -104,13 +156,28 @@ fn prior(
     requested: Option<&str>,
 ) -> Result<Prior, ServerError> {
     let view = tracked.first().and_then(|first| first.launch.as_ref());
-    let started = tracked.reports.iter().any(|report| {
-        report.state == crate::runtime_state::Reported::Running
-            && report.reported_by == format!("the runner of machine {}", tracked.machine)
-            && report.what.starts_with("the runner started process ")
-    });
-    let native = if started {
-        view.map(|view| saved_native(view, harness))
+    if let (Some(requested), Some(view)) = (requested, view)
+        && view
+            .get("directory")
+            .and_then(Value::as_str)
+            .is_some_and(|old| old != requested)
+    {
+        return Ok(Prior {
+            session: tracked.session.clone(),
+            directory: Some(recorded_directory(view, None)?),
+            native: None,
+        });
+    }
+    let native = if started(tracked) && view.is_some() {
+        let observed = tracked.reports.iter().rev().find(|report| {
+            report.state != crate::runtime_state::Reported::Starting
+                && report.reported_by == format!("the runner of machine {}", tracked.machine)
+                && report.confirmation == "the runner identified the native conversation"
+        });
+        observed
+            .and_then(|report| report.launch.as_ref())
+            .or(view)
+            .map(|view| saved_native(view, harness))
             .transpose()?
             .flatten()
     } else {
@@ -128,7 +195,7 @@ fn prior(
                 "the selected profile uses a different native harness from the previous session",
             ));
         }
-        Some(recorded_directory(view, requested)?)
+        Some(recorded_directory(view, None)?)
     } else {
         None
     };
@@ -159,7 +226,7 @@ fn replay(view: &Value, machine: &str, requested: Option<&str>) -> Result<Chosen
     })
 }
 
-pub(super) async fn chosen(
+pub(crate) async fn chosen(
     state: &Arc<AppState>,
     agent: &str,
     machine: &str,
@@ -219,20 +286,43 @@ pub(super) async fn chosen(
             conversation: None,
         });
     };
-    let native = crate::seats_acts::live_session(state, machine, &prior.session)
+    let recorded = if prior.directory.is_some() {
+        prior.directory.clone()
+    } else {
+        with_runtime(state, |store| {
+            Ok(store
+                .session(&prior.session)
+                .and_then(|tracked| tracked.first())
+                .and_then(|first| first.launch.as_ref())
+                .and_then(|view| view.get("directory"))
+                .and_then(Value::as_str)
+                .map(str::to_owned))
+        })?
+    };
+    if requested
+        .as_deref()
+        .zip(recorded.as_deref())
+        .is_some_and(|(new, old)| new != old)
+    {
+        return Ok(Chosen {
+            profile: None,
+            directory: requested,
+            conversation: None,
+        });
+    }
+    let observed = crate::seats_acts::live_session(state, machine, &prior.session)
         .await?
-        .and_then(|live| live.harness_session)
-        .or(prior.native);
+        .and_then(|live| live.harness_session);
+    if let Some(native) = &observed {
+        validate_native(harness, native)?;
+        super::runner::remember_native(state, &prior.session, native)?;
+    }
+    let native = observed.or(prior.native);
     let native = known_native(harness, native)?;
     let directory = if native.is_some() {
-        match prior.directory {
-            Some(directory) => Some(directory),
-            None => {
-                let view = super::admitted(state, &prior.session, agent)?
-                    .ok_or_else(|| refused("the known conversation has no recorded launch"))?;
-                Some(recorded_directory(&view, requested.as_deref())?)
-            }
-        }
+        let view = super::admitted(state, &prior.session, agent)?
+            .ok_or_else(|| refused("the known conversation has no recorded launch"))?;
+        Some(recorded_directory(&view, requested.as_deref())?)
     } else {
         requested
     };

@@ -108,7 +108,14 @@ export function readAddAndRun(key: string, person: string): AddAndRun | null {
   try { return addAndRunOf(JSON.parse(raw), person); }
   catch (error) { if (error instanceof Refused) throw error; return unreadable('stored request JSON must describe this add-and-run flow'); }
 }
-export function newAddAndRun(registration: PendingAgent, settings: Record<string, unknown>, name: string, person: string, computer?: Machine): AddAndRun {
+export const CONNECT_COMPUTER = 'Connect your own computer first: Network → Add a computer → download its installer';
+function requireComputerAccess(computer: Machine | undefined, person: string, administrator: boolean): void {
+  if (!administrator && (!computer || computer.named_by !== person)) throw new Refused(0, {
+    refusal: 'ComputerConnectionRequired', reason: CONNECT_COMPUTER,
+  });
+}
+export function newAddAndRun(registration: PendingAgent, settings: Record<string, unknown>, name: string, person: string, computer?: Machine, administrator = false): AddAndRun {
+  requireComputerAccess(computer, person, administrator);
   profileFromSettings(settings);
   const placement: Placement = computer ? placementOf({ kind: 'existing', computer, admission: null }, registration, 'registration')
     : { kind: 'new', machine: { body: { operation: operationId(), name, kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [], may_run_roles: [], may_reach: [] }, phase: 'machine', machine: null } };
@@ -132,10 +139,11 @@ export class AddAndRunFailure extends Error {
     super((refusedWith ? 'Lys refused ' + step + ': ' + refusedWith : 'Lys could not confirm ' + step + '.') + (code === 'RunnerStartUnconfirmed' || code === 'RunnerDidNotRun' ? ' Lys admitted the start, but no runner ran it.' : code === 'RunnerStartEnded' ? ' The runner confirmed this session already ended.' : ''));
   }
 }
-export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: AddAndRun) => void): Promise<string> {
+export async function addAndRun(initial: AddAndRun, login: Login, keep: (next: AddAndRun) => void, administrator = false): Promise<string> {
   let current = initial;
   const save = (next: AddAndRun) => { keep(next); current = next; };
   try {
+    requireComputerAccess(current.placement.kind === 'existing' ? current.placement.computer : undefined, current.person, administrator);
     save(current);
     if (current.step === 'registration') {
       const agent = await addAgent(current.registration, current.person, (registration) => save({ ...current, registration }), login);
@@ -184,15 +192,15 @@ export interface FirstRunOptions { choices: Choices | null; network: NetworkView
 export function runnerProblemReason(problem: unknown): string {
   return problem instanceof Refused ? problem.refusal.reason : problem instanceof Error ? problem.message : String(problem);
 }
-export async function firstRunChoices(capability: AddAndRunCapability, publish?: (options: FirstRunOptions) => void): Promise<FirstRunOptions> {
+export async function firstRunChoices(capability: AddAndRunCapability, person: string, administrator: boolean, publish?: (options: FirstRunOptions) => void): Promise<FirstRunOptions> {
   let network: NetworkView | null = null;
   let runners: RunnerChoice[] = [];
   try {
     const answer = await request<unknown>('/network');
     if (!isRecord(answer) || !Array.isArray(answer.machines) || !answer.machines.every(readableMachine) || typeof answer.reports_served !== 'boolean') throw new Refused(200, { refusal: 'NetworkUnreadable', reason: 'The service did not name readable computers and their admission rules.' });
     network = { machines: answer.machines, reports_served: answer.reports_served, host_name: typeof answer.host_name === 'string' && answer.host_name.trim() ? answer.host_name : null };
-    const inUse = network.machines.filter((machine) => machine.state === 'in_use');
-    if (!inUse.length) return { choices: await readChoices(network), network, computers: [], runners, loading: false, problem: null };
+    const inUse = network.machines.filter((machine) => machine.state === 'in_use' && (administrator || machine.named_by === person));
+    if (!inUse.length) return { choices: administrator ? await readChoices(network) : null, network, computers: [], runners, loading: false, problem: null };
     if (capability.machineAdmission !== true) return { choices: null, network, computers: [], runners, loading: false, problem: capability.admissionProblem };
     const eligible = inUse.filter((machine) => machine.kind === 'Computer' && machine.runtime === 'lys-runner' && operation.test(machine.id));
     runners = eligible.map((machine) => ({ machine, state: 'asking' }));
@@ -216,6 +224,10 @@ export async function firstRunChoices(capability: AddAndRunCapability, publish?:
           const held = await request<unknown>('/network/machines/' + encodeURIComponent(machine.id) + '/runner');
           // Lys's own runner counts, held by this install or dialled in from the computer itself; a socket Lys does not hold is not a place to start an agent.
           confirmRunner(held, machine.id, false);
+          if (!isRecord(held) || held.answers !== true) throw new Refused(200, {
+            refusal: 'RunnerNotAnswering',
+            reason: machine.name + ' is not answering right now; start its computer, then try again',
+          });
           if (isRecord(held) && isRecord(held.runner) && held.runner.kind === 'socket') throw new Refused(200, { refusal: 'RunnerNotLys', reason: 'The computer’s runner is a socket Lys does not hold. Agents start only through Lys’s own runner, on this computer or dialled in.' });
           answer = { machine, state: 'confirmed' };
         } catch (problem) { answer = { machine, state: 'unavailable', reason: runnerProblemReason(problem) }; }

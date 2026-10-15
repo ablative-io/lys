@@ -164,7 +164,10 @@ pub(super) fn place_runner(
     let companion = source(helper)?;
     if companion.is_file() {
         swap::place_binary(&companion, &layout.bin_dir(), helper)?;
-        say(&format!("{helper} placed in {}", layout.bin_dir().display()));
+        say(&format!(
+            "{helper} placed in {}",
+            layout.bin_dir().display()
+        ));
         return Ok(true);
     }
     say(&format!(

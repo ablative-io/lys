@@ -27,7 +27,7 @@ function computer(digit: string, name: string): Machine {
 }
 
 const runnerPath = (machine: Machine) => '/network/machines/' + machine.id + '/runner';
-const confirmed = (machine: Machine) => ok({ machine: machine.id, runner: { kind: 'lys' } });
+const confirmed = (machine: Machine) => ok({ machine: machine.id, runner: { kind: 'lys' }, answers: true });
 
 function routes(computers: Machine[], extra: Record<string, Route> = {}): Record<string, Route> {
   const contract = SERVICE['/surface-contract'];
@@ -89,6 +89,29 @@ async function ready(container: HTMLElement, name = 'Clover') {
 beforeEach(() => sessionStorage.clear());
 
 describe('Add-agent runner availability', () => {
+  it.each([false, undefined, 'true', 1])('withholds a remote runner whose answers is %s', async (answers) => {
+    const remote = computer('a', 'Ward computer');
+    const local = computer('b', 'Own computer');
+    const { container, posted } = await mount('#/agents/new', routes([remote, local], {
+      [runnerPath(remote)]: ok({ machine: remote.id, runner: { kind: 'dialled', key: 'a'.repeat(64) }, ...(answers === undefined ? {} : { answers }) }),
+    }));
+    expect(offered(container)).not.toContain(remote.id);
+    expect(offered(container)).toContain(local.id);
+    expect(form(container).textContent).toContain(remote.name + ' is not answering right now; start its computer, then try again');
+    await ready(container);
+    expect(submit(container).getAttribute('aria-label')).toBe('Add Clover and run it on ' + local.name);
+    expect(posted.filter((entry) => entry.path === '/network/machines' || entry.path.endsWith('/runner'))).toEqual([]);
+  });
+
+  it('names the answering remote computer on Add and run', async () => {
+    const remote = computer('a', 'Ward computer');
+    const { container } = await mount('#/agents/new', routes([remote], {
+      [runnerPath(remote)]: ok({ machine: remote.id, runner: { kind: 'dialled', key: 'a'.repeat(64) }, answers: true }),
+    }));
+    await ready(container);
+    expect(submit(container).getAttribute('aria-label')).toBe('Add Clover and run it on Ward computer');
+  });
+
   it('offers the confirmed computer when the first listed computer refuses, with the refusal reason verbatim', async () => {
     const laptop = computer('a', 'Away laptop');
     const local = computer('b', 'Own computer');

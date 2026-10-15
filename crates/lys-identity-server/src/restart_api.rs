@@ -19,7 +19,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::error::ServerError;
-use crate::launch_api::{Chosen, admitted, start_caller, start_for, start_profile};
+use crate::launch_api::{Chosen, admitted, start_caller, start_profile};
 use crate::provisioning_api::with_provisioning;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runner_api::{Carried, perform};
@@ -81,7 +81,25 @@ async fn restart(
         return Err(ServerError::RuntimeSessionUnknown);
     }
     if admitted(&state, &operation, &driven.agent)?.is_some() {
-        return start_for(&state, &headers, &actor, agent, &driven.machine, &operation).await;
+        let chosen = crate::launch_api::ordinary::chosen(
+            &state,
+            &driven.agent,
+            &driven.machine,
+            &operation,
+            None,
+            false,
+        )
+        .await?;
+        return start_profile(
+            &state,
+            &headers,
+            &actor,
+            agent,
+            &driven.machine,
+            &operation,
+            chosen,
+        )
+        .await;
     }
     // The folder the ended session's own start named, when it named one;
     // a kept start from before folders were named goes through as none,
@@ -122,6 +140,15 @@ async fn restart(
                 ),
             })
     })?;
+    let chosen = crate::launch_api::ordinary::chosen(
+        &state,
+        &driven.agent,
+        &driven.machine,
+        &operation,
+        kept_directory,
+        false,
+    )
+    .await?;
     let Json(stopped) = perform(
         &state,
         (&driven, caller, "end"),
@@ -145,8 +172,8 @@ async fn restart(
         &operation,
         Chosen {
             profile: Some(profile),
-            directory: kept_directory,
-            conversation: None,
+            directory: chosen.directory,
+            conversation: chosen.conversation,
         },
     )
     .await

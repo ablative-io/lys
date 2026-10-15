@@ -134,8 +134,7 @@ fn settings_value(
         ] {
             let mut entry = json!({"hooks": [{
                 "type": "command",
-                "command": r#""$LYS_PROGRAM" runner hook --socket "$LYS_RUNNER_SOCKET""#,
-                "timeout": 5
+                "command": r#""$LYS_PROGRAM" runner hook --socket "$LYS_RUNNER_SOCKET""#
             }]});
             if !matches!(event, "UserPromptSubmit" | "Stop") {
                 entry["matcher"] = json!("*");

@@ -108,9 +108,6 @@ impl Controller {
                 self.boundary = Boundary::Idle;
                 self.turn = None;
                 self.compacted = None;
-                if self.promote_notice() {
-                    return Ok(update);
-                }
                 self.request_boundary(&mut update)?;
                 self.dispatch(&mut update)?;
             }

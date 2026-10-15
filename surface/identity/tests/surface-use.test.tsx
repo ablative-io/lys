@@ -50,7 +50,7 @@ describe("Surface use on laptops and phones", () => {
         },
       }),
       "/network": ok({ machines: [machine(first), machine(second)], reports_served: true }),
-      ["/network/machines/" + first + "/runner"]: ok({ machine: first, runner: { kind: "lys" } }),
+      ["/network/machines/" + first + "/runner"]: ok({ machine: first, runner: { kind: "lys" }, answers: true }),
       ["/network/machines/" + second + "/runner"]: ok({ machine: second, runner: null }),
       "/harnesses": ok({ programs: [program] }),
       "/skills": ok({ skills: [] }),

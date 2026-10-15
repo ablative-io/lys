@@ -239,7 +239,7 @@ pub fn start(spawn: &OwnerSpawn<'_>, plan: &OwnerPlan) -> Result<OwnerEndpoint, 
             &start_failed("the owner's pipe was not made"),
         ));
     };
-    let ready = match ready_within(pipe, READY_WITHIN) {
+    let ready = match wait_ready(&mut BufReader::new(pipe), &Meter::default()) {
         Ok(ready) => {
             crate::error::step("owner_spawned_to_ready", began);
             ready
@@ -303,38 +303,6 @@ fn with_log_tail(refusal: &RunnerError, log: &Path) -> RunnerError {
     RunnerError::refused(&refusal.name(), format!("{refusal}; {tail}"))
 }
 
-/// How long a start waits for its owner's ready line: the owner starts its
-/// harness before it writes it, so this is the harness's start and more.
-pub const READY_WITHIN: std::time::Duration = std::time::Duration::from_secs(120);
-
-/// The owner's ready line, read from `pipe` on a thread of its own, or
-/// `seat_owner_start_failed` once `within` has passed with none: a start is
-/// never left waiting on an owner that neither writes nor exits.
-///
-/// # Errors
-///
-/// [`wait_ready`]'s refusals, and `seat_owner_start_failed` past `within`.
-pub fn ready_within(
-    pipe: impl std::io::Read + Send + 'static,
-    within: std::time::Duration,
-) -> Result<(String, PathBuf, Leader, String), RunnerError> {
-    let (sent, answer) = std::sync::mpsc::channel();
-    std::thread::Builder::new()
-        .name("lys-owner-ready".to_owned())
-        .spawn(move || {
-            let meter = Meter::default();
-            // The receiver is gone only once the start has given up.
-            drop(sent.send(wait_ready(&mut BufReader::new(pipe), &meter)));
-        })
-        .map_err(|error| start_failed(format!("the ready reader could not start: {error}")))?;
-    answer.recv_timeout(within).unwrap_or_else(|_| {
-        Err(start_failed(format!(
-            "the owner wrote no ready line within {} s",
-            within.as_secs()
-        )))
-    })
-}
-
 /// The ready line's runner, owner and build, once the owner it names is
 /// the process this start spawned, proved at the kernel, listening on its
 /// planned socket.
@@ -392,6 +360,7 @@ fn abandon(child: &mut std::process::Child, refusal: &RunnerError) -> RunnerErro
 /// # Errors
 ///
 /// None: the refusal is the answer, with the end's outcome in its words.
+#[must_use]
 pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
     let ended = match peer::start_identity(owner.pid) {
         Ok(start) if start == owner.start => {
@@ -407,9 +376,8 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
                     "{seen}, and whether it is still the owner could not be read: {words}{group}"
                 ),
             };
-            match super::exit_wait::exit_within(owner.pid, std::time::Duration::from_secs(5)) {
+            match super::exit_wait::wait(owner.pid) {
                 super::exit_wait::Exit::Gone => format!("the owner was ended{group}"),
-                super::exit_wait::Exit::Running => not_gone("the owner did not end within 5 s"),
                 super::exit_wait::Exit::Unwatched(cause) => {
                     not_gone(&format!("the owner's end could not be watched ({cause})"))
                 }

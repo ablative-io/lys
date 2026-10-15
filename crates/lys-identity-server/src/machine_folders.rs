@@ -75,7 +75,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
 }
 
 /// The machine's runner, when the machine is kept and names one.
-fn runner_of(state: &Arc<AppState>, id: &str) -> Result<crate::runner_client::RunnerRecord, ServerError> {
+fn runner_of(
+    state: &Arc<AppState>,
+    id: &str,
+) -> Result<crate::runner_client::RunnerRecord, ServerError> {
     with_network(state, |store| {
         store.machine(id).ok_or(ServerError::MachineUnknown)?;
         Ok(store.runner(id).cloned())
@@ -147,3 +150,7 @@ async fn folders(
         }),
     }
 }
+
+#[cfg(test)]
+#[path = "machine_folders_tests.rs"]
+mod tests;

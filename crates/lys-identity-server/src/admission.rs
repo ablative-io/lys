@@ -69,6 +69,16 @@ impl Admission {
             .clone())
     }
 
+    pub(crate) fn administrator_name(
+        directory: &Projection,
+        login: &LoginBinding,
+    ) -> Option<String> {
+        let person = directory.person_for(login)?;
+        let record = directory.record(IdentityId::Person(person))?;
+        (record.state() == LifecycleState::Active)
+            .then(|| record.profile().display_name().to_owned())
+    }
+
     pub(crate) fn administrator_available(&self) -> Result<(), ServerError> {
         let held =
             self.administrator

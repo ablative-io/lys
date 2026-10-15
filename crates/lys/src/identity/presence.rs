@@ -11,7 +11,7 @@ pub trait Presence {
     fn authenticate(&self) -> IdentityResult<()>;
 }
 
-/// LocalAuthentication on macOS; other platforms refuse recovery issuance.
+/// `LocalAuthentication` on macOS; other platforms refuse recovery issuance.
 pub struct SystemPresence;
 
 pub(crate) fn refused(kind: ErrorKind, detail: impl Into<String>) -> IdentityError {

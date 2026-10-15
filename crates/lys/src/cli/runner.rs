@@ -8,6 +8,34 @@ pub const SCROLLBACK: usize = 1 << 20;
 /// `lys runner` subcommands.
 #[derive(Debug, clap::Subcommand)]
 pub enum RunnerCommand {
+    /// Start the runner using this computer's saved connection, without a code.
+    Start {
+        /// Serve under the login service's readiness supervisor.
+        #[arg(long, hide = true, conflicts_with = "restored")]
+        worker: bool,
+        /// Start the restored build without another update attempt.
+        #[arg(long, hide = true)]
+        restored: bool,
+    },
+    /// Connect this computer once and install its native login service.
+    Install {
+        /// The owner-only pending connection carried by the downloaded installer.
+        #[arg(long, value_name = "PATH", conflicts_with_all = ["server", "machine", "server_ca"])]
+        pending: Option<PathBuf>,
+        /// The server's HTTPS API address; the connection code is read from stdin.
+        #[arg(long, requires = "machine")]
+        server: Option<String>,
+        /// This computer's id from the Network page.
+        #[arg(long, requires = "server")]
+        machine: Option<String>,
+        /// An additional PEM authority for the named server.
+        #[arg(long, requires = "server")]
+        server_ca: Option<PathBuf>,
+    },
+    /// Remove the login service while keeping this computer's saved connection.
+    Uninstall,
+    /// Verify and install the server's release, keeping the previous runner.
+    Update,
     /// Enter an isolated managed process session using a startup frame on stdin.
     #[command(hide = true)]
     ManagedEntry,

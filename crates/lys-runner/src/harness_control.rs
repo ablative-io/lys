@@ -11,7 +11,6 @@ mod approval;
 mod context;
 mod conversation;
 mod initialize;
-mod notices;
 mod observations;
 mod reminders;
 pub use context::{
@@ -114,21 +113,40 @@ pub struct Controller {
     transport: Transport,
     boundary: Boundary,
     compact: bool,
-    ready: bool,
+    channel: ChannelState,
     pending: VecDeque<Pending>,
     current: Option<Pending>,
-    early_notices: VecDeque<notices::Written>,
     compacted: Option<String>,
     admitted: bool,
     turn: Option<String>,
     last_result: Option<String>,
-    initialized: bool,
     initialize: String,
     refusal: Option<String>,
     replayed: bool,
-    closed: bool,
     pending_ids: BTreeSet<String>,
     authority: context::Authority,
+}
+
+/// The channel's binding, initialization and closure evidence.
+#[derive(Debug, Default)]
+pub struct ChannelState {
+    ready: bool,
+    initialized: bool,
+    closed: bool,
+}
+
+impl std::ops::Deref for Controller {
+    type Target = ChannelState;
+
+    fn deref(&self) -> &Self::Target {
+        &self.channel
+    }
+}
+
+impl std::ops::DerefMut for Controller {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.channel
+    }
 }
 
 impl Controller {
@@ -151,19 +169,16 @@ impl Controller {
             transport,
             boundary: Boundary::Unknown,
             compact: false,
-            ready: false,
+            channel: ChannelState::default(),
             pending: VecDeque::new(),
             current: None,
-            early_notices: VecDeque::new(),
             compacted: None,
             admitted: false,
             turn: None,
             last_result: None,
-            initialized: false,
             initialize: crate::protocol::hex(&rand::random::<[u8; 16]>()),
             refusal: None,
             replayed: false,
-            closed: false,
             pending_ids: BTreeSet::new(),
             authority: context::Authority::default(),
         })
@@ -214,15 +229,6 @@ impl Controller {
             ));
         }
         self.pending_ids.clear();
-        for written in self.early_notices.drain(..) {
-            if !written.admitted {
-                update.receipts.push(receipt(
-                    &written.pending.id,
-                    crate::operations::OperationState::Uncertain,
-                    "control_transport_lost",
-                ));
-            }
-        }
         self.turn = None;
         self.compacted = None;
         self.admitted = false;
@@ -355,9 +361,6 @@ impl Controller {
         if self.transport == Transport::Codex
             && let Some(update) = self.bind_codex(value)?
         {
-            return Ok(update);
-        }
-        if let Some(update) = self.observe_early_notice(value)? {
             return Ok(update);
         }
         if self.transport == Transport::Claude

@@ -29,17 +29,14 @@ pub(super) fn confirmed(table: &mut Table, compaction_id: &str) {
     }) {
         return;
     }
-    if let Err(error) = super::boundary::arm(table, &operation) {
-        match table
-            .operations
-            .set(&operation, OperationState::Refused, error.to_string())
-        {
-            Ok(outcome) => feed(table, &outcome),
-            Err(record_error) => crate::error::said(&format!(
-                "operation {operation}: {error}; refusal record failed: {record_error}"
-            )),
-        }
-    }
+    let Some(session) = table
+        .operations
+        .get(&operation)
+        .map(|held| held.session.clone())
+    else {
+        return;
+    };
+    super::deliver(table, &session);
 }
 
 /// Confirm a delivered Codex compaction at its next agent turn's end.

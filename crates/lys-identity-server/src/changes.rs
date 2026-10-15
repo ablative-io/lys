@@ -79,14 +79,10 @@ impl Changes {
             let permit = self.waiting.try_acquire().map_err(|error| {
                 unavailable(format!("change subscriptions are at capacity: {error}"))
             })?;
-            // Renew idle requests before an intermediary cuts the connection.
-            if let Ok(answer) =
-                tokio::time::timeout(std::time::Duration::from_secs(25), current.changed()).await
-            {
-                answer.map_err(|error| {
-                    unavailable(format!("change subscriptions closed: {error}"))
-                })?;
-            }
+            current
+                .changed()
+                .await
+                .map_err(|error| unavailable(format!("change subscriptions closed: {error}")))?;
             drop(permit);
         }
         let generation = *current.borrow_and_update();
@@ -275,51 +271,17 @@ mod tests {
         Ok(())
     }
     #[tokio::test(start_paused = true)]
-    async fn an_unchanged_poll_answers_within_twenty_five_seconds_and_releases_its_place()
+    async fn elapsed_time_does_not_answer_a_change_wait_and_cancellation_releases_its_place()
     -> Result<(), Box<dyn std::error::Error>> {
         let changes = Changes::new()?;
         let first = changes.after(None).await?;
-        let checks = Cell::new(0);
-        let mut wait = Box::pin(changes.checked_after(Some(first), || {
-            checks.set(checks.get() + 1);
-            Ok(())
-        }));
+        let mut wait = Box::pin(changes.after(Some(first)));
         let mut context = Context::from_waker(Waker::noop());
         assert!(wait.as_mut().poll(&mut context).is_pending());
         assert_eq!(changes.waiting(), 1);
-        tokio::time::advance(std::time::Duration::from_secs(24)).await;
+        tokio::time::advance(std::time::Duration::from_secs(86_400)).await;
         assert!(wait.as_mut().poll(&mut context).is_pending());
-        tokio::time::advance(std::time::Duration::from_secs(1)).await;
-        let Poll::Ready(answer) = wait.as_mut().poll(&mut context) else {
-            return Err("the unchanged poll exceeded twenty-five seconds".into());
-        };
-        assert_eq!(answer?, first);
-        assert_eq!(checks.get(), 1);
-        assert_eq!(changes.waiting(), 0);
-        Ok(())
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn an_unchanged_poll_rechecks_authority_before_its_no_change_answer()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let changes = Changes::new()?;
-        let first = changes.after(None).await?;
-        let admitted = Cell::new(true);
-        let mut wait = Box::pin(changes.checked_after(Some(first), || {
-            if admitted.get() {
-                Ok(())
-            } else {
-                Err(ServerError::NotSignedIn)
-            }
-        }));
-        let mut context = Context::from_waker(Waker::noop());
-        assert!(wait.as_mut().poll(&mut context).is_pending());
-        admitted.set(false);
-        tokio::time::advance(std::time::Duration::from_secs(25)).await;
-        assert!(matches!(
-            wait.as_mut().poll(&mut context),
-            Poll::Ready(Err(ServerError::NotSignedIn))
-        ));
+        drop(wait);
         assert_eq!(changes.waiting(), 0);
         Ok(())
     }

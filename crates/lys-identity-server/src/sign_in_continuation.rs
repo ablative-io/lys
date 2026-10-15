@@ -45,6 +45,7 @@ impl Continuation {
 /// that answered.
 pub(super) struct Refused {
     pub(super) error: ServerError,
+    pub(super) email: Option<String>,
     pub(super) continuation: Option<Continuation>,
 }
 
@@ -52,6 +53,7 @@ impl Refused {
     pub(super) fn dropping(error: ServerError) -> Self {
         Self {
             error,
+            email: None,
             continuation: None,
         }
     }

@@ -34,15 +34,10 @@ it('shows the signed-in person the add row with Another computer chosen and This
   expect(buttons.find((button) => button.textContent === 'Another computer')?.getAttribute('aria-pressed')).toBe('true');
 });
 
-it('adds an own computer, shows the command under /api and one code with Copy, and Done removes them', async () => {
+it('adds an own computer and offers one installer download for it, asking for no code until a terminal is chosen', async () => {
   const answers: Record<string, Route> = {};
   answers['POST /network/machines'] = (value) => {
     const body = value as NameMachine;
-    answers['POST /network/machines/' + body.operation + '/join-code'] = ok({
-      machine: body.operation, server: 'https://lys.example/api',
-      command: 'lys runner join --server https://lys.example/api --machine ' + body.operation,
-      code: 'fixture-once',
-    });
     return ok({ ...body, id: body.operation, named_by: ADA, named_at: 1, retired: null, state: 'in_use',
       may_run: body.may_run.map((id) => ({ id, display_name: id, state: 'active' })) });
   };
@@ -54,15 +49,15 @@ it('adds an own computer, shows the command under /api and one code with Copy, a
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
   expect(posted[0]?.path).toBe('/network/machines');
   expect((posted[0]?.body as NameMachine).may_run).toEqual(OWN.people[0].agents.map((agent) => agent.id));
-  expect(host.querySelector('[data-join="command"]')?.textContent).toContain('--server https://lys.example/api');
-  expect(host.querySelectorAll('[data-join="code"]')).toHaveLength(1);
-  expect(host.querySelector('button[aria-label="Copy the command"]')).not.toBeNull();
-  expect(host.querySelector('button[aria-label="Copy the code"]')).not.toBeNull();
-  expect(Object.values(sessionStorage).join('')).not.toContain('fixture-once');
+  expect(posted.some((entry) => entry.path.endsWith('/join-code'))).toBe(false);
+  expect(host.querySelector('select[aria-label="What kind of computer is My laptop?"]')).not.toBeNull();
+  const download = host.querySelector<HTMLButtonElement>('button[aria-label="Download the installer for My laptop"]');
+  expect(download?.disabled).toBe(true);
+  expect(host.querySelector('[data-join="code"]')).toBeNull();
   const done = host.querySelector<HTMLButtonElement>('button[aria-label="Done"]');
   if (!done) throw new Error('Done missing');
   await act(async () => { done.click(); });
-  expect(host.querySelector('[data-join="code"]')).toBeNull();
+  expect(host.querySelector('select[aria-label="What kind of computer is My laptop?"]')).toBeNull();
 });
 
 it('keeps the administrator default as This computer with both choices enabled', async () => {

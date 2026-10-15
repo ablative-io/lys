@@ -17,10 +17,6 @@ pub(crate) use acceptance::accept;
 
 #[path = "delivery_enter.rs"]
 mod enter;
-/// Claude Code and Codex detect paste bursts by byte arrival rate; keep Enter
-/// outside their paste window after the terminal text has been flushed.
-pub(super) const ENTER_AFTER_TEXT: std::time::Duration = std::time::Duration::from_millis(300);
-
 /// Say `outcome` in the feed, naming in the log a feed that cannot take it:
 /// the record of operations still answers it.
 pub(super) fn feed(table: &mut Table, outcome: &OperationOutcome) {
@@ -69,20 +65,11 @@ pub(super) fn stop(
 /// Type the first accepted operation of session `id` that waits for a
 /// boundary: `delivering` made durable first, `delivered` after.
 pub(crate) fn deliver(table: &mut Table, id: &str) {
-    deliver_at(table, id, now_ms());
-}
-
-pub(crate) fn deliver_at(table: &mut Table, id: &str, now: u64) {
     if table
         .sessions
         .get(id)
         .is_some_and(|session| session.managed.is_some())
     {
-        if let Err(error) = crate::harness_control::events::expire_notices(table, id, now) {
-            crate::error::said(&format!(
-                "session {id}: managed boundary fallback failed: {error}"
-            ));
-        }
         return;
     }
     let Some(queue) = table.operations.accepted.get(id) else {
@@ -109,7 +96,7 @@ pub(crate) fn deliver_at(table: &mut Table, id: &str, now: u64) {
     let Some(operation) = next else {
         return;
     };
-    let Some(mut words) = super::boundary::note_at(table, id, &operation, now) else {
+    let Some(mut words) = super::boundary::note(table, id) else {
         return;
     };
     if let Some(held) = table.operations.get(&operation)
@@ -217,7 +204,6 @@ pub(super) fn finish(table: &mut Table, operation: &str, result: Result<(), Runn
             if state == OperationState::Refused {
                 super::wake::failed(table, operation);
             }
-            super::boundary::resume(table, &outcome.session);
         }
         Err(error) => crate::error::said(&format!(
             "operation {operation}: its delivery was not recorded, and it stays uncertain: {error}"

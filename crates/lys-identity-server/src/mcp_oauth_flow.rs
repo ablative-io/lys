@@ -124,7 +124,7 @@ pub(super) async fn authorize(
         }
         Err(error) => return Err(error),
     };
-    let session_actor = session.actor.clone();
+    let session_actor = session.actor;
     let person = crate::routes::with_directory(&apps.state, |directory| {
         crate::read_api::own_person(directory.projection()?, &session_actor)
     })?;

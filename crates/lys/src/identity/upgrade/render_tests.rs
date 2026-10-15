@@ -292,6 +292,7 @@ fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_ca
     let original = std::fs::read(layout.service_config())?;
     let mut explicitly_set: serde_json::Value = serde_json::from_slice(&original)?;
     explicitly_set["trusted_proxies"] = serde_json::json!(["127.0.0.1", "::1"]);
+    explicitly_set["operator_choice"] = serde_json::json!({"limit": 17});
     private_files::write(
         &layout.service_config(),
         &serde_json::to_vec(&explicitly_set)?,
@@ -302,6 +303,7 @@ fn proxy_trust_is_never_added_by_install_or_upgrade_and_an_explicit_choice_is_ca
         if file.name == "identity.json" {
             let value: serde_json::Value = serde_json::from_slice(&file.bytes)?;
             assert_eq!(value["trusted_proxies"], explicitly_set["trusted_proxies"]);
+            assert_eq!(value["operator_choice"], explicitly_set["operator_choice"]);
             checked += 1;
         }
     }

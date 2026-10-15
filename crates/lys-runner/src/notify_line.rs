@@ -1,4 +1,4 @@
-//! Codex notify intake sends only completed turns through the bounded peer exchange.
+//! Codex notify intake sends completed turns and waits for the collector answer.
 
 use std::io::Write;
 use std::path::Path;
@@ -42,7 +42,7 @@ fn request(json: &str) -> Result<Option<PeerRequest>, RunnerError> {
 ///
 /// # Errors
 /// Names malformed JSON, an unreachable runner, a refused request or an
-/// exhausted socket wait allowance within the three-second exchange bound.
+/// a closed socket. Elapsed time is never a collector answer.
 /// Other notification types return
 /// `notify_ignored` without opening a connection.
 pub fn hand(socket: &Path, json: &str) -> Result<Answer, RunnerError> {
@@ -58,6 +58,7 @@ pub fn hand(socket: &Path, json: &str) -> Result<Answer, RunnerError> {
 /// Hand one completed turn to its runner; ignore every other notification.
 /// Every outcome exits zero with no standard output and at most one named
 /// diagnostic on standard error.
+#[must_use]
 pub fn run(
     Args {
         socket,

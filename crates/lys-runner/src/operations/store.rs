@@ -84,8 +84,6 @@ impl Operations {
             active: BTreeMap::new(),
             texts: BTreeMap::new(),
             compacting: BTreeSet::new(),
-            boundary_waiters: HashMap::new(),
-            boundary_expired: HashMap::new(),
             writer: None,
         };
         if !operations.path.exists() {

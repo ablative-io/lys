@@ -6,14 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GettingStarted, readStanding } from '../src/features/dashboard/GettingStarted';
 import type { Standing } from '../src/features/dashboard/GettingStarted';
 import { $, serve } from './harness';
-import { ADA, ARCHIVIST, COURIER, SCRIBE, SERVICE, ok } from './fixtures';
+import { ADA, ARCHIVIST, COURIER, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 
 let root: Root | null = null;
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.body.innerHTML = ''; });
-const empty: Standing = { machines: 0, cambium: null, google: false, read: true };
+const empty: Standing = { machines: 0, cambium: null, google: false, read: true, administrator: true };
 
 function service(): Record<string, Route> {
   const routes: Record<string, Route> = { ...SERVICE, '/network': ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' }) };
@@ -120,8 +120,27 @@ describe('Getting started on an empty install', () => {
     serve({ ...base, '/sign-in-providers': providers([provider(false)]) }, []);
     expect((await readStanding()).google).toBe(false);
     serve({ ...base, '/sign-in-providers': providers([]) }, []);
-    expect(await readStanding()).toEqual({ machines: 0, cambium: null, google: false, read: true });
+    expect(await readStanding()).toEqual({ ...empty });
     serve(base, []);
     expect((await readStanding()).google).toBe(false);
+  });
+
+  it('takes a member to their own installer without offering the server or Google setup', async () => {
+    localStorage.setItem('lys.getting-started.not-this-computer.' + ADA, 'yes');
+    const { posted } = await open(service(), undefined, { ...empty, administrator: false });
+    expect(titles()).toEqual(['Add your own computer', 'Connect Cambium', 'Add your first agent']);
+    expect(document.body.textContent).toContain('Another computer, then download its installer');
+    expect($('[aria-label="Getting started"] a')?.getAttribute('href')).toBe('#/network');
+    expect($('[aria-label="Run agents on this computer"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Lys is running on this computer');
+    expect(document.body.textContent).not.toContain('Let people sign in with Google');
+    expect(posted).toEqual([]);
+  });
+
+  it('never reads provider settings for a member', async () => {
+    const requests = serve({ ...service(), '/directory/people': refused(403, 'NotAdmitted', 'Only the administrator.'),
+      '/people': ok(OWN), '/apps': ok({ apps: [] }) });
+    expect(await readStanding()).toEqual({ ...empty, administrator: false });
+    expect(requests).not.toContain('/sign-in-providers');
   });
 });

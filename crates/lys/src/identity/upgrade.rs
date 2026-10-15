@@ -48,6 +48,7 @@ use super::private_files;
 
 pub mod adopt;
 mod command;
+mod companion;
 #[cfg(test)]
 use command::ClientRender;
 pub mod data_kept;
@@ -310,6 +311,9 @@ pub fn upgrade(
     parts: &mut Parts<'_>,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
+    if parts.runner.is_some() {
+        companion::check(layout, from)?;
+    }
     let mut restart = parts
         .runner
         .map(|_| runner::Restart::prepare(layout))

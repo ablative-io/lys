@@ -22,7 +22,7 @@ describe('Running build', () => {
   });
 
   // A signed-out caller's change feed is refused as the service refuses it, so nothing reads on.
-  const signedOut = { ...SERVICE, '/changes': refused(401, 'NotSignedIn', 'Sign in first'), '/directory/people': refused(401, 'NotSignedIn', 'Sign in first') };
+  const signedOut = { ...SERVICE, '/changes': refused(401, 'NotSignedIn', 'Sign in first'), '/directory/people': refused(401, 'NotSignedIn', 'Sign in first'), '/sign-in/help': ok({ administrator: null }) };
 
   it('signs in with the title, one button and one account help line, without service details or build', async () => {
     const { requests } = await mount('#/people', signedOut);

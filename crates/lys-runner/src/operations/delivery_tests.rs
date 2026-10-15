@@ -86,7 +86,7 @@ fn seatfix_text_then_enter_are_separate_writes_with_one_durable_delivery()
             vec![b"seat message".to_vec(), vec![13]]
         );
         let writes = writes.lock().map_err(|error| error.to_string())?;
-        assert!(writes.written[1].duration_since(writes.flushed[0]) >= super::ENTER_AFTER_TEXT);
+        assert!(writes.written[1] >= writes.flushed[0]);
         Ok::<_, Box<dyn Error>>(())
     })();
     sessions.stop_all()?;
@@ -199,7 +199,7 @@ fn session_ending_in_enter_gap_refuses_delivery_without_writing_enter() -> Resul
 }
 
 #[test]
-fn empty_text_submits_enter_without_publishing_a_timer_gap() -> Result<(), Box<dyn Error>> {
+fn empty_text_submits_enter_on_its_flush_event() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let sessions = Sessions::open(dir.path(), 4096)?;
     let launch = serde_json::from_value(serde_json::json!({

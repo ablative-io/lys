@@ -12,12 +12,6 @@ impl Controller {
             .current
             .as_ref()
             .filter(|pending| pending.id == dispatch.operation)
-            .or_else(|| {
-                self.early_notices
-                    .iter()
-                    .map(|written| &written.pending)
-                    .find(|pending| pending.id == dispatch.operation)
-            })
             .ok_or_else(|| {
                 RunnerError::refused(
                     "control_preparation_missing",

@@ -32,8 +32,8 @@ const picked = (value: unknown, machine: string): value is FolderChosen => typeo
   && (value as FolderChosen).machine === machine && typeof (value as FolderChosen).folder === 'string' && (value as FolderChosen).folder.startsWith('/');
 
 /** Ask `machine` for the folders inside `under`, or inside its home folder when none is named. */
-export async function foldersIn(machine: string, under?: string): Promise<FolderList> {
-  const answer = await request<unknown>('/network/machines/' + encodeURIComponent(machine) + '/folders', under ? { under } : {});
+export async function foldersIn(machine: string, under?: string, signal?: AbortSignal): Promise<FolderList> {
+  const answer = await request<unknown>('/network/machines/' + encodeURIComponent(machine) + '/folders', under ? { under } : {}, 'POST', signal);
   if (!readable(answer, machine)) throw new Refused(200, { refusal: 'FoldersUnreadable', reason: 'The computer did not answer with its folders.' });
   return answer;
 }
@@ -112,20 +112,29 @@ export function FolderChooser({ computers, preferred = '', chosen, choose, disab
       else setProblem(error instanceof Error ? error : new Error(String(error)));
     } finally { working.current = false; setBusy(false); }
   };
-  // While a path is typed, the folders inside the folder it is being typed in are read once a pause in typing comes, to offer the names that match.
+  // A new parent path starts one read; edits within it filter the returned names.
   const hinting = open && computer ? typingIn(typed) : null;
   const hintParent = hinting ? hinting.parent : null;
   useEffect(() => {
     if (!hintParent || !computer) return;
-    let live = true;
-    const timer = setTimeout(() => { foldersIn(computer, hintParent).then((found) => { if (live) setHints(found); }, () => { if (live) setHints(null); }); }, 250);
-    return () => { live = false; clearTimeout(timer); };
+    const current = new AbortController();
+    setHints(null);
+    void foldersIn(computer, hintParent, current.signal).then(
+      (found) => { if (!current.signal.aborted) setHints(found); },
+      (error: unknown) => {
+        if (!current.signal.aborted) {
+          setHints(null);
+          setProblem(error instanceof Error ? error : new Error(String(error)));
+        }
+      },
+    );
+    return () => current.abort();
   }, [hintParent, computer]);
   if (!computers.length) return <p className="folder-chooser">You choose its folder once a computer with Lys running on it is added.</p>;
   if (!open) return <p className="folder-chooser">
     <Act symbol="open" name={label ?? (chosen ? 'Choose another folder' : 'Choose a folder')} word={word} disabled={disabled} onClick={() => { setOpen(true); setTyped(chosen); setNotice(''); setTypedWrong(''); if (computer) void look(computer); }} />
   </p>;
-  const offered = hinting && hints && hints.under === hinting.parent
+  const offered = hinting && hints && hints.machine === computer && hints.under === hinting.parent
     ? hints.folders.filter((entry) => !entry.startsWith('.') && entry.toLowerCase().startsWith(hinting.start.toLowerCase())).slice(0, 50).map((entry) => inside(hints.under, entry)) : [];
   const listId = 'folder-paths-' + (computer || 'none');
   return <div className="folder-chooser" role="group" aria-label="Choose a folder">

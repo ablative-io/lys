@@ -40,7 +40,7 @@
 mod kept;
 pub use kept::kept_launch;
 
-mod ordinary;
+pub(crate) mod ordinary;
 mod runner;
 pub(crate) use runner::enforced;
 #[cfg(test)]
@@ -130,7 +130,10 @@ pub(crate) struct Launch {
 
 /// The start-command route.
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/agents/{id}/start-command", post(start_command))
+    Router::new().route(
+        "/agents/{id}/start-command",
+        post(start_command).get(ordinary::preview),
+    )
 }
 
 async fn start_command(
@@ -192,27 +195,6 @@ pub(crate) struct Chosen {
     pub(crate) directory: Option<String>,
     /// Existing conversation to resume; absent, begin a fresh one.
     pub(crate) conversation: Option<String>,
-}
-
-/// Give every admitted start the same checks, kept report and runner call.
-pub(crate) async fn start_for(
-    state: &Arc<AppState>,
-    headers: &HeaderMap,
-    actor: &Actor,
-    agent: AgentId,
-    machine: &str,
-    operation: &str,
-) -> Result<Json<Value>, ServerError> {
-    start_profile(
-        state,
-        headers,
-        actor,
-        agent,
-        machine,
-        operation,
-        Chosen::default(),
-    )
-    .await
 }
 
 /// Start through the same admission and launch path, from the exact profile

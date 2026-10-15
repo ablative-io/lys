@@ -126,9 +126,8 @@ fn prepare_reach(
     // Explanations use relationships alone; unrelated permission answers cannot invalidate this snapshot.
     let batch = engine
         .read_batch(stamp.revision(), covered, &BTreeSet::new(), at)
-        .map_err(|error| {
+        .inspect_err(|error| {
             *measured.reason.borrow_mut() = Some(error.to_string());
-            error
         })?;
     measured.batches.set(1);
     *measured.reason.borrow_mut() = None;

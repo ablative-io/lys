@@ -77,13 +77,20 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     const saved = allowed.find((machine) => machine.id === provisioning.profile?.runs_on);
     const choices = saved ? [saved] : allowed;
     const harness = provisioning.profile?.harness;
+    const previous: Record<string, { directory: string | null; problem: StartRefusal | null }> = Object.fromEntries(await Promise.all(choices.map(async (computer) => {
+      try {
+        const answer = await request<{ machine: string; directory: string | null }>(prefix + '/start-command?machine=' + encodeURIComponent(computer.id));
+        if (answer.machine !== computer.id || answer.directory !== null && (typeof answer.directory !== 'string' || !answer.directory.startsWith('/'))) throw new Error('ConversationFolderUnreadable: Lys did not name the earlier conversation’s folder on this computer.');
+        return [computer.id, { directory: answer.directory, problem: null }];
+      } catch (error) { return [computer.id, { directory: null, problem: refusalOf(error) }]; }
+    })));
     const availability: Record<string, StartRefusal | null> = harness ? Object.fromEntries(
       await Promise.all(choices.map(async (computer) => {
         try { return [computer.id, await readMachineHarness(computer.id, harness, request, computer.name)]; }
         catch (error) { return [computer.id, refusalOf(error)]; }
       })),
     ) : {};
-    return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile, availability };
+    return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile, availability, previous };
   }, 'team-start:' + agent + ':' + round);
   const [refusal, setRefusal] = useState<StartRefusal | null>(null);
   const [ended, setEnded] = useState('');
@@ -114,7 +121,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     working.current = true; setBusy(true); setRefusal(null); setEnded('');
     try {
       const review = (version: number, machine: string): Pending => ({ stage: 'review', path: prefix + '/provisioning/' + version + '/review', body: { operation: operationId() }, machine, version });
-      const start = (version: number, machine: string): Pending => ({ stage: 'start', path: prefix + '/start-command', body: { machine, operation: operationId(), ...(fresh.current ? { fresh: true } : {}) }, machine, version });
+      const start = (version: number, machine: string): Pending => ({ stage: 'start', path: prefix + '/start-command', body: { machine, operation: operationId(), directory: profile.working_folder, ...(fresh.current ? { fresh: true } : {}) }, machine, version });
       // A request this tab already sent and never saw answered is sent again, the same one, before anything new.
       const raw = sessionStorage.getItem(key);
       let current: Pending = raw === null
@@ -168,8 +175,11 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
     {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => {
       const unavailable = data?.availability[computer.id];
+      const previous = data?.previous[computer.id];
       const detail = unavailable ? unavailable.refusal + ': ' + unavailable.reason : '';
       return <div key={computer.id}>
+        {previous?.directory && previous.directory !== profile?.working_folder ? <p>This starts a new conversation in {profile?.working_folder}; the earlier one stays in {previous.directory}</p> : null}
+        {previous?.problem ? <p role="alert">Lys could not read the earlier conversation’s folder on {computer.name}: {previous.problem.reason}</p> : null}
         <Act symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void run(computer.id); }} />
         {unavailable ? <div className="why-not" role="alert">
           <p>{unavailable.refusal === 'harness_absent_on_machine' && profile?.harness

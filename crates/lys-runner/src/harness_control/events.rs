@@ -1,10 +1,7 @@
 //! One reader projects managed evidence into the existing feed and receipts.
 
-#[path = "events/notices_delivery.rs"]
-mod notices;
 mod reader;
 mod writes;
-pub(crate) use notices::expire as expire_notices;
 
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -242,7 +239,31 @@ pub(super) fn apply(
             })?;
         }
     }
-    for dispatch in update.dispatches {
+    dispatch_frames(table, id, generation, update.dispatches)?;
+    let idle = runtime(table, id, generation)?.controller.idle();
+    if let Some(session) = table.sessions.get_mut(id) {
+        session.guard.idle = idle;
+        if let (Some(settings), Some(control)) = (
+            &mut session.managed,
+            session.live.as_ref().and_then(|live| live.control.as_ref()),
+        ) {
+            if settings.conversation != control.controller.binding.conversation {
+                settings
+                    .conversation
+                    .clone_from(&control.controller.binding.conversation);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn dispatch_frames(
+    table: &mut Table,
+    id: &str,
+    generation: u64,
+    dispatches: Vec<super::Dispatch>,
+) -> Result<(), RunnerError> {
+    for dispatch in dispatches {
         if table.sessions.get(id).is_some_and(|session| session.ending) {
             if table.operations.get(&dispatch.operation).is_some() {
                 crate::operations::managed_state(
@@ -312,20 +333,6 @@ pub(super) fn apply(
                 crate::error::said(&format!("control_delivery_uncertain: {error}"));
             }
         })?;
-    }
-    let idle = runtime(table, id, generation)?.controller.idle();
-    if let Some(session) = table.sessions.get_mut(id) {
-        session.guard.idle = idle;
-        if let (Some(settings), Some(control)) = (
-            &mut session.managed,
-            session.live.as_ref().and_then(|live| live.control.as_ref()),
-        ) {
-            if settings.conversation != control.controller.binding.conversation {
-                settings
-                    .conversation
-                    .clone_from(&control.controller.binding.conversation);
-            }
-        }
     }
     Ok(())
 }

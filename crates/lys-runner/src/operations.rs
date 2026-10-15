@@ -9,9 +9,8 @@
 //! connection's challenge is never its identity.
 //!
 //! Text waits for the harness's turn boundary, or types at once between
-//! turns or in a session that reports no turns. A tracked busy session
-//! that never signals its boundary is released at the named wait budget;
-//! its receipt keeps the unsignalled wait rather than hiding that exception. Before typing, `delivering` is made durable; after, it
+//! turns or in a session that reports no turns. A busy session remains queued
+//! until its harness reports a boundary. Before typing, `delivering` is made durable; after, it
 //! is `delivered`. A runner that stops between the two cannot know whether
 //! the text reached the terminal, so the next one reports the operation
 //! `uncertain` and never types it again. A compaction is `confirmed` when
@@ -38,10 +37,6 @@ mod boundary;
 mod wake;
 pub(crate) use wake::confirm_on_turn_end;
 mod delivery;
-#[cfg(test)]
-pub(crate) fn deliver_at(table: &mut crate::session::Table, id: &str, now: u64) {
-    delivery::deliver_at(table, id, now);
-}
 pub(crate) use delivery::{accept, compacting, deliver, ended};
 use delivery::{feed, stop};
 
@@ -57,8 +52,6 @@ pub(crate) use restart::{begin_restart, finish_restart};
 
 /// The legacy record format accepted by the forward migration.
 pub const FORMAT: &str = "lys-runner-operations/v1";
-/// Maximum wait for a tracked terminal to signal a turn boundary.
-pub const BOUNDARY_WAIT: std::time::Duration = std::time::Duration::from_secs(20 * 60);
 const RETAIN_MS: u64 = 24 * 60 * 60 * 1000;
 
 mod requests;
@@ -89,8 +82,6 @@ pub(crate) struct Operations {
     active: BTreeMap<String, BTreeSet<String>>,
     texts: BTreeMap<String, String>,
     compacting: BTreeSet<String>,
-    boundary_waiters: HashMap<String, std::sync::mpsc::Sender<()>>,
-    boundary_expired: HashMap<String, u64>,
     writer: Option<crate::durable::Writer>,
 }
 
@@ -162,8 +153,6 @@ impl Operations {
                 .insert(id.clone());
         }
         if outcome.state != OperationState::Accepted {
-            self.boundary_waiters.remove(&id);
-            self.boundary_expired.remove(&id);
             if let Some(queue) = self.accepted.get_mut(&outcome.session) {
                 queue.retain(|operation| operation != &id);
                 if queue.is_empty() {
@@ -203,8 +192,6 @@ impl Operations {
             self.original_requests.remove(&id);
             self.texts.remove(&id);
             self.compacting.remove(&id);
-            self.boundary_waiters.remove(&id);
-            self.boundary_expired.remove(&id);
         }
     }
 
@@ -333,28 +320,6 @@ impl Operations {
     pub(crate) fn journal_path(&self) -> &std::path::Path {
         &self.path
     }
-
-    pub(crate) fn boundary_armed(&self, operation: &str) -> bool {
-        self.boundary_waiters.contains_key(operation)
-    }
-}
-
-pub(crate) fn managed_notice_note(
-    table: &mut crate::session::Table,
-    id: &str,
-    operation: &str,
-    now: u64,
-) -> Result<bool, RunnerError> {
-    let Some(words) = boundary::note_at(table, id, operation, now) else {
-        return Ok(false);
-    };
-    if !words.contains("boundary_unsignalled") {
-        return Ok(false);
-    }
-    table
-        .operations
-        .set(operation, OperationState::Accepted, words)?;
-    Ok(true)
 }
 
 pub(crate) fn managed_feed(table: &mut crate::session::Table, outcome: &OperationOutcome) {

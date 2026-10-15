@@ -89,13 +89,15 @@ pub(crate) async fn run(
         if let Some(native) = &live.harness_session {
             match view.get("harness").and_then(Value::as_str) {
                 Some("claude-code") => {
-                    lys_runner::harness_control::Transport::Claude.validate_resume(native)?
+                    lys_runner::harness_control::Transport::Claude.validate_resume(native)?;
                 }
                 Some("codex") => {
-                    lys_runner::harness_control::Transport::Codex.validate_resume(native)?
+                    lys_runner::harness_control::Transport::Codex.validate_resume(native)?;
                 }
                 _ => {}
             }
+            remember_native(state, &session, native)?;
+            view["native_conversation"] = serde_json::json!(native);
         }
         if live.started_fresh {
             view["conversation"] = Value::Null;
@@ -107,6 +109,69 @@ pub(crate) async fn run(
         crate::seats_run::remember_started(state, &view, admitted_by).await?;
     }
     Ok(Json(view))
+}
+
+pub(super) fn remember_native(
+    state: &AppState,
+    session: &str,
+    native: &str,
+) -> Result<(), ServerError> {
+    with_runtime(state, |store| remember_native_in(store, session, native))
+}
+
+fn remember_native_in(
+    store: &mut crate::runtime_store::RuntimeStore,
+    session: &str,
+    native: &str,
+) -> Result<(), ServerError> {
+    let tracked = store
+        .session(session)
+        .ok_or(ServerError::RuntimeSessionUnknown)?;
+    // A stopped session takes no further reports; the next admission keeps the selected id.
+    if tracked.stopped() {
+        return Ok(());
+    }
+    if tracked.reports.iter().rev().find_map(|report| {
+        report
+            .launch
+            .as_ref()
+            .and_then(|view| view.get("native_conversation"))
+            .and_then(Value::as_str)
+    }) == Some(native)
+    {
+        return Ok(());
+    }
+    let mut view = tracked
+        .first()
+        .and_then(|first| first.launch.clone())
+        .ok_or(ServerError::LaunchRecordMissing)?;
+    view["native_conversation"] = serde_json::json!(native);
+    let report = Report {
+        operation: lys_identity::OperationId::generate()?.to_string(),
+        session: session.to_owned(),
+        agent: tracked.agent.clone(),
+        machine: tracked.machine.clone(),
+        state: tracked
+            .latest()
+            .ok_or(ServerError::RuntimeSessionUnknown)?
+            .state,
+        what: tracked
+            .reports
+            .iter()
+            .rev()
+            .find(|report| {
+                report.state == Reported::Running
+                    && report.what.starts_with("the runner started process ")
+            })
+            .ok_or(ServerError::RuntimeSessionUnknown)?
+            .what
+            .clone(),
+        confirmation: "the runner identified the native conversation".to_owned(),
+        reported_by: format!("the runner of machine {}", tracked.machine),
+        at: crate::session::now(),
+        launch: Some(view),
+    };
+    store.report(report).map(drop)
 }
 
 fn fresh_terminal_conversation(

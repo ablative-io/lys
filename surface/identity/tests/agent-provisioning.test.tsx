@@ -116,9 +116,9 @@ describe('The folder an agent works in', () => {
     expect(warning?.querySelector('p')?.textContent).not.toContain(code);
     expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(warning?.querySelector('details')?.textContent).toContain(code + ': the saved folder cannot be opened');
-    // The dialog and the typed path are still offered; nothing else is asked until one is used.
+    // The saved folder is checked while its parent supplies typing suggestions.
     expect(document.querySelector('.folder-chooser[role="group"]')?.textContent).toContain('Choose on Ward desk');
-    expect(posted.map((entry) => entry.body)).toEqual([{ under: saved }]);
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: saved }, { under: '/srv' }]);
     await typeInto('[name="folder-path"]', '/home/ward');
     await submitForm('form.folder-path');
     expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward');
@@ -183,7 +183,7 @@ describe('The folder an agent works in', () => {
     await submitForm('form.folder-path');
     expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toBe('There is no folder Lys can open at /nowhere/at/all on this computer. Check the path, or choose it in the dialog.');
     expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
-    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/nowhere/at/all' }]);
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/nowhere/at' }, { under: '/nowhere/at/all' }]);
   });
   it('asks for a whole path before asking the computer anything', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
@@ -212,7 +212,10 @@ describe('The folder an agent works in', () => {
     expect(warning?.querySelector('p')?.textContent).toBe('This computer has no connected Lys runner. Connect its runner before continuing.');
     expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(warning?.querySelector('details')?.textContent).toContain('runner_absent: machine names no runner');
-    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + computer.id + '/folders']);
+    expect(posted.map((entry) => ({ path: entry.path, body: entry.body }))).toEqual([
+      { path: '/network/machines/' + computer.id + '/folders', body: { under: '/home' } },
+      { path: '/network/machines/' + computer.id + '/folders', body: { under: '/home/ward' } },
+    ]);
     expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
   });
   it('names the unreadable saved folder, and then a dialog the runner cannot start in its home', async () => {
@@ -230,7 +233,7 @@ describe('The folder an agent works in', () => {
     await click(button('Choose the folder on Ward desk'));
     expect(document.querySelector('.folder-problem [role="alert"] > p')?.textContent).toBe('The runner could not find its home folder. Ask the administrator to check the account it runs under.');
     expect(document.querySelector('.folder-problem details')?.textContent).toContain('home_unknown: the runner account has no home folder');
-    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/srv/removed' }, {}]);
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/srv/removed' }, { under: '/srv' }, {}]);
     expect(document.querySelector('.works-in code')?.textContent).toBe('/srv/removed');
   });
 });

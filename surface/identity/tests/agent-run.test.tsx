@@ -40,6 +40,19 @@ const stopped = { ...routes, '/teams': ok({ teams: [] }), '/runtime/live': ok({ 
 describe('An agent\'s run on People and agents', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
+  it.each([FOLDER, '/earlier/project'])('sends the displayed folder and explains a change from %s', async (earlier) => {
+    const { posted } = await mount('#/file/' + SCRIBE, {
+      ...stopped,
+      ['/agents/' + SCRIBE + '/start-command?machine=' + LAB]: ok({ machine: LAB, directory: earlier }),
+      ['POST /agents/' + SCRIBE + '/start-command']: started(SCRIBE),
+    });
+    const words = 'This starts a new conversation in ' + FOLDER + '; the earlier one stays in ' + earlier;
+    if (earlier === FOLDER) expect(text()).not.toContain(words);
+    else expect(text()).toContain(words);
+    await click(button('Start'));
+    expect(posted.find((entry) => entry.path === '/agents/' + SCRIBE + '/start-command')?.body).toMatchObject({ machine: LAB, directory: FOLDER });
+  });
+
   it('has no page of its own: the Dashboard lists your agents, each with Start or Stop in its own row, and the agent\'s own page says where it runs with its acts, with no terminal and no side pane on People and agents', async () => {
     await mount('#/', routes);
     expect($('section[aria-label="Agents"] .section-h')?.textContent).toBe('Agents');

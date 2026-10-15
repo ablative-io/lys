@@ -76,7 +76,7 @@ fn parsed(params: &Value) -> Result<(Call, Uri), (i32, String)> {
     if !TOOLS.iter().any(|(name, _)| *name == call.name) {
         return Err((-32602, format!("unknown tool {}", call.name)));
     }
-    validate_arguments(given, &call)?;
+    validate_arguments(&given, &call)?;
     let uri: Uri = call
         .arguments
         .path
@@ -101,7 +101,7 @@ fn parsed(params: &Value) -> Result<(Call, Uri), (i32, String)> {
     Ok((call, uri))
 }
 
-fn validate_arguments(given: GivenFields, call: &Call) -> Result<(), (i32, String)> {
+fn validate_arguments(given: &GivenFields, call: &Call) -> Result<(), (i32, String)> {
     if call.name == "what-can-I-do" {
         return if given.empty {
             Ok(())

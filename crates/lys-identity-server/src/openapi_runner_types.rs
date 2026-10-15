@@ -264,6 +264,12 @@ fn joining_and_receipts(api: &mut Api) -> Vec<Entry> {
         ),
         (
             POST,
+            "/network/machines/{id}/installer/{kind}",
+            Some(api.schema::<crate::runner_installer::Body>()),
+            None,
+        ),
+        (
+            POST,
             "/runner/join",
             Some(api.schema::<crate::network_join::RunnerJoinBody>()),
             Some(api.schema::<crate::network_join::RunnerJoined>()),

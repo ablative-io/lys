@@ -377,3 +377,6 @@ async fn an_unconfigured_runtime_refuses_restart_by_name() -> TestResult {
 
 #[path = "restart_api/exit_evidence.rs"]
 mod exit_evidence;
+
+#[path = "restart_api/conversations.rs"]
+mod conversations;

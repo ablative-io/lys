@@ -138,6 +138,7 @@ impl Render for Templates {
             .map_err(|error| rendering_failed("identity.json", &error))?;
         let previous: serde_json::Value = serde_json::from_slice(&previous)
             .map_err(|error| rendering_failed("identity.json", &error))?;
+        carry_existing_settings(&previous, &mut service);
         carry_sign_in(&previous, &mut service)?;
         let service = serde_json::to_vec_pretty(&service)
             .map_err(|error| rendering_failed("identity.json", &error))?;
@@ -204,6 +205,29 @@ impl Render for Templates {
 #[path = "render_tests.rs"]
 mod tests;
 
+fn carry_existing_settings(previous: &serde_json::Value, next: &mut serde_json::Value) {
+    let (Some(previous), Some(next)) = (previous.as_object(), next.as_object_mut()) else {
+        return;
+    };
+    for (key, value) in previous {
+        // A renamed message bridge has already been carried under its current name.
+        if key.ends_with("_messages")
+            && next.contains_key("message_service")
+            && value.as_object().is_some_and(|bridge| {
+                bridge.len() == 2 && bridge.contains_key("url") && bridge.contains_key("bindings")
+            })
+        {
+            continue;
+        }
+        match next.get_mut(key) {
+            Some(rendered) => carry_existing_settings(value, rendered),
+            None => {
+                next.insert(key.clone(), value.clone());
+            }
+        }
+    }
+}
+
 fn carry_sign_in(previous: &serde_json::Value, next: &mut serde_json::Value) -> IdentityResult<()> {
     for key in ["secure_cookie", "session_seconds"] {
         let Some(value) = previous.get(key) else {
@@ -228,6 +252,23 @@ fn carry_sign_in(previous: &serde_json::Value, next: &mut serde_json::Value) -> 
 
 #[cfg(test)]
 mod sign_in_tests {
+    #[test]
+    fn an_upgrade_keeps_existing_keys_that_its_template_does_not_name() {
+        let previous = serde_json::json!({
+            "trusted_proxies": ["127.0.0.1"],
+            "operator_choice": {"limit": 17},
+            "provider": {"rights_bytes": 8192},
+        });
+        let mut next = serde_json::json!({"provider": {"pass_seconds": 300}});
+        super::carry_existing_settings(&previous, &mut next);
+        assert_eq!(next["trusted_proxies"], previous["trusted_proxies"]);
+        assert_eq!(next["operator_choice"], previous["operator_choice"]);
+        assert_eq!(next["provider"]["rights_bytes"], 8192);
+        assert_eq!(next["provider"]["pass_seconds"], 300);
+        super::carry_existing_settings(&previous, &mut next);
+        assert_eq!(next["trusted_proxies"], previous["trusted_proxies"]);
+    }
+
     #[test]
     fn an_upgrade_keeps_secure_cookies_and_the_operators_session_duration()
     -> crate::identity::error::IdentityResult<()> {

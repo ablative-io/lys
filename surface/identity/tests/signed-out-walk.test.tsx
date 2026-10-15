@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { SERVICE, refused } from './fixtures';
+import { SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { serve } from './harness';
 
@@ -11,7 +11,7 @@ const roots: Root[] = [];
 afterEach(() => { for (const root of roots.splice(0)) act(() => root.unmount()); });
 
 async function render(hash: string, routes: Record<string, Route>) {
-  serve(routes);
+  serve({ '/sign-in/help': ok({ administrator: null }), ...routes });
   location.hash = hash;
   const container = document.createElement('div');
   document.body.appendChild(container);

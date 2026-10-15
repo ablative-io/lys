@@ -11,7 +11,7 @@ import type { SignedIn } from '../../generated';
 import '../people/recorded-form.css';
 import './sign-in.css';
 import { Act } from '../../shell/Act';
-import { AccountHelp } from '../signin/AccountHelp';
+import { AccountHelpWords, administratorWords, useAdministratorContact } from '../signin/AccountHelp';
 import { LysMark } from '../../shell/LysMark';
 
 /** Where a person lands once signed in. */
@@ -32,15 +32,21 @@ interface Offered { id: string; name: string; provider: string | null }
 
 /** What a provider sign-in that did not finish is called, in Lys words. */
 const PROVIDER_REFUSALS: Record<string, string> = {
+  SignInCancelled: 'Sign-in was cancelled or permission was not given. Try again.',
   SignInStateUnknown: 'That sign-in expired or was already used. Try again.',
   SecondFactorUnsupported: 'That account asks for a second factor, which Lys sign-in does not take yet.',
   SignInThrottled: 'Too many sign-ins failed from here. Wait a little, then try again.',
 };
 
 /** The refusal a provider sign-in came back with, named in the address. */
-function refusedInAddress(): string {
-  const name = /[?&]refused=([A-Za-z]+)/.exec(location.hash)?.[1];
+export function refusedInAddress(who = 'your administrator'): string {
+  const params = new URLSearchParams(location.hash.split('?')[1] ?? '');
+  const name = params.get('refused');
   if (!name) return '';
+  const email = params.get('email');
+  const account = 'This Google account' + (email ? ' (' + email + ')' : '');
+  if (name === 'NotAdmittedYet') return account + " hasn't been added to Lys yet. Ask " + who + ' to add it.';
+  if (name === 'AccountDisabled') return account + ' has been disabled in Lys. Ask ' + who + ' to enable it.';
   return PROVIDER_REFUSALS[name] ?? 'The sign-in did not finish. Try again.';
 }
 
@@ -81,7 +87,10 @@ export function continuation(): string | null {
 /** The sign-in form, on its own or inside a screen that needs a session. */
 export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signedIn?: () => void }) {
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(refusedInAddress);
+  const [error, setError] = useState('');
+  const help = useAdministratorContact();
+  const providerError = refusedInAddress(administratorWords(help.administrator));
+  const [providerDismissed, setProviderDismissed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
 
@@ -97,6 +106,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
     }
     setBusy(true);
     setError('');
+    setProviderDismissed(true);
     try {
       await request<SignedIn>('/sign-in', { email, password });
       const next = continuation();
@@ -122,10 +132,10 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
         <label htmlFor="sign-in-password">Password</label>
         <input id="sign-in-password" name="password" type="password" autoComplete="current-password" required disabled={busy} />
       </div>
-      {error ? <p role="alert" className="why-not">{error}</p> : null}
+      {error || (!providerDismissed && providerError) ? <p role="alert" className="why-not">{error || providerError}</p> : null}
       <Act symbol="enter" name={busy ? 'Signing in…' : 'Sign in'} word={busy ? 'Signing in…' : 'Sign in'} tone="primary" type="submit" disabled={busy} />
     </form>
     <Providers />
-    <AccountHelp />
+    <AccountHelpWords help={help} />
   </div>;
 }

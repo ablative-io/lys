@@ -31,14 +31,20 @@ fn a_fresh_install_places_the_runner_in_bin_with_its_helper_when_the_build_holds
     assert!(!helper);
     assert_eq!(std::fs::read(layout.binary("lys"))?, b"runner");
     assert!(!layout.binary("lys-containment-entry").is_file());
-    assert!(said.iter().any(|line| line.contains("lys-containment-entry is not in the build folder")));
+    assert!(
+        said.iter()
+            .any(|line| line.contains("lys-containment-entry is not in the build folder"))
+    );
     // With the helper beside it, both are placed, and a later placement replaces what was there.
     std::fs::write(build.join("lys"), b"runner-2")?;
     std::fs::write(build.join("lys-containment-entry"), b"helper")?;
     let helper = super::place_runner(&layout, &source, &mut |_| {})?;
     assert!(helper);
     assert_eq!(std::fs::read(layout.binary("lys"))?, b"runner-2");
-    assert_eq!(std::fs::read(layout.binary("lys-containment-entry"))?, b"helper");
+    assert_eq!(
+        std::fs::read(layout.binary("lys-containment-entry"))?,
+        b"helper"
+    );
     // A build folder with no lys is refused by name.
     std::fs::remove_file(build.join("lys"))?;
     assert!(super::place_runner(&layout, &source, &mut |_| {}).is_err());

@@ -348,7 +348,10 @@ describe('Codex', () => {
     await click(button(element, 'Open the folder typed'));
     await settle();
     expect(latest.additional_directories).toEqual(['/Users/ada']);
-    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + computer + '/folders']);
+    expect(posted.map((entry) => ({ path: entry.path, body: entry.body }))).toEqual([
+      { path: '/network/machines/' + computer + '/folders', body: { under: '/Users' } },
+      { path: '/network/machines/' + computer + '/folders', body: { under: '/Users/ada' } },
+    ]);
   });
 });
 

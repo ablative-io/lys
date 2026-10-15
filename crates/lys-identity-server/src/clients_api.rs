@@ -1,18 +1,18 @@
-//! Signed-in people download the same client release the install records.
+//! Public downloads of the client release the install records.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::extract::{Path as RoutePath, State};
-use axum::http::{HeaderMap, header};
+use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router, routing::get};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::error::ServerError;
-use crate::routes::{AppState, Shared, signed_in};
+use crate::routes::{AppState, Shared};
 
 /// One platform's binaries, bound to the commit and to their file digests.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, utoipa::ToSchema)]
@@ -32,7 +32,7 @@ pub struct Clients {
     pub platforms: BTreeMap<String, ClientRelease>,
 }
 
-fn refused(name: &str, words: impl Into<String>) -> ServerError {
+pub(crate) fn refused(name: &str, words: impl Into<String>) -> ServerError {
     ServerError::Runner {
         refusal: name.to_owned(),
         words: words.into(),
@@ -46,7 +46,7 @@ fn segment(text: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
 
-fn root(state: &AppState) -> Result<PathBuf, ServerError> {
+pub(crate) fn root(state: &AppState) -> Result<PathBuf, ServerError> {
     let data = state.estate_plan_file.parent().ok_or_else(|| {
         refused(
             "clients_unreadable",
@@ -66,7 +66,7 @@ fn root(state: &AppState) -> Result<PathBuf, ServerError> {
     Ok(root.to_path_buf())
 }
 
-fn read(root: &Path) -> Result<Clients, ServerError> {
+pub(crate) fn read(root: &Path) -> Result<Clients, ServerError> {
     let path = root.join("install/build.json");
     let bytes = match std::fs::read(&path) {
         Ok(bytes) => bytes,
@@ -123,36 +123,36 @@ fn read(root: &Path) -> Result<Clients, ServerError> {
     Ok(Clients { platforms })
 }
 
-/// Downloads require the same signed-in authority as the directory's reads.
+/// A runner can fetch its release before it has joined or signed in.
 pub(crate) fn routes() -> Router<Shared> {
     Router::new()
         .route("/clients", get(list))
         .route("/clients/{platform}/{name}", get(download))
 }
 
-async fn list(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Clients>, ServerError> {
-    signed_in(&state, &headers)?;
+async fn list(State(state): State<Arc<AppState>>) -> Result<Json<Clients>, ServerError> {
     Ok(Json(read(&root(&state)?)?))
 }
 
-async fn download(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    RoutePath((platform, name)): RoutePath<(String, String)>,
-) -> Result<Response, ServerError> {
-    signed_in(&state, &headers)?;
-    let root = root(&state)?;
-    let clients = read(&root)?;
-    let release = clients.platforms.get(&platform).ok_or_else(|| {
+pub(crate) struct Executable {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) digest: String,
+    pub(crate) commit: String,
+}
+
+pub(crate) fn executable(
+    root: &Path,
+    clients: &Clients,
+    platform: &str,
+    name: &str,
+) -> Result<Executable, ServerError> {
+    let release = clients.platforms.get(platform).ok_or_else(|| {
         refused(
             "client_platform_unknown",
             format!("Lys holds no client for platform {platform}"),
         )
     })?;
-    let expected = release.files.get(&name).ok_or_else(|| {
+    let expected = release.files.get(name).ok_or_else(|| {
         refused(
             "client_file_unknown",
             "this platform holds lys and lys-containment-entry only",
@@ -160,9 +160,9 @@ async fn download(
     })?;
     let path = root
         .join("clients")
-        .join(&platform)
+        .join(platform)
         .join(&release.commit)
-        .join(&name);
+        .join(name);
     let bytes = std::fs::read(&path)
         .map_err(|error| refused("clients_unreadable", format!("{}: {error}", path.display())))?;
     let digest = format!("{:x}", Sha256::digest(&bytes));
@@ -172,6 +172,20 @@ async fn download(
             "the held executable differs from the install's recorded SHA-256",
         ));
     }
+    Ok(Executable {
+        bytes,
+        digest,
+        commit: release.commit.clone(),
+    })
+}
+
+async fn download(
+    State(state): State<Arc<AppState>>,
+    RoutePath((platform, name)): RoutePath<(String, String)>,
+) -> Result<Response, ServerError> {
+    let root = root(&state)?;
+    let clients = read(&root)?;
+    let held = executable(&root, &clients, &platform, &name)?;
     Ok((
         [
             (
@@ -186,10 +200,10 @@ async fn download(
                 header::CACHE_CONTROL.as_str(),
                 "private, no-store".to_owned(),
             ),
-            ("x-lys-sha256", digest),
-            ("x-lys-commit", release.commit.clone()),
+            ("x-lys-sha256", held.digest),
+            ("x-lys-commit", held.commit),
         ],
-        bytes,
+        held.bytes,
     )
         .into_response())
 }
@@ -202,5 +216,10 @@ mod tests;
 pub(crate) fn describe_download(document: &mut serde_json::Value) {
     document["paths"]["/clients/{platform}/{name}"]["get"]["responses"]["200"]["content"] = serde_json::json!({
         "application/octet-stream": {"schema": {"type":"string", "format":"binary"}}
+    });
+    document["paths"]["/network/machines/{id}/installer/{kind}"]["post"]["responses"]["200"]["content"] = serde_json::json!({
+        "application/octet-stream": {"schema": {"type":"string", "format":"binary"}},
+        "application/vnd.debian.binary-package": {"schema": {"type":"string", "format":"binary"}},
+        "application/gzip": {"schema": {"type":"string", "format":"binary"}}
     });
 }

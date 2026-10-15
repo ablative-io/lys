@@ -28,19 +28,17 @@ async function draw(element: ReactNode, routes: Record<string, Route>) {
   return posted;
 }
 
-it('adds a self-service computer as a remote runner and gets its code without assigning the server runner', async () => {
+it('adds a self-service computer for an installer without issuing a code or assigning the server runner', async () => {
   const routes: Record<string, Route> = {};
   routes['POST /network/machines'] = (body) => {
     const named = body as NameMachine;
-    routes['POST /network/machines/' + named.operation + '/join-code'] = ok({
-      machine: named.operation, server: 'https://lys.example/api',
-      command: 'lys runner join --server https://lys.example/api --machine ' + named.operation,
-      code: 'once-only-code',
-    });
     return ok({ ...machine, ...named, id: named.operation });
   };
-  const connected: unknown[] = [];
-  const posted = await draw(<table><tfoot><AddComputerRow person={ADA} selfService changed={() => {}} name={createRef()} connect={(value) => connected.push(value)} /></tfoot></table>, routes);
+  const connected: Connecting[] = [];
+  const messages: string[] = [];
+  const posted = await draw(<table><tfoot><AddComputerRow person={ADA} selfService changed={(message) => messages.push(message)} name={createRef()} connect={(value) => connected.push(value)} /></tfoot></table>, routes);
+  expect($('button[aria-label="Add this computer"]')?.textContent).toBe('Add');
+  expect(document.body.textContent).not.toContain('one-time code');
   const field = $('input[name="name"]');
   if (!(field instanceof HTMLInputElement)) throw new Error('missing computer name');
   field.value = 'Own laptop';
@@ -48,15 +46,20 @@ it('adds a self-service computer as a remote runner and gets its code without as
   if (!form) throw new Error('missing addition');
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
   await settle();
-  expect(posted.map((entry) => entry.path)).toEqual(['/network/machines', expect.stringMatching(/\/join-code$/)]);
-  expect(connected).toHaveLength(1);
-  expect(JSON.stringify([...Array(sessionStorage.length)].map((_, index) => sessionStorage.getItem(sessionStorage.key(index) ?? '')))).not.toContain('once-only-code');
+  expect(posted.map((entry) => entry.path)).toEqual(['/network/machines']);
+  expect(connected).toEqual([{ machine: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Own laptop', given: null, failure: '', at: 'row' }]);
+  expect(messages).toEqual(['Own laptop was added. Choose its kind and download its installer below.']);
+  expect(sessionStorage.length).toBe(0);
 });
 
 it('offers an own computer connection code and names a refused code', async () => {
   const connections: Connecting[] = [];
   const posted = await draw(<MachineDetail computer={computer} admin={false} me={ADA} teams={[]} names={new Map()} changed={() => {}} connecting={null} connect={(value) => connections.push(value)} done={() => {}} />,
     { ['POST /network/machines/' + machine.id + '/join-code']: refused(403, 'not_your_computer', 'this computer belongs to someone else') });
+  expect($('button[aria-label="Download the installer for Own laptop"]')).not.toBeNull();
+  const terminal = $('details[data-connect="terminal"]');
+  expect(terminal?.hasAttribute('open')).toBe(false);
+  await click(terminal?.querySelector('summary') ?? null);
   await click($('button[aria-label="Get a new connection code"]'));
   expect(posted.at(-1)?.path).toBe('/network/machines/' + machine.id + '/join-code');
   expect(connections.at(-1)?.failure).toBe('You do not manage this computer. Ask its owner or the administrator to make the change.');
@@ -77,5 +80,6 @@ it('offers only the person’s own agents on their computer and sends an allowan
 it('shows no self-service code or allowance controls on someone else’s computer', async () => {
   await draw(<MachineDetail computer={{ ...computer, machine: { ...machine, named_by: 'person-' + 'b'.repeat(32) } }} admin={false} me={ADA} teams={[]} names={new Map()} changed={() => {}} connecting={null} connect={() => {}} done={() => {}} />, {});
   expect($('button[aria-label="Get a new connection code"]')).toBeNull();
+  expect($('button[aria-label="Download the installer for Own laptop"]')).toBeNull();
   expect($('select[aria-label="Agent to allow on this computer"]')).toBeNull();
 });

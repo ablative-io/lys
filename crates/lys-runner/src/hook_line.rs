@@ -1,10 +1,9 @@
-//! Claude hook intake uses a bounded peer exchange without holding up the harness.
+//! Claude hook intake waits on the collector answer or its socket closing.
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::fd::{AsFd, AsRawFd};
 use std::os::unix::net::UnixStream;
 use std::path::Path;
-use std::time::{Duration, Instant};
 
 use nix::errno::Errno;
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
@@ -15,9 +14,6 @@ use serde_json::Value;
 use crate::error::RunnerError;
 use crate::peer::{Collected, PeerAct, PeerRequest};
 use crate::protocol::{Answer, PROTOCOL_VERSION, read_greeting, read_reply};
-
-// Readiness can resume after its timeout; leave time to return within three seconds.
-const EXCHANGE_BUDGET: Duration = Duration::from_secs(2);
 
 /// The hook command's inputs and captured process streams.
 pub struct Args<'a> {
@@ -68,13 +64,14 @@ fn request(stdin: &str, event: Option<&str>) -> Result<PeerRequest, RunnerError>
 ///
 /// # Errors
 /// Names malformed input, an unreachable runner, a refused request or
-/// an exhausted socket wait allowance within the three-second exchange bound.
+/// a closed socket, without treating elapsed time as a collector answer.
 pub fn hand(socket: &Path, stdin: &str, event: Option<&str>) -> Result<Answer, RunnerError> {
     exchange(socket, &request(stdin, event)?)
 }
 
 /// Read and hand one hook to its runner. Every outcome exits zero; a failure
 /// is named on standard error, and standard output remains empty.
+#[must_use]
 pub fn run(
     Args {
         socket,
@@ -112,33 +109,14 @@ fn unreachable(stage: &str, error: impl std::fmt::Display) -> RunnerError {
     }
 }
 
-fn remaining(deadline: Instant, stage: &str) -> Result<Duration, RunnerError> {
-    deadline
-        .checked_duration_since(Instant::now())
-        .filter(|left| !left.is_zero())
-        .ok_or_else(|| {
-            RunnerError::refused(
-                "collector_timeout",
-                format!("{stage} exceeded the two-second connect and exchange wait allowance"),
-            )
-        })
-}
-
-fn ready(
-    stream: &UnixStream,
-    interest: PollFlags,
-    deadline: Instant,
-    stage: &str,
-) -> Result<(), RunnerError> {
+fn ready(stream: &UnixStream, interest: PollFlags, stage: &str) -> Result<(), RunnerError> {
     loop {
-        let timeout = PollTimeout::try_from(remaining(deadline, stage)?)
-            .map_err(|error| unreachable(stage, error))?;
         let mut descriptors = [PollFd::new(stream.as_fd(), interest)];
-        match poll(&mut descriptors, timeout) {
+        match poll(&mut descriptors, PollTimeout::NONE) {
             Ok(0) => {
                 return Err(RunnerError::refused(
-                    "collector_timeout",
-                    format!("{stage} exhausted the two-second connect and exchange wait allowance"),
+                    "collector_watch_ended",
+                    format!("{stage}: the socket watch ended without an event"),
                 ));
             }
             Ok(_) => return Ok(()),
@@ -148,7 +126,7 @@ fn ready(
     }
 }
 
-fn connection(path: &Path, deadline: Instant) -> Result<UnixStream, RunnerError> {
+fn connection(path: &Path) -> Result<UnixStream, RunnerError> {
     let stage = format!("connecting to {}", path.display());
     let address = UnixAddr::new(path).map_err(|error| unreachable(&stage, error))?;
     let descriptor = socket(
@@ -164,11 +142,10 @@ fn connection(path: &Path, deadline: Instant) -> Result<UnixStream, RunnerError>
     stream
         .set_nonblocking(true)
         .map_err(|error| unreachable(&stage, error))?;
-    remaining(deadline, &stage)?;
     match connect(stream.as_raw_fd(), &address) {
         Ok(()) => {}
         Err(Errno::EINPROGRESS) => {
-            ready(&stream, PollFlags::POLLOUT, deadline, &stage)?;
+            ready(&stream, PollFlags::POLLOUT, &stage)?;
             if let Some(error) = stream
                 .take_error()
                 .map_err(|error| unreachable(&stage, error))?
@@ -181,14 +158,9 @@ fn connection(path: &Path, deadline: Instant) -> Result<UnixStream, RunnerError>
     Ok(stream)
 }
 
-fn line(
-    reader: &mut BufReader<UnixStream>,
-    deadline: Instant,
-    stage: &str,
-) -> Result<String, RunnerError> {
+fn line(reader: &mut BufReader<UnixStream>, stage: &str) -> Result<String, RunnerError> {
     let mut bytes = Vec::new();
     loop {
-        remaining(deadline, stage)?;
         let (count, ended) = match reader.fill_buf() {
             Ok([]) => return Err(unreachable(stage, "runner closed before the line ended")),
             Ok(buffer) => {
@@ -199,7 +171,7 @@ fn line(
             }
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                ready(reader.get_ref(), PollFlags::POLLIN, deadline, stage)?;
+                ready(reader.get_ref(), PollFlags::POLLIN, stage)?;
                 continue;
             }
             Err(error) => return Err(unreachable(stage, error)),
@@ -213,10 +185,9 @@ fn line(
     }
 }
 
-fn send(stream: &mut UnixStream, bytes: &[u8], deadline: Instant) -> Result<(), RunnerError> {
+fn send(stream: &mut UnixStream, bytes: &[u8]) -> Result<(), RunnerError> {
     let mut pending = bytes;
     while !pending.is_empty() {
-        remaining(deadline, "writing collector request")?;
         match stream.write(pending) {
             Ok(0) => {
                 return Err(unreachable(
@@ -227,12 +198,7 @@ fn send(stream: &mut UnixStream, bytes: &[u8], deadline: Instant) -> Result<(), 
             Ok(count) => pending = &pending[count..],
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                ready(
-                    stream,
-                    PollFlags::POLLOUT,
-                    deadline,
-                    "writing collector request",
-                )?;
+                ready(stream, PollFlags::POLLOUT, "writing collector request")?;
             }
             Err(error) => return Err(unreachable("writing collector request", error)),
         }
@@ -245,9 +211,8 @@ pub(crate) fn exchange(socket: &Path, request: &PeerRequest) -> Result<Answer, R
         reason: format!("collector request could not be encoded: {error}"),
     })?;
     request.push(b'\n');
-    let deadline = Instant::now() + EXCHANGE_BUDGET;
-    let mut reader = BufReader::new(connection(socket, deadline)?);
-    read_greeting(&line(&mut reader, deadline, "reading runner greeting")?)?;
-    send(reader.get_mut(), &request, deadline)?;
-    read_reply(&line(&mut reader, deadline, "reading collector answer")?)
+    let mut reader = BufReader::new(connection(socket)?);
+    read_greeting(&line(&mut reader, "reading runner greeting")?)?;
+    send(reader.get_mut(), &request)?;
+    read_reply(&line(&mut reader, "reading collector answer")?)
 }

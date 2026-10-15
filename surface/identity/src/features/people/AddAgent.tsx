@@ -14,7 +14,7 @@ import { addAgent, newAgentRequest, readAgentRequest } from './add-agent-request
 import type { PendingAgent } from './add-agent-request';
 import { addAndRunCapability } from './registration-capability';
 import type { AddAndRunCapability } from './registration-capability';
-import { addAndRun, AddAndRunFailure, addAndRunStep, firstRunChoices, newAddAndRun, placementComputer, profileFromSettings, readAddAndRun, runnerProblemReason } from './add-and-run';
+import { addAndRun, AddAndRunFailure, addAndRunStep, CONNECT_COMPUTER, firstRunChoices, newAddAndRun, placementComputer, profileFromSettings, readAddAndRun, runnerProblemReason } from './add-and-run';
 import type { AddAndRun, FirstRunOptions } from './add-and-run';
 import { ProfileFields } from '../provisioning/ProfileEditor';
 import { validComputerName } from '../network/AddMachine';
@@ -86,9 +86,14 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     if (!computer && !walk && soleId) setComputer(soleId);
   }, [computer, walk, soleId]);
   const selectedComputer = runOptions.computers.find((entry) => entry.id === computer);
+  const administrator = people.scope === 'directory';
+  const needsComputer = !administrator && !runOptions.loading && !runOptions.computers.length;
+  const runComputerName = walk ? placementComputer(walk.placement).name : selectedComputer?.name ?? computerName.trim();
   const inUse = useMemo(() => runOptions.network?.machines.filter((machine) => machine.state === 'in_use') ?? [], [runOptions.network]);
   const computerReady = inUse.length ? Boolean(selectedComputer) : validComputerName(computerName.trim());
-  const hold = walk && runOptions.network === null
+  const hold = walk?.placement.kind === 'new' && !administrator
+    ? new Refused(0, { refusal: 'ComputerConnectionRequired', reason: CONNECT_COMPUTER })
+    : walk && runOptions.network === null
     ? new Refused(0, { refusal: 'RetainedNetworkUnconfirmed', reason: 'Lys could not confirm the computers for this saved request; it has not been sent.' })
     : walk?.placement.kind === 'new' && inUse.length > 0 && !inUse.some((machine) => machine.id === placementComputer(walk.placement).id)
       ? new Refused(0, { refusal: 'RetainedComputerAdditionHeld', reason: 'This saved request would add a second computer; it has not been sent.' })
@@ -151,8 +156,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
       const registration = pending ?? walk?.registration ?? newAgentRequest(name.trim(), person, team, newAgentGrants(options, selectedGrants));
       if (onePress) {
         if (!walk && !settings) throw new Refused(0, { refusal: 'SettingsUnavailable', reason: 'Choose the settings before adding this agent.' });
-        const initial = walk ?? newAddAndRun(registration, settings ?? {}, computerName.trim(), me.person.id, selectedComputer);
-        agent = await addAndRun(initial, me.signed_in, keepWalk);
+        const initial = walk ?? newAddAndRun(registration, settings ?? {}, computerName.trim(), me.person.id, selectedComputer, administrator);
+        agent = await addAndRun(initial, me.signed_in, keepWalk, administrator);
         releaseRecord(runKey);
       } else {
         agent = await addAgent(registration, me.person.id, keep, me.signed_in);
@@ -208,7 +213,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
       <div className={fields ? 'add-agent-two' : 'add-agent-one'}>
         <div>{registrationFields}{firstRunForm ? null : moreRegistration}
-        {onePress || runOptions.runners.length ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? <label className="field">Computer this agent runs on<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => { setNamedComputer(true); setComputerName(event.target.value); }} /><span className="hint">{hostName ? 'The name this computer gives itself; change it if you like.' : 'Type a name for this computer.'}</span></label> : null}
+        {!needsComputer && (onePress || runOptions.runners.length) ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? <label className="field">Computer this agent runs on<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => { setNamedComputer(true); setComputerName(event.target.value); }} /><span className="hint">{hostName ? 'The name this computer gives itself; change it if you like.' : 'Type a name for this computer.'}</span></label> : null}
         </div>
         {fields ? <div>{fields}</div> : null}
       </div>
@@ -223,6 +228,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     {runOptions.loading && (!runOptions.runners.some((entry) => entry.state === 'asking') || runOptions.computers.length > 0) ? <p role="status">Reading the choices for running this agent…</p> : null}
     {runOptions.problem ? <p role="alert" className="why-not">{runnerProblemReason(runOptions.problem)} <a href="#/network">Open Network</a></p> : null}
     <div aria-live="polite">{runOptions.runners.map((entry) => entry.state === 'confirmed' ? null : <p key={entry.machine.id}>{entry.machine.name}{entry.state === 'unavailable' ? ': not available: ' + entry.reason : ': asking its runner…'}</p>)}</div>
+    {needsComputer ? <p><a href="#/network">{CONNECT_COMPUTER}</a></p> : null}
     {saved.error ? saved.both
       ? <section className="why-not" role="alert" aria-label="Saved requests"><p>This browser kept two earlier requests without a confirmed answer: a registration, and a request to add and run an agent. Until both are settled, this form stays locked.</p>
         <p><Act symbol="retry" name="Check the saved registration first" word="Check the saved registration" tone="primary" onClick={() => restart(true)} /></p>
@@ -238,7 +244,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     {/* The button is never greyed without its reason beside it: the reasons not already said above are said here. */}
     {!sending && !hold && !unavailable && !saved.error && !name.trim() ? <p className="why-not" role="alert">Give this agent a name.</p>
       : !sending && !hold && !unavailable && !saved.error && onePress && !walk && !profileProblem && !computerReady ? <p className="why-not" role="alert">{inUse.length ? 'Choose the computer this agent runs on.' : 'Give this computer a name.'}</p> : null}
-    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on this computer' : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
+    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on ' + (runComputerName || 'the chosen computer') : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''}
     newComputer={walk ? walk.placement.kind === 'new' : !inUse.length} more={moreRegistration}
@@ -252,9 +258,9 @@ function ReadyForm({ me, people, teams, search, capability, grants }: { me: MeVi
   useEffect(() => {
     let live = true;
     const receive = (options: FirstRunOptions) => { if (live) setRunOptions(options); };
-    void firstRunChoices(capability, receive).then(receive);
+    void firstRunChoices(capability, me.person.id, people.scope === 'directory', receive).then(receive);
     return () => { live = false; };
-  }, [capability]);
+  }, [capability, me.person.id, people.scope]);
   return runOptions ? <Form key={round.count} me={me} people={people} teams={teams} search={search} capability={capability} runOptions={runOptions} grants={grants} later={round.later} restart={(later) => setRound((prior) => ({ count: prior.count + 1, later }))} /> : <p role="status">Reading computers and their runners…</p>;
 }
 

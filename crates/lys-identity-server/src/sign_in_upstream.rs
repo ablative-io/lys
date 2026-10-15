@@ -25,11 +25,11 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
+use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::http::{Extensions, HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use lys_identity::Actor;
@@ -44,7 +44,6 @@ use super::{
 use crate::error::ServerError;
 use crate::oidc::Oidc;
 use crate::routes::AppState;
-use crate::sign_in_providers::Provider;
 
 /// Where a person lands once a provider sign-in has finished, on Lys's origin.
 const SIGNED_IN: &str = "/#/me";
@@ -240,8 +239,9 @@ impl IssuerSignIn {
         let continuation = held.continuation.clone();
         match self.settle(oidc, code, upstream, address, held).await {
             Ok(actor) => Ok((actor, continuation)),
-            Err(error) => Err(Refused {
-                error,
+            Err(refused) => Err(Refused {
+                error: refused.error,
+                email: refused.email,
                 continuation,
             }),
         }
@@ -256,7 +256,7 @@ impl IssuerSignIn {
         upstream: &str,
         address: IpAddr,
         held: Upstream,
-    ) -> Result<Actor, ServerError> {
+    ) -> Result<Actor, ProviderRefusal> {
         let body = json!({
             "state": upstream,
             "code": code,
@@ -276,16 +276,18 @@ impl IssuerSignIn {
                 Err(callback_refusal(answer).await)
             }
             Ok(answer) => match unix_second() {
-                Ok(checked_at) => accepted(answer, None, checked_at).await,
-                Err(error) => Err(error),
+                Ok(checked_at) => accepted(answer, None, checked_at).await.map_err(Into::into),
+                Err(error) => Err(error.into()),
             },
-            Err(error) => Err(error),
+            Err(error) => Err(error.into()),
         };
         match outcome {
-            Ok((code, answered)) if answered == held.state => oidc.finish(code, &held.state).await,
+            Ok((code, answered)) if answered == held.state => {
+                oidc.finish(code, &held.state).await.map_err(Into::into)
+            }
             Ok(_) => {
                 oidc.abandon(&held.state)?;
-                Err(ServerError::SignInStateUnknown)
+                Err(ServerError::SignInStateUnknown.into())
             }
             Err(error) => {
                 oidc.abandon(&held.state)?;
@@ -295,119 +297,25 @@ impl IssuerSignIn {
     }
 }
 
-/// Only recognized refusal words enter the log; upstream bodies can carry
-/// credentials, personal details and text that would forge another log line.
-fn callback_summary(body: &[u8]) -> String {
-    let Ok(value) = serde_json::from_slice::<Value>(body) else {
-        return format!("body is not a JSON refusal ({} bytes)", body.len());
-    };
-    let error = match value.get("error").and_then(Value::as_str) {
-        Some(word)
-            if matches!(
-                word,
-                "BadRequest"
-                    | "Blocked"
-                    | "Connection"
-                    | "CSRFTokenError"
-                    | "Database"
-                    | "DatabaseIo"
-                    | "Disabled"
-                    | "Encryption"
-                    | "Forbidden"
-                    | "Internal"
-                    | "invalid_grant"
-                    | "invalid_target"
-                    | "JwtToken"
-                    | "JoseError"
-                    | "MfaRequired"
-                    | "NoSession"
-                    | "NotFound"
-                    | "PasswordExpired"
-                    | "PasswordRefresh"
-                    | "PreconditionRequired"
-                    | "Scim"
-                    | "SessionExpired"
-                    | "SessionTimeout"
-                    | "Timeout"
-                    | "Unauthorized"
-                    | "NotAccepted"
-            ) =>
-        {
-            word
-        }
-        _ => "unrecognized",
-    };
-    let message = match value.get("message").and_then(Value::as_str) {
-        Some(text)
-            if text.starts_with("User with email '")
-                && text.ends_with("' already exists but is not linked to this provider.") =>
-        {
-            "existing account is not linked to this provider"
-        }
-        Some(
-            text @ ("User not found"
-            | "Invalid value for the Upstream User ID"
-            | "Cannot find any user id in the response"
-            | "bad provider_id in link cookie"
-            | "bad user_id in link cookie"
-            | "Invalid E-Mail"
-            | "No `email` in ID token claims. This is a mandatory claim"
-            | "Callback Code not found - timeout reached?"
-            | "Neither `access_token` nor `id_token` existed"),
-        ) => text,
-        Some(text)
-            if text.starts_with("HTTP ")
-                && text.contains(" during POST ")
-                && text.contains(" for upstream auth provider '") =>
-        {
-            "upstream token endpoint refused"
-        }
-        Some(_) => "unrecognized message redacted",
-        None => "no string message",
-    };
-    format!(
-        "body error={error}; message={message} ({} bytes)",
-        body.len()
-    )
-}
-
-/// A callback refusal keeps its status even when its body cannot be read.
-async fn callback_refusal(mut answer: reqwest::Response) -> ServerError {
-    const MOST: usize = 4096;
-    let status = answer.status().as_u16();
-    let mut body = Vec::new();
-    loop {
-        match answer.chunk().await {
-            Ok(Some(chunk)) => {
-                if chunk.len() > MOST - body.len() {
-                    return failed(format!(
-                        "the provider callback answered {status}; body exceeds {MOST} bytes"
-                    ));
-                }
-                body.extend_from_slice(&chunk);
-            }
-            Ok(None) => break,
-            Err(error) => {
-                return failed(format!(
-                    "the provider callback answered {status}; body read failed: {}",
-                    super::unreached(error)
-                ));
-            }
-        }
-    }
-    failed(format!(
-        "the provider callback answered {status}; {}",
-        callback_summary(&body)
-    ))
-}
-
 /// Send the browser to Lys's sign-in screen naming the refusal, keeping
 /// `continuation`, encoded, so signing in there continues where it was going.
 fn to_sign_in(error: &ServerError, continuation: Option<&Continuation>) -> Response {
+    refused_to_sign_in(error, continuation, None)
+}
+
+fn refused_to_sign_in(
+    error: &ServerError,
+    continuation: Option<&Continuation>,
+    email: Option<&str>,
+) -> Response {
     // The browser is told only the refusal's name; the reason is written to
     // the service's log, so whoever reads it can see why.
     eprintln!("lys-identity-server provider sign-in refused: {error}");
     let mut location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
+    if let Some(email) = email {
+        location.push_str("&email=");
+        location.push_str(&crate::provider::encoded(email));
+    }
     if let Some(Continuation(target)) = continuation {
         location.push_str("&continue=");
         location.push_str(&crate::provider::encoded(target));
@@ -418,7 +326,8 @@ fn to_sign_in(error: &ServerError, continuation: Option<&Continuation>) -> Respo
 /// The sign-in provider routes under the service's own routes.
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/sign-in/providers", get(offered))
+        .route("/sign-in/providers", get(help::offered))
+        .route("/sign-in/help", get(help::contact))
         .route("/sign-in/providers/{id}", get(start))
 }
 
@@ -428,29 +337,6 @@ pub fn callback_routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route(super::PROVIDER_CALLBACK_PATH, get(callback))
         .with_state(state)
-}
-
-/// The providers a person may sign in with, one button each: their id at
-/// the issuer, their name and which offered provider each is.
-async fn offered(State(state): State<Arc<AppState>>) -> Result<Json<Value>, ServerError> {
-    let Some(api) = state.sign_in_providers.as_ref() else {
-        return Ok(Json(json!({ "providers": [] })));
-    };
-    let mut providers: Vec<Value> = api
-        .listed()
-        .await?
-        .into_iter()
-        .filter(|listed| listed.enabled)
-        .map(|listed| {
-            json!({
-                "id": listed.id,
-                "name": listed.name,
-                "provider": Provider::from_name(&listed.name),
-            })
-        })
-        .collect();
-    providers.sort_by_key(|provider| provider["name"].as_str().map(str::to_owned));
-    Ok(Json(json!({ "providers": providers })))
 }
 
 async fn begin(
@@ -551,6 +437,7 @@ async fn finish(
         Ok(cookie) => Ok((cookie, continuation)),
         Err(error) => Err(Refused {
             error,
+            email: None,
             continuation,
         }),
     }
@@ -577,158 +464,21 @@ async fn callback(
             ],
         )
             .into_response(),
-        Err(refused) => to_sign_in(&refused.error, refused.continuation.as_ref()),
+        Err(refused) => refused_to_sign_in(
+            &refused.error,
+            refused.continuation.as_ref(),
+            refused.email.as_deref(),
+        ),
     }
 }
+
+#[path = "sign_in_refusals.rs"]
+mod refusals;
+use refusals::{ProviderRefusal, callback_refusal};
+
+#[path = "sign_in_help.rs"]
+mod help;
 
 #[cfg(test)]
-mod tests {
-    use std::error::Error;
-
-    use axum::http::{StatusCode, header};
-
-    use super::{Continuation, callback_refusal, continuation_target, to_sign_in};
-    use crate::error::ServerError;
-
-    /// Where `response` sends the browser.
-    fn location(response: &axum::response::Response) -> Result<String, Box<dyn Error>> {
-        Ok(response
-            .headers()
-            .get(header::LOCATION)
-            .ok_or("the refusal names no location")?
-            .to_str()?
-            .to_owned())
-    }
-
-    #[test]
-    fn a_refused_provider_sign_in_keeps_its_continuation() -> Result<(), Box<dyn Error>> {
-        let target = "/oauth/authorize?client_id=notes&redirect_uri=https%3A%2F%2Fapp.example.test%2Fcallback&state=s1";
-        let Some(kept) = continuation_target(Some(target.to_owned()))? else {
-            return Err("an authorize request on this origin is a continuation".into());
-        };
-        let response = to_sign_in(&ServerError::SignInStateUnknown, Some(&kept));
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        let sent = location(&response)?;
-        let carried = sent
-            .strip_prefix("/#/sign-in?refused=SignInStateUnknown&continue=")
-            .ok_or_else(|| format!("the refusal keeps no continuation: {sent}"))?;
-        assert!(
-            !carried.contains(['&', '#', '?', '/']),
-            "the continuation is one encoded value: {carried}"
-        );
-        let read_back = reqwest::Url::parse(&format!("http://lys.test/?continue={carried}"))?;
-        let decoded = read_back
-            .query_pairs()
-            .find(|(name, _)| name == "continue")
-            .map(|(_, value)| value.into_owned());
-        assert_eq!(decoded.as_deref(), Some(target));
-        let without = to_sign_in(&ServerError::SignInStateUnknown, None);
-        assert_eq!(location(&without)?, "/#/sign-in?refused=SignInStateUnknown");
-        Ok(())
-    }
-
-    #[test]
-    fn an_unacceptable_continuation_is_refused_by_name_and_never_carried()
-    -> Result<(), Box<dyn Error>> {
-        let long = format!("/oauth/authorize?{}", "a".repeat(8192));
-        for target in [
-            "https://elsewhere.example/oauth/authorize?client_id=notes",
-            "//elsewhere.example/oauth/authorize?client_id=notes",
-            "/oauth/authorize",
-            "/#/me",
-            "/oauth/authorize?client_id=notes#elsewhere",
-            "/oauth/authorize?client_id=notes\\elsewhere",
-            "/oauth/authorize?client_id=no tes",
-            "/oauth/authorize?client_id=notes\r\nLocation:%20https://elsewhere.example",
-            "/oauth/authorize?client_id=n\u{f6}tes",
-            long.as_str(),
-        ] {
-            let Err(error) = continuation_target(Some(target.to_owned())) else {
-                return Err(format!("{target:?} was accepted").into());
-            };
-            assert_eq!(error.name(), "SignInFailed", "{target:?}");
-            let response = to_sign_in(&error, None);
-            let location = location(&response)?;
-            assert_eq!(location, "/#/sign-in?refused=SignInFailed", "{target:?}");
-        }
-        assert!(continuation_target(None)?.is_none());
-        let Continuation(kept) =
-            Continuation::accepted("/oauth/mcp/authorize?client_id=a".to_owned())?;
-        assert_eq!(kept, "/oauth/mcp/authorize?client_id=a");
-        Ok(())
-    }
-
-    fn answer(status: u16, body: String) -> Result<reqwest::Response, axum::http::Error> {
-        Ok(reqwest::Response::from(
-            axum::http::Response::builder()
-                .status(status)
-                .body(reqwest::Body::from(body))?,
-        ))
-    }
-
-    #[tokio::test]
-    async fn an_existing_unlinked_account_keeps_the_status_and_safe_cause()
-    -> Result<(), Box<dyn Error>> {
-        let body = serde_json::json!({
-            "error": "Forbidden",
-            "message": "User with email 'private-address' already exists but is not linked to this provider.",
-            "access_token": "private-token",
-        }).to_string();
-        let error = callback_refusal(answer(403, body)?).await;
-        assert_eq!(error.name(), "SignInFailed");
-        let words = error.to_string();
-        assert!(words.contains("403"), "{words}");
-        assert!(words.contains("Forbidden"), "{words}");
-        assert!(
-            words.contains("existing account is not linked to this provider"),
-            "{words}"
-        );
-        assert!(!words.contains("private-address"), "{words}");
-        assert!(!words.contains("private-token"), "{words}");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn unknown_messages_and_error_values_never_reach_the_log() -> Result<(), Box<dyn Error>> {
-        for body in [
-            r#"{"error":"private-token","message":"private-token\nforged log line"}"#,
-            r#"{"error":"Forbidden","message":"private-token"}"#,
-            r#"{"error":{"Forbidden":"private-token"},"message":"private-token"}"#,
-            "private-token\nforged log line",
-        ] {
-            let error = callback_refusal(answer(400, body.to_owned())?).await;
-            let words = error.to_string();
-            assert!(words.contains("400"), "{words}");
-            assert!(!words.contains("private-token"), "{words}");
-            assert!(!words.contains('\n'), "{words}");
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn each_callback_refusal_keeps_its_actual_status() -> Result<(), Box<dyn Error>> {
-        for status in [400, 401, 403, 404, 409, 422] {
-            let error = callback_refusal(answer(
-                status,
-                r#"{"error":"Forbidden","message":"User not found"}"#.to_owned(),
-            )?)
-            .await;
-            let words = error.to_string();
-            assert_eq!(error.name(), "SignInFailed");
-            assert!(words.contains(&status.to_string()), "{words}");
-            assert!(words.contains("User not found"), "{words}");
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn oversized_callback_bodies_are_named_without_logging_their_bytes()
-    -> Result<(), Box<dyn Error>> {
-        let error = callback_refusal(answer(403, "private-token".repeat(1024))?).await;
-        let words = error.to_string();
-        assert!(words.contains("403"), "{words}");
-        assert!(words.contains("body exceeds 4096 bytes"), "{words}");
-        assert!(!words.contains("private-token"), "{words}");
-        Ok(())
-    }
-}
+#[path = "sign_in_upstream_tests.rs"]
+mod tests;
