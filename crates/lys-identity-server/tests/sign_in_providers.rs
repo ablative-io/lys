@@ -82,8 +82,9 @@ async fn google_is_set_from_the_lookup_and_set_again_replaces_it() -> TestResult
     assert_eq!(held[0]["scope"], "openid email profile");
     assert_eq!(held[0]["use_pkce"], true);
     assert_eq!(held[0]["client_secret"], SECRET);
-    assert_eq!(held[0]["auto_onboarding"], true);
-    assert_eq!(held[0]["auto_link"], false);
+    // A stranger's provider login makes no account; an admitted person's is linked by email.
+    assert_eq!(held[0]["auto_onboarding"], false);
+    assert_eq!(held[0]["auto_link"], true);
 
     let again = json!({ "provider": "google", "client_id": "123-abc.apps.googleusercontent.com", "client_secret": "GOCSPX-rotated" });
     let (status, set) = service

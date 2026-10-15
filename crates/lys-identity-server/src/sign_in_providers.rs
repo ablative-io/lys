@@ -556,8 +556,11 @@ fn request_of(provider: Provider, body: &SetBody, found: Option<Lookup>, github:
         "use_pkce": found.use_pkce,
         "client_secret_basic": found.client_secret_basic,
         "client_secret_post": found.client_secret_post,
-        "auto_onboarding": true,
-        "auto_link": false,
+        // Nobody gets an account by signing in with a provider: a person is
+        // admitted first (`/people/admit` makes their account), and their
+        // provider login is then linked to that account by its email.
+        "auto_onboarding": false,
+        "auto_link": true,
         "client_id": body.client_id,
         "client_secret": body.client_secret,
         "scope": found.scope,
