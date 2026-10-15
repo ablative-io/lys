@@ -26,7 +26,8 @@ async function submit(entry: HTMLFormElement) {
   await act(async () => { entry.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 }
 async function fill(entry: HTMLFormElement) {
-  await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+  await type(entry.querySelector('input[name="given_name"]'), 'Care');
+  await type(entry.querySelector('input[name="family_name"]'), 'Helper');
   await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
   await choose(entry.querySelector('select[name="kind"]'), 'workspace');
   await choose(entry.querySelector('select[name="resource"]'), 'ward-7');
@@ -44,7 +45,7 @@ function admitted(body: unknown) {
 describe('Add a person', () => {
   it('has the name, the email and the first grant, and one Add button', async () => {
     const { entry } = await form({});
-    for (const name of ['display_name', 'email']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
+    for (const name of ['given_name', 'family_name', 'email']) expect(entry.querySelector(`input[name="${name}"]`)).not.toBeNull();
     for (const name of ['kind', 'resource']) expect(entry.querySelector(`select[name="${name}"]`)).not.toBeNull();
     expect(entry.querySelector('select[name="relation"]')).not.toBeNull();
     const add = entry.querySelector('button[type="submit"]');
@@ -67,6 +68,19 @@ describe('Add-person retry safety', () => {
     expect(second.posted).toHaveLength(0);
     await submit(second.entry);
     expect(second.posted).toEqual(first.posted);
+  });
+
+  it('retries a request saved before first and last names were asked for apart exactly as it was saved', async () => {
+    const saved = { name: 'Care helper', email: 'helper@example.test', kind: 'workspace', id: 'ward-7', relation: 'editor', operation: 'op-' + 'c'.repeat(32) };
+    sessionStorage.setItem('lys.add-person.' + ADA, JSON.stringify(saved));
+    const { entry, posted } = await form({ 'POST /people/admit': (body) => ok(admitted(body)) });
+    expect(entry.querySelector<HTMLInputElement>('input[name="display_name"]')?.value).toBe('Care helper');
+    expect(entry.querySelector('input[name="given_name"]')).toBeNull();
+    await submit(entry);
+    expect(posted).toEqual([{ path: '/people/admit', body: {
+      operation: saved.operation, display_name: 'Care helper', email: 'helper@example.test',
+      grant: { route: 'browser', resource: { kind: 'workspace', id: 'ward-7' }, relation: 'editor' },
+    } }]);
   });
 
   it('refuses an unconfirmed receipt without navigating', async () => {

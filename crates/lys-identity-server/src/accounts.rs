@@ -65,6 +65,32 @@ fn issuer_name(display_name: &str) -> Option<String> {
     taken.then(|| name.to_owned())
 }
 
+/// A person's name as a screen sent it: the name people see and, when the
+/// screen asked for them apart, their first and last names.
+#[derive(Clone, Copy)]
+pub struct AccountName<'a> {
+    /// The name people see in the directory.
+    pub display: &'a str,
+    /// The first name, when the screen asked for it.
+    pub given: Option<&'a str>,
+    /// The last name, when the screen asked for it.
+    pub family: Option<&'a str>,
+}
+
+impl AccountName<'_> {
+    /// The given and family names the issuer keeps: the first and last
+    /// names when both were sent and are not blank, else the whole name
+    /// people see as the given name and no family name. A name the issuer
+    /// would refuse is left out, as [`issuer_name`] says.
+    fn issuer(&self) -> (Option<String>, Option<String>) {
+        let filled = |name: &&str| !name.trim().is_empty();
+        match (self.given.filter(filled), self.family.filter(filled)) {
+            (Some(given), Some(family)) => (issuer_name(given), issuer_name(family)),
+            _ => (issuer_name(self.display), None),
+        }
+    }
+}
+
 fn user_id(user: &Value) -> Result<String, ServerError> {
     user.get("id")
         .and_then(Value::as_str)
@@ -119,15 +145,16 @@ pub async fn read(api: &SignInProviders, id: &str) -> Result<Value, ServerError>
 pub async fn make(
     api: &SignInProviders,
     email: &str,
-    display_name: &str,
+    name: AccountName<'_>,
 ) -> Result<(String, bool), ServerError> {
     if let Some(held) = find_by_email(api, email).await? {
         return Ok((user_id(&held)?, false));
     }
+    let (given_name, family_name) = name.issuer();
     let request = json!({
         "email": email,
-        "given_name": issuer_name(display_name),
-        "family_name": null,
+        "given_name": given_name,
+        "family_name": family_name,
         "language": "en",
         "groups": null,
         "roles": [],

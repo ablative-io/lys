@@ -99,10 +99,16 @@ describe('Lys setup page', () => {
       'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
     });
     expect(text()).toContain(POLICY.words);
-    expect($$('form[aria-label="Set up Lys"] .field input')).toHaveLength(4);
+    expect($$('form[aria-label="Set up Lys"] .field input')).toHaveLength(5);
+    expect($('label[for="setup-given-name"]')?.textContent).toBe('First name');
+    expect($('label[for="setup-family-name"]')?.textContent).toBe('Last name');
+    expect($('#setup-given-name')?.getAttribute('autocomplete')).toBe('given-name');
+    expect($('#setup-family-name')?.getAttribute('autocomplete')).toBe('family-name');
+    expect($('#setup-given-name')?.hasAttribute('required')).toBe(true);
+    expect($('#setup-family-name')?.hasAttribute('required')).toBe(true);
     expect(($('input[name="email"]') as HTMLInputElement | null)?.value).toBe('');
     expect(unstyled()).toEqual([]);
-    await fill({ display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1844' });
+    await fill({ given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1844' });
     await submit('Set up Lys');
     expect($('[role="alert"]')?.textContent).toBe('The two passwords are not the same.');
     await fill({ confirm: 'Analytical-Engine-1843' });
@@ -110,9 +116,23 @@ describe('Lys setup page', () => {
     const made = page.posted.filter((entry) => entry.path === '/setup/administrator');
     expect(made).toEqual([{ path: '/setup/administrator', body: {
       code: 'setup-code-1', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/),
-      display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
+      display_name: 'Ada Lovelace', given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
     } }]);
     expect(page.finished()).toBe(1);
+    page.unmount();
+  });
+
+  it('asks for a first and a last name before anything is sent', async () => {
+    const page = await render({
+      'POST /setup/open': ok({ purpose: 'first-run', email: null, policy: POLICY }),
+      'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
+    });
+    for (const [given, family] of [['Ada', ''], ['', 'Lovelace'], [' ', ' ']]) {
+      await fill({ given_name: given, family_name: family, email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1843' });
+      await submit('Set up Lys');
+      expect($('[role="alert"]')?.textContent).toBe('Enter your first name, your last name and your email.');
+    }
+    expect(page.posted.filter((entry) => entry.path === '/setup/administrator')).toEqual([]);
     page.unmount();
   });
 
@@ -122,7 +142,7 @@ describe('Lys setup page', () => {
       'POST /setup/administrator': ok({ person: 'person-1', receipt: {} }),
     });
     expect($('#setup-policy')?.textContent).toBe(POLICY.words);
-    await fill({ display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Engine-1843', confirm: 'Engine-1843' });
+    await fill({ given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Engine-1843', confirm: 'Engine-1843' });
     await submit('Set up Lys');
     expect($('[role="alert"]')?.textContent).toBe(POLICY.words);
     const long = 'Analytical-Engine-1843-' + 'x'.repeat(26);
@@ -177,11 +197,11 @@ describe('Lys setup page', () => {
       { path: '/setup/open', body: { code: 'Zq81mTn4Rw0pLk7H' } },
     ]);
     expect($('#setup-code')).toBeNull();
-    await fill({ display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1843' });
+    await fill({ given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843', confirm: 'Analytical-Engine-1843' });
     await submit('Set up Lys');
     expect(page.posted.filter((entry) => entry.path === '/setup/administrator')).toEqual([{ path: '/setup/administrator', body: {
       code: 'Zq81mTn4Rw0pLk7H', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/),
-      display_name: 'Ada Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
+      display_name: 'Ada Lovelace', given_name: 'Ada', family_name: 'Lovelace', email: 'ada@example.test', password: 'Analytical-Engine-1843',
     } }]);
     expect(page.finished()).toBe(1);
     page.unmount();

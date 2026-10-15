@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { api, operationId, Refused, request, useLoad } from '../../api';
 import type { GrantModel } from '../../generated/grants';
 import { sendKept } from '../../kept';
+import { fullName } from './person-name';
 import { DirectoryGate, ErrorWords } from './Words';
 import { identity } from '../access/Resources';
 import type { ResourcesView } from '../access/Resources';
@@ -12,7 +13,10 @@ import { PageHeader } from '../../shell/PageHeader';
 /** Adding a person is one act, POST /people/admit: register them, make their sign-in account at the issuer by
  * email, bind it, activate them and issue their first grant. The answer is one receipt naming each step and the log
  * leaf it was recorded at; asking again with the saved request answers the same receipt and makes nothing twice. */
-interface PendingPerson { name: string; email: string; kind: string; id: string; relation: string; operation: string }
+/** A saved request: `name` is the name people see, made from `given` and `family`; a request saved before the two
+ * were asked for apart carries `name` alone. */
+interface PendingPerson { name: string; given?: string; family?: string; email: string; kind: string; id: string; relation: string; operation: string }
+type Asking = { given: string; family: string; email: string; kind: string; id: string; relation: string };
 interface Logged { step: string; log: string; index: number }
 interface Admitted { person: string; logged: Logged[] }
 const STEPS = ['register', 'account', 'bind', 'activate', 'grant'];
@@ -31,7 +35,8 @@ function restored(key: string): PendingPerson | null {
   if (!object(value)) throw unreadable;
   const [name, email, kind, id, relation, operation] = ['name', 'email', 'kind', 'id', 'relation', 'operation'].map((each) => filled(value, each));
   if (!name || !email || !kind || !id || !relation || !operation || !/^op-[0-9a-f]{32}$/.test(operation)) throw unreadable;
-  return { name, email, kind, id, relation, operation };
+  const [given, family] = [filled(value, 'given'), filled(value, 'family')];
+  return { name, email, kind, id, relation, operation, ...(given && family ? { given, family } : {}) };
 }
 
 /** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named. */
@@ -110,23 +115,31 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
     } catch (error) { return { pending: null, error }; }
   });
   const [pending, setPending] = useState(saved.pending);
-  const [asking, setAsking] = useState<Omit<PendingPerson, 'operation'>>(saved.pending ?? { name: '', email: '', kind: '', id: '', relation: '' });
+  const [asking, setAsking] = useState<Asking>(() => {
+    const held = saved.pending;
+    if (!held) return { given: '', family: '', email: '', kind: '', id: '', relation: '' };
+    return { given: held.given ?? held.name, family: held.family ?? '', email: held.email, kind: held.kind, id: held.id, relation: held.relation };
+  });
   const [failure, setFailure] = useState<unknown>(saved.error);
   const [admitted, setAdmitted] = useState<Admitted | null>(null);
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
-  const complete = Object.values(asking).every((value) => value.trim());
+  // A saved request is sent again as it was saved, whatever the fields now hold.
+  const complete = pending !== null || Object.values(asking).every((value) => value.trim());
   const set = (field: keyof typeof asking) => (event: { target: { value: string } }) => setAsking({ ...asking, [field]: event.target.value });
   const locked = busy || pending !== null || Boolean(saved.error);
   const submit = async () => {
     if (sending.current || saved.error || !complete) return;
     sending.current = true; setBusy(true); setFailure(null);
     try {
-      const asked: PendingPerson = pending ?? { ...asking, name: asking.name.trim(), email: asking.email.trim(), operation: operationId() };
+      const given = asking.given.trim();
+      const family = asking.family.trim();
+      const asked: PendingPerson = pending ?? { ...asking, name: fullName(given, family), given, family, email: asking.email.trim(), operation: operationId() };
       const answer = await sendKept(key, asked, async () => {
         setPending(asked);
         return confirmed(await request<unknown>('/people/admit', {
-          operation: asked.operation, display_name: asked.name, email: asked.email,
+          operation: asked.operation, display_name: asked.name,
+          ...(asked.given && asked.family ? { given_name: asked.given, family_name: asked.family } : {}), email: asked.email,
           grant: { route: 'browser', resource: { kind: asked.kind, id: asked.id }, relation: asked.relation },
         }), asked.operation);
       }, false);
@@ -136,7 +149,12 @@ function PersonForm({ person, model, resources }: { person: string; model: Grant
   };
   if (admitted) return <Receipt admitted={admitted} />;
   return <form aria-label="Add a person" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-    <label className="field">Name<input name="display_name" autoFocus autoComplete="name" value={asking.name} disabled={locked} onChange={set('name')} /></label>
+    {pending && !(pending.given && pending.family)
+      ? <label className="field">Name<input name="display_name" value={pending.name} readOnly disabled /></label>
+      : <>
+        <label className="field">First name<input name="given_name" autoFocus autoComplete="given-name" required value={asking.given} disabled={locked} onChange={set('given')} /></label>
+        <label className="field">Last name<input name="family_name" autoComplete="family-name" required value={asking.family} disabled={locked} onChange={set('family')} /></label>
+      </>}
     <label className="field">Email<input name="email" type="email" autoComplete="email" value={asking.email} disabled={locked} onChange={set('email')} /></label>
     <p className="note">Their first grant: what they may use from the start. More can be given from Access later.</p>
     <label className="field">Kind of thing<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '' })}>

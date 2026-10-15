@@ -25,7 +25,8 @@ async function form(routes: Record<string, Route>) {
 }
 
 async function fill(entry: HTMLFormElement) {
-  await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
+  await type(entry.querySelector('input[name="given_name"]'), 'Care');
+  await type(entry.querySelector('input[name="family_name"]'), 'Helper');
   await type(entry.querySelector('input[name="email"]'), 'helper@example.test');
   await choose(entry.querySelector('select[name="kind"]'), 'workspace');
   await choose(entry.querySelector('select[name="resource"]'), 'ward-7');
@@ -60,7 +61,9 @@ describe('Add a person in one act', () => {
     await submit(entry);
     expect(posted.map((call) => call.path)).toEqual(['/people/admit']);
     const sent = posted[0]?.body as Record<string, unknown>;
-    expect(sent.display_name).toBe('Care helper');
+    expect(sent.display_name).toBe('Care Helper');
+    expect(sent.given_name).toBe('Care');
+    expect(sent.family_name).toBe('Helper');
     expect(sent.email).toBe('helper@example.test');
     expect(sent.grant).toEqual({ route: 'browser', resource: { kind: 'workspace', id: 'ward-7' }, relation: 'editor' });
     expect(sent.operation).toMatch(/^op-[0-9a-f]{32}$/);

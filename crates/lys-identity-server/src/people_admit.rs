@@ -41,6 +41,12 @@ pub(crate) struct AdmitBody {
     operation: String,
     /// The person's display name.
     display_name: String,
+    /// Their first name, kept at the issuer beside `family_name`.
+    #[serde(default)]
+    given_name: Option<String>,
+    /// Their last name, kept at the issuer beside `given_name`.
+    #[serde(default)]
+    family_name: Option<String>,
     /// The email their issuer account is found or made by.
     email: String,
     /// Their first root grant.
@@ -270,7 +276,12 @@ async fn steps(
     );
 
     let api = crate::sign_in_providers::api(state).map_err(at(account))?;
-    let (subject, _made) = crate::accounts::make(api, email, &asked.display_name)
+    let name = crate::accounts::AccountName {
+        display: &asked.display_name,
+        given: asked.given_name.as_deref(),
+        family: asked.family_name.as_deref(),
+    };
+    let (subject, _made) = crate::accounts::make(api, email, name)
         .await
         .map_err(at(account))?;
     receipt.done(account, None);

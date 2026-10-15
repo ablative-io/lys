@@ -229,12 +229,12 @@ async fn completing_setup_makes_one_administrator_and_signs_them_in() -> TestRes
     let table = table().await?;
     let service = &table.service;
     assert_eq!(service.get("/directory/people", None).await?.0, 401);
-    let (status, text, cookie) = post_raw(
-        service,
-        "/setup/administrator",
-        &administrator(CODE, EMAIL)?,
-    )
-    .await?;
+    // The setup page asks for first and last names apart and sends both
+    // beside the name people see.
+    let mut asked = administrator(CODE, EMAIL)?;
+    asked["given_name"] = json!("Ada");
+    asked["family_name"] = json!("Lovelace");
+    let (status, text, cookie) = post_raw(service, "/setup/administrator", &asked).await?;
     assert_eq!(status, 200, "{text}");
     let answer: Value = serde_json::from_str(&text)?;
     assert_eq!(answer["receipt"]["change_kind"], 7);
@@ -243,6 +243,8 @@ async fn completing_setup_makes_one_administrator_and_signs_them_in() -> TestRes
     let users = table.rauthy.users()?;
     assert_eq!(users.len(), 1, "exactly one account is made: {users:?}");
     assert_eq!(users[0]["email"], EMAIL);
+    assert_eq!(users[0]["given_name"], "Ada", "{users:?}");
+    assert_eq!(users[0]["family_name"], "Lovelace", "{users:?}");
     assert!(
         !serde_json::to_string(&users)?.contains(PASSWORD),
         "the password is not kept by the account"

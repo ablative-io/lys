@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Refused, operationId, request } from '../../api';
 import { sendKept } from '../../kept';
+import { fullName } from '../people/person-name';
 import { confirmReceipt } from '../people/recorded-receipt';
 import { SIGNED_IN, reasonOf } from '../sign-in/SignIn';
 import '../people/recorded-form.css';
@@ -124,14 +125,15 @@ export function FirstRunSetup({ code: linked, done = () => location.replace(SIGN
     if (password !== field('confirm')) { setError('The two passwords are not the same.'); return; }
     if (outOfLength(opened.policy, password)) { setError(opened.policy?.words ?? 'Enter a password.'); return; }
     const firstRun = opened.purpose === 'first-run';
-    const name = field('display_name').trim();
+    const given = field('given_name').trim();
+    const family = field('family_name').trim();
     const email = (opened.email ?? field('email')).trim();
-    if (firstRun && (!name || !email)) { setError('Enter your name and your email.'); return; }
+    if (firstRun && (!given || !family || !email)) { setError('Enter your first name, your last name and your email.'); return; }
     setBusy(true);
     setError('');
     try {
       if (firstRun) {
-        await request('/setup/administrator', { code, operation: operation.current, display_name: name, email, password });
+        await request('/setup/administrator', { code, operation: operation.current, display_name: fullName(given, family), given_name: given, family_name: family, email, password });
       } else {
         await request('/setup/password', { code, password });
       }
@@ -154,8 +156,12 @@ export function FirstRunSetup({ code: linked, done = () => location.replace(SIGN
     {opened ? <form className="recorded-form sign-in-form" aria-label={firstRun ? 'Set up Lys' : 'New password'} onSubmit={submit} aria-busy={busy} noValidate>
       <p className="sub">{firstRun ? 'You will be the administrator. Choose how you sign in.' : `Set a new password for ${opened.email ?? 'the administrator'}.`}</p>
       {firstRun ? <div className="field">
-        <label htmlFor="setup-full-name">Your name</label>
-        <input id="setup-full-name" name="display_name" autoComplete="name" required disabled={busy} />
+        <label htmlFor="setup-given-name">First name</label>
+        <input id="setup-given-name" name="given_name" autoComplete="given-name" required disabled={busy} />
+      </div> : null}
+      {firstRun ? <div className="field">
+        <label htmlFor="setup-family-name">Last name</label>
+        <input id="setup-family-name" name="family_name" autoComplete="family-name" required disabled={busy} />
       </div> : null}
       {firstRun ? <div className="field">
         <label htmlFor="setup-email">Email</label>
@@ -211,9 +217,12 @@ export function Setup({ completed }: { completed: () => void }) {
   async function finish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (sending.current || saved.error) return;
-    const name = String(new FormData(event.currentTarget).get('display_name') ?? '').trim();
+    const form = new FormData(event.currentTarget);
+    const given = String(form.get('given_name') ?? '').trim();
+    const family = String(form.get('family_name') ?? '').trim();
+    const name = fullName(given, family);
     setNameError('');
-    if (!pending && !name) { setNameError('Enter the name you want people to see.'); return; }
+    if (!pending && (!given || !family)) { setNameError('Enter your first name and your last name.'); return; }
     // Profile::new in lys-identity refuses control characters; never submit an invalid pending request.
     if (!pending && ([...name].some((character) => {
       const point = character.codePointAt(0);
@@ -248,18 +257,26 @@ export function Setup({ completed }: { completed: () => void }) {
     <div className="head"><div>
       <div className="eyebrow">Welcome to Lys</div>
       <h1 ref={heading} tabIndex={-1}>Finish setting up your account</h1>
-      <p className="sub">You’re signed in. Choose the name people will see in the directory.</p>
+      <p className="sub">You’re signed in. Enter your name as people will see it in the directory.</p>
     </div></div>
     <div className="directory-editor">
       <form className="recorded-form" aria-label="Finish setup" onSubmit={finish} aria-busy={busy}>
-        <div className="field">
-          <label htmlFor="setup-name">Full name</label>
-          <input id="setup-name" name="display_name" autoComplete="name" required
-            defaultValue={pending?.display_name ?? ''} readOnly={pending !== null} disabled={busy || Boolean(saved.error)}
-            aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'setup-name-help setup-name-error' : 'setup-name-help'} />
+        {pending ? <div className="field">
+          <label htmlFor="setup-name">Name</label>
+          <input id="setup-name" name="display_name" value={pending.display_name} readOnly disabled={busy || Boolean(saved.error)} />
+        </div> : <>
+          <div className="field">
+            <label htmlFor="setup-given-name">First name</label>
+            <input id="setup-given-name" name="given_name" autoComplete="given-name" required disabled={busy || Boolean(saved.error)}
+              aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'setup-name-error' : undefined} />
+          </div>
+          <div className="field">
+            <label htmlFor="setup-family-name">Last name</label>
+            <input id="setup-family-name" name="family_name" autoComplete="family-name" required disabled={busy || Boolean(saved.error)}
+              aria-invalid={Boolean(nameError)} aria-describedby={nameError ? 'setup-name-error' : undefined} />
+          </div>
           {nameError ? <p id="setup-name-error" role="alert">{nameError}</p> : null}
-          <p id="setup-name-help" className="note sec">Usually your first name and surname. If you use a single name, that’s fine too.</p>
-        </div>
+        </>}
         <p className="sec">This connects the account you just signed in with and makes you the directory administrator.</p>
         {pending && !busy ? <p role="status">Your setup request is saved. Retry checks the same request safely, without creating another account.</p> : null}
         {error ? <div role="alert" className="why-not">

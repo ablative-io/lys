@@ -336,6 +336,12 @@ pub(crate) struct NewAdministrator {
     code: String,
     operation: String,
     display_name: String,
+    /// The first name, kept at the issuer beside `family_name`.
+    #[serde(default)]
+    given_name: Option<String>,
+    /// The last name, kept at the issuer beside `given_name`.
+    #[serde(default)]
+    family_name: Option<String>,
     email: String,
     password: String,
 }
@@ -368,7 +374,16 @@ async fn make_administrator(
     accounts::check_password(policy, &body.password)?;
     let address = state.sign_in.address(&extensions, &headers)?;
     let api = crate::sign_in_providers::api(&state)?;
-    let (id, made) = accounts::make(api, email, &body.display_name).await?;
+    let (id, made) = accounts::make(
+        api,
+        email,
+        accounts::AccountName {
+            display: &body.display_name,
+            given: body.given_name.as_deref(),
+            family: body.family_name.as_deref(),
+        },
+    )
+    .await?;
     let attempt = Attempt {
         email,
         password: &body.password,

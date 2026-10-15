@@ -11,32 +11,38 @@ function recorded(body: unknown) {
   if (!body || typeof body !== 'object' || !('operation' in body)) throw new Error('Missing operation');
   return ok({ person: ADA, receipt: { ...RECEIPTS[4].receipt, operation: body.operation, identity: ADA, change_kind: 7 } });
 }
-async function submit(name?: string) {
+/** Submit the finish form, first typing `given` and `family` when given. */
+async function submit(given?: string, family?: string) {
   const form = $('form[aria-label="Finish setup"]');
-  const input = form?.querySelector<HTMLInputElement>('input[name="display_name"]');
-  if (!form || !input) throw new Error('Setup form missing');
-  if (name !== undefined) input.value = name;
+  if (!form) throw new Error('Setup form missing');
+  for (const [field, value] of [['given_name', given], ['family_name', family]] as const) {
+    if (value === undefined) continue;
+    const input = form.querySelector<HTMLInputElement>(`input[name="${field}"]`);
+    if (!input) throw new Error(`no ${field} field`);
+    input.value = value;
+  }
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
   await settle();
 }
 
 describe('First administrator setup', () => {
-  it('asks only for a full name, explains single names, and writes nothing until submitted', async () => {
+  it('asks only for a first and a last name, and writes nothing until submitted', async () => {
     let ready = false;
     const { posted } = await mount('#/access', { ...SERVICE,
       '/me': () => ready ? ok(ME) : needsSetup,
       'POST /setup': (body) => { ready = true; return recorded(body); },
     });
     expect(posted).toHaveLength(0);
-    expect(text()).toContain('Full name');
-    expect(text()).toContain('first name and surname');
-    expect(text()).toContain('single name');
-    expect($('label[for="setup-name"]')).not.toBeNull();
-    expect($('#setup-name')?.getAttribute('aria-describedby')).toBe('setup-name-help');
-    expect(document.querySelectorAll('form[aria-label="Finish setup"] input')).toHaveLength(1);
+    expect($('label[for="setup-given-name"]')?.textContent).toBe('First name');
+    expect($('label[for="setup-family-name"]')?.textContent).toBe('Last name');
+    expect($('#setup-given-name')?.getAttribute('autocomplete')).toBe('given-name');
+    expect($('#setup-family-name')?.getAttribute('autocomplete')).toBe('family-name');
+    expect($('#setup-given-name')?.hasAttribute('required')).toBe(true);
+    expect($('#setup-family-name')?.hasAttribute('required')).toBe(true);
+    expect(document.querySelectorAll('form[aria-label="Finish setup"] input')).toHaveLength(2);
     expect(unreachable()).toEqual([]);
-    await submit('Tom');
-    expect(posted.filter((entry) => entry.path === '/setup')).toEqual([{ path: '/setup', body: { display_name: 'Tom', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
+    await submit(' Tom ', ' Whiting ');
+    expect(posted.filter((entry) => entry.path === '/setup')).toEqual([{ path: '/setup', body: { display_name: 'Tom Whiting', operation: expect.stringMatching(/^op-[0-9a-f]{32}$/) } }]);
     expect(text()).not.toContain('Finish setting up your account');
     expect(sessionStorage.getItem('lys.pending.first-setup')).toBeNull();
   });
@@ -45,7 +51,7 @@ describe('First administrator setup', () => {
     const first = await mount('#/people', { ...SERVICE, '/me': needsSetup,
       'POST /setup': refused(503, 'StorageUncertain', 'The write outcome is not known.'),
     });
-    await submit('Tom Bearup');
+    await submit('Tom', 'Bearup');
     expect(text()).toContain('Retry setup');
     expect($('#setup-name')?.getAttribute('readonly')).not.toBeNull();
     const retained = first.posted[0];
@@ -67,7 +73,7 @@ describe('First administrator setup', () => {
       const answer = recorded(body);
       return ok({ ...answer.body as object, person: 'someone-else' });
     } });
-    await submit('Tom');
+    await submit('Tom', 'Whiting');
     expect(text()).toContain('Setup could not be confirmed');
     expect(text()).toContain('Retry setup');
     expect(sessionStorage.getItem('lys.pending.first-setup')).toContain('Tom');
@@ -88,25 +94,39 @@ describe('First administrator setup', () => {
 
   it('lets someone correct an invalid name before creating an operation', async () => {
     const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
-    await submit('Ada\u0007');
+    await submit('Ada\u0007', 'Lovelace');
     expect(posted).toHaveLength(0);
     expect(sessionStorage.getItem('lys.pending.first-setup')).toBeNull();
-    expect($('#setup-name')?.hasAttribute('readonly')).toBe(false);
+    expect($('#setup-name')).toBeNull();
+    expect($('#setup-given-name')?.hasAttribute('readonly')).toBe(false);
     expect(text()).toContain('without control characters');
   });
 
   it('sends a long name whole: no length is refused here', async () => {
     const long = 'A'.repeat(10_000);
     const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
-    await submit(long);
+    await submit(long, 'B');
     expect(posted).toHaveLength(1);
-    expect(posted[0]).toMatchObject({ path: '/setup', body: { display_name: long } });
+    expect(posted[0]).toMatchObject({ path: '/setup', body: { display_name: long + ' B' } });
+  });
+
+  it('asks for both names before creating an operation', async () => {
+    for (const [given, family] of [['Tom', ''], ['', 'Whiting'], ['  ', '  ']]) {
+      const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
+      await submit(given, family);
+      expect(posted).toHaveLength(0);
+      expect(sessionStorage.getItem('lys.pending.first-setup')).toBeNull();
+      expect($('#setup-name-error')?.textContent).toBe('Enter your first name and your last name.');
+      expect($('#setup-given-name')?.getAttribute('aria-invalid')).toBe('true');
+      unmountAll();
+      document.body.innerHTML = '';
+    }
   });
 
   it('refuses a broken saved operation without silently replacing it', async () => {
     sessionStorage.setItem('lys.pending.first-setup', '{broken');
     const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
-    await submit('Tom');
+    await submit('Tom', 'Whiting');
     expect(posted).toHaveLength(0);
     expect($('form button')?.hasAttribute('disabled')).toBe(true);
     expect(sessionStorage.getItem('lys.pending.first-setup')).toBe('{broken');

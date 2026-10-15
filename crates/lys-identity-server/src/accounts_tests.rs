@@ -4,7 +4,7 @@
 
 use std::error::Error;
 
-use super::{PasswordPolicy, check_email, check_password, issuer_name};
+use super::{AccountName, PasswordPolicy, check_email, check_password, issuer_name};
 use crate::sign_in_providers::unnamed;
 
 /// A policy no default holds: 11 to 40 characters, two digits, a character
@@ -125,6 +125,45 @@ fn the_issuer_keeps_a_name_only_of_the_characters_it_takes() {
     assert_eq!(issuer_name("Ada (admin)"), None);
     assert_eq!(issuer_name(&"a".repeat(33)), None);
     assert_eq!(issuer_name("   "), None);
+}
+
+#[test]
+fn first_and_last_names_sent_apart_are_kept_apart_at_the_issuer() {
+    let split = AccountName {
+        display: "Ada Lovelace",
+        given: Some(" Ada "),
+        family: Some("Lovelace"),
+    };
+    assert_eq!(
+        split.issuer(),
+        (Some("Ada".to_owned()), Some("Lovelace".to_owned()))
+    );
+    let whole = AccountName {
+        display: "Ada Lovelace",
+        given: None,
+        family: None,
+    };
+    assert_eq!(whole.issuer(), (Some("Ada Lovelace".to_owned()), None));
+    // One part blank or missing keeps the whole name, never half of it.
+    for (given, family) in [
+        (Some("Ada"), None),
+        (Some("Ada"), Some("  ")),
+        (None, Some("Lovelace")),
+    ] {
+        let partial = AccountName {
+            display: "Ada Lovelace",
+            given,
+            family,
+        };
+        assert_eq!(partial.issuer(), (Some("Ada Lovelace".to_owned()), None));
+    }
+    // A part the issuer would refuse is left out, as a whole name is.
+    let refused = AccountName {
+        display: "Ada (admin) Lovelace",
+        given: Some("Ada (admin)"),
+        family: Some("Lovelace"),
+    };
+    assert_eq!(refused.issuer(), (None, Some("Lovelace".to_owned())));
 }
 
 #[test]
