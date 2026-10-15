@@ -34,11 +34,11 @@ use crate::session::now;
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AppSignInBody {
-    operation: String,
+    pub(crate) operation: String,
     /// The addresses the sign-in client may send a person back to, exactly.
-    redirects: Vec<String>,
+    pub(crate) redirects: Vec<String>,
     /// Whether the app is given the person's name (the profile scope).
-    profile: bool,
+    pub(crate) profile: bool,
 }
 
 /// The return addresses `redirects` as they are kept for `app`: each judged by

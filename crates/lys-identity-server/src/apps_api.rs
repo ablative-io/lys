@@ -227,7 +227,11 @@ pub fn routes() -> Router<Arc<AppState>> {
         .merge(crate::apps_client_credentials::routes())
         .route("/apps/{app}/decline", post(decline))
         .route("/apps/{app}/retire", post(retire))
+        .merge(connect::routes())
 }
+
+#[path = "apps_connect.rs"]
+pub(crate) mod connect;
 
 /// The apps kept beside the grant log `config` names, with the app `lys`
 /// recorded from the model file when the log does not hold it yet, saying

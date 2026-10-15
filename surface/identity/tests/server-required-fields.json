@@ -12,6 +12,7 @@
   "POST /agents/{id}/start-command": ["machine", "operation"],
   "POST /agents/{id}/stop": ["operation", "reason"],
   "POST /apps": ["id", "name", "operation", "redirects", "schema"],
+  "POST /apps/connect": ["manifest", "operation", "return", "state"],
   "POST /apps/registrars": ["operation", "service_account"],
   "POST /apps/{app}/approve": ["operation", "profile", "redirects"],
   "POST /apps/{app}/bearer/issue": ["operation"],

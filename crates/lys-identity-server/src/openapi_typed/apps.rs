@@ -6,9 +6,47 @@ use super::{
     GET, POST, PUT, REGISTER, RETIRE, RegisterBody, RegistrarBody, RegistrarIssued, S, SchemaCheck,
     SchemaVersionView, VERSION, route,
 };
+use crate::openapi_table::P;
 
 pub(super) fn credentials(api: &mut Api, app: &str) -> Vec<lys_openapi::Route> {
     vec![
+        route(
+            (
+                POST,
+                "/apps/connect",
+                "Connect an app from its manifest: register, approve and issue in one act, answering where the browser goes with a one-time code",
+            ),
+            S,
+            Some(api.schema::<crate::apps_api::connect::ConnectBody>()),
+            Some(api.schema::<crate::apps_api::connect::Connected>()),
+            &[
+                ADMIN_BODY,
+                CREDENTIAL,
+                &[
+                    "NoPerson",
+                    "SecretsUnavailable",
+                    "redirect_invalid",
+                    "app_decided",
+                    "app_retired",
+                ],
+            ],
+        ),
+        route(
+            (
+                POST,
+                "/apps/connect/exchange",
+                "Exchange a one-time connect code for the app's credentials, once",
+            ),
+            P,
+            Some(api.schema::<crate::apps_api::connect::ExchangeBody>()),
+            Some(api.schema::<crate::apps_api::connect::Exchanged>()),
+            &[&[
+                "RequestMalformed",
+                "connect_code_unknown",
+                "connect_code_used",
+                "connect_code_expired",
+            ]],
+        ),
         route(
             (
                 POST,

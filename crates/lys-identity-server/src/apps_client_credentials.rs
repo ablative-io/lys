@@ -59,16 +59,16 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ClientCredentialIssueBody {
-    operation: String,
+    pub(crate) operation: String,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ClientCredentialRevokeBody {
-    operation: String,
+    pub(crate) operation: String,
     /// Why, in the administrator's words; may be empty.
     #[serde(default)]
-    reason: String,
+    pub(crate) reason: String,
 }
 
 /// What the broker answers an issue with.

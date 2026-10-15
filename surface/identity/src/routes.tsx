@@ -16,6 +16,7 @@ import { Model } from './features/access/Model';
 import { Graph } from './features/access/Graph';
 import { Resources } from './features/access/Resources';
 import { Apps } from './features/apps/Apps';
+import { ConnectApp } from './features/apps/ConnectApp';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
 import { NotFound } from './shell/NotFound';
 import { AccessRoute, FileRoute, OneStart, PeopleRoute, SettingsRoute } from './shell/RouteChecks';
@@ -32,6 +33,7 @@ export function AppRoutes() {
       <Route path="/connections" element={<Connections />} />
       <Route path="/model" element={<Model />} />
       <Route path="/apps" element={<Apps />} />
+      <Route path="/apps/connect" element={<ConnectApp />} />
       <Route path="/graph/:id?" element={<Graph />} />
       <Route path="/resources" element={<Resources />} />
       <Route path="/secrets/:section?" element={<SecretsPage />} />

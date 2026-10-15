@@ -29,6 +29,7 @@ import { ClientCredentials, CustodyConfirmed, credentialRecord } from './ClientC
 import type { CredentialRecord, StoredCredentials } from './ClientCredentials';
 import { Act } from '../../shell/Act';
 import { roleChanges } from './roleChanges';
+import { KnownApps } from './ConnectApp';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
@@ -107,34 +108,33 @@ export function Apps() {
   const [revision, setRevision] = useState(0);
   const [approved, setApproved] = useState<Record<string, AppRecord>>({});
   const [notice, setNotice] = useState('');
-  const [registering, setRegistering] = useState(false);
   // What approval's custody answered, shown until the page is left.
   const [stored, setStored] = useState<Record<string, StoredCredentials>>({});
   const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
-  const changed = (message: string) => { setApproved({}); setNotice(message); setRegistering(false); setRevision((value) => value + 1); };
+  const changed = (message: string) => { setApproved({}); setNotice(message); setRevision((value) => value + 1); };
   const [picked, setPicked] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   return <div className="page fill apps">
-    <div className="head"><div><h1>Configuration</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. An app registers itself through the API; nothing it registers takes effect until you approve it here.</p></div>
-      <Act symbol={registering ? 'close' : 'add'} name={registering ? 'Close the new app' : 'Register an app'} word={registering ? 'Close' : 'Register'} tone="primary" onClick={() => setRegistering(!registering)} /></div>
+    <div className="head"><div><h1>Configuration</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. Connect a known app below; nothing an app registers takes effect until you approve it here.</p></div></div>
     <ConfigTabs on="apps" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
       const apps = answer.apps.map((app) => approved[app.id] ?? app);
       const open = apps.find((app) => app.id === picked) ?? apps.find((app) => app.state === 'pending') ?? apps[0] ?? null;
       const edited = apps.find((app) => app.id === editing);
-      if (registering) return <div className="pane"><Register changed={changed} /></div>;
       if (edited) return <div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
         <div className="row"><h3>Permission template of {edited.name}</h3><Act symbol="close" name="Close the template" word="Close" onClick={() => setEditing(null)} /></div>
         <SchemaBuilder app={edited.id} version={edited.version} initial={edited.schema as SchemaJson} onSaved={(message) => { setEditing(null); changed(message); }} />
       </section></div>;
       // The app is chosen above; its card and its matrix take the whole width below and scroll inside their own pane.
       return <>
+        <KnownApps apps={apps} />
         {apps.length ? <nav className="app-picker" aria-label="Apps">
           {apps.map((app) => <button type="button" key={app.id} className={'app-choice' + (app.id === open?.id ? ' on' : '')} aria-pressed={app.id === open?.id} onClick={() => setPicked(app.id)}>
 {app.name}</button>)}
         </nav> : null}
         <div className="pane app-pane">
+          <details className="card" aria-label="Add your own app (for developers)"><summary>Add your own app (for developers)</summary><Register changed={changed} /></details>
           {open ? <AppCard edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : <p className="dim">No app is registered.</p>}
         </div>
       </>;
@@ -216,16 +216,19 @@ function SignInSettings({ app, busy, act, changed }: { app: AppRecord; busy: boo
 function Register({ changed }: { changed: (message: string) => void }) {
   const [id, setId] = useState('');
   const [name, setName] = useState('');
-  const [redirects, setRedirects] = useState('');
+  const [redirects, setRedirects] = useState<string[]>(['']);
   const ready = /^[a-z][a-z0-9_]{2,39}$/.test(id) && id !== LYS && name.trim() !== '';
   const register = async (schema: SchemaJson) => {
-    await send('POST', '/apps', { operation: operationId(), id, name: name.trim(), redirects: lines(redirects), schema });
+    await send('POST', '/apps', { operation: operationId(), id, name: name.trim(), redirects: redirects.map((address) => address.trim()).filter(Boolean), schema });
   };
   return <section className="card" aria-label="Register an app">
     <h3>Register an app</h3>
     <label className="field">App id, its kinds' prefix<input value={id} onChange={(event) => setId(event.target.value.trim())} placeholder="lowercase letters, digits and underscores" /></label>
     <label className="field">Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-    <label className="field">Return addresses it asks for, one to a line<textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} /></label>
+    <fieldset className="field"><legend>Return addresses it asks for</legend>
+      {redirects.map((address, at) => <input key={at} value={address} aria-label={'Return address ' + (at + 1)} placeholder="https://app.example.com/callback" onChange={(event) => setRedirects(redirects.map((held, index) => (index === at ? event.target.value : held)))} />)}
+      <Act symbol="add" name="Add another address" word="Add another address" onClick={() => setRedirects([...redirects, ''])} />
+    </fieldset>
     {ready ? <SchemaBuilder key={id} app={id} version={null} register={register} onSaved={changed} /> : <p className="note">Name the app and give it an id to build its permission template.</p>}
   </section>;
 }
