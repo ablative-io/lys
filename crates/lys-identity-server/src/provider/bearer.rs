@@ -193,3 +193,68 @@ pub(crate) fn personal_actor(
         .map(|entry| Some(entry.actor))
         .ok_or(ServerError::Provider(ProviderError::TokenUnknown))
 }
+
+/// An approved app's person pass retains only its issuing session's actor.
+pub(crate) fn app_person_actor(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<lys_identity::Actor>, ServerError> {
+    let Some(value) = headers.get(header::AUTHORIZATION) else {
+        return Ok(None);
+    };
+    let value = value.to_str().map_err(|_| ProviderError::TokenUnknown)?;
+    let Some(bearer) = value.strip_prefix("Bearer ") else {
+        return Ok(None);
+    };
+    if ["lys-app.", "lys-registrar.", "lys-cli."]
+        .iter()
+        .any(|scheme| bearer.starts_with(scheme))
+    {
+        return Ok(None);
+    }
+    if headers.get_all(header::AUTHORIZATION).iter().count() != 1 {
+        return Err(ProviderError::PassRefused {
+            refusal: "mixed_credentials".to_owned(),
+        }
+        .into());
+    }
+    let person = product_person(state, headers)?;
+    let pass = presented_pass(headers).ok_or(ProviderError::TokenUnknown)?;
+    let provider = provider(state)?;
+    let (session, app) = {
+        let tokens = held(&provider.tokens)?;
+        let kept = tokens.get(&hex(&Sha256::digest(pass.as_bytes())), now())?;
+        (kept.session_id.clone(), kept.app.clone())
+    };
+    let actor = state
+        .sessions
+        .live(|_| true)?
+        .into_iter()
+        .find(|entry| entry.id == session)
+        .map(|entry| entry.actor)
+        .ok_or(ProviderError::TokenUnknown)?;
+    crate::apps_api::with_apps(state, |apps, directory| {
+        let approved = apps
+            .app(&app)
+            .ok_or(crate::apps_error::AppError::CredentialRefused {
+                reason: "no approved app holds that audience",
+            })?;
+        match approved.standing() {
+            crate::apps_state::Standing::Approved => {}
+            crate::apps_state::Standing::Pending | crate::apps_state::Standing::Declined => {
+                return Err(
+                    crate::apps_error::AppError::AppNotApproved { app: app.clone() }.into(),
+                );
+            }
+            crate::apps_state::Standing::Retired => {
+                return Err(crate::apps_error::AppError::AppRetired { app: app.clone() }.into());
+            }
+        }
+        if crate::caller_admission::active_caller(directory, &actor)? != IdentityId::Person(person)
+        {
+            return Err(ProviderError::TokenUnknown.into());
+        }
+        Ok(())
+    })?;
+    Ok(Some(actor))
+}

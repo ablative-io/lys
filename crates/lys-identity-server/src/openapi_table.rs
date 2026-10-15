@@ -7,9 +7,9 @@ use lys_openapi::{Auth, Method};
 use lys_runner::console_stop::PATH as CONSOLE_PATH;
 
 use crate::openapi_refusals::{
-    ADMIN, ADMIN_BODY, AGENT, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE, GRANT_READ,
-    MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, REPORTING, RESTART, SIGNED, SIGNED_BODY,
-    START_BUDGET, START_RUNNER, UNANSWERED,
+    ADMIN, ADMIN_BODY, AGENT, APP_PERSON, BUDGET_READ, BUDGET_SET, GRANT_ASKED, GRANT_MADE,
+    GRANT_READ, MACHINE_AGENTS, PERSON, PROFILE_REVIEW, RECORDED, REPORTING, RESTART, SIGNED,
+    SIGNED_BODY, START_BUDGET, START_RUNNER, UNANSWERED,
 };
 
 pub(crate) const GET: Method = Method::Get;
@@ -148,7 +148,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/callback" "Finish a sign-in and begin a session" P [&["SignInStateUnknown", "SignInFailed", "SignInRefused", "NotAdmittedYet", "AccountDisabled", "SignInCancelled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
     POST "/setup" "Finish the administrator's first-run setup" S [SIGNED_BODY, &["AlreadyBootstrapped", "NotAdmitted", "OperationReused", "ProfileInvalid"]];
     POST "/people" "Register a person" S [ADMIN_BODY, &["OperationReused"]] scope("person", "person.create", []);
-    POST "/agents" "Register an own agent, or administer registration" A [SIGNED_BODY, REPORTING, &["NotAdmitted", "credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
+    POST "/agents" "Register an own agent with a person's app pass or sign-in; administration requires sign-in" A [APP_PERSON, SIGNED_BODY, REPORTING, &["NotAdmitted", "credential_refused", "ServiceAccountUnknown", "NotHeld", "PolicyUnavailable"]] scope("agent", "agent.create", []);
     POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused"]];
     GET "/drafts" "The drafts the signed-in person may decide" C [SIGNED, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/dashboard" "The caller's own agents, how each is going, and what waits on the caller" C [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
@@ -159,7 +159,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/identities" "Every identity the directory holds" S [ADMIN] scope("identity", "read", []);
     GET "/identities/{id}" "One identity" S [ADMIN, &["IdentifierMalformed"]] scope("identity", "read", ["id"]);
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
-    POST "/identities/{id}/transitions" "Move an identity's state" S [ADMIN_BODY, &["TransitionRefused"]] scope("identity", "identity.transition", ["id"]);
+    POST "/identities/{id}/transitions" "Move an identity's state; a person's app pass only activates an own registered agent" S [APP_PERSON, ADMIN_BODY, &["TransitionRefused"]] scope("identity", "identity.transition", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
     POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, and a first root grant only when one is asked for" S [ADMIN_BODY, &["RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
@@ -372,7 +372,7 @@ pub(crate) const TABLE: &[E] = entries! {
     PUT "/configuration" "Set the organisation zone at its current version" S [ADMIN_BODY, &["ConfigurationMalformed", "ConfigurationVersionConflict", "ConfigurationZoneRefused", "ConfigurationUnavailable", "NoPerson"]] scope("configuration", "configuration.zone.set", []);
     GET "/agents/{id}/memory" "An agent's memory" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/agents/{id}/certificates" "An agent's certificates" S [SIGNED, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
-    POST "/agents/{id}/certificates" "Issue a certificate for an own agent, or administer issuance" S [SIGNED_BODY, &["NotAdmitted", "AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
+    POST "/agents/{id}/certificates" "Issue an own agent's certificate with a person's app pass or sign-in; administration requires sign-in" S [APP_PERSON, SIGNED_BODY, &["NotAdmitted", "AgentNotVisible", "CertificateReused"], &["CertificateReused"]] scope("agent", "agent.certificate.issue", ["id"]);
     POST "/agents/{id}/certificates/{serial}/withdrawal" "Withdraw one" S [ADMIN_BODY, &["CertificateUnknown", "CertificateWithdrawn", "CertificatesUnavailable"], &["CertificateWithdrawn"]] scope("agent", "agent.certificate.withdraw", ["id"]);
     POST "/agents/{id}/start" "Start an agent" S [SIGNED_BODY, START_BUDGET, &["AgentHasNoPolicy", "PolicyUnavailable", "everything_stopped", "LaunchUnrenderable", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("agent", "agent.start", ["id"]);
     POST "/launch-records/{id}/start-again" "Start a launch again" S [SIGNED_BODY, &["AgentHasNoPolicy", "PolicyUnavailable", "AgentNotActive", "AgentNotVisible", "CertificatesUnavailable", "everything_stopped", "account_handle_unheld", "account_provider_mismatch", "SecretsUnavailable"]] scope("launch-record", "launch-record.start-again", ["id"]);

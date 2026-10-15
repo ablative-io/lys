@@ -191,8 +191,24 @@ pub(crate) async fn issue(
     Path(id): Path<String>,
     body: Result<Json<IssueBody>, JsonRejection>,
 ) -> Result<Json<CertificatesView>, ServerError> {
-    crate::routes::responsible_or_administrator(&state, &headers, &id)?;
-    let seen = seen_agent(&state, &headers, &id)?;
+    let seen = if let Some(actor) = crate::provider::app_person_actor(&state, &headers)? {
+        with_directory(&state, |directory| {
+            let projection = directory.projection()?;
+            let person = crate::read_api::own_person(projection, &actor)?;
+            let agent = id.parse().map_err(|_| ServerError::AgentNotVisible)?;
+            let record = projection
+                .record(IdentityId::Agent(agent))
+                .filter(|record| record.responsible() == Some(person))
+                .ok_or(ServerError::AgentNotVisible)?;
+            Ok(SeenAgent {
+                agent,
+                responsible: record.responsible(),
+            })
+        })?
+    } else {
+        crate::routes::responsible_or_administrator(&state, &headers, &id)?;
+        seen_agent(&state, &headers, &id)?
+    };
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let serial = OperationId::from_str(&body.operation)?.to_string();
     let request = STANDARD

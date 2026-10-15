@@ -75,12 +75,18 @@ pub(crate) async fn register_agent(
     headers: HeaderMap,
     Json(body): Json<AgentRegistration>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
-    if !headers.contains_key(axum::http::header::AUTHORIZATION)
+    let app_actor = crate::provider::app_person_actor(&state, &headers)?;
+    if app_actor.is_some()
+        || !headers.contains_key(axum::http::header::AUTHORIZATION)
         || crate::mcp_oauth::native_actor(&state, &headers)?.is_some()
         || crate::provider::personal_actor(&state, &headers)?.is_some()
     {
-        let actor = signed_in(&state, &headers)?;
-        let administrator = crate::routes::is_administrator(&state, &actor)?;
+        let app_pass = app_actor.is_some();
+        let actor = match app_actor {
+            Some(actor) => actor,
+            None => signed_in(&state, &headers)?,
+        };
+        let administrator = !app_pass && crate::routes::is_administrator(&state, &actor)?;
         let (op, profile) = (
             operation(&body.operation)?,
             Profile::new(&body.display_name)?,
@@ -228,7 +234,17 @@ pub(crate) async fn transition(
     Path(id): Path<String>,
     Json(body): Json<Moved>,
 ) -> Result<Json<ReceiptAnswer>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
+    let app_actor = crate::provider::app_person_actor(&state, &headers)?;
+    let app_pass = app_actor.is_some();
+    let actor = match app_actor {
+        Some(actor) => actor,
+        None => signed_in(&state, &headers)?,
+    };
+    if app_pass && body.transition != "activate" {
+        return Err(ServerError::NotAdmitted {
+            reason: "a person's app pass may only activate an own registered agent",
+        });
+    }
     let moved = match body.transition.as_str() {
         "activate" => Transition::Activate,
         "suspend" => Transition::Suspend,
@@ -237,7 +253,7 @@ pub(crate) async fn transition(
         other => return Err(malformed(format!("{other} is not a transition"))),
     };
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
-    if !crate::routes::is_administrator(&state, &actor)? {
+    if !app_pass && !crate::routes::is_administrator(&state, &actor)? {
         if let (IdentityId::Agent(agent), Transition::Activate) = (id, moved) {
             crate::routes::responsible_or_administrator(&state, &headers, &agent.to_string())?;
         } else {
@@ -247,6 +263,25 @@ pub(crate) async fn transition(
         }
     }
     with_directory(&state, |directory| {
+        if app_pass {
+            let projection = directory.projection()?;
+            let person = crate::read_api::own_person(projection, &actor)?;
+            let record = projection
+                .record(id)
+                .filter(|record| {
+                    matches!(id, IdentityId::Agent(_)) && record.responsible() == Some(person)
+                })
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "a person's app pass may only activate an own registered agent",
+                })?;
+            if record.state() != lys_identity::LifecycleState::Registered {
+                return Err(lys_identity::IdentityError::TransitionRefused {
+                    transition: moved,
+                    from: record.state(),
+                }
+                .into());
+            }
+        }
         let receipt = directory.transition(actor, op, id, moved, &body.reason, now())?;
         if matches!(moved, Transition::Suspend | Transition::Retire) {
             let projection = directory.projection()?;

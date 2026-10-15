@@ -27,6 +27,20 @@ pub(crate) const REPORTING: &[&str] = &[
 ];
 /// A signed-in person bound to a person.
 pub(crate) const PERSON: &[&str] = &["NotSignedIn", "NoPerson"];
+/// A person's kept pass to an approved app, without a cookie or operator header.
+pub(crate) const APP_PERSON: &[&str] = &[
+    "TokenUnknown",
+    "PassRefused",
+    "ProductPassPersonRequired",
+    "ProviderUnavailable",
+    "SessionsUnavailable",
+    "DirectoryUnavailable",
+    "apps_unavailable",
+    "NoPerson",
+    "credential_refused",
+    "app_not_approved",
+    "app_retired",
+];
 /// A grant the caller may see.
 pub(crate) const GRANT_READ: &[&str] = &["NotSignedIn", "GrantNotVisible"];
 /// A grant made on a kind an approved app declares.

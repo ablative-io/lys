@@ -202,3 +202,6 @@ async fn an_agents_pass_cannot_read_a_persons_agents() -> TestResult {
     assert_eq!(refusal["refusal"], "ProductPassPersonRequired");
     Ok(())
 }
+
+#[path = "app_person_tests.rs"]
+mod app_person_tests;
