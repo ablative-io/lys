@@ -115,7 +115,7 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
     let dialog_by_bea = service
         .post(&dialog, Some(&bea), &json!({}))
         .await?;
-    refused(&dialog_by_bea, 403, "NotAdmitted");
+    refused(&dialog_by_bea, 403, "not_your_computer");
     let dialog_relative = service
         .post(&dialog, Some(&ada), &json!({ "start": "held/receipts" }))
         .await?;
@@ -165,7 +165,28 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
     let by_bea = service
         .post(&folders, Some(&bea), &json!({ "under": named }))
         .await?;
-    refused(&by_bea, 403, "NotAdmitted");
+    refused(&by_bea, 403, "not_your_computer");
+
+    // A computer bea named herself is hers to ask about, before any runner is named on it: the
+    // admission passes and the refusal is the runner's absence, not hers.
+    let own = operation()?;
+    let named_by_bea = service
+        .post(
+            "/network/machines",
+            Some(&bea),
+            &json!({ "operation": own, "name": "Bea's laptop", "kind": "laptop", "runtime": "lys-runner",
+                "slots": 1, "may_run": [], "may_reach": [] }),
+        )
+        .await?;
+    assert_eq!(named_by_bea.0, 200, "{}", named_by_bea.1);
+    let own_folders = service
+        .post(&format!("/network/machines/{own}/folders"), Some(&bea), &json!({ "under": named }))
+        .await?;
+    refused(&own_folders, 409, "runner_absent");
+    let own_dialog = service
+        .post(&format!("/network/machines/{own}/choose-folder"), Some(&bea), &json!({}))
+        .await?;
+    refused(&own_dialog, 409, "runner_absent");
 
     let relative = service
         .post(&folders, Some(&ada), &json!({ "under": "held/receipts" }))

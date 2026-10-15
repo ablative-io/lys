@@ -9,8 +9,9 @@
 //! folder the person picks there. The answer waits for the person; a cancel
 //! is the runner's `folder_choice_cancelled`.
 //!
-//! An administrator asks either, the same person who saves an agent's
-//! settings. The machine must be kept (`MachineUnknown`) and name a runner
+//! The computer's owner or an administrator asks either: whoever may save
+//! an agent's settings on it (`not_your_computer` for anyone else). The
+//! machine must be kept (`MachineUnknown`) and name a runner
 //! (`runner_absent`); a folder the runner cannot read, or a dialog it cannot
 //! show, is the runner's own refusal, by its name.
 
@@ -91,7 +92,7 @@ async fn choose_folder(
     given: Result<Json<ChooseFolderBody>, JsonRejection>,
 ) -> Result<Json<FolderChosenView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    crate::network_api::computer_owner(&state, &actor, &id)?;
     let Json(body) = given.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
@@ -122,7 +123,7 @@ async fn folders(
     given: Result<Json<FoldersBody>, JsonRejection>,
 ) -> Result<Json<FoldersView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::administrator(&state, &actor)?;
+    crate::network_api::computer_owner(&state, &actor, &id)?;
     let Json(body) = given.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
