@@ -106,6 +106,8 @@ tbody tr.cursor td { background: rgba(212,151,90,.07); }
 .tabs a { padding: 8px 12px; color: var(--text-muted); text-decoration: none; font-size: 12.5px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tabs a:hover { color: var(--text-primary); }
 .tabs a.on { color: var(--text-primary); border-bottom-color: var(--accent); }
+/* Configuration's tabs wrap onto a second line on a narrow screen, so none sits off the edge. */
+.tabs.config-tabs { flex-wrap: wrap; overflow-x: visible; }
 .tabs .n { font: 10px "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); margin-left: 5px; }
 .grid2 { display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; align-items: start; }
 .facts { display: grid; grid-template-columns: 150px 1fr; gap: 8px 14px; margin: 0; }

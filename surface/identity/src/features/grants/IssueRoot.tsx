@@ -41,7 +41,8 @@ export const NOT_ROOT = new Refused(403, { refusal: 'RootAuthorityRefused', reas
  * the administrator approves reaches it.
  */
 function Form({ people, model, kinds, resources, done }: { people: PeopleView; model: GrantModel; kinds: KindGroup[]; resources: ResourceRef[]; done: () => void }) {
-  const [noExpiry, setNoExpiry] = useState(false);
+  // A root grant has no expiry unless the issuer gives one.
+  const [noExpiry, setNoExpiry] = useState(true);
   const [kind, setKind] = useState('');
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
@@ -86,7 +87,7 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
     </select><span className="hint">A role gives what it carries whenever it is checked, so a widening you approve reaches this grant.</span></label> : null}
     <div className="field">May pass on<label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
     <div className="field">Expires (your local time)<div className="expires"><input name="expires" type="datetime-local" aria-label="Expires" required={!noExpiry} disabled={noExpiry} />
-      <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> no expiry</label></div></div>
+      <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry</label></div></div>
     <details className="field"><summary>More</summary>
       <label className="field">Mode<select name="mode" required value={mode} onChange={(event) => setMode(event.target.value)}>{MODES.map((each) => <option key={each} value={each}>{modeWords(each)}</option>)}</select>
         <span className="hint">{MODE_HINTS[mode as keyof typeof MODE_HINTS] ?? ''}</span></label>

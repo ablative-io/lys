@@ -89,8 +89,7 @@ describe('The issue form offers the kind\'s roles beside the mode', () => {
     const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
     if (!input) throw new Error('No resource id input');
     input.value = 'ward';
-    const checks = page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
-    await act(async () => { checks[1]?.click(); });
+    expect(page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]?.checked).toBe(true);
     await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     await settle();
     expect(posted.at(-1)).toMatchObject({ path: '/grants/roots', body: { resource: { kind: KIND, id: 'ward' }, relation: 'administrator' } });

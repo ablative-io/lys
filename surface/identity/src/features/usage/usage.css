@@ -50,3 +50,6 @@
 .control-operations > ul { list-style: none; padding: 0; }
 .control-operations article { border-block-start: 1px solid var(--line, #bbb); padding-block: .75rem; overflow-wrap: anywhere; }
 .control-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+/* The spending limit: its heading on its own line, the amount, period and Save under it, the note under those. */
+.usage form.usage-spending { display: block; }
+.usage-amount > span { flex: none; min-width: 0; }

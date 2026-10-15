@@ -87,3 +87,6 @@
 .dash-cord form { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .dash-cord p { margin: 0 0 6px; }
 .section-h .btn.danger { font: inherit; letter-spacing: 0; text-transform: none; }
+/* Getting started takes a whole row above the panels, so its form never runs under them. */
+.dash-body > .getting-started { grid-column: 1 / -1; flex: none; min-height: auto; }
+.dash-body:has(> .getting-started) { grid-template-rows: auto minmax(260px, 1fr) auto; }

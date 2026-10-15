@@ -27,3 +27,12 @@
 .apps .app-choice:hover { background: var(--surface-hover); color: var(--text-primary); }
 .apps .app-choice.on { border-color: var(--accent); color: var(--text-primary); background: var(--accent-glow); }
 .apps .app-pane { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+/* Connect a known app: one sentence, the address field across the card's whole width with its label above, the acts under it. */
+.apps .app-connect { margin-top: 8px; }
+.apps .app-connect .field { margin: 8px 0 6px; }
+.apps .app-connect .app-actions { margin-top: 6px; }
+/* The developer section's return addresses: a group drawn like the other fields, with no box of the browser's own. */
+.apps fieldset.field { border: 0; padding: 0; min-width: 0; }
+.apps fieldset.field > legend { padding: 0; margin-bottom: 6px; }
+/* An app's addresses are whole web addresses: they break anywhere rather than run out of the card. */
+.apps .app-addresses .mono { overflow-wrap: anywhere; }

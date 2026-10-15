@@ -5,7 +5,7 @@
  */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, $$, choose, click, mount, pick, settle, text } from './harness';
+import { $, $$, choose, mount, pick, settle, text } from './harness';
 import { ADA, GRANTS, RECEIPTS, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
@@ -51,8 +51,6 @@ async function fillIn(page: Element, kind: string, id: string, mode: string) {
   if (!input) throw new Error('No resource id input');
   input.value = id;
   await choose(page.querySelector('select[name="mode"]'), mode);
-  const checks = page.querySelectorAll('input[type="checkbox"]');
-  await click(checks[1]);
 }
 
 describe('A grant shows its mode in words', () => {

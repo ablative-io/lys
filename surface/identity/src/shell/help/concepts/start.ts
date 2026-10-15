@@ -40,7 +40,7 @@ export const START: Seed[] = [
     title: 'Connect Cambium',
     summary: 'Cambium is the team chat; connecting it lets you give agents its channels.',
     body: [
-      'Apps, under Configuration, lists the apps Lys knows how to connect, Cambium among them, each with Connect. Connect asks once for Cambium’s web address and reads what Cambium asks for.',
+      'Apps, under Configuration, lists the apps Lys knows how to connect, Cambium among them, each with Connect. Connect asks once for Cambium’s web address; Continue to Cambium sends your browser there, and Cambium brings you back to Lys to approve what it asks for.',
       'Nothing an app asks for takes effect until you approve it on Apps. If Cambium has already asked, the dashboard says so: review what it asks for and approve it.',
       'Until Cambium is approved, an agent’s Access tab says "Connect Cambium on Apps first; its channels appear here once it is approved."',
     ],

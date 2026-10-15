@@ -39,13 +39,49 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
   const [asking, setAsking] = useState(false);
   const [address, setAddress] = useState('');
   const origin = appOrigin(address);
-  return <div className="row" aria-label={'Known app ' + known.id}>
-    <b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ?? 'not connected'}</span>
-    {asking ? <>
-      <label className="field">{known.name}’s web address<input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="https://cambium.example.com" aria-label={known.name + ' web address'} /></label>
-      <Act symbol="approve" name={'Go to ' + known.name + ' to connect'} word="Go" tone="primary" disabled={!origin} onClick={() => { if (origin) window.location.assign(origin + '/identity/lys/connect?lys=' + encodeURIComponent(window.location.origin)); }} />
-    </> : <Act symbol="add" name={'Connect ' + known.name} word={state === 'approved' ? 'Connect again' : 'Connect'} tone="primary" onClick={() => setAsking(true)} />}
+  const whyNot = origin ? null : address.trim()
+    ? 'That is not a whole web address. Type it as it appears in the browser, starting with https://.'
+    : 'Type ' + known.name + '’s web address to continue.';
+  const cancel = () => { setAsking(false); setAddress(''); };
+  // The address takes the card's whole width on its own line, its label above it and the acts under it.
+  return <div aria-label={'Known app ' + known.id}>
+    <div className="row">
+      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ?? 'not connected'}</span></span>
+      {asking ? null : <Act symbol="add" name={'Connect ' + known.name} word={state === 'approved' ? 'Connect again' : 'Connect'} tone="primary" onClick={() => setAsking(true)} />}
+    </div>
+    {asking ? <div className="app-connect">
+      <p className="note">Lys sends your browser to {known.name}, which asks to connect and brings you back here to approve what it asks for.</p>
+      <label className="field">{known.name}’s web address<input type="url" inputMode="url" autoComplete="url" autoFocus value={address} onChange={(event) => setAddress(event.target.value)} placeholder="https://cambium.example.com" aria-label={known.name + ' web address'} /></label>
+      {whyNot ? <p className="note" aria-live="polite">{whyNot}</p> : null}
+      <div className="app-actions">
+        <Act symbol="approve" name={'Continue to ' + known.name} word={'Continue to ' + known.name} tone="primary" disabled={!origin} hint={whyNot ?? undefined} onClick={() => { if (origin) window.location.assign(origin + '/identity/lys/connect?lys=' + encodeURIComponent(window.location.origin)); }} />
+        <Act symbol="close" name={'Cancel connecting ' + known.name} word="Cancel" onClick={cancel} />
+      </div>
+    </div> : null}
   </div>;
+}
+
+/** The name a refusal gives the app: a known app's name when the link names its manifest, else "the app". */
+function appName(manifestUrl: string): string {
+  try {
+    const path = new URL(manifestUrl).pathname;
+    return KNOWN_APPS.find((known) => known.manifest === path)?.name ?? 'the app';
+  } catch { return 'the app'; }
+}
+
+/**
+ * Where a decline sends the browser: the app's return address with error=access_denied and its state, as OAuth says a
+ * refusal is returned. Only an address on the manifest's own origin is followed; anything else goes back to Apps.
+ */
+export function declinedAddress(back: string, manifestUrl: string, state: string): string | null {
+  const origin = appOrigin(manifestUrl);
+  try {
+    const url = new URL(back);
+    if (!origin || url.origin !== origin) return null;
+    url.searchParams.set('error', 'access_denied');
+    url.searchParams.set('state', state);
+    return url.toString();
+  } catch { return null; }
 }
 
 interface Manifest { id: string; name: string; redirects: string[]; post_logout_redirects?: string[]; profile: boolean; schema: unknown }
@@ -67,12 +103,20 @@ export function ConnectApp() {
   const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!appOrigin(manifestUrl) || !back || !state) { setRefusal('This link does not name an app’s manifest, its return address and its state. Start the connection from the app again.'); return; }
+    const name = appName(manifestUrl);
+    const from = name === 'the app' ? 'the app’s' : name + '’s';
+    if (!appOrigin(manifestUrl) || !back || !state) { setRefusal('This link is incomplete. Start again from ' + from + ' Connect to Lys.'); return; }
     let live = true;
-    fetch(manifestUrl).then((answer) => { if (!answer.ok) throw new Error('status ' + answer.status); return answer.json() as Promise<unknown>; }).then((value: unknown) => {
+    const unreachable = 'Lys could not reach ' + name + ' at ' + appOrigin(manifestUrl) + '. Check that ' + name + ' is running and the address is right, then start again from ' + name + '.';
+    const notManifest = (said: string) => 'Lys reached ' + appOrigin(manifestUrl) + ', but ' + said + ', so it is not ' + name + ' as Lys knows it. Check that the address is ' + from + ', then start again from ' + name + '.';
+    // Not answering at all, answering with a refusal, and answering with something else are three different faults, each said as itself.
+    fetch(manifestUrl).then(async (answer) => {
       if (!live) return;
-      if (validManifest(value)) setManifest(value); else setRefusal('The app at ' + appOrigin(manifestUrl) + ' answered, but not with a manifest Lys reads.');
-    }).catch(() => { if (live) setRefusal('The app’s manifest at ' + manifestUrl + ' could not be read.'); });
+      if (!answer.ok) { setRefusal(notManifest('it answered ' + answer.status + ' for the manifest')); return; }
+      const value: unknown = await answer.json().catch(() => undefined);
+      if (!live) return;
+      if (validManifest(value)) setManifest(value); else setRefusal(notManifest('its answer is not a manifest Lys reads'));
+    }, () => { if (live) setRefusal(unreachable); });
     return () => { live = false; };
   }, [manifestUrl, back, state]);
   const approve = async () => {
@@ -86,11 +130,11 @@ export function ConnectApp() {
     <h1>Connect an app</h1>
     {manifest ? <>
       <h3>{manifest.name}</h3>
-      <p className="note">At <span className="mono">{appOrigin(manifestUrl)}</span>. It will send people back to <span className="mono">{back}</span>{manifest.profile ? ' and is given their name' : ''}.</p>
+      <p className="note app-addresses">At <span className="mono">{appOrigin(manifestUrl)}</span>. It will send people back to <span className="mono">{back}</span>{manifest.profile ? ' and is given their name' : ''}.</p>
       <div><b>The permissions it asks for</b><SchemaTable app={manifest.id} schema={manifest.schema} label={'Permissions of ' + manifest.id} /></div>
       <div className="app-actions">
         <Act symbol="approve" name={'Approve ' + manifest.name} word="Approve" tone="primary" disabled={busy} onClick={() => { void approve(); }} />
-        <Act symbol="decline" name={'Decline ' + manifest.name} word="Decline" tone="danger" disabled={busy} onClick={() => { void navigate('/apps'); }} />
+        <Act symbol="decline" name={'Decline ' + manifest.name} word="Decline" tone="danger" disabled={busy} onClick={() => { const declined = declinedAddress(back, manifestUrl, state); if (declined) window.location.assign(declined); else void navigate('/apps'); }} />
       </div>
     </> : refusal ? null : <p className="dim">Reading the app’s manifest…</p>}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
