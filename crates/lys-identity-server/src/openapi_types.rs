@@ -79,6 +79,12 @@ pub(crate) type Entry = (Method, &'static str, Schema, Schema);
 pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, Schema)> {
     let mut entries = sign_in_and_identities(api);
     entries.push((
+        GET,
+        "/security-events",
+        None,
+        Some(api.schema::<crate::recovery_security::RecoveryEvents>()),
+    ));
+    entries.push((
         POST,
         "/grants/{id}/tokens",
         Some(api.schema::<crate::grant_tokens::IssueBody>()),

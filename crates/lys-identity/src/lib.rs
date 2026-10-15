@@ -30,6 +30,7 @@ pub mod profile;
 pub mod projection;
 pub mod provenance;
 pub mod receipt;
+pub mod recovery_events;
 pub mod restart;
 pub mod revocation;
 pub mod signer;

@@ -45,7 +45,12 @@ use crate::directory_views::{PersonRegistered, receipt_view};
 use crate::error::ServerError;
 use crate::routes::{AppState, hex, signed_in, with_directory};
 use crate::session::now;
-use crate::sign_in::{Attempt, begin_session};
+use crate::sign_in::Attempt;
+
+#[path = "setup_password.rs"]
+mod password;
+pub(crate) use password::NewPassword;
+use password::new_password;
 
 #[cfg(test)]
 #[path = "setup_durability_tests.rs"]
@@ -427,47 +432,6 @@ async fn make_administrator(
         receipt: receipt_view(&receipt),
     };
     Ok(([(header::SET_COOKIE, cookie)], Json(answer)).into_response())
-}
-
-/// What the setup page sends to set the administrator's new password. Never printed.
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct NewPassword {
-    code: String,
-    password: String,
-}
-
-async fn new_password(
-    State(state): State<Arc<AppState>>,
-    extensions: Extensions,
-    headers: HeaderMap,
-    body: Result<Json<NewPassword>, JsonRejection>,
-) -> Result<Response, ServerError> {
-    state
-        .sign_in
-        .setup_attempts
-        .admit(state.sign_in.address(&extensions, &headers)?, 5)?;
-    let Json(body) = body.map_err(|refused| malformed(&refused))?;
-    let turn = state.setup_lock.lock().await;
-    admit(&state, &body.code, Purpose::Password)?;
-    let login = state
-        .admission
-        .administrator_login()?
-        .ok_or(ServerError::SetupCodeRefused)?;
-    let address = state.sign_in.address(&extensions, &headers)?;
-    let api = crate::sign_in_providers::api(&state)?;
-    let policy = state.password_policy.as_ref();
-    accounts::set_password(api, policy, login.subject(), &body.password).await?;
-    let email = accounts::email_of(api, login.subject()).await?;
-    let attempt = Attempt {
-        email: &email,
-        password: &body.password,
-        address,
-    };
-    let actor = state.sign_in.password(&state.oidc, &attempt).await?;
-    spend(settings(&state)?)?;
-    drop(turn);
-    begin_session(&state, &actor).await
 }
 
 /// Browser-owned operation id and the name to display; identity claims are forbidden.

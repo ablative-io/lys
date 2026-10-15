@@ -6,6 +6,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+#[path = "build/presence.rs"]
+mod presence;
+
 /// The words a build with no commit to read carries.
 const NO_COMMIT: &str = "not built from a git commit";
 
@@ -103,6 +106,7 @@ fn stamp(dir: &Path) -> Result<(String, Vec<String>), String> {
 
 fn main() -> Result<(), String> {
     let dir = std::env::var_os("CARGO_MANIFEST_DIR").map_or_else(|| ".".into(), PathBuf::from);
+    presence::compile(&dir)?;
     println!("cargo:rerun-if-env-changed=LYS_BUILD_COMMIT");
     let (value, watched) = stamp(&dir)?;
     println!("cargo:rerun-if-changed=build.rs");

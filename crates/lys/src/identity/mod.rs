@@ -12,6 +12,7 @@ pub mod import;
 pub mod install;
 pub mod loopback_http;
 pub mod prepare;
+pub mod presence;
 pub mod private_files;
 pub mod rauthy;
 pub mod stop;

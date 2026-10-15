@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { request, Refused } from '../../api';
 import { Act } from '../../shell/Act';
+import { SecurityEvents } from './SecurityEvents';
 import { refusedPart, validAlarm } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
 
@@ -23,7 +24,11 @@ function shownAlarm(reported: Alarm, local: Alarm | undefined): Alarm {
   };
 }
 
-export function Alarms({ summary, agents }: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
+export function Alarms(props: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
+  return <><SecurityEvents /><SessionAlarms {...props} /></>;
+}
+
+function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefused; agents: DashboardAgent[] }) {
   const [acknowledged, setAcknowledged] = useState<Record<string, Alarm>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [failure, setFailure] = useState<PartRefused | null>(null);

@@ -236,6 +236,7 @@ export const SERVICE: Record<string, Route> = {
     storage: { directory_format: 'signed_leaf_log', grant_format: 'signed_leaf_log', requests_configured: true } }),
   '/runtime/live': ok({ sessions: [], unanswered: [] }),
   '/dashboard': ok(dashboard()),
+  '/security-events': ok({ administrator: false, events: [] }),
   '/runtime/stop-everything': ok(CORD),
   'POST /runtime/stop-everything': (body) => ok(pulledNothing(body)),
   'POST /runtime/stop-everything/release': refused(409, 'cord_not_pulled', 'cord_not_pulled: nothing is stopped, so there is nothing to let start again'),

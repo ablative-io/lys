@@ -365,6 +365,18 @@ async fn update_user(
         let Some(slot) = held.iter_mut().find(|user| user["id"] == id.as_str()) else {
             return no_user();
         };
+        // The issuer's account update cannot unlink federation or passkeys;
+        // those have separate endpoints and are retained by User::update.
+        for field in [
+            "auth_provider_id",
+            "federation_uid",
+            "webauthn_user_id",
+            "picture_id",
+        ] {
+            if let Some(value) = slot.get(field) {
+                body[field] = value.clone();
+            }
+        }
         *slot = body.clone();
     }
     let password = match password {

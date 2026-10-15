@@ -17,6 +17,10 @@ fn leaks(text: &str, secret: &str) -> bool {
 #[test]
 fn every_kind_has_a_distinct_snake_case_name() {
     let kinds = [
+        ErrorKind::PresenceRefused,
+        ErrorKind::PresenceCancelled,
+        ErrorKind::PresenceUnavailable,
+        ErrorKind::RecoveryEventsUnavailable,
         ErrorKind::ConfigUnreadable,
         ErrorKind::ConfigInvalid,
         ErrorKind::IssuerInvalid,

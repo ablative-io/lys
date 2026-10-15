@@ -158,8 +158,8 @@ pub enum IdentityCommand {
 
     /// Write a fresh one-time setup code and open the setup page with it, so
     /// the administrator sets a new password; or, before first-run setup
-    /// has finished, a fresh first-run code. The code is never printed: it
-    /// rides only in the address handed to the browser.
+    /// has finished, a fresh first-run code. Requires a macOS Touch ID or
+    /// device-password prompt. The code is never printed.
     SetupCode {
         /// The data root; the platform's application data path when absent.
         #[arg(long)]

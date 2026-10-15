@@ -24,6 +24,9 @@ use sha2::{Digest, Sha256};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "setup_page/security_recovery.rs"]
+mod recovery_security;
+
 const CODE: &str = "k3Jd9-first-run-code-Qm2";
 const EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";

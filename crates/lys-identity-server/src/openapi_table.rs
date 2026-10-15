@@ -291,7 +291,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [&["IssuerChallengeExpired"]];
     POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
     POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
-    POST "/setup/password" "Set the first administrator's password" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
+    POST "/setup/password" "Set the administrator's password without changing other sign-in factors" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SetupUnavailable", "AccountRefused", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
     POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
     POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
@@ -301,6 +301,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/directory/people/{id}/account/password" "Set a person's password" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]] scope("account", "person.password.set", ["id"]);
     GET "/agents/{id}/goals" "An agent's goals" S [SIGNED, &["AgentNotVisible", "goals_unavailable"]] scope("agent", "read", ["id"]);
     GET "/alarms" "The caller's alarms, open first" G [AGENT, SIGNED, &["NoPerson", "AlarmsUnavailable", "AlarmMalformed"]] scope("agent", "read", []);
+    GET "/security-events" "Recovery events visible to the administrator" S [SIGNED, &["NotAdmitted", "SetupUnavailable"]];
     GET "/alarms/{id}" "One of the caller's alarms" G [AGENT, SIGNED, &["NoPerson", "AlarmUnknown", "AlarmsUnavailable", "AlarmMalformed"]] scope("agent", "read", []);
     POST "/alarms/{id}/acknowledge" "A person acknowledges an alarm" C [SIGNED_BODY, &["NoPerson", "AlarmUnknown", "AlarmsUnavailable", "AlarmMalformed"]];
     POST "/agents/{id}/goals" "Set a goal on an agent" S [SIGNED_BODY, &["AgentNotVisible", "evidence_missing", "goal_reused", "reminder_needs_deadline"]];

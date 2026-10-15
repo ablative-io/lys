@@ -29,6 +29,7 @@ pub fn router(state: Shared) -> Router {
         .route("/people/admit", post(crate::people_admit::admit))
         .merge(crate::sign_in::routes())
         .merge(crate::setup::routes())
+        .merge(crate::recovery_security::routes())
         .merge(crate::accounts::routes())
         .merge(crate::read_api::routes())
         .merge(crate::drafts_api::routes())

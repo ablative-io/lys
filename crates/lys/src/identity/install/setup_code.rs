@@ -26,6 +26,7 @@ use sha2::{Digest, Sha256};
 use super::super::config::DeploymentConfig;
 use super::super::credentials::{Credential, Shape};
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
+use super::super::presence::{Presence, SystemPresence};
 use super::super::private_files;
 use super::layout::Layout;
 use crate::commands::output::Emitter;
@@ -79,7 +80,7 @@ pub fn pending_text(purpose: Purpose, code: &str) -> String {
 
 /// Write `code`'s digest with `purpose` to the state directory, owner-only,
 /// replacing any code pending before it.
-pub fn write_pending(state_dir: &Path, purpose: Purpose, code: &str) -> IdentityResult<()> {
+fn write_pending(state_dir: &Path, purpose: Purpose, code: &str) -> IdentityResult<()> {
     private_files::write(
         &state_dir.join(CODE_FILE),
         pending_text(purpose, code).as_bytes(),
@@ -153,6 +154,23 @@ pub fn hand_over(
     Ok(())
 }
 
+/// Hand over the first-run code only when issuance returned one.
+pub(super) fn hand_over_first_run(
+    layout: &Layout,
+    code: Option<Credential>,
+    emitter: &mut Emitter,
+) -> IdentityResult<()> {
+    if let Some(code) = code {
+        emitter.field(
+            "setup",
+            "setup",
+            super::ports::Ports::load(layout)?.setup_url(),
+        );
+        hand_over(layout, code.expose(), &open_in_browser, emitter)?;
+    }
+    Ok(())
+}
+
 /// Whether the install has an administrator: one first-run setup recorded,
 /// or one its configuration names.
 pub fn has_administrator(layout: &Layout) -> IdentityResult<bool> {
@@ -198,26 +216,77 @@ fn issue(root: Option<std::path::PathBuf>, json: bool) -> IdentityResult<()> {
         Some(root) => Layout::at(root),
         None => Layout::discover()?,
     };
-    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
-    let purpose = if has_administrator(&layout)? {
+    let mut emitter = Emitter::new(json);
+    issue_with(&layout, &SystemPresence, &open_in_browser, &mut emitter)?;
+    emitter.finish();
+    Ok(())
+}
+
+fn issue_with(
+    layout: &Layout,
+    presence: &dyn Presence,
+    open: &dyn Fn(&str) -> bool,
+    emitter: &mut Emitter,
+) -> IdentityResult<()> {
+    let purpose = if has_administrator(layout)? {
         Purpose::Password
     } else {
         Purpose::FirstRun
     };
-    let code = generate();
-    write_pending(&config.state_dir(), purpose, code.expose())?;
-    let mut emitter = Emitter::new(json);
+    let code = issue_pending(layout, purpose, presence)?;
     emitter.field(
         "setup",
         "setup",
-        super::ports::Ports::load(&layout)?.setup_url(),
+        super::ports::Ports::load(layout)?.setup_url(),
     );
     emitter.field("purpose", "purpose", purpose.word());
-    hand_over(&layout, code.expose(), &open_in_browser, &mut emitter)?;
-    emitter.finish();
+    hand_over(layout, code.expose(), open, emitter)?;
     Ok(())
+}
+
+/// The install and a later recovery use the same issuance boundary.
+pub(super) fn issue_pending(
+    layout: &Layout,
+    purpose: Purpose,
+    presence: &dyn Presence,
+) -> IdentityResult<Credential> {
+    presence.authenticate()?;
+    let config = DeploymentConfig::load_install(&layout.deployment_config())?;
+    let code = generate();
+    let kind = match purpose {
+        Purpose::FirstRun => lys_identity::recovery_events::Kind::FirstRunCodeIssued,
+        Purpose::Password => lys_identity::recovery_events::Kind::PasswordCodeIssued,
+    };
+    let at = u64::try_from(chrono::Utc::now().timestamp()).map_err(|error| {
+        IdentityError::new(
+            ErrorKind::RecoveryEventsUnavailable,
+            "record",
+            "recovery event",
+            error.to_string(),
+        )
+    })?;
+    lys_identity::recovery_events::record(
+        &config.state_dir().join("recovery-events"),
+        kind,
+        &digest(code.expose()),
+        at,
+    )
+    .map_err(|error| {
+        IdentityError::new(
+            ErrorKind::RecoveryEventsUnavailable,
+            "record",
+            "recovery event",
+            error.to_string(),
+        )
+    })?;
+    write_pending(&config.state_dir(), purpose, code.expose())?;
+    Ok(code)
 }
 
 #[cfg(test)]
 #[path = "setup_code_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "setup_presence_tests.rs"]
+mod presence_tests;

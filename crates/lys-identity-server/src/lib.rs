@@ -198,6 +198,7 @@ pub mod provisioning_store;
 pub mod read_api;
 pub mod read_views;
 pub mod receipts_api;
+mod recovery_security;
 pub mod refusals_api;
 pub mod refusals_follow;
 pub mod refusals_store;

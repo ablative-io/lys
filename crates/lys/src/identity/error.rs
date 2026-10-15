@@ -12,6 +12,14 @@ use std::path::{Path, PathBuf};
 /// test or a script matches on; the detail around it may be reworded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
+    /// The person declined or did not pass the system presence prompt.
+    PresenceRefused,
+    /// The person cancelled the system presence prompt.
+    PresenceCancelled,
+    /// System presence authentication cannot be performed here.
+    PresenceUnavailable,
+    /// A recovery security event could not be retained.
+    RecoveryEventsUnavailable,
     /// The import document or account credential is malformed.
     ImportInvalid,
     /// The service refused an import entry by name.
@@ -84,6 +92,10 @@ impl ErrorKind {
     /// The stable name printed at the start of every diagnostic.
     pub fn name(self) -> &'static str {
         match self {
+            Self::PresenceRefused => "presence_refused",
+            Self::PresenceCancelled => "presence_cancelled",
+            Self::PresenceUnavailable => "presence_unavailable",
+            Self::RecoveryEventsUnavailable => "recovery_events_unavailable",
             Self::ImportInvalid => "import_invalid",
             Self::ImportRefused => "import_refused",
             Self::ImportUncertain => "import_outcome_uncertain",
