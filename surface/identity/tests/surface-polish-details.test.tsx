@@ -116,6 +116,8 @@ describe("Readable surface details", () => {
       ["/budgets/agent/" + SCRIBE]: ok(budget),
       ["/agents/" + SCRIBE + "/usage"]: ok({ agent: SCRIBE, used: [], receipts: [], last_reported_ms: null }),
       ["/agents/" + SCRIBE + "/goals"]: ok({ goals: [] }),
+      // Managed controls are shown only when the saved setup asks for them (885b2f54), so this setup asks.
+      ["/agents/" + SCRIBE + "/provisioning"]: ok({ agent: SCRIBE, profile: { session: { requires_controls: true } } }),
       ["/agents/" + SCRIBE + "/control-sessions"]: ok({ agent: SCRIBE, sessions: [session], after: null }),
       ["/runtime/sessions/" + session + "/controls"]: ok({ session, control: null }),
       ["/runtime/sessions/" + session + "/control-receipts"]: ok({ session, receipts: [], after: null }),
