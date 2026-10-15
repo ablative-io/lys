@@ -16,7 +16,7 @@
 import { useEffect, useState } from 'react';
 import { operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
-import { AddName, KindNode } from './lysfix-ui-kind-builder';
+import { AddName, KindNode } from './kind-builder';
 import './schema-builder.css';
 import { Act } from '../../shell/Act';
 import { ErrorWords } from '../people/Words';
