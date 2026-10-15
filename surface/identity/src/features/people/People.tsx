@@ -14,7 +14,7 @@ import type { OrgTeam } from '../../shell/org';
 import { useWhose, WhoseSelect } from '../../shell/Whose';
 import { useShell } from '../../shell/ShellContext';
 import type { KindFilter } from '../../shell/ShellContext';
-import { DirectoryGate as Gate, problemWords } from './Words';
+import { DirectoryGate as Gate, problemWords, STATUS } from './Words';
 import { entries, needsNewPerson, visibleEntries } from './directory';
 import type { Entry } from './directory';
 import { readTeams } from '../teams/Teams';
@@ -75,6 +75,9 @@ function rowsOf(view: PeopleView, kind: KindFilter, retired: boolean): Row[] {
   return all.filter((x) => x.kind === 'person').map((x) => ({ ...x, agents: kind === 'person' ? [] : agentsOf(x.id) }));
 }
 
+/** A record's state in words a person reads: never the service's own name for it. */
+const stateWords = (state: string): string => STATUS[state] ?? 'Unknown state';
+
 const held = (x: Entry) => ({ id: x.id, person: x.person?.id ?? null });
 
 function holds(rows: Row[]): string {
@@ -115,8 +118,8 @@ function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; 
   const columns: Column<Row>[] = [
     { head: 'Name', cell: (x) => x.display_name },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
-    { head: 'State', cell: (x) => <span className="state-of"><span className={'dot s-' + x.state} />{x.state}</span> },
-    { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({x.person.state})</span> : null}</span> : null },
+    { head: 'State', cell: (x) => <span className="state-of" data-state={x.state}><span className={'dot s-' + x.state} />{stateWords(x.state)}</span> },
+    { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({stateWords(x.person.state).toLowerCase()})</span> : null}</span> : null },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
   ];
   return (
@@ -127,7 +130,7 @@ function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; 
         <Stat n={all.filter(needsNewPerson).length} l="with no one answering" warn />
         <RuntimeCounts />
       </div>
-      {admin ? null : <p className="note">Your own records: you and the agents that answer to you. A directory administrator sees everyone through the directory&apos;s own routes.</p>}
+      {admin ? null : <p className="note">You see yourself and the agents that answer to you. The administrator sees everyone.</p>}
       <div className="body one">
         <Listing<Row>
           groups={groups} columns={columns} id={(x) => x.id} href={(x) => '#/file/' + x.id} words={(x) => x.display_name}

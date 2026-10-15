@@ -1,0 +1,6 @@
+/* Teams: on a narrow screen the list and the chosen team stack, each as tall as what it holds, with no gap between. */
+@container surface (max-width: 850px) {
+  .fill > .body.halves.teams-body { grid-auto-rows: auto; }
+}
+.team-place { margin-top: 12px; }
+.team-create-acts { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }

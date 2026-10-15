@@ -8,3 +8,12 @@
 .permissions table.modes td.mode-name label { display: block; cursor: pointer; }
 /* The program's own name is shown whole: it never wraps and is never cut. */
 .permissions table.modes .mode-id { display: block; margin-top: 2px; font-size: 11px; white-space: nowrap; }
+/* On a phone the ways a program works read down the screen: the radio, then its name with what it means beneath, never cut off at the side. */
+@container surface (max-width: 600px) {
+  .permissions table.modes, .permissions table.modes tbody { display: block; width: 100%; }
+  .permissions table.modes thead, .permissions table.modes colgroup { display: none; }
+  .permissions table.modes tr.mode-row { display: grid; grid-template-columns: 32px minmax(0, 1fr); }
+  .permissions table.modes td { display: block; border-bottom: 0; }
+  .permissions table.modes td.mode-meaning { grid-column: 2; padding-top: 0; }
+  .permissions table.modes tr.mode-row + tr.mode-row { border-top: 1px solid var(--border-subtle); }
+}

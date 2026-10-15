@@ -25,7 +25,7 @@ describe('Teams', () => {
     const names = () => [...document.querySelectorAll('.teams-table tbody tr[data-team] td:first-child')].map((cell) => cell.textContent);
     expect(names()).toEqual(['Delivery']);
     await click(button('Show retired (1)'));
-    expect(names()).toEqual(['Delivery', 'Old crew retired']);
+    expect(names()).toEqual(['Delivery', 'Old crew (retired)']);
     await click(button('Hide retired'));
     expect(names()).toEqual(['Delivery']);
   });

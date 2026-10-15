@@ -4,6 +4,10 @@ import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
 import { TableScroll } from '../../shell/Listing';
 import { AccessTabs } from '../access/AccessTabs';
+import { ErrorWords } from '../people/Words';
+import { kindWords } from '../people/AddPerson';
+
+const count = (n: number, one: string, many: string) => n.toLocaleString('en-AU') + ' ' + (n === 1 ? one : many);
 
 type Resource = { kind: string; id: string; relation: string; actions: string[]; seats: string[]; evidence: string };
 type Plan = { version: 1; resources: Resource[]; agents: { display_name: string }[] };
@@ -39,7 +43,7 @@ async function recorded(path: string, caller: string, purpose: string, body: obj
   const id = await operation(caller, purpose, body);
   const answer = await request<Receipt>(path, { operation: id, ...body });
   if (answer.operation !== id || answer.receipt?.caller !== caller || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
-    throw new Error('The answer did not confirm this operation. Stop and reconcile ' + id);
+    throw new Error('EstateAnswerUnconfirmed: The answer did not confirm this operation. Stop and reconcile ' + id);
   }
   return answer;
 }
@@ -49,6 +53,11 @@ export function EstateApproval() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [account, setAccount] = useState('');
   const [status, setStatus] = useState('');
+  // What stopped the plan being read or approved: said in words, with its name and the service's reason under Error details.
+  const [problem, setProblem] = useState<unknown>(null);
+  // No plan installed at all is not a fault: it is said as the page's one sentence.
+  const [none, setNone] = useState(false);
+  const [unread, setUnread] = useState(false);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   useEffect(() => {
@@ -57,12 +66,16 @@ export function EstateApproval() {
       const parsed=planOf(answer.plan);
       if(!/^op-[0-9a-f]{32}$/.test(answer.loader))throw new Error('The installed loader was not identified');
       if(current){setPlan(parsed);setAccount(answer.loader);}
-    }).catch((error)=>{if(current)setStatus(error instanceof Refused ? error.refusal.refusal+': '+error.refusal.reason : String(error));});
+    }).catch((error: unknown)=>{
+      if(!current)return;
+      if(error instanceof Refused && error.status===404)setNone(true);
+      else { setUnread(true); setProblem(error); }
+    });
     return ()=>{current=false;};
   },[]);
   const approve = async () => {
     if (!plan || !account || working.current) return;
-    working.current = true; setBusy(true); setStatus('Recording your approval…');
+    working.current = true; setBusy(true); setProblem(null); setStatus('Recording your approval…');
     try {
       const me = await api.me();
       const all = await api.people();
@@ -76,24 +89,31 @@ export function EstateApproval() {
         const root = await recorded('/grants/roots', me.person.id, 'root', {...shared, holder:me.person.id, pass_on:{kind:'to',actions:resource.actions,recipients:['agent','service_account']}});
         const given = await recorded('/grants', me.person.id, 'loader', {...shared, source:root.grant, recipient:account, responsible:me.person.id, pass_on:{kind:'to',actions:resource.actions,recipients:['agent']}});
         for (const name of resource.seats) delegations.push({ name:resource.kind + '/' + resource.id + '/' + resource.relation + '/' + name, route:'api', source:given.grant, recipient:'@agent/' + name, responsible:'@owner', resource:shared.resource, relation:resource.relation, pass_on:{kind:'use_only'}, window:shared.window });
-        setStatus('Recorded ' + (index + 1) + ' of ' + plan.resources.length + ' resources');
+        setStatus('Recorded ' + (index + 1) + ' of ' + count(plan.resources.length, 'resource', 'resources') + '.');
       }
       setStatus('Applying the approved grants to the agents…');
       const result=await request<{by:{kind:string;id:string};completed:{entry:string;operation:string}[]}>('/identity/estate-apply',{agents:plan.agents,delegations});
       const expected=[...plan.agents.map((a)=>'agents/'+a.display_name),...delegations.map((d)=>'delegations/'+(d as {name:string}).name)];
-      if(result.by?.kind!=='service_account'||result.by.id!==account||!Array.isArray(result.completed)||result.completed.length!==expected.length||result.completed.some((r,i)=>r.entry!==expected[i]||!/^op-[0-9a-f]{32}$/.test(r.operation)))throw new Error('The import answer did not confirm every planned entry');
-      setStatus('Estate grants applied: '+delegations.length+' delegations recorded for '+plan.agents.length+' agents.');
-    } catch (error) { setStatus((error instanceof Refused ? error.refusal.refusal+': '+error.refusal.reason : String(error)) + '. Stopped; no automatic retry. Some earlier grants may be recorded. An explicit repeat of the same plan and account uses the same operation IDs.'); }
+      if(result.by?.kind!=='service_account'||result.by.id!==account||!Array.isArray(result.completed)||result.completed.length!==expected.length||result.completed.some((r,i)=>r.entry!==expected[i]||!/^op-[0-9a-f]{32}$/.test(r.operation)))throw new Error('EstateAnswerUnconfirmed: The import answer did not confirm every planned entry');
+      setStatus('Estate grants applied: '+count(delegations.length,'delegation','delegations')+' recorded for '+count(plan.agents.length,'agent','agents')+'.');
+    } catch (error) {
+      setStatus('Stopped, with no automatic retry. Some of the access may already be given. Approving the same plan again repeats the same steps and gives nothing twice.');
+      setProblem(error);
+    }
     finally { working.current=false;setBusy(false); }
   };
   return <div className="page fill">
-    <PageHeader title="Approve estate grants" subtitle="Review the installed estate plan, then approve as yourself. Opening this page does not write anything. Each root is held by you; your installed loader passes only these actions to the listed agents. Apps must already be approved and agents active." actions={plan ? <Act symbol="approve" name="Approve and apply estate grants" word="Approve" tone="primary" disabled={busy || !account} onClick={()=>void approve()} /> : null} />
+    <PageHeader title="Approve estate grants" subtitle="Lys was installed with a plan of what your agents may use in your other apps. Review it below, then approve it as yourself. Opening this page changes nothing. You hold each access, and Lys's installed loader passes only the listed actions on to the listed agents. The apps must already be approved and the agents active." actions={plan ? <Act symbol="approve" name="Approve and apply estate grants" word="Approve" tone="primary" disabled={busy || !account} onClick={()=>void approve()} /> : null} />
     <AccessTabs on="grants" />
     {status ? <p role="status">{status}</p> : null}
+    {unread ? <p className="why-not">The installed estate plan could not be read, so nothing can be approved here.</p> : null}
+    {problem ? <ErrorWords problem={problem} /> : null}
+    {none ? <p className="note">This Lys was installed without an estate plan, so there is nothing to approve here. Give access from <a href="#/access">Access</a> instead.</p> : null}
+    {!plan && !problem && !none ? <p role="status" className="dim">Reading the installed plan…</p> : null}
     {plan ? <div className="pane">
-      <p className="note">Using your installed Lys directory loader. {plan.resources.length} resources. No expiry of their own. You can revoke the roots or loader grants later.</p>
-      <TableScroll label="Estate grants"><table><thead><tr><th>Resource</th><th>Kind</th><th>Actions</th><th>Passed to</th><th>Why</th></tr></thead>
-        <tbody>{plan.resources.map((r)=><tr key={r.kind+'/'+r.id}><td><strong>{r.id}</strong></td><td className="sec">{r.kind}</td><td className="mono">{r.actions.join(', ')}</td><td className="sec">{r.seats.join(', ')}</td><td className="dim" title={r.evidence}>{evidenceWords(r)}</td></tr>)}</tbody></table></TableScroll>
+      <p className="note">{count(plan.resources.length, 'thing', 'things')} to give access to, for {count(plan.agents.length, 'agent', 'agents')}. The access has no end date of its own; you can take it back from Access at any time.</p>
+      <TableScroll label="Estate grants"><table><thead><tr><th>What</th><th>Kind</th><th>What the agents may do</th><th>Given to</th><th>Why it is in the plan</th></tr></thead>
+        <tbody>{plan.resources.map((r)=><tr key={r.kind+'/'+r.id+'/'+r.relation}><td><strong style={{ overflowWrap: 'anywhere' }}>{r.id}</strong></td><td className="sec">{kindWords(r.kind)}</td><td>{r.actions.join(', ')}</td><td className="sec">{r.seats.join(', ')}</td><td className="dim" title={r.evidence}>{evidenceWords(r)}</td></tr>)}</tbody></table></TableScroll>
     </div> : null}
   </div>;
 }

@@ -73,7 +73,7 @@ describe('Agent tool policy', () => {
     await click(button('Add rule'));
     expect(policyRows().map((row) => row.dataset.policy)).toEqual(['no-shell', 'secrets-dir']);
     expect(posted.filter((entry) => entry.path === policy)).toEqual([]);
-    expect(text()).toContain('changed and not yet kept');
+    expect(text()).toContain('changed and not yet saved');
     await click(button('Save policy rules for the next start'));
     expect(posted.filter((entry) => entry.path === policy)).toEqual([{ path: policy, body: { version: 0, rules: [
       { id: 'no-shell', tool: 'Bash', kind: 'tool', authority: 'hard' },

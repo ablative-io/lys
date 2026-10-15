@@ -11,6 +11,7 @@ import type { Role } from '../roles/contract';
 import { changedFrom, profileRequest } from '../runtime/start-requests';
 import { DirectoryGate as Gate, ErrorWords, refusalCode } from '../people/Words';
 import type { ProvisioningProfile } from './Provisioning';
+import { maySetSettings } from './Provisioning';
 import { Act } from '../../shell/Act';
 
 export function SaveSettings({ agent, profile, settings, refusal, canSave, people, machines, saved, brief = false }: {
@@ -28,7 +29,8 @@ export function SaveSettings({ agent, profile, settings, refusal, canSave, peopl
   return <Gate load={load} title="Settings" ok={({ me, roles }) => {
     const name = entries(people).find((entry) => entry.id === agent)?.display_name ?? agent;
     return <>
-      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave} then={saved} brief={brief} />
+      {/* The service lets the person the agent answers to save its settings as well as the administrator, so a screen that did not know that never stops them. */}
+      <Save key={agent} agent={agent} name={name} person={me.person.id} profile={profile} settings={settings} refusal={refusal} canSave={canSave || maySetSettings(people, me.person.id, agent)} then={saved} brief={brief} />
       <Admission agent={agent} name={name} person={me.person.id} admin={people.scope === 'directory'} machines={machines} roles={roles.roles} />
     </>;
   }} />;
@@ -87,7 +89,7 @@ function Save({ agent, name, person, profile, settings, refusal, canSave, then, 
   const why = initial.error ? 'Lys kept an earlier save for ' + name + ' that it can no longer read.'
     : pending ? ''
     : starting ? 'A start of ' + name + ' has no confirmed answer yet. Press Start on the front page to finish it before changing these settings.'
-    : !canSave ? 'An administrator changes these settings.'
+    : !canSave ? 'Only the person ' + name + ' answers to, or the administrator, changes these settings.'
     : refusal ? refusal
     : base && !('session' in base) ? 'ProfileReadIncomplete: update Lys before changing these settings; the saved ones were not all returned.'
     : !changed ? 'Nothing has changed.'

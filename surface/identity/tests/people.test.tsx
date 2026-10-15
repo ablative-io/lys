@@ -10,28 +10,33 @@ describe('People and agents', () => {
     expect(requests).toContain('/directory/people');
     expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist", 'Bea (test person)', "Reviewer"]);
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
-    expect(scribe?.textContent).toContain('active');
+    expect(scribe?.querySelector('.state-of')?.textContent).toBe('Active');
     expect(scribe?.textContent).toContain('Ada (test person)');
+    // A state is said in words, never by the service's own name for it.
+    const states = $$('.state-of').map((cell) => cell.textContent);
+    expect(states).toContain('Awaiting activation');
+    expect(states).toContain('Access suspended');
+    for (const raw of ['active', 'registered', 'suspended', 'retired']) expect(states).not.toContain(raw);
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
   });
 
   it('flags an agent whose person is retired (conformance 3.1)', async () => {
     await mount('#/people');
     const reviewer = $$('tbody tr').find((tr) => tr.textContent?.includes("Reviewer"));
-    expect(reviewer?.textContent).toContain('(retired)');
+    expect(reviewer?.textContent).toContain('(permanently retired)');
     // A retired agent is left out of the list until it is asked for.
     const lamplighter = () => $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
     expect(lamplighter()).toBeUndefined();
     await click($$('.tools button').find((each) => each.textContent?.startsWith('Show retired (')) ?? null);
     expect(lamplighter()).toBeDefined();
-    expect(lamplighter()?.textContent).not.toContain('(retired)');
+    expect(lamplighter()?.textContent).not.toContain('(permanently retired)');
   });
 
   it('flags an agent whose person is suspended, not only retired (conformance 3.1)', async () => {
     const suspended = { ...DIRECTORY, people: DIRECTORY.people.map((p) => (p.id === ADA ? { ...p, state: 'suspended' as const } : p)) };
     await mount('#/people', { ...SERVICE, '/directory/people': ok(suspended) });
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
-    expect(scribe?.textContent).toContain('(suspended)');
+    expect(scribe?.textContent).toContain('(access suspended)');
     expect($$('.stat .n')[2].textContent).toBe('4');
   });
 
@@ -85,7 +90,7 @@ describe('People and agents', () => {
     });
     expect(requests).toEqual(expect.arrayContaining(['/directory/people', '/people']));
     expect(names()).toEqual(['Ada (test person)', "Scribe", "Courier", "Archivist"]);
-    expect(text()).toContain('Your own records');
+    expect(text()).toContain('You see yourself and the agents that answer to you.');
   });
 
   it('asks a caller with no session to sign in through the service', async () => {

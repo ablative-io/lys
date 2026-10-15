@@ -59,22 +59,23 @@ function AddServer({ kinds, taken, add }: { kinds: ServerKind[]; taken: string[]
   const set = (field: keyof typeof given) => (event: { target: { value: string } }) => setGiven({ ...given, [field]: event.target.value });
   const noSubmit = (event: { key: string; preventDefault: () => void }) => { if (event.key === 'Enter') event.preventDefault(); };
   return <tr className="add-rule" role="group" aria-label="Add connected tools">
-    <td><input name="server-name" aria-label="A short name for them" placeholder="A short name, like notes" value={given.name} onChange={set('name')} onKeyDown={noSubmit} autoComplete="off" /></td>
+    <td><label className="field">Name<input name="server-name" aria-label="A short name for them" placeholder="notes" value={given.name} onChange={set('name')} onKeyDown={noSubmit} autoComplete="off" spellCheck={false} /><span className="hint">A short name, like notes.</span></label></td>
     <td>
-      <select name="server-kind" aria-label="How these tools are reached" value={kind} onChange={(event) => setKind(event.target.value as ServerKind | '')}>
+      <label className="field">How they are reached<select name="server-kind" aria-label="How these tools are reached" value={kind} onChange={(event) => setKind(event.target.value as ServerKind | '')}>
         {kinds.length === 1 ? null : <option value="">Choose how they are reached</option>}
         {kinds.includes('address') ? <option value="address">At a web address</option> : null}
         {kinds.includes('program') ? <option value="program">By a program on the agent’s computer</option> : null}
-      </select>
-      {kind === 'address' ? <input name="server-address" aria-label="Web address" placeholder="https://tools.example.org/mcp" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" /> : null}
+      </select></label>
+      {kind === 'address' ? <label className="field">Web address<input name="server-address" type="url" aria-label="Web address" placeholder="https://tools.example.org/mcp" value={given.address} onChange={set('address')} onKeyDown={noSubmit} autoComplete="off" spellCheck={false} /></label> : null}
       {kind === 'program' ? <>
-        <input name="server-program" aria-label="The program’s full path" placeholder="/usr/local/bin/notes-mcp" value={given.program} onChange={set('program')} onKeyDown={noSubmit} autoComplete="off" />
-        <textarea name="server-args" aria-label="What it is started with, one word on each line" placeholder="What it is started with, one on each line. Leave empty if there are none." rows={3} value={given.args} onChange={set('args')} />
+        <label className="field">The program’s full path<input name="server-program" aria-label="The program’s full path" placeholder="/usr/local/bin/notes-mcp" value={given.program} onChange={set('program')} onKeyDown={noSubmit} autoComplete="off" spellCheck={false} /></label>
+        <label className="field">What it is started with <span className="hint">Optional. One on each line; leave empty if there are none.</span><textarea name="server-args" aria-label="What it is started with, one word on each line" rows={3} value={given.args} onChange={set('args')} spellCheck={false} /></label>
       </> : null}
       {server ? <p className="rule-row"><b>{server.name}</b> {serverWords(server)}</p> : null}
       {touched && built && 'problem' in built ? <p className="why-not">{built.problem}</p> : null}
     </td>
-    <td><Act symbol="add" name="Add these tools" word="Add" tone="primary" disabled={!server} onClick={() => { if (server) { add(server); setGiven(empty); } }} /></td>
+    <td><Act symbol="add" name="Add these tools" word="Add" tone="primary" disabled={!server} onClick={() => { if (server) { add(server); setGiven(empty); } }} />
+      {!kind && touched ? <p className="why-not">Choose how they are reached.</p> : null}</td>
   </tr>;
 }
 

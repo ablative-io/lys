@@ -23,6 +23,8 @@ import type { GrantChoices } from './agent-grants';
 import { resourceNames, resourceWords } from './agent-resource-names';
 import { keepRecord, releaseRecord } from '../../kept';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
+import './add-agent.css';
 import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
 
 function reportingChoices(people: PeopleView) {
@@ -212,7 +214,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
   const firstRunForm = onePress && Boolean(runOptions.choices);
   const renderForm = (fields: ReactNode, settings?: Record<string, unknown>, profileProblem = '') => <form className="add-agent" aria-label="Add an agent" onSubmit={(event) => { void submit(event, settings, profileProblem); }}>
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
-      <div className={fields ? 'add-agent-two' : undefined}>
+      <div className={fields ? 'add-agent-two' : 'add-agent-one'}>
         <div>{registrationFields}{firstRunForm ? null : moreRegistration}
         {onePress || runOptions.runners.length ? walk ? <p>Computer: {placementComputer(walk.placement).name}</p> : inUse.length ? <label className="field">Computer this agent runs on<select name="computer" value={computer} onChange={(event) => setComputer(event.target.value)}><option value="">Choose a computer</option>{runOptions.computers.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label> : <label className="field">Computer name<input name="computer_name" value={computerName} required autoComplete="off" onChange={(event) => { setNamedComputer(true); setComputerName(event.target.value); }} /><span className="hint">{hostName ? 'The name this computer gives itself; change it if you like.' : 'Type a name for this computer.'}</span></label> : null}
         </div>
@@ -221,7 +223,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     </fieldset>
     {!walk && capability.machineAdmission === false ? inUse.map((machine) => <p key={machine.id}>Choose which agents may run on {machine.name} in <a href={'#/network?computer=' + encodeURIComponent(machine.id)}>Network</a>, then start {name.trim() || 'this agent'} from its page.</p>) : null}
     {hold ? <ErrorWords problem={hold} /> : null}
-    {inUse.length && (!onePress || hold || runOptions.runners.some((entry) => entry.state === 'unavailable')) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
+    {inUse.length && (!onePress || hold || runOptions.runners.some((entry) => entry.state === 'unavailable')) ? <p>Which agents may run on each computer is chosen in Network. <a className="btn" href="#/network">Open Network</a></p> : null}
     {capability.problem ? <><p>Only “You” is offered under Who this agent answers to: Lys did not say whether it can register an agent under someone else, so the agent is added under you. You can change who it answers to afterwards, on its own page.</p><ErrorWords problem={capability.problem} /></>
       : !capability.answersTo ? <p>Only “You” is offered under Who this agent answers to: this Lys registers a new agent under the person adding it. To have it answer to someone else, add it here, then change who it answers to on its own page.</p> : null}
     {unsupported ? <p role="alert" className="why-not">{unsupported}</p> : null}
@@ -270,7 +272,7 @@ export function AddAgent() {
     const [me, people, teams, capability, grants] = await Promise.all([api.me(), api.people(), readTeams(), addAndRunCapability(), readGrantChoices()]);
     return { me, people, teams, capability, grants };
   }, 'add-agent');
-  return <div className="page"><a href="#/people">People and agents</a><h1>Add an agent</h1>
+  return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add an agent" subtitle="An agent is an AI that works for a person. Name it, choose who it answers to and what it may use, then add it." />
     <Gate load={load} title="Add an agent" ok={(data) => <ReadyForm key={location.search} me={data.me} people={data.people} teams={data.teams} search={location.search} capability={data.capability} grants={data.grants} />} />
   </div>;
 }

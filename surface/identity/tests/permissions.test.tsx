@@ -267,7 +267,7 @@ describe('The rules', () => {
     expect(problem?.querySelector('details')?.open).toBe(false);
     expect(problem?.querySelector('details')?.textContent).toContain(code + ': ' + reason);
     expect(element.querySelector('.policy-kept')?.textContent).toContain('Open this tab again to check the saved rules before changing them.');
-    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet kept.');
+    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet saved.');
     expect(element.querySelector('.policy-kept b')?.textContent).toBe('Policy: Version 1.');
     expect(ruleRows(element).filter((row) => row.dataset.policy).map((row) => row.dataset.policy)).toEqual(['deny-top', 'liftable']);
     expect(posted).toEqual([{ path, body: { version: 1, rules: seeded.slice(1) } }]);
@@ -284,7 +284,7 @@ describe('The rules', () => {
     const problem = element.querySelector<HTMLElement>('.policy-kept [role="alert"]');
     expect(problem?.querySelector(':scope > p')?.textContent).toBe('The answer did not confirm the saved rules. Open this tab again to check the outcome.');
     expect(problem?.querySelector('details')?.open).toBe(false);
-    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet kept.');
+    expect(element.querySelector('.policy-kept')?.textContent).toContain('The policy rows above are changed and not yet saved.');
     expect(element.querySelector('.policy-kept b')?.textContent).toBe('Policy: Version 1.');
     expect(posted).toEqual([{ path, body: { version: 1, rules: seeded.slice(1) } }]);
   });

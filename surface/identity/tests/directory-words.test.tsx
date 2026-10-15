@@ -117,10 +117,18 @@ describe('Directory words and write answers', () => {
     await fill('input[name="display_name"]', 'New person');
     await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
     expect(button('Check whether Lys saved it').textContent).toBe('Check');
-    expect(visibleWords()).toContain('Use the button below to check the saved request');
+    expect(visibleWords()).toContain('Use Check to see whether Lys saved it.');
     expect(visibleWords()).not.toContain('StorageUncertain');
     expect(visibleWords()).not.toMatch(/op-[0-9a-f]{32}/);
     expect(sessionStorage.getItem('lys.pending.register-person')).toContain('New person');
+  });
+
+  it('says a refused root grant in words, its name only under Error details, and keeps the receipt folded', async () => {
+    await show(<RecordedForm name="root-grant" title="Issue a root grant" done={() => undefined} change={() => ({ path: '/grants/roots', body: { route: 'browser', holder: ADA, resource: { kind: 'workspace', id: 'ward-7' }, relation: 'viewer', pass_on: { kind: 'use_only' }, window: { starts_at: 0, ends_at: null } } })}><TextField name="display_name" label="Full name" optional /></RecordedForm>, { 'POST /grants/roots': refused(403, 'RootAuthorityRefused', 'only the root authority issues a root grant') });
+    await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(visibleWords()).toContain('Only the directory\'s root authority issues a root grant.');
+    expect(visibleWords()).not.toContain('RootAuthorityRefused');
+    expect(document.querySelector('details .refusal-name')?.textContent).toContain('RootAuthorityRefused');
   });
 
   it('shows one heading when a registration tab already names its form', async () => {

@@ -5,6 +5,7 @@ import type { Load } from '../../api';
 import { resourceText } from '../../generated/grants';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { reachMap } from '../grants/check';
+import { problemWords } from './Words';
 
 export interface DirectoryReach { rows: Map<string, Map<string, string[]>>; model: GrantModel }
 
@@ -22,7 +23,10 @@ export async function readDirectoryReach(): Promise<DirectoryReach> {
 
 export function Reach({ load, id, compact = false }: { load: Load<DirectoryReach>; id: string; compact?: boolean }) {
   if (load.status === 'loading') return <span className="dim">Reading access…</span>;
-  if (load.status === 'refused') return <span className="note" title={load.refused.refusal.reason}>{load.refused.refusal.refusal}: {load.refused.refusal.reason}</span>;
+  // A refusal is said in words; its name and the service's reason stay in the hover, never in the row.
+  if (load.status === 'refused') return compact
+    ? <span className="note" title={load.refused.refusal.refusal + ': ' + load.refused.refusal.reason}>Not known</span>
+    : <span className="note" title={load.refused.refusal.refusal + ': ' + load.refused.refusal.reason}>{problemWords(load.refused)}</span>;
   const rows = [...load.data.rows].filter(([, holders]) => holders.has(id));
   if (compact) return <span>{rows.length} {rows.length === 1 ? 'resource' : 'resources'}</span>;
   if (!rows.length) return <span className="note">No permitted access returned for the resources you may see.</span>;

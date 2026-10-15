@@ -86,20 +86,20 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
     <option value="policy">Lys, by this agent’s policy</option>
   </select> : <span className="dim">{enforcer}</span>;
   if (by === 'policy' && addPolicy) {
-    const field = (name: keyof typeof blank, label: string) => <input name={name} aria-label={label} placeholder={label} value={policy[name]} onChange={(event) => setPolicy({ ...policy, [name]: event.target.value })} onKeyDown={noEnter} />;
+    const field = (name: keyof typeof blank, label: string) => <label className="field">{label}<input name={name} aria-label={label} value={policy[name]} onChange={(event) => setPolicy({ ...policy, [name]: event.target.value })} onKeyDown={noEnter} autoComplete="off" spellCheck={false} /></label>;
     const value = (name: keyof typeof blank) => policy[name].trim();
     const ready = Boolean(value('id') && value('tool') && (denies === 'tool' || value('target')) && (!grantable || (value('resource_kind') && value('resource_id') && value('action'))));
     return <tr className="add-rule" role="group" aria-label="Add a rule">
       <td>{field('id', 'Rule name')}{field('tool', 'Tool name, exactly as the agent’s program names it')}</td>
-      <td><select name="kind" aria-label="Denies" value={denies} onChange={(event) => setDenies(event.target.value as PolicyKind)}>
+      <td><label className="field">What it refuses<select name="kind" aria-label="Denies" value={denies} onChange={(event) => setDenies(event.target.value as PolicyKind)}>
         {Object.entries(KINDS).map(([k, words]) => <option key={k} value={k}>{words}</option>)}
-      </select>{denies !== 'tool' ? field('target', denies === 'host' ? 'Host' : 'Absolute path') : null}</td>
+      </select></label>{denies !== 'tool' ? field('target', denies === 'host' ? 'Host' : 'Absolute path') : null}</td>
       <td>Refused</td>
       <td>{who}
         <label className="tick"><input type="checkbox" name="grantable" checked={grantable} onChange={(event) => setGrantable(event.target.checked)} />An access permission may allow this call</label>
         {grantable ? <>{field('resource_kind', 'Type of thing the permission covers')}{field('resource_id', 'Name of the thing the permission covers')}{field('action', 'Action')}</> : null}
       </td>
-      <td><Act symbol="add" name="Add rule" word="Add" tone="primary" disabled={!ready} onClick={() => {
+      <td>{ready || !Object.values(policy).some((each) => each.trim()) ? null : <p className="why-not">{!value('id') ? 'Name the rule.' : !value('tool') ? 'Name the tool it covers.' : denies !== 'tool' && !value('target') ? (denies === 'host' ? 'Type the host.' : 'Type the full path.') : 'Say which permission may allow it.'}</p>}<Act symbol="add" name="Add rule" word="Add" tone="primary" disabled={!ready} onClick={() => {
         if (!ready) return;
         const rule: PolicyRule = { id: value('id'), tool: value('tool'), kind: denies,
           authority: grantable ? { permission: { resource: { kind: value('resource_kind'), id: value('resource_id') }, action: value('action') } } : 'hard' };
@@ -118,7 +118,7 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
         {given ? <p className="works-in">The folder <code>{given}</code></p> : null}
         <FolderChooser computers={computers} preferred={computer} chosen={given} choose={setGiven} label={given ? 'Choose a different folder for this rule' : 'Choose the folder for this rule'} confirm="Use" />
       </> : null}
-      {typed ? <input name={typed.name} aria-label={typed.label} placeholder={typed.hint} value={given} onChange={(event) => setGiven(event.target.value)} onKeyDown={noEnter} /> : null}
+      {typed ? <label className="field">{typed.label}<input name={typed.name} aria-label={typed.label} placeholder={typed.hint} value={given} onChange={(event) => setGiven(event.target.value)} onKeyDown={noEnter} autoComplete="off" spellCheck={false} /></label> : null}
       {rule ? <p className="rule-row">{wordsFor(rule)} <small><code>{rule}</code></small></p> : null}
       {kind && given.trim() && problem ? <p className="why-not">{problem}</p> : null}
     </td>
@@ -251,10 +251,9 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
           {unread ? <tr className="rule-row"><td colSpan={5}>{unread}</td></tr> : null}
           {!own.length && !policyRules.length && !unread ? <tr><td colSpan={5} className="dim">Nothing.</td></tr> : null}
           {read ? <tr className="policy-kept"><td colSpan={5}>
-            <b>{read.view.policy ? 'Policy: Version ' + read.view.policy.version : 'No policy set'}.</b> A kept version {read.view.applies}.
-            {' '}
-            <Act symbol="save" name="Save policy rules for the next start" word="Save" disabled={saving || staged === null} onClick={() => { void keep(); }} />
-            {staged !== null && !saving ? <span className="dim"> The policy rows above are changed and not yet kept.</span> : null}
+            <b>{read.view.policy ? 'Policy: Version ' + read.view.policy.version : 'No policy set'}.</b> A saved version {read.view.applies}. {staged === null ? 'Rules added to or removed from the policy are saved here, apart from the settings.' : 'The policy rows above are changed and not yet saved.'}
+            {staged !== null ? <>{' '}<Act symbol="save" name="Save policy rules for the next start" word="Save policy" tone="primary" disabled={saving} onClick={() => { void keep(); }} />
+              {' '}<Act symbol="close" name="Undo the policy changes" word="Undo" disabled={saving} onClick={() => setStaged(null)} /></> : null}
             {failure ? <><ErrorWords problem={failure} /><p>Open this tab again to check the saved rules before changing them.</p></> : null}
           </td></tr> : null}
         </tbody>

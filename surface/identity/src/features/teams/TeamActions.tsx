@@ -7,6 +7,9 @@ import { ChangeStatus } from '../roles/ChangeStatus';
 import { sameLogin } from './contract';
 import type { Member, Team, TeamChanged } from './contract';
 import { Act as Press } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
+/** A kept team change this browser cannot read back, said as one sentence with what to do; the browser's own words go under Error details. */
+const unreadable = (error: unknown): string => 'TeamChangeUnreadable: ' + (error instanceof Error ? error.message : String(error));
 type Action = { act: 'added' | 'removed' | 'retired' | 'confirmed'; member: string | null };
 const pathOf = (id: string, action: Action) => '/teams/' + encodeURIComponent(id) + (action.act === 'added' ? '/members' : action.act === 'retired' ? '/retire' : '/members/' + encodeURIComponent(action.member ?? '') + (action.act === 'confirmed' ? '/confirm' : '/remove'));
 function held(key: string, id: string): Action | null {
@@ -23,12 +26,12 @@ function held(key: string, id: string): Action | null {
 /** A team's members as a table: remove on each row, add as the last row. One change is confirmed at a time, above the table. */
 export function TeamMembers({ team, person, login, members, name, administrator, manages, changed }: { team: Team; person: string; login: Login; members: Member[]; name: (id: string) => string; administrator: boolean; manages: boolean; changed: (answer: TeamChanged, message: string) => void }) {
   const key = 'lys.pending.team.' + person + '.' + team.id;
-  const [initial] = useState(() => { try { return { action: manages ? held(key, team.id) : null, error: '' }; } catch (error) { return { action: null, error: String(error) }; } });
+  const [initial] = useState(() => { try { return { action: manages ? held(key, team.id) : null, error: '' }; } catch (error) { return { action: null, error: unreadable(error) }; } });
   const [action, setAction] = useState<Action | null>(initial.action);
   const [member, setMember] = useState('');
   const open = manages && team.state !== 'retired' && !action && !initial.error;
   return <section className="card" aria-label="Members"><h3>Members <span className="sec">{team.members.length.toLocaleString('en-AU')}</span></h3>
-    {initial.error ? <p role="alert">{initial.error}</p> : null}
+    {initial.error ? <ErrorWords problem={initial.error} /> : null}
     {action ? <Act team={team} login={login} action={action} memberName={action.member ? name(action.member) : null} storageKey={key} changed={changed} cancel={() => setAction(null)} /> : null}
     <table className="usage-table"><thead><tr><th>Member</th><th>Takes part</th>{manages ? <th>Change</th> : null}</tr></thead>
       <tbody>
@@ -71,7 +74,7 @@ export function AgentTeams({ agent, name, teams, person, login, administrator, c
     try {
       for (const team of teams.filter(manages)) { const action = held(key(team), team.id); if (action) return { open: { team, action }, error: '' }; }
       return { open: null, error: '' };
-    } catch (error) { return { open: null, error: String(error) }; }
+    } catch (error) { return { open: null, error: unreadable(error) }; }
   });
   const [open, setOpen] = useState<{ team: Team; action: Action } | null>(initial.open);
   const inTeams = teams.filter((team) => team.state === 'active' && team.members.includes(agent));
@@ -82,7 +85,7 @@ export function AgentTeams({ agent, name, teams, person, login, administrator, c
       {manages(team) ? <Press symbol="remove" name={'Remove from ' + team.name} disabled={blocked} onClick={() => setOpen({ team, action: { act: 'removed', member: agent } })} /> : null}</span>) : 'No team yet'}
     {addable.length ? <select aria-label="Add to a team" value="" disabled={blocked} onChange={(event) => { const team = addable.find((each) => each.id === event.target.value); if (team) setOpen({ team, action: { act: 'added', member: agent } }); }}>
       <option value="">Add to a team</option>{addable.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select> : null}
-    {initial.error ? <p className="why-not" role="alert">{initial.error}</p> : null}
+    {initial.error ? <ErrorWords problem={initial.error} /> : null}
     {open ? <Act team={open.team} login={login} action={open.action} memberName={open.action.member === agent ? name : null} storageKey={key(open.team)} changed={() => { setOpen(null); changed(); }} cancel={() => setOpen(null)} /> : null}
   </>;
 }

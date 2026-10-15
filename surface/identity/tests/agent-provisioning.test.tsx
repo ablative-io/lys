@@ -1,8 +1,8 @@
 /** Agent handles disclose metadata only; provisioning changes retain their operation and reviewed version. */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { click, mount, text } from './harness';
-import { ADA, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { $, click, mount, text } from './harness';
+import { ADA, BEA_ME, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { ProvisioningAnswer, ProvisioningProfile } from '../src/features/provisioning/Provisioning';
 
 beforeEach(() => sessionStorage.clear());
@@ -61,10 +61,18 @@ describe('Agent provisioning', () => {
     expect(text()).not.toContain('"command"');
     expect(posted).toEqual([]);
   });
-  it('greys Save for a non-administrator and says an administrator changes these settings', async () => {
-    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
+  it('lets the person an agent answers to change its settings, as the service does, though they are not the administrator', async () => {
+    await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN) });
+    expect(text()).not.toContain('changes these settings.');
+    expect($('section[aria-label="Settings of this agent"] fieldset.settings-read-only')).toBeNull();
+    expect(($('select[name="model"]') as HTMLSelectElement | null)?.disabled).toBe(false);
+  });
+  it('shows someone else’s agent’s settings without letting them be changed, and says who changes them', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', { ...routes, '/directory/people': refused(403, 'NotAdmitted', 'Not an administrator'), '/people': ok(OWN), '/me': ok(BEA_ME) });
     expect(button('Save these settings')?.disabled).toBe(true);
-    expect(text()).toContain('An administrator changes these settings.');
+    expect(text()).toContain('Only the person Scribe answers to, or the administrator, changes these settings.');
+    // Every field is shown as saved and none can be changed, so nothing invites a change that cannot be saved.
+    expect(($('fieldset.settings-read-only') as HTMLFieldSetElement | null)?.disabled).toBe(true);
     expect(posted).toEqual([]);
   });
 });

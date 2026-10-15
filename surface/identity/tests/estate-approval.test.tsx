@@ -56,7 +56,7 @@ it('approval applies through the installed loader with no file download',async()
   const {posted}=await mount('#/access/import',{...routes,'POST /grants/roots':receipt,'POST /grants':receipt,
     'POST /identity/estate-apply':(body)=>{const doc=body as {agents:{display_name:string}[];delegations:{name:string}[]};return ok({by:{kind:'service_account',id:loader},completed:[...doc.agents.map((a)=>({entry:'agents/'+a.display_name,operation:'op-'+'a'.repeat(32)})),...doc.delegations.map((d)=>({entry:'delegations/'+d.name,operation:'op-'+'b'.repeat(32)}))]});}});
   await click(approve());expect(posted.map((p)=>p.path)).toEqual(['/grants/roots','/grants','/identity/estate-apply']);
-  expect(text()).toContain('Estate grants applied: 1 delegations recorded for 1 agents.');
+  expect(text()).toContain('Estate grants applied: 1 delegation recorded for 1 agent.');
   expect(document.querySelector('a[download]')).toBeNull();
 });
 

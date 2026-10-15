@@ -76,7 +76,7 @@ describe('Add a person in one act', () => {
     const receipt = document.querySelector('[aria-label="Receipt"]');
     expect(receipt).not.toBeNull();
     const text = receipt?.textContent ?? '';
-    for (const words of ['directory log leaf 12', 'directory log leaf 13', 'directory log leaf 14', 'grants log leaf 7']) {
+    for (const words of ['directory log, entry 12', 'directory log, entry 13', 'directory log, entry 14', 'grants log, entry 7']) {
       expect(text).toContain(words);
     }
     expect(text).toContain('issuer account');
@@ -120,9 +120,13 @@ describe('Add a person in one act', () => {
     const text = receipt?.textContent ?? '';
     expect(text).toContain('no agent may hold');
     expect(text).toContain('Lys refused while giving their first access');
-    expect([...(receipt?.querySelectorAll('li') ?? [])].map((leaf) => leaf.textContent)).toEqual([
-      'Registered: directory log leaf 12', 'Sign-in bound: directory log leaf 13', 'Activated: directory log leaf 14',
+    // The steps already done are said in words; where each was recorded is folded under its own summary.
+    expect([...(receipt?.querySelectorAll(':scope > ul > li') ?? [])].map((leaf) => leaf.textContent)).toEqual(['Registered', 'Sign-in bound', 'Activated']);
+    expect([...(receipt?.querySelectorAll('details ul > li') ?? [])].map((leaf) => leaf.textContent)).toEqual([
+      'Registered: directory log, entry 12', 'Sign-in bound: directory log, entry 13', 'Activated: directory log, entry 14',
     ]);
+    // The refusal's name is never in the open sentence, only under Error details.
+    expect(receipt?.querySelector(':scope > p')?.textContent).not.toContain('WithheldFromAgents');
   });
 
   it('does not take a refused receipt for another operation as this act\'s', async () => {

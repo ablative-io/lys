@@ -8,6 +8,7 @@ import { Start } from './Start';
 import './team.css';
 import { answeredNo } from '../../kept';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
@@ -27,7 +28,7 @@ export function Stop({ entry, session, changed, done }: { entry: Entry; session:
   };
   return <div className="team-stop" role="alertdialog" aria-label={'Stop ' + entry.display_name}>
     <p>Stop {entry.display_name}? What it has not saved is lost. You can start it again afterwards.</p>
-    {refused ? <p role="alert" className="why-not">{refused.message} <small className="refusal-name">{refused.refusal.refusal}</small></p> : null}
+    {refused ? <ErrorWords problem={refused} /> : null}
     <Act symbol="stop" name={'Stop ' + entry.display_name} word="Stop" tone="danger" disabled={busy} onClick={() => { void stop(); }} />
     <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
   </div>;
@@ -56,7 +57,7 @@ function Restart({ entry, session, changed, done }: { entry: Entry; session: Run
   };
   return <div className="team-stop" role="alertdialog" aria-label={'Restart ' + entry.display_name}>
     <p>Restart {entry.display_name}? This ends the run and starts it again in the same folder, on {session.machine_name ?? session.machine}. What it has not saved is lost.</p>
-    {refused ? <p role="alert" className="why-not">{refused.message} <small className="refusal-name">{refused.refusal.refusal}</small></p> : null}
+    {refused ? <ErrorWords problem={refused} /> : null}
     <Act symbol="retry" name={'Restart ' + entry.display_name} word="Restart" tone="danger" disabled={busy} onClick={() => { void restart(); }} />
     <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
   </div>;
@@ -74,7 +75,8 @@ export function AgentRun({ entry }: { entry: Entry }) {
   }, 'agent-run:' + entry.id + ':' + revision);
   const changed = () => setRevision((value) => value + 1);
   if (load.status === 'loading') return null;
-  if (load.status === 'refused') return <p className="why-not agent-run">Lys could not read whether {entry.display_name} is running: {load.refused.message} <small className="refusal-name">{load.refused.refusal.refusal}</small></p>;
+  if (load.status === 'refused') return <section className="agent-run" aria-label="Run"><p className="why-not">Lys could not read whether {entry.display_name} is running.</p><ErrorWords problem={load.refused} />
+    <Act symbol="retry" name="Read it again" word="Try again" onClick={changed} /></section>;
   const { session, silent, me, admin } = load.data;
   if (!session) return <section className="agent-run" aria-label="Run" data-live="false"><Start key={entry.id} entry={entry} me={me} admin={admin} changed={changed} settings={() => navigate(settings)} /></section>;
   const where = session.machine_name ?? session.machine;

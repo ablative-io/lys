@@ -60,7 +60,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
     } catch {
       // A damaged pending record cannot establish that resubmission is safe.
     }
-    return 'Pending record could not be read; inspect ' + key;
+    return 'PendingRecordUnreadable: the kept record ' + key + ' could not be read.';
   });
   const [answer, setAnswer] = useState('');
   const [message, setMessage] = useState('');
@@ -123,11 +123,14 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
       {children}
       <Act symbol={drawn.symbol} name={submitLabel ?? title} word={drawn.word} tone={drawn.tone ?? 'primary'} type="submit" />
     </fieldset>
-    {pending ? directory ? <div role="status"><p>Lys has not confirmed whether it saved this change. Do not submit this change again. Use the button below to check the saved request. <small className="refusal-name">{typeof pending === 'string' ? pending : pending.operation}</small></p></div> : <p role="status">Awaiting a confirmed result. Do not submit this change again. Its operation is retained in this browser: <code>{typeof pending === 'string' ? pending : pending.operation}</code>.</p> : null}
+    {pending ? <div role="status"><p>{typeof pending === 'string'
+      ? 'This browser kept an earlier change it can no longer read, so whether Lys saved it is not known. Do not submit this change again; check whether it was made first.'
+      : 'Lys has not confirmed whether it saved this change. Do not submit this change again. Use Check to see whether Lys saved it.'}</p>
+      <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{typeof pending === 'string' ? pending : 'Kept request ' + pending.operation}</p></details></div> : null}
     {pending && typeof pending !== 'string' ? <Act symbol="again" name={directory ? 'Check whether Lys saved it' : 'Check original change'} word="Check" onClick={recover} /> : null}
-    {failure ? directory ? <ErrorWords problem={failure} /> : <p className="why-not" role="alert">{failure}</p> : null}
+    {failure ? <ErrorWords problem={failure} /> : null}
     {message ? <p role="status">{message}</p> : null}
-    {answer ? <><h4>Recorded receipt</h4><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></> : null}
+    {answer ? <details className="recorded-receipt"><summary>What Lys recorded</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
   </form>;
 }
 
