@@ -1,6 +1,8 @@
 //! Admitting a person in one act: register them, make their sign-in account
-//! at the issuer by email, bind that login, activate them and issue their
-//! first named root grant, in that order (PERMISSIONS-STORY 9 Oct 2026: a
+//! at the issuer by email, bind that login, activate them and, when one is
+//! asked for, issue their first named root grant, in that order. A fresh
+//! install has nothing to grant yet, so the grant is optional and a person
+//! admitted without one holds no access (PERMISSIONS-STORY 9 Oct 2026: a
 //! root grant to a person not yet active is refused `IdentityNotActive`).
 //!
 //! Each step runs as the existing route does, under an operation derived from

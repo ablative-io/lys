@@ -16,9 +16,8 @@ export const spendingIndex = (limits: Limit[]): number => limits.findIndex((limi
 export function withSpending(limits: Limit[], amount: number | null, period: Length): Limit[] {
   const at = spendingIndex(limits);
   if (amount === null) return at < 0 ? limits : limits.filter((_, index) => index !== at);
+  // An existing limit keeps its own act and any explicit zone; only the amount and period are this form's.
   const next: Limit = at < 0 ? { unit: 'dollars', amount, period, act: 'stop' } : { ...limits[at], amount, period };
-  // A changed period starts a new window, so the earlier window's zone is not carried onto it.
-  if (at >= 0 && limits[at].period !== period) delete next.zone;
   return at < 0 ? [...limits, next] : limits.map((limit, index) => (index === at ? next : limit));
 }
 
@@ -28,7 +27,7 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
   const [amount, setAmount] = useState(current ? String(current.amount) : '');
   const [period, setPeriod] = useState<Length>(current?.period ?? 'month');
   const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<{ refusal: string; words: string } | null>(null);
   const [unsure, setUnsure] = useState(false);
   const sending = useRef(false);
   const unavailable = budgets.unavailable.find((each) => each.unit === 'dollars');
@@ -36,7 +35,7 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
   const valid = cleared ? current !== null : validAmount('dollars', amount);
   const save = async () => {
     if (sending.current || unsure || !valid) return;
-    sending.current = true; setBusy(true); setFailure('');
+    sending.current = true; setBusy(true); setFailure(null);
     const body: BudgetBody = { limits: withSpending(budgets.limits, cleared ? null : Number(amount), period), warn_at: budgets.warn_at, version: budgets.version };
     try {
       const answer = await request<unknown>('/budgets/' + budgets.holder.kind + '/' + encodeURIComponent(budgets.holder.id), body, 'PUT');
@@ -44,7 +43,8 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
       changed(cleared ? 'Spending limit removed.' : 'Spending limit set: $' + Number(amount) + ' a ' + PERIOD_WORDS[period] + '. It applies now.');
     } catch (error) {
       if (!answeredNo(error)) setUnsure(true);
-      setFailure(error instanceof Refused ? error.refusal.reason : error instanceof Error ? error.message : String(error));
+      setFailure(error instanceof Refused ? { refusal: error.refusal.refusal, words: error.refusal.reason }
+        : { refusal: 'SpendingLimitUnconfirmed', words: error instanceof Error ? error.message : String(error) });
     } finally { sending.current = false; setBusy(false); }
   };
   return <form aria-label="Spending limit" className="card usage-spending" onSubmit={(event) => { event.preventDefault(); void save(); }}>
@@ -61,7 +61,7 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
       <p className="note">{current ? 'Applies as soon as it is saved. When it is reached, the session ends. Leave it empty and save to remove it.' : 'Applies as soon as it is saved. When it is reached, the session ends.'}</p>
     </>}
     {busy ? <p role="status">Saving…</p> : null}
-    {failure ? <p role="alert" className="why-not">{failure}</p> : null}
+    {failure ? <p role="alert" className="why-not">Not saved: {failure.words} <small className="refusal-name">{failure.refusal}</small></p> : null}
     {unsure ? <p role="status">Whether this was saved is not confirmed. Reload the page before changing it again.</p> : null}
   </form>;
 }

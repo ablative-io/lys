@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, unreachable, unmountAll } from './harness';
-import { ADA, BEA, COURIER, ME, RECEIPTS, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, COURIER, GRANTS, ME, RECEIPTS, REVIEWER, SCRIBE, SCRIBE_VIEW, SERVICE, ok, refused } from './fixtures';
 
 /** What an agent's Overview reads for its run: its settings, the computers and the offered choices. */
 const RUN = {
@@ -218,5 +218,21 @@ describe('Naming the actor of a record line', () => {
     const two = { ...me, sign_in_identities: [...me.sign_in_identities, { provider: 'http://other.test', subject: 'ada' }] };
     expect(signedInActor({ issuer: 'http://old.test', subject: 'ada' }, two)).toBe(false);
     expect(signedInActor({ issuer: 'http://other.test', subject: 'ada' }, two)).toBe(true);
+  });
+});
+
+describe('An agent\'s access on an install with no app yet', () => {
+  it('says to connect Cambium on Apps first, linking there, while no app resource exists', async () => {
+    await mount('#/file/' + SCRIBE + '/access');
+    const note = $('[data-cambium-first]');
+    expect(note?.textContent).toBe('Connect Cambium on Apps first; its channels appear here once it is approved.');
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  it('says nothing about Cambium once an app resource is granted', async () => {
+    const appGrant = { ...GRANTS[0], id: 'grant-' + 'c'.repeat(32), resource: { kind: 'cambium.channel', id: 'general' } };
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, appGrant], revision: 7 }) });
+    expect($('[data-cambium-first]')).toBeNull();
   });
 });

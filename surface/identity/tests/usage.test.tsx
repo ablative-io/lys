@@ -474,6 +474,18 @@ describe('An agent\'s spending limit', () => {
     expect(($(limit + ' input[name="spending_amount"]') as HTMLInputElement | null)?.value).toBe('25');
   });
 
+  it('says a refused save in words with the refusal named, and keeps the limit unchanged', async () => {
+    const routes = { ...keeping(), ['PUT ' + budgets]: refused(403, 'not_permitted', 'only the responsible person or an administrator sets this budget') };
+    await mount(file, routes);
+    const limit = 'form[aria-label="Spending limit"]';
+    await type(limit + ' input[name="spending_amount"]', '25');
+    await click($(limit + ' button[type="submit"]'));
+    const alert = $(limit + ' [role="alert"]');
+    expect(alert?.textContent).toContain('Not saved: only the responsible person or an administrator sets this budget');
+    expect(alert?.querySelector('.refusal-name')?.textContent).toBe('not_permitted');
+    expect(text()).not.toContain('It applies now.');
+  });
+
   it('changes the existing dollar limit in place and keeps every other limit', async () => {
     const dollars: Budget = { holder, measure: 'dollars', limit: 10, period: { length: 'day', zone: 'UTC' }, act: 'tell', version: 1, by: SCRIBE, at: 1790000000 };
     const routes = { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens, dollars])) };
