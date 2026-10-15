@@ -103,6 +103,26 @@ fn prepare(tree: &std::path::Path, name: &str) -> Result<(), Box<dyn Error>> {
                 .join("build.rs"),
             tree.join("build.rs"),
         )?;
+        let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join(name)
+            .join("build");
+        let modules = tree.join("build");
+        std::fs::create_dir_all(&modules)?;
+        for entry in std::fs::read_dir(source)? {
+            let entry = entry?;
+            if entry.file_type()?.is_file() {
+                std::fs::copy(entry.path(), modules.join(entry.file_name()))?;
+            }
+        }
+        if name == "lys" {
+            std::fs::create_dir_all(tree.join("native"))?;
+            std::fs::copy(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("native/owner-presence.swift"),
+                tree.join("native/owner-presence.swift"),
+            )?;
+        }
         std::fs::write(
             tree.join("src").join("main.rs"),
             "fn main() {\n    println!(\"{}\", env!(\"LYS_BUILD\"));\n}\n",

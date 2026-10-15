@@ -42,10 +42,22 @@ fn compiler() -> Result<&'static Compiler, Box<dyn Error>> {
 
 fn executable(source: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let compiler = compiler()?;
+    let modules = source
+        .parent()
+        .ok_or("stamp source has no parent")?
+        .join("build");
     let source = fs::read(source)?;
     let mut hash = Sha256::new();
     hash.update(&compiler.version);
     hash.update(&source);
+    let mut dependencies = fs::read_dir(&modules)?.collect::<Result<Vec<_>, _>>()?;
+    dependencies.sort_by_key(std::fs::DirEntry::file_name);
+    for entry in &dependencies {
+        if entry.file_type()?.is_file() {
+            hash.update(entry.file_name().as_encoded_bytes());
+            hash.update(fs::read(entry.path())?);
+        }
+    }
     let key = format!("{:x}", hash.finalize());
     let cache = Path::new(env!("CARGO_TARGET_TMPDIR")).join("version-stamps");
     fs::create_dir_all(&cache)?;
@@ -61,6 +73,13 @@ fn executable(source: &Path) -> Result<PathBuf, Box<dyn Error>> {
         let temporary = tempfile::tempdir_in(&cache)?;
         let input = temporary.path().join("stamp.rs");
         fs::write(&input, source)?;
+        let output_modules = temporary.path().join("build");
+        fs::create_dir(&output_modules)?;
+        for entry in &dependencies {
+            if entry.file_type()?.is_file() {
+                fs::copy(entry.path(), output_modules.join(entry.file_name()))?;
+            }
+        }
         let output = temporary.path().join("stamp");
         let rustc_run = Command::new(&compiler.executable)
             .args(["--edition=2024", "--crate-name", "stamp_probe"])
