@@ -238,7 +238,7 @@ describe('an agent with no folder to work in', () => {
     expect(posted).toEqual([]);
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('Choose on Ada’s laptop');
+    expect(host.textContent).toContain('Folders on Ada’s laptop');
     await type(host.querySelector('input[name="folder-path"]'), '/Users/ada/Developer/receipts');
     await click(button(host, 'Open the folder typed'));
     await settle();
@@ -290,9 +290,11 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('Choose on Ward desk');
+    expect(host.textContent).toContain('Folders on Ward desk');
     expect(host.querySelector('select[name="folder-computer"]')).toBeNull();
-    expect(posted).toEqual([]);
+    // Only the allowed computer is asked for its folders; nothing is saved until a folder is chosen.
+    expect(posted.every((entry) => entry.path === '/network/machines/' + other + '/folders')).toBe(true);
+    expect(posted.map((entry) => entry.body)).toContainEqual({});
   });
 
   it('looks on the one computer a role the agent holds allows it on, and not on one a role it no longer holds allowed', async () => {
@@ -307,9 +309,11 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('Choose on Ward desk');
+    expect(host.textContent).toContain('Folders on Ward desk');
     expect(host.querySelector('select[name="folder-computer"]')).toBeNull();
-    expect(posted).toEqual([]);
+    // Only the allowed computer is asked for its folders; nothing is saved until a folder is chosen.
+    expect(posted.every((entry) => entry.path === '/network/machines/' + other + '/folders')).toBe(true);
+    expect(posted.map((entry) => entry.body)).toContainEqual({});
   });
 
   it('sends every setting it read back unchanged, with the folder, when it saves', async () => {

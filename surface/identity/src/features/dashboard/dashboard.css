@@ -8,13 +8,14 @@
 .dash-widget td { overflow-wrap: normal; }
 .dash-widget .section-h { flex-wrap: wrap; }
 .dash-body > * { min-width: 0; }
-/* Names and where each runs stay on one line; a budget or goals line wraps inside its own column, each limit on a line
-   of its own, so the Goals column is never pushed out of the panel. The table scrolls sideways only when even that
-   cannot fit, as on a phone. */
-.you-tree td:nth-child(1), .you-tree td:nth-child(2) { white-space: nowrap; }
-.you-tree { min-width: 640px; }
-.you-tree td.you-budget { min-width: 22ch; max-width: 46ch; }
-.you-tree td.you-goals { min-width: 14ch; max-width: 30ch; }
+/* The agents table always fits its panel: no column is pushed out of sight and nothing scrolls sideways. Every cell
+   wraps its own text, a long name or folder breaking where it must; the last column, the row's own act, keeps its width. */
+.you-tree { width: 100%; table-layout: auto; }
+.you-tree td, .you-tree th { overflow-wrap: anywhere; word-break: normal; }
+.you-tree td:nth-child(1) { min-width: 12ch; }
+.you-tree td.you-budget { min-width: 10ch; max-width: 46ch; }
+.you-tree td.you-goals { min-width: 8ch; max-width: 30ch; }
+.you-tree td:last-child, .you-tree th:last-child { white-space: nowrap; width: 1%; }
 /* Narrow: the panels stack. The query is on the dashboard's own width (the nearest container, .dash-page), never the
    window's, so the full help docked beside it at 1280 stacks them too. Getting started keeps its whole height there:
    as a .you-panel it would otherwise shrink to nothing and spill over the Agents table and the lists. */
@@ -71,7 +72,7 @@
 /* The agents table, moved here with its rows from You. */
 .you-panel { min-height: 0; display: flex; flex-direction: column; }
 .you-panel > .section-h { flex: none; margin: 0 0 8px; }
-.you-scroll { flex: 1; min-height: 0; overflow: auto; }
+.you-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .you-tree { width: 100%; }
 .you-tree td { border-bottom: 0; padding: 0; }
 .you-tree tr[data-href] td { padding: 7px 10px; }

@@ -349,6 +349,7 @@ describe('Codex', () => {
     await settle();
     expect(latest.additional_directories).toEqual(['/Users/ada']);
     expect(posted.map((entry) => ({ path: entry.path, body: entry.body }))).toEqual([
+      { path: '/network/machines/' + computer + '/folders', body: {} },
       { path: '/network/machines/' + computer + '/folders', body: { under: '/Users' } },
       { path: '/network/machines/' + computer + '/folders', body: { under: '/Users/ada' } },
     ]);

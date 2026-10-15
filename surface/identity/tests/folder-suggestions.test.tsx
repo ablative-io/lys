@@ -32,15 +32,20 @@ it('reads suggestions on the parent change and cancels a read when the chooser c
       setter.call(input, '/work/project');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ under: '/work' });
+    // Opening asks for the home folder's list; typing asks once for the folder being typed in.
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({});
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ under: '/work' });
     expect(timer).not.toHaveBeenCalled();
-    const signal = fetch.mock.calls[0][1].signal as AbortSignal;
+    const home = fetch.mock.calls[0][1].signal as AbortSignal;
+    const signal = fetch.mock.calls[1][1].signal as AbortSignal;
+    expect(home.aborted).toBe(false);
     expect(signal.aborted).toBe(false);
     const cancel = container.querySelector<HTMLButtonElement>('button[aria-label="Cancel"]');
     if (!cancel) throw new Error('the chooser has no cancel button');
     await act(async () => { cancel.click(); });
     expect(signal.aborted).toBe(true);
+    expect(home.aborted).toBe(true);
     await act(async () => { pending.resolve(new Response(JSON.stringify({ machine: 'computer', under: '/work', folders: ['project'] }))); });
     expect(container.querySelector('datalist')).toBeNull();
   } finally { await act(async () => { root.unmount(); }); container.remove(); }

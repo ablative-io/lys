@@ -85,3 +85,9 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 /* The remove inside a chosen pill: the control at the pill's own size. */
 .pill .act { min-width: 16px; min-height: 16px; padding: 0; border: 0; background: none; color: inherit; }
 .pill .act svg { width: 12px; height: 12px; }
+.folder-chooser .folder-browser { border: 1px solid var(--line, #d8d8d8); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.folder-chooser .folder-browser h4 { margin: 0 0 6px; }
+.folder-chooser .folder-path-parts { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+.folder-chooser .folder-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; overflow-x: hidden; }
+.folder-chooser .folder-list li .act { width: 100%; justify-content: flex-start; overflow-wrap: anywhere; text-align: left; }
+.folder-chooser .folder-browser-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0 0; }
