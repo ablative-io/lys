@@ -213,3 +213,7 @@ async fn served() -> Result<Response, ServerError> {
 #[cfg(test)]
 #[path = "openapi_cache_tests.rs"]
 mod cache_tests;
+
+#[cfg(test)]
+#[path = "openapi_request_contract_tests.rs"]
+mod request_contract;

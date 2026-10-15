@@ -95,3 +95,27 @@ it('starts independent reads together and limits collection fan-out to four', as
   for (const [i, slot] of slots.entries()) slot.resolve(i);
   expect(await result).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
 });
+
+it('renews an unchanged long poll without refusing it or rereading views', async () => {
+  const renewed = deferred<'waiting' | 'refused'>();
+  const pending = deferred<Response>();
+  const never = deferred<Response>();
+  const changed = vi.fn();
+  const refused = vi.fn(() => renewed.resolve('refused'));
+  const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(generation('7'))))
+    .mockResolvedValueOnce(new Response(JSON.stringify(generation('7'))))
+    .mockImplementationOnce(() => { renewed.resolve('waiting'); return pending.promise; })
+    .mockReturnValue(never.promise);
+  vi.stubGlobal('fetch', fetch);
+  const leave = subscribeChanges(changed, refused);
+  try {
+    expect(await renewed.promise).toBe('waiting');
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(refused).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(3);
+  } finally {
+    leave();
+    pending.resolve(new Response(JSON.stringify(generation('8'))));
+    never.resolve(new Response(JSON.stringify(generation('9'))));
+  }
+});

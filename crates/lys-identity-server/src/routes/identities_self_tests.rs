@@ -164,3 +164,36 @@ async fn the_next_signed_agent_pass_contains_the_certified_key_thumbprint()
     assert_eq!(claims["agent_key_thumbprints"], json!([expected]));
     table.finish().await
 }
+
+#[tokio::test]
+async fn a_transition_missing_operation_has_a_named_deserialize_refusal()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (service, _) = Service::start_with(|config| {
+        Ok(
+            identity_contract::lys_identity_server::dev_seed::seed_configured(
+                config,
+                [ADMINISTRATOR, "member"],
+            )?,
+        )
+    })
+    .await?;
+    let admin = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let (status, body) = service
+        .post(
+            "/identities/agent-f98af560f0aee0b35d0c6a510c2e3499/transitions",
+            Some(&admin),
+            &json!({"transition":"reinstate", "reason":"resume from the screen"}),
+        )
+        .await?;
+    assert_eq!(status, 422);
+    assert_eq!(body["refusal"], "RequestMalformed", "{body}");
+    assert!(
+        body["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("operation")),
+        "{body}"
+    );
+    Ok(())
+}

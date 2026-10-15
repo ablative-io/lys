@@ -175,3 +175,21 @@ fn a_test_build_starts_the_test_login_s_shell_and_never_the_runner_s() -> Result
     assert_eq!(environment.anthropic_base(), None);
     Ok(())
 }
+
+#[test]
+fn service_path_is_the_interactive_login_path_including_user_programmes()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let shell = dir.path().join("login-shell");
+    std::fs::write(
+        &shell,
+        "#!/bin/sh\nif [ \"$1\" = -l ]; then shift; fi\nif [ \"$1\" = -i ]; then PATH=/fixture/bun:/usr/bin:/bin; shift; else PATH=/usr/bin:/bin; fi\nexport PATH\nexec /bin/sh \"$@\"\n",
+    )?;
+    std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o700))?;
+    let mut process = process_with_leak()?;
+    process.retain(|(name, _)| name != "SHELL");
+    process.push(("SHELL".into(), shell.into()));
+    let environment = login_from(process)?;
+    assert_eq!(environment.record().path, "/fixture/bun:/usr/bin:/bin");
+    Ok(())
+}

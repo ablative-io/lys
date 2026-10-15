@@ -26,7 +26,7 @@ function refusalOf(error: unknown): StartRefusal {
 
 interface MachineCatalogue {
   machine: string;
-  programs: { name: string; builds: { program: string; from: string }[]; not_found?: string }[];
+  programs: { name: string; builds: { program: string; command?: string; from: string }[]; not_found?: string }[];
 }
 
 /** Commands must be reported by the chosen computer. An explicit absolute file is checked there at spawn. */
@@ -43,7 +43,7 @@ export async function readMachineHarness(
   };
   if (program.startsWith('/')) return null;
   if (catalogue.programs.some((choice) => choice.builds.some((copy) =>
-    launchCommand(copy.program) === program && (copy.from === 'installed' || copy.from === 'runner'),
+    launchCommand(copy.command ?? copy.program) === program && (copy.from === 'installed' || copy.from === 'runner'),
   ))) return null;
   const reasons = catalogue.programs.flatMap((choice) => choice.not_found ? [choice.not_found] : []);
   return {

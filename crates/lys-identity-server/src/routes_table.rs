@@ -84,5 +84,6 @@ pub fn router(state: Shared) -> Router {
             std::sync::Arc::clone(&state),
             crate::changes::observe,
         ))
+        .layer(axum::middleware::from_fn(crate::request_rejections::named))
         .with_state(state)
 }

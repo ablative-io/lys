@@ -204,6 +204,7 @@ pub mod refusals_store;
 mod reporting_api;
 mod reporting_read;
 pub mod reporting_views;
+mod request_rejections;
 pub mod requests_api;
 pub mod requests_decide;
 mod requests_state;

@@ -87,11 +87,13 @@ function TurnOn({ agent, name, label, transition, again }: {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<Failure | null>(null);
   const working = useRef(false);
+  const operation = useRef<string | null>(null);
   const turnOn = async () => {
     if (working.current) return;
     working.current = true; setBusy(true); setFailed(null);
     try {
-      await request<unknown>('/identities/' + encodeURIComponent(agent) + '/transitions', { transition, reason: label + ' from the start screen, to start ' + name });
+      operation.current ??= operationId();
+      await request<unknown>('/identities/' + encodeURIComponent(agent) + '/transitions', { operation: operation.current, transition, reason: label + ' from the start screen, to start ' + name });
       again();
     } catch (error) { setFailed({ problem: error }); }
     finally { working.current = false; setBusy(false); }

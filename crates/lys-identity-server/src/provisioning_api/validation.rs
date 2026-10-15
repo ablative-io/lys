@@ -185,7 +185,10 @@ pub(super) async fn on_machine(
         _ => "",
     };
     if found.programs.iter().any(|program| {
-        crate::launch_template::launch_command(&program.program) == command
+        crate::launch_template::launch_command(match program.command.as_deref() {
+            Some(command) => command,
+            None => &program.program,
+        }) == command
             && program.adapter == adapter
     }) {
         return Ok(());

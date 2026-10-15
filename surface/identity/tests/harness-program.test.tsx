@@ -36,3 +36,8 @@ describe('the chosen computer checks the declared program', () => {
     expect(await readMachineHarness(machine, { name: 'Codex', program: '/opt/forks/codex-fork' }, async () => catalogue)).toBeNull();
   });
 });
+
+it('accepts the runner command when its installed build reports an absolute executable', async () => {
+  const reported = { machine, programs: [{ name: 'Claude Code', builds: [{ program: '/installed/bin/claude', command: 'claude', from: 'installed' }] }] };
+  expect(await readMachineHarness(machine, { name: 'Claude Code', program: 'claude' }, async () => reported)).toBeNull();
+});

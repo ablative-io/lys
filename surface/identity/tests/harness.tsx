@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { vi } from 'vitest';
+import { checkServerRequest } from './server-request-contract';
 import { App } from '../src/App';
 import { SERVICE } from './fixtures';
 import type { Route } from './fixtures';
@@ -39,6 +40,7 @@ export function serve(routes: Record<string, Route>, posted: { path: string; bod
     const post = method !== 'GET';
     const body: unknown = post ? JSON.parse(String(init?.body)) : undefined;
     const key = post ? method + ' ' + path : path;
+    if (post) checkServerRequest(method, path, body);
     requests.push(key);
     if (post && !(reachIsARead && key === 'POST /grants/reach')) posted.push({ path: method === 'POST' ? path : key, body });
     if (method === 'GET' && path.startsWith('/changes') && !routes[key]) {

@@ -27,9 +27,10 @@ function start(): void {
       while (!current.signal.aborted) {
         const answer = await request<{ generation: string }>('/changes' + (generation ? '?after=' + encodeURIComponent(generation) : ''), undefined, 'POST', current.signal);
         if (current.signal.aborted) return;
-        if (!/^op-[0-9a-f]{32}$/.test(answer.generation) || answer.generation === generation) {
+        if (!/^op-[0-9a-f]{32}$/.test(answer.generation)) {
           throw new Refused(0, { refusal: 'ChangeSignalUnreadable', reason: 'The service did not provide a new change signal. Refresh to reconnect.' });
         }
+        if (answer.generation === generation) continue;
         generation = answer.generation;
         ready = true;
         failures = 0;

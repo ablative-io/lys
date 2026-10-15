@@ -92,8 +92,8 @@ const BASE_END: &str = ":LYS_LOGIN_ANTHROPIC_BASE_URL_END";
 static LOGIN: OnceLock<Environment> = OnceLock::new();
 
 /// The login's environment, read once for this process: the [`KEPT`]
-/// variables this process has, and `PATH` as the login shell (`SHELL`,
-/// started as a login shell with only those variables) answers it. Refused
+/// variables this process has, and `PATH` as the interactive login shell (`SHELL`,
+/// started as an interactive login shell with only those variables) answers it. Refused
 /// when there is no `SHELL`, when the shell does not run, when it does not
 /// answer, or when it answers an empty `PATH`.
 ///
@@ -144,6 +144,7 @@ pub fn login_from(
         .envs(&kept)
         .args([
             "-l",
+            "-i",
             "-c",
             &format!(
                 r#"printf '\n%s%s%s%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}' '{BASE_MARKER}' "${{ANTHROPIC_BASE_URL-}}" '{BASE_END}'"#

@@ -73,7 +73,7 @@ describe('why an agent cannot start', () => {
     const path = '/identities/' + SCRIBE + '/transitions';
     const { host, posted, calls } = await shown(notActive('suspended'), { ['POST ' + path]: ok({}) });
     await click(host.querySelector('button'));
-    expect(posted).toEqual([{ path, body: { transition: 'reinstate', reason: 'Turn back on from the start screen, to start Scribe' } }]);
+    expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), transition: 'reinstate', reason: 'Turn back on from the start screen, to start Scribe' } }]);
     expect(calls.again).toBe(1);
   });
 
@@ -82,7 +82,7 @@ describe('why an agent cannot start', () => {
     const { host, posted, calls } = await shown(notActive('registered'), { ['POST ' + path]: ok({}) });
     expect(buttons(host)).toEqual(['Turn on']);
     await click(host.querySelector('button'));
-    expect(posted[0]).toEqual({ path, body: { transition: 'activate', reason: 'Turn on from the start screen, to start Scribe' } });
+    expect(posted[0]).toEqual({ path, body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), transition: 'activate', reason: 'Turn on from the start screen, to start Scribe' } });
     expect(calls.again).toBe(1);
   });
 

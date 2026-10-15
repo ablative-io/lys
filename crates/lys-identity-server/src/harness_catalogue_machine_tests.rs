@@ -17,8 +17,15 @@ async fn an_absolute_fork_is_saved_on_a_computer_that_does_not_report_it()
     profile_on_machine("/opt/forks/claude-fork").await
 }
 
+#[tokio::test]
+async fn a_command_profile_accepts_the_absolute_program_reported_by_its_machine()
+-> Result<(), Box<dyn std::error::Error>> {
+    profile_on_machine("claude").await
+}
+
 async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let (service, (seeded, machine, unreadable, stop, worker)) = Service::start_with(|config| {
+    let absolute = program == "claude";
+    let (service, (seeded, machine, unreadable, stop, worker)) = Service::start_with(move |config| {
         let seeded = identity_contract::lys_identity_server::dev_seed::seed_configured(config, [ADMINISTRATOR, "member"])?;
         let machine = lys_identity::OperationId::generate()?.to_string();
         let socket = config.log_dir.with_file_name("programs.sock");
@@ -42,7 +49,7 @@ async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Err
                     Answer::refusal(&lys_runner::RunnerError::refused("harness_programs_unreadable", "the chosen programme version report is not UTF-8"))
                 } else if act == Act::Programs {
                     Answer::Programs { found: lys_runner::dial::programs::Programs { programs: vec![
-                        lys_runner::dial::programs::HarnessProgram { command: Some("claude".to_owned()), program: "claude".to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
+                        lys_runner::dial::programs::HarnessProgram { command: Some("claude".to_owned()), program: if absolute { "/installed/bin/claude" } else { "claude" }.to_owned(), version: "2.1.300".to_owned(), adapter: "claude-stream-json/1".to_owned() },
                         lys_runner::dial::programs::HarnessProgram { command: Some("codex".to_owned()), program: "codex".to_owned(), version: "0.161.0-alpha.3".to_owned(), adapter: "codex-app-server/1".to_owned() },
                     ], reason: None } }
                 } else { Answer::refusal(&lys_runner::RunnerError::refused("fixture_standing_unavailable", "this fixture answers programme discovery only")) };
@@ -66,9 +73,11 @@ async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Err
         .collect::<Vec<_>>();
     assert_eq!(builds.len(), 2);
     assert!(builds.iter().all(|build| {
-        build["program"]
-            .as_str()
-            .is_some_and(|command| command == "claude" || command == "codex")
+        build["program"].as_str().is_some_and(|command| {
+            command == "claude"
+                || command == "codex"
+                || (absolute && command == "/installed/bin/claude")
+        })
     }));
     assert!(builds.iter().any(|build| {
         build["package"]
