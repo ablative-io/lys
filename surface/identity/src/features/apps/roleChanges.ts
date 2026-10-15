@@ -6,7 +6,7 @@
  */
 
 type Roles = Record<string, Record<string, string[]>>;
-type Shape = { kinds?: Record<string, { roles?: Record<string, string[]> } | null> } | null;
+type Shape = { kinds?: Record<string, { roles?: Record<string, string[]>; agents?: string[]; hot?: string[] } | null> } | null;
 
 /** Each kind's roles, kind to role to the actions it carries. */
 export function rolesIn(schema: unknown): Roles {
@@ -14,7 +14,7 @@ export function rolesIn(schema: unknown): Roles {
   return Object.fromEntries(Object.entries(kinds).map(([kind, body]) => [kind, body?.roles ?? {}]));
 }
 
-/** Every role change from `before` to `after`, one sentence each, kinds and roles in name order. */
+/** Every role, agent and hot action change, so approval names changes to who may act and how an action is decided. */
 export function roleChanges(before: unknown, after: unknown): string[] {
   const was = rolesIn(before);
   const now = rolesIn(after);
@@ -32,6 +32,16 @@ export function roleChanges(before: unknown, after: unknown): string[] {
         for (const action of held.filter((each) => !given.includes(each))) words.push('removes ' + action + ' from ' + role);
       }
     }
+    const previous = (before as Shape)?.kinds?.[kind];
+    const proposed = (after as Shape)?.kinds?.[kind];
+    const oldAgents = previous?.agents ?? [];
+    const nextAgents = proposed?.agents ?? [];
+    for (const action of nextAgents.filter((each) => !oldAgents.includes(each)).sort()) words.push('agents may now hold ' + action + ' on ' + kind);
+    for (const action of oldAgents.filter((each) => !nextAgents.includes(each)).sort()) words.push('agents may no longer hold ' + action + ' on ' + kind);
+    const oldHot = previous?.hot ?? [];
+    const nextHot = proposed?.hot ?? [];
+    for (const action of nextHot.filter((each) => !oldHot.includes(each)).sort()) words.push('makes ' + action + ' hot on ' + kind + ' (decided from the pass alone)');
+    for (const action of oldHot.filter((each) => !nextHot.includes(each)).sort()) words.push('makes ' + action + ' deliberate on ' + kind);
   }
   return words;
 }

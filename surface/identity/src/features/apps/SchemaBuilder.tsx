@@ -16,29 +16,75 @@
 import { useEffect, useState } from 'react';
 import { operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
+import { AddName, KindNode } from './lysfix-ui-kind-builder';
 import './schema-builder.css';
 import { Act } from '../../shell/Act';
 import { ErrorWords } from '../people/Words';
 
 /** A kind as the schema JSON writes it. */
-export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[]; hot?: string[]; roles?: Record<string, string[]> }
+export interface SchemaKindJson {
+  actions: string[];
+  relations?: Record<string, string[]>;
+  parents?: string[];
+  hot?: string[];
+  agents?: string[];
+  roles?: Record<string, string[]>;
+}
 /** An app's schema as the API takes it. */
-export interface SchemaJson { kinds: Record<string, SchemaKindJson> }
+export interface SchemaJson {
+  kinds: Record<string, SchemaKindJson>;
+}
 /** One relation of a draft kind. */
-export interface DraftRelation { name: string; actions: string[] }
-/** One kind of the draft, named within the app's prefix; its `hot` actions (ACCESS-001 R2) and `roles` (ACCESS-004 R1) are carried through an edit as they were read. */
-export interface DraftKind { name: string; actions: string[]; relations: DraftRelation[]; parents: string[]; hot?: string[]; roles?: Record<string, string[]> }
+export interface DraftRelation {
+  name: string;
+  actions: string[];
+}
+/** One kind of the draft, with omitted optional members remembered so opening and saving does not add them. */
+export interface DraftKind {
+  name: string;
+  actions: string[];
+  relations: DraftRelation[];
+  parents: string[];
+  hot?: string[];
+  agents?: string[];
+  roles?: Record<string, string[]>;
+  omitted?: ('relations' | 'parents')[];
+}
 /** The draft being built. */
-export interface Draft { kinds: DraftKind[] }
+export interface Draft {
+  kinds: DraftKind[];
+}
 
 /** What a change would do, as the dry run answers it. */
-export interface Named { kind: string; name: string }
-export interface Strand { kind: string; relation: string; count: number }
+export interface Named {
+  kind: string;
+  name: string;
+}
+export interface Strand {
+  kind: string;
+  relation: string;
+  count: number;
+}
 export interface SchemaCheck {
-  current: number; next: number; applies: boolean; stranded: Strand[];
-  diff: { kinds_added: string[]; kinds_removed: string[]; relations_added: Named[]; relations_removed: Named[]; actions_added: Named[]; actions_removed: Named[]; parents_added: Named[]; parents_removed: Named[];
-    agents_added?: Named[]; agents_removed?: Named[];
-    roles_added?: Named[]; roles_removed?: Named[]; roles_changed?: { kind: string; role: string; words: string[] }[] };
+  current: number;
+  next: number;
+  applies: boolean;
+  stranded: Strand[];
+  diff: {
+    kinds_added: string[];
+    kinds_removed: string[];
+    relations_added: Named[];
+    relations_removed: Named[];
+    actions_added: Named[];
+    actions_removed: Named[];
+    parents_added: Named[];
+    parents_removed: Named[];
+    agents_added?: Named[];
+    agents_removed?: Named[];
+    roles_added?: Named[];
+    roles_removed?: Named[];
+    roles_changed?: { kind: string; role: string; words: string[] }[];
+  };
 }
 
 export { send };
@@ -47,17 +93,20 @@ export { send };
 export function toSchema(app: string, draft: Draft): SchemaJson {
   const kinds: Record<string, SchemaKindJson> = {};
   for (const kind of draft.kinds) {
-    const body: SchemaKindJson = {
-      actions: [...kind.actions],
-      relations: Object.fromEntries(kind.relations.map((relation) => [relation.name, kind.actions.filter((action) => relation.actions.includes(action))])),
-      parents: kind.parents.map((parent) => app + '.' + parent),
-    };
+    const body: SchemaKindJson = { actions: [...kind.actions] };
+    if (!kind.omitted?.includes('relations') || kind.relations.length) body.relations = Object.fromEntries(kind.relations.map((relation) => [relation.name, relation.actions.filter((action) => kind.actions.includes(action))]));
+    if (!kind.omitted?.includes('parents') || kind.parents.length) body.parents = kind.parents.map((parent) => app + '.' + parent);
     // A hot action is kept only while its kind still declares it; none left, and `hot` is not written.
     const hot = (kind.hot ?? []).filter((action) => kind.actions.includes(action));
-    if (hot.length) body.hot = hot;
+    if (hot.length || kind.hot?.length === 0) body.hot = hot;
+    // Removing a declared action removes it from agent access too, without widening what agents may hold.
+    if (kind.agents) body.agents = kind.agents.filter((action) => kind.actions.includes(action));
     // A role keeps only the actions its kind still declares; one left carrying none is dropped, and the dry run names it.
-    const roles = Object.entries(kind.roles ?? {}).map(([role, may]) => [role, may.filter((action) => kind.actions.includes(action))] as const).filter(([, may]) => may.length);
-    if (roles.length) body.roles = Object.fromEntries(roles);
+    const roles = Object.entries(kind.roles ?? {}).flatMap(([role, may]) => {
+      const kept = may.filter((action) => kind.actions.includes(action));
+      return kept.length || !may.length ? [[role, kept] as const] : [];
+    });
+    if (roles.length || (kind.roles && !Object.keys(kind.roles).length)) body.roles = Object.fromEntries(roles);
     kinds[app + '.' + kind.name] = body;
   }
   return { kinds };
@@ -78,7 +127,9 @@ export function fromSchema(app: string, schema: unknown): Draft {
       relations: Object.entries(kind.relations ?? {}).map(([relation, actions]) => ({ name: relation, actions: [...actions] })),
       parents: (kind.parents ?? []).map(local),
       ...(kind.hot ? { hot: [...kind.hot] } : {}),
-      ...(kind.roles ? { roles: { ...kind.roles } } : {}),
+      ...(kind.agents ? { agents: [...kind.agents] } : {}),
+      ...(kind.roles ? { roles: Object.fromEntries(Object.entries(kind.roles).map(([role, actions]) => [role, [...actions]])) } : {}),
+      omitted: (['relations', 'parents'] as const).filter((member) => !Object.hasOwn(kind, member)),
     })),
   };
 }
@@ -88,23 +139,56 @@ export const TEMPLATES: { id: string; label: string; draft: Draft }[] = [
   {
     id: 'owner-editor-viewer',
     label: 'Owner, editor and viewer on one kind',
-    draft: { kinds: [{ name: 'document', actions: ['read', 'write', 'share'], relations: [{ name: 'owner', actions: ['read', 'write', 'share'] }, { name: 'editor', actions: ['read', 'write'] }, { name: 'viewer', actions: ['read'] }], parents: [] }] },
+    draft: {
+      kinds: [
+        {
+          name: 'document',
+          actions: ['read', 'write', 'share'],
+          relations: [
+            { name: 'owner', actions: ['read', 'write', 'share'] },
+            { name: 'editor', actions: ['read', 'write'] },
+            { name: 'viewer', actions: ['read'] },
+          ],
+          parents: [],
+        },
+      ],
+    },
   },
   {
     id: 'workspace',
     label: 'A workspace whose members reach its channels',
-    draft: { kinds: [
-      { name: 'workspace', actions: ['read', 'write', 'admin'], relations: [{ name: 'owner', actions: ['read', 'write', 'admin'] }, { name: 'member', actions: ['read'] }], parents: [] },
-      { name: 'channel', actions: ['read', 'write'], relations: [{ name: 'poster', actions: ['read', 'write'] }], parents: ['workspace'] },
-    ] },
+    draft: {
+      kinds: [
+        {
+          name: 'workspace',
+          actions: ['read', 'write', 'admin'],
+          relations: [
+            { name: 'owner', actions: ['read', 'write', 'admin'] },
+            { name: 'member', actions: ['read'] },
+          ],
+          parents: [],
+        },
+        { name: 'channel', actions: ['read', 'write'], relations: [{ name: 'poster', actions: ['read', 'write'] }], parents: ['workspace'] },
+      ],
+    },
   },
   {
     id: 'team-scoped',
     label: 'Resources scoped to a team',
-    draft: { kinds: [
-      { name: 'team', actions: ['read', 'manage'], relations: [{ name: 'lead', actions: ['read', 'manage'] }, { name: 'member', actions: ['read'] }], parents: [] },
-      { name: 'project', actions: ['read', 'write'], relations: [{ name: 'contributor', actions: ['read', 'write'] }], parents: ['team'] },
-    ] },
+    draft: {
+      kinds: [
+        {
+          name: 'team',
+          actions: ['read', 'manage'],
+          relations: [
+            { name: 'lead', actions: ['read', 'manage'] },
+            { name: 'member', actions: ['read'] },
+          ],
+          parents: [],
+        },
+        { name: 'project', actions: ['read', 'write'], relations: [{ name: 'contributor', actions: ['read', 'write'] }], parents: ['team'] },
+      ],
+    },
   },
 ];
 
@@ -114,59 +198,150 @@ const storageKey = (app: string) => 'lys.schema-draft.' + app;
 function kept(app: string, initial: Draft): Draft {
   const stored = sessionStorage.getItem(storageKey(app));
   if (!stored) return initial;
-  try { return JSON.parse(stored) as Draft; } catch { return initial; }
+  try {
+    const draft = JSON.parse(stored) as Draft;
+    // Older drafts could not edit agent access and never stored it; carry it from the uploaded kind.
+    for (const kind of draft.kinds) {
+      const uploaded = initial.kinds.find((entry) => entry.name === kind.name);
+      if (kind.agents === undefined && uploaded?.agents) kind.agents = [...uploaded.agents];
+    }
+    return draft;
+  } catch {
+    return initial;
+  }
 }
 
 /** The builder for `app`'s schema at `version`, opened from `initial`. */
 export function SchemaBuilder({ app, version, initial, onSaved, register }: { app: string; version: number | null; initial?: SchemaJson; onSaved?: (message: string) => void; register?: (schema: SchemaJson) => Promise<void> }) {
-  const [opened] = useState(() => { try { return { draft: initial ? fromSchema(app, initial) : { kinds: [] }, error: '' }; } catch (error) { return { draft: { kinds: [] }, error: String(error) }; } });
+  const [opened] = useState(() => {
+    try {
+      return { draft: initial ? fromSchema(app, initial) : { kinds: [] }, error: '' };
+    } catch (error) {
+      return { draft: { kinds: [] }, error: String(error) };
+    }
+  });
   const [draft, setDraft] = useState<Draft>(() => kept(app, opened.draft));
   const [check, setCheck] = useState<SchemaCheck | null>(null);
   // What failed: a problem said through ErrorWords, its code kept under Error details.
   const [refusal, setRefusal] = useState<unknown>(opened.error ? new Error(opened.error.replace(/^Error:\s*/, '')) : null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { sessionStorage.setItem(storageKey(app), JSON.stringify(draft)); }, [app, draft]);
-  const change = (edit: (next: Draft) => void) => { const next = copy(draft); edit(next); setDraft(next); setCheck(null); };
+  useEffect(() => {
+    sessionStorage.setItem(storageKey(app), JSON.stringify(draft));
+  }, [app, draft]);
+  const change = (edit: (next: Draft) => void) => {
+    const next = copy(draft);
+    edit(next);
+    setDraft(next);
+    setCheck(null);
+  };
   const schema = toSchema(app, draft);
   const refused = (error: unknown) => setRefusal(error);
   const dryRun = async () => {
-    setBusy(true); setRefusal(null);
-    try { setCheck(await send<SchemaCheck>('POST', '/apps/' + encodeURIComponent(app) + '/schema/check', { replaces: version, schema })); } catch (error) { refused(error); }
+    setBusy(true);
+    setRefusal(null);
+    try {
+      setCheck(await send<SchemaCheck>('POST', '/apps/' + encodeURIComponent(app) + '/schema/check', { replaces: version, schema }));
+    } catch (error) {
+      refused(error);
+    }
     setBusy(false);
   };
   const save = async () => {
-    setBusy(true); setRefusal(null);
+    setBusy(true);
+    setRefusal(null);
     try {
-      if (version === null) { await register?.(schema); } else { await send('PUT', '/apps/' + encodeURIComponent(app) + '/schema', { operation: operationId(), replaces: version, schema }); }
-      sessionStorage.removeItem(storageKey(app)); setCheck(null);
+      if (version === null) {
+        await register?.(schema);
+      } else {
+        await send('PUT', '/apps/' + encodeURIComponent(app) + '/schema', { operation: operationId(), replaces: version, schema });
+      }
+      sessionStorage.removeItem(storageKey(app));
+      setCheck(null);
       onSaved?.(version === null ? 'The app is registered and waits for approval.' : 'The schema was saved.');
-    } catch (error) { refused(error); }
+    } catch (error) {
+      refused(error);
+    }
     setBusy(false);
   };
   // A greyed act always says why, beside it.
-  const saveWhyNot = busy ? '' : !draft.kinds.length ? 'Add a kind, or start from a template, to build the permissions.'
-    : version !== null && !check ? 'Check the change first: Lys shows what it adds and removes before it can be saved.'
-    : version !== null && check && !check.applies ? 'This change cannot be saved as it is; the check above says why.' : '';
-  return <section className="sb" aria-label={'Permission template for ' + app}>
-    <div className="sb-templates" role="group" aria-label="Start from a template">
-      <span className="note">Start from</span>
-      {TEMPLATES.map((template) => <button type="button" className="sb-chip" data-choice="" key={template.id} onClick={() => change((next) => { next.kinds = copy(template.draft).kinds; })}>{template.label}</button>)}
-    </div>
-    <div className="sb-layout">
-      <div className="sb-tree" aria-label="Kinds">
-        {roots(draft).map((kind) => <KindNode key={draft.kinds.indexOf(kind)} app={app} draft={draft} kind={kind} seen={[]} change={change} />)}
-        <AddName label="Add a kind" placeholder="kind name" onAdd={(name) => change((next) => { if (!next.kinds.some((kind) => kind.name === name)) next.kinds.push({ name, actions: [], relations: [], parents: [] }); })} />
+  const saveWhyNot = busy
+    ? ''
+    : !draft.kinds.length
+      ? 'Add a kind, or start from a template, to build the permissions.'
+      : version !== null && !check
+        ? 'Check the change first: Lys shows what it adds and removes before it can be saved.'
+        : version !== null && check && !check.applies
+          ? 'This change cannot be saved as it is; the check above says why.'
+          : '';
+  return (
+    <section className="sb" aria-label={'Permission template for ' + app}>
+      <div className="sb-templates" role="group" aria-label="Start from a template">
+        <span className="note">Start from</span>
+        {TEMPLATES.map((template) => (
+          <button
+            type="button"
+            className="sb-chip"
+            data-choice=""
+            key={template.id}
+            onClick={() =>
+              change((next) => {
+                next.kinds = copy(template.draft).kinds;
+              })
+            }
+          >
+            {template.label}
+          </button>
+        ))}
       </div>
-      <SchemaBench app={app} schema={schema} draft={draft} />
-    </div>
-    <div className="sb-save">
-      {version === null ? null : <Act symbol="again" name="Check the change" word="Check" disabled={busy || !draft.kinds.length} onClick={() => { void dryRun(); }} />}
-      {version !== null && check ? <CheckAnswer check={check} /> : null}
-      <Act symbol={version === null ? 'add' : 'save'} name={version === null ? 'Register the app' : 'Save version ' + (version + 1)} word={version === null ? 'Register' : 'Save'} tone="primary" disabled={busy || !draft.kinds.length || (version !== null && (!check || !check.applies))} onClick={() => { void save(); }} />
-      {saveWhyNot ? <p className="hint sb-why-not">{saveWhyNot}</p> : null}
-      {refusal ? <div className="sb-refused"><ErrorWords problem={refusal} /></div> : null}
-    </div>
-  </section>;
+      <div className="sb-layout">
+        <div className="sb-tree" aria-label="Kinds">
+          {roots(draft).map((kind) => (
+            <KindNode key={draft.kinds.indexOf(kind)} app={app} draft={draft} kind={kind} seen={[]} change={change} />
+          ))}
+          <AddName
+            label="Add a kind"
+            placeholder="kind name"
+            onAdd={(name) =>
+              change((next) => {
+                if (!next.kinds.some((kind) => kind.name === name)) next.kinds.push({ name, actions: [], relations: [], parents: [] });
+              })
+            }
+          />
+        </div>
+        <SchemaBench app={app} schema={schema} draft={draft} />
+      </div>
+      <div className="sb-save">
+        {version === null ? null : (
+          <Act
+            symbol="again"
+            name="Check the change"
+            word="Check"
+            disabled={busy || !draft.kinds.length}
+            onClick={() => {
+              void dryRun();
+            }}
+          />
+        )}
+        {version !== null && check ? <CheckAnswer check={check} /> : null}
+        <Act
+          symbol={version === null ? 'add' : 'save'}
+          name={version === null ? 'Register the app' : 'Save version ' + (version + 1)}
+          word={version === null ? 'Register' : 'Save'}
+          tone="primary"
+          disabled={busy || !draft.kinds.length || (version !== null && (!check || !check.applies))}
+          onClick={() => {
+            void save();
+          }}
+        />
+        {saveWhyNot ? <p className="hint sb-why-not">{saveWhyNot}</p> : null}
+        {refusal ? (
+          <div className="sb-refused">
+            <ErrorWords problem={refusal} />
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
 }
 
 /** The kinds drawn at the top of the tree: those with no parent in the draft. */
@@ -174,55 +349,42 @@ function roots(draft: Draft): DraftKind[] {
   return draft.kinds.filter((kind) => !kind.parents.some((parent) => draft.kinds.some((other) => other.name === parent)));
 }
 
-function KindNode({ app, draft, kind, seen, change }: { app: string; draft: Draft; kind: DraftKind; seen: string[]; change: (edit: (next: Draft) => void) => void }) {
-  const at = (next: Draft) => next.kinds.find((entry) => entry.name === kind.name);
-  const children = draft.kinds.filter((other) => other.parents[0] === kind.name && !seen.includes(other.name));
-  return <div className="sb-node">
-    <fieldset className="sb-kind" aria-label={'Kind ' + kind.name}>
-      <legend><span className="sb-prefix">{app}.</span><input className="sb-name" aria-label={'Name of kind ' + kind.name} value={kind.name} onChange={(event) => { const name = event.target.value; change((next) => { for (const other of next.kinds) other.parents = other.parents.map((parent) => (parent === kind.name ? name : parent)); const own = at(next); if (own) own.name = name; }); }} /></legend>
-      <div className="sb-row"><span className="note">Actions</span>
-        {kind.actions.map((action) => <span className="sb-chip" key={action}>{action}<Act symbol="close" name={'Remove action ' + action + ' from ' + kind.name} onClick={() => change((next) => { const own = at(next); if (own) { own.actions = own.actions.filter((held) => held !== action); for (const relation of own.relations) relation.actions = relation.actions.filter((held) => held !== action); } })} /></span>)}
-        <AddName label={'Add an action to ' + kind.name} placeholder="action" onAdd={(name) => change((next) => { const own = at(next); if (own && !own.actions.includes(name)) own.actions.push(name); })} />
-      </div>
-      <table className="sb-relations"><thead><tr><th scope="col">Relation</th>{kind.actions.map((action) => <th scope="col" key={action}>{action}</th>)}<th /></tr></thead>
-        <tbody>{kind.relations.map((relation, index) => <tr key={index}>
-          <th scope="row"><input className="sb-name" aria-label={'Name of relation ' + relation.name + ' on ' + kind.name} value={relation.name} onChange={(event) => { const name = event.target.value; change((next) => { const own = at(next)?.relations[index]; if (own) own.name = name; }); }} /></th>
-          {kind.actions.map((action) => <td key={action}><input type="checkbox" className="sb-tick" aria-label={relation.name + ' carries ' + action} checked={relation.actions.includes(action)} onChange={(event) => { const on = event.target.checked; change((next) => { const own = at(next)?.relations[index]; if (own) own.actions = on ? [...own.actions, action] : own.actions.filter((held) => held !== action); }); }} /></td>)}
-          <td><Act symbol="remove" name={'Remove relation ' + relation.name + ' from ' + kind.name} className="small" onClick={() => change((next) => { const own = at(next); if (own) own.relations.splice(index, 1); })} /></td>
-        </tr>)}</tbody></table>
-      <AddName label={'Add a relation to ' + kind.name} placeholder="relation" onAdd={(name) => change((next) => { const own = at(next); if (own && !own.relations.some((relation) => relation.name === name)) own.relations.push({ name, actions: [] }); })} />
-      <div className="sb-row"><span className="note">Parents</span>
-        {draft.kinds.filter((other) => other.name !== kind.name).map((other) => <label className="sb-chip" key={other.name}><input type="checkbox" className="sb-tick" aria-label={'Parent ' + other.name + ' of ' + kind.name} checked={kind.parents.includes(other.name)} onChange={(event) => { const on = event.target.checked; change((next) => { const own = at(next); if (own) own.parents = on ? [...own.parents, other.name] : own.parents.filter((held) => held !== other.name); }); }} />{other.name}</label>)}
-      </div>
-      <Act symbol="remove" name={'Remove kind ' + kind.name} word="Remove kind" tone="danger" className="small sb-remove" onClick={() => change((next) => { next.kinds = next.kinds.filter((entry) => entry.name !== kind.name); for (const other of next.kinds) other.parents = other.parents.filter((parent) => parent !== kind.name); })} />
-    </fieldset>
-    {children.length ? <div className="sb-children">{children.map((child) => <KindNode key={draft.kinds.indexOf(child)} app={app} draft={draft} kind={child} seen={[...seen, kind.name]} change={change} />)}</div> : null}
-  </div>;
-}
-
-/** A name typed and added with its button; nothing is added while it is blank. */
-function AddName({ label, placeholder, onAdd }: { label: string; placeholder: string; onAdd: (name: string) => void }) {
-  const [name, setName] = useState('');
-  const add = () => { const trimmed = name.trim(); if (trimmed) { onAdd(trimmed); setName(''); } };
-  return <span className="sb-add"><input className="sb-name" aria-label={label} placeholder={placeholder} value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /><Act symbol="add" name={label} className="small" onClick={add} disabled={!name.trim()} /></span>;
-}
-
 function CheckAnswer({ check }: { check: SchemaCheck }) {
-  const listed = (title: string, items: string[]) => (items.length ? <li>{title}: {items.join(', ')}</li> : null);
+  const listed = (title: string, items: string[]) =>
+    items.length ? (
+      <li>
+        {title}: {items.join(', ')}
+      </li>
+    ) : null;
   const named = (items: Named[]) => items.map((item) => item.name + ' on ' + item.kind);
   const diff = check.diff;
-  return <div className="sb-check" aria-label="What the change would do">
-    <ul>
-      {listed('Kinds added', diff.kinds_added)}{listed('Kinds removed', diff.kinds_removed)}
-      {listed('Relations added', named(diff.relations_added))}{listed('Relations removed', named(diff.relations_removed))}
-      {listed('Actions added', named(diff.actions_added))}{listed('Actions removed', named(diff.actions_removed))}
-      {listed('Agent actions added', named(diff.agents_added ?? []))}{listed('Agent actions removed', named(diff.agents_removed ?? []))}
-      {listed('Parents added', named(diff.parents_added))}{listed('Parents removed', named(diff.parents_removed))}
-      {listed('Roles added', named(diff.roles_added ?? []))}{listed('Roles removed', named(diff.roles_removed ?? []))}
-      {listed('Roles changed', (diff.roles_changed ?? []).flatMap((change) => change.words))}
-    </ul>
-    {check.stranded.length
-      ? <div role="alert" className="sb-stranded"><b>This change cannot be saved.</b> It would strand standing grants: {check.stranded.map((strand) => strand.count + ' standing grant' + (strand.count === 1 ? '' : 's') + ' of ' + strand.relation + ' on ' + strand.kind).join('; ')}. Revoke them first through the ordinary revoke route.</div>
-      : <p className="note">No standing grant is stranded. Saving makes version {check.next}.</p>}
-  </div>;
+  return (
+    <div className="sb-check" aria-label="What the change would do">
+      <ul>
+        {listed('Kinds added', diff.kinds_added)}
+        {listed('Kinds removed', diff.kinds_removed)}
+        {listed('Relations added', named(diff.relations_added))}
+        {listed('Relations removed', named(diff.relations_removed))}
+        {listed('Actions added', named(diff.actions_added))}
+        {listed('Actions removed', named(diff.actions_removed))}
+        {listed('Agent actions added', named(diff.agents_added ?? []))}
+        {listed('Agent actions removed', named(diff.agents_removed ?? []))}
+        {listed('Parents added', named(diff.parents_added))}
+        {listed('Parents removed', named(diff.parents_removed))}
+        {listed('Roles added', named(diff.roles_added ?? []))}
+        {listed('Roles removed', named(diff.roles_removed ?? []))}
+        {listed(
+          'Roles changed',
+          (diff.roles_changed ?? []).flatMap((change) => change.words)
+        )}
+      </ul>
+      {check.stranded.length ? (
+        <div role="alert" className="sb-stranded">
+          <b>This change cannot be saved.</b> It would strand standing grants: {check.stranded.map((strand) => strand.count + ' standing grant' + (strand.count === 1 ? '' : 's') + ' of ' + strand.relation + ' on ' + strand.kind).join('; ')}. Revoke them first through the ordinary revoke route.
+        </div>
+      ) : (
+        <p className="note">No standing grant is stranded. Saving makes version {check.next}.</p>
+      )}
+    </div>
+  );
 }
