@@ -1,35 +1,165 @@
-/* You fills the screen and never scrolls as a whole: the account's pieces as one row, what you hold across the width under it, each part scrolling inside itself. */
-.you-page { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding-bottom: 20px; }
-.you-page > .head { flex: none; margin-bottom: 8px; }
-.you-account { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
-/* The account's row: its changes as rows on the left, the signed-in sessions in the middle, the two short records one over the other on the right. All three are as tall as the account's changes; the others scroll inside themselves. */
-.you-account-row { flex: none; min-width: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px; }
-.you-page .you-account-row > .card { margin: 0; min-width: 0; min-height: 0; padding: 12px 14px; overflow: auto; overscroll-behavior: contain; }
-.you-account-row > .you-sessions { display: flex; flex-direction: column; max-height: 360px; }
-.you-account { overflow: auto; }
-.you-holds-pane { flex: 1 0 300px; }
-.you-sessions-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-.you-sessions-scroll td, .you-sessions-scroll th { padding: 5px 8px; }
-.you-sessions-scroll td:first-child { min-width: 170px; }
-.you-sessions-scroll td .note { margin: 0; overflow-wrap: anywhere; }
-.you-sessions-scroll td:nth-child(2), .you-sessions-scroll td:nth-child(3), .you-sessions-scroll .btn { white-space: nowrap; }
-.you-sessions-scroll .btn { padding: 3px 9px; font-size: 12px; }
-.you-holds-pane { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
-.you-holds-pane > .section-h { flex: none; }
-.you-count { margin-left: 8px; font-weight: 500; color: var(--text-muted); }
-.you-holds-scroll { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
-/* A grant is one line: its two changes sit side by side, and its window and last use do not wrap. */
-.you-holds-scroll .grant-cols .g-change { flex-wrap: nowrap; }
-.you-holds-scroll .grant-cols .g-change .btn { padding: 3px 9px; font-size: 12px; }
-.you-holds-scroll td[data-col="Window"], .you-holds-scroll td[data-col="Last used"], .you-holds-scroll td[data-col="May pass on"] { white-space: nowrap; }
-.you-holds-scroll thead th { position: sticky; top: 0; z-index: 1; }
+/* The account scrolls as one pane; its cards keep the height their content needs. */
+.you-page {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 20px;
+}
+.you-page > .head {
+  flex: none;
+  margin-bottom: 8px;
+}
+.you-account {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* A short record must not stretch to match the account form beside it. */
+.you-account-row {
+  flex: none;
+  min-width: 0;
+  display: grid;
+  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  gap: 12px;
+}
+.you-page .you-account-row > .card {
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 14px;
+  overflow: visible;
+}
+.you-account-row > .you-sessions {
+  display: flex;
+  flex-direction: column;
+}
+.you-account {
+  overflow: auto;
+}
+.you-holds-pane {
+  flex: 1 0 300px;
+}
+.you-sessions-scroll {
+  min-width: 0;
+  overflow: visible;
+}
+.you-sessions-scroll .table-scroll {
+  overflow: visible;
+}
+.you-sessions-scroll td,
+.you-sessions-scroll th {
+  padding: 5px 8px;
+}
+.you-sessions-scroll .table-scroll > table {
+  width: 100%;
+  table-layout: fixed;
+}
+.you-sessions-scroll th,
+.you-sessions-scroll td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.you-sessions-scroll th:last-child {
+  width: 3.5rem;
+}
+.you-sessions-scroll td:first-child {
+  min-width: 0;
+}
+.you-sessions-scroll td .note {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.you-sessions-scroll td .act {
+  width: 32px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+}
+.you-sessions-scroll td .act-word {
+  display: none;
+}
+.you-holds-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.you-holds-pane > .section-h {
+  flex: none;
+}
+.you-count {
+  margin-left: 8px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.you-holds-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* Grant facts and changes wrap within the same width as the account. */
+.you-holds-scroll .grant-cols .g-change .btn {
+  padding: 3px 9px;
+  font-size: 12px;
+}
+.you-holds-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
 /* A change of the account is one block: what it changes as its heading, its fields wide enough to read what is typed, its button at the end. */
-.account-rows { display: flex; flex-direction: column; }
-.account-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px 10px; padding: 10px 0; border-top: 1px solid var(--border-subtle); }
-.account-row-of { grid-column: 1 / -1; font-size: 13px; font-weight: 600; color: var(--text-primary); }
-.account-row-fields { display: flex; flex-wrap: wrap; gap: 8px 10px; min-width: 0; }
-.account-row-fields .field { flex: 1 1 180px; min-width: 0; margin: 0; }
-.account-row-fields .field label { display: block; margin-bottom: 3px; font-size: 11.5px; color: var(--text-muted); }
-.account-row-fields .field input { width: 100%; box-sizing: border-box; padding: 6px 9px; }
-.account-row-fields > p { flex: 1 1 100%; margin: 0; }
-.recorded-form.account-row button[type="submit"] { margin-top: 0; white-space: nowrap; }
+.account-rows {
+  display: flex;
+  flex-direction: column;
+}
+.account-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+.account-row-of {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.account-row-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.account-row-fields .field {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+}
+.account-row-fields .field label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+.account-row-fields .field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+}
+.account-row-fields > p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.recorded-form.account-row button[type='submit'] {
+  margin-top: 0;
+  white-space: nowrap;
+}

@@ -1,46 +1,145 @@
-/*
- * A grant's columns fit what they hold (Tom, 4 Oct 2026): nothing breaks inside a word
- * and the table never scrolls sideways. Grant and Relation are narrow and never wrap;
- * the On reference and the path to a person take the room, wrapping only where a
- * reference has its own breaks (after . : _ - /) or between names.
- */
-/* Columns size to what they hold, not eleven equal shares. */
-.usage-table.grant-cols { table-layout: auto; width: 100%; }
-.grant-cols td { overflow-wrap: break-word; word-break: normal; hyphens: none; }
-.grant-cols .g-tight { white-space: nowrap; }
-.grant-cols td[data-col="Allows"], .grant-cols td[data-col="Window"] { white-space: nowrap; }
-.grant-cols .chain { gap: 4px; }
-.grant-cols .chain .pill { white-space: nowrap; margin: 1px 0; }
-.grant-cols .g-change { display: flex; flex-wrap: wrap; gap: 6px; }
-.grant-cols .g-change .btn { white-space: nowrap; }
+/* Long action lists and references must share the available width with the other grant facts. */
+.usage-table.grant-cols,
+.grant-cols .table-scroll > table {
+  table-layout: auto;
+  width: 100%;
+}
+.grant-cols th,
+.grant-cols td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: none;
+}
+.grant-cols th {
+  overflow-wrap: normal;
+}
+.grant-cols .g-tight {
+  white-space: normal;
+}
+.grant-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.grant-cols .chain {
+  gap: 4px;
+}
+.grant-cols .chain .pill {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  margin: 1px 0;
+}
+.grant-cols .g-change {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.grant-cols .g-change .act {
+  white-space: normal;
+}
 
 /* A chosen grant read as facts in the panel beside a list: one line each, nothing squeezed. */
-.grant-facts { grid-template-columns: max-content minmax(0, 1fr); }
-.grant-facts dd { overflow-wrap: break-word; }
-.grant-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.grant-facts {
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+.grant-facts dd {
+  overflow-wrap: break-word;
+}
+.grant-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
 
 /* "Can [who] [do what] [on what]? [Check]": one sentence on one line, each field part of it. */
-.ask-line { flex-wrap: nowrap; }
-.ask-line select { min-width: 0; max-width: 30ch; }
-.ask-line .sec { white-space: nowrap; }
+.ask-line {
+  flex-wrap: nowrap;
+}
+.ask-line select {
+  min-width: 0;
+  max-width: 30ch;
+}
+.ask-line .sec {
+  white-space: nowrap;
+}
 
 /* The root grant form: each field labelled above, in columns at least wide enough for a full name; narrow screens take one field to a line. */
-.act-panel.issue-root { border: 0; background: none; padding: 0; margin: 0 0 12px; }
+.act-panel.issue-root {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0 0 12px;
+}
 .issue-root .recorded-form fieldset {
-  display: grid; align-items: end; gap: 6px 10px;
+  display: grid;
+  align-items: end;
+  gap: 6px 10px;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
 }
-.issue-root .recorded-form fieldset > p { grid-column: 1 / -1; margin: 0 0 4px; }
-.issue-root .recorded-form .field { margin: 0; font-size: 12px; color: var(--text-secondary); }
-.issue-root .recorded-form .field .tick { display: flex; align-items: center; gap: 6px; min-height: 36px; white-space: nowrap; color: var(--text-primary); }
-.issue-root .recorded-form .expires { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.issue-root .recorded-form .expires input[type="datetime-local"] { flex: 1 1 210px; min-width: 0; }
-.issue-root .recorded-form button[type="submit"] { margin-top: 4px; grid-column: 1 / -1; justify-self: start; }
-@media (max-width: 720px) { .issue-root .recorded-form fieldset { grid-template-columns: minmax(0, 1fr); } }
-.grant-acts > form { flex: none; }
-.grant-acts > p { flex-basis: 100%; }
+.issue-root .recorded-form fieldset > p {
+  grid-column: 1 / -1;
+  margin: 0 0 4px;
+}
+.issue-root .recorded-form .field {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.issue-root .recorded-form .field .tick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+.issue-root .recorded-form .expires {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.issue-root .recorded-form .expires input[type='datetime-local'] {
+  flex: 1 1 210px;
+  min-width: 0;
+}
+.issue-root .recorded-form button[type='submit'] {
+  margin-top: 4px;
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+@media (max-width: 720px) {
+  .issue-root .recorded-form fieldset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.grant-acts > form {
+  flex: none;
+}
+.grant-acts > p {
+  flex-basis: 100%;
+}
 /* Each field of the question carries its visible name above it; the words of the sentence stay on the line. */
-.ask-line { align-items: flex-end; }
-.ask-field { display: inline-flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ask-field strong { line-height: 30px; }
-.ask-line > .sec, .ask-line > .btn { margin-bottom: 0; align-self: flex-end; line-height: 30px; }
+.ask-line {
+  align-items: flex-end;
+}
+.ask-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ask-field strong {
+  line-height: 30px;
+}
+.ask-line > .sec,
+.ask-line > .btn {
+  margin-bottom: 0;
+  align-self: flex-end;
+  line-height: 30px;
+}
