@@ -18,7 +18,11 @@ export const START: Seed[] = [
     steps: [
       { text: 'On the computer Lys runs on, run lys identity setup-code and confirm with Touch ID.' },
       { text: 'Enter the code, then your first name, last name, email and password.' },
-      { text: 'Press Set up and sign in; the dashboard opens with Getting started.', href: '#/dashboard', link: 'Open the dashboard' },
+      {
+        text: 'Press Set up and sign in; the dashboard opens with Getting started.',
+        href: '#/dashboard',
+        link: 'Open the dashboard'
+      },
     ],
     related: ['start.sign-in', 'start.computer', 'people.dashboard'],
   },
@@ -31,7 +35,10 @@ export const START: Seed[] = [
       'Signing in with Google works only for someone already added as a person here: Lys links the Google login to the person with the same email address. It never makes a new account from a Google login.',
       'Your own page, You (g u), lists the sessions you are signed in with and the access you hold.',
     ],
-    steps: [{ text: 'Sign in with your password or with Google.' }, { text: 'Check your account and sessions on You.', href: '#/me', link: 'Open You' }],
+    steps: [
+      { text: 'Sign in with your password or with Google.' },
+      { text: 'Check your account and sessions on You.', href: '#/me', link: 'Open You' }
+    ],
     related: ['start.google', 'trouble.signin', 'people.kind'],
   },
   {
@@ -44,8 +51,16 @@ export const START: Seed[] = [
       'Another computer is added under Network: give it a name, then get a connection code and run the command shown on that computer. The code works once and is not shown again.',
     ],
     steps: [
-      { text: 'On the dashboard, answer "Run agents on this computer?" with its name and "Yes, run agents here".', href: '#/dashboard', link: 'Open the dashboard' },
-      { text: 'Or add a computer by name on Network, and connect it with its code.', href: '#/network', link: 'Open Network' },
+      {
+        text: 'On the dashboard, answer "Run agents on this computer?" with its name and "Yes, run agents here".',
+        href: '#/dashboard',
+        link: 'Open the dashboard'
+      },
+      {
+        text: 'Or add a computer by name on Network, and connect it with its code.',
+        href: '#/network',
+        link: 'Open Network'
+      },
     ],
     related: ['computers.network', 'computers.runner', 'computers.may-start'],
   },
@@ -58,7 +73,11 @@ export const START: Seed[] = [
       'A Google login reaches Lys only for a person already added with that email address; it never creates an account.',
     ],
     steps: [
-      { text: 'Open Configuration → Services and sign-in providers and add Google.', href: '#/connections', link: 'Open sign-in providers' },
+      {
+        text: 'Open Configuration → Services and sign-in providers and add Google.',
+        href: '#/connections',
+        link: 'Open sign-in providers'
+      },
       { text: 'Add each person with their Google email address.', href: '#/people/new', link: 'Add a person' },
     ],
     related: ['start.sign-in', 'start.person', 'trouble.signin'],
@@ -72,7 +91,11 @@ export const START: Seed[] = [
       'Nothing an app asks for takes effect until you approve it on Apps. If Cambium has already asked, the dashboard says so: review what it asks for and approve it.',
       'Until Cambium is approved, an agent’s Access tab says "Connect Cambium on Apps first; its channels appear here once it is approved."',
     ],
-    steps: [{ text: 'Open Apps under Configuration and press Connect beside Cambium.', href: '#/apps', link: 'Open Apps' }, { text: 'Give Cambium’s web address, such as https://cambium.example.com.' }, { text: 'Review the permissions it asks for, then approve it.' }],
+    steps: [
+      { text: 'Open Apps under Configuration and press Connect beside Cambium.', href: '#/apps', link: 'Open Apps' },
+      { text: 'Give Cambium’s web address, such as https://cambium.example.com.' },
+      { text: 'Review the permissions it asks for, then approve it.' }
+    ],
     related: ['apps.apps', 'access.cambium-channels', 'trouble.cambium-missing'],
   },
   {
@@ -85,7 +108,11 @@ export const START: Seed[] = [
       'On a first run the button is Add and run: it adds the agent and starts it on this computer straight away, with no Start to press. Otherwise the button is Add, and you arrive on the agent’s own page, where Start runs it.',
       'On a first run Lys starts the program in a mode that limits its changes to its own folder with the internet off. If the program has no such mode, a note on the form says it starts in its most careful mode instead, and names that mode. Every choice the form does not ask (the mode, who it answers to, its team and its access) is under More settings.',
     ],
-    steps: [{ text: 'Open People and agents and press Add agent.', href: '#/agents/new', link: 'Add an agent' }, { text: 'Give it a name, choose the program, the folder and the computer.' }, { text: 'On a first run press Add and run; it starts at once. Otherwise press Add, then Start on its page.' }],
+    steps: [
+      { text: 'Open People and agents and press Add agent.', href: '#/agents/new', link: 'Add an agent' },
+      { text: 'Give it a name, choose the program, the folder and the computer.' },
+      { text: 'On a first run press Add and run; it starts at once. Otherwise press Add, then Start on its page.' }
+    ],
     related: ['people.agent-file', 'access.give', 'budgets.limit', 'trouble.start'],
   },
   {
@@ -97,7 +124,12 @@ export const START: Seed[] = [
       'On the agent’s page, open Access and press Give. You can pass on only access you hold yourself and are allowed to pass to agents.',
       'Cambium channel access comes from a grant on a Cambium resource that you hold and may pass to agents. "Let me give agents access" records the administrator’s grants on the agents and apps directories only; it gives no Cambium access.',
     ],
-    steps: [{ text: 'Connect Cambium first.', href: '#/apps', link: 'Open Apps' }, { text: 'First hold a grant on the Cambium channel that permits passing its actions to agents.' }, { text: 'Open the agent’s page, then its Access tab, and press Give.' }, { text: 'Choose the channel and what the agent may do there.' }],
+    steps: [
+      { text: 'Connect Cambium first.', href: '#/apps', link: 'Open Apps' },
+      { text: 'First hold a grant on the Cambium channel that permits passing its actions to agents.' },
+      { text: 'Open the agent’s page, then its Access tab, and press Give.' },
+      { text: 'Choose the channel and what the agent may do there.' }
+    ],
     related: ['access.give', 'start.cambium', 'access.restricted'],
   },
   {
@@ -109,22 +141,34 @@ export const START: Seed[] = [
       'Below it, Budget holds further limits, each with "Spend at most", a period and what happens "When it’s hit", and can warn you at a percentage of a limit first. Whichever limit is reached first acts first.',
       'If Lys cannot measure spending for that agent yet, it says so and the limit cannot be set.',
     ],
-    steps: [{ text: 'Open the agent’s page, then Limits and goals.' }, { text: 'Under Spending limit, give the amount and the period, then save.' }],
+    steps: [
+      { text: 'Open the agent’s page, then Limits and goals.' },
+      { text: 'Under Spending limit, give the amount and the period, then save.' }
+    ],
     related: ['budgets.limit', 'budgets.goals', 'budgets.personal'],
   },
   {
     id: 'start.person',
     title: 'Add a person',
     summary: 'Add someone to the directory; giving them access is optional.',
-    body: ['Add a person asks for their name and email. Access is optional: they can start with none and be given it later.', 'If they will sign in with Google, use the email address of their Google account.'],
-    steps: [{ text: 'Open People and agents and press Add person.', href: '#/people/new', link: 'Add a person' }, { text: 'Give their name and email; choose a first grant only if they need one now.' }],
+    body: [
+      'Add a person asks for their name and email. Access is optional: they can start with none and be given it later.',
+      'If they will sign in with Google, use the email address of their Google account.'
+    ],
+    steps: [
+      { text: 'Open People and agents and press Add person.', href: '#/people/new', link: 'Add a person' },
+      { text: 'Give their name and email; choose a first grant only if they need one now.' }
+    ],
     related: ['start.google', 'people.kind', 'access.grant'],
   },
   {
     id: 'start.keys',
     title: 'Keyboard shortcuts',
     summary: 'Every screen is a key or two away.',
-    body: ['g then a letter goes to a screen; ? (outside a field) or ⌘/ (anywhere, a field included) shows what is on this page; ⌘K opens the command palette. The full table is in the page help.', 'In a list, j and k move the cursor and Enter opens the row. On a person’s or agent’s page, 1 to 7 switch its tabs.'],
+    body: [
+      'g then a letter goes to a screen; ? (outside a field) or ⌘/ (anywhere, a field included) shows what is on this page; ⌘K opens the command palette. The full table is in the page help.',
+      'In a list, j and k move the cursor and Enter opens the row. On a person’s or agent’s page, 1 to 7 switch its tabs.'
+    ],
     steps: [],
     related: ['people.rail'],
   },

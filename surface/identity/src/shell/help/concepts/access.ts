@@ -17,7 +17,10 @@ export const ACCESS: Seed[] = [
     id: 'access.check',
     title: 'Can this be done?',
     summary: 'Ask any way round; every answer shows its path.',
-    body: ['Ask, under Access, answers what someone can reach, who can reach something, and whether one identity can do one thing.', 'Yes answers show the chain to a person. No answers say which kind of refusal it is: no grant, identity not active, authority withdrawn upstream, or a type the model does not have.'],
+    body: [
+      'Ask, under Access, answers what someone can reach, who can reach something, and whether one identity can do one thing.',
+      'Yes answers show the chain to a person. No answers say which kind of refusal it is: no grant, identity not active, authority withdrawn upstream, or a type the model does not have.'
+    ],
     steps: [{ text: 'Open Access → Ask.', href: '#/access/can', link: 'Open Ask' }],
     related: ['access.grant', 'trouble.permission'],
   },
@@ -37,16 +40,29 @@ export const ACCESS: Seed[] = [
     id: 'access.cambium-channels',
     title: 'Cambium channels',
     summary: 'Once Cambium is approved, its channels are places you can grant.',
-    body: ['Until Cambium is connected and approved on Apps, no channel can be given, and Access says to connect Cambium first.'],
+    body: [
+      'Until Cambium is connected and approved on Apps, no channel can be given, and Access says to connect Cambium first.'
+    ],
     steps: [{ text: 'Connect Cambium on Apps.', href: '#/apps', link: 'Open Apps' }],
     related: ['start.cambium', 'start.channels'],
   },
-  { id: 'access.restricted', title: 'Restricted places', summary: 'Reached only by a grant on the place itself.', body: ['A restricted place is shown apart: nothing held on the place it sits in reaches it. Give a grant on the place itself.'], steps: [], related: ['access.grant'] },
+  {
+    id: 'access.restricted',
+    title: 'Restricted places',
+    summary: 'Reached only by a grant on the place itself.',
+    body: [
+      'A restricted place is shown apart: nothing held on the place it sits in reaches it. Give a grant on the place itself.'
+    ],
+    steps: [],
+    related: ['access.grant']
+  },
   {
     id: 'access.requests',
     title: 'Requests',
     summary: 'Someone asked for access; you decide.',
-    body: ['Access → Requests lists what was asked, by whom, on what. The rail’s Access count includes requests waiting for a decision.'],
+    body: [
+      'Access → Requests lists what was asked, by whom, on what. The rail’s Access count includes requests waiting for a decision.'
+    ],
     steps: [{ text: 'Open Requests.', href: '#/requests', link: 'Open Requests' }],
     related: ['access.drafts', 'access.reviews'],
   },
@@ -54,7 +70,10 @@ export const ACCESS: Seed[] = [
     id: 'access.drafts',
     title: 'Drafts',
     summary: 'What your agents prepared for you to decide. Nothing is done until you approve it.',
-    body: ['An agent may prepare a change it is not allowed to make and leave it for you. Each draft shows the request exactly as it would be sent.', 'Approve does it. Refuse asks why you refuse it, and the reason is shown with the draft, with who decided and when.'],
+    body: [
+      'An agent may prepare a change it is not allowed to make and leave it for you. Each draft shows the request exactly as it would be sent.',
+      'Approve does it. Refuse asks why you refuse it, and the reason is shown with the draft, with who decided and when.'
+    ],
     steps: [{ text: 'Open Access → Drafts.', href: '#/access/drafts', link: 'Open Drafts' }],
     related: ['access.requests', 'people.dashboard'],
   },
@@ -62,11 +81,20 @@ export const ACCESS: Seed[] = [
     id: 'access.reviews',
     title: 'Reviews',
     summary: 'Grants due a look, and agents needing an active owner.',
-    body: ['Access → Reviews lists grants due a review and agents whose person is no longer active. The rail’s Access count includes them.'],
+    body: [
+      'Access → Reviews lists grants due a review and agents whose person is no longer active. The rail’s Access count includes them.'
+    ],
     steps: [{ text: 'Open Reviews.', href: '#/reviews', link: 'Open Reviews' }],
     related: ['access.requests', 'people.state'],
   },
-  { id: 'access.graph', title: 'Graph', summary: 'The same answers as Access, drawn.', body: ['Click a person or agent to light what it reaches; click a resource to light who reaches it.'], steps: [{ text: 'Open Graph (g h).', href: '#/graph', link: 'Open Graph' }], related: ['access.grant'] },
+  {
+    id: 'access.graph',
+    title: 'Graph',
+    summary: 'The same answers as Access, drawn.',
+    body: ['Click a person or agent to light what it reaches; click a resource to light who reaches it.'],
+    steps: [{ text: 'Open Graph (g h).', href: '#/graph', link: 'Open Graph' }],
+    related: ['access.grant']
+  },
   {
     id: 'access.sealed',
     title: 'Secrets',
@@ -78,5 +106,12 @@ export const ACCESS: Seed[] = [
     steps: [{ text: 'Open Secrets (g v).', href: '#/secrets', link: 'Open Secrets' }],
     related: ['access.scope'],
   },
-  { id: 'access.scope', title: 'Scope', summary: 'Organisation, team, or yours alone.', body: ['A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you.'], steps: [], related: ['access.sealed'] },
+  {
+    id: 'access.scope',
+    title: 'Scope',
+    summary: 'Organisation, team, or yours alone.',
+    body: ['A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you.'],
+    steps: [],
+    related: ['access.sealed']
+  },
 ];
