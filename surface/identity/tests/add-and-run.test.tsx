@@ -325,17 +325,30 @@ describe('Add and run on an existing computer', () => {
     expect(posted).toEqual([]);
   });
 
-  it('falls back to the program’s own default mode with a plain note when it has no folder-only mode', async () => {
+  it('never starts an unrestricted program by default: with no careful mode it is blocked with a plain sentence', async () => {
     const server = service(undefined, 'running', [existingComputer()]);
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }] }] });
     const { posted } = await open(server.routes);
-    // First run is never blocked on the folder-only mode: the program's default is chosen and said, not hidden.
-    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
-    expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that keeps it to its own folder with the internet off, so it starts in its own default mode (All access). You can change this under More settings.');
-    expect(document.body.textContent).not.toContain('This program has no setting that keeps it to its own folder');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.body.textContent).toContain('Care program offers no mode that keeps it in check, so Lys will not choose one for it. Choose a mode under More settings.');
     expect(document.body.textContent).not.toContain('WorkspaceOnlyUnavailable');
-    // The note is on the face of the form, never folded under More settings.
+    expect($('.first-run-mode')).toBeNull();
+    await submit();
+    expect(posted).toEqual([]);
+  });
+
+  it('falls back to the most careful mode a program offers, said plainly on the face of the form', async () => {
+    const server = service(undefined, 'running', [existingComputer()]);
+    server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }, { id: 'read-only', meaning: 'Reads only' }] }] });
+    const { posted } = await open(server.routes);
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that keeps it to its own folder with the internet off, so it starts in its most careful mode: Reads, changes nothing. You can change this under More settings.');
     expect($('form details .first-run-mode')).toBeNull();
+    // All access stays only a choice under More settings, never on the face of the form.
+    const face = $('form[aria-label="Add an agent"]')?.cloneNode(true) as HTMLElement;
+    for (const folded of face.querySelectorAll('details.more-settings')) folded.remove();
+    expect(face.textContent).not.toContain('No limits');
+    expect(face.textContent).not.toContain('All access');
     expect(posted).toEqual([]);
   });
 

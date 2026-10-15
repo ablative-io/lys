@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { MODES } from './permission-modes';
 import type { ReactNode } from 'react';
 import type { Choices } from './choices';
 import type { ProvisioningProfile } from './Provisioning';
@@ -29,6 +30,12 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
       canSave={!readOnly} people={people} machines={choices.machines} saved={saved} />
   </section>} />;
 }
+
+/**
+ * The modes a first run falls back to when a program has no folder-only mode, most restrictive first, every one of them
+ * still able to start: works in its folder, asks before it acts, reads only, plans only. Never a mode that lifts checks.
+ */
+export const RESTRICTIVE = ['workspace-write', 'default', 'read-only', 'plan'] as const;
 
 export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, more, render }: {
   /** Only the model and the computer are shown; everything else is kept as saved. */
@@ -61,8 +68,11 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [programName, setProgram] = useState(profile?.harness?.name ?? initialProgram?.name ?? '');
   const program = available.find((entry) => entry.name === programName);
   const [model, setModel] = useState(profile?.model_access[0] ?? (strict && program?.models.length !== 1 ? '' : program?.models[0]?.id ?? ''));
-  // A first run keeps the program to its folder where it can; where it cannot, it starts in the program's own default mode.
-  const firstMode = (entry: typeof program) => firstRun ? workspaceMode(entry) || (entry?.modes[0]?.id ?? '') : strict && entry?.modes.length !== 1 ? '' : entry?.modes[0]?.id ?? '';
+  // A first run keeps the program to its folder where it can; where it cannot, it takes the most restrictive mode the
+  // program offers that still lets it start. A mode that lifts the checks (all access, no checks, never asks) or one Lys
+  // does not know is never chosen for the person: with none of the restrictive ones, the mode is left for them to choose.
+  const restrictiveMode = (entry: typeof program) => RESTRICTIVE.find((id) => entry?.modes.some((mode) => mode.id === id)) ?? '';
+  const firstMode = (entry: typeof program) => firstRun ? workspaceMode(entry) || restrictiveMode(entry) : strict && entry?.modes.length !== 1 ? '' : entry?.modes[0]?.id ?? '';
   const firstPrompt = (entry: typeof program) => entry?.instructions_modes?.includes('keep') ? 'keep' : entry?.instructions_modes?.includes('append') ? 'append' : '';
   // The whole of what the agent may do: the mode, the three rule lists and the extra folders. The mode is one member of it.
   const [permissions, setPermissions] = useState<PermissionsValue>(() => ({ ...profile?.permissions, default_mode: profile?.permissions?.default_mode ?? firstMode(program) }));
@@ -124,7 +134,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     : 'Choose an installed copy of ' + program.name + '.';
   else if (preferred && !selectedProgram?.startsWith('/') && !builds.some((entry) => launchCommand(entry.program) === selectedProgram)) refusal = 'This computer did not report ' + launchCommand(selected.program) + '. ' + PROGRAM_RULE;
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
-  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? program.name + ' lists no mode Lys can start it in.' : 'Choose a mode this program lists.';
+  else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? program.name + ' offers no mode that keeps it in check, so Lys will not choose one for it. Choose a mode under More settings.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
   else if (prompt === 'replace' && !instructions.trim()) refusal = 'Type the prompt this agent uses instead, or choose another prompt setting.';
   else if (choices.skills && skills.some((name) => !choices.skills?.includes(name))) refusal = 'Lys keeps no skill named ' + skills.find((name) => !choices.skills?.includes(name)) + '. Remove it from this agent’s skills.';
@@ -197,7 +207,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {folderFirst ? where : null}
     {programField}
     {found ? <p className="wide first-run-copy">Lys found {program?.name} on this computer and uses <code>{launchCommand(found.program)}</code>.</p> : copyField}
-    {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that keeps it to its own folder with the internet off, so it starts in its own default mode ({fallbackMode.meaning}). You can change this under More settings.</p> : null}
+    {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that keeps it to its own folder with the internet off, so it starts in its most careful mode: {MODES[fallbackMode.id]?.name ?? fallbackMode.meaning}. You can change this under More settings.</p> : null}
     {folderFirst ? null : where}
     <details className="wide more-settings"><summary>More settings</summary><div className="form-grid">
       {found ? copyField : null}
