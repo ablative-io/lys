@@ -19,7 +19,7 @@ export default defineConfig({
   // hangs is found by its signal, never by a clock.
   test: {
     environment: 'jsdom',
-    include: ['tests/**/*.test.tsx', 'src/features/runtime/*.test.tsx', 'src/features/budgets/*.test.tsx', 'src/features/network-self-service.test.tsx', 'tests/acceptance/grants.spec.ts', 'tests/acceptance/agent-control.spec.ts'],
+    include: ['src/features/provisioning/*.test.tsx', 'tests/**/*.test.tsx', 'src/features/runtime/*.test.tsx', 'src/features/budgets/*.test.tsx', 'src/features/network-self-service.test.tsx', 'tests/acceptance/grants.spec.ts', 'tests/acceptance/agent-control.spec.ts'],
     setupFiles: ['tests/setup.ts'],
     testTimeout: 0,
     hookTimeout: 0,

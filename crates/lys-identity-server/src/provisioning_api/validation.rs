@@ -107,6 +107,16 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
             .transpose()?,
     };
     let seat = settings.seat_fields().map_err(malformed)?;
+    if settings.harness.as_ref().is_some_and(|harness| {
+        harness.description.rendering_contract == lys_home::harness::seat_program::CONTRACT
+    }) {
+        lys_home::harness::seat_program::check_seat(&seat).map_err(malformed)?;
+        if settings.permissions.is_some() {
+            return Err(malformed(
+                "permissions: native confinement is unavailable for seat-program/v1",
+            ));
+        }
+    }
     seat.check(settings.harness.as_ref().map_or("", |declared| {
         declared.description.rendering_contract.as_str()
     }))
@@ -154,6 +164,23 @@ fn checked_program(program: &str) -> Result<(), ServerError> {
 /// absolute path, or it names no package to verify the program against.
 fn harness(declared: DeclaredHarness) -> Result<DeclaredHarness, ServerError> {
     checked_program(&declared.program)?;
+    if declared.description.rendering_contract == lys_home::harness::seat_program::CONTRACT {
+        let seat = declared
+            .description
+            .seat_program
+            .as_ref()
+            .ok_or_else(|| malformed("harness.description.seat_program is missing"))?;
+        seat.check().map_err(malformed)?;
+        if seat.executable != declared.program {
+            return Err(malformed(
+                "harness.program differs from seat_program.executable",
+            ));
+        }
+    } else if declared.description.seat_program.is_some() {
+        return Err(malformed(
+            "seat_program requires the seat-program/v1 rendering contract",
+        ));
+    }
     if declared.name.trim().is_empty() {
         return Err(malformed("harness.name is empty"));
     }

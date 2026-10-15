@@ -181,12 +181,14 @@ pub fn openai_base(proxy: &str, run: Option<&str>) -> Option<String> {
 enum Contract {
     Native,
     Codex,
+    SeatProgram,
 }
 
 fn resolve(contract: &str) -> Option<Contract> {
     match contract {
         "claude-code/template-v1" => Some(Contract::Native),
         "codex/template-v1" => Some(Contract::Codex),
+        super::seat_program::CONTRACT => Some(Contract::SeatProgram),
         _ => None,
     }
 }
@@ -212,10 +214,23 @@ pub fn render(
     secrets: &[SecretBinding],
 ) -> Result<RenderedTemplate, RenderRefusal> {
     let fields = input.launch_fields();
+    if fields.harness.description.rendering_contract == super::seat_program::CONTRACT {
+        if !skills.is_empty() {
+            return Err(refused(
+                fields,
+                "skills",
+                "the reviewed seat file owns skills",
+            ));
+        }
+        return super::seat_program::render(fields, input.seat_fields(), permissions, secrets);
+    }
     let mut rendered = match resolve(&fields.harness.description.rendering_contract) {
         Some(Contract::Native) => native_template(fields, skills, permissions, secrets),
         Some(Contract::Codex) => {
             super::codex::launch_template::render(fields, skills, permissions, secrets)
+        }
+        Some(Contract::SeatProgram) => {
+            super::seat_program::render(fields, input.seat_fields(), permissions, secrets)
         }
         None => Err(refused(
             fields,

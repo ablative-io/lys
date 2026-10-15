@@ -102,6 +102,9 @@ pub fn render(
     text: &str,
     instructions_mode: InstructionsMode,
 ) -> Result<Launch, String> {
+    if contract == super::seat_program::CONTRACT {
+        return super::seat_program::launch(program, text);
+    }
     if !matches!(contract, "claude-code/template-v1" | "codex/template-v1") {
         return Err(format!("unknown rendering contract `{contract}`"));
     }

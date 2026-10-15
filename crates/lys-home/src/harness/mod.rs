@@ -21,9 +21,14 @@ pub mod lys_mcp;
 /// The native rendering registry, addressed by description contract identifier.
 pub mod rendering;
 pub mod rendering_launch;
+/// Reviewed executable, arguments and opaque seat-file bindings.
+pub mod seat_program;
 /// Kept skills written into a session's own config directory, each checked
 /// against the hash Lys keeps it by (HOME-037 R3).
 pub mod skills;
 mod skills_tests;
 
 mod rendering_permissions;
+
+#[cfg(test)]
+mod seat_program_tests;

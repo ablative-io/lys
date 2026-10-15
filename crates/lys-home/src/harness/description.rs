@@ -59,6 +59,9 @@ pub struct Mcp {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Description {
+    /// The reviewed process inputs for a program with its own seat file.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seat_program: Option<super::seat_program::SeatProgram>,
     /// The model cardinality and serialization contract.
     pub models: Models,
     /// The permissions contract.
