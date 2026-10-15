@@ -305,7 +305,8 @@ fn runner_status(refusal: &str) -> StatusCode {
         | "runner_protocol_mismatch"
         | "runner_request_unsigned"
         | "runner_request_replayed" => StatusCode::BAD_GATEWAY,
-        "session_unknown" => StatusCode::NOT_FOUND,
+        "session_unknown" | "runner_reply_unknown" => StatusCode::NOT_FOUND,
+        "runner_reply_expired" => StatusCode::GONE,
         "pattern_invalid" | "size_invalid" | "cursor_ahead" | "session_invalid"
         | "folder_invalid" => StatusCode::BAD_REQUEST,
         _ => StatusCode::CONFLICT,

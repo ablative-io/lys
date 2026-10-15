@@ -208,7 +208,7 @@ fn pinned(state: &AppState, machine: &str, runner: &str) -> Result<(), ServerErr
 
 /// The epoch every dial to this server is signed under.
 async fn epoch(State(state): State<Arc<AppState>>) -> String {
-    state.runners.hub().epoch().to_owned()
+    state.runners.hub().epoch()
 }
 
 async fn reply(

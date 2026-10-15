@@ -250,6 +250,17 @@ impl Channel {
         if refusal.as_deref() == Some(STALE) {
             return Err(RunnerError::DialStale { reason: words });
         }
+        if let Some(
+            refusal @ ("runner_reply_expired" | "runner_reply_duplicate" | "runner_reply_unknown"),
+        ) = refusal.as_deref()
+        {
+            let answer: serde_json::Value = serde_json::from_str(&words)
+                .map_err(|error| failed(format!("the reply refusal is not JSON: {error}")))?;
+            let reason = answer["reason"]
+                .as_str()
+                .ok_or_else(|| failed("the reply refusal gives no reason"))?;
+            return Err(RunnerError::refused(refusal, reason));
+        }
         Err(failed(format!(
             "the server answered {}: {words}",
             response.status

@@ -247,15 +247,16 @@ pub(super) async fn ask_exactly(
             .ask(&asked_machine, &asked_record, &act, &leave)
     });
     let joined = if bounded {
-        match tokio::time::timeout(std::time::Duration::from_secs(5), waiting).await {
-            Ok(joined) => joined,
-            Err(_) => {
-                guard.0.leave()?;
-                return Err(ServerError::Runner {
-                    refusal: "runner_unreachable".to_owned(),
-                    words: "this computer's runner did not answer within 5 seconds; check its connection".to_owned(),
-                });
-            }
+        if let Ok(joined) = tokio::time::timeout(std::time::Duration::from_secs(5), waiting).await {
+            joined
+        } else {
+            guard.0.leave()?;
+            return Err(ServerError::Runner {
+                refusal: "runner_unreachable".to_owned(),
+                words:
+                    "this computer's runner did not answer within 5 seconds; check its connection"
+                        .to_owned(),
+            });
         }
     } else {
         waiting.await

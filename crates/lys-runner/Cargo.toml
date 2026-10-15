@@ -46,6 +46,7 @@ webpki-roots = "=1.0.9"
 libproc = "0.14"
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
 axum.workspace = true
 base64.workspace = true
 identity-contract = { path = "../../tests/identity_contract" }

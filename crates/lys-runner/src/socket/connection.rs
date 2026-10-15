@@ -17,14 +17,23 @@ pub(super) async fn write_line(
     line: String,
 ) -> Result<(), RunnerError> {
     let bytes = line.into_bytes();
+    write_bytes(stream, &bytes).await.map_err(socket_failed)
+}
+
+async fn write_bytes(stream: &tokio::net::UnixStream, bytes: &[u8]) -> io::Result<()> {
     let mut offset = 0;
     while offset < bytes.len() {
-        stream.writable().await.map_err(socket_failed)?;
+        stream.writable().await?;
         match stream.try_write(&bytes[offset..]) {
-            Ok(0) => return Err(socket_failed("the connection closed during its answer")),
+            Ok(0) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
+                    "the connection closed during its answer",
+                ));
+            }
             Ok(written) => offset += written,
             Err(error) if error.kind() == io::ErrorKind::WouldBlock => {}
-            Err(error) => return Err(socket_failed(error)),
+            Err(error) => return Err(error),
         }
     }
     Ok(())
@@ -342,8 +351,14 @@ pub(super) async fn connection(
     let mut peer = crate::peer::Connection::default();
     while !*stop.borrow() {
         let greeting = Greeting::fresh(sessions.runner());
+        let line = format!("{}\n", greeting.line());
         tokio::select! {
-            result = write_line(&stream, format!("{}\n", greeting.line())) => result?,
+            result = write_bytes(&stream, line.as_bytes()) => match result {
+                Ok(()) => {},
+                // One-shot clients leave after their answer; a new greeting has no caller then.
+                Err(error) if matches!(error.kind(), io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset | io::ErrorKind::NotConnected) => break,
+                Err(error) => return Err(socket_failed(error)),
+            },
             changed = stop.changed() => { changed.map_err(socket_failed)?; break; }
         }
         let line = tokio::select! {
@@ -443,3 +458,7 @@ mod control_status_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "connection_tests.rs"]
+mod lifecycle_tests;

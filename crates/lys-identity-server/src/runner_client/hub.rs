@@ -8,6 +8,7 @@ use tokio::sync::Notify;
 
 const HANDOFF: Duration = Duration::from_secs(2);
 const NONCES: usize = 65_536;
+const FINISHED: usize = 4096;
 const EPOCH_SECONDS: u64 = 300;
 
 /// A request waiting for a machine's bridge to take it.
@@ -32,11 +33,26 @@ pub(super) struct Machine {
     notify: Arc<Notify>,
     pub(super) delivered: HashMap<String, mpsc::Sender<Replied>>,
     pub(super) nonces: HashSet<String>,
+    finished: HashMap<String, &'static str>,
+    finished_order: VecDeque<String>,
     nonce_epoch: String,
     last_contact: Option<Instant>,
     /// How many of the machine's bridges are dialled in now, each waiting
     /// for its next request.
     pub(super) bridges: usize,
+}
+
+impl Machine {
+    fn finish(&mut self, ticket: &str, refusal: &'static str) {
+        if self.finished.insert(ticket.to_owned(), refusal).is_none() {
+            self.finished_order.push_back(ticket.to_owned());
+        }
+        while self.finished_order.len() > FINISHED {
+            if let Some(ticket) = self.finished_order.pop_front() {
+                self.finished.remove(&ticket);
+            }
+        }
+    }
 }
 
 /// A bridge dialled in and waiting: counted while its ask is held, and no
@@ -173,8 +189,11 @@ impl DialHub {
     /// caller left, so its reply has no one to reach.
     pub(super) fn withdraw(&self, machine: &str, ticket: &str) -> Result<(), RunnerError> {
         self.with(machine, |held| {
+            let queued = held.queue.len();
             held.queue.retain(|pending| pending.ticket != ticket);
-            held.delivered.remove(ticket);
+            if held.delivered.remove(ticket).is_some() || held.queue.len() != queued {
+                held.finish(ticket, "runner_reply_expired");
+            }
         })
     }
 
@@ -198,22 +217,28 @@ impl DialHub {
             held.last_contact = Some(Instant::now());
         })?;
         let _waiting = Bridged { hub: self, machine };
+        let notify = self.with(machine, |held| Arc::clone(&held.notify))?;
         loop {
-            let (taken, notify) = self.with(machine, |held| {
-                let taken = held.queue.pop_front().and_then(|pending| {
+            // Register both waiting bridges before inspecting the queue, so a wake cannot be lost.
+            let notified = notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
+            let taken = self.with(machine, |held| {
+                while let Some(pending) = held.queue.pop_front() {
                     held.last_contact = Some(Instant::now());
                     if pending.taken.send(()).is_err() {
-                        return None;
+                        held.finish(&pending.ticket, "runner_reply_expired");
+                        continue;
                     }
                     held.delivered.insert(pending.ticket.clone(), pending.reply);
-                    Some((pending.ticket, pending.act))
-                });
-                (taken, Arc::clone(&held.notify))
+                    return Some((pending.ticket, pending.act));
+                }
+                None
             })?;
             if let Some(taken) = taken {
                 return Ok(taken);
             }
-            notify.notified().await;
+            notified.await;
         }
     }
 
@@ -222,22 +247,39 @@ impl DialHub {
     /// # Errors
     /// Refuses unavailable hub state, an unknown ticket or a departed caller.
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
-        let waiting = self.with(machine, |held| {
+        self.with(machine, |held| {
             held.last_contact = Some(Instant::now());
-            held.delivered.remove(ticket)
-        })?;
-        let waiting = waiting.ok_or_else(|| {
-            crate::error_machine::MachineError::dial_refused(format!(
-                "no request of machine `{machine}` waits on ticket `{ticket}`"
-            ))
-        })?;
-        if waiting.send(reply).is_err() {
-            return Err(ServerError::Runner {
-                refusal: "caller_left".to_owned(),
-                words: "the caller left before the runner answered".to_owned(),
-            });
+            let Some(waiting) = held.delivered.remove(ticket) else {
+                let refusal = held
+                    .finished
+                    .get(ticket)
+                    .copied()
+                    .unwrap_or("runner_reply_unknown");
+                return Err(finished(refusal));
+            };
+            if waiting.send(reply).is_err() {
+                held.finish(ticket, "runner_reply_expired");
+                return Err(finished("runner_reply_expired"));
+            }
+            held.finish(ticket, "runner_reply_duplicate");
+            Ok(())
+        })?
+    }
+}
+
+fn finished(refusal: &str) -> ServerError {
+    let words = match refusal {
+        "runner_reply_expired" => {
+            "the caller left before the runner answered; do not send this reply again"
         }
-        Ok(())
+        "runner_reply_duplicate" => {
+            "this request was already answered; do not send this reply again"
+        }
+        _ => "this server holds no such request; do not send this reply again",
+    };
+    ServerError::Runner {
+        refusal: refusal.to_owned(),
+        words: words.to_owned(),
     }
 }
 

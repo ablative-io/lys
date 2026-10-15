@@ -491,8 +491,9 @@ async fn a_captured_dial_is_admitted_once_and_never_under_another_epoch() -> Tes
     let [admitted, replayed, stale] = asked.as_slice() else {
         return Err("three dials were not answered".into());
     };
+    assert_eq!(admitted.0, 404, "{admitted:?}");
     assert!(
-        admitted.1.contains("no request of machine"),
+        admitted.1.contains("runner_reply_unknown"),
         "the first dial is admitted and finds no request: {admitted:?}"
     );
     assert_eq!(replayed.0, 401, "{replayed:?}");

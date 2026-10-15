@@ -63,3 +63,58 @@ async fn an_unanswered_status_read_has_a_deadline_and_closes_its_socket()
     dir.close()?;
     table.finish().await
 }
+
+#[tokio::test]
+async fn a_dialled_status_ticket_expires_only_when_its_own_caller_times_out()
+-> Result<(), Box<dyn Error>> {
+    use std::future::Future;
+    use std::task::Poll;
+
+    let table = crate::budgets_feed::entry_tests::fixture().await?;
+    let mut next = Box::pin(table.state.runners.hub().next("machine"));
+    std::future::poll_fn(|context| match next.as_mut().poll(context) {
+        Poll::Pending => Poll::Ready(Ok(())),
+        Poll::Ready(_) => Poll::Ready(Err("the unasked bridge did not wait")),
+    })
+    .await?;
+    let state = std::sync::Arc::clone(&table.state);
+    let asking = tokio::spawn(async move {
+        super::ask_exactly(
+            &state,
+            "machine",
+            RunnerRecord::Dialled {
+                key: "0".repeat(64),
+                runner: None,
+            },
+            Act::Status { session: None },
+            false,
+        )
+        .await
+    });
+    let (ticket, _) = next.await?;
+    assert!(
+        table
+            .state
+            .runners
+            .hub()
+            .with("machine", |held| held.delivered.contains_key(&ticket))?
+    );
+    tokio::time::pause();
+    tokio::time::advance(std::time::Duration::from_secs(6)).await;
+    let timeout = asking
+        .await?
+        .err()
+        .ok_or("an unanswered status did not time out")?;
+    tokio::time::resume();
+    assert_eq!(timeout.name(), "runner_unreachable");
+    let late = table
+        .state
+        .runners
+        .hub()
+        .reply("machine", &ticket, Ok("late".to_owned()))
+        .err()
+        .ok_or("a timed-out caller received a late reply")?;
+    assert_eq!(late.name(), "runner_reply_expired");
+    assert_eq!(late.status(), axum::http::StatusCode::GONE);
+    table.finish().await
+}

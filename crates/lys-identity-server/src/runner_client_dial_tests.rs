@@ -141,3 +141,77 @@ fn retiring_an_epoch_clears_its_nonce_memory_without_accepting_its_signed_dials(
     assert!(!hub.fresh("machine", "current")?);
     Ok(())
 }
+
+#[tokio::test]
+async fn a_late_reply_is_named_expired_after_its_caller_withdraws() -> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    runners.hub().with("machine", |held| held.bridges = 1)?;
+    let queued = runners
+        .hub()
+        .queue("machine", Act::Status { session: None })?;
+    let (ticket, _) = runners.hub().next("machine").await?;
+    runners.hub().withdraw("machine", &ticket)?;
+    let refused = runners
+        .hub()
+        .reply("machine", &ticket, Ok("late".to_owned()))
+        .err()
+        .ok_or("a departed caller received a reply")?;
+    assert_eq!(refused.name(), "runner_reply_expired");
+    assert_eq!(refused.status(), axum::http::StatusCode::GONE);
+    assert!(
+        runners
+            .hub()
+            .with("machine", |held| held.delivered.is_empty())?
+    );
+    drop(queued);
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_duplicate_reply_is_named_and_never_reaches_the_caller_twice()
+-> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    runners.hub().with("machine", |held| held.bridges = 1)?;
+    let queued = runners
+        .hub()
+        .queue("machine", Act::Status { session: None })?;
+    let (ticket, _) = runners.hub().next("machine").await?;
+    runners
+        .hub()
+        .reply("machine", &ticket, Ok("first".to_owned()))?;
+    let refused = runners
+        .hub()
+        .reply("machine", &ticket, Ok("duplicate".to_owned()))
+        .err()
+        .ok_or("a duplicate reply was accepted")?;
+    assert_eq!(refused.name(), "runner_reply_duplicate");
+    assert_eq!(refused.status(), axum::http::StatusCode::CONFLICT);
+    assert_eq!(queued.answer.recv()??, "first");
+    assert!(matches!(
+        queued.answer.try_recv(),
+        Err(std::sync::mpsc::TryRecvError::Empty)
+    ));
+    Ok(())
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_delivered_ticket_outlives_the_handoff_until_its_own_caller_leaves()
+-> Result<(), Box<dyn Error>> {
+    let runners = runners();
+    runners.hub().with("machine", |held| held.bridges = 1)?;
+    let queued = runners
+        .hub()
+        .queue("machine", Act::Status { session: None })?;
+    let (ticket, _) = runners.hub().next("machine").await?;
+    tokio::time::advance(std::time::Duration::from_secs(600)).await;
+    assert!(
+        runners
+            .hub()
+            .with("machine", |held| held.delivered.contains_key(&ticket))?
+    );
+    runners
+        .hub()
+        .reply("machine", &ticket, Ok("still waiting".to_owned()))?;
+    assert_eq!(queued.answer.recv()??, "still waiting");
+    Ok(())
+}

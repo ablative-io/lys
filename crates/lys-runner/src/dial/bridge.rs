@@ -47,6 +47,7 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
     ];
     let stopping = AtomicBool::new(false);
     let disconnected = AtomicBool::new(false);
+    let finished_reply = Arc::new(AtomicBool::new(false));
     let dispatch = Mutex::new(dispatch::Dispatch::new());
     std::thread::scope(|scope| {
         let (send, receive) = mpsc::channel();
@@ -57,11 +58,20 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
             let stopping = &stopping;
             let disconnected = &disconnected;
             let dispatch = &dispatch;
+            let finished_reply = Arc::clone(&finished_reply);
             match std::thread::Builder::new()
                 .name("runner-dial-poll".to_owned())
                 .spawn_scoped(scope, move || {
                     let answer = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        poll(dial, lane, stopping, disconnected, dispatch)
+                        poll(
+                            dial,
+                            lane,
+                            stopping,
+                            disconnected,
+                            dispatch,
+                            &send,
+                            &finished_reply,
+                        )
                     }))
                     .unwrap_or_else(|_| {
                         Err(RunnerError::refused(
@@ -111,6 +121,8 @@ fn poll(
     stopping: &AtomicBool,
     disconnected: &AtomicBool,
     dispatch: &Mutex<dispatch::Dispatch>,
+    failures: &mpsc::Sender<Result<(), RunnerError>>,
+    finished_reply: &Arc<AtomicBool>,
 ) -> Result<(), RunnerError> {
     let signer = &lane.signer;
     let epoch = || {
@@ -155,6 +167,8 @@ fn poll(
         let posted = Arc::clone(signer);
         let posting_epoch = current.clone();
         let posting_ticket = ticket.clone();
+        let failures = failures.clone();
+        let posting_finished = Arc::clone(finished_reply);
         let mut dispatch = dispatch.lock().map_err(|error| {
             RunnerError::refused("runner_dial_worker_failed", error.to_string())
         })?;
@@ -162,13 +176,52 @@ fn poll(
             let reply = connection
                 .exchange(&request_line)
                 .unwrap_or_else(|error| reply_line(Answer::refusal(&error)));
-            if let Err(error) = posted.reply(&posting_epoch, &posting_ticket, &reply) {
-                crate::error::said(&format!("a reply was not delivered: {error}"));
+            if let Err(error) = post_reply(
+                &posted,
+                &posting_epoch,
+                &posting_ticket,
+                &reply,
+                &posting_finished,
+            ) && failures.send(Err(error)).is_err()
+            {
+                crate::error::said(
+                    "runner_dial_worker_failed: the bridge left before its reply ended",
+                );
             }
             drop(registration);
         }) {
-            signer.reply(&current, &ticket, &reply_line(Answer::refusal(&error)))?;
+            post_reply(
+                signer,
+                &current,
+                &ticket,
+                &reply_line(Answer::refusal(&error)),
+                finished_reply,
+            )?;
         }
+    }
+}
+
+fn post_reply(
+    signer: &Signer,
+    epoch: &str,
+    ticket: &str,
+    reply: &str,
+    finished: &AtomicBool,
+) -> Result<(), RunnerError> {
+    match signer.reply(epoch, ticket, reply) {
+        Err(error @ RunnerError::Refused { .. })
+            if matches!(
+                error.name().as_str(),
+                "runner_reply_expired" | "runner_reply_duplicate" | "runner_reply_unknown"
+            ) =>
+        {
+            // The ticket is terminal. Retire its reply once and keep unrelated requests usable.
+            if !finished.swap(true, Ordering::AcqRel) {
+                crate::error::said(&error.to_string());
+            }
+            Ok(())
+        }
+        answer => answer,
     }
 }
 
@@ -207,3 +260,6 @@ impl Drop for Held {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod lifecycle_tests;

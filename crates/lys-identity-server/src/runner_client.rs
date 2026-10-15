@@ -214,10 +214,7 @@ impl Runners {
                 } = self.hub.queue(machine, act.clone())?;
                 let (hub, machine) = (Arc::clone(&self.hub), machine.to_owned());
                 leave.hold(withdraw_on_leave(hub, machine, ticket, cancellation))?;
-                if taken
-                    .recv_timeout(std::time::Duration::from_secs(2))
-                    .is_err()
-                {
+                if taken.recv().is_err() {
                     leave.leave()?;
                     return Err(RunnerError::Unreachable {
                         reason:
