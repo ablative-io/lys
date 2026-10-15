@@ -10,7 +10,7 @@ fn spec() -> Value {
         "adapter": "acp/1"})
 }
 
-fn fields(seat: Value) -> Result<LaunchFields, serde_json::Error> {
+fn fields(seat: &Value) -> Result<LaunchFields, serde_json::Error> {
     serde_json::from_value(json!({
         "identity": {"agent": "agent", "session": "session", "machine": "machine", "version": 1},
         "harness": {"name": "Seat host", "program": "/opt/seat/host", "package": "seat 1",
@@ -30,7 +30,7 @@ fn seat_program_contract_is_registered() {
 
 #[test]
 fn seat_program_argv_is_exactly_the_reviewed_literals() -> Result<(), Box<dyn Error>> {
-    let fields = fields(spec())?;
+    let fields = fields(&spec())?;
     let rendered = rendering::render(&fields, &[], &json!({}), &[])?;
     let launch = rendering_launch::render(
         "seat-program/v1",
@@ -43,7 +43,8 @@ fn seat_program_argv_is_exactly_the_reviewed_literals() -> Result<(), Box<dyn Er
         launch.arguments,
         ["run", "--config", "/opt/seat/seat.json", "", " literal "]
     );
-    assert!(launch.files.is_empty());
+    assert_eq!(launch.files.len(), 1);
+    assert_eq!(launch.files[0].path, super::seat_program::FILE);
     assert!(launch.argument_files.is_empty());
     Ok(())
 }
@@ -86,7 +87,7 @@ fn seat_program_malformed_fields_are_refused_by_name() -> Result<(), Box<dyn Err
         bad.push((field, value));
     }
     for (field, value) in bad {
-        let error = match fields(value) {
+        let error = match fields(&value) {
             Err(error) => error.to_string(),
             Ok(fields) => rendering::render(&fields, &[], &json!({}), &[])
                 .err()

@@ -21,6 +21,7 @@ pub mod claude;
 pub mod codex;
 pub mod events;
 pub mod process;
+pub(crate) mod seat_program;
 
 pub(crate) use conversation::Settings;
 pub use conversation::{ManagedLaunch, Transport};

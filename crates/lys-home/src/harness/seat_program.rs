@@ -12,6 +12,8 @@ use crate::record::blocks::Hash;
 
 /// The product-independent rendering contract for a program hosting its own seat.
 pub const CONTRACT: &str = "seat-program/v1";
+/// Signed metadata kept separately from the opaque product file.
+pub const FILE: &str = "seat-program.json";
 
 /// Exact process inputs retained with the person's reviewed description.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -266,12 +268,19 @@ pub(super) fn launch(program: &str, text: &str) -> Result<Launch, String> {
     if program != template.seat_program.executable {
         return Err("harness.program: differs from seat_program.executable".to_owned());
     }
+    let metadata =
+        serde_json::to_string(&template.seat_program).map_err(|error| error.to_string())?;
+    let metadata_sha256 = Hash::of(metadata.as_bytes()).as_str().to_owned();
     Ok(Launch {
         program: program.to_owned(),
         arguments: template.seat_program.argv(),
         environment: template.environment,
         argument_files: BTreeMap::new(),
         environment_paths: BTreeMap::new(),
-        files: Vec::new(),
+        files: vec![super::rendering_launch::File {
+            path: FILE.to_owned(),
+            text: metadata,
+            sha256: metadata_sha256,
+        }],
     })
 }

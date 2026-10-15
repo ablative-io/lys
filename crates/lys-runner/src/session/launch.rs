@@ -16,17 +16,113 @@ pub(super) fn valid_id(id: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
+struct LaunchRecords {
+    responsible: Option<String>,
+    seat_proof: Option<serde_json::Value>,
+    launched: Option<(String, String)>,
+    trusted: Option<crate::trust::Trust>,
+}
+
 impl Sessions {
-    pub(crate) fn begin_transport(
+    fn finish_launch(
         self: &Arc<Self>,
-        mut launch: Launch,
-        policy: Option<Policy>,
-        tracking: Option<Tracking>,
-        proxy: Option<crate::tracking_proxy::ProxyTracking>,
-        responsible: Option<String>,
-        managed: Option<crate::harness_control::Settings>,
+        session: Session,
+        pending: lifecycle::Pending,
+        reservation: Starting,
+        records: LaunchRecords,
     ) -> Result<(u32, u64), RunnerError> {
-        if let Some(tracking) = &tracking {
+        let LaunchRecords {
+            responsible,
+            seat_proof,
+            launched,
+            trusted,
+        } = records;
+        let id = session
+            .launch
+            .as_ref()
+            .ok_or_else(|| {
+                RunnerError::refused("spawn_install_failed", "installed session has no launch")
+            })?
+            .session
+            .clone();
+        let pid = session.pid.ok_or_else(|| {
+            RunnerError::refused(
+                "spawn_install_failed",
+                "the installed child has no process id",
+            )
+        })?;
+        let started_at = session.started_at;
+        let mut table = match self.lock() {
+            Ok(table) => table,
+            Err(error) => {
+                if let Err(cleanup) = pending.cancel() {
+                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {cleanup}"));
+                }
+                return Err(error);
+            }
+        };
+        if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
+            drop(table);
+            pending.cancel()?;
+            return Err(RunnerError::refused(
+                "runner_stopping",
+                "the runner stopped during the launch",
+            ));
+        }
+        table.sessions.insert(id.clone(), session);
+        if let Some(person) = responsible {
+            table.responsible.insert(id.clone(), person);
+        }
+        let mut recorded = self.persist(&table);
+        if let Some(proof) = seat_proof {
+            recorded = recorded.and_then(|()| {
+                crate::harness_control::seat_program::record(
+                    &mut table,
+                    &id,
+                    "seat_program_started",
+                    &proof,
+                )
+            });
+        }
+        if let Some((executable, version)) = launched {
+            recorded = recorded
+                .and_then(|()| lifecycle::tracking_started(&mut table, &id, &executable, &version));
+        }
+        if let Some(trust) = &trusted {
+            recorded = recorded.and_then(|()| lifecycle::trust_recorded(&mut table, &id, trust));
+        }
+        // A session tracked through the proxy is bound to its usage file. A
+        // run is not refused for a file that cannot be followed: what stands
+        // in the way is said in its coverage.
+        self.follow_proxy(&mut table, &id);
+        drop(table);
+        self.activate(&id, pending)?;
+        drop(reservation);
+        recorded?;
+        // The row went into a file the harness rewrites whole at its own
+        // start; another harness starting in between can lose it. The run's
+        // first screen is watched for the dialog, which is answered for the
+        // named folder only and said in the feed.
+        if let Some(trust) = trusted
+            && self
+                .lock()?
+                .sessions
+                .get(&id)
+                .is_some_and(|session| session.managed.is_none())
+        {
+            self.watch_trust_dialog(&id, trust.directory)?;
+        }
+        self.writer.barrier()?;
+        self.wake();
+        Ok((pid, started_at))
+    }
+
+    fn reserve_launch(
+        self: &Arc<Self>,
+        launch: &Launch,
+        tracking: Option<&Tracking>,
+    ) -> Result<(Starting, Option<RotationState>), RunnerError> {
+        if let Some(tracking) = tracking {
             tracking.checked()?;
         }
         if !valid_id(&launch.session) {
@@ -60,6 +156,51 @@ impl Sessions {
             id: launch.session.clone(),
         };
         drop(table);
+        Ok((reservation, rotation))
+    }
+
+    fn initial_session(
+        &self,
+        launch: Launch,
+        guard: Guard,
+        managed: Option<crate::harness_control::Settings>,
+        rotation: Option<RotationState>,
+    ) -> Session {
+        Session {
+            started_at: now_ms(),
+            pid: None,
+            leader_start: None,
+            columns: launch.columns,
+            rows: launch.rows,
+            output: Arc::new(output::OutputHandle::new(self.scrollback, None)),
+            ended: None,
+            live: None,
+            generation: 0,
+            launch: Some(launch),
+            managed,
+            rotation,
+            ending: false,
+            guard,
+            follower: None,
+            pending_status: None,
+            plan_windows: None,
+            stopped: None,
+            attach: crate::attach::Ring::new(self.scrollback),
+            last_signal: None,
+        }
+    }
+
+    pub(crate) fn begin_transport(
+        self: &Arc<Self>,
+        mut launch: Launch,
+        policy: Option<Policy>,
+        tracking: Option<Tracking>,
+        proxy: Option<crate::tracking_proxy::ProxyTracking>,
+        responsible: Option<String>,
+        managed: Option<crate::harness_control::Settings>,
+    ) -> Result<(u32, u64), RunnerError> {
+        let (reservation, rotation) = self.reserve_launch(&launch, tracking.as_ref())?;
+        let seat_proof = crate::harness_control::seat_program::prepare(&mut launch)?;
         if !launch.program.starts_with('/') && !launch.environment.contains_key("PATH") {
             let path = crate::program_path::login_path()
                 .map_err(|reason| RunnerError::refused("spawn_failed", reason))?;
@@ -82,7 +223,6 @@ impl Sessions {
         }
         self.status_line_named(&mut launch);
         super::notify_named(&mut launch)?;
-        let id = launch.session.clone();
         let cwd = lifecycle::bound_directory(&launch.directory);
         // Naming the folder is the trust answer: a Claude Code run's folder
         // is recorded as trusted in the configuration the harness reads for
@@ -96,36 +236,16 @@ impl Sessions {
             )?),
             Some(crate::tracking::Harness::Codex) | None => None,
         };
-        let mut session = Session {
-            started_at: now_ms(),
-            pid: None,
-            leader_start: None,
-            columns: launch.columns,
-            rows: launch.rows,
-            output: Arc::new(output::OutputHandle::new(self.scrollback, None)),
-            ended: None,
-            live: None,
-            generation: 0,
-            launch: Some(launch),
-            managed,
-            rotation,
-            ending: false,
-            guard: Guard {
-                policy,
-                tracking,
-                proxy,
-                leader: None,
-                cwd,
-                idle: true,
-                boundary_observed: false,
-            },
-            follower: None,
-            pending_status: None,
-            plan_windows: None,
-            stopped: None,
-            attach: crate::attach::Ring::new(self.scrollback),
-            last_signal: None,
+        let guard = Guard {
+            policy,
+            tracking,
+            proxy,
+            leader: None,
+            cwd,
+            idle: true,
+            boundary_observed: false,
         };
+        let mut session = self.initial_session(launch, guard, managed, rotation);
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;
         if let Some(note) = session
@@ -140,66 +260,17 @@ impl Sessions {
             pending.cancel()?;
             return Err(error);
         }
-        let pid = session.pid.ok_or_else(|| {
-            RunnerError::refused(
-                "spawn_install_failed",
-                "the installed child has no process id",
-            )
-        })?;
-        let started_at = session.started_at;
-        let mut table = match self.lock() {
-            Ok(table) => table,
-            Err(error) => {
-                if let Err(cleanup) = pending.cancel() {
-                    crate::error::said(&format!("cancelled_spawn_cleanup_failed: {cleanup}"));
-                }
-                return Err(error);
-            }
-        };
-        if table.stopping || self.upgrading.load(std::sync::atomic::Ordering::Acquire) {
-            drop(table);
-            pending.cancel()?;
-            return Err(RunnerError::refused(
-                "runner_stopping",
-                "the runner stopped during the launch",
-            ));
-        }
-        table.sessions.insert(id.clone(), session);
-        if let Some(person) = responsible {
-            table.responsible.insert(id.clone(), person);
-        }
-        let mut recorded = self.persist(&table);
-        if let Some((executable, version)) = launched {
-            recorded = recorded
-                .and_then(|()| lifecycle::tracking_started(&mut table, &id, &executable, &version));
-        }
-        if let Some(trust) = &trusted {
-            recorded = recorded.and_then(|()| lifecycle::trust_recorded(&mut table, &id, trust));
-        }
-        // A session tracked through the proxy is bound to its usage file. A
-        // run is not refused for a file that cannot be followed: what stands
-        // in the way is said in its coverage.
-        self.follow_proxy(&mut table, &id);
-        drop(table);
-        self.activate(&id, pending)?;
-        drop(reservation);
-        recorded?;
-        // The row went into a file the harness rewrites whole at its own
-        // start; another harness starting in between can lose it. The run's
-        // first screen is watched for the dialog, which is answered for the
-        // named folder only and said in the feed.
-        if let Some(trust) = trusted
-            && self
-                .lock()?
-                .sessions
-                .get(&id)
-                .is_some_and(|session| session.managed.is_none())
-        {
-            self.watch_trust_dialog(&id, trust.directory)?;
-        }
-        self.writer.barrier()?;
-        self.wake();
-        Ok((pid, started_at))
+        self.finish_launch(
+            session,
+            pending,
+            reservation,
+            LaunchRecords {
+                responsible,
+                seat_proof,
+                launched,
+                trusted,
+            },
+        )
     }
 }
 
@@ -299,3 +370,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "seat_program_launch_tests.rs"]
+pub(crate) mod seat_program_launch_tests;
