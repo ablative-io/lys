@@ -44,6 +44,9 @@ impl std::fmt::Debug for UpgradeSession {
     }
 }
 
+/// The sessions captured, and each that could not be with its reason.
+pub type Captured = (Vec<UpgradeSession>, Vec<(String, RunnerError)>);
+
 impl Sessions {
     /// Capture every live launch and prevent new starts until replacement or cancellation.
     ///
@@ -59,54 +62,34 @@ impl Sessions {
         }
         let mut saved = Vec::new();
         for (id, session) in &table.sessions {
-            if session.ended.is_some() {
-                continue;
+            if session.ended.is_none() {
+                saved.push(capture(&table, id, session)?);
             }
-            let launch = session.launch.clone().ok_or_else(|| {
-                RunnerError::refused(
-                    "session_launch_missing",
-                    format!("session {id} has no launch to retain; no runner was stopped"),
-                )
-            })?;
-            let conversation = table
-                .feed
-                .source(id)
-                .and_then(|source| source.native_conversation.clone())
-                .or_else(|| {
-                    launch.arguments.windows(2).find_map(|pair| {
-                        matches!(pair[0].as_str(), "--session-id" | "--resume" | "resume")
-                            .then(|| pair[1].clone())
-                    })
-                });
-            if session.managed.is_none() {
-                let mut checked = launch.clone();
-                crate::pty_conversation::prepare_restart(&mut checked, conversation.as_deref())?;
-            }
-            saved.push(UpgradeSession {
-                agent: launch
-                    .policy
-                    .as_ref()
-                    .map(|admitted| admitted.policy.agent.clone()),
-                conversation: conversation.clone(),
-                tracking: session.guard.tracking.clone(),
-                proxy: session.guard.proxy.clone(),
-                managed: session.managed.as_ref().map(|settings| ManagedLaunch {
-                    launch: launch.clone(),
-                    transport: settings.transport,
-                    conversation: conversation
-                        .clone()
-                        .unwrap_or_else(|| settings.conversation.clone()),
-                    resume: conversation.as_deref().is_some_and(|id| !id.is_empty())
-                        || !settings.conversation.is_empty(),
-                    requires_controls: true,
-                    owner: None,
-                }),
-                launch,
-                responsible: table.responsible.get(id).cloned(),
-            });
         }
         self.upgrading.store(true, Ordering::Release);
         Ok(saved)
+    }
+
+    /// Capture each live session on its own, for a stop that goes ahead
+    /// whatever is captured: a session that cannot be captured is answered
+    /// with its reason beside the ones that were, never instead of them.
+    ///
+    /// # Errors
+    /// Refuses only an unreadable session table.
+    pub fn capture_each(&self) -> Result<Captured, RunnerError> {
+        let table = self.lock()?;
+        let (mut saved, mut failed) = (Vec::new(), Vec::new());
+        for (id, session) in &table.sessions {
+            if session.ended.is_some() {
+                continue;
+            }
+            match capture(&table, id, session) {
+                Ok(kept) => saved.push(kept),
+                Err(error) => failed.push((id.clone(), error)),
+            }
+        }
+        self.upgrading.store(true, Ordering::Release);
+        Ok((saved, failed))
     }
 
     /// Release a captured runner when an upgrade fails before its stop.
@@ -191,9 +174,143 @@ impl Sessions {
     }
 }
 
+/// The arguments of `launch` without any that name a native conversation.
+fn without_conversation(arguments: &[String]) -> Vec<String> {
+    let mut kept = Vec::new();
+    let mut given = arguments.iter();
+    while let Some(argument) = given.next() {
+        let flag = argument
+            .split_once('=')
+            .map_or(argument.as_str(), |(flag, _)| flag);
+        if matches!(flag, "--session-id" | "--resume" | "-r") {
+            if !argument.contains('=') {
+                given.next();
+            }
+            continue;
+        }
+        kept.push(argument.clone());
+    }
+    kept
+}
+
+/// One live session's admitted launch and the conversation it holds. A
+/// Claude Code session nobody has written to yet has no transcript, so there
+/// is nothing to resume: it is kept to start afresh, never refused.
+fn capture(
+    table: &super::Table,
+    id: &str,
+    session: &super::Session,
+) -> Result<UpgradeSession, RunnerError> {
+    let mut launch = session.launch.clone().ok_or_else(|| {
+        RunnerError::refused(
+            "session_launch_missing",
+            format!("session {id} has no launch to retain; no runner was stopped"),
+        )
+    })?;
+    let mut conversation = table
+        .feed
+        .source(id)
+        .and_then(|source| source.native_conversation.clone())
+        .or_else(|| {
+            launch.arguments.windows(2).find_map(|pair| {
+                matches!(pair[0].as_str(), "--session-id" | "--resume" | "resume")
+                    .then(|| pair[1].clone())
+            })
+        });
+    if session.managed.is_none() {
+        let mut checked = launch.clone();
+        match crate::pty_conversation::prepare_restart(&mut checked, conversation.as_deref()) {
+            Ok(()) => {}
+            Err(error) if error.name() == "pty_resume_missing" => {
+                launch.arguments = without_conversation(&launch.arguments);
+                conversation = None;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(UpgradeSession {
+        agent: launch
+            .policy
+            .as_ref()
+            .map(|admitted| admitted.policy.agent.clone()),
+        conversation: conversation.clone(),
+        tracking: session.guard.tracking.clone(),
+        proxy: session.guard.proxy.clone(),
+        managed: session.managed.as_ref().map(|settings| ManagedLaunch {
+            launch: launch.clone(),
+            transport: settings.transport,
+            conversation: conversation
+                .clone()
+                .unwrap_or_else(|| settings.conversation.clone()),
+            resume: conversation.as_deref().is_some_and(|id| !id.is_empty())
+                || !settings.conversation.is_empty(),
+            requires_controls: true,
+            owner: None,
+        }),
+        launch,
+        responsible: table.responsible.get(id).cloned(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_session_with_nothing_said_yet_is_kept_without_its_conversation_arguments() {
+        let given: Vec<String> = [
+            "--mcp-config",
+            "mcp.json",
+            "--session-id",
+            "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee",
+            "--resume=x",
+            "-r",
+            "y",
+            "--model",
+            "opus",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        assert_eq!(
+            without_conversation(&given),
+            ["--mcp-config", "mcp.json", "--model", "opus"]
+                .map(str::to_owned)
+                .to_vec()
+        );
+    }
+
+    #[test]
+    fn capture_each_answers_every_live_session_and_skips_ended_ones()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = tempfile::tempdir()?;
+        let sessions = Sessions::open(root.path(), 4096)?;
+        let launch = |id: &str| Launch {
+            session: id.into(),
+            program: "/bin/cat".into(),
+            arguments: Vec::new(),
+            directory: root.path().display().to_string(),
+            environment: BTreeMap::new(),
+            config: None,
+            columns: 80,
+            rows: 24,
+            rotation: None,
+            policy: None,
+        };
+        sessions.start(launch("live"))?;
+        sessions.start(launch("ended"))?;
+        sessions.end("ended", &AtomicBool::new(false))?;
+        let (kept, failed) = sessions.capture_each()?;
+        assert_eq!(
+            kept.iter()
+                .map(|saved| saved.launch.session.as_str())
+                .collect::<Vec<_>>(),
+            ["live"]
+        );
+        assert!(failed.is_empty());
+        sessions.cancel_upgrade();
+        sessions.end("live", &AtomicBool::new(false))?;
+        Ok(())
+    }
     use std::collections::BTreeMap;
     use std::sync::atomic::AtomicBool;
 

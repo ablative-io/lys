@@ -83,10 +83,15 @@ impl Sessions {
     /// kept by an earlier stop that has not been resumed yet.
     ///
     /// # Errors
-    /// Refuses when a session is still starting or the file cannot be written;
-    /// the stop goes on either way, and the caller says why.
+    /// Refuses when the file cannot be written; a session that cannot be kept
+    /// is said by name and the others are kept. The stop goes on either way.
     pub fn keep_for_restart(&self, state: &Path) -> Result<usize, RunnerError> {
-        let live = self.prepare_upgrade()?;
+        let (live, failed) = self.capture_each()?;
+        for (id, error) in failed {
+            said(&format!(
+                "runner_session_not_kept: session {id}: {error}; it will not resume"
+            ));
+        }
         let file = path(state);
         let mut by_id: BTreeMap<String, UpgradeSession> = read(&file)?
             .into_iter()
