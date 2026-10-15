@@ -14,6 +14,14 @@ use tokio::sync::{Semaphore, mpsc, watch};
 use crate::protocol::{read_greeting, read_reply, sign_request};
 use crate::{Act, Answer, Client, Options, Runner};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReplyMode {
+    Accepted,
+    Refused,
+    Expired,
+    Unavailable,
+}
+
 struct Remote {
     key: Arc<lys_core::Ed25519Identity>,
     polls: AtomicUsize,
@@ -22,8 +30,8 @@ struct Remote {
     replies: mpsc::UnboundedSender<Answer>,
     posted: Mutex<BTreeMap<String, usize>>,
     finished: watch::Sender<bool>,
-    refuse: bool,
-    expired: bool,
+    mode: ReplyMode,
+    settled: tokio::sync::Barrier,
 }
 
 async fn next(State(remote): State<Arc<Remote>>, body: Bytes) -> Response {
@@ -72,20 +80,21 @@ async fn reply(
     if let Err(error) = result {
         return (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()).into_response();
     }
-    if remote.expired {
-        (StatusCode::GONE, "{\"refusal\":\"runner_reply_expired\",\"reason\":\"the caller left; do not send this reply again\"}").into_response()
-    } else if remote.refuse {
-        (
+    match remote.mode {
+        ReplyMode::Expired => (StatusCode::GONE, "{\"refusal\":\"runner_reply_expired\",\"reason\":\"the caller left; do not send this reply again\"}").into_response(),
+        ReplyMode::Refused => (
             StatusCode::FORBIDDEN,
             "{\"refusal\":\"fixture_reply_refused\"}",
-        )
-            .into_response()
-    } else {
-        "{}".into_response()
+        ).into_response(),
+        ReplyMode::Unavailable => {
+            remote.settled.wait().await;
+            StatusCode::SERVICE_UNAVAILABLE.into_response()
+        }
+        ReplyMode::Accepted => "{}".into_response(),
     }
 }
 
-async fn bridge(refuse: bool, expired: bool) -> Result<(), Box<dyn Error>> {
+async fn bridge(mode: ReplyMode) -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let key = Arc::new(lys_core::Ed25519Identity::ephemeral());
     let socket = dir.path().join("runner.sock");
@@ -107,8 +116,8 @@ async fn bridge(refuse: bool, expired: bool) -> Result<(), Box<dyn Error>> {
         replies,
         posted: Mutex::default(),
         finished,
-        refuse,
-        expired,
+        mode,
+        settled: tokio::sync::Barrier::new(2),
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let server = format!("http://{}", listener.local_addr()?);
@@ -153,7 +162,7 @@ async fn bridge(refuse: bool, expired: bool) -> Result<(), Box<dyn Error>> {
         .await
         .ok_or("the bridge did not post its answer")?;
     assert!(matches!(first, Answer::Liveness { .. }));
-    if !refuse {
+    if mode != ReplyMode::Refused {
         let second = answers
             .recv()
             .await
@@ -175,7 +184,7 @@ async fn bridge(refuse: bool, expired: bool) -> Result<(), Box<dyn Error>> {
         posted.values().all(|count| *count == 1),
         "a reply was posted twice"
     );
-    if refuse {
+    if mode == ReplyMode::Refused {
         assert!(
             error.to_string().contains("fixture_reply_refused"),
             "{error}"
@@ -189,16 +198,22 @@ async fn bridge(refuse: bool, expired: bool) -> Result<(), Box<dyn Error>> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn both_local_connections_survive_the_server_long_polls() -> Result<(), Box<dyn Error>> {
-    bridge(false, false).await
+    bridge(ReplyMode::Accepted).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_refused_reply_ends_the_bridge_without_posting_it_twice() -> Result<(), Box<dyn Error>> {
-    bridge(true, false).await
+    bridge(ReplyMode::Refused).await
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn expired_replies_are_retired_once_while_other_requests_remain_usable()
 -> Result<(), Box<dyn Error>> {
-    bridge(false, true).await
+    bridge(ReplyMode::Expired).await
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_unavailable_reply_is_not_replayed_and_does_not_end_the_bridge()
+-> Result<(), Box<dyn Error>> {
+    bridge(ReplyMode::Unavailable).await
 }

@@ -46,7 +46,7 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
         },
     ];
     let stopping = AtomicBool::new(false);
-    let disconnected = AtomicBool::new(false);
+    let disconnected = Arc::new(AtomicBool::new(false));
     let finished_reply = Arc::new(AtomicBool::new(false));
     let dispatch = Mutex::new(dispatch::Dispatch::new());
     std::thread::scope(|scope| {
@@ -119,7 +119,7 @@ fn poll(
     dial: &Dial,
     lane: &Lane,
     stopping: &AtomicBool,
-    disconnected: &AtomicBool,
+    disconnected: &Arc<AtomicBool>,
     dispatch: &Mutex<dispatch::Dispatch>,
     failures: &mpsc::Sender<Result<(), RunnerError>>,
     finished_reply: &Arc<AtomicBool>,
@@ -169,6 +169,7 @@ fn poll(
         let posting_ticket = ticket.clone();
         let failures = failures.clone();
         let posting_finished = Arc::clone(finished_reply);
+        let posting_disconnected = Arc::clone(disconnected);
         let mut dispatch = dispatch.lock().map_err(|error| {
             RunnerError::refused("runner_dial_worker_failed", error.to_string())
         })?;
@@ -182,6 +183,7 @@ fn poll(
                 &posting_ticket,
                 &reply,
                 &posting_finished,
+                &posting_disconnected,
             ) && failures.send(Err(error)).is_err()
             {
                 crate::error::said(
@@ -196,6 +198,7 @@ fn poll(
                 &ticket,
                 &reply_line(Answer::refusal(&error)),
                 finished_reply,
+                disconnected,
             )?;
         }
     }
@@ -207,8 +210,14 @@ fn post_reply(
     ticket: &str,
     reply: &str,
     finished: &AtomicBool,
+    disconnected: &AtomicBool,
 ) -> Result<(), RunnerError> {
     match signer.reply(epoch, ticket, reply) {
+        Err(RunnerError::Unreachable { .. }) => {
+            // Its outcome is unknown. Reconnect the poll lanes without replaying this reply.
+            reconnect::disconnected(disconnected);
+            Ok(())
+        }
         Err(error @ RunnerError::Refused { .. })
             if matches!(
                 error.name().as_str(),
