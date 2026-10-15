@@ -33,6 +33,10 @@ use super::render::RenderedFile;
 use super::runner::Restart;
 use super::{Engine, Unit, adopt, data_kept, launch, record_build};
 
+#[path = "planned_return.rs"]
+mod planned_return;
+pub(crate) use planned_return::announce as announce_restart;
+
 fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityError {
     IdentityError::new(
         ErrorKind::PrivateFileIo,
@@ -157,6 +161,7 @@ pub fn place_file(target: &Path, bytes: &[u8], private: bool) -> IdentityResult<
 
 /// Stops the service and then the broker.
 pub fn stop_all(units: &[Unit], say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+    announce_restart(units, true)?;
     for unit in units.iter().rev() {
         adopt::stop(unit, say)?;
     }

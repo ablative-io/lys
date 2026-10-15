@@ -6,6 +6,9 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 use tokio::sync::Notify;
 
+#[path = "hub/connection_control.rs"]
+mod connection_control;
+
 const HANDOFF: Duration = Duration::from_secs(2);
 const NONCES: usize = 65_536;
 const FINISHED: usize = 4096;
@@ -72,6 +75,7 @@ pub(super) struct Machine {
     finished: HashMap<String, &'static str>,
     finished_order: VecDeque<String>,
     completions: HashMap<String, String>,
+    control: connection_control::Control,
     nonce_epoch: String,
     last_contact: Option<Instant>,
     /// How many of the machine's bridges are dialled in now, each waiting

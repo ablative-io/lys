@@ -32,6 +32,9 @@ use crate::routes::{AppState, signed_in};
 #[path = "machine_completions.rs"]
 mod completions;
 
+#[path = "machine_connection.rs"]
+mod connection;
+
 /// Which folder to look in.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -74,6 +77,7 @@ pub(crate) struct FolderChosenView {
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .merge(completions::routes())
+        .merge(connection::routes())
         .route("/network/machines/{id}/folders", post(folders))
         .route("/network/machines/{id}/choose-folder", post(choose_folder))
 }

@@ -5,6 +5,8 @@ use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Instant;
 
+mod planned_stop;
+
 use lys_identity_server::read_api::BUILD;
 use lys_identity_server::{Config, ServerError, service_saying};
 
@@ -28,6 +30,7 @@ fn ms(since: Instant) -> u128 {
 /// start nobody timed cannot be shown to be in milliseconds).
 async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> {
     let config = Config::load(&config_path)?;
+    planned_stop::retire_previous_plan(&config_path)?;
     let configured = ms(began);
     let say: lys_identity_server::routes::Say =
         Arc::new(|line: &str| println!("lys-identity-server {line}"));
@@ -40,6 +43,9 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
     let service_began = Instant::now();
     let app = service_saying(&config, say).await?;
     let service = ms(service_began);
+    let stop = planned_stop::PlannedStop::new();
+    let signals = planned_stop::Signals::open()?;
+    let app = planned_stop::router(app, stop.clone());
     let bind_began = Instant::now();
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
@@ -54,14 +60,24 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
     );
     // The connection's address is the person's own, carried to the issuer
     // so its failed sign-in count is per person.
+    let (finished, stopped) = tokio::sync::oneshot::channel();
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
+    .with_graceful_shutdown(async move {
+        let outcome = signals.wait(stop, config_path).await;
+        if finished.send(outcome).is_err() {
+            eprintln!("planned_stop_result_lost: the service left before reading its stop result");
+        }
+    })
     .await
     .map_err(|error| ServerError::DirectoryUnavailable {
         reason: error.to_string(),
-    })
+    })?;
+    stopped.await.map_err(|error| ServerError::ConfigInvalid {
+        reason: format!("planned_stop_result_lost: {error}"),
+    })?
 }
 
 #[tokio::main]

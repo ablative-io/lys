@@ -9,6 +9,9 @@
 
 use lys_openapi::Api;
 
+#[path = "openapi_runner_control_types.rs"]
+mod control_types;
+
 use crate::agent_policy_api::{PolicyBody, PolicyView};
 use crate::budgets_act::{UsageBody, UsageView};
 use crate::budgets_api::{BudgetBody, BudgetsView, ConfirmBody as BudgetConfirmBody};
@@ -59,6 +62,7 @@ pub(crate) fn runner(api: &mut Api) -> Vec<Entry> {
     routes.extend(policy_and_usage(api, usage, policy));
     routes.extend(session_operations(api, empty));
     routes.extend(runner_connections(api));
+    routes.extend(control_types::entries(api));
     routes.extend(joining_and_receipts(api));
     routes.push((
         GET,

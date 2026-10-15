@@ -164,15 +164,10 @@ impl Runner {
                 held(SignalKind::hangup())?,
             );
             let serving = self.spawn();
+            if let Err(error) = serving.sessions().resume_kept(&state) {
+                crate::error::said(&format!("runner_session_resume_failed: {error}"));
+            }
             ready();
-            // Sessions kept by the last stop start again now, each in its own conversation, beside the serving socket.
-            let resuming = Arc::clone(serving.sessions());
-            let kept_in = state.clone();
-            std::thread::spawn(move || {
-                if let Err(error) = resuming.resume_kept(&kept_in) {
-                    crate::error::said(&format!("runner_session_resume_failed: {error}"));
-                }
-            });
             let name = tokio::select! {
                 _ = term.recv() => "SIGTERM",
                 _ = interrupt.recv() => "SIGINT",
@@ -181,16 +176,22 @@ impl Runner {
             Ok::<_, RunnerError>((serving, name))
         });
         let (serving, name) = asked?;
-        match serving.sessions().keep_for_restart(&state) {
-            Ok(0) => {
-                crate::error::said(&format!("asked to stop by {name}: no session was running"));
+        if serving.sessions().upgrade_prepared() {
+            crate::error::said(
+                "runner_upgrade_restoration_owned: the controlled replacement holds the saved launches",
+            );
+        } else {
+            match serving.sessions().keep_for_restart(&state) {
+                Ok(0) => {
+                    crate::error::said(&format!("asked to stop by {name}: no session was running"));
+                }
+                Ok(kept) => crate::error::said(&format!(
+                    "asked to stop by {name}: {kept} running session(s) kept; each resumes in its own conversation when the runner starts again"
+                )),
+                Err(error) => crate::error::said(&format!(
+                    "asked to stop by {name}: running sessions could not be kept to resume: {error}"
+                )),
             }
-            Ok(kept) => crate::error::said(&format!(
-                "asked to stop by {name}: {kept} running session(s) kept; each resumes in its own conversation when the runner starts again"
-            )),
-            Err(error) => crate::error::said(&format!(
-                "asked to stop by {name}: running sessions could not be kept to resume: {error}"
-            )),
         }
         if let Err(error) = serving
             .sessions()

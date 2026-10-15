@@ -32,6 +32,12 @@ pub enum RunnerCommand {
         #[arg(long, requires = "server")]
         server_ca: Option<PathBuf>,
     },
+    /// End the current reconnect wait and dial Lys immediately.
+    Reconnect {
+        /// The runner socket; defaults to this user's installed runner.
+        #[arg(long)]
+        socket: Option<PathBuf>,
+    },
     /// Remove the login service while keeping this computer's saved connection.
     Uninstall,
     /// Verify and install the server's release, keeping the previous runner.

@@ -146,6 +146,17 @@ mod tests {
                 .completion("own", "fixture-ticket")?
                 .is_none()
         );
+        let response = router
+            .oneshot(
+                Request::get("/network/machines/own/completions/fixture-ticket")
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert!(response.status().is_client_error());
+        let removed: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await?)?;
+        assert_eq!(removed["refusal"], "runner_completion_unknown");
         runner.stop()?;
         Ok(())
     }

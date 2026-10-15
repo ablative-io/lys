@@ -440,6 +440,7 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
         "clients recorded: {} platforms",
         clients.releases.len()
     ));
+    swap::announce_restart(&units, changed || options.surface.is_some())?;
     let build = adopt::settle(
         &layout,
         &units,

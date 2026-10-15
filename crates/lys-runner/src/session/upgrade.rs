@@ -48,6 +48,11 @@ impl std::fmt::Debug for UpgradeSession {
 pub type Captured = (Vec<UpgradeSession>, Vec<(String, RunnerError)>);
 
 impl Sessions {
+    /// Whether a controlled replacement has taken responsibility for restoration.
+    pub(crate) fn upgrade_prepared(&self) -> bool {
+        self.upgrading.load(Ordering::Acquire)
+    }
+
     /// Capture every live launch and prevent new starts until replacement or cancellation.
     ///
     /// # Errors

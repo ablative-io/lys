@@ -20,6 +20,10 @@ pub(crate) mod service;
 pub(crate) mod update;
 
 /// Runs `lys runner`.
+///
+/// # Errors
+/// Returns malformed configuration, unavailable runner control, failed installation,
+/// connection, protocol, launch or terminal input/output errors by name.
 pub fn run(command: RunnerCommand) -> CliResult<()> {
     match command {
         RunnerCommand::Start { worker, restored } => service::start(worker, restored),
@@ -29,6 +33,7 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
             machine,
             server_ca,
         } => service::install(pending, server, machine, server_ca),
+        RunnerCommand::Reconnect { socket } => reconnect(socket),
         RunnerCommand::Uninstall => service::uninstall(),
         RunnerCommand::Update => update::run(),
         RunnerCommand::ManagedEntry => {
@@ -110,6 +115,22 @@ pub fn run(command: RunnerCommand) -> CliResult<()> {
         })
         .map_err(Into::into),
     }
+}
+
+fn reconnect(socket: Option<std::path::PathBuf>) -> CliResult<()> {
+    let socket = match socket {
+        Some(socket) => socket,
+        None => crate::identity::install::layout::Layout::discover()?.runner_socket(),
+    };
+    let answer = Dial::reconnect_socket(&socket)?;
+    if answer["reconnecting"] != true {
+        return Err(RunnerError::refused(
+            "runner_reconnect_unconfirmed",
+            "the bridge did not confirm the reconnect signal",
+        )
+        .into());
+    }
+    service::say("runner reconnect requested; the current backoff has ended")
 }
 
 /// Serve `runner` on `socket` until it is asked to stop, saying once it

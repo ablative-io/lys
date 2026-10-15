@@ -4,8 +4,9 @@
 //! `ended_by_runner_restart`, at the instant the restart found it gone and
 //! with no exit status; a process that ignored the hang-up and outlived it
 //! is ended by the restart before it is reported gone. Asked to stop by
-//! SIGTERM, the runner ends every session and waits for each exit, so the
-//! next runner reports each one exited. Each runner is known to be
+//! SIGTERM, the runner ends every session and durably records each observed
+//! exit. The next runner restores each saved launch before it announces
+//! readiness. Each runner is known to be
 //! answering by the line it prints once it listens, and a process known to
 //! be gone by the end of a pipe it held, never by a clock.
 
@@ -170,11 +171,15 @@ fn a_runner_asked_to_stop_ends_every_session_and_the_next_reports_each_exit() ->
         "the stopped runner removed its socket"
     );
 
-    let mut second = serve(dir.path())?;
-    let sessions = held(&client)?;
+    let kept = lys_runner::state::StateFile::open(&dir.path().join("state"))?;
+    let sessions = kept.read()?.sessions;
+    drop(kept);
     let mut exited = 0;
     for id in ["one", "two"] {
-        let ended = find(&sessions, id)?
+        let ended = sessions
+            .iter()
+            .find(|session| session.session == id)
+            .ok_or("a stopped session was not retained")?
             .ended
             .clone()
             .ok_or("a session reads running")?;
@@ -197,6 +202,14 @@ fn a_runner_asked_to_stop_ends_every_session_and_the_next_reports_each_exit() ->
         exited += 1;
     }
     assert_eq!(exited, 2);
+    let mut second = serve(dir.path())?;
+    let sessions = held(&client)?;
+    for id in ["one", "two"] {
+        assert!(
+            find(&sessions, id)?.ended.is_none(),
+            "{id} was not restored before readiness"
+        );
+    }
     second.kill()?;
     second.wait()?;
     Ok(())

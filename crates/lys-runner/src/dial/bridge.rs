@@ -15,6 +15,12 @@ use reply_outbox::{Outbox, Reply};
 #[path = "control.rs"]
 mod control;
 
+#[path = "next_frame.rs"]
+mod next_frame;
+
+#[path = "remote_control.rs"]
+mod remote_control;
+
 impl Dial {
     /// Interrupt this runner's current reconnect backoff through its owner-only socket.
     ///
@@ -43,7 +49,18 @@ impl Stopping {
             take,
             disconnected,
             |delay| self.retry.wait(delay),
-            |status| self.retry.report(status),
+            |status| {
+                self.retry.report(status)?;
+                if let Some(reporter) = &self.reporter {
+                    if let Err(error) = reporter
+                        .epoch()
+                        .and_then(|epoch| remote_control::report(reporter, &self.retry, &epoch))
+                    {
+                        crate::error::said(&format!("runner_connection_report_failed: {error}"));
+                    }
+                }
+                Ok(())
+            },
         )
     }
 }
@@ -52,6 +69,7 @@ impl Stopping {
 struct Stopping {
     state: AtomicBool,
     retry: Arc<reconnect::RetryWait>,
+    reporter: Option<Arc<Signer>>,
 }
 
 struct Lane {
@@ -68,6 +86,11 @@ fn stop(lanes: &[Lane], stopping: &Stopping) {
     stopping.state.store(true, Ordering::Release);
     if let Err(error) = stopping.retry.stop() {
         crate::error::said(&error.to_string());
+    }
+    if let Some(reporter) = &stopping.reporter {
+        if let Err(error) = reporter.channel.close() {
+            crate::error::said(&error.to_string());
+        }
     }
     for lane in lanes {
         if let Err(error) = lane.signer.channel.close() {
@@ -86,20 +109,11 @@ fn stop(lanes: &[Lane], stopping: &Stopping) {
 
 pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
     let outbox = Arc::new(Outbox::open(&dial.socket)?);
-    let lanes = [
-        Lane {
-            outbox: Arc::clone(&outbox),
-            signer: Arc::new(dial.signer()?),
-            local: Arc::default(),
-        },
-        Lane {
-            outbox: Arc::clone(&outbox),
-            signer: Arc::new(dial.signer()?),
-            local: Arc::default(),
-        },
-    ];
-    let stopping = Stopping::default();
+    let lanes = lanes(dial, &outbox)?;
+    let mut stopping = Stopping::default();
     let control = control::Control::open(&dial.socket, Arc::clone(&stopping.retry))?;
+    let remote = remote_control::Remote::open(dial, &stopping)?;
+    stopping.reporter = remote.reporter();
     let disconnected = Arc::new(AtomicBool::new(false));
     let finished_reply = Arc::new(AtomicBool::new(false));
     let dispatch = Mutex::new(dispatch::Dispatch::new());
@@ -167,7 +181,8 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
         }
         answer
     });
-    match (answered, control.finish()) {
+    let controls = control.finish().and_then(|()| remote.finish());
+    match (answered, controls) {
         (Err(error), Err(control)) => Err(RunnerError::refused(
             "runner_dial_stop_failed",
             format!("{error}; {control}"),
@@ -175,6 +190,21 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
         (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
         (Ok(()), Ok(())) => Ok(()),
     }
+}
+
+fn lanes(dial: &Dial, outbox: &Arc<Outbox>) -> Result<[Lane; 2], RunnerError> {
+    Ok([
+        Lane {
+            outbox: Arc::clone(outbox),
+            signer: Arc::new(dial.signer()?),
+            local: Arc::default(),
+        },
+        Lane {
+            outbox: Arc::clone(outbox),
+            signer: Arc::new(dial.signer()?),
+            local: Arc::default(),
+        },
+    ])
 }
 
 fn poll(
@@ -288,7 +318,7 @@ fn next_request(
                     *current = stopping.ready(epoch, disconnected)?;
                     flush_replies(signer, current, &lane.outbox, finished_reply, disconnected)?;
                 }
-                let answer = signer.next(current, greeting);
+                let answer = signer.next_frame(current, greeting);
                 refresh = matches!(&answer, Err(RunnerError::Unreachable { .. }));
                 answer
             },
@@ -298,10 +328,20 @@ fn next_request(
             return Err(stopped());
         }
         match answer {
+            Ok(next_frame::Frame::Request(ticket, request)) => return Ok((ticket, request)),
+            Ok(next_frame::Frame::GoingAway(expected)) => {
+                crate::error::said(&format!(
+                    "runner_going_away: Lys expects to return at {expected}"
+                ));
+                *current = stopping
+                    .retry
+                    .resume_at(expected, || stopping.ready(epoch, disconnected))?;
+                flush_replies(signer, current, &lane.outbox, finished_reply, disconnected)?;
+            }
             Err(RunnerError::DialStale { .. }) => {
                 *current = stopping.ready(epoch, disconnected)?;
             }
-            answer => return answer,
+            Err(error) => return Err(error),
         }
     }
 }

@@ -1,5 +1,5 @@
 /** One computer, in the half of the page beside the list: its team, what runs there, who may start there, how Lys reaches it, and retiring it. */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Refused, api, operationId, request, useLoad } from '../../api';
 import type { OrgTeam } from '../../shell/org';
 import { useRoleChange } from '../roles/useRoleChange';
@@ -15,6 +15,9 @@ import { MachineHolders } from './MachineIdentities';
 import type { MachineIdentity } from './contract';
 import { ErrorWords, problemWords } from '../people/Words';
 import { roleWords } from './allowed';
+import { retryWords, useConnectionClock } from './reconnect-clock';
+import type { Retry } from './reconnect-clock';
+import { subscribeChanges } from '../../live';
 
 export type RunnerRecord = { kind: 'lys' } | { kind: 'socket'; path: string } | { kind: 'dialled'; key: string; runner?: string };
 
@@ -71,6 +74,7 @@ export function MachineDetail({ computer, admin, me, teams, names, changed, mach
     </tbody></table>}
     {machine.named_by === me && machine.runtime && machine.state !== 'retired' ? <OwnAgents machine={machine} me={me} changed={changed} /> : null}
     <div className="section-h">How Lys reaches it</div>
+    {(admin || machine.named_by === me) && machine.runtime && runner && machine.state !== 'retired' ? <RunnerConnection machine={machine.id} name={machine.name} /> : null}
     {computer.asked === 'answered' || machine.runtime === null ? <p>{reached(machine, runner, computer.joining)}</p> : computer.asked === 'asking' ? <p className="dim">Asking its runner…</p> : null}
     {computer.answers === false && computer.reason && !waiting(computer) ? <p className="why-not" title={(computer.refusal ? computer.refusal + ': ' : '') + computer.reason}>Its runner did not answer. {computer.refusal ? problemWords(new Refused(0, { refusal: computer.refusal, reason: computer.reason })) : computer.reason}</p> : null}
     {computer.asked === 'unread' ? <><p className="why-not">Lys could not ask its runner whether this computer is up.</p><ErrorWords problem={computer.problem ?? computer.reason} /></> : null}
@@ -150,4 +154,37 @@ function OwnAgents({ machine, me, changed }: { machine: Machine; me: string; cha
     <span className="own-agents-act"><Act symbol={allowed ? 'remove' : 'add'} name={(allowed ? 'Remove ' : 'Allow ') + agent.display_name} word={allowed ? 'Stop allowing here' : 'Allow here'} type="submit" disabled={change.blocked} /></span>
     <ChangeStatus change={change} />
   </form>;
+}
+
+
+/** The explicit reconnect act interrupts a failed connection's wait. */
+function RunnerConnection({ machine, name }: { machine: string; name: string }) {
+  const [words, setWords] = useState('Reading runner connection…');
+  const [retry, setRetry] = useState<Retry | null>(null);
+  const host = useRef<HTMLDivElement>(null);
+  const now = useConnectionClock(retry !== null, host);
+  const [failure, setFailure] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const leave = new AbortController();
+    const load = () => {
+      void request<{ state: string; retry?: Retry | null }>('/network/machines/' + encodeURIComponent(machine) + '/connection', undefined, 'POST', leave.signal)
+        .then((answer) => { if (!leave.signal.aborted) { setRetry(answer.retry ?? null); setWords('Runner connection: ' + answer.state); } },
+          (error: unknown) => { if (!leave.signal.aborted) setFailure(error); });
+    };
+    load();
+    const unsubscribe = subscribeChanges(load, (error) => { if (!leave.signal.aborted) setFailure(error); });
+    return () => { unsubscribe(); leave.abort(); };
+  }, [machine]);
+  const reconnect = async () => {
+    setBusy(true); setFailure(null);
+    try {
+      const answer = await request<{ reconnecting: boolean }>('/network/machines/' + encodeURIComponent(machine) + '/reconnect', {});
+      if (answer.reconnecting !== true) throw new Error('runner_reconnect_unconfirmed: Lys did not confirm the reconnect signal.');
+      setRetry(null); setWords('Reconnecting…');
+    } catch (error) { setFailure(error); }
+    finally { setBusy(false); }
+  };
+  return <div ref={host}><p role="status">{retry ? retryWords(retry, now) : words}</p>{retry?.reason ? <p>{retry.reason}</p> : null}<button type="button" aria-label={'Reconnect ' + name} disabled={busy} onClick={() => void reconnect()}>Reconnect</button>
+    {failure ? <ErrorWords problem={failure} /> : null}</div>;
 }

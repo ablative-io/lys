@@ -59,7 +59,7 @@ pub(super) fn ready_reporting<T>(
     let mut failures = 0_u32;
     loop {
         match take() {
-            Err(error @ RunnerError::Unreachable { .. }) => {
+            Err(RunnerError::Unreachable { reason }) => {
                 disconnected(state);
                 let delay = delay(failures, rand::random());
                 failures = failures.saturating_add(1);
@@ -71,7 +71,7 @@ pub(super) fn ready_reporting<T>(
                     refused_at,
                     next_dial: refused_at.saturating_add(milliseconds),
                     attempt: failures,
-                    reason: error.to_string(),
+                    reason,
                 }))?;
                 wait(delay)?;
             }
@@ -103,6 +103,7 @@ struct WaitState {
     connected: bool,
     generation: u64,
     status: Option<RetryStatus>,
+    plan: Option<planned_return::Plan>,
 }
 
 impl RetryWait {
@@ -257,3 +258,6 @@ mod reconnect_tests;
 #[cfg(test)]
 #[path = "reconnect_control_tests.rs"]
 mod control_tests;
+
+#[path = "reconnect/planned_return.rs"]
+mod planned_return;
