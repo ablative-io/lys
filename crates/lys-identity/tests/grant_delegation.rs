@@ -1,6 +1,8 @@
 //! R2: affirmative delegation and bounded ancestry (`GRANT_USE_VS_LEND`,
 //! `GRANT_RECIPIENT`, `GRANT_ANCESTRY` and `GRANT_AGENT_PARITY`).
 
+#[path = "grant_delegation/ancestry.rs"]
+mod ancestry;
 #[path = "grant_delegation/connectors.rs"]
 mod connectors;
 #[path = "grant_delegation/machines.rs"]
@@ -257,86 +259,7 @@ fn row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_
     )?;
     let middle = world.delegate(&request)?.event.grant();
     let before = world.events();
-    let mut refusals = Vec::new();
-    let mut broader_resource =
-        world.request(tom, middle, tom_agent, "tern", PassOn::UseOnly, Some(ends))?;
-    broader_resource.resource = Resource::new("project", "beta")?;
-    refusals.push((
-        broader_resource,
-        GrantError::ResourceOutside {
-            requested: "project:beta".to_owned(),
-            source_grant: middle.to_string(),
-        },
-    ));
-    refusals.push((
-        world.request(tom, middle, tom_agent, "heron", PassOn::UseOnly, Some(ends))?,
-        GrantError::ActionsOutside {
-            relation: "heron".to_owned(),
-            outside: "write".to_owned(),
-            model_version: 1,
-        },
-    ));
-    let forged = GrantId::from_bytes([0xf0; 16]);
-    refusals.push((
-        world.request(tom, forged, tom_agent, "tern", PassOn::UseOnly, Some(ends))?,
-        GrantError::SourceUnknown {
-            grant: forged.to_string(),
-        },
-    ));
-    refusals.push((
-        world.request(tom, root, tom_agent, "tern", PassOn::UseOnly, Some(ends))?,
-        GrantError::NotHolder {
-            caller: tom.to_string(),
-            grant: root.to_string(),
-        },
-    ));
-    let mut changed_responsible =
-        world.request(tom, middle, tom_agent, "tern", PassOn::UseOnly, Some(ends))?;
-    changed_responsible.responsible = world.dana;
-    refusals.push((
-        changed_responsible,
-        GrantError::ResponsibleMismatch {
-            identity: tom_agent.to_string(),
-            named: dana.to_string(),
-            recorded: tom.to_string(),
-        },
-    ));
-    refusals.push((
-        world.request(
-            tom,
-            middle,
-            tom_agent,
-            "tern",
-            PassOn::UseOnly,
-            Some(ends + 1),
-        )?,
-        GrantError::ExpiryBeyondSource {
-            requested: (ends + 1).to_string(),
-            source_grant: middle.to_string(),
-            source_ends: ends,
-        },
-    ));
-    refusals.push((
-        world.request(tom, middle, tom_agent, "tern", PassOn::UseOnly, None)?,
-        GrantError::ExpiryBeyondSource {
-            requested: "no end".to_owned(),
-            source_grant: middle.to_string(),
-            source_ends: ends,
-        },
-    ));
-    refusals.push((
-        world.request(
-            tom,
-            middle,
-            tom_agent,
-            "tern",
-            pass(&["read"], &BOTH)?,
-            Some(ends),
-        )?,
-        GrantError::PassOnBeyondSource {
-            source_grant: middle.to_string(),
-        },
-    ));
+    let refusals = ancestry::refusals(&mut world, root, middle, ends)?;
     for (request, refusal) in &refusals {
         assert_eq!(world.delegate(request).as_ref(), Err(refusal));
     }
