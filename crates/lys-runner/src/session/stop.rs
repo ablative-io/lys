@@ -54,6 +54,9 @@ struct Corded {
 
 impl Sessions {
     /// End every running session for `by`, because `reason`, as `ask` says.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if caller/reason words are empty, table locking or waiting fails, the runner stops, durable completion fails or owned-seat state cannot be read.
     pub fn stop_everything(
         &self,
         by: &str,
@@ -179,6 +182,9 @@ impl Sessions {
 
     /// Mark every running session stopped by the runner's own stop, for
     /// `reason`, before [`Sessions::stop_all`] ends them.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `session_table_poisoned` if the session table cannot be locked.
     pub fn stopping_because(&self, reason: &str) -> Result<(), RunnerError> {
         let stopped = Stopped {
             by: "the runner".to_owned(),

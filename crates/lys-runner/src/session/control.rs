@@ -37,6 +37,9 @@ impl Sessions {
     }
 
     /// Type `bytes` into session `id`.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the table is poisoned, the session is unknown or ended, owned input lacks caller context, or the input writer cannot accept the bytes.
     pub fn write(&self, id: &str, bytes: &[u8]) -> Result<(), RunnerError> {
         let writer = {
             let mut table = self.lock()?;
@@ -53,6 +56,9 @@ impl Sessions {
     }
 
     /// Type `text`, then Enter when asked.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the table is poisoned, the session is unknown or ended, owned input lacks caller context, or the input writer cannot accept the bytes.
     pub fn input(&self, id: &str, text: &str, enter: bool) -> Result<(), RunnerError> {
         self.write(id, &self.input_bytes(id, text, enter)?)
     }
@@ -69,6 +75,9 @@ impl Sessions {
     }
 
     /// Send `keys`, in order.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the table is poisoned, the session is unknown or ended, owned input lacks caller context, or the input writer cannot accept the bytes.
     pub fn keys(&self, id: &str, keys: &[Key]) -> Result<(), RunnerError> {
         let bytes: Vec<u8> = keys
             .iter()
@@ -78,6 +87,9 @@ impl Sessions {
     }
 
     /// Resize session `id`'s terminal.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the table is poisoned, the session is unknown or ended, the transport has no terminal, the size is zero or resizing fails.
     pub fn resize(&self, id: &str, columns: u16, rows: u16) -> Result<(), RunnerError> {
         let mut table = self.lock()?;
         let session = table.sessions.get_mut(id).ok_or_else(|| unknown(id))?;
@@ -113,6 +125,9 @@ impl Sessions {
     }
 
     /// End session `id`'s process and answer once its exit is seen.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if session/output locking, process signalling or durable-writer completion fails, the session is unknown, or the caller leaves or runner stops before its exit.
     pub fn end(&self, id: &str, left: &AtomicBool) -> Result<Ended, RunnerError> {
         {
             let mut table = self.lock()?;
@@ -130,6 +145,9 @@ impl Sessions {
     }
 
     /// What the runner holds: every session, or the one named.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if session/output state cannot be locked or the named session is unknown.
     pub fn status(&self, only: Option<&str>) -> Result<StatusView, RunnerError> {
         let table = self.lock()?;
         let sessions = match only {
@@ -155,6 +173,10 @@ impl Sessions {
 
     /// End every running session and answer once each exit is seen; the
     /// runner then starts nothing more.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if table locking or waiting, or durable-writer completion fails.
+    /// - `RunnerError::State` if final session persistence fails.
     pub fn stop_all(&self) -> Result<(), RunnerError> {
         let mut table = self.lock()?;
         table.stopping = true;

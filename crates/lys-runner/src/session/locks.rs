@@ -46,6 +46,9 @@ impl Sessions {
     }
 
     /// Wake a cancelled output request and the shared control waiters.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if the session table or output lock is poisoned, or the session is unknown.
     pub fn wake_session(&self, id: &str) -> Result<(), RunnerError> {
         let table = self.lock()?;
         let output = Arc::clone(&table.sessions.get(id).ok_or_else(|| unknown(id))?.output);
