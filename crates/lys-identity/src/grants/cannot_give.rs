@@ -82,6 +82,7 @@ impl CannotGiveReason {
     ];
 
     /// The reason's name, as the answer spells it.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::SignInIdentity => "sign_in_identity",
@@ -95,6 +96,7 @@ impl CannotGiveReason {
     }
 
     /// The reason `name` spells, or none when it is not one of the seven.
+    #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|reason| reason.name() == name)
     }
@@ -162,6 +164,7 @@ pub struct CannotGiveRequest {
 
 /// The one reason `grant` cannot be given to a recipient of `kind`, read
 /// from the grant's own members, or none when its pass-on admits that kind.
+#[must_use]
 pub fn grant_reason(grant: &Grant, kind: RecipientKind) -> Option<CannotGiveReason> {
     let mut applicable = BTreeSet::new();
     match grant.pass_on() {
@@ -190,6 +193,13 @@ pub fn grant_reason(grant: &Grant, kind: RecipientKind) -> Option<CannotGiveReas
 /// defines. Refused `SourceUnknown` when the book holds no such source,
 /// `NotHolder` when the caller does not hold it, and `IdentityUnknown` when
 /// the directory records no such recipient.
+///
+/// # Errors
+/// - `GrantError::SourceUnknown` if the requested source grant is absent.
+/// - `GrantError::NotHolder` if the caller lacks holder or responsible-person delegation authority.
+/// - `GrantError::MachineRefused` if a machine attempts delegation.
+/// - `GrantError::IdentityNotActive` if the responsible caller or source holder is inactive.
+/// - `GrantError::Identity` wrapping `IdentityError::IdentityUnknown` if the recipient or required person or holder is absent.
 pub fn cannot_give(
     book: &GrantBook,
     directory: &Projection,
@@ -268,6 +278,13 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// The cannot-give list for `request` at `at`, from the committed grants
     /// and the model they are judged against. It reads only: nothing is
     /// recorded, and nothing is admitted by it.
+    ///
+    /// # Errors
+    /// - `GrantError::SourceUnknown` if the requested source grant is absent.
+    /// - `GrantError::NotHolder` if the caller lacks holder or responsible-person delegation authority.
+    /// - `GrantError::MachineRefused` if a machine attempts delegation.
+    /// - `GrantError::IdentityNotActive` if the responsible caller or source holder is inactive.
+    /// - `GrantError::Identity` wrapping `IdentityError::IdentityUnknown` if the recipient or required person or holder is absent.
     pub fn cannot_give(
         &self,
         directory: &Projection,

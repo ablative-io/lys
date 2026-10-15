@@ -23,7 +23,6 @@
 //! refused.
 
 use ciborium::Value;
-use lys_core::Ed25519Identity;
 
 use super::admission::Route;
 use super::codec::{
@@ -32,9 +31,7 @@ use super::codec::{
 };
 use super::error::GrantError;
 use super::types::{Grant, GrantId};
-use crate::encoding::{
-    MAJOR_ARRAY, MAJOR_NEGATIVE, MAJOR_TAG, bytes, head, map, payload_commitment, text, uint,
-};
+use crate::encoding::{bytes, map, text, uint};
 use crate::id::IdentityId;
 use crate::operation::OperationId;
 
@@ -110,6 +107,7 @@ impl GrantEvent {
     /// Version three adds the connector, four a held mode, five a grant
     /// naming a role and six the machine. Each event takes the version of
     /// the newest kind or mode it names.
+    #[must_use]
     pub fn version(&self) -> u64 {
         self.newest().0
     }
@@ -148,6 +146,9 @@ impl GrantEvent {
     /// An issued grant names this event's operation as the one that
     /// authorised it, and its issuer is the caller; a revocation names a
     /// reason that is not blank.
+    ///
+    /// # Errors
+    /// - `GrantError::EventMismatch` if an issued grant names another operation or issuer, or a revocation has a blank reason.
     pub fn new(
         operation: OperationId,
         caller: IdentityId,
@@ -185,26 +186,31 @@ impl GrantEvent {
     }
 
     /// The operation id the caller gave the change.
+    #[must_use]
     pub fn operation(&self) -> OperationId {
         self.operation
     }
 
     /// The identity that made the request.
+    #[must_use]
     pub fn caller(&self) -> IdentityId {
         self.caller
     }
 
     /// When the service recorded the change, in seconds since the Unix epoch.
+    #[must_use]
     pub fn recorded_at(&self) -> u64 {
         self.recorded_at
     }
 
     /// The change.
+    #[must_use]
     pub fn change(&self) -> &GrantChange {
         &self.change
     }
 
     /// The grant the change is about.
+    #[must_use]
     pub fn grant(&self) -> GrantId {
         match &self.change {
             GrantChange::Issue(grant) => grant.id(),
@@ -221,6 +227,7 @@ pub(crate) const REVOKE: u64 = 2;
 pub(crate) const USE: u64 = 3;
 
 /// The change kind's wire code: `1` issue, `2` revoke, `3` use.
+#[must_use]
 pub fn change_kind(change: &GrantChange) -> u64 {
     match change {
         GrantChange::Issue(_) => ISSUE,
@@ -230,6 +237,7 @@ pub fn change_kind(change: &GrantChange) -> u64 {
 }
 
 /// The canonical body bytes of `event`.
+#[must_use]
 pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
     let mut out = Vec::new();
     map(&mut out, 6);
@@ -294,6 +302,23 @@ fn cbor(encoded: &[u8], reason: &'static str) -> Result<Value, GrantError> {
 }
 
 /// The event a body's bytes name, refused unless the bytes are its canonical encoding.
+///
+/// # Errors
+/// - `GrantError::EventMalformed` if the event CBOR or wire codes have the wrong shape.
+/// - `GrantError::VersionUnsupported` if the event version is unsupported.
+/// - `GrantError::GrantMalformed` if a grant member, identity or optional mark has the wrong shape.
+/// - `GrantError::MemberUnknown` if an encoded grant names an unsupported member.
+/// - `GrantError::MemberMissing` if an encoded grant omits a required member.
+/// - `GrantError::RecipientKindUnknown` if a pass-on recipient code is unsupported.
+/// - `GrantError::TokenInvalid` if an action, relation or resource token is invalid.
+/// - `GrantError::AuthorityAbsent` if exercise or pass-on actions or recipients are empty.
+/// - `GrantError::PassOnOutside` if pass-on authority exceeds exercise authority.
+/// - `GrantError::WindowInvalid` if the grant ends at or before its start.
+/// - `GrantError::ModelInvalid` if the model version is zero.
+/// - `GrantError::LineageMalformed` if the source or root holder is invalid.
+/// - `GrantError::UseOnly` if a one-time grant allows pass-on.
+/// - `GrantError::EventMismatch` if the issued grant disagrees with its event or a revocation reason is blank.
+/// - `GrantError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
 pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
     const SHAPE: &str = "a grant event body is a map of keys 1 to 6";
     let value = cbor(body, SHAPE)?;
@@ -337,177 +362,7 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
     Ok(event)
 }
 
-fn protected_header(kid: &[u8; KEY_LEN], content_type: &str) -> Vec<u8> {
-    let mut out = Vec::new();
-    map(&mut out, 3);
-    uint(&mut out, 1);
-    head(&mut out, MAJOR_NEGATIVE, 7);
-    uint(&mut out, 3);
-    text(&mut out, content_type);
-    uint(&mut out, 4);
-    bytes(&mut out, kid);
-    out
-}
+#[path = "events_signing.rs"]
+mod signing;
 
-fn sig_structure(protected: &[u8], payload: &[u8]) -> Vec<u8> {
-    let mut out = Vec::new();
-    head(&mut out, MAJOR_ARRAY, 4);
-    text(&mut out, "Signature1");
-    bytes(&mut out, protected);
-    bytes(&mut out, &[]);
-    bytes(&mut out, payload);
-    out
-}
-
-fn cose_sign1(protected: &[u8], payload: &[u8], signature: &[u8]) -> Vec<u8> {
-    let mut out = Vec::new();
-    head(&mut out, MAJOR_TAG, COSE_SIGN1_TAG);
-    head(&mut out, MAJOR_ARRAY, 4);
-    bytes(&mut out, protected);
-    map(&mut out, 0);
-    bytes(&mut out, payload);
-    bytes(&mut out, signature);
-    out
-}
-
-/// A grant event with the exact bytes that were signed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignedGrantEvent {
-    bytes: Vec<u8>,
-    event: GrantEvent,
-    commitment: [u8; 32],
-}
-
-impl SignedGrantEvent {
-    /// The whole `COSE_Sign1` message: the log leaf.
-    pub fn bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-
-    /// The event the message carries.
-    pub fn event(&self) -> &GrantEvent {
-        &self.event
-    }
-
-    /// SHA-256 over the body bytes.
-    pub fn payload_commitment(&self) -> [u8; 32] {
-        self.commitment
-    }
-}
-
-/// Sign `event` with the service key. Every event is signed whole, however
-/// large: each CBOR part carries its own length, so no size is refused.
-pub fn sign_grant_event(
-    event: GrantEvent,
-    service_key: &Ed25519Identity,
-) -> Result<SignedGrantEvent, GrantError> {
-    let body = encode_event_body(&event);
-    let protected = protected_header(&service_key.public_key_bytes(), event.content_type());
-    let signature = service_key.sign(&sig_structure(&protected, &body));
-    let bytes = cose_sign1(&protected, &body, &signature);
-    Ok(SignedGrantEvent {
-        bytes,
-        commitment: payload_commitment(&body),
-        event,
-    })
-}
-
-fn as_bytes(value: Value, reason: &'static str) -> Result<Vec<u8>, GrantError> {
-    match value {
-        Value::Bytes(raw) => Ok(raw),
-        _ => Err(malformed(reason)),
-    }
-}
-
-/// The protected header's content type and key id.
-fn header(protected: &[u8]) -> Result<(String, Vec<u8>), GrantError> {
-    const SHAPE: &str = "the protected header is not a map naming a content type and a key id";
-    let Value::Map(pairs) = cbor(protected, SHAPE)? else {
-        return Err(malformed(SHAPE));
-    };
-    let mut content_type = None;
-    let mut kid = None;
-    for (key, value) in pairs {
-        match (as_uint(&key, SHAPE), value) {
-            (Ok(3), Value::Text(found)) => content_type = Some(found),
-            (Ok(4), Value::Bytes(found)) => kid = Some(found),
-            _ => {}
-        }
-    }
-    Ok((
-        content_type.ok_or_else(|| malformed(SHAPE))?,
-        kid.ok_or_else(|| malformed(SHAPE))?,
-    ))
-}
-
-/// Verify `message` against the service key and return the grant event it carries.
-pub fn verify_grant_event(
-    message: &[u8],
-    service_key: &[u8; KEY_LEN],
-) -> Result<SignedGrantEvent, GrantError> {
-    const SHAPE: &str = "the message is not a tagged COSE_Sign1 of four parts";
-    let Value::Tag(COSE_SIGN1_TAG, inner) = cbor(message, SHAPE)? else {
-        return Err(malformed(SHAPE));
-    };
-    let Value::Array(items) = *inner else {
-        return Err(malformed(SHAPE));
-    };
-    let [protected, _, payload, signature] = <[Value; 4]>::try_from(items)
-        .ok()
-        .ok_or_else(|| malformed(SHAPE))?;
-    let (protected, payload, signature) = (
-        as_bytes(protected, SHAPE)?,
-        as_bytes(payload, SHAPE)?,
-        as_bytes(signature, SHAPE)?,
-    );
-    let (content_type, kid) = header(&protected)?;
-    if ![
-        GRANT_ENVELOPE,
-        SERVICE_ACCOUNT_ENVELOPE,
-        CONNECTOR_ENVELOPE,
-        HELD_MODE_ENVELOPE,
-        ROLE_ENVELOPE,
-        MACHINE_ENVELOPE,
-    ]
-    .contains(&content_type.as_str())
-    {
-        return Err(GrantError::EnvelopeMismatch {
-            reason: format!("it names {content_type}"),
-        });
-    }
-    let kid = <[u8; KEY_LEN]>::try_from(kid.as_slice())
-        .ok()
-        .ok_or_else(|| malformed("the key id is not a 32-byte Ed25519 public key"))?;
-    if protected != protected_header(&kid, &content_type) {
-        return Err(malformed(
-            "the protected header is not the grant-event header",
-        ));
-    }
-    if &kid != service_key {
-        return Err(GrantError::SignerMismatch);
-    }
-    if signature.len() != SIGNATURE_LEN
-        || Ed25519Identity::verify(
-            service_key,
-            &sig_structure(&protected, &payload),
-            &signature,
-        )
-        .is_err()
-    {
-        return Err(GrantError::SignatureInvalid);
-    }
-    let event = decode_event_body(&payload)?;
-    if content_type != event.content_type() {
-        return Err(malformed(
-            "the grant body version differs from its envelope",
-        ));
-    }
-    if cose_sign1(&protected, &payload, &signature) != message {
-        return Err(GrantError::EventNotCanonical);
-    }
-    Ok(SignedGrantEvent {
-        bytes: message.to_vec(),
-        commitment: payload_commitment(&payload),
-        event,
-    })
-}
+pub use signing::{SignedGrantEvent, sign_grant_event, verify_grant_event};

@@ -19,6 +19,10 @@ use super::types::GrantId;
 use crate::id::{IdentityId, PersonId};
 
 /// Refuse, by the revoked grant's name, an ancestry with a revoked grant on it.
+///
+/// # Errors
+/// - `GrantError::SourceUnknown` if an ancestry grant is absent.
+/// - `GrantError::Revoked` if an ancestry grant has been revoked.
 pub fn unrevoked(book: &GrantBook, lineage: &Lineage) -> Result<(), GrantError> {
     for id in &lineage.path {
         let record = book.record(*id).ok_or_else(|| GrantError::SourceUnknown {
@@ -35,6 +39,21 @@ pub fn unrevoked(book: &GrantBook, lineage: &Lineage) -> Result<(), GrantError> 
 
 /// Refuse a revocation unless `caller` issued the grant, holds a grant it
 /// derives from, or is the root authority.
+///
+/// # Errors
+/// - `GrantError::SourceUnknown` if an ancestor grant is absent.
+/// - `GrantError::LineageCycle` if the source chain revisits a grant.
+/// - `GrantError::LineageMalformed` if the root holder or standing issuer is not a person.
+/// - `GrantError::IssuerNotHolder` if a child issuer is outside its source authority.
+/// - `GrantError::ResourceOutside` if a child names another resource.
+/// - `GrantError::UseOnly` if an ancestor disallows pass-on.
+/// - `GrantError::RecipientRefused` if the child holder kind is excluded.
+/// - `GrantError::ActionsOutside` if a child carries actions outside its source.
+/// - `GrantError::PassOnBeyondSource` if a child may pass on more than its source permits.
+/// - `GrantError::ExpiryBeyondSource` if a child outlives its source.
+/// - `GrantError::GrantUnknown` if the requested grant is absent.
+/// - `GrantError::AlreadyRevoked` if it was already revoked.
+/// - `GrantError::RevokeRefused` if the caller is neither root authority, issuer nor ancestor holder.
 pub fn judge_revoke(
     book: &GrantBook,
     root_authority: PersonId,
@@ -71,6 +90,10 @@ pub fn judge_revoke(
 
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// How many permission relationships name `grant` or any grant derived from it.
+    ///
+    /// # Errors
+    /// - `GrantError::PermissionEngineUnavailable` if the permission revision or relationships cannot be read.
+    /// - A custom `RelationshipStore` may return another `GrantError` from its read or revision methods; that exact variant is propagated.
     pub fn relationships_derived_from(&self, grant: GrantId) -> Result<usize, GrantError> {
         let mut tree: BTreeSet<GrantId> = self.book.descendants(grant).into_iter().collect();
         tree.insert(grant);

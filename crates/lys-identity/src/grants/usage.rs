@@ -69,6 +69,7 @@ pub(super) fn note(
 impl Usage {
     /// The use of the grant `record` holds, with the exercises of it the log
     /// has no report of.
+    #[must_use]
     pub fn of(record: &GrantRecord, unreported: Option<&Unreported>) -> Self {
         Self {
             last: record.last_use(),

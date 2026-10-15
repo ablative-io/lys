@@ -82,6 +82,11 @@ impl<S: LeafStore> GrantLedger<S> {
     /// Open the log over the store `reopen` gives from its owner's snapshot,
     /// reading only the leaves after it, and hand back the snapshot's state
     /// with every event after it. A snapshot is owed every `every` entries.
+    ///
+    /// # Errors
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
+    /// - `GrantError::CheckpointRefused` if the signed checkpoint is invalid; opening leaves it held for an operator reset.
     pub fn open(
         reopen: Reopen<S>,
         key: &Ed25519Identity,
@@ -258,6 +263,10 @@ impl<S: LeafStore> GrantLedger<S> {
 
     /// Refuse the snapshot's state, which the owner could not read, by
     /// `reason`, and reopen the log from every leaf, answering every event.
+    ///
+    /// # Errors
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn refuse_state(
         &mut self,
         reason: String,
@@ -305,6 +314,9 @@ impl<S: LeafStore> GrantLedger<S> {
     }
 
     /// The log's current size and root, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
     pub fn head(&self) -> Result<(u64, [u8; 32]), GrantError> {
         Ok(self.certain()?.head())
     }
@@ -312,12 +324,22 @@ impl<S: LeafStore> GrantLedger<S> {
     /// The event at `index` with the coordinate it completed, read from the
     /// store from the nearest checkpoint and verified, refused while an
     /// append is uncertain.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn entry(&self, index: u64) -> Result<Option<(SignedGrantEvent, Coordinate)>, GrantError> {
         self.certain()?.entry(index, &self.service_key)
     }
 
     /// Every event in log order with its coordinate, read from the store in
     /// one pass and verified, refused while an append is uncertain.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn entries(&self) -> Result<Vec<(SignedGrantEvent, Coordinate)>, GrantError> {
         self.certain()?.entries(&self.service_key)
     }
@@ -327,6 +349,11 @@ impl<S: LeafStore> GrantLedger<S> {
     /// and verified: a replay's cost is bounded by the checkpoint distance
     /// and the range, never the history (DIRECTORY-089 R1). Refused while
     /// an append is uncertain.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn entries_between(
         &self,
         from: u64,
@@ -337,12 +364,20 @@ impl<S: LeafStore> GrantLedger<S> {
     }
 
     /// An inclusion proof of the leaf at `index` in the log's current tree.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if the proof tree cannot be read or the index is outside the tree.
     pub fn inclusion_proof(&self, index: u64) -> Result<InclusionProof, GrantError> {
         self.certain()?.inclusion_proof(index)
     }
 
     /// Append `event` as one leaf. A failed append is held uncertain and
     /// answered `LogUnavailable`; [`GrantLedger::reconcile`] resolves it.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if appending or pinning the event fails; the append is then held uncertain.
     pub fn append(&mut self, event: &SignedGrantEvent) -> Result<Coordinate, GrantError> {
         let index = self.certain()?.len();
         self.ledger.append(event.bytes()).map_err(|failure| {
@@ -362,6 +397,10 @@ impl<S: LeafStore> GrantLedger<S> {
     /// only the leaves from its index on, and answer every one of them.
     /// Answers `None` when nothing was held. The hold stays until every step
     /// has succeeded.
+    ///
+    /// # Errors
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn reconcile(
         &mut self,
         key: &Ed25519Identity,

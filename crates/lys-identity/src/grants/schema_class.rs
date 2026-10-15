@@ -70,6 +70,7 @@ fn marked(
 impl KindSchema {
     /// Whether `action` is decided from the pass alone; every other action
     /// of the kind is deliberate.
+    #[must_use]
     pub fn is_hot(&self, action: &Action) -> bool {
         self.hot.contains(action)
     }
@@ -79,6 +80,7 @@ impl AppSchema {
     /// The first hot action, in name order, that `relation` of `kind` carries,
     /// or the role of that name (ACCESS-004 R1): a grant held by draft or by
     /// two under it is refused.
+    #[must_use]
     pub fn hot_action(&self, kind: &str, relation: &Relation) -> Option<&Action> {
         let kind = self.kind(kind)?;
         kind.relations
@@ -89,6 +91,7 @@ impl AppSchema {
     }
 
     /// The schema as JSON, in the form it is read from.
+    #[must_use]
     pub fn to_json(&self) -> Value {
         let names = |actions: &BTreeSet<Action>| -> Vec<String> {
             actions.iter().map(ToString::to_string).collect()

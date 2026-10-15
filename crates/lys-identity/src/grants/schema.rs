@@ -101,6 +101,9 @@ fn segment(name: &str) -> String {
 /// Refuse `id` unless it is an app id: three to forty lowercase letters,
 /// digits and underscores, starting with a letter. The id is the permission
 /// store's prefix unchanged, so a hyphen or a dot is refused.
+///
+/// # Errors
+/// - `SchemaError::AppIdInvalid` if the id is outside the length or lowercase identifier grammar.
 pub fn app_id(id: &str) -> Result<&str, SchemaError> {
     let refused = |reason| SchemaError::AppIdInvalid {
         id: id.to_owned(),
@@ -127,6 +130,7 @@ pub fn app_id(id: &str) -> Result<&str, SchemaError> {
 
 /// The app a resource kind belongs to: the prefix before its first dot, or
 /// `lys` for a kind written without one.
+#[must_use]
 pub fn owner_of(kind: &str) -> &str {
     kind.split_once('.').map_or(LYS_APP, |(prefix, _)| prefix)
 }
@@ -187,163 +191,18 @@ struct Raw {
     roles: BTreeMap<Relation, BTreeSet<Action>>,
 }
 
-fn object<'a>(
-    value: &'a Value,
-    pointer: &str,
-    what: &str,
-) -> Result<&'a Map<String, Value>, SchemaError> {
-    value
-        .as_object()
-        .ok_or_else(|| invalid(pointer, format!("{what} is a JSON object")))
-}
+#[path = "schema_read.rs"]
+mod read;
 
-fn only(map: &Map<String, Value>, pointer: &str, allowed: &[&str]) -> Result<(), SchemaError> {
-    match map.keys().find(|key| !allowed.contains(&key.as_str())) {
-        Some(key) => Err(invalid(
-            &format!("{pointer}/{}", segment(key)),
-            format!(
-                "`{key}` is not a member here; the members are {}",
-                allowed.join(", ")
-            ),
-        )),
-        None => Ok(()),
-    }
-}
-
-/// Each string of the array at `pointer`, with its own pointer.
-fn strings(value: &Value, pointer: &str, what: &str) -> Result<Vec<(String, String)>, SchemaError> {
-    let items = value
-        .as_array()
-        .ok_or_else(|| invalid(pointer, format!("{what} is a JSON array of names")))?;
-    items
-        .iter()
-        .enumerate()
-        .map(|(index, item)| {
-            let at = format!("{pointer}/{index}");
-            item.as_str()
-                .map(|text| (at.clone(), text.to_owned()))
-                .ok_or_else(|| invalid(&at, format!("each of {what} is a name")))
-        })
-        .collect()
-}
-
-fn action(pointer: &str, name: &str) -> Result<Action, SchemaError> {
-    engine_name(pointer, "action", name)?;
-    Action::new(name).map_err(|error| invalid(pointer, error.to_string()))
-}
-
-fn relation(pointer: &str, name: &str) -> Result<Relation, SchemaError> {
-    engine_name(pointer, "relation", name)?;
-    if name.starts_with(PARENT_RELATION) {
-        return Err(invalid(
-            pointer,
-            format!(
-                "the relation `{name}` starts with `{PARENT_RELATION}`, which the permission engine keeps for parent relations"
-            ),
-        ));
-    }
-    Relation::new(name).map_err(|error| invalid(pointer, error.to_string()))
-}
-
-fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError> {
-    let body = object(value, pointer, "a kind")?;
-    only(
-        body,
-        pointer,
-        &["actions", "relations", "parents", "hot", "agents", "roles"],
-    )?;
-    let actions_at = format!("{pointer}/actions");
-    let listed = body
-        .get("actions")
-        .ok_or_else(|| invalid(pointer, "a kind declares its actions"))?;
-    let mut actions = BTreeSet::new();
-    for (at, name) in strings(listed, &actions_at, "actions")? {
-        if !actions.insert(action(&at, &name)?) {
-            return Err(invalid(
-                &at,
-                format!("the action `{name}` is declared twice"),
-            ));
-        }
-    }
-    if actions.is_empty() {
-        return Err(invalid(&actions_at, "a kind declares at least one action"));
-    }
-    let hot = class::hot(body, pointer, &actions)?;
-    let agents = class::agents(body, pointer, &actions)?;
-    let mut relations = Vec::new();
-    if let Some(value) = body.get("relations") {
-        let relations_at = format!("{pointer}/relations");
-        for (name, carried) in object(value, &relations_at, "relations")? {
-            let at = format!("{relations_at}/{}", segment(name));
-            let parsed = relation(&at, name)?;
-            if actions.iter().any(|action| action.as_str() == name) {
-                return Err(invalid(
-                    &at,
-                    format!(
-                        "the relation `{name}` is also an action of its kind, and the permission engine holds each name of a kind once"
-                    ),
-                ));
-            }
-            let carried = strings(carried, &at, "a relation's actions")?;
-            if carried.is_empty() {
-                return Err(invalid(
-                    &at,
-                    format!("the relation `{name}` carries no action"),
-                ));
-            }
-            relations.push((at, parsed, carried));
-        }
-    }
-    let named: BTreeSet<&str> = relations
-        .iter()
-        .map(|(_, relation, _)| relation.as_str())
-        .collect();
-    let roles = roles::roles(body, pointer, &actions, &named)?;
-    let parents = match body.get("parents") {
-        Some(value) => strings(value, &format!("{pointer}/parents"), "parents")?,
-        None => Vec::new(),
-    };
-    if relations.is_empty() && parents.is_empty() {
-        return Err(invalid(
-            pointer,
-            "a kind has at least one relation or one parent, or nothing could ever act on it",
-        ));
-    }
-    Ok(Raw {
-        actions,
-        relations,
-        parents,
-        hot,
-        agents,
-        roles,
-    })
-}
-
-/// The pointer of the parent entry through which `kinds` returns to a kind
-/// it started from, the first such entry in the order of the kinds' names.
-fn cycle(kinds: &BTreeMap<String, Raw>) -> Option<String> {
-    for (name, kind) in kinds {
-        for (at, parent) in &kind.parents {
-            let mut seen = BTreeSet::new();
-            let mut next = vec![parent.as_str()];
-            while let Some(current) = next.pop() {
-                if current == name {
-                    return Some(at.clone());
-                }
-                if seen.insert(current)
-                    && let Some(above) = kinds.get(current)
-                {
-                    next.extend(above.parents.iter().map(|(_, parent)| parent.as_str()));
-                }
-            }
-        }
-    }
-    None
-}
+use read::{action, cycle, object, only, raw_kind, relation, strings};
 
 impl AppSchema {
     /// Read the schema `value` of the app `app`, refusing the first fault by
     /// its JSON pointer. The app `lys` is read as Lys's own model.
+    ///
+    /// # Errors
+    /// - `SchemaError::AppIdInvalid` if the app id cannot be a permission-store prefix.
+    /// - `SchemaError::Invalid` at the first invalid shape, member, name, undeclared action, foreign or missing parent, role or parent cycle.
     pub fn parse(app: &str, value: &Value) -> Result<Self, SchemaError> {
         if app == LYS_APP {
             return Self::parse_lys(value);
@@ -504,6 +363,7 @@ impl AppSchema {
     }
 
     /// Lys's own model as the schema of the app `lys`.
+    #[must_use]
     pub fn lys(relations: BTreeMap<Relation, BTreeSet<Action>>) -> Self {
         let actions = relations.values().flatten().cloned().collect();
         let kind = KindSchema {
@@ -521,18 +381,21 @@ impl AppSchema {
     }
 
     /// The app the schema belongs to.
+    #[must_use]
     pub fn app(&self) -> &str {
         &self.app
     }
 
     /// Every kind, in the order of their names; the app `lys` holds one,
     /// [`ANY_KIND`].
+    #[must_use]
     pub fn kinds(&self) -> &BTreeMap<String, KindSchema> {
         &self.kinds
     }
 
     /// The kind of this schema a resource of `kind` is judged by: the kind
     /// itself, or for the app `lys` its one kind when `kind` has no prefix.
+    #[must_use]
     pub fn kind(&self, kind: &str) -> Option<&KindSchema> {
         if self.app == LYS_APP {
             return if kind.contains('.') {
@@ -546,6 +409,7 @@ impl AppSchema {
 
     /// Each kind of an app's schema as the grants judge it, under `version`.
     /// The app `lys` has none: its relations are the model's own.
+    #[must_use]
     pub fn kind_models(&self, version: u64) -> BTreeMap<String, KindModel> {
         if self.app == LYS_APP {
             return BTreeMap::new();

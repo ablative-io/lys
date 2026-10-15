@@ -63,6 +63,9 @@ pub struct Within {
 impl Model {
     /// The model `version` defining `relations`, refused if the version is 0,
     /// there is no relation, or a relation carries no action.
+    ///
+    /// # Errors
+    /// - `GrantError::ModelInvalid` if the version is zero, the relation table is empty or a relation has no actions.
     pub fn new(
         version: u64,
         relations: impl IntoIterator<Item = (Relation, BTreeSet<Action>)>,
@@ -98,6 +101,7 @@ impl Model {
     }
 
     /// Every app kind the model judges, in the order of their names.
+    #[must_use]
     pub fn kinds(&self) -> &BTreeMap<String, KindModel> {
         &self.kinds
     }
@@ -130,6 +134,7 @@ impl Model {
 
     /// The version a resource of `kind` is judged under: its app schema's,
     /// or the model's own for a kind without a prefix or one it does not hold.
+    #[must_use]
     pub fn version_on(&self, kind: &str) -> u64 {
         self.table(kind)
             .map_or(self.version, |(version, _)| version)
@@ -145,6 +150,9 @@ impl Model {
     }
 
     /// The actions `relation` carries on a resource of `kind`.
+    ///
+    /// # Errors
+    /// - `GrantError::RelationUnknown` if the model has no such relation for the requested kind or table.
     pub fn actions_on(
         &self,
         kind: &str,
@@ -160,6 +168,10 @@ impl Model {
 
     /// Whether `requested`, on a resource of `kind`, resolves to actions
     /// that all lie within `held`.
+    ///
+    /// # Errors
+    /// - `GrantError::RelationUnknown` if the requested relation is absent from the model.
+    /// - `GrantError::ActionsOutside` if the requested relation carries an action outside the held authority.
     pub fn within_on(
         &self,
         kind: &str,
@@ -185,6 +197,7 @@ impl Model {
 
     /// The actions the role `role` of the app kind `kind` carries under the
     /// version current now, if the kind names it.
+    #[must_use]
     pub fn role_on(&self, kind: &str, role: &Relation) -> Option<&BTreeSet<Action>> {
         self.kinds.get(kind)?.roles.get(role)
     }
@@ -193,6 +206,7 @@ impl Model {
     /// role is judged as the role's actions under the version current when
     /// it is judged, and as none once the role has left its kind (ACCESS-004
     /// R1); every other grant keeps the actions it was issued with.
+    #[must_use]
     pub fn actions_of<'a>(&'a self, grant: &'a Grant) -> &'a BTreeSet<Action> {
         if !grant.names_role() {
             return grant.actions();
@@ -202,6 +216,7 @@ impl Model {
     }
 
     /// The model's version.
+    #[must_use]
     pub fn version(&self) -> u64 {
         self.version
     }
@@ -213,6 +228,9 @@ impl Model {
     }
 
     /// The actions `relation` carries in this model.
+    ///
+    /// # Errors
+    /// - `GrantError::RelationUnknown` if the model has no such relation for the requested kind or table.
     pub fn actions(&self, relation: &Relation) -> Result<&BTreeSet<Action>, GrantError> {
         self.relations
             .get(relation)
@@ -223,6 +241,10 @@ impl Model {
     }
 
     /// Whether `requested` resolves to actions that all lie within `held`.
+    ///
+    /// # Errors
+    /// - `GrantError::RelationUnknown` if the requested relation is absent from the model.
+    /// - `GrantError::ActionsOutside` if the requested relation carries an action outside the held authority.
     pub fn within(
         &self,
         requested: &Relation,

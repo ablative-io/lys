@@ -18,6 +18,11 @@ use super::projection::GrantBook;
 
 /// Refuse an ancestry whose earliest end is at or before `at`, or with a grant
 /// on it that has not started by `at`.
+///
+/// # Errors
+/// - `GrantError::Expired` if the earliest end is at or before the decision instant.
+/// - `GrantError::SourceUnknown` if an ancestry grant is absent from the book.
+/// - `GrantError::NotStarted` if an ancestry grant has not started.
 pub fn within_window(book: &GrantBook, lineage: &Lineage, at: u64) -> Result<(), GrantError> {
     if let Some((ended_at, by)) = lineage.ends
         && at >= ended_at
@@ -45,6 +50,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Judge new requests against `model` from now on. Its version must be
     /// newer than the current one. Grants already held keep their actions and
     /// their ends.
+    ///
+    /// # Errors
+    /// - `GrantError::ModelInvalid` if the replacement version is not newer than the current model.
     pub fn set_model(&mut self, model: Model) -> Result<(), GrantError> {
         if model.version() <= self.model.version() {
             return Err(GrantError::ModelInvalid {

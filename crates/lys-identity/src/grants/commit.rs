@@ -65,6 +65,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Resolve an uncertain append, and apply every leaf it adopted.
+    ///
+    /// # Errors
+    /// - `GrantError::LogUnavailable` if the store or checkpoint cannot be read.
+    /// - `GrantError::LeafNotAnEvent` if a leaf is missing or is not a valid event signed by this service.
     pub fn settle_log(&mut self) -> Result<(), GrantError> {
         if let Some(adopted) = self.ledger.reconcile(&self.key)? {
             for (signed, coordinate) in adopted {
@@ -141,6 +145,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// is read from the book, never from the log. An engine that takes a
     /// write and does not move past the revision it stood at is refused by
     /// name rather than written to again.
+    ///
+    /// # Errors
+    /// - `GrantError::PermissionEngineUnavailable` if the engine cannot read or write relationships, or accepts a write without advancing its revision.
+    /// - `GrantError::GrantUnknown` if a committed issuance names no grant in the book.
+    /// - A `RelationshipStore` implementation may return another `GrantError` from its revision or write methods; that exact variant is propagated.
     pub fn project(&mut self) -> Result<u64, GrantError> {
         let mut revision = self.relationships.revision()?;
         if revision >= self.folded {

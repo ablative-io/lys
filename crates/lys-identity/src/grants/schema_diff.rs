@@ -72,6 +72,7 @@ pub struct RoleChange {
 impl RoleChange {
     /// The change in words, as the Apps screen names it: "adds `seat_retire`
     /// to administrator", "removes `post` from member".
+    #[must_use]
     pub fn words(&self) -> Vec<String> {
         let role = &self.role.name;
         self.added
@@ -88,6 +89,7 @@ impl RoleChange {
 
 impl SchemaDiff {
     /// Whether the change changes nothing.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }

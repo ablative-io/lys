@@ -94,6 +94,7 @@ pub(super) fn to_json(roles: &BTreeMap<Relation, BTreeSet<Action>>) -> Value {
 
 impl KindSchema {
     /// The actions the role `role` of this kind carries, if the kind names it.
+    #[must_use]
     pub fn role(&self, role: &Relation) -> Option<&BTreeSet<Action>> {
         self.roles.get(role)
     }
@@ -101,6 +102,7 @@ impl KindSchema {
 
 impl AppSchema {
     /// The actions the role `role` of `kind` carries in this schema.
+    #[must_use]
     pub fn role(&self, kind: &str, role: &Relation) -> Option<&BTreeSet<Action>> {
         self.kind(kind)?.role(role)
     }

@@ -37,6 +37,7 @@ pub struct GrantReceipt {
 
 impl GrantReceipt {
     /// The receipt of `signed`, committed at `coordinate`.
+    #[must_use]
     pub fn of(signed: &SignedGrantEvent, coordinate: Coordinate) -> Self {
         let event = signed.event();
         Self {
@@ -51,6 +52,7 @@ impl GrantReceipt {
     }
 
     /// The revision a decision must stand at to reflect this change.
+    #[must_use]
     pub fn revision(&self) -> u64 {
         self.coordinate.index + 1
     }
@@ -58,6 +60,27 @@ impl GrantReceipt {
 
 /// Check `receipt` against the signed `message`, the service key, a
 /// checkpoint of the grant log (`tree_size` and `root`) and an inclusion proof.
+///
+/// # Errors
+/// - `GrantError::EventMalformed` if the event CBOR or wire codes have the wrong shape.
+/// - `GrantError::VersionUnsupported` if the event version is unsupported.
+/// - `GrantError::GrantMalformed` if a grant member, identity or optional mark has the wrong shape.
+/// - `GrantError::MemberUnknown` if an encoded grant names an unsupported member.
+/// - `GrantError::MemberMissing` if an encoded grant omits a required member.
+/// - `GrantError::RecipientKindUnknown` if a pass-on recipient code is unsupported.
+/// - `GrantError::TokenInvalid` if an action, relation or resource token is invalid.
+/// - `GrantError::AuthorityAbsent` if exercise or pass-on actions or recipients are empty.
+/// - `GrantError::PassOnOutside` if pass-on authority exceeds exercise authority.
+/// - `GrantError::WindowInvalid` if the grant ends at or before its start.
+/// - `GrantError::ModelInvalid` if the model version is zero.
+/// - `GrantError::LineageMalformed` if the source or root holder is invalid.
+/// - `GrantError::UseOnly` if a one-time grant allows pass-on.
+/// - `GrantError::EventMismatch` if the issued grant disagrees with its event or a revocation reason is blank.
+/// - `GrantError::EventNotCanonical` if re-encoding does not reproduce the input bytes.
+/// - `GrantError::EnvelopeMismatch` if the message names another envelope.
+/// - `GrantError::SignerMismatch` if the envelope names another service key.
+/// - `GrantError::SignatureInvalid` if the signature has the wrong length or does not verify.
+/// - `GrantError::ReceiptInvalid` if the receipt fields, hashes, index or inclusion proof disagree with the signed message and checkpoint.
 pub fn verify_grant_receipt(
     receipt: &GrantReceipt,
     message: &[u8],

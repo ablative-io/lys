@@ -51,6 +51,9 @@ impl MemoryState {
 }
 
 /// Read only the holder's grants and their source lineage, and placements above the resource.
+///
+/// # Errors
+/// Propagates the exact `GrantError` returned by either supplied relationship reader; this traversal creates no error variant of its own.
 pub fn select(
     subject: IdentityId,
     resource: &Resource,
