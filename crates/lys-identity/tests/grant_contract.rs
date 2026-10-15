@@ -153,36 +153,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
         cases += 1;
         assert_eq!(decode_grant(bytes).as_ref(), Err(expected), "case {cases}");
     };
-    // Key 15 names a role (ACCESS-004 R1), so 16 is the first key outside
-    // the contract; 15 carrying anything but true is refused by its own rule.
-    for key in [0, 16, 40] {
-        let mut pairs = fixture();
-        pairs.push((int(key), int(1)));
-        refused(&bytes_of(pairs)?, &GrantError::MemberUnknown { key });
-    }
-    let mut pairs = fixture();
-    pairs.push((int(15), int(1)));
-    refused(
-        &bytes_of(pairs)?,
-        &GrantError::GrantMalformed {
-            reason: "a grant naming a role names key 15 once, as true",
-        },
-    );
-    let mut pairs = fixture();
-    pairs.push((int(13), int(1)));
-    refused(
-        &bytes_of(pairs)?,
-        &GrantError::GrantMalformed {
-            reason: "a one-time grant names key 13 once, as true",
-        },
-    );
-    for (key, member) in (1..).zip(MEMBERS) {
-        let pairs = fixture()
-            .into_iter()
-            .filter(|(k, _)| *k != int(key))
-            .collect();
-        refused(&bytes_of(pairs)?, &GrantError::MemberMissing { member });
-    }
+    assert_member_refusals(&mut refused)?;
     refused(
         &with(7, &texts(&[]))?,
         &GrantError::AuthorityAbsent { member: "actions" },
@@ -260,6 +231,40 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
         3 + 1 + 1 + 12 + 4 + 3 + 5 + 1,
         "every refusal case was counted"
     );
+    Ok(())
+}
+
+fn assert_member_refusals(refused: &mut impl FnMut(&[u8], &GrantError)) -> TestResult {
+    // Key 15 names a role (ACCESS-004 R1), so 16 is the first key outside
+    // the contract; 15 carrying anything but true is refused by its own rule.
+    for key in [0, 16, 40] {
+        let mut pairs = fixture();
+        pairs.push((int(key), int(1)));
+        refused(&bytes_of(pairs)?, &GrantError::MemberUnknown { key });
+    }
+    let mut pairs = fixture();
+    pairs.push((int(15), int(1)));
+    refused(
+        &bytes_of(pairs)?,
+        &GrantError::GrantMalformed {
+            reason: "a grant naming a role names key 15 once, as true",
+        },
+    );
+    let mut pairs = fixture();
+    pairs.push((int(13), int(1)));
+    refused(
+        &bytes_of(pairs)?,
+        &GrantError::GrantMalformed {
+            reason: "a one-time grant names key 13 once, as true",
+        },
+    );
+    for (key, member) in (1..).zip(MEMBERS) {
+        let pairs = fixture()
+            .into_iter()
+            .filter(|(k, _)| *k != int(key))
+            .collect();
+        refused(&bytes_of(pairs)?, &GrantError::MemberMissing { member });
+    }
     Ok(())
 }
 
