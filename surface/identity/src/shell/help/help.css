@@ -15,7 +15,10 @@
 .help-kt dt { font: 11px "JetBrains Mono", ui-monospace, monospace; color: var(--accent); white-space: nowrap; }
 .help-kt dd { margin: 0; color: var(--text-secondary); }
 .help-keys-foot { margin-top: 10px; display: flex; justify-content: flex-end; }
-/* The full help's sheet. */
+/* The full help: the page's own notes first, then the sheet. */
+.help-this-page .help-notes { gap: 8px; margin-bottom: 14px; }
+.help-this-page .help-call-t { font-size: 12.5px; }
+.help-this-page .help-call-d { font-size: 12px; line-height: 1.5; }
 .help-track + .help-track { margin-top: 10px; }
 .help-sheet-track { font-size: 11px !important; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted) !important; margin-bottom: 6px !important; }
 .help-steps { margin: 4px 0 12px; padding-left: 18px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; }

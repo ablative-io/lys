@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router';
 import { Act } from '../Act';
 import { keyable } from '../keyable';
 import { useShell } from '../ShellContext';
 import { CONCEPTS, TRACKS, conceptById, conceptGroups } from './concepts';
 import type { Concept } from './concepts';
+import { ANY_PAGE, PAGES, pageKeyOf } from './pages';
 
 /** One row of the index: the concept's name and its one sentence. Enter or a click opens its sheet. */
 function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
@@ -17,8 +19,36 @@ function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
 }
 
 /**
- * Everything the help explains, by track (aion's HelpTrackIndex), narrowed in place by what is typed: every word
- * typed must appear in a concept's name, sentence, explanation or steps.
+ * What is on the page open now, control by control, in the page's own order: the same notes the numbered layer
+ * shows, so Help explains the screen a person is looking at before it lists every topic. "Number them" turns the
+ * layer on, which marks each control with its number.
+ */
+function OnThisPage() {
+  const shell = useShell();
+  const { pathname } = useLocation();
+  const help = PAGES[pageKeyOf(pathname)] ?? ANY_PAGE;
+  if (help === ANY_PAGE) return null;
+  return (
+    <section className="help-track help-this-page" aria-label={'On this page: ' + help.title}>
+      <div className="section-h" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span>On this page: {help.title}</span>
+        <Act symbol="help" name="Number these on the page" hint="Mark each control on the page with its number (?)" word="Number them" className="small" data-act="explain-page" onClick={shell.explainOn} />
+      </div>
+      <ol className="help-notes" aria-label={'Notes for ' + help.title}>
+        {help.regions.map((region) => (
+          <li key={region.sel} data-page-note={region.title}>
+            <div className="help-call-t">{region.title}</div>
+            <div className="help-call-d">{region.text}</div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+/**
+ * Everything the help explains: first what is on this page, then every topic by track (aion's HelpTrackIndex),
+ * narrowed in place by what is typed: every word typed must appear in a concept's name, sentence, explanation or steps.
  */
 function TrackIndex() {
   const [query, setQuery] = useState('');
@@ -26,6 +56,7 @@ function TrackIndex() {
   return (
     <>
       <input className="search" id="helpQ" type="search" aria-label="Search help" placeholder="Search help…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      {query.trim() ? null : <div style={{ marginTop: 8 }}><OnThisPage /></div>}
       <div id="helpList" style={{ marginTop: 8 }}>
         {groups.length ? groups.map((group) => (
           <section key={group.track} className="help-track" data-track={group.track} aria-label={group.label}>
@@ -84,7 +115,7 @@ export function HelpDock() {
           <b style={{ fontWeight: 600 }}>{chosen ? chosen.title : 'Help'}</b>
         </span>
         <span style={{ display: 'flex', gap: 4 }}>
-          <Act symbol="help" name="Explain this page" hint="Number what is on this page (?)" word="This page" data-act="explain" onClick={shell.explainOn} />
+          <Act symbol="help" name="Number the controls on this page" hint="Mark each control on this page with its number (?)" word="Number them" data-act="explain" onClick={shell.explainOn} />
           <Act symbol="close" name="Close help" className="small quiet" data-dockbtn-close="" onClick={shell.closeDock} />
         </span>
       </div>
