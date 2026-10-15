@@ -108,6 +108,9 @@ mod durable_tests;
 impl Live {
     /// Ask the verified leader to exit so its final usage can be flushed.
     pub(crate) fn end(&self) -> Result<(), RunnerError> {
+        if let Some(pipe) = &self.writer.seat {
+            return pipe.close();
+        }
         let leader = self.leader.as_ref().ok_or_else(|| {
             RunnerError::refused(
                 "leader_unproved",

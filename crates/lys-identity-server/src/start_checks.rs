@@ -189,12 +189,12 @@ pub fn fields(
         .collect::<Result<Vec<_>, _>>()?;
     let supports_proxy = matches!(
         harness.description.rendering_contract.as_str(),
-        "claude-code/template-v1" | "codex/template-v1"
+        "claude-code/template-v1" | "codex/template-v1" | "seat-program/v1"
     );
     if supports_proxy && start.model_proxy.is_none() {
         return Err(lys_runner::RunnerError::refused(
             "model_proxy_unset",
-            "the server has no model proxy setting; configure its model proxy before starting Claude Code or Codex",
+            "the server has no model proxy setting; configure its model proxy before starting this reviewed program",
         ).into());
     }
     let model_proxy = start

@@ -18,6 +18,9 @@
 //! follow of its terminal bytes (`read_bytes`), and asking for its lines is
 //! refused `attach_pty_use_read_bytes`.
 
+mod frames;
+mod seat_program;
+
 use std::collections::VecDeque;
 use std::sync::atomic::AtomicBool;
 
@@ -409,40 +412,6 @@ fn codex_item(item: &Value, at: u64) -> Vec<AttachLine> {
 }
 
 impl Sessions {
-    /// Render `frame`, read from session `id`'s managed channel in process
-    /// generation `generation`, into its attach lines, and record it as the
-    /// session's last signal. Whatever follows its lines is woken.
-    pub(crate) fn attach_frame(
-        &self,
-        id: &str,
-        generation: u64,
-        transport: Transport,
-        frame: &Value,
-    ) -> Result<(), RunnerError> {
-        let at = now_ms();
-        let lines = render(transport, frame, at);
-        let mut table = self.lock()?;
-        let Some(session) = table
-            .sessions
-            .get_mut(id)
-            .filter(|session| session.generation == generation)
-        else {
-            // A frame of a generation no longer held is the managed
-            // reader's to refuse, on its next look at the table.
-            return Ok(());
-        };
-        session.last_signal = Some(at);
-        let rendered = !lines.is_empty();
-        for each in lines {
-            session.attach.push(each);
-        }
-        drop(table);
-        if rendered {
-            self.wake();
-        }
-        Ok(())
-    }
-
     /// Session `id`'s rendered lines from `cursor`, the oldest kept when none
     /// is given. With `follow`, the answer waits until a line is rendered
     /// after the cursor or the session ends. A session with no managed
@@ -461,7 +430,7 @@ impl Sessions {
             let Some(session) = table.sessions.get(id) else {
                 return Some(Err(unknown(id)));
             };
-            if session.managed.is_none() {
+            if session.managed.is_none() && !session.launch.as_ref().is_some_and(|launch| launch.environment.contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)) {
                 return Some(Err(RunnerError::refused(
                     "attach_pty_use_read_bytes",
                     format!(

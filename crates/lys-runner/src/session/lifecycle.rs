@@ -31,6 +31,7 @@ mod activation;
 mod drain;
 mod launch;
 mod managed;
+mod seat_program;
 mod stream;
 mod terminal;
 
@@ -196,6 +197,12 @@ impl Sessions {
             .take()
         {
             probe();
+        }
+        if plan
+            .environment
+            .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+        {
+            return Self::run_seat_program(plan);
         }
         if let Some(managed) = &plan.managed {
             return self.run_managed(plan, managed);

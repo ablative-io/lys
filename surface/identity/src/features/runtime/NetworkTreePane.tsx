@@ -69,7 +69,7 @@ export function NetworkTreePane({ seat, name, reason, change }: { seat: SeatView
     {ended ? <p role="status">{ended}</p> : null}
     {failure ? <ErrorWords problem={failure} /> : null}
     {running && seat.session ? seat.transport === 'pty' ? <GpuTerminal key={seat.session} session={seat.session} onEnd={end} onFailure={(error) => setFailure(error)} />
-      : seat.transport === 'managed' ? <ManagedTerminal key={seat.session} seat={seat} end={() => setEnded('Session ' + seat.session + ' ended.')} failure={setFailure} />
+      : seat.transport === 'managed' || seat.transport === 'acp' ? <ManagedTerminal key={seat.session} seat={seat} end={() => setEnded('Session ' + seat.session + ' ended.')} failure={setFailure} />
       : <p className="why-not" role="alert">This seat is running, but Lys does not know how to show its terminal. Stop it and start it again; if that does not help, ask the administrator to check its runner.</p>
       : !running && (seat.state === 'offline' || seat.state === 'not-seen' || seat.state === 'unknown') ? <div className="network-start">
         <p className="note">{seat.state === 'unknown' ? 'Lys cannot tell whether ' + name + ' is running. Start it to watch its terminal here; if it is already running, Lys says so.' : name + ' is not running. Start it to watch its terminal here.'}</p>

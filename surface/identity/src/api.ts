@@ -361,7 +361,7 @@ export type SeatState = 'online-working' | 'online-idle' | 'offline' | 'not-seen
 const SEAT_STATES: readonly SeatState[] = ['online-working', 'online-idle', 'offline', 'not-seen', 'unknown'];
 /** One seat: its record and its liveness. `last_signal_at` is milliseconds since the epoch, as the runner keeps it. */
 export interface SeatView {
-  transport?: 'pty' | 'managed' | null; reason?: string;
+  transport?: 'pty' | 'managed' | 'acp' | null; reason?: string;
   name: string; agent: string; harness: string; profile_version: number; machine: string; working_folder: string | null; account?: string | null;
   responsible: string | null; session?: string | null; harness_session?: string | null; state: SeatState; last_signal_at?: number | null;
   created_by: string; created_at: number; revision: number;
@@ -390,7 +390,7 @@ export const seats = {
     if (!answer || !Array.isArray(answer.seats) || (answer.runner !== 'read' && answer.runner !== 'unknown')) seatsUnreadable('The service did not answer a seat list with whether its runner was read.');
     if (answer.seats.some((seat) => !seat || typeof seat.name !== 'string' || !seat.name || typeof seat.agent !== 'string' || !seat.agent
       || typeof seat.machine !== 'string' || !seat.machine || !SEAT_STATES.includes(seat.state)
-      || (seat.transport !== undefined && seat.transport !== null && seat.transport !== 'pty' && seat.transport !== 'managed')
+      || (seat.transport !== undefined && seat.transport !== null && seat.transport !== 'pty' && seat.transport !== 'managed' && seat.transport !== 'acp')
       || (seat.reason !== undefined && typeof seat.reason !== 'string'))) seatsUnreadable('A seat has no name, an unknown state or an unreadable transport or reason; its state is not assumed.');
     return answer;
   },

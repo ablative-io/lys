@@ -110,7 +110,12 @@ fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError>
             session: id.to_owned(),
             pid: session.pid,
             alive: false,
-            managed: session.managed.is_some(),
+            managed: session.managed.is_some()
+                || session.launch.as_ref().is_some_and(|launch| {
+                    launch
+                        .environment
+                        .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+                }),
             harness_session,
             started_fresh,
             turn_active,

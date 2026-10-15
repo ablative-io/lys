@@ -13,13 +13,22 @@ impl Sessions {
         reader: Box<dyn Read + Send>,
         managed: bool,
     ) -> std::io::Result<std::thread::JoinHandle<()>> {
+        let seat = self
+            .lock()
+            .map_err(std::io::Error::other)?
+            .sessions
+            .get(id)
+            .and_then(|session| session.live.as_ref())
+            .is_some_and(|live| live.writer.seat.is_some());
         let pumped = Arc::clone(self);
         let owned = id.to_owned();
         let output = Arc::clone(output);
         std::thread::Builder::new()
             .name("runner-output".to_owned())
             .spawn(move || {
-                if managed {
+                if seat {
+                    pumped.seat_program_read(&owned, generation, &output, reader);
+                } else if managed {
                     pumped.managed_read(&owned, generation, reader);
                 } else {
                     pumped.pump(&owned, generation, &output, reader);

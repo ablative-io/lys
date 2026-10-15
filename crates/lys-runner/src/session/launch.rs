@@ -73,6 +73,13 @@ impl Sessions {
         if let Some(person) = responsible {
             table.responsible.insert(id.clone(), person);
         }
+        let answer = table
+            .sessions
+            .get(&id)
+            .and_then(|session| session.live.as_ref())
+            .and_then(|live| live.writer.seat.as_ref())
+            .and_then(|pipe| pipe.answer.get())
+            .cloned();
         let mut recorded = self.persist(&table);
         if let Some(proof) = seat_proof {
             recorded = recorded.and_then(|()| {
@@ -81,6 +88,16 @@ impl Sessions {
                     &id,
                     "seat_program_started",
                     &proof,
+                )
+            });
+        }
+        if let Some(answer) = answer {
+            recorded = recorded.and_then(|()| {
+                crate::harness_control::seat_program::record(
+                    &mut table,
+                    &id,
+                    "seat_program_answered",
+                    &answer,
                 )
             });
         }
@@ -190,6 +207,40 @@ impl Sessions {
         }
     }
 
+    fn installed_seat_proof(
+        session: &mut Session,
+        is_seat: bool,
+    ) -> Result<Option<serde_json::Value>, RunnerError> {
+        if is_seat {
+            let proof = session
+                .live
+                .as_ref()
+                .and_then(|live| live.writer.seat.as_ref())
+                .ok_or_else(|| {
+                    RunnerError::refused(
+                        "seat_program_pipe_missing",
+                        "the installed seat has no adapter pipe",
+                    )
+                })?
+                .proof
+                .clone();
+            let launch = session.launch.as_mut().ok_or_else(|| {
+                RunnerError::refused(
+                    "seat_program_record_missing",
+                    "the installed seat has no launch",
+                )
+            })?;
+            launch.environment.insert(
+                crate::harness_control::seat_program::PROOF_VARIABLE.to_owned(),
+                serde_json::to_string(&proof).map_err(|error| {
+                    RunnerError::refused("seat_program_record_invalid", error.to_string())
+                })?,
+            );
+            return Ok(Some(proof));
+        }
+        Ok(None)
+    }
+
     pub(crate) fn begin_transport(
         self: &Arc<Self>,
         mut launch: Launch,
@@ -200,7 +251,6 @@ impl Sessions {
         managed: Option<crate::harness_control::Settings>,
     ) -> Result<(u32, u64), RunnerError> {
         let (reservation, rotation) = self.reserve_launch(&launch, tracking.as_ref())?;
-        let seat_proof = crate::harness_control::seat_program::prepare(&mut launch)?;
         if !launch.program.starts_with('/') && !launch.environment.contains_key("PATH") {
             let path = crate::program_path::login_path()
                 .map_err(|reason| RunnerError::refused("spawn_failed", reason))?;
@@ -223,6 +273,7 @@ impl Sessions {
         }
         self.status_line_named(&mut launch);
         super::notify_named(&mut launch)?;
+        let mut seat_proof = crate::harness_control::seat_program::prepare(&mut launch)?;
         let cwd = lifecycle::bound_directory(&launch.directory);
         // Naming the folder is the trust answer: a Claude Code run's folder
         // is recorded as trusted in the configuration the harness reads for
@@ -248,6 +299,7 @@ impl Sessions {
         let mut session = self.initial_session(launch, guard, managed, rotation);
         let prepared = self.run(&lifecycle::plan(&session, false)?)?;
         let pending = Self::install(&mut session, prepared)?;
+        seat_proof = Self::installed_seat_proof(&mut session, seat_proof.is_some())?;
         if let Some(note) = session
             .launch
             .as_ref()
@@ -374,3 +426,7 @@ mod tests {
 #[cfg(test)]
 #[path = "seat_program_launch_tests.rs"]
 pub(crate) mod seat_program_launch_tests;
+
+#[cfg(test)]
+#[path = "seat_program_stdin_tests.rs"]
+mod seat_program_stdin_tests;

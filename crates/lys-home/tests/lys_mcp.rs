@@ -269,3 +269,47 @@ fn a_seat_whose_key_is_not_a_seed_is_refused_and_no_file_changes() -> TestResult
     assert_eq!(Redacted(files), Redacted(before));
     Ok(())
 }
+
+#[test]
+fn a_seat_keeps_its_pass_in_a_generated_file_without_changing_reviewed_argv() -> TestResult {
+    let metadata = File {
+        path: lys_home::harness::seat_program::FILE.to_owned(),
+        text: "reviewed inputs".to_owned(),
+        sha256: Hash::of(b"reviewed inputs").as_str().to_owned(),
+    };
+    let mut files = vec![metadata.clone()];
+    let mut arguments = vec![
+        "run".to_owned(),
+        "--config".to_owned(),
+        "/seat.json".to_owned(),
+    ];
+    let before = arguments.clone();
+    let mut environment = BTreeMap::new();
+    lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())?;
+    assert_eq!(arguments, before);
+    assert_eq!(files.len(), 2);
+    assert_eq!(files[0], metadata);
+    assert_eq!(
+        environment.get("LYS_AGENT_PASS").map(String::as_str),
+        Some("agent-pass.json")
+    );
+    let pass = files
+        .iter()
+        .find(|file| file.path == "agent-pass.json")
+        .ok_or("run pass file missing")?;
+    let proof: Value = serde_json::from_str(&pass.text)?;
+    assert_eq!(
+        Redacted(proof),
+        Redacted(json!({"headers":{"lys-agent-pass":PASS}}))
+    );
+    assert_eq!(pass.sha256, Hash::of(pass.text.as_bytes()).as_str());
+    assert!(!format!("{files:?}").contains(PASS));
+    assert_eq!(
+        lys_mcp::render(&mut files, &mut arguments, &mut environment, &entry())
+            .err()
+            .ok_or("duplicate pass admitted")?
+            .name(),
+        "LysMcpDuplicate"
+    );
+    Ok(())
+}

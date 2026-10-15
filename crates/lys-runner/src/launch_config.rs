@@ -137,7 +137,17 @@ pub(crate) fn add_lys_mcp(
     })?;
     checked(config, arguments.len())?;
     lys_home::harness::lys_mcp::render(&mut config.files, arguments, environment, entry)
-        .map_err(|error| RunnerError::refused(error.name(), error.to_string()))
+        .map_err(|error| RunnerError::refused(error.name(), error.to_string()))?;
+    if config
+        .files
+        .iter()
+        .any(|file| file.path == lys_home::harness::seat_program::FILE)
+    {
+        config
+            .environment_paths
+            .insert("LYS_AGENT_PASS".to_owned(), "agent-pass.json".to_owned());
+    }
+    Ok(())
 }
 
 fn directory(path: &Path) -> Result<(), RunnerError> {

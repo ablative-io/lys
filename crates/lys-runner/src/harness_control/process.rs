@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use portable_pty::{Child, ChildKiller, ExitStatus};
@@ -19,6 +19,7 @@ use crate::peer::Leader;
 mod qualification;
 
 mod executable;
+mod pipe_spawn;
 pub use executable::executable;
 pub(crate) use executable::report_version;
 
@@ -173,32 +174,19 @@ fn selected(program: &str, environment: &BTreeMap<String, String>) -> Result<Pat
         .map_err(|reason| failed("control_executable_unproved", reason))
 }
 
-pub(crate) fn spawn(
-    launch: &crate::protocol::Launch,
-    transport: Transport,
-    conversation: &str,
-    generation: u64,
-    resume: bool,
-) -> Result<Spawned, RunnerError> {
-    let selected = selected(&launch.program, &launch.environment)?;
-    let (harness_name, adapter) = match transport {
-        Transport::Claude => ("Claude", "claude-stream-json/1"),
-        Transport::Codex => ("Codex", "codex-app-server/1"),
-        Transport::Pty => {
-            return Err(failed(
-                "control_transport_unsupported",
-                "automatic controls require a managed pipe",
-            ));
-        }
-    };
+fn reported_version(
+    selected: &Path,
+    harness_name: &str,
+    environment: &BTreeMap<String, String>,
+) -> Result<(String, String), RunnerError> {
     // A file whose version was asked while it had its present identity is
     // not run again to say it (`identity_cache`); Claude Code's `--version`
     // is a whole program start.
-    let (exited, reported) = if let Some(reported) = identity_cache::version(&selected) {
+    Ok(if let Some(reported) = identity_cache::version(selected) {
         ("0 (kept)".to_owned(), reported)
     } else {
         let began = std::time::Instant::now();
-        let (status, bytes) = report_version(&selected, &launch.environment).map_err(|error| {
+        let (status, bytes) = report_version(selected, environment).map_err(|error| {
             failed(
                 "control_adapter_unqualified",
                 format!(
@@ -226,9 +214,30 @@ pub(crate) fn spawn(
                 ),
             ));
         }
-        identity_cache::remember_version(&selected, &reported);
+        identity_cache::remember_version(selected, &reported);
         (status.to_string(), reported)
+    })
+}
+
+pub(crate) fn spawn(
+    launch: &crate::protocol::Launch,
+    transport: Transport,
+    conversation: &str,
+    generation: u64,
+    resume: bool,
+) -> Result<Spawned, RunnerError> {
+    let selected = selected(&launch.program, &launch.environment)?;
+    let (harness_name, adapter) = match transport {
+        Transport::Claude => ("Claude", "claude-stream-json/1"),
+        Transport::Codex => ("Codex", "codex-app-server/1"),
+        Transport::Pty => {
+            return Err(failed(
+                "control_transport_unsupported",
+                "automatic controls require a managed pipe",
+            ));
+        }
     };
+    let (exited, reported) = reported_version(&selected, harness_name, &launch.environment)?;
     let harness_version = crate::tracking::version_in(&reported).ok_or_else(|| {
         failed(
             "control_adapter_unqualified",
@@ -269,120 +278,40 @@ pub(crate) fn spawn(
             ));
         }
     };
-    #[cfg(test)]
-    let current = qualification::entry()?
-        .map_or_else(std::env::current_exe, Ok)
-        .map_err(|error| failed("control_entry_unproved", error))?;
-    #[cfg(not(test))]
-    let current =
-        std::env::current_exe().map_err(|error| failed("control_entry_unproved", error))?;
-    let entry_identity = executable(&current)?;
-    let mut child = Command::new(&current)
-        .args(["runner", "managed-entry"])
-        .envs(&launch.environment)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .map_err(|error| failed("control_spawn_failed", error))?;
-    let mut proved = None;
-    let started = (|| {
-        let mut writer = child
-            .stdin
-            .take()
-            .ok_or_else(|| failed("control_spawn_failed", "child has no input pipe"))?;
-        let mut reader = BufReader::new(
-            child
-                .stdout
-                .take()
-                .ok_or_else(|| failed("control_spawn_failed", "child has no output pipe"))?,
-        );
-        let entry = Entry {
-            program: selected,
+    pipe_spawn::spawn(
+        launch,
+        pipe_spawn::Plan {
+            selected,
             arguments,
-            directory: PathBuf::from(&launch.directory),
-        };
-        serde_json::to_writer(&mut writer, &entry)
-            .map_err(|error| failed("control_entry_failed", error))?;
-        writer
-            .write_all(b"\n")
-            .and_then(|()| writer.flush())
-            .map_err(|error| failed("control_entry_failed", error))?;
-        let ready: Ready = serde_json::from_value(frame(&mut reader)?).map_err(|error| {
-            failed(
-                "control_process_unproved",
-                format!("entry identity frame is invalid: {error}"),
-            )
-        })?;
-        let pid = child.id();
-        let native = Pid::from_raw(
-            i32::try_from(pid).map_err(|error| failed("control_process_unproved", error))?,
-        )
-        .ok_or_else(|| failed("control_process_unproved", "child pid is invalid"))?;
-        if ready.pid != pid
-            || ready.executable != harness
-            || getsid(Some(native)).map_err(|error| failed("control_process_unproved", error))?
-                != native
-            || getpgid(Some(native)).map_err(|error| failed("control_process_unproved", error))?
-                != native
-        {
-            return Err(failed(
-                "control_process_unproved",
-                "entry does not own its proved process session and group",
-            ));
-        }
-        let leader = Leader {
-            pid,
-            start: crate::peer::start_identity(pid)?,
-        };
-        proved = Some(leader.clone());
-        writer
-            .write_all(b"{\"execute\":true}\n")
-            .and_then(|()| writer.flush())
-            .map_err(|error| failed("control_entry_failed", error))?;
-        let binding = Binding {
-            session: launch.session.clone(),
-            generation,
-            leader,
-            conversation: conversation.to_owned(),
-            entry: entry_identity,
             harness,
-            harness_version,
             adapter,
-        };
-        Ok((reader, writer, binding))
-    })();
-    match started {
-        Ok((reader, writer, binding)) => Ok(Spawned {
-            reader: Box::new(reader),
-            writer: Box::new(writer),
-            child: Box::new(PipeChild {
-                child,
-                leader: binding.leader.clone(),
-            }),
-            binding,
-        }),
-        Err(error) => {
-            if child
-                .try_wait()
-                .map_err(|wait| failed("control_spawn_cleanup_failed", wait))?
-                .is_none()
-            {
-                if let Some(leader) = &proved {
-                    crate::pty::end(leader)
-                        .map_err(|kill| failed("control_spawn_cleanup_failed", kill))?;
-                } else {
-                    child
-                        .kill()
-                        .map_err(|kill| failed("control_spawn_cleanup_failed", kill))?;
-                }
-            }
-            child
-                .wait()
-                .map_err(|wait| failed("control_spawn_cleanup_failed", wait))?;
-            Err(error)
-        }
-    }
+            harness_version,
+            conversation: conversation.to_owned(),
+            generation,
+            clean: false,
+        },
+    )
+}
+
+pub(crate) fn spawn_seat(
+    launch: &crate::protocol::Launch,
+    generation: u64,
+) -> Result<Spawned, RunnerError> {
+    let selected = selected(&launch.program, &launch.environment)?;
+    let harness = executable(&selected)?;
+    pipe_spawn::spawn(
+        launch,
+        pipe_spawn::Plan {
+            selected,
+            arguments: launch.arguments.clone(),
+            harness,
+            adapter: "acp/1".to_owned(),
+            harness_version: "seat-program/v1".to_owned(),
+            conversation: String::new(),
+            generation,
+            clean: true,
+        },
+    )
 }
 
 #[derive(Debug)]
@@ -462,6 +391,9 @@ pub(crate) fn validate_start(
     }
     Ok(())
 }
+
+#[cfg(test)]
+pub(crate) mod seat_test_support;
 
 #[cfg(test)]
 mod startup_tests;

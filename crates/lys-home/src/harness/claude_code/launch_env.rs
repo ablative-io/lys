@@ -339,3 +339,26 @@ pub fn write_new(path: &Path, bytes: &[u8]) -> Result<Hash, HomeError> {
 #[cfg(test)]
 #[path = "../../../tests/rendering/runner_launch.rs"]
 mod runner_rendering_tests;
+
+/// Whether an environment name denotes a credential rather than ordinary login state.
+#[must_use]
+pub fn credential_shaped(name: &str) -> bool {
+    let name = name.to_ascii_uppercase();
+    name.split('_').any(|part| {
+        matches!(
+            part,
+            "KEY"
+                | "TOKEN"
+                | "SECRET"
+                | "PASSWORD"
+                | "CREDENTIAL"
+                | "CREDENTIALS"
+                | "PAT"
+                | "AUTH"
+                | "PASS"
+                | "AUTHORIZATION"
+                | "BEARER"
+                | "PASSWD"
+        )
+    }) || matches!(name.as_str(), "DATABASE_URL" | "PGPASSWORD" | "NETRC")
+}

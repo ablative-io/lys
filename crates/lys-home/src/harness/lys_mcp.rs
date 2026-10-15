@@ -333,18 +333,46 @@ fn codex(
 /// Code's and gets the entry in its `mcp.json`; any other launch is Codex's
 /// and gets a `-c mcp_servers.lys=` setting. Both receive the run pass in
 /// their environment, so their other MCP children may request an audience.
+/// A seat keeps its run proof in a file, preserving its reviewed arguments.
 /// Errors change nothing.
 ///
 /// # Errors
 /// Refuses invalid endpoints, passes, config shapes, a Claude Code launch
 /// without its `mcp.json`, or a duplicate lys.
 pub fn render(
-    files: &mut [File],
+    files: &mut Vec<File>,
     arguments: &mut Vec<String>,
     environment: &mut BTreeMap<String, String>,
     entry: &LysMcp,
 ) -> Result<(), Refusal> {
     check(entry)?;
+    if files
+        .iter()
+        .any(|file| file.path == super::seat_program::FILE)
+    {
+        let mut headers = serde_json::Map::new();
+        headers.insert("lys-agent-pass".to_owned(), json!(entry.pass));
+        if let Some(seat) = &entry.seat {
+            headers.insert(
+                SEAT_HEADER.to_owned(),
+                json!(seat_header(seat, &entry.pass)?),
+            );
+        }
+        let text = serde_json::to_string(&json!({"headers": headers})).map_err(Refusal::Json)?;
+        let sha256 = Hash::of(text.as_bytes()).as_str().to_owned();
+        if files.iter().any(|file| file.path == "agent-pass.json")
+            || environment.contains_key(CODEX_PASS_VARIABLE)
+        {
+            return Err(Refusal::Duplicate);
+        }
+        files.push(File {
+            path: "agent-pass.json".to_owned(),
+            text,
+            sha256,
+        });
+        environment.insert(CODEX_PASS_VARIABLE.to_owned(), "agent-pass.json".to_owned());
+        return Ok(());
+    }
     if environment.contains_key(CODEX_PASS_VARIABLE) {
         return Err(Refusal::Duplicate);
     }

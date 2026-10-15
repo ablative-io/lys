@@ -48,17 +48,27 @@ struct State {
 pub(crate) struct Input {
     state: Arc<Mutex<State>>,
     injection: Arc<Mutex<()>>,
+    pub(crate) seat: Option<Arc<crate::harness_control::seat_program::Pipe>>,
 }
 
 impl Input {
     pub(crate) fn new(writer: Box<dyn Write + Send>) -> Self {
         Self {
             injection: Arc::new(Mutex::new(())),
+            seat: None,
             state: Arc::new(Mutex::new(State {
                 writer: Some(writer),
                 sender: None,
             })),
         }
+    }
+
+    pub(crate) fn seat(pipe: Arc<crate::harness_control::seat_program::Pipe>) -> Self {
+        let mut input = Self::new(Box::new(crate::harness_control::seat_program::Writer::new(
+            Arc::clone(&pipe),
+        )));
+        input.seat = Some(pipe);
+        input
     }
 
     pub(crate) fn injection(&self) -> Result<std::sync::MutexGuard<'_, ()>, RunnerError> {

@@ -192,7 +192,11 @@ async fn begin(
             .ok_or(ServerError::ProfileVersionUnknown { version: number })
     })?;
     let mut notes = vec![crate::seats_monitor::check(&name)?];
-    let transport = if crate::launch_template::requires_controls(&version) {
+    let transport = if version.settings.harness.as_ref().is_some_and(|harness| {
+        harness.description.rendering_contract == lys_home::harness::seat_program::CONTRACT
+    }) {
+        "acp"
+    } else if crate::launch_template::requires_controls(&version) {
         "managed"
     } else {
         "pty"
@@ -317,6 +321,8 @@ async fn end(
     let mut ended = false;
     if force {
         notes.push("force was named: going straight to Act::End".to_owned());
+    } else if held.transport.as_deref() == Some("acp") {
+        notes.push("the seat ends by closing stdin and waiting for its process exit".to_owned());
     } else {
         ended = request_end(
             state,
@@ -459,3 +465,6 @@ async fn ready_start(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod seat_program_stop_tests;

@@ -202,8 +202,18 @@ impl Sessions {
             how,
             at,
             status,
-            signal,
-            reason: None,
+            signal: signal.clone(),
+            reason: table
+                .sessions
+                .get(id)
+                .filter(|session| {
+                    session.launch.as_ref().is_some_and(|launch| {
+                        launch
+                            .environment
+                            .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+                    })
+                })
+                .map(|_| format!("seat_program_exited: status {status:?}; signal {signal:?}")),
             stopped,
         };
         let drains = table

@@ -1,5 +1,7 @@
+#![cfg(test)]
 use super::{Launch, Sessions};
 use lys_home::harness::seat_program::SeatProgram;
+use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
@@ -7,7 +9,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
-pub(crate) const ENTRY: &str = r#"#!/usr/bin/python3
+pub(crate) const ENTRY: &str = r"#!/usr/bin/python3
 import os, sys, json, hashlib
 line = bytearray()
 while not line.endswith(b'\n'):
@@ -27,19 +29,20 @@ while not line.endswith(b'\n'):
 if json.loads(line) != {'execute':True}: sys.exit(3)
 os.chdir(entry['directory'])
 os.execve(program, [program] + entry['arguments'], dict(os.environ))
-"#;
-pub(crate) const PROGRAM: &str = r#"#!/usr/bin/python3
+";
+pub(crate) const PROGRAM: &str = r"#!/usr/bin/python3
 import sys, os, json
 if os.isatty(0): sys.exit(0)
 request = json.loads(sys.stdin.readline())
 key = os.environ.get('LYS_RUN', '')
 report = {'argv':sys.argv, 'names':sorted(os.environ), 'anthropic_keyed':('/'+key+'/anthropic') in os.environ.get('ANTHROPIC_BASE_URL',''), 'openai_keyed':('/'+key+'/openai/v1') in os.environ.get('OPENAI_BASE_URL','')}
 print(json.dumps({'jsonrpc':'2.0','id':request['id'],'result':{'protocolVersion':1,'agentCapabilities':{},'fixture':report}}), flush=True)
-"#;
+";
 
 pub(crate) struct Fixture {
     pub(crate) dir: tempfile::TempDir,
     pub(crate) launch: Launch,
+    pub(crate) entry: std::path::PathBuf,
     pub(crate) spec: SeatProgram,
 }
 
@@ -125,7 +128,12 @@ impl Fixture {
             rotation: None,
             policy: None,
         };
-        Ok(Self { dir, launch, spec })
+        Ok(Self {
+            dir,
+            launch,
+            entry,
+            spec,
+        })
     }
 }
 
@@ -166,9 +174,126 @@ fn seat_program_launch_refuses_a_non_private_seat_before_spawn() -> Result {
 #[test]
 fn seat_program_launch_accepts_a_private_seat_file() -> Result {
     let fixture = Fixture::new(PROGRAM, 0o600)?;
+    let admission =
+        crate::harness_control::process::seat_test_support::entry(fixture.entry.clone())?;
     let sessions = Sessions::open(fixture.dir.path(), 8192)?;
     let (pid, _) = sessions.start(fixture.launch)?;
     assert!(pid > 0, "a 0600 seat file must still launch");
     sessions.end("seat-fixture", &AtomicBool::new(false))?;
+    drop(admission);
+    Ok(())
+}
+
+#[test]
+fn seat_program_launch_keeps_exact_argv_identity_proxy_and_only_environment_names() -> Result {
+    let fixture = Fixture::new(PROGRAM, 0o600)?;
+    let admission =
+        crate::harness_control::process::seat_test_support::entry(fixture.entry.clone())?;
+    let sessions = Sessions::open(fixture.dir.path(), 16384)?;
+    sessions.start(fixture.launch)?;
+    sessions.until("seat-fixture", &AtomicBool::new(false), |state, _| {
+        state.ended().map(Ok)
+    })?;
+    let table = sessions.lock()?;
+    let record = table
+        .feed
+        .page(None)?
+        .entries
+        .into_iter()
+        .find_map(|entry| match entry.body {
+            crate::tracking_store::Body::Coverage(coverage)
+                if coverage.state == "seat_program_answered" =>
+            {
+                Some(coverage.words)
+            }
+            _ => None,
+        })
+        .ok_or("no first ACP answer was recorded")?;
+    let answer: Value = serde_json::from_str(&record)?;
+    let report = &answer["result"]["fixture"];
+    let mut expected = vec![fixture.spec.executable.clone()];
+    expected.extend(fixture.spec.argv());
+    assert_eq!(report["argv"], json!(expected));
+    let names = report["names"]
+        .as_array()
+        .ok_or("environment names missing")?;
+    for name in [
+        "LYS_RUN",
+        "LYS_AGENT",
+        "LYS_MACHINE",
+        "LYS_RUNNER_SOCKET",
+        "LYS_PROVISIONING_VERSION",
+        "LYS_AGENT_PASS",
+        "ANTHROPIC_BASE_URL",
+        "OPENAI_BASE_URL",
+    ] {
+        assert!(
+            names.contains(&json!(name)),
+            "missing environment name {name}"
+        );
+    }
+    for name in ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "SERVICE_CREDENTIAL"] {
+        assert!(
+            !names.contains(&json!(name)),
+            "credential name reached child: {name}"
+        );
+    }
+    assert_eq!(report["anthropic_keyed"], true);
+    assert_eq!(report["openai_keyed"], true);
+    drop(table);
+    drop(admission);
+    Ok(())
+}
+
+#[test]
+fn seat_program_launch_records_both_started_digests() -> Result {
+    let fixture = Fixture::new(PROGRAM, 0o600)?;
+    let admission =
+        crate::harness_control::process::seat_test_support::entry(fixture.entry.clone())?;
+    let sessions = Sessions::open(fixture.dir.path(), 8192)?;
+    sessions.start(fixture.launch)?;
+    sessions.end("seat-fixture", &AtomicBool::new(false))?;
+    let proof = sessions
+        .lock()?
+        .feed
+        .page(None)?
+        .entries
+        .into_iter()
+        .find_map(|entry| match entry.body {
+            crate::tracking_store::Body::Coverage(coverage)
+                if coverage.state == "seat_program_started" =>
+            {
+                Some(coverage.words)
+            }
+            _ => None,
+        })
+        .ok_or("run record has no started executable and seat-file digests")?;
+    let proof: Value = serde_json::from_str(&proof)?;
+    assert_eq!(
+        proof["found_executable_sha256"],
+        fixture.spec.executable_sha256
+    );
+    assert_eq!(
+        proof["found_seat_file_sha256"],
+        fixture.spec.seat_file_sha256
+    );
+    drop(admission);
+    Ok(())
+}
+
+#[test]
+fn seat_program_launch_reports_a_pipe_in_its_liveness() -> Result {
+    let program = format!("{PROGRAM}\nsys.stdin.read()\n");
+    let fixture = Fixture::new(&program, 0o600)?;
+    let admission = crate::harness_control::process::seat_test_support::entry(fixture.entry)?;
+    let sessions = Sessions::open(fixture.dir.path(), 8192)?;
+    sessions.start(fixture.launch)?;
+    let live = sessions.liveness(Some("seat-fixture"))?;
+    sessions.end("seat-fixture", &AtomicBool::new(false))?;
+    assert!(
+        live[0].managed,
+        "the ACP pipe was reported as a pseudo-terminal"
+    );
+    drop(admission);
     Ok(())
 }
