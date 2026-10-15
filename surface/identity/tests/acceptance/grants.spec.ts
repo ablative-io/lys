@@ -79,14 +79,18 @@ const fresh = () => {
 };
 
 const cell = (tr: Element, col: string) => tr.querySelector('td[data-col="' + col + '"]')?.textContent ?? '';
-const holdRows = () => [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => [cell(tr, 'Allows'), cell(tr, 'Relation'), (tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title ?? ''), ((pills) => pills.length === 1 ? 'root' : (pills[pills.length - 2].textContent ?? '').split(' · ')[0])([...tr.querySelectorAll('.chain .pill')]), (cell(tr, 'May pass on').includes('agent') ? 'yes' : 'no'), (tr.querySelector('[data-act="delegate"]')?.textContent ?? '')]);
+const holdRows = () =>
+  [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => [
+    cell(tr, 'Allows'),
+    cell(tr, 'Relation'),
+    tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title ?? '',
+    ((pills) => (pills.length === 1 ? 'root' : (pills[pills.length - 2].textContent ?? '').split(' · ')[0]))([...tr.querySelectorAll('.chain .pill')]),
+    cell(tr, 'May pass on').includes('agent') ? 'yes' : 'no',
+    tr.querySelector('[data-act="delegate"]')?.textContent ?? '',
+  ]);
 
 /** The administrator's wider view: both people, and the grants of both. */
-const ADMIN: Record<string, (typeof SERVICE)[string]> = {
-  ...SERVICE,
-  '/directory/people': ok(BEA_DIRECTORY),
-  '/grants': ok({ grants: [...GRANTS, ...BEA_GRANTS], revision: 7 }),
-};
+const ADMIN: Record<string, (typeof SERVICE)[string]> = { ...SERVICE, '/directory/people': ok(BEA_DIRECTORY), '/grants': ok({ grants: [...GRANTS, ...BEA_GRANTS], revision: 7 }) };
 
 describe('The accepted mock-up', () => {
   it('is the file this acceptance was written against, pinned by its SHA-256', async () => {
@@ -272,10 +276,14 @@ describe('Keyboard operation (conformance 9.3)', () => {
     expect(offered).toContain('view');
     expect(boxes().filter((box) => box.checked)).toEqual([]);
     await click($('.act-panel input[name="action"][value="view"]'));
-    expect(boxes().filter((box) => box.checked).map((box) => box.value)).toEqual(['view']);
+    expect(
+      boxes()
+        .filter((box) => box.checked)
+        .map((box) => box.value)
+    ).toEqual(['view']);
 
     // The whole form is in the tab order, in the order it reads.
-    const order = $$('.act-panel select, .act-panel input[name="action"], .act-panel button').map((el) => (el as HTMLInputElement).name === 'action' ? (el as HTMLInputElement).value : el.id || (el as HTMLInputElement).value || el.dataset.act);
+    const order = $$('.act-panel select, .act-panel input[name="action"], .act-panel button').map((el) => ((el as HTMLInputElement).name === 'action' ? (el as HTMLInputElement).value : el.id || (el as HTMLInputElement).value || el.dataset.act));
     expect(order).toEqual(['dTo', ...offered, 'dLease', 'dPass', 'delegatedo', 'close']);
     for (const el of $$('.act-panel select, .act-panel input[name="action"], .act-panel button')) expect(el.tabIndex).toBeGreaterThanOrEqual(0);
 
@@ -305,7 +313,12 @@ describe('Deep linking (conformance 9.1)', () => {
     expect(text()).toContain('Scribe');
     await click($('[data-act="grant"]'));
     expect($('.act-panel')).not.toBeNull();
+    expect(($('[aria-label="Grant to give"]') as HTMLSelectElement).value).toBe('');
+    expect($('#dTo')).toBeNull();
+    await choose($('[aria-label="Grant to give"]'), ROOT_G);
     expect(($('#dTo') as HTMLSelectElement).value).toBe(SCRIBE);
+    expect(($('#dLease') as HTMLSelectElement).value).toBe('7 days');
+    expect($('.act-panel h2')?.textContent).toContain('owner of project:identity');
 
     fresh();
     await mount(`#/access/reach/${SCRIBE}`);
