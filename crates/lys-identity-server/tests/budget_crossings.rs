@@ -20,6 +20,8 @@ fn an_uncertain_crossing_is_reasked_under_the_same_id_after_reopen() -> Result<(
         unavailable: None,
         limit_index: 0,
         warning: false,
+        context_tokens: None,
+        context_window: None,
         account: None,
         act: Act::Stop,
         agent: "agent".to_owned(),

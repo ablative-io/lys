@@ -79,6 +79,9 @@ pub struct BudgetsView {
     pub effective_limits: Option<Vec<Limit>>,
     /// Requested legacy values and the full budgets enforced pending confirmation.
     pub unconfirmed: Vec<crate::budgets_legacy::Unconfirmed>,
+    /// For an agent, the organisation's context default it inherits or has set aside.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_default: Option<crate::budgets_default::ContextDefault>,
 }
 
 /// A reported unit is absent for a named reason, never inferred from another unit.
@@ -116,10 +119,11 @@ fn kind_of(kind: &str) -> Result<HolderKind, ServerError> {
         "agent" => Ok(HolderKind::Agent),
         "team" => Ok(HolderKind::Team),
         "person" => Ok(HolderKind::Person),
+        "organisation" => Ok(HolderKind::Organisation),
         other => Err(ServerError::Agents(AgentsError::Budget(
             BudgetError::BudgetRefused {
                 refusal: "holder_unknown",
-                words: format!("{other} is not a holder: agent, team or person"),
+                words: format!("{other} is not a holder: agent, team, person or organisation"),
             },
         ))),
     }
@@ -140,6 +144,7 @@ fn kind_name(kind: HolderKind) -> &'static str {
         HolderKind::Agent => "agent",
         HolderKind::Team => "team",
         HolderKind::Person => "person",
+        HolderKind::Organisation => "organisation",
     }
 }
 
@@ -161,7 +166,7 @@ pub(crate) fn authorised(
                 .and_then(lys_identity::projection::Record::responsible)
                 .map(|owner| owner.to_string()),
             HolderKind::Person => Some(holder.id.clone()),
-            HolderKind::Team => None,
+            HolderKind::Team | HolderKind::Organisation => None,
         };
         Ok((person, responsible))
     })?;
@@ -171,7 +176,7 @@ pub(crate) fn authorised(
                 .team(&holder.id)
                 .map(|team| team.created.owner.clone()))
         })?,
-        HolderKind::Agent | HolderKind::Person => responsible,
+        HolderKind::Agent | HolderKind::Person | HolderKind::Organisation => responsible,
     };
     if administrator || responsible.as_deref() == Some(person.as_str()) {
         Ok(person)
@@ -382,7 +387,8 @@ fn view_held(
         sessions,
         at_ms,
     } = *read;
-    let collection = held.limit_set(holder);
+    let collection = held.limit_set_in_force(holder);
+    let collection = collection.as_deref();
     let effective = collection.map_or_else(Vec::new, |limits| held.effective_limits(limits));
     let agents = crate::budgets_members::covered(holder, standings);
     let used = effective
@@ -445,13 +451,18 @@ fn view_held(
         warn_at: collection.and_then(|limits| limits.warn_at.clone()),
         zone: zone.to_owned(),
         version: collection.map_or(0, |limits| limits.version),
-        by: collection.map(|limits| limits.by.clone()),
-        at: collection.map(|limits| limits.at),
+        by: collection
+            .filter(|limits| limits.version > 0)
+            .map(|limits| limits.by.clone()),
+        at: collection
+            .filter(|limits| limits.version > 0)
+            .map(|limits| limits.at),
         used,
         unavailable,
         within,
         effective_limits: (!unconfirmed.is_empty()).then_some(effective),
         unconfirmed,
+        context_default: crate::budgets_default::view(held, holder, standings),
     })
 }
 

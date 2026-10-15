@@ -223,6 +223,22 @@ macro_rules! budgets_feed_entries {
                 assert!(state.runners.links().begin($crate::runner_links::Link::Feed, machine));
                 assert!(state.runners.links().begin($crate::runner_links::Link::Grants, machine));
             }
+            // This fake runner answers ownership and control status alone, so the
+            // organisation's context default is switched off here; its warnings and
+            // compaction are proved against the real runner in tests/budgets_act.rs.
+            $crate::budgets_api::with_budgets_mut(&state, |store| {
+                store.set_limits(
+                    $crate::budgets_limits::Limits {
+                        holder: $crate::budgets_default::holder(),
+                        limits: Vec::new(),
+                        warn_at: None,
+                        version: 0,
+                        by: "owner".to_owned(),
+                        at: 1,
+                    },
+                    0,
+                )
+            })?;
             Ok(Fixture { state, agent: agent.to_string(), messages, workers, dir })
         }
 

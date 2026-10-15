@@ -43,6 +43,7 @@ pub mod budgets_act;
 pub mod budgets_api;
 pub mod budgets_context;
 pub mod budgets_crossing;
+pub mod budgets_default;
 pub mod budgets_enforce;
 pub mod budgets_feed;
 pub mod budgets_figures;

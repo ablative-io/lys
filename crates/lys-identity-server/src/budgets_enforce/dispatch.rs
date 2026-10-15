@@ -71,6 +71,8 @@ pub(super) fn dispatch(
         mark,
     } = *request;
     let mut crossed = Vec::new();
+    // A measured context crossing carries the tokens its words are said in.
+    let context = limit.unit == Measure::ContextPercent && figure.is_some();
     let recipients = if limit.unit == Measure::ContextPercent {
         std::collections::BTreeSet::from([usage.agent.clone()])
     } else {
@@ -122,6 +124,8 @@ pub(super) fn dispatch(
                 unavailable: missing.map(str::to_owned),
                 limit_index: u64::try_from(index).map_err(unavailable)?,
                 warning: is_warning,
+                context_tokens: usage.context_tokens.filter(|_| context),
+                context_window: usage.context_window.filter(|_| context),
                 account: account.map(str::to_owned),
                 act,
                 agent: agent.clone(),

@@ -103,6 +103,8 @@ async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
             unavailable: None,
             limit_index: 0,
             warning: false,
+            context_tokens: None,
+            context_window: None,
             account: None,
             act: Act::Stop,
             agent: agent.clone(),

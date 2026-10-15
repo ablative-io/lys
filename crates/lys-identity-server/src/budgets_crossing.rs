@@ -48,6 +48,12 @@ pub struct Crossing {
     /// A warning uses its own once-per-period identity and tells the responsible person.
     #[serde(default)]
     pub warning: bool,
+    /// The session's context in tokens when a context level was reached.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u64>,
+    /// The declared window, in tokens, a context figure is a percentage of.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
     /// The paying account whose reported plan window reached the threshold.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<String>,

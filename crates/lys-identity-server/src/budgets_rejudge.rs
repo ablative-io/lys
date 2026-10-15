@@ -9,14 +9,16 @@ use std::sync::Arc;
 
 use crate::budgets_api::{with_budgets, with_budgets_mut};
 use crate::budgets_crossing::{Acted, Crossing, Stands};
-use crate::budgets_state::Act;
+use crate::budgets_state::{Act, HolderKind, Measure};
 use crate::error::ServerError;
 use crate::routes::AppState;
 use crate::runner_operate::{Undelivered, withdraw};
 
 /// The accepted compactions whose budget has changed since they were
-/// crossed.
+/// crossed, including an organisation default the agent's own context limit
+/// has since set aside.
 fn stale(state: &AppState) -> Result<Vec<Crossing>, ServerError> {
+    let standings = crate::budgets_members::standings(state)?;
     with_budgets(state, |store| {
         let held = store.held();
         Ok(held
@@ -30,16 +32,29 @@ fn stale(state: &AppState) -> Result<Vec<Crossing>, ServerError> {
                     .get(&crossing.operation)
                     .is_some_and(|acted| acted.stands == Stands::Accepted)
             })
-            .filter(|crossing| {
-                held.limit_sets
-                    .iter()
-                    .find(|limits| limits.holder == crossing.holder)
-                    .map(|limits| limits.version)
-                    != Some(crossing.version)
-            })
+            .filter(|crossing| changed(held, &standings, crossing))
             .cloned()
             .collect())
     })
+}
+
+/// Whether `crossing` no longer stands as judged: its holder's limits moved
+/// to another version, or it came from the organisation's context default
+/// and the agent now has a context limit of its own, or no standing at all.
+fn changed(
+    held: &crate::budgets_state::Held,
+    standings: &[crate::budgets_state::Standing],
+    crossing: &Crossing,
+) -> bool {
+    held.limit_set_in_force(&crossing.holder)
+        .map(|limits| limits.version)
+        != Some(crossing.version)
+        || (crossing.holder.kind == HolderKind::Organisation
+            && crossing.measure == Measure::ContextPercent
+            && standings
+                .iter()
+                .find(|standing| standing.agent == crossing.agent)
+                .is_none_or(|standing| held.own_context(standing)))
 }
 
 /// Withdraw every accepted compaction whose budget has changed, keeping
@@ -106,7 +121,97 @@ fn refused(operation: &str, words: &str, at_ms: i64) -> Acted {
 
 #[cfg(test)]
 mod tests {
-    use super::{Stands, refused};
+    use super::{Stands, changed, refused};
+    use crate::budgets_crossing::Crossing;
+    use crate::budgets_limits::{Limit, Limits};
+    use crate::budgets_state::{Act, Held, Holder, HolderKind, Measure, Standing};
+
+    fn compaction(holder: Holder, version: u64) -> Crossing {
+        Crossing {
+            operation: "op".to_owned(),
+            holder,
+            measure: Measure::ContextPercent,
+            version,
+            limit: 40.into(),
+            figure: Some(41.into()),
+            unavailable: None,
+            limit_index: 2,
+            warning: false,
+            context_tokens: None,
+            context_window: None,
+            account: None,
+            act: Act::Compact,
+            agent: "agent-a".to_owned(),
+            session: Some("session-a".to_owned()),
+            text: None,
+            at_ms: 1,
+        }
+    }
+
+    fn agents_own(limits: Vec<Limit>) -> Limits {
+        Limits {
+            holder: Holder {
+                kind: HolderKind::Agent,
+                id: "agent-a".to_owned(),
+            },
+            limits,
+            warn_at: None,
+            version: 1,
+            by: "person-a".to_owned(),
+            at: 1,
+        }
+    }
+
+    #[test]
+    fn a_default_compaction_stands_until_the_default_changes_or_is_set_aside() {
+        let standings = [Standing {
+            agent: "agent-a".to_owned(),
+            ..Standing::default()
+        }];
+        let crossing = compaction(crate::budgets_default::holder(), 0);
+        let mut held = Held::default();
+        assert!(
+            !changed(&held, &standings, &crossing),
+            "the built-in default stands"
+        );
+        assert!(
+            changed(&held, &[], &crossing),
+            "an agent with no standing is not compacted"
+        );
+
+        held.limit_sets.push(agents_own(vec![Limit {
+            unit: Measure::Tokens,
+            amount: 10.into(),
+            period: Some(crate::budgets_state::Length::Day),
+            act: Act::Stop,
+            zone: None,
+        }]));
+        assert!(
+            !changed(&held, &standings, &crossing),
+            "a spend limit leaves it standing"
+        );
+
+        held.limit_sets[0].limits.push(Limit {
+            unit: Measure::ContextPercent,
+            amount: 70.into(),
+            period: None,
+            act: Act::Compact,
+            zone: None,
+        });
+        assert!(
+            changed(&held, &standings, &crossing),
+            "its own context limit sets it aside"
+        );
+
+        let mut saved = Held::default();
+        let mut default = crate::budgets_default::built_in();
+        default.version = 1;
+        saved.limit_sets.push(default);
+        assert!(
+            changed(&saved, &standings, &crossing),
+            "a saved default is a new version"
+        );
+    }
 
     #[test]
     fn a_refused_withdrawal_is_kept_as_typed_or_as_not_done() {

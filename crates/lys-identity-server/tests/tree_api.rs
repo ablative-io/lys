@@ -67,7 +67,32 @@ async fn the_tree_shows_only_owned_teams_and_never_turns_people_into_members() -
     assert_eq!(members[0]["session"], "stopped");
     assert_eq!(members[0]["profile"], Value::Null);
     assert_eq!(members[0]["goals"], json!([]));
-    assert_eq!(members[0]["budgets"], json!([]));
+    // An agent with no limit of its own shows the organisation's default.
+    let inherited: Vec<_> = members[0]["budgets"]
+        .as_array()
+        .ok_or("member has no budgets")?
+        .iter()
+        .map(|budget| {
+            (
+                budget["holder"]["kind"].clone(),
+                budget["measure"].clone(),
+                budget["limit"].clone(),
+                budget["act"].clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        inherited,
+        [(20, "notice"), (38, "notice"), (40, "compact")]
+            .map(|(limit, act)| (
+                json!("organisation"),
+                json!("context_percent"),
+                json!(limit),
+                json!(act)
+            ))
+            .to_vec(),
+        "{answer}"
+    );
     assert_eq!(teams[0]["teams"], json!([]));
     let (status, other_tree) = service.get("/tree", Some(&other_cookie)).await?;
     assert_eq!(status, 200, "{other_tree}");

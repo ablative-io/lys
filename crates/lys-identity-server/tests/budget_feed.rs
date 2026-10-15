@@ -376,6 +376,21 @@ fn named(config: &lys_identity_server::Config) -> TestResult<Named> {
         at: 1,
         launch: None,
     })?;
+    // This stand-in runner answers the feed and its reads alone, so the
+    // organisation's context default is switched off before the feed is read;
+    // its warnings and compaction are proved against the real runner in
+    // tests/budgets_act.rs.
+    lys_identity_server::budgets_store::BudgetStore::open(&dir, Arc::clone(&key))?.set_limits(
+        lys_identity_server::budgets_limits::Limits {
+            holder: lys_identity_server::budgets_default::holder(),
+            limits: Vec::new(),
+            warn_at: None,
+            version: 0,
+            by: seed.people[0].id.to_string(),
+            at: 1,
+        },
+        0,
+    )?;
     let at = u64::try_from(jiff::Timestamp::now().as_millisecond())?;
     let kept = kept_call(config.proxy_dir.as_deref().ok_or("no proxy directory")?)?;
     let page = page(&session, &agent, at, &kept)?;

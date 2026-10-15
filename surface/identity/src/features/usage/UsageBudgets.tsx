@@ -11,6 +11,7 @@ import { plain, reasons } from './reasons';
 import type { Named } from './reasons';
 import { Act } from '../../shell/Act';
 import { TableScroll } from '../../shell/Listing';
+import { InheritedContext } from './ContextDefault';
 import { ErrorWords } from '../people/Words';
 
 /** `name` is the holder's name, said wherever the service's words carry its identifier. */
@@ -44,6 +45,9 @@ export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
   return <section className="card usage-budgets" aria-label="Budgets"><h3>Budget</h3>
     <EditBudgets budgets={budgets} receipts={receipts} busy={blocked} save={save} holder={holder} add={add.row} />
     {add.form}
+    {budgets.context_default ? <InheritedContext inherited={budgets.context_default} busy={blocked}
+      adopt={(limits) => void save({ limits: [...budgets.limits, ...limits], warn_at: budgets.warn_at, version: budgets.version })}
+      editor={(view, changed) => <UsageBudgets budgets={view} receipts={[]} changed={changed} name="every agent" />} /> : null}
     {reasons(budgets.unavailable, holder, missing).map((words) => <p key={words} className="usage-reason">{words}</p>)}
     {busy ? <p role="status">Sending; not yet confirmed.</p> : null}
     {failure ? <>{uncertain ? null : <p role="alert" className="why-not">The budget was not saved.</p>}<ErrorWords problem={failure} /></> : null}

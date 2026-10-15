@@ -132,11 +132,11 @@ impl Slot {
     #[must_use]
     pub fn built_in(self) -> Option<&'static str> {
         match self {
-            Self::ContextWarning => Some(
-                "[Lys context watch] Context is at {{context_percent}} percent of the window. Write your checkpoint and set your variables now; compaction follows at the next turn boundary. {{goals}}",
-            ),
+            Self::ContextWarning => {
+                Some("[Lys context watch] You're at {{context_figures}}; {{compaction}}. {{goals}}")
+            }
             Self::Preparation => Some(
-                "[Lys context watch] Compaction is next. Finish the line you are on and write what the next window needs to know.",
+                "[Lys context watch] You're at {{context_figures}}; this session compacts at {{compaction_figures}}, about a minute from now. Wrap up what you're holding and note anything you need after compaction.",
             ),
             Self::Compaction => None,
             Self::WakeUp => Some("[Lys] {{message}}"),

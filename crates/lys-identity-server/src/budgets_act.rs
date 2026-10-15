@@ -54,6 +54,12 @@ pub(crate) struct UsageBody {
     session: Option<String>,
     #[serde(default)]
     context_percent: Option<u64>,
+    /// The context in tokens, given with its window and percentage.
+    #[serde(default)]
+    context_tokens: Option<u64>,
+    /// The declared window the percentage is of, in tokens.
+    #[serde(default)]
+    context_window: Option<u64>,
     #[serde(default)]
     dollars_micros: Option<u64>,
     #[serde(default)]
@@ -105,6 +111,19 @@ async fn report(
             reason: "context_percent is a percentage: 0 to 100".to_owned(),
         });
     }
+    match (
+        given.context_percent,
+        given.context_tokens,
+        given.context_window,
+    ) {
+        (_, None, None) => {}
+        (Some(_), Some(tokens), Some(window)) if window > 0 && tokens <= window => {}
+        _ => {
+            return Err(ServerError::RequestMalformed {
+                reason: "context_tokens and context_window come together, with context_percent, and the tokens fit a positive window".to_owned(),
+            });
+        }
+    }
     let usage = Usage {
         event: given.event,
         agent: agent.clone(),
@@ -113,6 +132,8 @@ async fn report(
         running_ms: given.running_ms,
         session: given.session,
         context_percent: given.context_percent,
+        context_tokens: given.context_tokens,
+        context_window: given.context_window,
         dollars_micros: given.dollars_micros,
         account: given.account,
         plan_windows: given.plan_windows,

@@ -7,7 +7,7 @@ use lys_identity::projection::Projection;
 use serde::Serialize;
 
 use crate::budgets_limits::Limit;
-use crate::budgets_state::{Act, Held, Holder, Length, Measure, Standing};
+use crate::budgets_state::{Act, Held, Holder, HolderKind, Length, Measure, Standing};
 use crate::error::ServerError;
 use crate::error_budget::BudgetError;
 use crate::error_team::TeamError;
@@ -226,12 +226,25 @@ impl TreeState {
                 })
             });
         let mut budgets = Vec::new();
-        for collection in &self.budgets.limit_sets {
-            if !crate::budgets_members::covered(&collection.holder, standings).contains(id) {
-                continue;
-            }
-            for limit in self.budgets.effective_limits(collection) {
-                budgets.push(self.budget(&collection.holder, &limit, standings)?);
+        if let Some(standing) = standings.iter().find(|standing| standing.agent == id) {
+            for collection in self.budgets.in_force() {
+                if !crate::budgets_members::covers(&collection.holder, standing) {
+                    continue;
+                }
+                let covered = crate::budgets_members::covered(&collection.holder, standings);
+                let own = BTreeSet::from([id.to_owned()]);
+                for (_, limit) in self.budgets.applying_limits(&collection, standing) {
+                    // The organisation's context levels are read on this agent's
+                    // own sessions, as they act, never across every agent.
+                    let agents = if collection.holder.kind == HolderKind::Organisation
+                        && limit.unit == Measure::ContextPercent
+                    {
+                        &own
+                    } else {
+                        &covered
+                    };
+                    budgets.push(self.budget(&collection.holder, &limit, agents)?);
+                }
             }
         }
         Ok(Some(TreeAgent {
@@ -249,13 +262,12 @@ impl TreeState {
         &self,
         holder: &Holder,
         limit: &Limit,
-        standings: &[Standing],
+        agents: &std::collections::BTreeSet<String>,
     ) -> Result<TreeBudget, ServerError> {
-        let agents = crate::budgets_members::covered(holder, standings);
         let mut used = crate::budgets_usage::figure(
             &self.budgets,
             limit,
-            &agents,
+            agents,
             &self.zone,
             self.at_ms,
             None,

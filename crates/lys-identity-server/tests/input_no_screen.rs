@@ -243,7 +243,8 @@ async fn budget_compaction_and_notice_reach_a_session_before_any_viewer_opens() 
     assert!(held.status(other)?.ended.is_none());
     // Delivery receipts precede the first output consumer.
     held.output(session, "compacted").await?;
-    held.output(session, "Context is at 90 percent").await?;
+    held.output(session, "You're at 90% of your context window")
+        .await?;
     held.close()
 }
 

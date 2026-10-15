@@ -85,7 +85,12 @@ async fn preparation_is_the_last_of_multiple_warnings_below_compaction() -> Test
         {"unit":"context_percent","amount":45,"period":null,"act":"notice"},
         {"unit":"context_percent","amount":50,"period":null,"act":"compact"}],"warn_at":null,"version":0})).await?;
     table.used(context("warning", &session, 26)).await?;
-    table.waited(&session, "Context is at 26 percent").await?;
+    table
+        .waited(
+            &session,
+            "You're at 26% of your context window; compaction is at 50%.",
+        )
+        .await?;
     table
         .serving
         .as_ref()
@@ -107,10 +112,15 @@ async fn preparation_is_the_last_of_multiple_warnings_below_compaction() -> Test
     assert_eq!(
         sessions.outcome(id)?.text,
         Some(TextDigest::of(
-            "[Lys context watch] Compaction is next. Finish the line you are on and write what the next window needs to know."
+            "[Lys context watch] You're at 46% of your context window; this session compacts at 50%, about a minute from now. Wrap up what you're holding and note anything you need after compaction."
         ))
     );
-    table.waited(&session, "Compaction is next").await?;
+    table
+        .waited(
+            &session,
+            "this session compacts at 50%, about a minute from now",
+        )
+        .await?;
     table.end(&session).await?;
     table.stop_runner()
 }
@@ -207,7 +217,7 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
     let lys_runner::Answer::Output { output } = output else {
         return Err("no output".into());
     };
-    assert!(!output.text.contains("Context is at 46 percent"));
+    assert!(!output.text.contains("You're at 46% of your context window"));
     sessions.collect(
         &session,
         &lys_runner::session::Collected::Hook {
@@ -215,7 +225,9 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
             input: json!({}),
         },
     )?;
-    table.waited(&session, "Context is at 46 percent").await?;
+    table
+        .waited(&session, "You're at 46% of your context window")
+        .await?;
     let mut cursor = None;
     loop {
         let lys_runner::Answer::Feed { page } = client.ask(&lys_runner::Act::Feed {
@@ -244,7 +256,9 @@ async fn one_warning_remains_context_warning_and_busy_delivery_waits() -> TestRe
     );
     let shown = table.end(&session).await?;
     assert_eq!(
-        shown.matches("Context is at 46 percent").count(),
+        shown
+            .matches("You're at 46% of your context window")
+            .count(),
         1,
         "{shown}"
     );

@@ -20,6 +20,8 @@ fn crossing(index: usize) -> Crossing {
         unavailable: None,
         limit_index: 0,
         warning: false,
+        context_tokens: None,
+        context_window: None,
         account: None,
         act: Act::Tell,
         agent: "covered".to_owned(),

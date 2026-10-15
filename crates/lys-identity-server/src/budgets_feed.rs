@@ -273,6 +273,10 @@ pub struct ContextFigure {
     pub percent: u64,
     /// The declaration used: `profile` or `model`.
     pub source: &'static str,
+    /// The context in use, in tokens.
+    pub tokens: u64,
+    /// The declared window the percentage is of, in tokens.
+    pub window: u64,
 }
 
 /// Use the run's declaration first, then its model's organisation default.
@@ -322,7 +326,14 @@ pub fn context_figure(
         }
     };
     u64::try_from(u128::from(context) * 100 / u128::from(window))
-        .map(|percent| Some(ContextFigure { percent, source }))
+        .map(|percent| {
+            Some(ContextFigure {
+                percent,
+                source,
+                tokens: context,
+                window,
+            })
+        })
         .map_err(|error| refused(format!("native context percentage: {error}")))
 }
 
@@ -400,6 +411,8 @@ pub fn convert(
         unavailable,
         session: Some(record.session.clone()),
         context_percent: context.as_ref().map(|figure| figure.percent),
+        context_tokens: context.as_ref().map(|figure| figure.tokens),
+        context_window: context.as_ref().map(|figure| figure.window),
         context_source: context.map(|figure| figure.source.to_owned()),
         // A spend record the proxy's usage file gave names its run: it counts one call.
         call: record.run.as_ref().filter(|_| !snapshot).map(|run| {

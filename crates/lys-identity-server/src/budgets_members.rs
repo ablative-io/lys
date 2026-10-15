@@ -128,11 +128,19 @@ pub fn standings(state: &AppState) -> Result<Vec<Standing>, ServerError> {
 pub fn covered(holder: &Holder, standings: &[Standing]) -> BTreeSet<String> {
     standings
         .iter()
-        .filter(|standing| match holder.kind {
-            HolderKind::Agent => standing.agent == holder.id,
-            HolderKind::Team => standing.teams.contains(&holder.id),
-            HolderKind::Person => standing.person.as_ref() == Some(&holder.id),
-        })
+        .filter(|standing| covers(holder, standing))
         .map(|standing| standing.agent.clone())
         .collect()
+}
+
+/// Whether `holder`'s limits reach the agent `standing` describes: its own,
+/// an admitted team's, its responsible person's, or the organisation's.
+#[must_use]
+pub fn covers(holder: &Holder, standing: &Standing) -> bool {
+    match holder.kind {
+        HolderKind::Agent => standing.agent == holder.id,
+        HolderKind::Team => standing.teams.contains(&holder.id),
+        HolderKind::Person => standing.person.as_ref() == Some(&holder.id),
+        HolderKind::Organisation => true,
+    }
 }

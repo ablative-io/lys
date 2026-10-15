@@ -48,7 +48,7 @@ pub(crate) fn giver(
             principal,
         )
     })? {
-        return Ok(Giver::Agent(agent));
+        return person_only(holder).map(|()| Giver::Agent(agent));
     }
     let actor = signed_in(state, headers)?;
     let caller = with_directory(state, |directory| {
@@ -59,9 +59,9 @@ pub(crate) fn giver(
             actor.provenance().method(),
             lys_identity::AuthMethod::AgentPass(_)
         ) {
-            return Ok(Giver::Pass(agent));
+            return person_only(holder).map(|()| Giver::Pass(agent));
         }
-        return Ok(Giver::Agent(agent));
+        return person_only(holder).map(|()| Giver::Agent(agent));
     }
     let by = authorised(state, &actor, holder)?;
     if holder.kind == HolderKind::Person && !crate::routes::is_administrator(state, &actor)? {
@@ -73,6 +73,17 @@ pub(crate) fn giver(
         });
     }
     Ok(Giver::Person(by))
+}
+
+/// The organisation's default reaches every agent, so no agent sets it,
+/// whatever it holds or is granted; an administrator does.
+fn person_only(holder: &Holder) -> Result<(), ServerError> {
+    if holder.kind == HolderKind::Organisation {
+        return Err(ServerError::NotPermitted {
+            reason: "the organisation's budget reaches every agent, so only an administrator sets it, never an agent".to_owned(),
+        });
+    }
+    Ok(())
 }
 
 pub(crate) fn append(
@@ -144,6 +155,7 @@ fn kind(kind: HolderKind) -> &'static str {
         HolderKind::Agent => "agent",
         HolderKind::Team => "team",
         HolderKind::Person => "person",
+        HolderKind::Organisation => "organisation",
     }
 }
 

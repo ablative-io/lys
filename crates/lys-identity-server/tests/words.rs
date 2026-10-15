@@ -290,14 +290,18 @@ async fn the_preview_renders_the_numbers_and_sends_nothing() -> TestResult {
             &json!({
                 "slot": "context_warning",
                 "agent": table.beas_agent,
-                "numbers": { "context_percent": "71" },
+                "numbers": {
+                    "context_percent": "71",
+                    "context_figures": "71% of your context window (710,000 of 1,000,000 tokens)",
+                    "compaction": "compaction is at 80% (800,000 tokens)",
+                },
             }),
         )
         .await?;
     assert_eq!(status, 200, "{answer}");
     let text = answer["text"].as_str().unwrap_or_default();
     assert!(
-        text.starts_with("[Lys context watch] Context is at 71 percent"),
+        text.starts_with("[Lys context watch] You're at 71% of your context window (710,000 of 1,000,000 tokens); compaction is at 80% (800,000 tokens)."),
         "{text}"
     );
     assert!(text.contains("No open goal."), "{text}");

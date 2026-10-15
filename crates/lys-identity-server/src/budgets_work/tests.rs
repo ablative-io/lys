@@ -250,6 +250,8 @@ fn crossing(operation: String, agent: &str) -> crate::budgets_crossing::Crossing
         unavailable: None,
         limit_index: 0,
         warning: false,
+        context_tokens: None,
+        context_window: None,
         account: None,
         act: Act::Stop,
         agent: agent.to_owned(),

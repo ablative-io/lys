@@ -1,6 +1,6 @@
 //! A current boundary uses the existing policy and point measurement.
 
-use super::{Act, Held, HolderKind, Measure, Standing};
+use super::{Act, Held, Measure, Standing};
 
 impl Held {
     /// Judge a current owned boundary using the existing folded measurement.
@@ -20,19 +20,18 @@ impl Held {
             reason: reason.to_owned(),
         };
         let mut threshold = None;
-        for limits in &self.limit_sets {
-            let covered = match limits.holder.kind {
-                HolderKind::Agent => limits.holder.id == standing.agent,
-                HolderKind::Person => standing.person.as_ref() == Some(&limits.holder.id),
-                HolderKind::Team => standing.teams.contains(&limits.holder.id),
-            };
-            if !covered {
+        for limits in self.in_force() {
+            if !crate::budgets_members::covers(&limits.holder, standing) {
                 continue;
             }
-            for limit in self.effective_limits(limits).into_iter().filter(|limit| {
-                limit.unit == Measure::ContextPercent
-                    && matches!(limit.act, Act::Compact | Act::Stop)
-            }) {
+            for (_, limit) in
+                self.applying_limits(&limits, standing)
+                    .into_iter()
+                    .filter(|(_, limit)| {
+                        limit.unit == Measure::ContextPercent
+                            && matches!(limit.act, Act::Compact | Act::Stop)
+                    })
+            {
                 let amount = limit.scaled().map_err(|error| error.words)?;
                 if threshold.is_none_or(|(earlier, _)| {
                     amount < earlier || (amount == earlier && limit.act == Act::Stop)

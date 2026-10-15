@@ -30,11 +30,14 @@ const SLOTS: [(&str, Slot); 5] = [
     ("scheduled", Slot::ScheduledReminder),
 ];
 /// The placeholders Lys renders at delivery, beside `vars.<key>`.
-const RENDERED: [&str; 7] = [
+const RENDERED: [&str; 10] = [
     "goals",
     "time_left",
     "deadline",
     "context_percent",
+    "context_figures",
+    "compaction",
+    "compaction_figures",
     "limit",
     "message",
     "text",

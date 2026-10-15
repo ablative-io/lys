@@ -170,6 +170,17 @@ impl Limits {
         if self.holder.id.is_empty() {
             return Err(refused("BudgetLimitsRefused", "a holder is named"));
         }
+        if self.holder.kind == HolderKind::Organisation
+            && self.holder.id != crate::budgets_default::ORGANISATION
+        {
+            return Err(refused(
+                "BudgetLimitsRefused",
+                format!(
+                    "the organisation holder is named {}",
+                    crate::budgets_default::ORGANISATION
+                ),
+            ));
+        }
         for (index, limit) in self.limits.iter().enumerate() {
             limit.checked(&self.holder)?;
             if self.limits[..index].contains(limit) {

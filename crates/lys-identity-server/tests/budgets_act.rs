@@ -290,7 +290,12 @@ async fn a_configured_context_notice_appears_in_the_live_session() -> TestResult
         .budget(json!({"limits": [{"unit": "context_percent", "amount": 50, "period": null, "act": "notice"}], "warn_at": null, "version": 0}))
         .await?;
     table.used(context("e1", &session, 64)).await?;
-    table.waited(&session, "Context is at 64 percent").await?;
+    table
+        .waited(
+            &session,
+            "You're at 64% of your context window; no compaction is set for this agent.",
+        )
+        .await?;
     table.end(&session).await?;
     table.stop_runner()
 }
@@ -367,3 +372,228 @@ mod budget_session_security;
 
 #[path = "../../lys-runner/tests/operations_budget_cases.rs"]
 mod compaction_cases;
+
+fn measured(event: &str, session: &str, figure: u64, window: u64) -> Value {
+    json!({
+        "event": event, "at_ms": now_ms(), "session": session, "context_percent": figure,
+        "context_tokens": window / 100 * figure, "context_window": window,
+    })
+}
+
+/// The session's turn ends, so the next act waiting for a boundary is typed.
+fn turn_ends(table: &Table, session: &str) -> TestResult {
+    table
+        .serving
+        .as_ref()
+        .ok_or("no runner")?
+        .sessions()
+        .collect(
+            session,
+            &lys_runner::session::Collected::Hook {
+                event: "Stop".to_owned(),
+                input: json!({}),
+            },
+        )?;
+    Ok(())
+}
+
+/// The acts kept for the agent, in the order kept.
+async fn acts(table: &Table) -> Result<Vec<(String, u64)>, Box<dyn Error>> {
+    Ok(table
+        .receipts()
+        .await?
+        .iter()
+        .map(|receipt| {
+            (
+                receipt["crossing"]["act"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+                receipt["crossing"]["limit"].as_u64().unwrap_or_default(),
+            )
+        })
+        .collect())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agent_with_no_limit_is_warned_at_20_and_38_and_compacted_at_40() -> TestResult {
+    let mut table = Table::set(&json!({ "compact": "echo compacted-$((2+3))" })).await?;
+    let session = table.start().await?;
+    let path = format!("/budgets/agent/{}", table.agent());
+    let (status, view) = table.call(reqwest::Method::GET, &path, None).await?;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(
+        view["limits"],
+        json!([]),
+        "the agent holds no limit of its own"
+    );
+    assert_eq!(view["context_default"]["built_in"], true, "{view}");
+    assert_eq!(view["context_default"]["set_aside"], false, "{view}");
+    assert_eq!(view["context_default"]["version"], 0, "{view}");
+    let levels: Vec<_> = view["context_default"]["limits"]
+        .as_array()
+        .ok_or("no default limits")?
+        .iter()
+        .map(|limit| (limit["amount"].clone(), limit["act"].clone()))
+        .collect();
+    assert_eq!(
+        levels,
+        vec![
+            (json!(20), json!("notice")),
+            (json!(38), json!("notice")),
+            (json!(40), json!("compact"))
+        ]
+    );
+
+    let window = 1_000_000;
+    let under = table.used(measured("e1", &session, 10, window)).await?;
+    assert_eq!(under["receipts"], json!([]), "{under}");
+    table.used(measured("e2", &session, 20, window)).await?;
+    table
+        .waited(&session, "You're at 20% of your context window")
+        .await?;
+    turn_ends(&table, &session)?;
+    table.used(measured("e3", &session, 25, window)).await?;
+    assert_eq!(acts(&table).await?, vec![("notice".to_owned(), 20)]);
+    table.used(measured("e4", &session, 38, window)).await?;
+    table
+        .waited(&session, "You're at 38% of your context window")
+        .await?;
+    turn_ends(&table, &session)?;
+    table.used(measured("e5", &session, 41, window)).await?;
+    table.waited(&session, "compacted-5").await?;
+    assert_eq!(
+        acts(&table).await?,
+        vec![
+            ("notice".to_owned(), 20),
+            ("notice".to_owned(), 38),
+            ("compact".to_owned(), 40)
+        ]
+    );
+
+    // After the compaction the context climbs again: each warning has
+    // already spoken in this session, so neither speaks twice.
+    table.used(measured("e6", &session, 5, window)).await?;
+    table.used(measured("e7", &session, 39, window)).await?;
+    assert_eq!(
+        acts(&table).await?.len(),
+        3,
+        "each warning once per session"
+    );
+    let shown = table.end(&session).await?;
+    assert_eq!(shown.matches("You're at ").count(), 2, "{shown:?}");
+    // The runner kept each warning's words whole, with the tokens beside the
+    // percentage; the terminal's echo wraps them, so the kept text is compared.
+    let receipts = table.receipts().await?;
+    let typed = |index: usize| -> Result<_, Box<dyn Error>> {
+        let operation = receipts[index]["crossing"]["operation"]
+            .as_str()
+            .ok_or("no operation")?;
+        Ok(table
+            .serving
+            .as_ref()
+            .ok_or("no runner")?
+            .sessions()
+            .outcome(operation)?
+            .text)
+    };
+    assert_eq!(
+        typed(0)?,
+        Some(lys_runner::operations::TextDigest::of(
+            "[Lys context watch] You're at 20% of your context window (200,000 of 1,000,000 tokens); compaction is at 40% (400,000 tokens). No open goal."
+        ))
+    );
+    assert_eq!(
+        typed(1)?,
+        Some(lys_runner::operations::TextDigest::of(
+            "[Lys context watch] You're at 38% of your context window (380,000 of 1,000,000 tokens); this session compacts at 40% (400,000 tokens), about a minute from now. Wrap up what you're holding and note anything you need after compaction."
+        ))
+    );
+    table.stop_runner()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_agents_own_context_limit_overrides_the_default() -> TestResult {
+    let mut table = Table::set(&json!({ "compact": "echo compacted-$((2+3))" })).await?;
+    let session = table.start().await?;
+    table
+        .budget(json!({"limits": [{"unit": "context_percent", "amount": 70, "period": null, "act": "compact"}], "warn_at": null, "version": 0}))
+        .await?;
+    let path = format!("/budgets/agent/{}", table.agent());
+    let (_, view) = table.call(reqwest::Method::GET, &path, None).await?;
+    assert_eq!(view["context_default"]["set_aside"], true, "{view}");
+    let passed = table.used(context("e1", &session, 50)).await?;
+    assert_eq!(
+        passed["receipts"],
+        json!([]),
+        "no default warning or compaction: {passed}"
+    );
+    table.used(context("e2", &session, 71)).await?;
+    table.waited(&session, "compacted-5").await?;
+    assert_eq!(acts(&table).await?, vec![("compact".to_owned(), 70)]);
+    table.end(&session).await?;
+    table.stop_runner()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn switching_the_default_off_stops_its_warnings_and_its_compaction() -> TestResult {
+    let mut table = Table::set(&json!({ "compact": "echo compacted-$((2+3))" })).await?;
+    let session = table.start().await?;
+    let path = "/budgets/organisation/organisation";
+    let (status, view) = table.call(reqwest::Method::GET, path, None).await?;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(view["version"], 0, "{view}");
+    assert!(
+        view["by"].is_null(),
+        "the built-in default names no setter: {view}"
+    );
+    assert_eq!(view["limits"].as_array().map(Vec::len), Some(3), "{view}");
+    let off = json!({"limits": [], "warn_at": null, "version": 0});
+    let (status, view) = table.call(reqwest::Method::PUT, path, Some(&off)).await?;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(view["version"], 1, "{view}");
+    assert_eq!(view["limits"], json!([]), "{view}");
+    let agent = format!("/budgets/agent/{}", table.agent());
+    let (_, view) = table.call(reqwest::Method::GET, &agent, None).await?;
+    assert_eq!(view["context_default"]["built_in"], false, "{view}");
+    assert_eq!(view["context_default"]["limits"], json!([]), "{view}");
+    for (event, figure) in [("e1", 20), ("e2", 38), ("e3", 45)] {
+        let passed = table.used(context(event, &session, figure)).await?;
+        assert_eq!(passed["receipts"], json!([]), "{figure}: {passed}");
+    }
+    table.end(&session).await?;
+    table.stop_runner()
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn only_an_administrator_changes_the_default() -> TestResult {
+    let mut table = Table::set(&json!({})).await?;
+    let bea = table
+        .service
+        .sign_in(Login {
+            subject: "bea-subject".to_owned(),
+            email: "bea@example.test".to_owned(),
+        })
+        .await?;
+    let off = json!({"limits": [], "warn_at": null, "version": 0});
+    let (status, answer) = send(
+        &table.service,
+        reqwest::Method::PUT,
+        "/budgets/organisation/organisation",
+        Auth::Cookie(&bea),
+        Some(&off),
+    )
+    .await?;
+    assert_eq!(status, 403, "{answer}");
+    let elsewhere = json!({"limits": [], "warn_at": null, "version": 0});
+    let (status, answer) = table
+        .call(
+            reqwest::Method::PUT,
+            "/budgets/organisation/elsewhere",
+            Some(&elsewhere),
+        )
+        .await?;
+    assert_eq!(status, 400, "{answer}");
+    assert_eq!(answer["refusal"], "BudgetLimitsRefused", "{answer}");
+    table.stop_runner()
+}

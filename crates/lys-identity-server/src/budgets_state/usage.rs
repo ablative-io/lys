@@ -46,6 +46,12 @@ pub struct Usage {
     /// The session's context, in percent of its window, when measured.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_percent: Option<u64>,
+    /// The session's context in tokens, when measured; absent in older records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_tokens: Option<u64>,
+    /// The declared window `context_percent` is of, in tokens; absent in older records.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u64>,
     /// The declaration that supplied this context window, absent in older records.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_source: Option<String>,

@@ -207,15 +207,35 @@ fn session_coverage(
     agent: &str,
     standings: &[Standing],
 ) -> Result<BTreeSet<String>, ServerError> {
+    let Some(standing) = standings.iter().find(|standing| standing.agent == agent) else {
+        return Ok(BTreeSet::new());
+    };
     with_budgets(state, |store| {
-        Ok(store
-            .held()
-            .limit_sets
-            .iter()
-            .map(|collection| crate::budgets_members::covered(&collection.holder, standings))
-            .filter(|agents| agents.contains(agent))
-            .flatten()
-            .collect())
+        let held = store.held();
+        let mut selected = BTreeSet::new();
+        for collection in held.in_force() {
+            if !crate::budgets_members::covers(&collection.holder, standing) {
+                continue;
+            }
+            let applying = held.applying_limits(&collection, standing);
+            // Context levels act on the reporting agent's own session alone,
+            // so a default reaching every agent reads no other agent's sessions.
+            if collection.holder.kind == crate::budgets_state::HolderKind::Organisation
+                && applying
+                    .iter()
+                    .all(|(_, limit)| limit.unit == Measure::ContextPercent)
+            {
+                if !applying.is_empty() {
+                    selected.insert(agent.to_owned());
+                }
+                continue;
+            }
+            selected.extend(crate::budgets_members::covered(
+                &collection.holder,
+                standings,
+            ));
+        }
+        Ok(selected)
     })
 }
 
@@ -242,12 +262,20 @@ fn crossings(
         crossed: Vec::new(),
         missing: None,
     };
-    for collection in &held.limit_sets {
-        let agents = crate::budgets_members::covered(&collection.holder, standings);
-        if !agents.contains(&usage.agent) {
+    let Some(standing) = standings
+        .iter()
+        .find(|standing| standing.agent == usage.agent)
+    else {
+        return Ok(assessed);
+    };
+    for collection in held.in_force() {
+        let collection = collection.as_ref();
+        if !crate::budgets_members::covers(&collection.holder, standing) {
             continue;
         }
-        for (index, limit) in held.effective_limits(collection).iter().enumerate() {
+        let agents = crate::budgets_members::covered(&collection.holder, standings);
+        for (index, limit) in &held.applying_limits(collection, standing) {
+            let index = *index;
             let Some(level) = levels(held, usage, limit, &agents, zone, sessions)? else {
                 continue;
             };
@@ -349,7 +377,9 @@ fn measured_crossings(
         {
             continue;
         }
-        let mark = if is_warning && limit.unit == Measure::ContextPercent {
+        // A context warning, set as warn_at or as a Notice level, speaks once
+        // per session and threshold; a compaction or stop acts on every rise.
+        let mark = if limit.unit == Measure::ContextPercent && (is_warning || act == Act::Notice) {
             format!(
                 "session {}",
                 usage
@@ -395,13 +425,17 @@ pub fn admit_at(state: &AppState, agent: &str, at_ms: i64) -> Result<(), ServerE
     let standings = crate::budgets_members::standings(state)?;
     let selected = session_coverage(state, agent, &standings)?;
     let sessions = crate::runtime_api::session_agents(state, &selected)?;
+    let Some(standing) = standings.iter().find(|standing| standing.agent == agent) else {
+        return Ok(());
+    };
     with_budgets(state, |store| {
-        for collection in &store.held().limit_sets {
-            let agents = crate::budgets_members::covered(&collection.holder, &standings);
-            if !agents.contains(agent) {
+        for collection in store.held().in_force() {
+            let collection = collection.as_ref();
+            if !crate::budgets_members::covers(&collection.holder, standing) {
                 continue;
             }
-            for limit in store.held().effective_limits(collection) {
+            let agents = crate::budgets_members::covered(&collection.holder, &standings);
+            for (_, limit) in store.held().applying_limits(collection, standing) {
                 if limit.act != Act::Stop || limit.period.is_none() {
                     continue;
                 }

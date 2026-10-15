@@ -38,6 +38,9 @@ pub enum HolderKind {
     Team,
     /// Each agent a person is responsible for.
     Person,
+    /// Every agent of the organisation: the default each agent inherits
+    /// until a limit of its own, or its person's, says otherwise.
+    Organisation,
 }
 
 /// A budget's holder.
@@ -481,11 +484,7 @@ impl Held {
             .map(|budget| self.effective(budget))
             .filter(|budget| {
                 budget.measure == measure
-                    && match budget.holder.kind {
-                        HolderKind::Agent => budget.holder.id == standing.agent,
-                        HolderKind::Team => standing.teams.contains(&budget.holder.id),
-                        HolderKind::Person => standing.person.as_ref() == Some(&budget.holder.id),
-                    }
+                    && crate::budgets_members::covers(&budget.holder, standing)
             })
             .min_by_key(|budget| budget.limit)
     }
@@ -597,11 +596,7 @@ pub fn covered<'a>(
 ) -> BTreeSet<String> {
     standings
         .into_iter()
-        .filter(|standing| match budget.holder.kind {
-            HolderKind::Agent => standing.agent == budget.holder.id,
-            HolderKind::Team => standing.teams.contains(&budget.holder.id),
-            HolderKind::Person => standing.person.as_deref() == Some(budget.holder.id.as_str()),
-        })
+        .filter(|standing| crate::budgets_members::covers(&budget.holder, standing))
         .map(|standing| standing.agent.clone())
         .collect()
 }
