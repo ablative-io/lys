@@ -63,12 +63,15 @@ async fn apps_connect_registers_approves_and_issues_in_one_act() -> TestResult {
         .ok_or("no client secret")?;
     assert!(
         secret.starts_with(&format!("lys-client.{NOTES}.")),
-        "{secret}"
+        "the client credential has the wrong scheme"
     );
     let bearer = exchanged["workspace_credential"]
         .as_str()
         .ok_or("no bearer")?;
-    assert!(bearer.starts_with(&format!("lys-app.{NOTES}.")), "{bearer}");
+    assert!(
+        bearer.starts_with(&format!("lys-app.{NOTES}.")),
+        "the workspace credential has the wrong scheme"
+    );
     ok(get(&service, "/apps/me", Auth::Bearer(bearer)).await?)?;
     refused(
         &post(

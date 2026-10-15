@@ -6,13 +6,17 @@
 //! Lys still calls no app: the manifest arrives in the administrator's body
 //! and the return address is only answered, never fetched.
 //!
-//! The code is 256 bits, lives ten minutes, is used once and is kept only as
-//! its SHA-256, bound to its app. Pending codes are held in this process's
-//! memory: a restart forgets them, and the app starts its connection again.
+//! The code is 256 bits, is used once and is bound to its app by a SHA-256
+//! lookup. An encrypted operation checkpoint retains
+//! its outcome across retries and restarts; consuming a code durably removes
+//! the credential values before answering the exchange.
 
+#[cfg(test)]
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::{Mutex, OnceLock};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path as UrlPath, State};
@@ -38,6 +42,9 @@ use crate::session::now;
 /// How long a connect code is exchangeable, in milliseconds.
 const CODE_LIFETIME_MS: u64 = 10 * 60 * 1000;
 
+#[path = "lysfix_srv_connect_state.rs"]
+mod checkpoint;
+
 /// The connect routes, merged into the app routes.
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -46,16 +53,12 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
 }
 
 /// What an app publishes at `{app}/identity/lys/manifest`.
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Deserialize, Serialize, utoipa::ToSchema)]
 pub(crate) struct Manifest {
     id: String,
     name: String,
     redirects: Vec<String>,
     #[serde(default)]
-    #[allow(
-        dead_code,
-        reason = "named by the manifest; Lys keeps no logout addresses yet"
-    )]
     post_logout_redirects: Vec<String>,
     #[serde(default)]
     profile: bool,
@@ -64,7 +67,7 @@ pub(crate) struct Manifest {
 }
 
 /// The administrator's approval of a fetched manifest.
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConnectBody {
     operation: String,
@@ -75,7 +78,7 @@ pub(crate) struct ConnectBody {
 }
 
 /// Where the approval page sends the browser.
-#[derive(Serialize, utoipa::ToSchema)]
+#[derive(Clone, Deserialize, Serialize, utoipa::ToSchema)]
 pub(crate) struct Connected {
     redirect: String,
 }
@@ -87,7 +90,7 @@ pub(crate) struct ExchangeBody {
 }
 
 /// What the app's server collects, once.
-#[derive(Clone, Serialize, utoipa::ToSchema)]
+#[derive(Clone, Deserialize, Serialize, utoipa::ToSchema)]
 pub(crate) struct Exchanged {
     app: String,
     issuer: String,
@@ -101,6 +104,7 @@ struct Pending {
     answer: Option<Exchanged>,
 }
 
+#[cfg(test)]
 fn codes() -> &'static Mutex<HashMap<String, Pending>> {
     static CODES: OnceLock<Mutex<HashMap<String, Pending>>> = OnceLock::new();
     CODES.get_or_init(|| Mutex::new(HashMap::new()))
@@ -135,8 +139,137 @@ pub(crate) fn return_admitted(back: &str, redirects: &[String]) -> Result<(), Se
     .into())
 }
 
-fn operation() -> Result<String, ServerError> {
-    Ok(OperationId::generate()?.to_string())
+fn operation(parent: &str, phase: &str) -> String {
+    let digest = sha256_hex(&format!("lys/app-connect/v1/{parent}/{phase}"));
+    format!("op-{}", &digest[..32])
+}
+
+async fn prepare_app(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    manifest: &Manifest,
+    operation_id: &str,
+) -> Result<(), ServerError> {
+    let id = manifest.id.clone();
+    let standing = with_apps(state, |apps, _| {
+        Ok(apps.app(&id).map(crate::apps_state::App::standing))
+    })?;
+    match standing {
+        None => {
+            drop(
+                register(
+                    State(Arc::clone(state)),
+                    headers.clone(),
+                    Ok(Json(RegisterBody {
+                        operation: operation(operation_id, "register"),
+                        id: id.clone(),
+                        name: manifest.name.clone(),
+                        redirects: manifest.redirects.clone(),
+                        schema: manifest.schema.clone(),
+                        service_account: None,
+                    })),
+                )
+                .await?,
+            );
+        }
+        Some(Standing::Pending | Standing::Approved) => {}
+        Some(Standing::Declined) => return Err(AppError::AppDecided { app: id }.into()),
+        Some(Standing::Retired) => return Err(AppError::AppRetired { app: id }.into()),
+    }
+    if standing == Some(Standing::Approved) {
+        drop(
+            crate::apps_sign_in::set(
+                State(Arc::clone(state)),
+                headers.clone(),
+                UrlPath(id.clone()),
+                Ok(Json(crate::apps_sign_in::AppSignInBody {
+                    operation: operation(operation_id, "sign-in"),
+                    redirects: manifest.redirects.clone(),
+                    profile: manifest.profile,
+                })),
+            )
+            .await?,
+        );
+    } else {
+        drop(
+            approve(
+                State(Arc::clone(state)),
+                headers.clone(),
+                UrlPath(id.clone()),
+                Ok(Json(AppApprovalBody {
+                    operation: operation(operation_id, "approve"),
+                    redirects: manifest.redirects.clone(),
+                    profile: manifest.profile,
+                })),
+            )
+            .await?,
+        );
+    }
+    Ok(())
+}
+
+async fn replace_credentials(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    record: &mut checkpoint::Record,
+    operation_id: &str,
+    checkpoint: &checkpoint::Checkpoint,
+) -> Result<(), ServerError> {
+    let id = &record.app;
+    if record.client.is_none() {
+        let Json(client) = issue(
+            State(Arc::clone(state)),
+            headers.clone(),
+            UrlPath(id.to_owned()),
+            Ok(Json(ClientCredentialIssueBody {
+                operation: operation_id.to_owned(),
+            })),
+        )
+        .await?;
+        let value = client.credential.ok_or_else(|| unavailable(
+            "the client issue is recorded but its one-time value was not checkpointed; the old credentials remain live; start a new connect operation"))?;
+        record.client = Some((client.credential_id, Some(value)));
+        checkpoint.save(record)?;
+    }
+    if record.bearer.is_none() {
+        let Json(bearer) = issue_bearer(
+            State(Arc::clone(state)),
+            headers.clone(),
+            UrlPath(id.to_owned()),
+            Ok(Json(ClientCredentialIssueBody {
+                operation: operation(operation_id, "bearer"),
+            })),
+        )
+        .await?;
+        let value = bearer.credential.ok_or_else(|| unavailable(
+            "the bearer issue is recorded but its one-time value was not checkpointed; start a new connect operation"))?;
+        record.bearer = Some((bearer.reference, Some(value)));
+        checkpoint.save(record)?;
+    }
+    Ok(())
+}
+
+fn complete(
+    checkpoint: &checkpoint::Checkpoint,
+    record: &mut checkpoint::Record,
+    back: &str,
+    state: &str,
+) -> Result<Connected, ServerError> {
+    let (code, _) = new_secret()?;
+    let mut back = reqwest::Url::parse(back)
+        .map_err(|error| malformed(format!("the return address is invalid: {error}")))?;
+    back.query_pairs_mut()
+        .append_pair("code", &code)
+        .append_pair("state", state);
+    let connected = Connected {
+        redirect: back.to_string(),
+    };
+    record.code = Some(code);
+    record.at = now();
+    record.connected = Some(connected.clone());
+    checkpoint.save(record)?;
+    checkpoint.index(record)?;
+    Ok(connected)
 }
 
 async fn connect(
@@ -144,9 +277,8 @@ async fn connect(
     headers: HeaderMap,
     body: Result<Json<ConnectBody>, JsonRejection>,
 ) -> Result<Json<Connected>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    OperationId::from_str(&body.operation)?;
-    let manifest = body.manifest;
+    let Json(mut body) = body.map_err(|refused| malformed(refused.body_text()))?;
+    body.operation = OperationId::from_str(&body.operation)?.to_string();
     if body.state.is_empty()
         || body
             .state
@@ -155,14 +287,20 @@ async fn connect(
     {
         return Err(malformed("a connection carries the app's state, one word"));
     }
-    return_admitted(&body.back, &manifest.redirects)?;
-    // Lys's own provider when configured; without it the app's sign-in
-    // client lives at the issuer Lys itself signs in through.
-    let issuer = state
-        .provider
-        .as_ref()
-        .map_or_else(|| state.oidc.issuer(), |provider| provider.issuer())
-        .to_owned();
+    return_admitted(&body.back, &body.manifest.redirects)?;
+    with_apps(&state, |apps, directory| {
+        super::administrator(&state, apps, &headers, directory)
+    })?;
+    let checkpoint = checkpoint::Checkpoint::open(&state)?;
+    let gate = checkpoint.gate().await?;
+    let by = with_apps(&state, |apps, directory| {
+        super::administrator(&state, apps, &headers, directory)
+    })?;
+    let request = sha256_hex(
+        &serde_json::to_string(&json!({"body":body,"by":by}))
+            .map_err(|error| checkpoint::json_failed("encode its request", &error))?,
+    );
+    let manifest = body.manifest;
     let id = manifest.id.clone();
     if id == lys_identity::grants::LYS_APP {
         return Err(AppError::AppIsLys {
@@ -170,119 +308,70 @@ async fn connect(
         }
         .into());
     }
-    let standing = with_apps(&state, |apps, _| {
-        Ok(apps.app(&id).map(crate::apps_state::App::standing))
-    })?;
-    let live = match standing {
+    let mut record = match checkpoint.load(&body.operation)? {
+        Some(record) if record.request == request && record.app == id => record,
+        Some(_) => {
+            return Err(AppError::AppOperationReused {
+                operation: body.operation,
+            }
+            .into());
+        }
         None => {
-            let Json(_registered) = register(
+            let prior = with_apps(&state, |apps, _| {
+                if apps.held().operation(&body.operation).is_some() {
+                    return Err(AppError::AppOperationReused {
+                        operation: body.operation.clone(),
+                    }
+                    .into());
+                }
+                Ok(apps
+                    .app(&id)
+                    .map_or_else(Vec::new, crate::apps_state::App::live_client_credentials))
+            })?;
+            let issuer = state
+                .provider
+                .as_ref()
+                .map_or_else(|| state.oidc.issuer(), |provider| provider.issuer())
+                .to_owned();
+            let record = checkpoint::Record::new(
+                request,
+                body.operation.clone(),
+                id.clone(),
+                issuer,
+                prior,
+                now(),
+            );
+            checkpoint.save(&record)?;
+            record
+        }
+    };
+    if let Some(connected) = record.connected.clone() {
+        checkpoint.index(&record)?;
+        return Ok(Json(connected));
+    }
+    prepare_app(&state, &headers, &manifest, &body.operation).await?;
+    replace_credentials(&state, &headers, &mut record, &body.operation, &checkpoint).await?;
+    // Both replacement values are durable before any previous credential is revoked.
+    for credential in &record.prior {
+        drop(
+            revoke(
                 State(Arc::clone(&state)),
                 headers.clone(),
-                Ok(Json(RegisterBody {
-                    operation: operation()?,
-                    id: id.clone(),
-                    name: manifest.name.clone(),
-                    redirects: manifest.redirects.clone(),
-                    schema: manifest.schema.clone(),
-                    service_account: None,
+                UrlPath((id.clone(), credential.clone())),
+                Ok(Json(ClientCredentialRevokeBody {
+                    operation: operation(&body.operation, &format!("revoke/{credential}")),
+                    reason: "the app was connected again".to_owned(),
                 })),
             )
-            .await?;
-            Vec::new()
-        }
-        Some(Standing::Pending) => Vec::new(),
-        Some(Standing::Approved) => with_apps(&state, |apps, _| {
-            Ok(apps
-                .app(&id)
-                .map(crate::apps_state::App::live_client_credentials)
-                .unwrap_or_default())
-        })?,
-        Some(Standing::Declined) => return Err(AppError::AppDecided { app: id }.into()),
-        Some(Standing::Retired) => return Err(AppError::AppRetired { app: id }.into()),
-    };
-    if standing != Some(Standing::Approved) {
-        let Json(_approved) = approve(
-            State(Arc::clone(&state)),
-            headers.clone(),
-            UrlPath(id.clone()),
-            Ok(Json(AppApprovalBody {
-                operation: operation()?,
-                redirects: manifest.redirects.clone(),
-                profile: manifest.profile,
-            })),
-        )
-        .await?;
+            .await?,
+        );
     }
-    if standing == Some(Standing::Approved) {
-        // Reconnecting: the sign-in settings follow the manifest as it is now.
-        let Json(_signed_in) = crate::apps_sign_in::set(
-            State(Arc::clone(&state)),
-            headers.clone(),
-            UrlPath(id.clone()),
-            Ok(Json(crate::apps_sign_in::AppSignInBody {
-                operation: operation()?,
-                redirects: manifest.redirects.clone(),
-                profile: manifest.profile,
-            })),
-        )
-        .await?;
-    }
-    // Reconnecting an approved app: its old client credentials end, and the
-    // bearer issued below supersedes the old one.
-    for credential in live {
-        let Json(_revoked) = revoke(
-            State(Arc::clone(&state)),
-            headers.clone(),
-            UrlPath((id.clone(), credential)),
-            Ok(Json(ClientCredentialRevokeBody {
-                operation: operation()?,
-                reason: "the app was connected again".to_owned(),
-            })),
-        )
-        .await?;
-    }
-    let Json(client) = issue(
-        State(Arc::clone(&state)),
-        headers.clone(),
-        UrlPath(id.clone()),
-        Ok(Json(ClientCredentialIssueBody {
-            operation: operation()?,
-        })),
-    )
-    .await?;
-    let Json(bearer) = issue_bearer(
-        State(Arc::clone(&state)),
-        headers,
-        UrlPath(id.clone()),
-        Ok(Json(ClientCredentialIssueBody {
-            operation: operation()?,
-        })),
-    )
-    .await?;
-    let (Some(client_secret), Some(workspace_credential)) = (client.credential, bearer.credential)
-    else {
-        return Err(unavailable(
-            "a fresh credential was not answered by its issue",
-        ));
-    };
-    let (code, digest) = new_secret()?;
-    let answer = Exchanged {
-        app: id.clone(),
-        issuer,
-        client_id: id,
-        client_secret,
-        workspace_credential,
-    };
-    keep_code(digest, now(), answer)?;
-    let mut back = reqwest::Url::parse(&body.back).map_err(|_unparsed| malformed("return"))?;
-    back.query_pairs_mut()
-        .append_pair("code", &code)
-        .append_pair("state", &body.state);
-    Ok(Json(Connected {
-        redirect: back.to_string(),
-    }))
+    let connected = complete(&checkpoint, &mut record, &body.back, &body.state)?;
+    drop(gate);
+    Ok(Json(connected))
 }
 
+#[cfg(test)]
 fn keep_code(digest: String, at: u64, answer: Exchanged) -> Result<(), ServerError> {
     let mut codes = codes()
         .lock()
@@ -301,6 +390,7 @@ fn keep_code(digest: String, at: u64, answer: Exchanged) -> Result<(), ServerErr
 }
 
 /// Take the answer `code` holds at `at`, or the refusal's name.
+#[cfg(test)]
 fn take(code: &str, at: u64) -> Result<Result<Exchanged, &'static str>, ServerError> {
     let mut codes = codes()
         .lock()
@@ -308,11 +398,15 @@ fn take(code: &str, at: u64) -> Result<Result<Exchanged, &'static str>, ServerEr
     let Some(pending) = codes.get_mut(&sha256_hex(code)) else {
         return Ok(Err("connect_code_unknown"));
     };
+    Ok(take_pending(pending, at))
+}
+
+fn take_pending(pending: &mut Pending, at: u64) -> Result<Exchanged, &'static str> {
     if at.saturating_sub(pending.at) > CODE_LIFETIME_MS {
         pending.answer = None;
-        return Ok(Err("connect_code_expired"));
+        return Err("connect_code_expired");
     }
-    Ok(pending.answer.take().ok_or("connect_code_used"))
+    pending.answer.take().ok_or("connect_code_used")
 }
 
 /// The refusal `name` in plain words for the person reading the app's page.
@@ -327,10 +421,15 @@ fn refusal_words(name: &str) -> &'static str {
 }
 
 async fn exchange(
+    State(state): State<Arc<AppState>>,
     body: Result<Json<ExchangeBody>, JsonRejection>,
 ) -> Result<Response, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    Ok(match take(&body.code, now())? {
+    let checkpoint = checkpoint::Checkpoint::open(&state)?;
+    let gate = checkpoint.gate().await?;
+    let answer = checkpoint.take(&body.code, now())?;
+    drop(gate);
+    Ok(match answer {
         Ok(answer) => Json(answer).into_response(),
         Err(refusal) => (
             StatusCode::BAD_REQUEST,
