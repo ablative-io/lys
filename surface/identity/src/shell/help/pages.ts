@@ -36,7 +36,10 @@ export const RAIL_REGION: Region = {
   at: 'right',
 };
 
-const ROWS: readonly (readonly [string, string])[] = [['j / k', 'move down / up the list'], ['Enter', 'open the row']];
+const ROWS: readonly (readonly [string, string])[] = [
+  ['j / k', 'move down / up the list'],
+  ['Enter', 'open the row'],
+];
 
 /** The fields every agent's settings share, on Add an agent, the Settings tab and the Overview's model and computer. */
 const PROFILE_FIELDS: readonly Region[] = [
@@ -143,7 +146,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
       SECTIONS_REGION,
       { sel: '.file-section-head', title: 'Give', text: 'Passes on access you hold and may pass to agents. Only the agent’s responsible person can give it access; if you hold nothing passable, Lys says so.', at: 'below' },
       { sel: '.grant-table', title: 'Grants it holds', text: 'Every grant held by this agent: what it may do, on what, from whom, until when, and whether it stands now. Give passes part of one on; Revoke withdraws one after asking why.', at: 'right' },
-      { sel: '[data-act="agent-roots"]', title: 'Let me give agents access', text: 'A new administrator holds nothing to pass on, so Give does nothing yet. Press this once: Lys records the access you may pass to agents, and Give works from then on.', at: 'right' },
+      { sel: '[data-act="agent-roots"]', title: 'Let me give agents access', text: 'Records the administrator’s grants on the agents and apps directories only. It gives no access to Cambium channels; those need a separate grant you hold and may pass to agents.', at: 'right' },
       { sel: '[data-cambium-first]', title: 'Cambium', text: 'Cambium’s channels can be given once Cambium is connected and approved on Apps.', at: 'below' },
       { sel: '.access-halves', title: 'What it can reach, and a check', text: 'Left: everything this agent can reach, summed up from its grants. Right: ask whether it can do one thing; the answer shows the chain of grants back to a person, or says why not.', at: 'above' },
     ],
@@ -173,22 +176,13 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
   'file:provisioning': {
     title: 'Settings',
     topic: 'people.settings',
-    regions: [
-      SECTIONS_REGION,
-      ...PROFILE_FIELDS,
-      { sel: '.pane .head:has(h2)', title: 'Refused tool calls', text: 'What this agent’s policy stopped, newest first: the tool, what it tried and which rule refused it. Reading it is how you see whether a rule is too tight.', at: 'right' },
-    ],
+    regions: [SECTIONS_REGION, ...PROFILE_FIELDS, { sel: '.pane .head:has(h2)', title: 'Refused tool calls', text: 'What this agent’s policy stopped, newest first: the tool, what it tried and which rule refused it. Reading it is how you see whether a rule is too tight.', at: 'right' }],
     keys: [],
   },
   'file:sessions': {
     title: 'Sessions',
     topic: 'people.agent-file',
-    regions: [
-      SECTIONS_REGION,
-      { sel: '.pane table', title: 'Sessions', text: 'Every session of this agent its runners reported: the computer, its state (running, ended, not answering) and the last report. A session that started and stopped straight away shows why here.', at: 'right' },
-      { sel: '.pane .head', title: 'Memory and home', text: 'Where this agent’s memories came from and the last context it was given at a start: the session, the starting point and what was sent.', at: 'right' },
-      { sel: 'section[aria-label="Your signed-in sessions"], section.card.you-sessions', title: 'Signed-in sessions', text: 'For a person: each browser they are signed in from. End signs that browser out; it does not stop any agent.', at: 'right' },
-    ],
+    regions: [SECTIONS_REGION, { sel: '.pane table', title: 'Sessions', text: 'Every session of this agent its runners reported: the computer, its state (running, ended, not answering) and the last report. A session that started and stopped straight away shows why here.', at: 'right' }, { sel: '.pane .head', title: 'Memory and home', text: 'Where this agent’s memories came from and the last context it was given at a start: the session, the starting point and what was sent.', at: 'right' }, { sel: 'section[aria-label="Your signed-in sessions"], section.card.you-sessions', title: 'Signed-in sessions', text: 'For a person: each browser they are signed in from. End signs that browser out; it does not stop any agent.', at: 'right' }],
     keys: [],
   },
   'file:credentials': {
@@ -206,22 +200,13 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
   'file:record': {
     title: 'Record',
     topic: 'people.agent-file',
-    regions: [
-      SECTIONS_REGION,
-      { sel: '.grid2 > div:first-child .card', title: 'What changed', text: 'Every change to this record, oldest first: what changed, to what, by whom and when, with the reason given. Nothing here can be edited or removed.', at: 'right' },
-      { sel: '.grid2 > div:last-child .card', title: 'Proof of each change', text: 'Lys signs every change and keeps it for good. Download gives the signed entry for one change, to hand to anyone who asks for proof.', at: 'left' },
-      { sel: 'section[aria-label="Emergency-stop history"]', title: 'Emergency-stop history', text: 'Earlier stops of this agent: who pulled the cord, why, and what each stop did. Outcome not confirmed means Lys asked but never heard back. This is history, not the agent’s state now.', at: 'right' },
-    ],
+    regions: [SECTIONS_REGION, { sel: '.grid2 > div:first-child .card', title: 'What changed', text: 'Every change to this record, oldest first: what changed, to what, by whom and when, with the reason given. Nothing here can be edited or removed.', at: 'right' }, { sel: '.grid2 > div:last-child .card', title: 'Proof of each change', text: 'Lys signs every change and keeps it for good. Download gives the signed entry for one change, to hand to anyone who asks for proof.', at: 'left' }, { sel: 'section[aria-label="Emergency-stop history"]', title: 'Emergency-stop history', text: 'Earlier stops of this agent: who pulled the cord, why, and what each stop did. Outcome not confirmed means Lys asked but never heard back. This is history, not the agent’s state now.', at: 'right' }],
     keys: [],
   },
   start: {
     title: 'Start',
     topic: 'start.agent',
-    regions: [
-      { sel: 'section[aria-label="Run"]', title: 'Start', text: 'Starts the agent on its computer, in its folder, with its saved settings. If more than one computer is allowed, choose which. If it has no program chosen yet, Choose opens its Settings. Started and stopped straight away means the runner refused it; the link shows what it reported.', at: 'right' },
-      { sel: 'section[aria-label="Settings of this agent"]', title: 'Set-up before the first start', text: 'The folder and program a first run must know. Save keeps them, then Start works.', at: 'right' },
-      ...PROFILE_FIELDS,
-    ],
+    regions: [{ sel: 'section[aria-label="Run"]', title: 'Start', text: 'Starts the agent on its computer, in its folder, with its saved settings. If more than one computer is allowed, choose which. If it has no program chosen yet, Choose opens its Settings. Started and stopped straight away means the runner refused it; the link shows what it reported.', at: 'right' }, { sel: 'section[aria-label="Settings of this agent"]', title: 'Set-up before the first start', text: 'The folder and program a first run must know. Save keeps them, then Start works.', at: 'right' }, ...PROFILE_FIELDS],
     keys: [],
   },
   network: {
@@ -394,9 +379,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
   graph: {
     title: 'Graph',
     topic: 'access.graph',
-    regions: [
-      { sel: '[aria-label="Permission graph"]', title: 'The graph', text: 'The same answers as Access, drawn. Click a person or agent to light everything it reaches; click a resource to light everyone who reaches it; Enter on one opens its page. Zoom with the buttons or the wheel; Fit shows the whole graph.', at: 'c' },
-    ],
+    regions: [{ sel: '[aria-label="Permission graph"]', title: 'The graph', text: 'The same answers as Access, drawn. Click a person or agent to light everything it reaches; click a resource to light everyone who reaches it; Enter on one opens its page. Zoom with the buttons or the wheel; Fit shows the whole graph.', at: 'c' }],
     keys: [],
   },
   canvas: {
@@ -410,7 +393,11 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
       { sel: '.canvas-layouts', title: 'Layouts', text: 'Save this arrangement under a name and bring it back later. Save over replaces a saved one; Remove asks first.', at: 'left' },
       { sel: '[aria-label="Connections"]', title: 'Connections', text: 'Which agents are messaging which, drawn as lines between their windows.', at: 'left' },
     ],
-    keys: [['arrows, on a focused bar', 'move the window'], ['Shift + arrows, on a focused bar', 'size its terminal'], ['arrows, on the surface', 'move the surface']],
+    keys: [
+      ['arrows, on a focused bar', 'move the window'],
+      ['Shift + arrows, on a focused bar', 'size its terminal'],
+      ['arrows, on the surface', 'move the surface'],
+    ],
   },
   import: {
     title: 'Approve estate grants',

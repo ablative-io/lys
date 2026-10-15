@@ -17,10 +17,7 @@ export const ACCESS: Seed[] = [
     id: 'access.check',
     title: 'Can this be done?',
     summary: 'Ask any way round; every answer shows its path.',
-    body: [
-      'Ask, under Access, answers what someone can reach, who can reach something, and whether one identity can do one thing.',
-      'Yes answers show the chain to a person. No answers say which kind of refusal it is: no grant, identity not active, authority withdrawn upstream, or a type the model does not have.',
-    ],
+    body: ['Ask, under Access, answers what someone can reach, who can reach something, and whether one identity can do one thing.', 'Yes answers show the chain to a person. No answers say which kind of refusal it is: no grant, identity not active, authority withdrawn upstream, or a type the model does not have.'],
     steps: [{ text: 'Open Access → Ask.', href: '#/access/can', link: 'Open Ask' }],
     related: ['access.grant', 'trouble.permission'],
   },
@@ -30,13 +27,10 @@ export const ACCESS: Seed[] = [
     summary: 'Pass on access you hold to an agent that answers to you.',
     body: [
       'On the agent’s Access tab, Give passes on one of your own grants that may be passed to agents. Only the agent’s responsible person can give it access.',
-      'If you hold nothing you can give, the tab says so; a new Lys’s administrator presses "Let me give agents access" once to record it for themselves.',
+      'If you hold nothing you can give, the tab says so. The administrator can press "Let me give agents access" to record grants on the agents and apps directories only. It gives no access to Cambium channels; those need a separate grant you hold and may pass to agents.',
       'Beside the grants, "What it can reach" sums them up, and the check box answers whether it can do one thing.',
     ],
-    steps: [
-      { text: 'Open the agent’s page, then Access.' },
-      { text: 'Press Give and choose what to pass on.' },
-    ],
+    steps: [{ text: 'Open the agent’s page, then Access.' }, { text: 'Press Give and choose what to pass on.' }],
     related: ['access.grant', 'start.channels', 'trouble.no-access-to-give'],
   },
   {
@@ -47,14 +41,7 @@ export const ACCESS: Seed[] = [
     steps: [{ text: 'Connect Cambium on Apps.', href: '#/apps', link: 'Open Apps' }],
     related: ['start.cambium', 'start.channels'],
   },
-  {
-    id: 'access.restricted',
-    title: 'Restricted places',
-    summary: 'Reached only by a grant on the place itself.',
-    body: ['A restricted place is shown apart: nothing held on the place it sits in reaches it. Give a grant on the place itself.'],
-    steps: [],
-    related: ['access.grant'],
-  },
+  { id: 'access.restricted', title: 'Restricted places', summary: 'Reached only by a grant on the place itself.', body: ['A restricted place is shown apart: nothing held on the place it sits in reaches it. Give a grant on the place itself.'], steps: [], related: ['access.grant'] },
   {
     id: 'access.requests',
     title: 'Requests',
@@ -67,10 +54,7 @@ export const ACCESS: Seed[] = [
     id: 'access.drafts',
     title: 'Drafts',
     summary: 'What your agents prepared for you to decide. Nothing is done until you approve it.',
-    body: [
-      'An agent may prepare a change it is not allowed to make and leave it for you. Each draft shows the request exactly as it would be sent.',
-      'Approve does it. Refuse asks why you refuse it, and the reason is shown with the draft, with who decided and when.',
-    ],
+    body: ['An agent may prepare a change it is not allowed to make and leave it for you. Each draft shows the request exactly as it would be sent.', 'Approve does it. Refuse asks why you refuse it, and the reason is shown with the draft, with who decided and when.'],
     steps: [{ text: 'Open Access → Drafts.', href: '#/access/drafts', link: 'Open Drafts' }],
     related: ['access.requests', 'people.dashboard'],
   },
@@ -82,14 +66,7 @@ export const ACCESS: Seed[] = [
     steps: [{ text: 'Open Reviews.', href: '#/reviews', link: 'Open Reviews' }],
     related: ['access.requests', 'people.state'],
   },
-  {
-    id: 'access.graph',
-    title: 'Graph',
-    summary: 'The same answers as Access, drawn.',
-    body: ['Click a person or agent to light what it reaches; click a resource to light who reaches it.'],
-    steps: [{ text: 'Open Graph (g h).', href: '#/graph', link: 'Open Graph' }],
-    related: ['access.grant'],
-  },
+  { id: 'access.graph', title: 'Graph', summary: 'The same answers as Access, drawn.', body: ['Click a person or agent to light what it reaches; click a resource to light who reaches it.'], steps: [{ text: 'Open Graph (g h).', href: '#/graph', link: 'Open Graph' }], related: ['access.grant'] },
   {
     id: 'access.sealed',
     title: 'Secrets',
@@ -101,12 +78,5 @@ export const ACCESS: Seed[] = [
     steps: [{ text: 'Open Secrets (g v).', href: '#/secrets', link: 'Open Secrets' }],
     related: ['access.scope'],
   },
-  {
-    id: 'access.scope',
-    title: 'Scope',
-    summary: 'Organisation, team, or yours alone.',
-    body: ['A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you.'],
-    steps: [],
-    related: ['access.sealed'],
-  },
+  { id: 'access.scope', title: 'Scope', summary: 'Organisation, team, or yours alone.', body: ['A personal secret is yours. An agent uses it only through a virtual credential you issue, acting for you.'], steps: [], related: ['access.sealed'] },
 ];

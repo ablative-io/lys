@@ -19,7 +19,7 @@ import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { Delegate } from '../grants/Delegate';
 import { ActPanel, GrantTable } from '../grants/GrantTable';
-import { onText, passesToAgents } from '../grants/model';
+import { grantNo, onText, passesToAgents } from '../grants/model';
 import { changeWords } from './receipt-words';
 import { Pill } from '../people/Pill';
 import { calledBy, firstName } from '../people/directory';
@@ -33,20 +33,28 @@ function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
   return (
     <div className="grid2">
-      {!agent ? <div>
-        <AssignedRoles id={x.id} />
-      </div> : null}
+      {!agent ? (
+        <div>
+          <AssignedRoles id={x.id} />
+        </div>
+      ) : null}
       <div>
         <div className="card">
           <dl className="facts">
             <dt>Kind</dt>
             <dd>{x.kind === 'agent' ? 'Agent' : 'Person'}</dd>
-            {x.person ? <>
-              <dt>Answers to</dt>
-              <dd><Pill x={x.person} /> <span className="note">decides when its access is renewed or retired</span></dd>
-            </> : null}
+            {x.person ? (
+              <>
+                <dt>Answers to</dt>
+                <dd>
+                  <Pill x={x.person} /> <span className="note">decides when its access is renewed or retired</span>
+                </dd>
+              </>
+            ) : null}
             <dt>Teams</dt>
-            <dd><TeamsOf id={x.id} /></dd>
+            <dd>
+              <TeamsOf id={x.id} />
+            </dd>
             <dt>Access</dt>
             <dd>{STATUS[x.state] ?? x.state}</dd>
           </dl>
@@ -66,14 +74,27 @@ function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }
     <div className="card">
       <div className="file-section-head">
         <h2>Agents answering to {firstName(name)}</h2>
-        {retiredCount ? <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>{retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}</button> : null}
+        {retiredCount ? (
+          <button type="button" className="btn" aria-pressed={retired} onClick={() => setRetired(!retired)}>
+            {retired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'}
+          </button>
+        ) : null}
       </div>
-      {shown.length ? shown.map((a) => (
-        <div className="row" key={a.id}>
-          <a href={'#/file/' + a.id} style={{ textDecoration: 'none' }}>{a.display_name}</a>
-          <span><span className={'dot s-' + a.state} /><span className="dim">{STATUS[a.state] ?? a.state}</span></span>
-        </div>
-      )) : <div className="dim">{agents.length ? 'Every agent answering to ' + firstName(name) + ' is retired.' : 'None yet.'}</div>}
+      {shown.length ? (
+        shown.map((a) => (
+          <div className="row" key={a.id}>
+            <a href={'#/file/' + a.id} style={{ textDecoration: 'none' }}>
+              {a.display_name}
+            </a>
+            <span>
+              <span className={'dot s-' + a.state} />
+              <span className="dim">{STATUS[a.state] ?? a.state}</span>
+            </span>
+          </div>
+        ))
+      ) : (
+        <div className="dim">{agents.length ? 'Every agent answering to ' + firstName(name) + ' is retired.' : 'None yet.'}</div>
+      )}
     </div>
   );
 }
@@ -81,6 +102,7 @@ function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }
 function Access({ data, reload }: { data: FileData; reload: () => void }) {
   const shell = useShell();
   const [giving, setGiving] = useState<HTMLElement | null>(null);
+  const [sourceId, setSourceId] = useState('');
   const { x, grants: w } = data;
   const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
@@ -91,23 +113,58 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
     reach.set(key, [...new Set([...(reach.get(key) ?? []), ...g.actions])]);
   }
   const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on));
+  const source = passable.find((grant) => grant.id === sourceId);
   const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <>
       {/* The button sits beside the heading, not inside it, so it keeps every other button's font. */}
-      <div className="file-section-head"><span className="section-h">Grants</span>
-        {x.kind === 'agent' && x.state !== 'retired' ? <Act symbol="send" name="Give access" word="Give" data-act="grant" onClick={(event) => mineToGive && passable.length ? setGiving(event.currentTarget)
-          : shell.toast(mineToGive ? 'You hold no access you can give an agent. Use “Let me give agents access” below.' : `Only ${name}’s responsible person can give it access.`)} /> : null}
+      <div className="file-section-head">
+        <span className="section-h">Grants</span>
+        {x.kind === 'agent' && x.state !== 'retired' ? (
+          <Act
+            symbol="send"
+            name="Give access"
+            word="Give"
+            data-act="grant"
+            onClick={(event) => {
+              if (mineToGive && passable.length) {
+                setSourceId('');
+                setGiving(event.currentTarget);
+              } else shell.toast(mineToGive ? 'You hold no access you can give an agent. The button below records directory access only; Cambium needs a separate grant.' : `Only ${name}’s responsible person can give it access.`);
+            }}
+          />
+        ) : null}
       </div>
-      {giving && passable.length ? <ActPanel label="Give" opener={giving} close={() => setGiving(null)}><Delegate w={w} source={passable[0]} to={x.id} done={reload} close={() => setGiving(null)} /></ActPanel> : null}
+      {giving && passable.length ? (
+        <ActPanel label="Give" opener={giving} close={() => setGiving(null)}>
+          <label className="field">
+            Access to give
+            <select aria-label="Grant to give" value={source?.id ?? ''} onChange={(event) => setSourceId(event.target.value)}>
+              <option value="">Choose access to give</option>
+              {passable.map((grant) => (
+                <option key={grant.id} value={grant.id}>
+                  {onText(grant)} · {grant.relation} · {grantNo(grant.id)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {source ? <Delegate key={source.id} w={w} source={source} to={x.id} done={reload} close={() => setGiving(null)} /> : <p className="hint">Choose a grant to see which actions you can give.</p>}
+        </ActPanel>
+      ) : null}
       <GrantTable w={w} grants={held} done={reload} give={false} />
       {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <CambiumFirst /> : null}
       {mineToGive && !passable.length ? (
         <div style={{ marginTop: 12 }}>
-          <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record it once, for themselves.</p>
-          <Act symbol="add" name="Let me give agents access" word="Let me give agents access" data-act="agent-roots" onClick={() => {
-            request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
-          }} />
+          <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record access to the agents and apps directories below. Cambium needs a separate grant.</p>
+          <Act
+            symbol="add"
+            name="Let me give agents access"
+            word="Let me give agents access"
+            data-act="agent-roots"
+            onClick={() => {
+              request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
+            }}
+          />
         </div>
       ) : null}
       {/* After the grant table, the two panels share the width as two halves. */}
@@ -115,16 +172,29 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
         <div>
           <div className="section-h">
             <span>What {name} can reach</span>
-            <a href={'#/access/reach/' + x.id} className="note" style={{ letterSpacing: 0, textTransform: 'none' }}>open in Access</a>
+            <a href={'#/access/reach/' + x.id} className="note" style={{ letterSpacing: 0, textTransform: 'none' }}>
+              open in Access
+            </a>
           </div>
           <div className="card">
             {reach.size ? (
-              <table><tbody>
-                {[...reach].map(([res, acts]) => (
-                  <tr key={res}><td>{res}</td><td><span className="svc built-in">built in</span></td><td className="mono">{acts.join(', ')}</td><td /></tr>
-                ))}
-              </tbody></table>
-            ) : <div className="dim">Nothing.</div>}
+              <table>
+                <tbody>
+                  {[...reach].map(([res, acts]) => (
+                    <tr key={res}>
+                      <td>{res}</td>
+                      <td>
+                        <span className="svc built-in">built in</span>
+                      </td>
+                      <td className="mono">{acts.join(', ')}</td>
+                      <td />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="dim">Nothing.</div>
+            )}
           </div>
         </div>
         <div>
@@ -169,10 +239,24 @@ function Actor({ actor, me }: { actor: ReceiptAnswer['receipt']['actor']; me: Me
 /** What a record line changed: from and to when the signed event carries them, else the change's kind. */
 function Change({ answer }: { answer: ReceiptAnswer }) {
   const said = changeWords(answer);
-  return <>
-    {said.words}{said.names.to ? <> <IdentityName id={said.names.to} />{said.names.from ? <span className="note"> (before: <IdentityName id={said.names.from} />)</span> : null}</> : null}
-    {said.reason ? <span className="note"> · “{said.reason}”</span> : null}
-  </>;
+  return (
+    <>
+      {said.words}
+      {said.names.to ? (
+        <>
+          {' '}
+          <IdentityName id={said.names.to} />
+          {said.names.from ? (
+            <span className="note">
+              {' '}
+              (before: <IdentityName id={said.names.from} />)
+            </span>
+          ) : null}
+        </>
+      ) : null}
+      {said.reason ? <span className="note"> · “{said.reason}”</span> : null}
+    </>
+  );
 }
 
 function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
@@ -182,7 +266,9 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
       <div>
         <div className="card">
           <h2>What changed</h2>
-          <div className="sec" style={{ marginBottom: 10 }}>Every change to this record, oldest first, and who made it.</div>
+          <div className="sec" style={{ marginBottom: 10 }}>
+            Every change to this record, oldest first, and who made it.
+          </div>
           {receipts.length ? (
             <div className="timeline">
               {receipts.map((r, i) => (
@@ -190,7 +276,11 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
                   <div className="when">{clock(r.receipt.actor.authenticated_at)}</div>
                   <div>
                     <Change answer={r} />
-                    <span className="note"> · by <Actor actor={r.receipt.actor} me={me.status === 'ok' ? me.data : null} />{r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}</span>
+                    <span className="note">
+                      {' '}
+                      · by <Actor actor={r.receipt.actor} me={me.status === 'ok' ? me.data : null} />
+                      {r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -206,7 +296,9 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
           <div className="sec">Lys signs every change and keeps it for good, so it can be checked later. You only need these if someone asks for proof.</div>
           {receipts.map((r) => (
             <div className="row" style={{ padding: '5px 0' }} key={r.receipt.log.index}>
-              <a href={'/api/receipts/' + r.receipt.log.index} download={'lys-change-' + r.receipt.log.index + '.json'}>Download proof of change {r.receipt.log.index}</a>
+              <a href={'/api/receipts/' + r.receipt.log.index} download={'lys-change-' + r.receipt.log.index + '.json'}>
+                Download proof of change {r.receipt.log.index}
+              </a>
               <span className="dim">{clock(r.receipt.actor.authenticated_at)}</span>
             </div>
           ))}
@@ -220,17 +312,49 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
   const person = data.x.kind === 'person';
   switch (tab) {
     case 'budgets':
-      return person ? <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} /> : <section className="usage"><AgentUsage key={data.x.id} agent={data.x.id} name={data.x.display_name} /></section>;
+      return person ? (
+        <PersonalBudgets key={data.x.id} id={data.x.id} name={data.x.display_name} />
+      ) : (
+        <section className="usage">
+          <AgentUsage key={data.x.id} agent={data.x.id} name={data.x.display_name} />
+        </section>
+      );
     case 'access':
       return <Access data={data} reload={reload} />;
     case 'provisioning':
-      return person ? <Profile data={data} /> : <><Provisioning id={data.x.id} /><AgentRefusals key={'r' + data.x.id} id={data.x.id} /></>;
+      return person ? (
+        <Profile data={data} />
+      ) : (
+        <>
+          <Provisioning id={data.x.id} />
+          <AgentRefusals key={'r' + data.x.id} id={data.x.id} />
+        </>
+      );
     case 'credentials':
-      return person ? <PersonCredentials id={data.x.id} /> : <><AgentCredentials id={data.x.id} /><AgentCertificates id={data.x.id} /></>;
+      return person ? (
+        <PersonCredentials id={data.x.id} />
+      ) : (
+        <>
+          <AgentCredentials id={data.x.id} />
+          <AgentCertificates id={data.x.id} />
+        </>
+      );
     case 'sessions':
-      return person ? <PersonSessions id={data.x.id} /> : <><RuntimeSessions agent={data.x.id} /><AgentMemory id={data.x.id} /></>;
+      return person ? (
+        <PersonSessions id={data.x.id} />
+      ) : (
+        <>
+          <RuntimeSessions agent={data.x.id} />
+          <AgentMemory id={data.x.id} />
+        </>
+      );
     case 'record':
-      return <><Record data={data} />{person ? null : <StopHistory key={data.x.id} id={data.x.id} />}</>;
+      return (
+        <>
+          <Record data={data} />
+          {person ? null : <StopHistory key={data.x.id} id={data.x.id} />}
+        </>
+      );
     default:
       return <Profile data={data} />;
   }
