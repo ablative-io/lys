@@ -13,9 +13,10 @@ use std::fs;
 use std::path::Path;
 
 /// Every start file the brief names, relative to the repository root.
-const START_FILES: [&str; 17] = [
+const START_FILES: [&str; 18] = [
     "crates/lys-identity/src/start/mod.rs",
     "crates/lys-identity/src/start/request.rs",
+    "crates/lys-identity/src/start/reading.rs",
     "crates/lys-identity/src/start/error.rs",
     "crates/lys-identity/src/start/authority.rs",
     "crates/lys-identity/src/start/checks.rs",
@@ -76,7 +77,7 @@ fn every_library_start_file_is_listed() -> Result<(), Box<dyn Error>> {
         );
         found += 1;
     }
-    assert_eq!(found, 16);
+    assert_eq!(found, 17);
     Ok(())
 }
 
