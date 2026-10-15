@@ -18,17 +18,19 @@
   flex-direction: column;
   gap: 14px;
 }
-/* A short record must not stretch to match the account form beside it. */
+/* Each column flows independently so a short record leaves room for the next card. */
 .you-account-row {
   flex: none;
   min-width: 0;
-  display: grid;
+  display: block;
   align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  column-count: 2;
+  column-width: 360px;
   gap: 12px;
 }
 .you-page .you-account-row > .card {
-  margin: 0;
+  margin: 0 0 12px;
+  break-inside: avoid;
   min-width: 0;
   min-height: 0;
   padding: 12px 14px;
@@ -118,6 +120,50 @@
   top: 0;
   z-index: 1;
 }
+/* Dense grant facts read as labelled pairs instead of forcing a wide table. */
+.you-holds-scroll .grant-cols {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+.you-holds-scroll .grant-cols thead {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.you-holds-scroll .grant-cols tbody {
+  display: block;
+}
+.you-holds-scroll .grant-cols tr[data-grant] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.you-holds-scroll .grant-cols td[data-col] {
+  display: block;
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  white-space: normal;
+}
+.you-holds-scroll .grant-cols td[data-col]::before {
+  display: block;
+  content: attr(data-col);
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.you-holds-scroll .grant-cols td[data-col="Grant"],
+.you-holds-scroll .grant-cols td[data-col="Allows"],
+.you-holds-scroll .grant-cols td[data-col="Change"] {
+  grid-column: 1 / -1;
+}
 /* A change of the account is one block: what it changes as its heading, its fields wide enough to read what is typed, its button at the end. */
 .account-rows {
   display: flex;
@@ -163,7 +209,7 @@
   flex: 1 1 100%;
   margin: 0;
 }
-.recorded-form.account-row button[type='submit'] {
+.recorded-form.account-row button[type="submit"] {
   margin-top: 0;
   white-space: nowrap;
 }

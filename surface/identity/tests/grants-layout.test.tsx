@@ -23,10 +23,7 @@ const sessions: SessionView[] = [true, false].map((current, index) => ({
 const routes = {
   ...SERVICE,
   '/grants': ok({ grants: [grant], revision: 7 }),
-  '/grants/model': ok({
-    ...MODEL,
-    action_sentences: { ...MODEL.action_sentences, ...Object.fromEntries(actions.map((action, index) => [action, sentences[index]])) },
-  }),
+  '/grants/model': ok({ ...MODEL, action_sentences: { ...MODEL.action_sentences, ...Object.fromEntries(actions.map((action, index) => [action, sentences[index]])) } }),
   '/sessions': ok({ person: ME.person.id, sessions }),
 };
 
@@ -36,9 +33,7 @@ let style: HTMLStyleElement;
 beforeEach(() => {
   style = document.createElement('style');
   // The entry point loads feature styles before the shared screen styles.
-  style.textContent = ['features/grants/grants.css', 'features/me/you.css', 'styles/screen.css']
-    .map((path) => readFileSync(new URL('../src/' + path, import.meta.url), 'utf8'))
-    .join('\n');
+  style.textContent = ['features/grants/grants.css', 'features/me/you.css', 'styles/screen.css'].map((path) => readFileSync(new URL('../src/' + path, import.meta.url), 'utf8')).join('\n');
   document.head.appendChild(style);
   const container = document.createElement('div');
   document.body.appendChild(container);
@@ -62,7 +57,7 @@ async function showYou(): Promise<void> {
   expect(document.querySelectorAll('.you-sessions tbody tr')).toHaveLength(2);
 }
 
-function expectWordBoundaries(): void {
+function expectWordBoundaries(stacked = false): void {
   const cells = document.querySelectorAll<HTMLElement>('.grant-cols td');
   expect(cells.length).toBeGreaterThan(0);
   for (const cell of cells) {
@@ -71,7 +66,7 @@ function expectWordBoundaries(): void {
     expect(css.wordBreak, cell.dataset.col).toBe('normal');
   }
   for (const column of ['Grant', 'Relation']) {
-    expect(getComputedStyle(element(`td[data-col="${column}"]`)).whiteSpace, column).toBe('nowrap');
+    expect(getComputedStyle(element(`td[data-col="${column}"]`)).whiteSpace, column).toBe(stacked ? 'normal' : 'nowrap');
   }
   expect(getComputedStyle(element('.g-tight')).whiteSpace).toBe('nowrap');
   expect(getComputedStyle(element('.chain .pill')).overflowWrap).toBe('normal');
@@ -89,7 +84,7 @@ describe('LYSWALK layout contracts', () => {
     expect(getComputedStyle(element('.grant-cols th')).overflowWrap).toBe('normal');
     expectWordBoundaries();
     await showYou();
-    expectWordBoundaries();
+    expectWordBoundaries(true);
     for (const column of ['Allows', 'Window', 'Last used', 'May pass on']) {
       expect(getComputedStyle(element(`td[data-col="${column}"]`)).whiteSpace, column).not.toBe('nowrap');
     }
@@ -141,5 +136,35 @@ describe('LYSWALK layout contracts', () => {
       expect(css.maxHeight, card.id || card.className).not.toBe('360px');
     }
     expect(getComputedStyle(element('.you-sessions-scroll')).overflow).toBe('visible');
+  });
+});
+
+describe('You at desktop widths', () => {
+  it('W2 flows each card down its own column so a short card leaves no empty grid cell', async () => {
+    await showYou();
+    const css = getComputedStyle(element('.you-account-row'));
+    expect(css.display).toBe('block');
+    expect(css.columnCount).toBe('2');
+    expect(css.columnWidth).toBe('360px');
+    for (const card of document.querySelectorAll<HTMLElement>('.you-account-row > .card')) {
+      expect(getComputedStyle(card).breakInside).toBe('avoid');
+      expect(getComputedStyle(card).marginBottom).toBe('12px');
+    }
+  });
+
+  it('W3 stacks the labelled facts of each grant within the available width', async () => {
+    await showYou();
+    const row = element('.you-holds-scroll tr[data-grant]');
+    expect(getComputedStyle(row).display).toBe('grid');
+    expect(getComputedStyle(row).gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+    const cells = row.querySelectorAll<HTMLElement>('td[data-col]');
+    expect(cells.length).toBeGreaterThan(8);
+    for (const cell of cells) {
+      expect(cell.dataset.col).toBeTruthy();
+      expect(getComputedStyle(cell).whiteSpace).toBe('normal');
+      expect(getComputedStyle(cell).width).not.toBe('1%');
+    }
+    expect(getComputedStyle(element('.you-holds-scroll table')).width).toBe('100%');
+    expect(getComputedStyle(element('.you-holds-scroll td[data-col="Grant"]')).gridColumn).toBe('1 / -1');
   });
 });
