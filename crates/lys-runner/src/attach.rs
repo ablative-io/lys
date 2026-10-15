@@ -76,6 +76,7 @@ pub struct Lines {
 
 impl Ring {
     /// An empty ring keeping at most `limit` bytes of text.
+    #[must_use]
     pub fn new(limit: usize) -> Self {
         Self {
             lines: VecDeque::new(),
@@ -86,11 +87,13 @@ impl Ring {
     }
 
     /// The cursor of the oldest line kept.
+    #[must_use]
     pub fn oldest(&self) -> u64 {
         self.oldest
     }
 
     /// The cursor after the last line rendered.
+    #[must_use]
     pub fn end(&self) -> u64 {
         self.oldest + self.lines.len() as u64
     }
@@ -119,6 +122,9 @@ impl Ring {
     /// The lines from `cursor`, the oldest kept when none is given, refused
     /// `cursor_expired` when it is older than the oldest kept and
     /// `cursor_ahead` when it is past the end.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` with `cursor_expired`, `cursor_ahead` or `cursor_invalid` if the cursor is outside the retained range or its offset is unrepresentable.
     pub fn from(&self, cursor: Option<u64>) -> Result<Lines, RunnerError> {
         let from = cursor.unwrap_or(self.oldest);
         if from < self.oldest {
@@ -184,6 +190,7 @@ fn text_of(value: &Value) -> String {
 /// The lines `frame` renders as, read at `at`, on a channel of `transport`.
 /// A frame that is only part of a message still being written, or the
 /// assistant's private reasoning, renders as no line.
+#[must_use]
 pub fn render(transport: Transport, frame: &Value, at: u64) -> Vec<AttachLine> {
     match transport {
         Transport::Claude => claude(frame, at),
@@ -440,6 +447,9 @@ impl Sessions {
     /// is given. With `follow`, the answer waits until a line is rendered
     /// after the cursor or the session ends. A session with no managed
     /// channel is refused `attach_pty_use_read_bytes`.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if session-table locking or waiting fails, the caller leaves, the runner stops, the session is unknown or unmanaged, or the line cursor is invalid or outside the retained range.
     pub fn attach_read(
         &self,
         id: &str,
