@@ -84,8 +84,11 @@ describe('Directory reach', () => {
   });
   it('shows the named refusal instead of zero reach on an unreadable grant store', async () => {
     await mount('#/people', { ...SERVICE, '/grants': refused(503, 'GrantStoreUnavailable', 'store offline') });
-    expect($('tbody tr td:last-child')?.textContent).toContain('GrantStoreUnavailable');
-    expect(text()).toContain('store offline');
+    // The row says it in words; the refusal's name and the service's reason are in the hover, never on the face.
+    const cell = $('tbody tr td:last-child');
+    expect(cell?.textContent).toBe('Not known');
+    expect(cell?.querySelector('[title]')?.getAttribute('title')).toBe('GrantStoreUnavailable: store offline');
+    expect(text()).not.toContain('GrantStoreUnavailable');
   });
 });
 

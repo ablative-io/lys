@@ -356,7 +356,7 @@ describe('managed control readback', () => {
     try {
       const panel = view.container.querySelector('section[aria-label="Managed controls"]');
       expect(panel).not.toBeNull();
-      expect(panel?.textContent).toContain('Active turn');
+      expect(panel?.textContent).toContain('In the middle of a turn');
       expect(panel?.textContent).toContain('Held: above limit');
       expect(panel?.textContent).toContain('Unconfirmed');
       expect(panel?.textContent).toContain('Possible prior delivery');
@@ -450,7 +450,7 @@ describe('running session control readback', () => {
       const button = container.querySelector<HTMLButtonElement>('button[aria-label="Read controls for Scribe"]');
       expect(button).not.toBeNull();
       await act(async () => { button?.click(); });
-      expect(container.textContent).toContain('Active turn');
+      expect(container.textContent).toContain('In the middle of a turn');
       expect(container.textContent).toContain('Held: above limit');
       expect(requests).toContain('/runtime/sessions/session-old/controls');
       expect(requests).toContain('/runtime/sessions/session-old/control-receipts');

@@ -80,7 +80,7 @@ describe('An agent’s run', () => {
     await click($('section[aria-label="Run"] [data-act="stop"]'));
     await click(button('Stop Scribe'));
     const asking = $('[role="alertdialog"][aria-label="Stop Scribe"]');
-    expect(openWords(asking)).toContain('Lys could not read or change this agent’s sessions.');
+    expect(openWords(asking)).toContain('Lys could not reach this agent’s sessions just now.');
     expect(openWords(asking)).not.toContain('RuntimeUnavailable');
     expect(asking?.querySelector('details .refusal-name')?.textContent).toContain('RuntimeUnavailable');
   });

@@ -4,7 +4,7 @@ import type { Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
 import { $, $$, choose, click, serve, settle, text } from './harness';
-import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA_ME, BEA_OWN, ME, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
 let root: Root | null = null;
@@ -128,6 +128,24 @@ describe('An agent page explains the agent before its controls', () => {
     expect(posted).toEqual([]);
   });
 
+  it('lets the person the agent answers to choose its computer and model, as the service allows, not only the administrator', async () => {
+    await open({ ...notRunning, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(OWN) });
+    const about = () => $('[aria-label="About this agent"]');
+    const computer = about()?.querySelector('select[name="runs_on"]');
+    expect(computer).not.toBeNull();
+    expect((computer as HTMLSelectElement).disabled).toBe(false);
+    await choose(computer ?? null, '');
+    expect([...(about()?.querySelectorAll('form.save-settings button') ?? [])].map((entry) => entry.textContent)).toEqual(['Save']);
+  });
+
+  it('shows someone else’s agent’s computer and model as saved, with no way to change them', async () => {
+    await open({ ...notRunning, '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/people': ok(BEA_OWN), '/me': ok(BEA_ME) });
+    const computer = $('[aria-label="About this agent"] select[name="runs_on"]');
+    expect(computer).not.toBeNull();
+    expect((computer as HTMLSelectElement).disabled).toBe(true);
+    expect($('[aria-label="About this agent"] form.save-settings button')).toBeNull();
+  });
+
   it('says a saved model no program lists is unlisted instead of showing a bare id as its name', async () => {
     await open({ '/harnesses': ok({ programs: [{ name: 'Claude Code', line: 'claude', models: [{ id: 'model-two', label: 'Model Two' }], modes: [], builds: [] }] }) });
     expect($('[aria-label="About this agent"]')?.textContent).toContain('model-one (no program lists this model now)');
@@ -176,10 +194,13 @@ describe('An agent page explains the agent before its controls', () => {
 
   it('names a failed runtime read instead of inventing an empty or stopped state', async () => {
     await open({ '/runtime/live': refused(503, 'RunnerUnavailable', 'The runner did not answer') });
-    expect($('.agent-run')?.textContent).toContain('Lys could not read whether Scribe is running: The runner did not answer');
-    expect($('.agent-run')?.textContent).toContain('RunnerUnavailable');
+    // Plain words first; the service's reason and the refusal's name sit under Error details, never on the face.
+    expect($('.agent-run')?.textContent).toContain('Lys could not read whether Scribe is running.');
+    expect($('.agent-run')?.textContent).toContain('The runner did not answer');
+    expect($('.agent-run details')?.textContent).toContain('RunnerUnavailable');
     expect($('.agent-run')?.textContent).not.toContain('is not running');
-    expect($('.agent-run button')).toBeNull();
+    // No Start, Stop or Watch is invented from a read that failed; the one act offered is to read again.
+    expect($$('.agent-run button').map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['Read it again']);
     expect($('[data-act="watch"]')).toBeNull();
   });
 

@@ -136,7 +136,8 @@ export function SessionControls({ session }: { session: string }) {
 
 function CurrentControlState({ control }: { control: CurrentControl | null }) {
   if (control === null) return <Plain words="Automatic context reminders aren't connected for this session." detail="Managed control channel unavailable. No boundary is assumed." />;
-  const phase = { unknown: 'Boundary unknown; no idle boundary is proved', idle: 'Idle boundary', reserved: 'Next turn reserved', active: 'Active turn', closed: 'Managed channel closed' }[control.phase];
+  // Where the agent is between turns, in words: a managed control is sent only between turns.
+  const phase = { unknown: 'Not known whether it is between turns', idle: 'Between turns', reserved: 'Its next turn is reserved', active: 'In the middle of a turn', closed: 'Its managed channel is closed' }[control.phase];
   const context = control.context;
   const words = context === null ? 'Context decision not yet received' : context.state === 'released' ? 'Normal input permitted' : context.state === 'compact' ? 'Compaction authorised; completion not yet proved' : context.state === 'held' ? 'Held: ' + context.reason.replaceAll('_', ' ') : 'Authority unavailable: ' + context.reason.replaceAll('_', ' ');
   return <div className="current-control" role="status">
@@ -187,7 +188,7 @@ function ControlOperation({ receipt }: { receipt: PublicControlReceipt }) {
   return <article>
     <p><b>{controlOutcome(current)}</b> · {current.operation} · {current.request.replaceAll('_', ' ')}</p>
     {current.state === 'uncertain' || current.reference?.prior ? <p>Possible prior delivery{current.reference?.prior ? ': ' + current.reference.prior : ''}. It will not be resent automatically.</p> : null}
-    <p>{current.admitted ? 'Matching harness admission recorded.' : 'Matching harness admission not recorded.'}</p>
+    <p>{current.admitted ? 'The agent’s program confirmed it received this.' : 'The agent’s program has not confirmed it received this.'}</p>
     {personal ? <p>Person recorded {personal.choice.replaceAll('_', ' ')}{personal.choice === 'resent' ? ' under occurrence ' + personal.occurrence : ''}. The harness outcome remains {controlOutcome(current)}.</p> : null}
     {failure ? <div role="status"><ErrorWords problem={failure} /><p>Keep this decision when retrying; its answer is not confirmed.</p></div> : null}
     {current.state === 'uncertain' && !personal ? <div className="control-actions">

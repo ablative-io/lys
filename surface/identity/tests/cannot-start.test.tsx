@@ -53,7 +53,7 @@ describe('why an agent cannot start', () => {
   it('uses the shared approval and unanswered sentences and offers the same start again', () => {
     expect(whyNot('Scribe', { refusal: 'ProfileNotReviewed', reason: 'ProfileNotReviewed: version 3 of the agent\'s profile is not reviewed; review it before the agent is started' }))
       .toEqual({ sentence: 'These settings need approval before the agent can use them.', fix: { kind: 'try-again' } });
-    expect(whyNot('Scribe', { refusal: 'Unanswered', reason: '' }).sentence).toBe('Lys answered without confirming the request’s outcome. Check its original outcome before sending another.');
+    expect(whyNot('Scribe', { refusal: 'Unanswered', reason: '' }).sentence).toBe('Lys answered, but did not confirm what was asked. If you were making a change, check whether it was made before sending it again.');
     expect(whyNot('Scribe', { refusal: 'FutureStartRule', reason: '' }).sentence).toBe('Lys refused without explaining why.');
   });
 
@@ -148,7 +148,7 @@ describe('why an agent cannot start', () => {
 
   it('offers the same start again for a reason it has no fix for', async () => {
     const { host, calls } = await shown({ refusal: 'RuntimeUnavailable', reason: 'the runner did not answer' });
-    expect(host.querySelector('.cannot-start > p')?.textContent).toBe('Lys could not read or change this agent’s sessions. Check the current session before repeating a change.');
+    expect(host.querySelector('.cannot-start > p')?.textContent).toBe('Lys could not reach this agent’s sessions just now. Try again shortly; if you were making a change, check the current session before repeating it.');
     expect(host.querySelector('.cannot-start')?.getAttribute('title')).toBe('RuntimeUnavailable: the runner did not answer');
     await click(host.querySelector('button'));
     expect(calls.again).toBe(1);
