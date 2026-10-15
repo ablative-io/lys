@@ -344,6 +344,11 @@
       "path": "crates/lys-runner/src/harness_control/",
       "note": "harness admission and qualification",
       "brief": "AGENTS-008"
+    },
+    {
+      "path": "surface/identity/src/features/provisioning/",
+      "note": "the harness description review form and its profile copies, where a seat program's executable, arguments, seat file and digests are reviewed",
+      "brief": "AGENTS-009"
     }
   ],
   "principles": [

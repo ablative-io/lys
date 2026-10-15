@@ -121,6 +121,7 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-runner/src/protocol/` | the runner protocol's acts | AGENTS-008 |
 | `crates/lys-runner/src/socket/` | the runner socket's dispatch | AGENTS-008 |
 | `crates/lys-runner/src/harness_control/` | harness admission and qualification | AGENTS-008 |
+| `surface/identity/src/features/provisioning/` | the harness description review form and its profile copies, where a seat program's executable, arguments, seat file and digests are reviewed | AGENTS-009 |
 
 ## Inventory
 
