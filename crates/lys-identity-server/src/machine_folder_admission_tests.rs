@@ -49,7 +49,7 @@ async fn ask(
     ))
 }
 
-async fn fixture() -> TestResult<(
+pub(super) async fn fixture() -> TestResult<(
     tempfile::TempDir,
     Arc<crate::routes::AppState>,
     lys_runner::Serving,
@@ -138,7 +138,7 @@ async fn fixture() -> TestResult<(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn lysfix_srv_administrator_without_person_lists_machine_folders() -> TestResult {
+async fn administrator_without_person_lists_machine_folders() -> TestResult {
     let (dir, mut state, runner, _) = fixture().await?;
     let binding = LoginBinding::new(state.oidc.issuer(), "unbound-administrator")?;
     Arc::get_mut(&mut state).ok_or("fixture shared")?.admission = crate::admission::Admission::new(
@@ -176,7 +176,7 @@ async fn lysfix_srv_administrator_without_person_lists_machine_folders() -> Test
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn lysfix_srv_agent_lists_own_machine_folders_and_refuses_another_machine() -> TestResult {
+async fn agent_lists_own_machine_folders_and_refuses_another_machine() -> TestResult {
     let (dir, state, runner, agent) = fixture().await?;
     let actor = Actor::new(
         LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,

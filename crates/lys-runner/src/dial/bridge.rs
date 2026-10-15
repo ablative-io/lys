@@ -8,13 +8,54 @@ use super::{Dial, Signer, control_request, dispatch, reconnect};
 use crate::error::RunnerError;
 use crate::protocol::{Answer, reply_line};
 
+#[path = "reply_outbox.rs"]
+mod reply_outbox;
+use reply_outbox::{Outbox, Reply};
+
+#[path = "control.rs"]
+mod control;
+
+impl Dial {
+    /// Interrupt this runner's current reconnect backoff through its owner-only socket.
+    ///
+    /// # Errors
+    /// Returns unavailable local control or a named reconnect refusal.
+    pub fn reconnect_socket(socket: &std::path::Path) -> Result<serde_json::Value, RunnerError> {
+        control::ask(socket, b'R')
+    }
+
+    /// Read the runner's current connection status, including its next attempted dial.
+    ///
+    /// # Errors
+    /// Returns unavailable local control or an unreadable status response.
+    pub fn connection_status(socket: &std::path::Path) -> Result<serde_json::Value, RunnerError> {
+        control::ask(socket, b'S')
+    }
+}
+
+impl Stopping {
+    fn ready<T>(
+        &self,
+        take: impl FnMut() -> Result<T, RunnerError>,
+        disconnected: &AtomicBool,
+    ) -> Result<T, RunnerError> {
+        reconnect::ready_reporting(
+            take,
+            disconnected,
+            |delay| self.retry.wait(delay),
+            |status| self.retry.report(status),
+        )
+    }
+}
+
 #[derive(Default)]
 struct Stopping {
     state: AtomicBool,
-    retry: reconnect::RetryWait,
+    retry: Arc<reconnect::RetryWait>,
 }
 
 struct Lane {
+    outbox: Arc<Outbox>,
     signer: Arc<Signer>,
     local: Arc<Mutex<BTreeMap<String, crate::client::Closer>>>,
 }
@@ -44,21 +85,25 @@ fn stop(lanes: &[Lane], stopping: &Stopping) {
 }
 
 pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
+    let outbox = Arc::new(Outbox::open(&dial.socket)?);
     let lanes = [
         Lane {
+            outbox: Arc::clone(&outbox),
             signer: Arc::new(dial.signer()?),
             local: Arc::default(),
         },
         Lane {
+            outbox: Arc::clone(&outbox),
             signer: Arc::new(dial.signer()?),
             local: Arc::default(),
         },
     ];
     let stopping = Stopping::default();
+    let control = control::Control::open(&dial.socket, Arc::clone(&stopping.retry))?;
     let disconnected = Arc::new(AtomicBool::new(false));
     let finished_reply = Arc::new(AtomicBool::new(false));
     let dispatch = Mutex::new(dispatch::Dispatch::new());
-    std::thread::scope(|scope| {
+    let answered = std::thread::scope(|scope| {
         let (send, receive) = mpsc::channel();
         let mut workers = Vec::new();
         let mut spawn_failure = None;
@@ -121,7 +166,15 @@ pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
             }
         }
         answer
-    })
+    });
+    match (answered, control.finish()) {
+        (Err(error), Err(control)) => Err(RunnerError::refused(
+            "runner_dial_stop_failed",
+            format!("{error}; {control}"),
+        )),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    }
 }
 
 fn poll(
@@ -141,7 +194,8 @@ fn poll(
             signer.epoch()
         }
     };
-    let mut current = reconnect::ready(epoch, disconnected, |delay| stopping.retry.wait(delay))?;
+    let mut current = stopping.ready(epoch, disconnected)?;
+    flush_replies(signer, &current, &lane.outbox, finished_reply, disconnected)?;
     loop {
         if stopping.state.load(Ordering::Acquire) {
             return Err(stopped());
@@ -149,39 +203,14 @@ fn poll(
         let mut connection = crate::client::connect(&dial.socket)?;
         let registration = Held::new(&lane.local, connection.closer()?)?;
         let greeting = connection.greeting_line()?;
-        let (ticket, request_line) = loop {
-            if stopping.state.load(Ordering::Acquire) {
-                return Err(stopped());
-            }
-            let mut refresh = false;
-            let answer = reconnect::ready(
-                || {
-                    if stopping.state.load(Ordering::Acquire) {
-                        return Err(stopped());
-                    }
-                    if refresh {
-                        current = reconnect::ready(epoch, disconnected, |delay| {
-                            stopping.retry.wait(delay)
-                        })?;
-                    }
-                    let answer = signer.next(&current, &greeting);
-                    refresh = matches!(&answer, Err(RunnerError::Unreachable { .. }));
-                    answer
-                },
-                disconnected,
-                |delay| stopping.retry.wait(delay),
-            );
-            if stopping.state.load(Ordering::Acquire) {
-                return Err(stopped());
-            }
-            match answer {
-                Err(RunnerError::DialStale { .. }) => {
-                    current =
-                        reconnect::ready(epoch, disconnected, |delay| stopping.retry.wait(delay))?;
-                }
-                answer => break answer?,
-            }
-        };
+        let (ticket, request_line) = next_request(
+            lane,
+            &mut current,
+            &greeting,
+            stopping,
+            disconnected,
+            finished_reply,
+        )?;
         if disconnected.swap(false, Ordering::AcqRel) {
             crate::error::said("runner_dial_reconnected: the server accepted this runner again");
         }
@@ -192,6 +221,7 @@ fn poll(
         let failures = failures.clone();
         let posting_finished = Arc::clone(finished_reply);
         let posting_disconnected = Arc::clone(disconnected);
+        let posting_outbox = Arc::clone(&lane.outbox);
         let mut dispatch = dispatch.lock().map_err(|error| {
             RunnerError::refused("runner_dial_worker_failed", error.to_string())
         })?;
@@ -199,13 +229,14 @@ fn poll(
             let reply = connection
                 .exchange(&request_line)
                 .unwrap_or_else(|error| reply_line(Answer::refusal(&error)));
-            if let Err(error) = post_reply(
+            if let Err(error) = record_reply(
                 &posted,
                 &posting_epoch,
                 &posting_ticket,
                 &reply,
                 &posting_finished,
                 &posting_disconnected,
+                &posting_outbox,
             ) && failures.send(Err(error)).is_err()
             {
                 crate::error::said(
@@ -214,18 +245,112 @@ fn poll(
             }
             drop(registration);
         }) {
-            post_reply(
+            record_reply(
                 signer,
                 &current,
                 &ticket,
                 &reply_line(Answer::refusal(&error)),
                 finished_reply,
                 disconnected,
+                &lane.outbox,
             )?;
         }
     }
 }
 
+fn next_request(
+    lane: &Lane,
+    current: &mut String,
+    greeting: &str,
+    stopping: &Stopping,
+    disconnected: &AtomicBool,
+    finished_reply: &AtomicBool,
+) -> Result<(String, String), RunnerError> {
+    let signer = &lane.signer;
+    let epoch = || {
+        if stopping.state.load(Ordering::Acquire) {
+            Err(stopped())
+        } else {
+            signer.epoch()
+        }
+    };
+    loop {
+        if stopping.state.load(Ordering::Acquire) {
+            return Err(stopped());
+        }
+        let mut refresh = false;
+        let answer = stopping.ready(
+            || {
+                if stopping.state.load(Ordering::Acquire) {
+                    return Err(stopped());
+                }
+                if refresh {
+                    *current = stopping.ready(epoch, disconnected)?;
+                    flush_replies(signer, current, &lane.outbox, finished_reply, disconnected)?;
+                }
+                let answer = signer.next(current, greeting);
+                refresh = matches!(&answer, Err(RunnerError::Unreachable { .. }));
+                answer
+            },
+            disconnected,
+        );
+        if stopping.state.load(Ordering::Acquire) {
+            return Err(stopped());
+        }
+        match answer {
+            Err(RunnerError::DialStale { .. }) => {
+                *current = stopping.ready(epoch, disconnected)?;
+            }
+            answer => return answer,
+        }
+    }
+}
+
+fn record_reply(
+    signer: &Signer,
+    epoch: &str,
+    ticket: &str,
+    reply: &str,
+    finished: &AtomicBool,
+    disconnected: &AtomicBool,
+    outbox: &Outbox,
+) -> Result<(), RunnerError> {
+    outbox.save(&Reply {
+        epoch: epoch.to_owned(),
+        ticket: ticket.to_owned(),
+        body: reply.to_owned(),
+    })?;
+    if transmit_reply(signer, epoch, ticket, reply, finished, disconnected)? {
+        outbox.acknowledge(ticket)?;
+    }
+    Ok(())
+}
+
+fn flush_replies(
+    signer: &Signer,
+    epoch: &str,
+    outbox: &Outbox,
+    finished: &AtomicBool,
+    disconnected: &AtomicBool,
+) -> Result<(), RunnerError> {
+    for reply in outbox.pending()? {
+        if transmit_reply(
+            signer,
+            epoch,
+            &reply.ticket,
+            &reply.body,
+            finished,
+            disconnected,
+        )? {
+            outbox.acknowledge(&reply.ticket)?;
+        } else {
+            break;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
 fn post_reply(
     signer: &Signer,
     epoch: &str,
@@ -234,11 +359,22 @@ fn post_reply(
     finished: &AtomicBool,
     disconnected: &AtomicBool,
 ) -> Result<(), RunnerError> {
+    transmit_reply(signer, epoch, ticket, reply, finished, disconnected).map(drop)
+}
+
+fn transmit_reply(
+    signer: &Signer,
+    epoch: &str,
+    ticket: &str,
+    reply: &str,
+    finished: &AtomicBool,
+    disconnected: &AtomicBool,
+) -> Result<bool, RunnerError> {
     match signer.reply(epoch, ticket, reply) {
         Err(RunnerError::Unreachable { .. }) => {
-            // Its outcome is unknown. Reconnect the poll lanes without replaying this reply.
+            // A completed act is never replayed; only its retained reply can be resent.
             reconnect::disconnected(disconnected);
-            Ok(())
+            Ok(false)
         }
         Err(error @ RunnerError::Refused { .. })
             if matches!(
@@ -246,13 +382,14 @@ fn post_reply(
                 "runner_reply_expired" | "runner_reply_duplicate" | "runner_reply_unknown"
             ) =>
         {
-            // The ticket is terminal. Retire its reply once and keep unrelated requests usable.
+            // Expired and unknown tickets keep their local receipt until readback is acknowledged.
             if !finished.swap(true, Ordering::AcqRel) {
                 crate::error::said(&error.to_string());
             }
-            Ok(())
+            Ok(error.name() == "runner_reply_duplicate")
         }
-        answer => answer,
+        Ok(()) => Ok(true),
+        Err(error) => Err(error),
     }
 }
 

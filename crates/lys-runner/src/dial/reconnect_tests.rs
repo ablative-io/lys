@@ -5,8 +5,7 @@ use std::sync::atomic::AtomicBool;
 use std::time::Duration;
 
 #[test]
-fn lysfix_srv_reconnect_failed_attempts_use_capped_exponential_backoff()
--> Result<(), crate::RunnerError> {
+fn reconnect_failed_attempts_use_capped_exponential_backoff() -> Result<(), crate::RunnerError> {
     let mut attempts = 0;
     let mut delays = Vec::new();
     let disconnected = AtomicBool::new(false);
@@ -41,7 +40,7 @@ fn lysfix_srv_reconnect_failed_attempts_use_capped_exponential_backoff()
 }
 
 #[test]
-fn lysfix_srv_connected_feed_has_no_backoff_wait() -> Result<(), crate::RunnerError> {
+fn connected_feed_has_no_backoff_wait() -> Result<(), crate::RunnerError> {
     let disconnected = AtomicBool::new(false);
     let mut waits = 0;
     assert_eq!(
@@ -60,7 +59,7 @@ fn lysfix_srv_connected_feed_has_no_backoff_wait() -> Result<(), crate::RunnerEr
 }
 
 #[test]
-fn lysfix_srv_reconnect_jitter_varies_within_the_cap() {
+fn reconnect_jitter_varies_within_the_cap() {
     assert_eq!(super::delay(0, 0), Duration::from_millis(125));
     assert_eq!(super::delay(0, 125), Duration::from_millis(250));
     assert_eq!(super::delay(100, 0), Duration::from_secs(15));
@@ -69,8 +68,7 @@ fn lysfix_srv_reconnect_jitter_varies_within_the_cap() {
 }
 
 #[test]
-fn lysfix_srv_reconnect_stop_signal_cancels_a_pending_backoff()
--> Result<(), Box<dyn std::error::Error>> {
+fn reconnect_stop_signal_cancels_a_pending_backoff() -> Result<(), Box<dyn std::error::Error>> {
     let wait = std::sync::Arc::new(super::RetryWait::default());
     let waiting = std::sync::Arc::clone(&wait);
     let (entered, ready) = std::sync::mpsc::channel();

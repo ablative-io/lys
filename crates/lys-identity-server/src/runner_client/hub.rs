@@ -19,11 +19,47 @@ pub(super) struct Pending {
     taken: mpsc::Sender<()>,
 }
 
-pub(super) struct Queued {
+pub(super) struct Queued<'hub> {
     pub(super) ticket: String,
-    pub(super) answer: mpsc::Receiver<Replied>,
+    pub(super) answer: ReplyReceiver<'hub>,
     pub(super) cancellation: mpsc::Sender<Replied>,
     pub(super) taken: mpsc::Receiver<()>,
+}
+
+pub(super) struct ReplyReceiver<'hub> {
+    hub: &'hub DialHub,
+    machine: String,
+    ticket: String,
+    answer: mpsc::Receiver<Replied>,
+}
+
+impl ReplyReceiver<'_> {
+    fn received(&self, answer: &Replied) {
+        if let Ok(line) = answer {
+            if !matches!(
+                lys_runner::protocol::read_reply(line),
+                Ok(_) | Err(RunnerError::Refused { .. })
+            ) {
+                return;
+            }
+        }
+        if let Err(error) = self.hub.acknowledge_completion(&self.machine, &self.ticket) {
+            tracing::error!("runner completion acknowledgement refused: {error}");
+        }
+    }
+
+    pub(super) fn recv(&self) -> Result<Replied, mpsc::RecvError> {
+        let answer = self.answer.recv()?;
+        self.received(&answer);
+        Ok(answer)
+    }
+
+    #[cfg(test)]
+    pub(super) fn try_recv(&self) -> Result<Replied, mpsc::TryRecvError> {
+        let answer = self.answer.try_recv()?;
+        self.received(&answer);
+        Ok(answer)
+    }
 }
 
 /// One machine's side of the hub.
@@ -35,6 +71,7 @@ pub(super) struct Machine {
     pub(super) nonces: HashSet<String>,
     finished: HashMap<String, &'static str>,
     finished_order: VecDeque<String>,
+    completions: HashMap<String, String>,
     nonce_epoch: String,
     last_contact: Option<Instant>,
     /// How many of the machine's bridges are dialled in now, each waiting
@@ -156,7 +193,7 @@ impl DialHub {
 
     /// Queue `act` for `machine`'s bridge, answering the ticket and what
     /// its reply arrives on.
-    pub(super) fn queue(&self, machine: &str, act: Act) -> Result<Queued, RunnerError> {
+    pub(super) fn queue(&self, machine: &str, act: Act) -> Result<Queued<'_>, RunnerError> {
         let (reply, answer) = mpsc::channel();
         let cancellation = reply.clone();
         let (taken, received) = mpsc::channel();
@@ -168,6 +205,12 @@ impl DialHub {
                         .to_owned(),
                 });
             }
+            if held.completions.len() + held.queue.len() + held.delivered.len() >= FINISHED {
+                return Err(RunnerError::refused(
+                    "runner_completion_capacity",
+                    "read and acknowledge completed replies before queuing more requests",
+                ));
+            }
             held.queue.push_back(Pending {
                 ticket: ticket.clone(),
                 act,
@@ -178,8 +221,13 @@ impl DialHub {
             Ok(())
         })??;
         Ok(Queued {
+            answer: ReplyReceiver {
+                hub: self,
+                machine: machine.to_owned(),
+                ticket: ticket.clone(),
+                answer,
+            },
             ticket,
-            answer,
             cancellation,
             taken: received,
         })
@@ -242,6 +290,40 @@ impl DialHub {
         }
     }
 
+    /// Read the first completion recorded for a ticket without consuming it.
+    ///
+    /// # Errors
+    /// Returns unavailable hub state by name.
+    pub fn completion(&self, machine: &str, ticket: &str) -> Result<Option<String>, ServerError> {
+        Ok(self.with(machine, |held| held.completions.get(ticket).cloned())?)
+    }
+
+    /// List retained tickets without exposing their reply payloads.
+    ///
+    /// # Errors
+    /// Returns unavailable hub state by name.
+    pub fn completion_tickets(&self, machine: &str) -> Result<Vec<String>, ServerError> {
+        let mut tickets = self.with(machine, |held| {
+            held.completions.keys().cloned().collect::<Vec<_>>()
+        })?;
+        tickets.sort();
+        Ok(tickets)
+    }
+
+    /// Release a completion after its caller has explicitly acknowledged readback.
+    ///
+    /// # Errors
+    /// Returns unavailable hub state by name.
+    pub fn acknowledge_completion(&self, machine: &str, ticket: &str) -> Result<bool, ServerError> {
+        Ok(self.with(machine, |held| {
+            let received = held.completions.remove(ticket).is_some();
+            if received {
+                held.finish(ticket, "runner_reply_duplicate");
+            }
+            received
+        })?)
+    }
+
     /// Hand `reply` to the caller waiting on `ticket`.
     ///
     /// # Errors
@@ -249,6 +331,19 @@ impl DialHub {
     pub fn reply(&self, machine: &str, ticket: &str, reply: Replied) -> Result<(), ServerError> {
         self.with(machine, |held| {
             held.last_contact = Some(Instant::now());
+            if held.finished.get(ticket) == Some(&"runner_reply_duplicate") && !held.completions.contains_key(ticket) {
+                return Err(finished("runner_reply_duplicate"));
+            }
+            if !held.completions.contains_key(ticket) {
+                if held.completions.len() >= FINISHED {
+                    return Err(ServerError::Runner { refusal: "runner_completion_capacity".to_owned(), words: "the completion store is full; the bridge must keep this reply until a caller acknowledges an earlier completion".to_owned() });
+                }
+                let retained = match &reply {
+                    Ok(line) => line.clone(),
+                    Err(error) => lys_runner::protocol::reply_line(lys_runner::Answer::refusal(error)),
+                };
+                held.completions.insert(ticket.to_owned(), retained);
+            }
             let Some(waiting) = held.delivered.remove(ticket) else {
                 let refusal = held
                     .finished
@@ -286,3 +381,7 @@ fn finished(refusal: &str) -> ServerError {
 fn present(held: &Machine) -> bool {
     held.bridges > 0 || held.last_contact.is_some_and(|at| at.elapsed() <= HANDOFF)
 }
+
+#[cfg(test)]
+#[path = "hub/late_completion_tests.rs"]
+mod late_completion_tests;

@@ -29,6 +29,9 @@ use crate::error::ServerError;
 use crate::network_api::with_network;
 use crate::routes::{AppState, signed_in};
 
+#[path = "machine_completions.rs"]
+mod completions;
+
 /// Which folder to look in.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -70,6 +73,7 @@ pub(crate) struct FolderChosenView {
 /// The folders and folder-dialog routes.
 pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .merge(completions::routes())
         .route("/network/machines/{id}/folders", post(folders))
         .route("/network/machines/{id}/choose-folder", post(choose_folder))
 }
@@ -183,5 +187,5 @@ async fn folders(
 mod tests;
 
 #[cfg(test)]
-#[path = "lysfix_srv_folder_tests.rs"]
-mod lysfix_srv_folder_tests;
+#[path = "machine_folder_admission_tests.rs"]
+mod machine_folder_admission_tests;
