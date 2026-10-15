@@ -14,8 +14,9 @@ fn legacy_refusal() -> Result<Answer, lys_runner::error::RunnerError> {
 #[test]
 fn an_empty_legacy_runner_can_be_upgraded_after_its_unknown_act_refusal()
 -> Result<(), Box<dyn std::error::Error>> {
-    let sessions = captured(legacy_refusal(), true, Path::new("runner.sock"))?;
+    let (sessions, fenced) = captured(legacy_refusal(), true, Path::new("runner.sock"))?;
     assert!(sessions.is_empty());
+    assert!(!fenced, "the legacy runner never accepted a start fence");
     Ok(())
 }
 

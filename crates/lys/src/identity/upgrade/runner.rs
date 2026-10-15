@@ -82,6 +82,7 @@ pub struct Restart {
     pid: u32,
     child: Option<Child>,
     recorded: bool,
+    fenced: std::cell::Cell<bool>,
 }
 
 impl Restart {
@@ -165,6 +166,7 @@ impl Restart {
             pid,
             child: None,
             recorded: true,
+            fenced: std::cell::Cell::new(false),
         })
     }
 

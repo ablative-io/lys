@@ -60,8 +60,14 @@ fn named(saved: &UpgradeSession) -> String {
 impl Restart {
     /// Release a capture when the transaction cannot begin.
     pub fn cancel(&self) -> IdentityResult<()> {
+        if !self.fenced.get() {
+            return Ok(());
+        }
         match self.client.ask(&Act::CancelUpgrade) {
-            Ok(Answer::UpgradeCancelled) => Ok(()),
+            Ok(Answer::UpgradeCancelled) => {
+                self.fenced.set(false);
+                Ok(())
+            }
             answer => Err(refuse(
                 "runner_upgrade_cancel_failed",
                 format!("the start fence could not be cancelled: {answer:?}"),
@@ -76,7 +82,7 @@ impl Restart {
             return Ok(());
         }
         let before = status(&self.client, &self.socket)?;
-        let sessions = captured(
+        let (sessions, fenced) = captured(
             self.client.ask(&Act::UpgradeSessions),
             before
                 .sessions
@@ -84,8 +90,9 @@ impl Restart {
                 .all(|session| session.ended.is_some()),
             &self.socket,
         )?;
+        self.fenced.set(fenced);
         let result = self.retain_with(sessions);
-        if result.is_err() {
+        if result.is_err() && self.fenced.get() {
             match self.client.ask(&Act::CancelUpgrade) {
                 Ok(Answer::UpgradeCancelled) => {}
                 answer => {
@@ -111,21 +118,7 @@ impl Restart {
             by_id.insert(session.launch.session.clone(), session);
         }
         saved.sessions = by_id.into_values().collect();
-        let owners = match self.client.ask(&Act::Owned) {
-            Ok(Answer::Owned {
-                owners,
-                unreachable,
-            }) if unreachable.is_empty() => owners,
-            answer => {
-                return Err(refuse(
-                    "runner_owned_capture_unavailable",
-                    format!(
-                        "independent owners could not be confirmed; no process was stopped: {answer:?}"
-                    ),
-                    &self.socket,
-                ));
-            }
-        };
+        let owners = owners_captured(self.client.ask(&Act::Owned), &self.socket)?;
         saved.owners.clear();
         for seat in owners {
             let owner = Client::new(
@@ -231,22 +224,22 @@ fn captured(
     answer: Result<Answer, lys_runner::error::RunnerError>,
     all_ended: bool,
     socket: &Path,
-) -> IdentityResult<Vec<UpgradeSession>> {
+) -> IdentityResult<(Vec<UpgradeSession>, bool)> {
     match answer {
-        Ok(Answer::UpgradeSessions { sessions }) => Ok(sessions),
+        Ok(Answer::UpgradeSessions { sessions }) => Ok((sessions, true)),
         Err(lys_runner::error::RunnerError::Refused { refusal, words, .. })
             if refusal == "runner_request_malformed"
                 && words.starts_with("the act does not read")
                 && all_ended =>
         {
-            Ok(Vec::new())
+            Ok((Vec::new(), false))
         }
         Ok(Answer::Refused { words, .. })
             if words.contains("unknown variant")
                 && words.contains("upgrade_sessions")
                 && all_ended =>
         {
-            Ok(Vec::new())
+            Ok((Vec::new(), false))
         }
         answer => Err(refuse(
             "runner_upgrade_capture_unavailable",
@@ -256,6 +249,40 @@ fn captured(
     }
 }
 
+fn owners_captured(
+    answer: Result<Answer, lys_runner::error::RunnerError>,
+    socket: &Path,
+) -> IdentityResult<Vec<OwnedSeat>> {
+    match answer {
+        Ok(Answer::Owned {
+            owners,
+            unreachable,
+        }) if unreachable.iter().all(|found| {
+            matches!(
+                found.unreachable.as_ref(),
+                Some(
+                    lys_runner::seat_owner::recovery::Unreachable::Exited
+                        | lys_runner::seat_owner::recovery::Unreachable::PidReused { .. }
+                )
+            )
+        }) =>
+        {
+            Ok(owners)
+        }
+        answer => Err(refuse(
+            "runner_owned_capture_unavailable",
+            format!(
+                "independent owners could not be confirmed; no process was stopped: {answer:?}"
+            ),
+            socket,
+        )),
+    }
+}
+
 #[cfg(test)]
 #[path = "runner_legacy_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "runner_owner_tests.rs"]
+mod owner_tests;
