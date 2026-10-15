@@ -110,10 +110,7 @@ pub(super) fn perform(
             text,
             enter,
         } => {
-            let mut bytes = text.into_bytes();
-            if enter {
-                bytes.extend_from_slice(crate::protocol::Key::Enter.bytes());
-            }
+            let bytes = sessions.input_bytes(&session, &text, enter)?;
             crate::legacy_input::write(sessions, server, &session, &bytes, context)
                 .map(|()| Answer::Delivered { session })
         }

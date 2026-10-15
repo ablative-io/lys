@@ -6,6 +6,30 @@ use std::sync::{Arc, Mutex, mpsc};
 
 use crate::error::RunnerError;
 
+/// Explicit paste events keep a delayed terminal read from swallowing Enter
+/// as a newline in a burst of ordinary character events.
+pub(crate) fn text_bytes(session: &crate::session::Session, text: &str, enter: bool) -> Vec<u8> {
+    let bracketed = !text.is_empty()
+        && (session.guard.tracking.is_some()
+            || session
+                .launch
+                .as_ref()
+                .and_then(|launch| launch.config.as_ref())
+                .is_some_and(|config| config.harness.is_some()));
+    let mut bytes = Vec::new();
+    if bracketed {
+        bytes.extend_from_slice(b"\x1b[200~");
+    }
+    bytes.extend_from_slice(text.as_bytes());
+    if bracketed {
+        bytes.extend_from_slice(b"\x1b[201~");
+    }
+    if enter {
+        bytes.extend_from_slice(crate::protocol::Key::Enter.bytes());
+    }
+    bytes
+}
+
 type Completion = Box<dyn FnOnce(Result<(), RunnerError>) + Send>;
 
 struct Span {

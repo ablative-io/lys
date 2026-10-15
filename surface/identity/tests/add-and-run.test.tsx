@@ -132,6 +132,18 @@ function plain(stage: Stage, code = 'StepUnavailable') {
 }
 
 describe('Add and run on the first computer', () => {
+  it.each([false, true])('saves the runner command when adding an agent with an existing computer: %s', async (existing) => {
+    const computers = existing ? [existingComputer()] : [];
+    const server = service(undefined, 'running', computers);
+    const reported = { ...program, builds: [{ ...program.builds[0], program: '/Users/x/.local/share/claude/versions/2.1.300', command: 'claude' }] };
+    server.routes['/harnesses'] = ok({ programs: [reported] });
+    if (existing) server.routes['/harnesses?machine=' + computers[0].id] = ok({ machine: computers[0].id, programs: [reported] });
+    const { posted } = await open(server.routes);
+    if (existing) await type($('[name="display_name"]'), 'Clover'); else await names();
+    await submit();
+    expect(posted.find((entry) => entry.path === prefix + '/provisioning')?.body).toMatchObject({ harness: { program: 'claude' } });
+  });
+
   it('requires the empty computer name and offered choices before enabling its one button', async () => {
     const { posted, requests } = await open(service().routes);
     const button = $('form button[type="submit"]') as HTMLButtonElement;

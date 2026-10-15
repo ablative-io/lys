@@ -115,6 +115,32 @@ describe('Installed copies on an agent’s Settings page', () => {
     expect(picker()?.textContent).toContain('/opt/forks/claude');
   });
 
+  it.each(['claude', 'codex', 'cdx'])('saves the reported %s command rather than its resolved executable', async (command) => {
+    const service = routes({ ...profile, harness: null, runs_on: desk.id });
+    service['/harnesses?machine=' + desk.id] = scoped(desk, [program([
+      { ...copy('/Users/x/.local/share/claude/versions/2.1.300', '2.1.300'), command },
+    ])]);
+    const result = await mount('#/file/' + SCRIBE + '/provisioning', service);
+    await choose(field('prompt'), 'keep');
+    expect(button()?.disabled, document.querySelector('.save-settings .why-not')?.textContent ?? '').toBe(false);
+    await click(button());
+    expect(result.posted[0]?.body).toMatchObject({ harness: { program: command } });
+    expect(picker()?.value).toBe(command + '\nclaude 2.1.300');
+  });
+
+  it('offers one choice per reported command across resolved paths and versions', async () => {
+    const service = routes({ ...profile, harness: null, runs_on: desk.id });
+    service['/harnesses?machine=' + desk.id] = scoped(desk, [program([
+      { ...copy('/Users/x/.local/share/claude/versions/2.1.300', '2.1.300'), command: 'claude' },
+      { ...copy('/Users/x/.local/bin/claude', '2.1.299'), command: 'claude' },
+      { ...copy('/opt/bin/cdx', '1'), command: 'cdx' },
+    ])]);
+    await mount('#/file/' + SCRIBE + '/provisioning', service);
+    expect([...groups()[0].querySelectorAll('option')].map((option) => option.value)).toEqual([
+      'claude\nclaude 2.1.300', 'cdx\nclaude 1',
+    ]);
+  });
+
   it('clears an installed copy when the computer changes and requires a choice when the new computer reports several commands', async () => {
     const fork = { ...profile.harness!, program: '/opt/forks/claude', package: 'claude fork' };
     const service = routes({ ...profile, runs_on: desk.id, harness: fork });

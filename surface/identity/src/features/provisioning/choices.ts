@@ -10,7 +10,7 @@ export interface Program {
   modes: { id: string; meaning: string }[];
   instructions_modes?: ('keep' | 'append' | 'replace')[];
   description: HarnessDescription;
-  builds: { name: string; program: string; package: string; from: 'profile' | 'runner'; machine?: string }[];
+  builds: { name: string; program: string; command?: string | null; package: string; from: 'profile' | 'runner' | 'installed'; machine?: string }[];
 }
 export interface Choices {
   programs: Program[] | null; programsMissing: string;

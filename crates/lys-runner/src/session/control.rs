@@ -54,11 +54,18 @@ impl Sessions {
 
     /// Type `text`, then Enter when asked.
     pub fn input(&self, id: &str, text: &str, enter: bool) -> Result<(), RunnerError> {
-        let mut bytes = text.as_bytes().to_vec();
-        if enter {
-            bytes.extend_from_slice(Key::Enter.bytes());
-        }
-        self.write(id, &bytes)
+        self.write(id, &self.input_bytes(id, text, enter)?)
+    }
+
+    pub(crate) fn input_bytes(
+        &self,
+        id: &str,
+        text: &str,
+        enter: bool,
+    ) -> Result<Vec<u8>, RunnerError> {
+        let table = self.lock()?;
+        let session = table.sessions.get(id).ok_or_else(|| unknown(id))?;
+        Ok(crate::input::text_bytes(session, text, enter))
     }
 
     /// Send `keys`, in order.

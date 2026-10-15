@@ -12,7 +12,7 @@ import { McpServers } from './McpServers';
 import { Skills, ToolsNamed, PluginsNamed, promptWords } from './Given';
 import type { PeopleView } from '../../generated';
 import { ErrorWords, problemWords } from '../people/Words';
-import { copyValue, ProfileCopiesProblems, useProfileCopies } from './ProfileCopies';
+import { copyProgram, copyValue, distinctCopies, ProfileCopiesProblems, useProfileCopies } from './ProfileCopies';
 
 import { commandOrAbsolutePath, launchCommand, PROGRAM_RULE } from './harness-program';
 export { commandOrAbsolutePath as isCommandOrPath } from './harness-program';
@@ -77,8 +77,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [requiresControls, setRequiresControls] = useState(profile?.session?.requires_controls ?? false);
   const aggregate = newComputer;
   const groups = (aggregate ? [] : catalogues).map((entry) => ({ machine: entry.machine, builds: entry.programs.find((entry) => entry.name === programName)?.builds ?? [] }));
-  const copies = aggregate ? (program?.builds ?? []).map((copy) => ({ ...copy, machine: '', value: copyValue(copy) }))
-    : groups.flatMap((group) => group.builds.map((copy) => ({ ...copy, machine: group.machine.id,
+  const copies = aggregate ? distinctCopies(program?.builds ?? []).map((copy) => ({ ...copy, program: copyProgram(copy), machine: '', value: copyValue(copy) }))
+    : groups.flatMap((group) => group.builds.map((copy) => ({ ...copy, program: copyProgram(copy), machine: group.machine.id,
       value: preferred || machines.length === 1 ? copyValue(copy) : group.machine.id + '\n' + copyValue(copy) })));
   const builds = copies;
   const heldBuild = profile?.harness?.name === programName ? profile.harness : null;
@@ -153,7 +153,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     <label className="field">Program this agent uses<select name="program" value={programName} onChange={(event) => {
       const next = available.find((entry) => entry.name === event.target.value);
       setProgram(event.target.value); setModel(strict && next?.models.length !== 1 ? '' : next?.models[0]?.id ?? ''); setPermissions({ default_mode: firstMode(next), ...(permissions.additional_directories ? { additional_directories: permissions.additional_directories } : {}) }); setPrompt(firstRun ? firstPrompt(next) : strict ? next?.instructions_modes?.length === 1 ? next.instructions_modes[0] : '' : 'keep'); setPromptChanged(true);
-      const nextCopies = aggregate ? next?.builds ?? [] : catalogues.flatMap((catalogue) => catalogue.programs.find((entry) => entry.name === next?.name)?.builds ?? []);
+      const nextCopies = aggregate ? distinctCopies(next?.builds ?? []) : catalogues.flatMap((catalogue) => catalogue.programs.find((entry) => entry.name === next?.name)?.builds ?? []);
       setBuild((aggregate || preferred || machines.length === 1) && (firstRun ? nextCopies.length > 0 : nextCopies.length === 1) ? copyValue(nextCopies[0]) : '');
       setProgramPath('');
     }}>

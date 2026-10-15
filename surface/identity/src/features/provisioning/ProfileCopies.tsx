@@ -10,7 +10,19 @@ type Computer = Pick<Machine, 'id' | 'name'>;
 export interface ComputerPrograms {
   machine: Computer; programs: Program[]; problem: unknown | null; failed: boolean;
 }
-export const copyValue = (copy: Program['builds'][number]): string => copy.program + '\n' + copy.package;
+export const copyProgram = (copy: Program['builds'][number]): string => copy.command ?? copy.program;
+export const copyValue = (copy: Program['builds'][number]): string => copyProgram(copy) + '\n' + copy.package;
+
+export function distinctCopies(copies: Program['builds']): Program['builds'] {
+  const commands = new Map<string, Program['builds'][number]>();
+  for (const copy of copies) {
+    const command = launchCommand(copyProgram(copy));
+    const held = commands.get(command);
+    // A command stays one choice when profiles keep older names or versions of it.
+    if (!held || copyProgram(copy) === command && copyProgram(held) !== command) commands.set(command, copy);
+  }
+  return [...commands.values()];
+}
 
 function readableDescription(value: unknown): boolean {
   if (!isRecord(value) || !isRecord(value.models) || !isRecord(value.models.further_encoding)
@@ -33,6 +45,7 @@ function readableProgram(value: unknown, machine: string): value is Program {
     && Array.isArray(value.builds) && value.builds.every((copy) => isRecord(copy)
       && typeof copy.name === 'string' && Boolean(copy.name.trim()) && typeof copy.package === 'string' && Boolean(copy.package.trim())
       && typeof copy.program === 'string' && commandOrAbsolutePath(copy.program)
+      && (copy.command === undefined || copy.command === null || typeof copy.command === 'string' && !copy.command.startsWith('/') && commandOrAbsolutePath(copy.command))
       && (copy.from === 'profile' || copy.from === 'runner' || copy.from === 'installed')
       && (copy.machine === undefined || copy.machine === machine));
 }
@@ -44,15 +57,7 @@ function computerPrograms(value: unknown, machine: Computer): Program[] {
     || new Set(value.programs.map((program) => program.name)).size !== value.programs.length) {
     throw new Refused(200, { refusal: 'harness_programs_unreadable', reason: 'The installed-program answer for ' + machine.name + ' did not match that computer or the program-list format.' });
   }
-  return value.programs.map((program) => {
-    const commands = new Map<string, Program['builds'][number]>();
-    for (const copy of program.builds) {
-      const command = launchCommand(copy.program);
-      // A command stays one choice when profiles keep older names or versions of it.
-      if (!commands.has(command) || copy.program === command && commands.get(command)?.program !== command) commands.set(command, copy);
-    }
-    return { ...program, builds: [...commands.values()] };
-  });
+  return value.programs.map((program) => ({ ...program, builds: distinctCopies(program.builds) }));
 }
 
 /** Installed copies belong to the computer explicitly asked, never to the aggregate profile list. */

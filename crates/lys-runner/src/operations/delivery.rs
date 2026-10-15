@@ -150,10 +150,19 @@ pub(super) fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<()
             format!("operation {operation} has no text"),
         )
     })?;
+    let paste = table
+        .operations
+        .get(operation)
+        .is_some_and(|held| !matches!(held.request.as_str(), "compact" | "context_compact"));
     let session = table
         .sessions
         .get_mut(id)
         .ok_or_else(|| RunnerError::refused("session_unknown", format!("no session {id}")))?;
+    let bytes = if paste {
+        crate::input::text_bytes(session, &text, false)
+    } else {
+        text.as_bytes().to_vec()
+    };
     let writer = session.live(id)?.writer.clone();
     session.guard.idle = false;
     let owner = Weak::clone(&table.owner);
@@ -165,7 +174,7 @@ pub(super) fn enqueue(table: &mut Table, id: &str, operation: &str) -> Result<()
     let operation = operation.to_owned();
     let enter_writer = writer.clone();
     let empty = text.is_empty();
-    writer.submit_after(text.into_bytes(), durable, move |result| {
+    writer.submit_after(bytes, durable, move |result| {
         if let Err(error) = result {
             completion::record(&owner, &operation, Err(error));
             return;
@@ -320,3 +329,7 @@ pub(crate) fn ended(table: &mut Table, id: &str, ended: &Ended) {
 #[cfg(test)]
 #[path = "delivery_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "delivery_composer_tests.rs"]
+mod composer_tests;
