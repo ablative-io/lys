@@ -16,7 +16,9 @@ describe('Person security tabs', () => {
     expect($('a[href*="directory/manage"]')).toBeNull();
     expect($('form[aria-label="Bind a sign-in identity"] input[name="issuer"]')).not.toBeNull();
     expect($('form[aria-label="Bind a sign-in identity"] [name="person"]')).toBeNull();
-    expect($('section[aria-label="Lys account"]')).not.toBeNull();
+    expect($('section[aria-label="Lys account"]')).toBeNull();
+    expect($('input[type="password"]')).toBeNull();
+    expect($('a[href="#/settings/account"]')).not.toBeNull();
   });
   it('reads another person’s bindings from the protected identity route', async () => {
     const { requests, posted } = await mount('#/file/' + BEA + '/credentials', { ...SERVICE,

@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { describe, expect, it } from 'vitest';
 import { $, $$, mount, settle, text, click } from './harness';
-import { ADA, SERVICE, ok, refused } from './fixtures';
+import { BEA, SERVICE, ok, refused } from './fixtures';
 
 async function fill(form: string, values: Record<string, string>) {
   await act(async () => {
@@ -21,7 +21,8 @@ async function submit(form: string) {
   await settle();
 }
 
-const ACCOUNT = '/directory/people/' + ADA + '/account';
+const ACCOUNT = '/directory/people/' + BEA + '/account';
+const BEA_LOGINS = { ['/identities/' + BEA]: ok({ id: BEA, logins: [] }) };
 
 describe('Your Lys account', () => {
   it('changes your email, confirmed by your password', async () => {
@@ -48,8 +49,9 @@ describe('Your Lys account', () => {
 describe("The administrator's account screen", () => {
   it('resets a password and disables sign-in, each through the service', async () => {
     let enabled = true;
-    const { posted } = await mount('#/file/' + ADA + '/credentials', {
+    const { posted } = await mount('#/file/' + BEA + '/credentials', {
       ...SERVICE,
+      ...BEA_LOGINS,
       [ACCOUNT]: ok({ email: 'ada@example.test', enabled: true }),
       ['POST ' + ACCOUNT + '/password']: ok({ email: 'ada@example.test', enabled: true }),
       ['POST ' + ACCOUNT + '/enabled']: (body) => {
@@ -71,8 +73,9 @@ describe("The administrator's account screen", () => {
   });
 
   it("names the service's refusal in Lys words", async () => {
-    await mount('#/file/' + ADA + '/credentials', {
+    await mount('#/file/' + BEA + '/credentials', {
       ...SERVICE,
+      ...BEA_LOGINS,
       [ACCOUNT]: ok({ email: 'ada@example.test', enabled: true }),
       ['POST ' + ACCOUNT + '/email']: refused(400, 'AccountRefused', 'AccountRefused: an account with that email already exists'),
     });
