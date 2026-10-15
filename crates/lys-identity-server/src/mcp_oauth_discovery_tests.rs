@@ -150,6 +150,10 @@ async fn consent_groups_duplicate_grants_by_resource_and_says_what_an_empty_choi
         .await?;
     assert_eq!(response.status(), 200);
     let answer: Value = response.json().await?;
+    assert_granted_discovery(&answer)
+}
+
+fn assert_granted_discovery(answer: &Value) -> Result<(), Box<dyn Error>> {
     let discovered = &crate::mcp_test_answer::body(&answer["result"])["body"];
     assert_eq!(answer["result"]["isError"], false, "{answer}");
     assert_eq!(

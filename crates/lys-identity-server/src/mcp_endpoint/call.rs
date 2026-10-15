@@ -151,6 +151,20 @@ fn validate_arguments(given: &GivenFields, call: &Call) -> Result<(), (i32, Stri
     Ok(())
 }
 
+fn grant_principal(
+    endpoint: &Endpoint,
+    headers: &axum::http::HeaderMap,
+    method: &str,
+    path: &str,
+) -> Result<crate::agent_signature::TokenPrincipal, crate::grant_tokens::TokenError> {
+    let token = crate::grant_tokens::header(headers)?;
+    let (resource, action) = crate::openapi_table::token_scope(method, path)?;
+    let state = endpoint.state.as_ref().ok_or_else(|| {
+        crate::grant_tokens::TokenError::Unavailable("MCP has no token authority state".to_owned())
+    })?;
+    crate::grant_tokens::principal(state, token, &resource, &action)
+}
+
 async fn dispatch(
     endpoint: &Endpoint,
     mut parts: axum::http::request::Parts,
@@ -164,17 +178,7 @@ async fn dispatch(
     let route = uri.clone();
     let mut agent = signer.or_else(|| app.as_ref().map(|app| app.agent));
     if parts.headers.contains_key(crate::grant_tokens::HEADER) {
-        let admitted = (|| {
-            let token = crate::grant_tokens::header(&parts.headers)?;
-            let (resource, action) =
-                crate::openapi_table::token_scope(&call.arguments.method, uri.path())?;
-            let state = endpoint.state.as_ref().ok_or_else(|| {
-                crate::grant_tokens::TokenError::Unavailable(
-                    "MCP has no token authority state".to_owned(),
-                )
-            })?;
-            crate::grant_tokens::principal(state, token, &resource, &action)
-        })();
+        let admitted = grant_principal(endpoint, &parts.headers, &method, route.path());
         match admitted {
             Ok(principal) => {
                 token = Some(principal);

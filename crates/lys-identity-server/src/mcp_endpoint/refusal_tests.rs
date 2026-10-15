@@ -126,8 +126,7 @@ fn same_admission(named: &Value, status: u16, direct: &Value) -> Result {
     Ok(())
 }
 
-#[tokio::test]
-async fn scope_details_keep_the_http_refusal_admission() -> Result {
+async fn member_fixture() -> Result<(identity_contract::harness::Service, String)> {
     use identity_contract::harness::{ADMINISTRATOR, Service};
     use lys_identity::{
         Actor, AuthMethod, IdentityId, LoginBinding, OperationId, Profile, Provenance, Transition,
@@ -181,6 +180,12 @@ async fn scope_details_keep_the_http_refusal_admission() -> Result {
     let cookie = service
         .sign_in(identity_contract::apps::login("member"))
         .await?;
+    Ok((service, cookie))
+}
+
+#[tokio::test]
+async fn scope_details_keep_the_http_refusal_admission() -> Result {
+    let (service, cookie) = member_fixture().await?;
     let (direct_status, direct_body) = service.get("/directory/people", Some(&cookie)).await?;
     assert_eq!(direct_status, 403, "{direct_body}");
     let client = reqwest::Client::new();

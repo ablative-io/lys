@@ -94,8 +94,17 @@ async fn native_pkce_approves_the_same_person_after_browser_session_renewal_and_
         .await?;
     assert_eq!(response.status(), 200);
     let tokens: Value = response.json().await?;
+    assert_native_person_access(&service, &client, &cookie, &tokens).await
+}
+
+async fn assert_native_person_access(
+    service: &identity_contract::harness::Service,
+    client: &reqwest::Client,
+    cookie: &str,
+    tokens: &Value,
+) -> Result<(), Box<dyn std::error::Error>> {
     let access = tokens["access_token"].as_str().ok_or("pass absent")?;
-    let (_, own) = service.get("/me", Some(&cookie)).await?;
+    let (_, own) = service.get("/me", Some(cookie)).await?;
     assert_eq!(tokens["person"], own["person"]["id"]);
     let response = client
         .get(format!("{}/me", service.base))
@@ -121,7 +130,7 @@ async fn native_pkce_approves_the_same_person_after_browser_session_renewal_and_
     let response = client
         .get(format!("{}/me", service.base))
         .bearer_auth(access)
-        .header("cookie", &cookie)
+        .header("cookie", cookie)
         .send()
         .await?;
     assert_eq!(response.status(), 401);
