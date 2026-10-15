@@ -28,42 +28,59 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
     setRevision((value) => value + 1);
   };
   const [adding, setAdding] = useState(() => initial.service_accounts.length === 0 || sessionStorage.getItem('lys.pending.service-create.' + me.person.id) !== null);
+  // A retirement whose answer was lost is opened again, so its Check is in front of the person, never hidden in a row.
+  const [retiring, setRetiring] = useState<string | null>(() => initial.service_accounts.find((account) => sessionStorage.getItem(retireKey(me.person.id, account.id)) !== null)?.id ?? null);
+  const [notice, setNotice] = useState('');
+  const chosen = accounts.service_accounts.find((account) => account.id === retiring) ?? null;
   const group = [{ id: '', name: 'Accounts', lead: null, depth: 0, items: accounts.service_accounts, within: accounts.service_accounts }];
   const columns: Column<ServiceAccount>[] = [
     { head: 'Account', cell: (account) => account.name },
-    { head: 'State', cell: (account) => <span className="sec">{account.state === 'active' ? 'Registered' : account.state}</span> },
+    { head: 'State', cell: (account) => <span className="sec">{ACCOUNT_STATE[account.state] ?? 'State not recognised'}</span> },
     { head: 'Owner', cell: (account) => <IdentityName id={account.owner} /> },
     { head: 'What it is for', cell: (account) => account.description },
     { head: 'Created', cell: (account) => <span className="sec">{clock(account.created_at)}</span> },
-    { head: 'Retire or retired at', cell: (account) => account.retired_at !== null ? <span className="sec">{clock(account.retired_at)}</span> : <Retire key={account.id + ':' + revision} account={account} person={me.person.id} changed={changed} /> },
+    { head: 'Retired', cell: (account) => account.retired_at !== null ? <span className="sec">{clock(account.retired_at)}</span>
+      : account.state === 'retired' ? <span className="sec">Yes</span>
+        : <Act symbol="retire" name="Retire this service account" hint={'Retire ' + account.name} word="Retire" tone="danger" disabled={retiring !== null} onClick={() => { setNotice(''); setRetiring(account.id); }} /> },
   ];
   return <>
     <div className="tools account-tools"><span className="note">{accounts.scope === 'directory' ? 'Showing the directory’s account records.' : 'Showing your own account records.'}</span>
       {!adding ? <Act symbol="add" name="Register an account" word="Register" tone="primary" onClick={() => setAdding(true)} /> : null}</div>
-    {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); }} /> : null}
-    {!adding && !accounts.service_accounts.length ? <p>No service-account records were returned.</p> : null}
+    {notice ? <p role="status">{notice}</p> : null}
+    {adding ? <Create key={me.person.id + ':' + revision} person={me.person.id} administrator={accounts.scope === 'directory'} changed={(answer) => { changed(answer); setAdding(false); setNotice(answer.name + ' is registered.'); }}
+      cancel={accounts.service_accounts.length ? () => setAdding(false) : undefined} /> : null}
+    {chosen ? <Retire key={chosen.id} account={chosen} person={me.person.id} changed={(answer) => { changed(answer); setRetiring(null); setNotice(answer.name + ' is retired in Lys. Its provider account and credentials are unchanged.'); }} cancel={() => setRetiring(null)} /> : null}
+    {!adding && !accounts.service_accounts.length ? <p>No service accounts are registered yet.</p> : null}
     <div className="body one">
       <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/people/view/accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
         noun="accounts" holds={(items) => items.length + ' accounts'} selected={null} select={() => undefined} />
     </div>
   </>;
 }
-function Create({ person, administrator, changed }: { person: string; administrator: boolean; changed: (answer: ServiceAccount) => void }) {
+function Create({ person, administrator, changed, cancel }: { person: string; administrator: boolean; changed: (answer: ServiceAccount) => void; cancel?: () => void }) {
   const [owner, setOwner] = useState(person);
   const people = useLoad(api.people, 'service-account-owners');
   const [name, setName] = useState(''); const [description, setDescription] = useState('');
   const change = useRoleChange<ServiceAccount>('lys.pending.service-create.' + person, '/service-accounts', (answer, body) => answer.id === body.operation && answer.owner === (body.owner ?? person) && answer.name === body.name && answer.description === body.description, changed);
   return <form className="card form-grid" aria-label="Register service account" onSubmit={(event) => { event.preventDefault(); if (name.trim()) change.submit({ operation: operationId(), name: name.trim(), description: description.trim(), ...(owner === person ? {} : { owner }) }); }}><h2>Register a service account</h2><p>You own this record unless an administrator selects another person.</p>
     {administrator ? <Gate load={people} title="Account owners" ok={(view) => <div className="field">Responsible person, if not you<Picker name="owner" label="Find a person" options={view.people.filter((entry) => entry.state !== 'retired').map((entry) => ({ id: entry.id, name: entry.display_name + (entry.id === person ? ' (you)' : '') }))} onChange={(ids) => setOwner(ids[0] ?? person)} /></div>} /> : null}
-    <label className="field">Account name<input name="name" required value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} placeholder="For example, invoice processing" /></label>
-    <label className="field">What it is for<input value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /></label>
-    <Act symbol="add" name="Register account" word="Register" tone="primary" type="submit" disabled={change.blocked || !name.trim()} /><ChangeStatus change={change} />
+    <label className="field">Account name (required)<input name="name" required value={name} disabled={change.blocked} onChange={(event) => setName(event.target.value)} /><span className="hint">For example, Invoice processing.</span></label>
+    <label className="field wide">What it is for<textarea name="description" rows={3} value={description} disabled={change.blocked} onChange={(event) => setDescription(event.target.value)} /><span className="hint">Which provider it is with and what it is used for, so others know whether it is still needed.</span></label>
+    <p className="actions"><Act symbol="add" name="Register account" word="Register" tone="primary" type="submit" disabled={change.blocked || !name.trim()} />{' '}
+      {cancel ? <Act symbol="close" name="Cancel registering" word="Cancel" disabled={change.busy} onClick={cancel} /> : null}
+      {!name.trim() && !change.blocked ? <span className="why-not"> Give the account a name to register it.</span> : null}</p>
+    <ChangeStatus change={change} />
   </form>;
 }
-function Retire({ account, person, changed }: { account: ServiceAccount; person: string; changed: (answer: ServiceAccount) => void }) {
-  const [confirm, setConfirm] = useState(false);
-  const change = useRoleChange<ServiceAccount>('lys.pending.service-retire.' + person + '.' + account.id, '/service-accounts/' + encodeURIComponent(account.id) + '/retire', (answer) => answer.id === account.id && answer.state === 'retired' && answer.retired_at !== null, changed);
-  return <>{account.state !== 'retired' && !confirm ? <Act symbol="retire" name="Retire this service account" word="Retire" tone="danger" disabled={change.blocked} onClick={() => setConfirm(true)} /> : null}
-    {confirm ? <section aria-label="Confirm service account retirement"><p>Retire this service account, {account.name}, in Lys? Lys keeps its history. This does not close its provider account or revoke credentials.</p><Act symbol="retire" name={'Yes, retire ' + account.name} word="Retire" tone="danger" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })} /><Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setConfirm(false)} /></section> : null}<ChangeStatus change={change} />
-  </>;
+const retireKey = (person: string, account: string): string => 'lys.pending.service-retire.' + person + '.' + account;
+/** An account's state in words; the service's own name never shows. */
+const ACCOUNT_STATE: Record<string, string> = { active: 'Registered', retired: 'Retired' };
+/** The retirement of one account, asked above the list where its words have room, never squeezed into a table cell. */
+function Retire({ account, person, changed, cancel }: { account: ServiceAccount; person: string; changed: (answer: ServiceAccount) => void; cancel: () => void }) {
+  const change = useRoleChange<ServiceAccount>(retireKey(person, account.id), '/service-accounts/' + encodeURIComponent(account.id) + '/retire', (answer) => answer.id === account.id && answer.state === 'retired' && answer.retired_at !== null, changed);
+  return <section className="card" aria-label="Confirm service account retirement" style={{ marginBottom: 14 }}><h2>Retire {account.name}?</h2>
+    <p>Lys marks its record retired and keeps its history. This does not close its provider account or revoke credentials; do that with the provider.</p>
+    {change.pending ? null : <p className="actions"><Act symbol="retire" name={'Yes, retire ' + account.name} word="Retire" tone="danger" disabled={change.blocked} onClick={() => change.submit({ operation: operationId() })} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={cancel} /></p>}
+    <ChangeStatus change={change} />
+  </section>;
 }

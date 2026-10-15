@@ -69,7 +69,9 @@ describe('Identity graph', () => {
   });
   it('names an identity outside the visible directory', async () => {
     await mount('#/graph/person-missing');
-    expect(text()).toContain('Identity person-missing is not in the directory records you may see');
+    expect(text()).toContain('This person, agent or resource is not among the records you may see');
+    expect(text()).not.toContain('person-missing');
+    expect($('.why-not a[href="#/graph"]')?.textContent).toBe('Show the whole graph');
     expect(drawing()).toBeNull();
   });
 });

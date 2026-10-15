@@ -32,12 +32,12 @@ export function Roles() {
   const identities = authority.status === 'ok' ? authority.data.people.people.flatMap((person) => [{ id: person.id, name: person.display_name }, ...person.agents.map((agent) => ({ id: agent.id, name: agent.display_name, detail: 'agent of ' + person.display_name }))]) : [];
   const role = id ? roles.find((entry) => entry.id === id) : undefined;
   const me = authority.status === 'ok' ? authority.data.me.person.id : '';
-  const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} /> : null;
+  const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} cancel={() => setEditing(false)} /> : null;
   return <div className="page fill"><PageHeader title={role ? role.name : 'Roles'} breadcrumb={id ? <a href="#/roles">Roles</a> : undefined} subtitle={id ? undefined : 'Describe a job, assign it to people or agents, and review changes before updating their assigned version.'} actions={admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} tone={editing ? 'plain' : 'primary'} onClick={() => setEditing((value) => !value)} /> : null} />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Roles" ok={() => {
-      if (id && !role) return <p className="why-not">This role was not returned by the service.</p>;
-      if (role) return <div className="body halves">
+      if (id && !role) return <div className="why-not"><p>This role is not among the roles Lys returned. It may have been removed, or the link may be wrong.</p><a className="btn" href="#/roles">All roles</a></div>;
+      if (role) return <div className="body halves role-detail">
         <div className="pane">{editor ?? <RoleText role={role} />}</div>
         <div className="pane"><RoleHolders role={role} person={me} admin={admin} identities={identities} changed={changed} /></div>
       </div>;
@@ -45,7 +45,7 @@ export function Roles() {
       const group = [{ id: '', name: 'Roles', lead: null, depth: 0, items: roles, within: roles }];
       const columns: Column<Role>[] = [
         { head: 'Role', cell: (entry) => entry.name },
-        { head: 'Version', cell: (entry) => <span className="sec">v{entry.latest}</span> },
+        { head: 'Latest version', cell: (entry) => <span className="sec">Version {entry.latest}</span> },
         { head: 'Held by', cell: (entry) => <span className="sec">{entry.holders.filter((holder) => holder.state === 'holding').length}</span> },
       ];
       return <div className="body one">

@@ -47,7 +47,7 @@ const agentOf = (draft: Draft): string => draft.agent?.display_name ?? 'An agent
 
 /** Who decided: the person by name, else the sign-in's account name when it is a name, never an identifier. */
 const deciderOf = (decided: NonNullable<Draft['decided']>): string =>
-  decided.by?.display_name ?? (RAW_ID.test(decided.login.subject) ? 'someone outside your view' : decided.login.subject);
+  decided.by?.display_name ?? (RAW_ID.test(decided.login.subject) || !/[A-Za-z]/.test(decided.login.subject) || /^[0-9a-f-]{20,}$/i.test(decided.login.subject) ? 'someone outside your view' : decided.login.subject);
 
 function Decided({ draft, listed }: { draft: Draft; listed: (id: string) => boolean }) {
   const said = draft.state === 'approved' ? 'Approved' : draft.state === 'refused' ? 'Refused' : draft.state === 'corrected' ? 'Corrected' : draft.state;
@@ -70,7 +70,7 @@ function Decide({ draft, person, changed }: { draft: Draft; person: string; chan
   return <div className="draft-decide">
     {refusing && !refuse.pending && !refuse.done
       ? <form aria-label={'Refuse the draft of ' + agentOf(draft)} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), creation_hash: draft.creation_hash, reason: reason.trim() }); }}>
-        <input aria-label="Why you refuse it" required value={reason} disabled={blocked} placeholder="Why you refuse it" onChange={(event) => setReason(event.target.value)} />
+        <label className="field draft-reason-field">Why you refuse it<input aria-label="Why you refuse it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The agent is told this reason.</span></label>
         <Act symbol="decline" name="Refuse" word="Refuse" tone="danger" type="submit" data-act="refuse-confirm" disabled={blocked || !reason.trim()} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
       </form>
@@ -135,7 +135,7 @@ export function Drafts() {
     <AccessTabs on="drafts" />
     <div className="tools">
       <div className="seg">{([['waiting', 'Waiting'], ['decided', 'Decided']] as [DraftFilter, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
-      {load.status === 'ok' && load.data.model instanceof Refused ? <p className="why-not">What each action means could not be read, so actions are named as the agent wrote them. <small className="refusal-name">{load.data.model.refusal.refusal}</small></p> : null}
+      {load.status === 'ok' && load.data.model instanceof Refused ? <div className="why-not"><p>What each action means could not be read, so actions are named as the agent wrote them.</p><details><summary>Error details</summary><p className="refusal-name">{load.data.model.refusal.refusal}: {load.data.model.refusal.reason}</p></details></div> : null}
     </div>
     <Gate load={load} title="your drafts" ok={(data) => <div className="drafts-body">
       <Table drafts={data.drafts} show={show} model={data.model} names={namesOf(data.people)} person={data.me.person.id} changed={() => setVersion((v) => v + 1)} />

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, mount, text, type } from './harness';
 import { ADA, SERVICE, ok, refused } from './fixtures';
+import { clock } from '../src/features/file/time';
 
 describe('Access read views', () => {
   it('renders the served model version and relations instead of a fixed model', async () => {
@@ -23,7 +24,10 @@ describe('Access read views', () => {
     expect($$('tbody tr[data-href]')).toHaveLength(2);
     expect($('a[href="#/access/who/project%3Aidentity"]')).not.toBeNull();
     expect($$('tbody tr[data-href]')[0].textContent).toContain('identity723');
-    expect(text()).toContain('revision 23');
+    // When the counts were made is said as a time; the store's internal revision number is never shown to a person.
+    expect(text()).toContain('Counted at ' + clock(1790540000));
+    expect(text()).not.toContain('revision 23');
+    expect(text()).toContain('use the Ask tab');
     expect(requests).toContain('/resources');
     await type($('input[aria-label="Search resources"]'), 'secret');
     expect($$('tbody tr[data-href]')).toHaveLength(1);

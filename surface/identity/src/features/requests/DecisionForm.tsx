@@ -28,8 +28,10 @@ function load(key: string): Pending {
   return { kind: 'damaged' };
 }
 
-export function DecisionForm({ entry, person, canIssueRoot, changed }: {
+export function DecisionForm({ entry, person, canIssueRoot, changed, describe }: {
   entry: AccessRequest; person: string; canIssueRoot: boolean; changed: (answer: AccessRequest) => void;
+  /** A source grant in words, by what it is on; never its identifier. */
+  describe: (source: string, index: number) => string;
 }) {
   const key = 'lys.pending.decision.' + person + '.' + entry.id;
   const [pending, setPending] = useState(() => load(key));
@@ -81,14 +83,14 @@ export function DecisionForm({ entry, person, canIssueRoot, changed }: {
         <h4>{action === 'approve' ? 'Approve this access?' : 'Decline this request?'}</h4>
         {action === 'approve' ? <label className="field">Grant access from<select name="source" required defaultValue="">
           <option value="">Choose how you can give this access</option>{canIssueRoot ? <option value="root">Give access directly as the administrator</option> : null}
-          {entry.sources.map((source, index) => <option key={source} value={source}>Your permission {index + 1}</option>)}
-        </select></label> : null}
-        {action === 'approve' && entry.sources.length ? <><p className="note">Permissions this approval draws on</p><ul>{entry.sources.map((source, index) => <li key={source}>Permission {index + 1}: {source}</li>)}</ul></> : null}
+          {entry.sources.map((source, index) => <option key={source} value={source}>{describe(source, index)}</option>)}
+        </select><span className="hint">The access they get traces back to what you choose here, and ends when it does.</span></label> : null}
         <label className="field">Reason for your decision<textarea name="note" required /></label>
         <Act symbol="approve" name={'Confirm ' + (action === 'approve' ? 'approval' : 'decline')} word="Confirm" tone="primary" type="submit" disabled={busy} />{' '}
         <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setAction(null)} />
       </form> : <><Act symbol="approve" name="Approve access" word="Approve" tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}
-        <Act symbol="decline" name="Decline request" word="Decline" onClick={() => setAction('decline')} /></>}
+        <Act symbol="decline" name="Decline request" word="Decline" onClick={() => setAction('decline')} />
+        {!canIssueRoot && !entry.sources.length ? <p className="why-not">You cannot approve this: you hold no access you may pass on that covers it. You can still decline it.</p> : null}</>}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </div>;
 }

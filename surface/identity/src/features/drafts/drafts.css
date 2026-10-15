@@ -15,3 +15,8 @@
 .draft-decide [role="status"] p, .draft-decide .why-not p { margin: 0; }
 .draft-open td { padding: 4px 12px 14px; }
 .draft-request { margin: 4px 0 0; max-height: 40vh; overflow: auto; overscroll-behavior: contain; padding: 10px 12px; background: var(--surface-code); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* On a narrow screen the tables keep readable columns and scroll sideways inside their pane, never one word to a line. */
+.drafts, .product-drafts { min-width: 760px; }
+.drafts .draft-note { min-width: 18ch; }
+.drafts-body > section.pane { margin-top: 22px; overflow-x: auto; }
+.draft-decide .draft-reason-field { margin: 0; min-width: 240px; flex: 1 1 240px; }

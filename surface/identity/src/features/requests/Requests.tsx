@@ -42,7 +42,7 @@ export function Requests() {
   const choices = useLoad(async () => {
     const [me, grants, model] = await Promise.all([api.me(), api.grants(), api.model()]);
     const resources = [...new Map(grants.grants.map((grant) => [JSON.stringify(grant.resource), grant.resource])).values()];
-    return { person: me.person.id, resources, model };
+    return { person: me.person.id, resources, model, grants: grants.grants };
   }, 'request-choices');
   return <div className="page fill">
     <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) => {
@@ -53,7 +53,10 @@ export function Requests() {
 }
 
 type Loaded = { people: Awaited<ReturnType<typeof api.people>>; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string } };
-type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: string; id: string }[]; model: Awaited<ReturnType<typeof api.model>> }>>;
+type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: string; id: string }[]; model: Awaited<ReturnType<typeof api.model>>; grants: Awaited<ReturnType<typeof api.grants>>['grants'] }>>;
+
+/** A request's state in words. */
+const STATE: Record<AccessRequest['state'], string> = { waiting: 'Awaiting a decision', approved: 'Approved', declined: 'Declined' };
 
 function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void }) {
   const admin = data.people.scope === 'directory';
@@ -79,7 +82,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   const columns: Column<AccessRequest>[] = [
     { head: 'Who asked', cell: (entry) => entry.asked_by_name ?? 'Name unavailable' },
     { head: 'For', cell: (entry) => <span className="sec">{entry.relation} on {onWhat(entry)}</span> },
-    { head: 'Waiting', cell: (entry) => entry.state === 'waiting' ? waited(entry.asked_at) : <span className="dim">{entry.state}</span> },
+    { head: 'Waiting', cell: (entry) => entry.state === 'waiting' ? waited(entry.asked_at) : <span className="dim">{STATE[entry.state] ?? 'Decided'}</span> },
     { head: 'Can decide', cell: (entry) => <span className="sec">{mayDecide(entry) ? 'you' : entry.approvers.map((each) => each.display_name).join(', ') || 'no one eligible'}</span> },
   ];
   const count = (items: AccessRequest[]) => { const waiting = items.filter((entry) => entry.state === 'waiting').length; return waiting ? waiting + ' waiting' : items.length + ' decided'; };
@@ -100,22 +103,29 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
           <div className="seg">{([['mine', 'Waiting on me'], ['waiting', 'All waiting'], ['decided', 'Decided']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
         </>} />
       <div className="detail">
-        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm {...each} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }} />} />
-          : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} entry={open} on={onWhat(open)} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : null}
+        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm person={each.person} resources={each.resources} model={each.model} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }}
+            cancel={entries.length && !retained ? () => setAsking(false) : undefined} />} />
+          : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} describe={describeSource(choices.status === 'ok' ? choices.data.grants : [])} decider={open.decision ? names.get(open.decision.by) : undefined} entry={open} on={onWhat(open)} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : null}
       </div>
     </div>
   </>;
 }
 
-function Detail({ model, entry, on, person, mayDecide, changed }: { model: GrantModel | null; entry: AccessRequest; on: string; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
+/** A source grant the decider holds, said by what it is on; one not in their list is said so, never shown by its identifier. */
+const describeSource = (grants: { id: string; relation: string; resource: { kind: string; id: string } }[]) => (source: string, index: number): string => {
+  const grant = grants.find((each) => each.id === source);
+  return grant ? 'Your ' + grant.relation + ' access to ' + grant.resource.kind + ' ' + grant.resource.id : 'Your access ' + (index + 1) + ' (not in your list of access)';
+};
+
+function Detail({ model, describe, decider, entry, on, person, mayDecide, changed }: { model: GrantModel | null; decider: string | undefined; describe: (source: string, index: number) => string; entry: AccessRequest; on: string; person: string; mayDecide: boolean; changed: (answer: AccessRequest) => void }) {
   return <article className="card" aria-label="Request">
     <h2>{entry.asked_by_name ?? 'Name unavailable'} · {entry.relation} on {on}</h2>
-    <p><strong>{entry.state === 'waiting' ? 'Awaiting a decision' : entry.state === 'approved' ? 'Approved' : 'Declined'}</strong> · Asked {clock(entry.asked_at)}</p>
+    <p><strong>{STATE[entry.state] ?? 'Decided'}</strong> · Asked {clock(entry.asked_at)}</p>
     <p>{entry.why}</p>
     <p className="note">Allows {model ? actionWords(model, entry.resource, entry.actions) : 'permission descriptions are unavailable'}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
-    {entry.decision ? <p>{entry.decision.note}{entry.decision.grant ? <> · <Link to={'/file/' + encodeURIComponent(entry.asked_by) + '/access'}>View granted access</Link></> : null}</p>
+    {entry.decision ? <p>{STATE[entry.state] ?? 'Decided'} by {decider ?? 'someone outside your view'}, {clock(entry.decision.decided_at)}: {entry.decision.note}{entry.decision.grant ? <> · <Link to={'/file/' + encodeURIComponent(entry.asked_by) + '/access'}>View granted access</Link></> : null}</p>
       : <p className="note">Can be reviewed by {entry.approvers.map((each) => each.display_name).join(', ') || 'no currently eligible person'}.</p>}
     {entry.state === 'waiting' && entry.held_by ? <HeldApproval entry={entry} changed={changed} /> : null}
-    {entry.state === 'waiting' && !entry.held_by && mayDecide ? <DecisionForm entry={entry} person={person} canIssueRoot={entry.can_issue_root === true} changed={changed} /> : null}
+    {entry.state === 'waiting' && !entry.held_by && mayDecide ? <DecisionForm entry={entry} person={person} canIssueRoot={entry.can_issue_root === true} changed={changed} describe={describe} /> : null}
   </article>;
 }

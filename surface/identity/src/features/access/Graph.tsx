@@ -182,7 +182,7 @@ function Drawing({ world: whole, installed, focus, reach }: { world: GrantWorld;
   const clear = (event: { target: EventTarget; currentTarget: EventTarget }) => { if (event.target === event.currentTarget && !dragged.current && focus) navigate('/graph'); };
   useEffect(() => { const esc = (event: KeyboardEvent) => { if (event.key === 'Escape' && focus) navigate('/graph'); }; window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc); }, [focus, navigate]);
   const pick = (id: string) => { if (!dragged.current) go(id); };
-  if (focus && !picked) return <p role="alert">Identity {focus} is not in the directory records you may see.</p>;
+  if (focus && !picked) return <div className="why-not" role="alert"><p>This person, agent or resource is not among the records you may see, so it cannot be drawn.</p><a className="btn" href="#/graph">Show the whole graph</a></div>;
   return <>
     <div className="graph-toggles">
       <Act symbol="retire" name={retired ? 'Hide retired' : 'Show retired'} word={retired ? 'Hide retired' : 'Show retired'} aria-pressed={retired} onClick={() => setRetired(!retired)} />

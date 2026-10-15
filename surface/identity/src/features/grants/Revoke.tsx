@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { Refused, api, operationId } from '../../api';
 import type { Grant } from '../../generated/grants';
 import { useShell } from '../../shell/ShellContext';
-import { grantNo, nameOf, onText } from './model';
+import { grantNo, nameOf, named, onText } from './model';
+import { PendingWords, RefusedWords } from './Outcome';
 import type { GrantWorld } from './model';
 import { Act } from '../../shell/Act';
 
@@ -63,8 +64,8 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
       <h2 style={{ marginTop: 6, fontSize: 16 }}>Revoke {g.relation} of {onText(g)}</h2>
       <p className="sub" style={{ marginTop: 6 }}>Everything that depends on this grant, before it goes.</p>
       <div className="field">
-        <label htmlFor="why">Reason</label>
-        <textarea id="why" style={{ minHeight: 60 }} value={why} onChange={(e) => setWhy(e.target.value)} />
+        <label htmlFor="why">Reason <span className="hint">(kept with the record)</span></label>
+        <textarea id="why" style={{ minHeight: 60 }} value={why} disabled={outcome.at === 'sending'} onChange={(e) => setWhy(e.target.value)} />
       </div>
       <div className="card" style={{ marginTop: 12 }}>
         <dl className="facts">
@@ -81,17 +82,14 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
           </dd>
         </dl>
       </div>
-      {outcome.at === 'refused' ? (
-        <div className="why-not" id="rAnswer"><b>{outcome.refused.refusal.refusal}</b><div className="note">{outcome.refused.refusal.reason}</div></div>
-      ) : null}
+      {outcome.at === 'refused' ? <RefusedWords w={w} id="rAnswer" refused={outcome.refused} /> : null}
       {outcome.at === 'pending' ? (
-        <div className="why-not" id="rAnswer" style={{ color: 'var(--warn)' }}>
-          <b>pending</b>
-          <div className="note">Sent as {op.current}; the service has not confirmed it ({outcome.reason}). Revoke again sends the same operation.</div>
-        </div>
+        <PendingWords id="rAnswer">
+          <div className="note">Lys has not confirmed the revoke ({named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, ''))}). Revoke again sends exactly the same request, so it is never done twice.</div>
+        </PendingWords>
       ) : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Act symbol="revoke" name="Revoke" word="Revoke" tone="primary" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke} />
+        <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />
       </div>
     </>

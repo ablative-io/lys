@@ -9,8 +9,9 @@ import type { GrantTemplate, Role } from './contract';
 import { useRoleChange } from './useRoleChange';
 import { ChangeStatus } from './ChangeStatus';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
 
-export function RoleEditor({ role, person, model, changed }: { role?: Role; person: string; model: GrantModel; changed: (answer: Role) => void }) {
+export function RoleEditor({ role, person, model, changed, cancel }: { role?: Role; person: string; model: GrantModel; changed: (answer: Role) => void; cancel: () => void }) {
   const current = role?.versions.find((version) => version.number === role.latest);
   const [rows, setRows] = useState((current?.grant_templates ?? []).map((template, id) => ({ id, template })));
   const [failure, setFailure] = useState('');
@@ -43,24 +44,26 @@ export function RoleEditor({ role, person, model, changed }: { role?: Role; pers
       {!role ? <label className="field wide">Role name<input name="name" required /></label> : null}
       {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field wide" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} rows={6} required defaultValue={current?.[name] ?? ''} /></label>)}
       <label className="field wide">Starting instructions for an agent<textarea name="profile" rows={6} defaultValue={current?.profile ?? ''} /></label>
-      <table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
+      <h3>Access this role usually needs</h3>
+      <p className="note">A template only describes the access; it grants nothing. Give the access itself on Access.</p>
+      <TableScroll label="Access templates"><table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
         <tbody>
           {rows.map(({ id, template }) => <tr key={id} aria-label={'Access template ' + (id + 1)}>
             <td><input name={'kind-' + id} aria-label="Type of thing this access covers" required list="role-kinds" autoComplete="off" defaultValue={template.resource.kind} /></td>
             <td><input name={'resource-' + id} aria-label="Name of the thing this access covers" required list="role-ids" autoComplete="off" defaultValue={template.resource.id} /></td>
             <td><select name={'relation-' + id} aria-label="Access level" required defaultValue={template.relation}><option value="">Choose access</option>{Object.entries(model.relations).map(([name, actions]) => <option key={name} value={name}>{name} · {actions.join(', ')}</option>)}</select></td>
             <td><input name={'days-' + id} aria-label="Usual duration in days, empty for no expiry of its own" type="number" min={1} step={1} defaultValue={template.days ?? ''} /></td>
-            <td><Act symbol="remove" name="Remove template" onClick={() => setRows((values) => values.filter((row) => row.id !== id))} /></td>
+            <td><Act symbol="remove" name="Remove template" word="Remove" onClick={() => setRows((values) => values.filter((row) => row.id !== id))} /></td>
           </tr>)}
           {rows.length ? null : <tr><td colSpan={5} className="dim">No access template. A template grants nothing by itself.</td></tr>}
         </tbody>
         <tfoot><tr><td colSpan={5} className="usage-add"><Act symbol="add" name="Add access template" word="Add" onClick={() => setRows((values) => [...values, { id: Math.max(-1, ...values.map((value) => value.id)) + 1, template: { resource: { kind: '', id: '' }, relation: '', days: null } }])} /></td></tr></tfoot>
-      </table>
+      </table></TableScroll>
       <datalist id="role-kinds">{[...new Set(resources.map((resource) => resource.kind))].sort().map((kind) => <option key={kind} value={kind} />)}</datalist>
       <datalist id="role-ids">{resources.map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} label={resource.kind} />)}</datalist>
-      {known.status === 'refused' ? <p className="note">The things already named in grants could not be read, so a template’s kind and name are typed. <small className="refusal-name">{known.refused.refusal.refusal}</small></p> : null}
-      <label className="field wide">Reason for this version<textarea name="note" rows={2} required /></label>
-      <p><Act symbol="save" name={role ? 'Save this version' : 'Create role'} word={role ? 'Save' : 'Create'} tone="primary" type="submit" /></p>
+      {known.status === 'refused' ? <div className="note"><p>The things already named in grants could not be read, so type each template’s type of thing and its name.</p><details><summary>Error details</summary><p className="refusal-name">{known.refused.refusal.refusal}: {known.refused.refusal.reason}</p></details></div> : null}
+      <label className="field wide">Reason for this version<textarea name="note" rows={2} required /><span className="hint">Kept in the version history, so others know why it changed.</span></label>
+      <p><Act symbol="save" name={role ? 'Save this version' : 'Create role'} word={role ? 'Save' : 'Create'} tone="primary" type="submit" />{' '}<Act symbol="close" name="Cancel editing" word="Cancel" onClick={cancel} /></p>
     </fieldset>
     {failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;

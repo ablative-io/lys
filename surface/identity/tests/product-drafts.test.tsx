@@ -39,7 +39,7 @@ describe('Product drafts on the Drafts screen', () => {
     expect(requests).toContain('/product-drafts');
     expect($$('table.product-drafts thead th').map((th) => th.textContent)).toEqual(['Product', 'Wants to', 'Holder', 'Approved by', 'State']);
     expect(cells(WAITING).slice(0, 4)).toEqual([
-      'notes', 'publish · notes.doc roadmap · by two approvals', 'Scribe · answered for by Ada (test person)', 'Ada (test person), ' + clock(1790000100),
+      'notes', 'publish · Doc roadmap · by two approvals', 'Scribe · answered for by Ada (test person)', 'Ada (test person), ' + clock(1790000100),
     ]);
     expect(cells(APPROVED)[4]).toBe('Approved, not yet executed');
     expect(cells(EXECUTED)[3]).toBe('No approval yet');

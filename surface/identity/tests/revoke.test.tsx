@@ -85,7 +85,7 @@ describe('Revoke', () => {
   it('shows the refusal by the service name, and nothing is withdrawn', async () => {
     await open({ ...SERVICE, [`POST /grants/${ROOT_G}/revoke`]: refused(409, 'RevokeRefused', `RevokeRefused: ${ADA} neither issued ${ROOT_G} nor holds a grant it derives from`) });
     await click($('[data-act="revokedo"]'));
-    expect($('#rAnswer b')?.textContent).toBe('RevokeRefused');
+    expect($('#rAnswer')?.dataset.refusal).toBe('RevokeRefused');
     expect($('.act-panel')).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Revoked');
   });
@@ -97,7 +97,7 @@ describe('Revoke', () => {
       [`POST /grants/${ROOT_G}/revoke`]: () => (++calls === 1 ? refused(503, 'AppendUncertain', 'AppendUncertain: not known') : ok({ operation: 'x', grant: ROOT_G, index: 3, receipt: { revision: 8 } })),
     });
     await click($('[data-act="revokedo"]'));
-    expect($('#rAnswer b')?.textContent).toBe('pending');
+    expect($('#rAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     await click($('[data-act="revokedo"]'));
     const ops = posted.filter((p) => p.path.endsWith('/revoke')).map((p) => (p.body as RevokeBody).operation);
     expect(ops).toHaveLength(2);

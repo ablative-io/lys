@@ -8,6 +8,8 @@ export interface RoleHolder {
   state: 'holding' | 'lapsed' | 'ended'; moves: { from: number; to: number; by: string; at: number }[];
   ended_by: string | null; ended_at: number | null;
 }
+/** An assignment's state in words; the service's own names never show. */
+export const HOLDING: Record<string, string> = { holding: 'Assigned', lapsed: 'Expired', ended: 'Removed' };
 export interface Role { id: string; name: string; latest: number; policy: 'stays_until_moved'; versions: RoleVersion[]; holders: RoleHolder[] }
 const sameTemplate = (left: GrantTemplate, right: GrantTemplate): boolean =>
   left.resource.kind === right.resource.kind && left.resource.id === right.resource.id && left.relation === right.relation && left.days === right.days;

@@ -5,6 +5,7 @@ import type { Grant } from '../../generated/grants';
 import { askCannotGive } from './cannotGiveAnswer';
 import { grantNo, onText } from './model';
 import type { GrantWorld } from './model';
+import { RefusedWords } from './Outcome';
 
 /** What each reason says; the compiler refuses a reason left without words. */
 const WORDS: Record<CannotGiveReason, string> = {
@@ -63,13 +64,10 @@ export function CannotGiveList({ w, source, recipient }: { w: GrantWorld; source
   }, [source.id, recipient]);
 
   if (!recipient) return <p className="note">Choose who to give it to.</p>;
-  if (shown.at === 'asking') return <p className="note" aria-live="polite">Asking the service…</p>;
+  if (shown.at === 'asking') return <p className="note" aria-live="polite">Asking Lys what you cannot give…</p>;
   if (shown.at === 'refused') {
     return (
-      <div className="why-not" role="alert" data-refusal={shown.refused.refusal.refusal}>
-        <b>{shown.refused.refusal.refusal}</b>
-        <div className="note">{shown.refused.refusal.reason}</div>
-      </div>
+      <RefusedWords w={w} id="cannotGiveRefused" refused={shown.refused} />
     );
   }
   if (shown.answer.items.length === 0) return <p className="note">Nothing: you may give this recipient everything you hold.</p>;

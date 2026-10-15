@@ -7,16 +7,20 @@ import { keptSend, keepRecord, releaseRecord } from '../../kept';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
 import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
-import { day } from '../file/time';
+import { clock, day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { appKind, appKindProblem, givenOnText, grantNo, nameOf, passText, relationsOf, sourceText, withinPassOn } from './model';
+import { appKind, appKindProblem, givenOnText, grantNo, nameOf, named, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from './CambiumFirst';
+import { PendingWords, RefusedWords } from './Outcome';
 
 const DAY = 86400;
+
+/** A recipient that is not active says so in words, after its name. */
+const stateWords = (state: string): string => state === 'active' ? '' : state === 'registered' ? ' (not yet activated)' : state === 'suspended' ? ' (suspended)' : ' (' + state + ')';
 
 /** The lease choice that binds the grant's end to one of the agent's role holdings. */
 const ASSIGNMENT = 'assignment:';
@@ -96,6 +100,14 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
     if (chosen) return noLater(chosen.ends_at);
     return ends;
   };
+
+  // Give is never greyed without its reason beside it.
+  const fresh = pending.kind !== 'held' && rest.kind !== 'held';
+  const whyNot = damaged ? 'Sending is blocked until the earlier request is settled.'
+    : !recipient ? 'Choose who to give it to.'
+      : !leaseKnown ? 'Choose how long it lasts.'
+        : fresh && toAgent && picked.length === 0 ? 'Tick at least one thing they may do.'
+          : fresh && !toAgent && !relation ? 'Choose what they may do.' : '';
 
   /** The body for one relation, as this form fills it now. */
   const bodyFor = (chosen: string, carried: string[]): DelegateBody => {
@@ -240,18 +252,19 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
       <fieldset disabled={locked} style={{ border: 0, padding: 0 }}>
       <div className="field">
         <label htmlFor="dTo">To</label>
-        <select id="dTo" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
-          {agents.map(([id, x]) => (
-            <option key={id} value={id}>{x.name}{x.state !== 'active' ? ' (' + x.state + ')' : ''}</option>
-          ))}
-          {people.length > 0 ? (
-            <optgroup label="People">
-              {people.map(([id, x]) => (
-                <option key={id} value={id}>{x.name}{x.state !== 'active' ? ' (' + x.state + ')' : ''}</option>
-              ))}
+        {agents.length || people.length ? <select id="dTo" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
+          {recipient ? null : <option value="" disabled>Choose who to give it to</option>}
+          {agents.length > 0 ? (
+            <optgroup label="Your agents">
+              {agents.map(([id, x]) => <option key={id} value={id}>{x.name}{stateWords(x.state)}</option>)}
             </optgroup>
           ) : null}
-        </select>
+          {people.length > 0 ? (
+            <optgroup label="People">
+              {people.map(([id, x]) => <option key={id} value={id}>{x.name}{stateWords(x.state)}</option>)}
+            </optgroup>
+          ) : null}
+        </select> : <p className="note" data-no-recipient>You have no agent and there is no other person to give it to. Add an agent on People and agents first.</p>}
       </div>
       {toAgent ? <div className="field">
         {/* The picker's own legend names the actions; a label is the heading only when no picker is shown. */}
@@ -279,18 +292,18 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
       <div className="field">
         <label htmlFor="dLease">Lasts</label>
         <select id="dLease" value={lasts} onChange={(e) => setLasts(e.target.value)}>
-          <option>7 days</option>
+          <option value="7 days">7 days</option>
           {holdings.length === 0
-            ? <option disabled title={roles.status === 'ok' ? 'the agent holds no role with an end date' : roles.status === 'loading' ? 'reading the agent\'s roles' : roles.refused.refusal.reason}>ends with assignment</option>
-            : holdings.map((h) => <option key={h.assignment} value={ASSIGNMENT + h.assignment}>ends with {h.role} assignment ({day(h.ends_at)})</option>)}
-          <option>no end</option>
+            ? <option disabled value="">{roles.status === 'loading' ? 'Ends with a role assignment (reading roles…)' : roles.status === 'ok' ? 'Ends with a role assignment (none with an end date)' : 'Ends with a role assignment (roles could not be read)'}</option>
+            : holdings.map((h) => <option key={h.assignment} value={ASSIGNMENT + h.assignment}>Ends with the {h.role} assignment ({day(h.ends_at)})</option>)}
+          <option value="no end">{ends === null ? 'No end' : 'When your own access ends'}</option>
         </select>
       </div>
       <div className="field">
         <label htmlFor="dPass">May the agent pass it on</label>
         <select id="dPass" value={pass} onChange={(e) => setPass(e.target.value)}>
-          <option>no</option>
-          {onward ? <option value="to agents">to agents</option> : <option disabled>to agents (you may not allow this for {source.relation})</option>}
+          <option value="no">No</option>
+          {onward ? <option value="to agents">Yes, to their own agents</option> : <option disabled value="">Yes (your own access does not allow it)</option>}
         </select>
       </div>
       </fieldset>
@@ -302,21 +315,19 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
         <div className="row"><span className="sec">Ends no later than</span><span>{source.effective_ends_at !== null ? day(source.effective_ends_at) : 'no end'}</span></div>
       </div>
       <div className="card"><h2>What you can&apos;t give</h2><CannotGiveList w={w} source={source} recipient={recipient} /></div>
-      {outcome.at === 'refused' ? (
-        <div className="why-not" id="dAnswer"><b>{outcome.refused.refusal.refusal}</b><div className="note">{outcome.refused.refusal.reason}</div></div>
-      ) : null}
+      {outcome.at === 'refused' ? <RefusedWords w={w} id="dAnswer" refused={outcome.refused} /> : null}
       {pending.kind === 'held' && outcome.at !== 'sending' ? (
-        <div className="why-not" id="dAnswer" style={{ color: 'var(--warn)' }}>
-          <b>pending</b>
-          {pending.kind === 'held' ? <p>{nameOf(w, pending.body.recipient)} · {pending.body.relation} of {pending.body.resource.kind}:{pending.body.resource.id}. Original start {new Date(pending.body.window.starts_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })}; end {pending.body.window.ends_at === null ? 'none' : new Date(pending.body.window.ends_at * 1000).toLocaleString('en-AU', { timeZone: 'Australia/Melbourne' })}.</p> : null}
-          <div className="note">Sent as {pending.kind === 'held' ? pending.body.operation : ''}; the service has not confirmed it{outcome.at === 'pending' ? ' (' + outcome.reason + ')' : ''}. Check original grant sends exactly the same request and operation{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
-        </div>
+        <PendingWords id="dAnswer">
+          <p>{nameOf(w, pending.body.recipient)}: {grantedWords([pending.body])} {givenOnText(source)}, from {clock(pending.body.window.starts_at)} {pending.body.window.ends_at === null ? 'with no end' : 'to ' + clock(pending.body.window.ends_at)}.</p>
+          <div className="note">Lys has not confirmed this grant{outcome.at === 'pending' ? ' (' + named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, '')) + ')' : ''}. Check sends exactly the same request again, so it can never be given twice{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
+        </PendingWords>
       ) : null}
       {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
         {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
-        <Act symbol={pending.kind === 'held' ? 'again' : 'send'} name={pending.kind === 'held' ? 'Check original grant' : 'Give'} word={pending.kind === 'held' ? 'Check' : 'Give'} tone="primary" data-act="delegatedo" disabled={outcome.at === 'sending' || damaged || !recipient || !leaseKnown || (pending.kind !== 'held' && rest.kind !== 'held' && (toAgent ? picked.length === 0 : !relation))} onClick={give} />
+        <Act symbol={pending.kind === 'held' ? 'again' : 'send'} name={pending.kind === 'held' ? 'Check original grant' : 'Give'} word={pending.kind === 'held' ? 'Check' : 'Give'} tone="primary" data-act="delegatedo" disabled={outcome.at === 'sending' || whyNot !== ''} onClick={give} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />
+        {whyNot && outcome.at !== 'sending' ? <span className="why-not" data-why-not>{whyNot}</span> : null}
       </div>
     </>
   );

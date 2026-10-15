@@ -5,7 +5,8 @@
  * A waiting one is approved or refused in its own row, each a kept change, never sent twice.
  */
 import { useRef, useState } from 'react';
-import { operationId, useLoad } from '../../api';
+import { operationId, request, useLoad } from '../../api';
+import { kindLabel } from '../grants/IssueRoot';
 import { clock } from '../file/time';
 import { modeWords } from '../grants/mode-words';
 import { ChangeStatus } from '../roles/ChangeStatus';
@@ -37,7 +38,7 @@ function Decide({ draft, person, changed }: { draft: ProductDraft; person: strin
   return <div className="draft-decide">
     {refusing && !refuse.pending && !refuse.done
       ? <form aria-label={'Refuse the ' + draft.app + ' draft'} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), request_digest: draft.request_digest, reason: reason.trim() }); }}>
-        <input aria-label="Why you refuse it" required value={reason} disabled={blocked} placeholder="Why you refuse it" onChange={(event) => setReason(event.target.value)} />
+        <label className="field draft-reason-field">Why you refuse it<input aria-label="Why you refuse it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The product is told this reason.</span></label>
         <Act symbol="decline" name="Refuse" word="Refuse" tone="danger" type="submit" data-act="product-refuse-confirm" disabled={blocked || !reason.trim()} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="product-refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
       </form>
@@ -54,16 +55,17 @@ function Decide({ draft, person, changed }: { draft: ProductDraft; person: strin
 /** The state as answered, with the product's own words for a refusal on execution. */
 function Closed({ draft }: { draft: ProductDraft }) {
   const execution = draft.execution;
-  return <span className="sec" data-state={draft.state ?? ''}>{draft.state ? STATES[draft.state] ?? draft.state : 'State not answered'}
-    {execution?.state === 'refused_on_execution' ? <span className="draft-reason"><small className="refusal-name">{execution.refusal}</small>: {execution.reason}</span> : null}
+  return <span className="sec" data-state={draft.state ?? ''}>{draft.state ? STATES[draft.state] ?? 'State not recognised' : 'State not answered'}
+    {execution?.state === 'refused_on_execution' ? <span className="draft-reason">The product said: {execution.reason || 'no reason given'}
+      <details><summary>Error details</summary><small className="refusal-name">{execution.refusal}</small></details></span> : null}
   </span>;
 }
 
-function Row({ draft, names, person, changed }: { draft: ProductDraft; names: Map<string, string>; person: string; changed: () => void }) {
+function Row({ draft, names, apps, person, changed }: { draft: ProductDraft; names: Map<string, string>; apps: Map<string, string>; person: string; changed: () => void }) {
   const approvals = draft.approvals ?? [];
   return <tr data-product-draft={draft.id}>
-    <td>{draft.app}</td>
-    <td><span className="mono">{draft.target.action}</span> · {draft.target.kind} {draft.target.id}{draft.mode ? <span className="sec"> · {modeWords(draft.mode)}</span> : null}</td>
+    <td>{apps.get(draft.app) ?? draft.app}</td>
+    <td title={draft.words}>{draft.target.action} · {kindLabel(draft.target.kind)} {names.get(draft.target.id) ?? draft.target.id}{draft.mode ? <span className="sec"> · {modeWords(draft.mode)}</span> : null}</td>
     <td>{nameOf(names, draft.holder)}<span className="sec"> · answered for by {nameOf(names, draft.responsible)}</span></td>
     <td className="sec" data-col="approvals">{approvals.length ? approvals.map((approval) => nameOf(names, approval.by) + ', ' + clock(approval.at)).join('; ') : 'No approval yet'}</td>
     <td>{draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Closed draft={draft} />}</td>
@@ -74,6 +76,9 @@ function Row({ draft, names, person, changed }: { draft: ProductDraft; names: Ma
 export function ProductDrafts({ names, person }: { names: Map<string, string>; person: string }) {
   const [version, setVersion] = useState(0);
   const read = useLoad(readProductDrafts, 'product-drafts:' + version);
+  // Products by their registered names; a person the apps list is not read for sees each product by its id.
+  const registered = useLoad(() => request<{ apps: { id: string; name: string }[] }>('/apps'), 'product-draft-apps');
+  const apps = new Map(registered.status === 'ok' ? registered.data.apps.map((app) => [app.id, app.name] as const) : []);
   // While the table reads itself again after a decision, what it last showed stays, so a decision's answer is not lost.
   const last = useRef<typeof read | null>(null);
   if (read.status === 'ok') last.current = read;
@@ -84,7 +89,7 @@ export function ProductDrafts({ names, person }: { names: Map<string, string>; p
     <Gate load={load} title="product drafts" ok={(drafts) => <table className="product-drafts" aria-label="Product drafts">
       <thead><tr><th>Product</th><th>Wants to</th><th>Holder</th><th>Approved by</th><th>State</th></tr></thead>
       <tbody>
-        {drafts.length ? drafts.map((draft) => <Row key={draft.id} draft={draft} names={names} person={person} changed={() => setVersion((v) => v + 1)} />)
+        {drafts.length ? drafts.map((draft) => <Row key={draft.id} draft={draft} names={names} apps={apps} person={person} changed={() => setVersion((v) => v + 1)} />)
           : <tr className="empty"><td colSpan={5} className="dim">No product holds anything for approval.</td></tr>}
       </tbody>
     </table>} />

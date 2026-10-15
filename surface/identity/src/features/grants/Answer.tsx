@@ -21,8 +21,9 @@ export function AnswerView({ w, a, land }: { w: GrantWorld; a: Answer; land: boo
       ) : (
         <div className="answer">
           <span className={'verdict-mark no' + (land ? ' land' : '')}>No</span>
-          <span className="tag">{a.kind}</span>
+          {a.kind === 'no grant' ? <span className="tag">No grant</span> : null}
           <span className="why" title={namesTitle(w, a.why)}>{named(w, a.why)}.</span>
+          {a.kind === 'no grant' ? null : <details className="answer-code"><summary>Error details</summary><span className="refusal-name">{a.kind}</span></details>}
         </div>
       )}
       <div className="meta-line">

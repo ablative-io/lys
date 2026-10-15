@@ -49,7 +49,7 @@ describe('The delegation form', () => {
     expect(ends().textContent).toBe('Ends no later than27 Oct');
     expect(ends().querySelector('.open-q')).toBeNull();
     expect(from).not.toContain('when yours does');
-    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with assignment', 'no end']);
+    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'Ends with a role assignment (none with an end date)', 'When your own access ends']);
     expect(unreachable()).toEqual([]);
 
     unmountAll();
@@ -134,7 +134,7 @@ describe('The delegation form', () => {
     await tick('edit', 'view');
     await click($('[data-act="delegatedo"]'));
     expect(posted.filter((p) => p.path === '/grants')).toHaveLength(2);
-    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     expect($('.act-panel')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G + '.rest')).toBeNull();
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G)).not.toBeNull();
@@ -155,7 +155,7 @@ describe('The delegation form', () => {
     await choose($('#dLease'), 'no end');
     await tick('edit', 'view');
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     const restRaw = sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G + '.rest');
     expect(restRaw).not.toBeNull();
     expect((JSON.parse(restRaw ?? '[]') as DelegateBody[]).map((b) => [b.relation, b.window.ends_at])).toEqual([['viewer', GRANTS.find((g) => g.id === ROOT_G)?.effective_ends_at ?? NaN]]);
@@ -176,7 +176,7 @@ describe('The delegation form', () => {
     await tick('edit', 'view');
     await click($('[data-act="delegatedo"]'));
     expect(second.posted.filter((p) => p.path === '/grants')).toHaveLength(2);
-    expect($('#dAnswer b')?.textContent).toBe('Expired');
+    expect($('#dAnswer')?.dataset.refusal).toBe('Expired');
     expect($('#toast')?.textContent).toContain('Given before the refusal: Edit this resource project:identity.');
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G + '.rest')).toBeNull();
   });
@@ -185,8 +185,9 @@ describe('The delegation form', () => {
     await open({ ...SERVICE, 'POST /grants': refused(409, 'IdentityNotActive', `IdentityNotActive: ${SCRIBE} is suspended, and only an active identity's grants are effective`) });
     await tick('view');
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('IdentityNotActive');
-    expect($('#dAnswer .note')?.textContent).toContain('is suspended');
+    expect($('#dAnswer')?.dataset.refusal).toBe('IdentityNotActive');
+    expect($('#dAnswer b')?.textContent).toContain('Scribe is suspended');
+    expect($('#dAnswer b')?.textContent).not.toContain('IdentityNotActive');
     expect($('.act-panel')).not.toBeNull();
   });
 
@@ -194,7 +195,7 @@ describe('The delegation form', () => {
     await open({ ...SERVICE, 'POST /grants': refused(409, 'RecipientRefused', `RecipientRefused: ${ROOT_G} may not be passed on to a agent`) });
     await tick('view');
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('RecipientRefused');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RecipientRefused');
     expect($('.act-panel')).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Given');
   });
@@ -207,7 +208,7 @@ describe('The delegation form', () => {
     });
     await tick('view');
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 120000);
     expect(($('#dTo') as HTMLSelectElement).closest('fieldset')?.disabled).toBe(true);
     await click($('[data-act="delegatedo"]'));
@@ -228,7 +229,7 @@ describe('The delegation form', () => {
     await press('Escape');
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 600000);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    expect($('#dAnswer')?.textContent).toContain('pending');
+    expect($('#dAnswer[data-pending]')?.textContent).toContain('Not confirmed yet');
     await click($('[data-act="delegatedo"]'));
     expect(posted.filter((entry) => entry.path === '/grants')).toHaveLength(2);
     expect(posted[1].body).toEqual(posted[0].body);
@@ -242,7 +243,7 @@ describe('The delegation form', () => {
     await tick('view');
     await click($('[data-act="delegatedo"]'));
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     expect(posted[1].body).toEqual(posted[0].body);
     expect(sessionStorage.getItem('lys.pending.grant.' + ADA + '.' + ROOT_G)).not.toBeNull();
     expect($('#toast')?.textContent).not.toContain('Given.');
@@ -252,7 +253,7 @@ describe('The delegation form', () => {
     const { posted } = await open({ ...SERVICE, 'POST /grants': ok({ operation: 'wrong', grant: SCRIBE_G, receipt: { caller: ADA } }) });
     await tick('view');
     await click($('[data-act="delegatedo"]'));
-    expect($('#dAnswer b')?.textContent).toBe('pending');
+    expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
     expect($('#toast')?.textContent).not.toContain('Given.');
     expect(posted).toHaveLength(1);
   });
@@ -271,7 +272,7 @@ describe('The delegation form', () => {
     spy.mockRestore();
     const given = () => posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);
     expect(given()).toEqual([]);
-    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RequestNotRetained');
     // State says what storage says: nothing is held, so nothing is offered as an earlier run.
     expect(sessionStorage.getItem(KEY)).toBeNull();
     expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
@@ -298,7 +299,7 @@ describe('The delegation form', () => {
     await click($('[data-act="delegatedo"]'));
     spy.mockRestore();
     expect(posted.filter((p) => p.path === '/grants')).toHaveLength(2);
-    expect($('#dAnswer b')?.textContent).toBe('RecipientRefused');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RecipientRefused');
     expect($('#toast')?.textContent).toContain('could not clear them');
     expect(sessionStorage.getItem(KEY)).toBeNull();
     expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
@@ -316,7 +317,7 @@ describe('The delegation form', () => {
     await click($('[data-act="delegatedo"]'));
     spy.mockRestore();
     expect(posted.filter((p) => p.path === '/grants')).toEqual([]);
-    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RequestNotRetained');
     expect(sessionStorage.getItem(KEY)).toBeNull();
     expect(sessionStorage.getItem(KEY + '.rest')).toBeNull();
   });
@@ -334,7 +335,7 @@ describe('The delegation form', () => {
     spy.mockRestore();
     const given = () => posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);
     expect(given().map((b) => b.relation)).toEqual(['only.edit']);
-    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RequestNotRetained');
     expect($('#toast')?.textContent).toContain('Not sent: View this resource');
     expect(sessionStorage.getItem(KEY)).toBeNull();
     const rest = JSON.parse(sessionStorage.getItem(KEY + '.rest') ?? 'null') as DelegateBody[] | null;
@@ -355,7 +356,7 @@ describe('The delegation form', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('storage unavailable'); });
     await click($('[data-act="delegatedo"]'));
     expect(posted).toEqual([]);
-    expect($('#dAnswer b')?.textContent).toBe('RequestNotRetained');
+    expect($('#dAnswer')?.dataset.refusal).toBe('RequestNotRetained');
   });
 
   it('opens the real bounded grant form from temporary access on an agent file', async () => {
@@ -383,7 +384,7 @@ describe("What you can't give (conformance 2.4)", () => {
     const { requests } = await mount('#/me?tab=account');
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect(requests).toContain(`/grants/cannot-give?route=browser&source=${ROOT_G}&recipient=${SCRIBE}`);
-    const reasons = $$('.act-panel .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
+    const reasons = $$('.act-panel [data-cannot-give]').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
     expect(reasons).toEqual([
       ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
       ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
@@ -413,7 +414,8 @@ describe('Can X do this? (conformance 8.1)', () => {
     await choose($('#cPerm'), 'edit');
     await click($('[data-act="check"]'));
     expect($('#answer .verdict-mark')?.textContent).toBe('No');
-    expect($('#answer .tag')?.textContent).toBe('no grant');
+    expect($('#answer .tag')?.textContent).toBe('No grant');
+    expect($('#answer .refusal-name')).toBeNull();
     expect($('#answer .meta-line')?.textContent).toContain('model v3');
     expect($('#answer .meta-line')?.textContent).toContain('change 7');
   });
@@ -421,7 +423,8 @@ describe('Can X do this? (conformance 8.1)', () => {
   it('names a refusal for a suspended identity, with no design note beside it', async () => {
     await mount('#/access/can', { ...SERVICE, 'POST /grants/why': refused(409, 'IdentityNotActive', `IdentityNotActive: ${ADA} is suspended, and only an active identity's grants are effective`) });
     await click($('[data-act="check"]'));
-    expect($('#answer .tag')?.textContent).toBe('IdentityNotActive');
+    expect($('#answer .refusal-name')?.textContent).toBe('IdentityNotActive');
+    expect($('#answer .why')?.textContent).not.toContain('IdentityNotActive');
     expect($('#answer .open-q')).toBeNull();
   });
 
@@ -446,7 +449,8 @@ describe('Can X do this? (conformance 8.1)', () => {
     await mount('#/access/can', { ...SERVICE, 'POST /grants/why': refused(409, 'Revoked', `Revoked: ${ROOT_G} was revoked, and nothing derived from it is effective`) });
     await click($('[data-act="check"]'));
     expect($('#answer .verdict-mark')?.textContent).toBe('No');
-    expect($('#answer .tag')?.textContent).toBe('Revoked');
+    expect($('#answer .refusal-name')?.textContent).toBe('Revoked');
+    expect($('#answer .why')?.textContent).not.toContain('Revoked:');
     expect($('#answer .why')?.textContent).toContain('was revoked');
   });
 });
@@ -523,7 +527,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
     const { posted } = await mount('#/me?tab=account', routes);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     await choose($('#dTo'), SCRIBE);
-    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'ends with Scribe assignment (9 Oct)', 'no end']);
+    expect($$('#dLease option').map((o) => o.textContent)).toEqual(['7 days', 'Ends with the Scribe assignment (9 Oct)', 'When your own access ends']);
     await choose($('#dLease'), 'assignment:op-00000000000000000000000000000001');
     await click($('.act-panel input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
@@ -536,7 +540,7 @@ describe('A grant that ends with a role assignment (conformance 4.5)', () => {
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     const option = $$('#dLease option')[1];
     expect(option?.hasAttribute('disabled')).toBe(true);
-    expect(option?.getAttribute('title')).toBe('the agent holds no role with an end date');
+    expect(option?.textContent).toBe('Ends with a role assignment (none with an end date)');
   });
 });
 
@@ -698,9 +702,20 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
       expect(posted).toHaveLength(1);
       expect(requests.filter((r) => r === 'POST /grants')).toHaveLength(1);
       // The refusal, exactly as the API answered it.
-      expect($('#dAnswer b')?.textContent).toBe(c.marker);
-      expect($('#dAnswer')?.textContent).toContain(c.reason);
-      expect(text()).toContain(name);
+      // The refusal's name is in the Error details fold only; its reason is read with each grant by its short name, never its raw id.
+      if (c.marker === 'pending') {
+        expect($('#dAnswer[data-pending] b')?.textContent).toBe('Not confirmed yet');
+        expect($('#dAnswer')?.textContent).not.toContain(name);
+      } else {
+        expect($('#dAnswer')?.dataset.refusal).toBe(c.marker);
+        expect($('#dAnswer b')?.textContent).not.toContain(c.marker);
+        expect($('#dAnswer .refusal-name')?.textContent).toContain(c.marker + ':');
+      }
+      // Read in words with each grant by its short name; the fold keeps the body word for word.
+      if (c.marker === 'pending') expect($('#dAnswer')?.textContent).toContain(c.reason.replace(/^[A-Za-z]+: /, '').replace(/grant-[0-9a-f]{32}/g, (id) => 'G/' + id.slice(6, 14)));
+      else expect($('#dAnswer .refusal-name')?.textContent).toBe(c.reason);
+      expect($('#dAnswer b')?.textContent ?? '').not.toMatch(/grant-[0-9a-f]{32}/);
+      if (c.marker !== 'pending') expect(text()).toContain(name);
       // Nothing given: no re-read of the list, no success, the rows as they were.
       expect(requests.filter((r) => r === '/grants')).toHaveLength(reads);
       expect($('#toast')?.textContent ?? '').not.toContain('Given');
@@ -843,7 +858,7 @@ describe('Reviews shows the chosen grant whole (walk of 4 Oct)', () => {
     const panel = $('section[aria-label="Grant to review"]');
     expect(panel?.querySelector('table')).toBeNull();
     expect($('table[aria-label="Grants"]')).toBeNull();
-    expect([...(panel?.querySelectorAll('dt') ?? [])].map((dt) => dt.textContent)).toEqual(['Holder', 'Allows', 'On', 'Relation', 'Path to a person', 'Window', 'Last used', 'Stands']);
+    expect([...(panel?.querySelectorAll('dt') ?? [])].map((dt) => dt.textContent)).toEqual(['Holder', 'Allows', 'On', 'Access level', 'Path to a person', 'Window', 'Last used', 'Stands']);
     expect([...(panel?.querySelectorAll('.chain .pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
     expect(panel?.textContent).toContain('27 Sep to 4 Oct');
     expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.getAttribute('aria-label'))).toEqual(['Keep access', 'Revoke']);

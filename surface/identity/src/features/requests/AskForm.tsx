@@ -65,8 +65,10 @@ function readRest(key: string): Rest {
   }
 }
 
-export function AskForm({ person, resources, model, changed }: {
+export function AskForm({ person, resources, model, changed, cancel }: {
   person: string; resources: ResourceRef[]; model: GrantModel; changed: (answer: AccessRequest) => void;
+  /** Closes the form; left out where the form is the only thing the page has to offer. */
+  cancel?: () => void;
 }) {
   const key = 'lys.pending.request.' + person;
   const [pending, setPending] = useState<Pending>(() => readPending(key));
@@ -78,6 +80,8 @@ export function AskForm({ person, resources, model, changed }: {
   const [noExpiry, setNoExpiry] = useState(false);
   const [resourceIndex, setResourceIndex] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
+  // Nothing is chosen until the person chooses it: an empty choice is no resource, never the first in the list.
+  const chosenResource: ResourceRef | undefined = resourceIndex === '' ? undefined : resources[Number(resourceIndex)];
   const [rest, setRest] = useState<Rest>(() => readRest(key));
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const keepRest = (left: Ask[]) => {
@@ -174,8 +178,8 @@ export function AskForm({ person, resources, model, changed }: {
     if (pending.kind !== 'empty' || rest.kind === 'held' || damaged || working.current) return;
     try {
       const data = new FormData(event.currentTarget);
-      const resource = advanced ? { kind: field(data, 'kind'), id: field(data, 'resource') } : resources[Number(resourceIndex)];
-      if ((!advanced && resourceIndex === '') || !resource?.kind || !resource.id) throw new Error('Choose what you need access to, or enter its details under Advanced.');
+      const resource = advanced ? { kind: field(data, 'kind'), id: field(data, 'resource') } : chosenResource;
+      if (!resource?.kind || !resource.id) throw new Error(advanced ? 'Enter both the type of thing and its name.' : 'Choose what you need access to, or tick the box to enter something not in the list.');
       const offered = askable(model, resource);
       const chosen = offered.length ? picked.filter((action) => offered.includes(action)) : [];
       const carriers = singleActionCarriers(model);
@@ -196,11 +200,11 @@ export function AskForm({ person, resources, model, changed }: {
       {!advanced ? <label className="field">What do you need access to?<select value={resourceIndex} onChange={(event) => setResourceIndex(event.target.value)} required>
         <option value="">Choose what you need</option>{resources.map((resource, index) => <option key={JSON.stringify(resource)} value={index}>{resource.id} · {resource.kind}</option>)}
       </select></label> : null}
-      {!resources.length && !advanced ? <p className="note">No resources appear in your visible grants yet. Tick the box below if you have been given a resource's details.</p> : null}
-      <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />Enter another resource by its kind and ID</label>
-        {advanced ? <><label className="field">Resource kind<input name="kind" required /></label><label className="field">Resource ID<input name="resource" required /></label></> : null}
+      {!resources.length && !advanced ? <p className="note">Nothing appears in your access yet, so there is nothing to choose from. Tick the box below and enter what you were told you need.</p> : null}
+      <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />What I need is not in the list</label>
+        {advanced ? <div className="form-grid"><label className="field">Type of thing<input name="kind" required autoComplete="off" /><span className="hint">For example, project or workspace.</span></label><label className="field">Its name<input name="resource" required autoComplete="off" /><span className="hint">Exactly as the person or app that told you about it wrote it.</span></label></div> : null}
       {(() => {
-        const resource = advanced ? undefined : resources[Number(resourceIndex)];
+        const resource = advanced ? undefined : chosenResource;
         const offered = askable(model, resource);
         return offered.length
           ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} title="Access needed" />
@@ -209,8 +213,9 @@ export function AskForm({ person, resources, model, changed }: {
       })()}
       <label className="field">Why do you need this access?<textarea name="why" required /></label>
       <label className="field">Access until (your local time)<input name="expires" type="datetime-local" required={!noExpiry} disabled={noExpiry} /></label>
-      <label><input type="checkbox" name="no-expiry" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry requested</label>
-      <p><Act symbol="send" name="Request access" word="Request" tone="primary" type="submit" disabled={busy} /></p>
+      <label className="tick"><input type="checkbox" name="no-expiry" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry requested</label>
+      <p><Act symbol="send" name="Request access" word="Request" tone="primary" type="submit" disabled={busy} />{' '}
+        {cancel ? <Act symbol="close" name="Cancel asking" word="Cancel" disabled={busy} onClick={cancel} /> : null}</p>
     </fieldset>
     {pending.kind === 'held' ? <div role="status"><p>The result is not yet confirmed. Your original request is retained; checking will not create a duplicate.</p><Act symbol="again" name={busy ? 'Checking…' : rest.kind === 'held' ? `Check original request, then ask for the ${rest.asks.length} remaining` : 'Check original request'} word={busy ? 'Checking…' : rest.kind === 'held' ? 'Check, then ask' : 'Check'} disabled={busy} onClick={() => void send(pending.asked, true, rest.kind === 'held' ? rest.asks.filter((each) => each.operation !== pending.asked.operation) : [])} /></div> : null}
     {pending.kind === 'empty' && rest.kind === 'held' ? <div role="status"><p>{rest.asks.length} of an earlier run not yet sent: {rest.asks.map((each) => each.relation).join(', ')}.</p><Act symbol="send" name={busy ? 'Sending…' : `Ask for the ${rest.asks.length} remaining`} word={busy ? 'Sending…' : 'Ask'} data-act="ask-rest" disabled={busy} onClick={() => { const [head, ...tail] = rest.asks; if (head) void send(head, false, tail); }} /></div> : null}

@@ -1,0 +1,11 @@
+/* Roles: the assign form under the holders table, labelled fields side by side, one to a line when narrow. */
+.role-assign { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border-subtle); }
+.role-assign h3 { margin: 0 0 10px; font-size: 13px; }
+.role-assign .form-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.role-assign .role-no-expiry { align-self: end; min-height: 36px; }
+.role-assign p.wide { margin: 0; }
+/* On a narrow screen a role's words and its holders stand one above the other and the page scrolls, so neither is cut short. */
+@container surface (max-width: 850px) {
+  .fill > .body.halves.role-detail { grid-auto-rows: auto; }
+  .fill > .body.halves.role-detail > .pane { overflow: visible; min-height: auto; }
+}

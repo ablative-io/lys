@@ -4,6 +4,7 @@ import type { Load } from '../../api';
 import { clock } from '../file/time';
 import type { Role } from './contract';
 import { ErrorWords, PART } from '../people/Words';
+import { HOLDING } from './contract';
 
 export const readRoles = () => request<{ roles: Role[] }>('/roles');
 export type RolesLoad = Load<{ roles: Role[] }>;
@@ -32,6 +33,6 @@ export function AssignedRoles({ id }: { id: string }) {
           : <ErrorWords problem={"RoleVersionMissing: " + role.id + " assignment " + holder.assignment + " names missing version " + holder.version} />}
       </section>;
     })}
-    {past.length ? <section className="card" aria-label="Past role assignments"><h3>Past role assignments ({past.length})</h3>{past.map(({ role, holder }) => <p key={holder.assignment}><a href={'#/roles/' + encodeURIComponent(role.id)}>{role.name}</a> · Version {holder.version} · {holder.state}{holder.ended_at === null ? '' : ' · ended ' + clock(holder.ended_at)}</p>)}</section> : null}
+    {past.length ? <section className="card" aria-label="Past role assignments"><h3>Past role assignments ({past.length})</h3>{past.map(({ role, holder }) => <p key={holder.assignment}><a href={'#/roles/' + encodeURIComponent(role.id)}>{role.name}</a> · Version {holder.version} · {HOLDING[holder.state] ?? 'State not recognised'}{holder.ended_at === null ? '' : ' · ended ' + clock(holder.ended_at)}</p>)}</section> : null}
   </>;
 }

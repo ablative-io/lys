@@ -125,7 +125,7 @@ const ROWS: ConformanceRow[] = [
       expect(accounts?.querySelector('[data-act="delegate"]')).toBeNull();
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       // What cannot be given is the service's answer, and it lists no service account.
-      const cannot = $$('.act-panel .why-not').map((d) => d.querySelector('b')?.textContent);
+      const cannot = $$('.act-panel [data-cannot-give]').map((d) => d.querySelector('b')?.textContent);
       expect(cannot).toEqual(['viewer of project:ledger', 'Your sign-in identities']);
     },
   },
@@ -178,7 +178,7 @@ const ROWS: ConformanceRow[] = [
     check: async () => {
       await mount('#/me?tab=account');
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-      const reasons = $$('.act-panel .why-not').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
+      const reasons = $$('.act-panel [data-cannot-give]').map((d) => [d.querySelector('b')?.textContent, d.querySelector('.note')?.textContent]);
       expect(reasons).toEqual([
         ['viewer of project:ledger', 'You may use it; it does not let you pass it on.'],
         ['Your sign-in identities', 'They prove who you are. No agent can hold them.'],
@@ -200,7 +200,7 @@ const ROWS: ConformanceRow[] = [
       await choose($('#cPerm'), 'edit');
       await click($('[data-act="check"]'));
       expect($('#answer .verdict-mark')?.textContent).toBe('No');
-      expect($('#answer .tag')?.textContent).toBe('no grant');
+      expect($('#answer .tag')?.textContent).toBe('No grant');
       expect($('#answer .meta-line')?.textContent).toContain('model v3');
     },
   },
@@ -332,10 +332,12 @@ describe('API refusal parity', () => {
     await click($('.act-panel input[name="action"][value="view"]'));
     await click($('[data-act="delegatedo"]'));
     expect(posted).toHaveLength(1);
-    expect($('#dAnswer b')?.textContent).toBe(name);
-    expect($('#dAnswer .note')?.textContent).toBe(reason);
-    // Nothing added, reworded or dropped between the body and the screen.
-    expect($('#dAnswer')?.textContent).toBe(name + reason);
+    // The person reads it in words, the grant by its short name; the body itself, word for word, is in the Error details fold.
+    expect($('#dAnswer')?.dataset.refusal).toBe(name);
+    expect($('#dAnswer b')?.textContent).toBe('Lys refused: G/' + ROOT_G.slice(6, 14) + ' may not be passed on to a agent');
+    // Nothing added, reworded or dropped between the body and the fold.
+    expect($('#dAnswer details .refusal-name')?.textContent).toBe(reason);
+    expect($('#dAnswer')?.textContent).toBe('Lys refused: G/' + ROOT_G.slice(6, 14) + ' may not be passed on to a agentError details' + reason);
     expect($('#toast')?.textContent ?? '').not.toContain('Given');
   });
 });

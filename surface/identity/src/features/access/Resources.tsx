@@ -38,7 +38,7 @@ export function Resources() {
       ];
       return <>
         <div className="head">
-          <div><h1>Access</h1><p className="sub">Resources named in grants you may see. Counts were checked at {clock(list.judged_at)}, grant revision {list.revision}; they describe recorded grants. Ask for the permission engine's current decision.</p></div>
+          <div><h1>Access</h1><p className="sub">Everything named in the grants you may see, with how many grants are on each. Counted at {clock(list.judged_at)}. To find out whether someone can do something right now, use the Ask tab.</p></div>
         </div>
         <AccessTabs on="resources" />
         <div className="body one">

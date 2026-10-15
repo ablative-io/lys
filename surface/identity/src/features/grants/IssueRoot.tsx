@@ -5,7 +5,7 @@ import type { GrantModel, ResourceRef } from '../../generated/grants';
 import type { PeopleView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm } from '../people/RecordedForm';
-import { ErrorWords } from '../people/Words';
+import { ErrorWords, STATUS } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { MODE_HINTS, MODES, modeWords } from './mode-words';
 import { actionWords } from './action-words';
@@ -90,7 +90,7 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
     } };
   }}>
     <p className="note">You are giving this to a person. Tick “May pass on” and they can give it to their own agents.</p>
-    <div className="field">Person<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
+    <div className="field">Person<Picker name="holder" label="Find a person" options={people.people.filter((p) => p.state !== 'retired').map((p) => ({ id: p.id, name: p.display_name, detail: STATUS[p.state] ?? p.state }))} /></div>
     <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); }}>
       <option value="" disabled>Choose a kind</option>
       {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each} title={each}>{kindLabel(each)}</option>)}</optgroup>)}

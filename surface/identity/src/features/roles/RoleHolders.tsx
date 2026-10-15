@@ -5,11 +5,14 @@ import type { FormEvent } from 'react';
 import { operationId } from '../../api';
 import { field } from '../people/RecordedForm';
 import { clock } from '../file/time';
+import { HOLDING } from './contract';
 import type { Role, RoleAnswer, RoleHolder, RoleVersion } from './contract';
 import { useRoleChange } from './useRoleChange';
 import { ChangeStatus } from './ChangeStatus';
 import { IdentityName, PART } from '../people/Words';
 import { Act } from '../../shell/Act';
+import { TableScroll } from '../../shell/Listing';
+import './roles.css';
 
 /** The holders table's last row: who, until when, and the button that assigns the latest saved version. */
 function AssignRole({ role, person, identities, changed }: { role: Role; person: string; identities: { id: string; name: string }[]; changed: (answer: RoleAnswer) => void }) {
@@ -24,13 +27,14 @@ function AssignRole({ role, person, identities, changed }: { role: Role; person:
     if (!identities.some((identity) => identity.id === holder) || (ends !== null && (!Number.isSafeInteger(ends) || ends <= Date.now() / 1000))) { setFailure('Choose a person or agent and a future end date, or select No expiry.'); return; }
     change.submit({ operation: operationId(), holder, ends_at: ends });
   };
-  return <form aria-label="Assign role" onSubmit={submit}>
-    <fieldset className="usage-add-row" disabled={change.blocked} style={{ border: 0, padding: 0, margin: 0, gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1.4fr) auto auto' }}>
-      <Picker name="holder" label="Find a person or agent" options={identities} />
-      <input type="datetime-local" name="expires" aria-label="Role until, your local time" required={!noExpiry} disabled={noExpiry} />
-      <label className="tick">No expiry<input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /></label>
-      <span><Act symbol="add" name="Assign role" word="Assign" tone="primary" type="submit" /></span>
-    </fieldset>{failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
+  return <form aria-label="Assign role" onSubmit={submit} className="role-assign">
+    <h3>Assign this role</h3>
+    <fieldset className="form-grid" disabled={change.blocked} style={{ border: 0, padding: 0, margin: 0 }}>
+      <div className="field wide">Person or agent<Picker name="holder" label="Find a person or agent" options={identities} /></div>
+      <label className="field">Until (your local time)<input type="datetime-local" name="expires" aria-label="Role until, your local time" required={!noExpiry} disabled={noExpiry} /></label>
+      <label className="tick role-no-expiry"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} />No expiry</label>
+      <p className="wide"><Act symbol="add" name="Assign role" word="Assign" tone="primary" type="submit" /></p>
+    </fieldset>{failure ? <p className="why-not" role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;
 }
 
@@ -58,14 +62,14 @@ function HolderRow({ role, holder, person, admin, changed }: { role: Role; holde
   return <>
     <tr aria-label={'Holder ' + name}>
       <td><a href={'#/file/' + holder.holder}>{name}</a></td>
-      <td>Version {holder.version}{holder.behind ? <div className="note">A newer version is available.</div> : null}</td>
-      <td>{holder.state}</td>
+      <td>Version {holder.version}{holder.behind && holder.state === 'holding' ? <div className="note">A newer version is available.</div> : null}</td>
+      <td>{HOLDING[holder.state] ?? 'State not recognised'}</td>
       <td>{holder.ends_at === null ? 'No expiry' : clock(holder.ends_at)}</td>
       <td>{clock(holder.assigned_at)} by <IdentityName id={holder.assigned_by} />
         {holder.moves.map((entry, index) => <div className="note" key={index}>Version {entry.from} → {entry.to}, {clock(entry.at)}, by <IdentityName id={entry.by} /></div>)}
         {holder.ended_at !== null ? <div className="note">Ended {clock(holder.ended_at)} by {holder.ended_by ? <IdentityName id={holder.ended_by} /> : 'Name unavailable'}</div> : null}</td>
       {admin ? <td>{holder.state !== 'holding' ? null : !holder.assignment ? <span className="why-not">The server must identify this assignment before it can be changed safely.</span> : open ? null : <>
-        {holder.behind ? <Act symbol="again" name={titles.move} word="Review" onClick={() => setConfirm('move')} /> : null}
+        {holder.behind ? <Act symbol="again" name={titles.move} word={'Move to v' + role.latest} onClick={() => setConfirm('move')} /> : null}
         <Act symbol="remove" name={titles.end} word="Remove" onClick={() => setConfirm('end')} /></>}
         <ChangeStatus change={move} /><ChangeStatus change={end} /></td> : null}
     </tr>
@@ -80,12 +84,12 @@ function HolderRow({ role, holder, person, admin, changed }: { role: Role; holde
 
 export function RoleHolders({ role, person, admin, identities, changed }: { role: Role; person: string; admin: boolean; identities: { id: string; name: string }[]; changed: (answer: RoleAnswer) => void }) {
   return <section className="card" aria-label="Holders"><h2>People and agents assigned this role</h2><p className="note">Each person or agent keeps their assigned version until an administrator applies another. A version change never extends its expiry.</p>
-    <table className="usage-table"><thead><tr><th>Who</th><th>Version</th><th>State</th><th>Until</th><th>Assigned</th>{admin ? <th>Change</th> : null}</tr></thead>
+    <TableScroll label="People and agents assigned this role"><table className="usage-table"><thead><tr><th>Who</th><th>Version</th><th>State</th><th>Until</th><th>Assigned</th>{admin ? <th>Change</th> : null}</tr></thead>
       <tbody>
         {role.holders.map((holder) => <HolderRow key={holder.assignment ?? holder.holder + ':' + holder.assigned_at} role={role} holder={holder} person={person} admin={admin} changed={changed} />)}
         {role.holders.length ? null : <tr><td colSpan={admin ? 6 : 5} className="dim">No holders yet.</td></tr>}
       </tbody>
-      {admin ? <tfoot><tr><td colSpan={6} className="usage-add"><AssignRole key={role.id + ':' + role.holders.length} role={role} person={person} identities={identities} changed={changed} /></td></tr></tfoot> : null}
-    </table>
+    </table></TableScroll>
+    {admin ? <AssignRole key={role.id + ':' + role.holders.length} role={role} person={person} identities={identities} changed={changed} /> : null}
   </section>;
 }

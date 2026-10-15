@@ -32,6 +32,6 @@ describe('Keep access', () => {
     expect(face.textContent).not.toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
   });
   it('does not offer a recording action when the store is unavailable', async () => {
-    await mount('#/reviews', { ...routes, '/reviews': ok({ ...view, decisions_recorded: false }) }); expect(button('Keep access')).toBeNull(); expect(text()).toContain('This service does not record keep decisions.');
+    await mount('#/reviews', { ...routes, '/reviews': ok({ ...view, decisions_recorded: false }) }); expect(button('Keep access')).toBeNull(); expect(text()).toContain('This Lys does not record decisions to keep access, so only Revoke is offered.');
   });
 });

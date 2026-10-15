@@ -15,7 +15,7 @@ export function KeepGrant({ grant, person, changed }: { grant: string; person: s
       if (matches) confirmed.current = answer;
       return matches;
     }, () => { if (confirmed.current) changed(confirmed.current); });
-  return <><Act symbol="approve" name="Keep access" word="Keep" disabled={change.blocked} onClick={() => setOpen(true)} />
+  return <>{open ? null : <Act symbol="approve" name="Keep access" word="Keep" disabled={change.blocked} onClick={() => setOpen(true)} />}
     {open ? <form aria-label="Keep this access" onSubmit={(event) => { event.preventDefault(); change.submit({ operation: operationId(), note: note.trim() }); }}>
       <p>Record that this access is still needed. Its permissions and expiry stay the same.</p>
       <label className="field">Review note (optional)<textarea value={note} disabled={change.blocked} onChange={(event) => setNote(event.target.value)} /></label>

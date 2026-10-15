@@ -38,6 +38,9 @@ interface ReviewsView {
 }
 type Due = ReviewsView['due'][number];
 
+/** Why an owner cannot answer for an agent, in words. */
+const OWNER_STATE: Record<string, string> = { retired: 'retired', suspended: 'suspended', registered: 'not yet activated' };
+
 export function Reviews() {
   const [confirmed, setConfirmed] = useState<Record<string, Kept>>({});
   const [notice, setNotice] = useState('');
@@ -78,8 +81,9 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
   ];
   return <>
     <p className="note">{view.scope === 'directory' ? 'All agents in the directory.' : 'Agents you are responsible for.'} Checked {clock(view.judged_at)}.</p>
-    {view.unanswered.length ? <section className="card" aria-label="Agents needing an active owner"><h2>These agents need an active owner</h2>
-      {view.unanswered.map(({ agent, person }) => <p key={agent.id}><Link to={'/file/' + encodeURIComponent(agent.id)}>{agent.display_name}</Link> answers to {person.display_name}, whose account is {person.state}.</p>)}
+    {view.unanswered.length ? <section className="card" aria-label="Agents needing an active owner" style={{ marginBottom: 16 }}><h2>These agents need an active owner</h2>
+      <p className="note">Open each agent to change who it answers to, or retire it if it is no longer needed.</p>
+      {view.unanswered.map(({ agent, person }) => <p key={agent.id}><Link to={'/file/' + encodeURIComponent(agent.id)}>{agent.display_name}</Link> answers to {person.display_name}, whose account is {OWNER_STATE[person.state] ?? 'not active'}.</p>)}
     </section> : null}
     {teams.refused ? <p className="why-not">Teams cannot be read, so access is listed without its team. {teams.refused}</p> : null}
     {view.due.length ? <div className="body work">
@@ -95,11 +99,11 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
             <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></dd>
             <dt>Allows</dt><dd>{open.grant.actions.length ? actionWords(model, open.grant.resource, open.grant.actions) : 'No action'}</dd>
             <dt>On</dt><dd>{open.grant.resource.kind} {names.get(open.grant.resource.id) ?? open.grant.resource.id}</dd>
-            <dt>Relation</dt><dd className="mono">{open.grant.relation}</dd>
+            <dt>Access level</dt><dd>{open.grant.relation}</dd>
           </dl>}
         {last(open) ? <p className="note">Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
         <div className="grant-acts">
-          {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p>This service does not record keep decisions.</p>}
+          {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p className="note">This Lys does not record decisions to keep access, so only Revoke is offered.</p>}
           {drawn && world.status === 'ok' && !drawn.revoked ? <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)} /> : null}
         </div>
         {revoking && drawn && world.status === 'ok' ? <ActPanel key={drawn.id} label="Revoke" opener={revoking} close={() => setRevoking(null)}>
@@ -117,7 +121,7 @@ function GrantFacts({ w, g, agent }: { w: GrantWorld; g: Grant; agent: AgentSumm
     <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(agent.id) + '/access'} title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}</Link></dd>
     <dt>Allows</dt><dd>{mayText(w, g)}</dd>
     <dt>On</dt><dd title={resourceTitle(w, g.resource)}>{resourceName(w, g.resource)}</dd>
-    <dt>Relation</dt><dd className="mono">{g.relation}</dd>
+    <dt>Access level</dt><dd>{g.relation}</dd>
     <dt>Path to a person</dt><dd><Chain w={w} chain={chainOf(w, g)} /></dd>
     <dt>Window</dt><dd>{windowText(g)}</dd>
     <dt>Last used</dt><dd className={g.last_use.seen ? undefined : 'dim'}>{lastUsedText(g)}</dd>

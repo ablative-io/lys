@@ -154,6 +154,8 @@ describe('What you cannot give, as the service answers it (conformance 2.4)', ()
     const refusals = $$('.act-panel [data-refusal]');
     expect(refusals).toHaveLength(1);
     expect(refusals[0].dataset.refusal).toBe('unknown_cannot_give_reason');
-    expect(refusals[0].querySelector('b')?.textContent).toBe('unknown_cannot_give_reason');
+    expect(refusals[0].querySelector('b')?.textContent).not.toContain('unknown_cannot_give_reason');
+    expect(refusals[0].querySelector('b')?.textContent).toContain('which is not one of');
+    expect(refusals[0].querySelector('.refusal-name')?.textContent).toContain('unknown_cannot_give_reason:');
   });
 });
