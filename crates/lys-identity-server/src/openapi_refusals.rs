@@ -47,6 +47,7 @@ pub(crate) const GRANT_READ: &[&str] = &["NotSignedIn", "GrantNotVisible"];
 pub(crate) const GRANT_MADE: &[&str] = &[
     "NotSignedIn",
     "RequestMalformed",
+    "credential_refused",
     "kind_not_registered",
     "app_not_approved",
     "app_retired",
