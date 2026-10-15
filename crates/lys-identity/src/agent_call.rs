@@ -27,6 +27,11 @@ pub struct AgentCall {
 impl AgentCall {
     /// A call record, refused unless it names a changing method, a local
     /// route and a SHA-256 digest in lowercase hex.
+    ///
+    /// # Errors
+    /// Returns [`IdentityError::ChangeMismatch`] when the method is not POST, PUT,
+    /// PATCH or DELETE, the path does not start with exactly one slash, or the
+    /// digest is not exactly 64 lowercase hexadecimal digits.
     pub fn new(
         method: &str,
         path: &str,

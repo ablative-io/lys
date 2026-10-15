@@ -66,6 +66,7 @@ impl fmt::Debug for Seat {
 pub const SEAT_HEADER: &str = "lys-seat";
 
 /// The bytes the AI's certificate key signs to delegate to a seat.
+#[must_use]
 pub fn delegation_bytes(
     agent: &str,
     serial: &str,

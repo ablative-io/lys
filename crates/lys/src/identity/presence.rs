@@ -2,7 +2,7 @@
 
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 
-/// The person must answer a system-owned authentication prompt.
+/// The operating system must prove a present local operator.
 pub trait Presence {
     /// Authenticate once, without reusing an earlier authentication decision.
     ///
@@ -11,7 +11,7 @@ pub trait Presence {
     fn authenticate(&self) -> IdentityResult<()>;
 }
 
-/// `LocalAuthentication` on macOS; other platforms refuse recovery issuance.
+/// Device-owner authentication on macOS or the installing user's foreground terminal on Linux.
 pub struct SystemPresence;
 
 pub(crate) fn refused(kind: ErrorKind, detail: impl Into<String>) -> IdentityError {
@@ -22,20 +22,30 @@ pub(crate) fn refused(kind: ErrorKind, detail: impl Into<String>) -> IdentityErr
 #[path = "presence_macos.rs"]
 mod macos;
 
+#[path = "lysfix_srv_presence_linux.rs"]
+pub(crate) mod linux;
+
 impl Presence for SystemPresence {
     fn authenticate(&self) -> IdentityResult<()> {
-        #[cfg(target_os = "macos")]
-        {
-            macos::authenticate()
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            Err(refused(
-                ErrorKind::PresenceUnavailable,
-                "administrator recovery requires macOS device-owner authentication",
-            ))
-        }
+        authenticate_for(std::env::consts::OS, linux::authenticate)
     }
+}
+
+pub(crate) fn authenticate_for(
+    platform: &str,
+    operator: impl FnOnce() -> IdentityResult<()>,
+) -> IdentityResult<()> {
+    if platform == "linux" {
+        return operator();
+    }
+    if platform == "macos" {
+        #[cfg(target_os = "macos")]
+        return macos::authenticate();
+    }
+    Err(refused(
+        ErrorKind::PresenceUnavailable,
+        format!("administrator recovery has no system presence check for {platform}"),
+    ))
 }
 
 #[cfg(any(target_os = "macos", test))]
@@ -88,7 +98,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
     #[test]
     fn platforms_without_local_authentication_refuse_instead_of_skipping_presence() {
         use super::{Presence, SystemPresence};
