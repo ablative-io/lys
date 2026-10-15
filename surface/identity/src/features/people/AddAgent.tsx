@@ -30,13 +30,6 @@ import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
 function reportingChoices(people: PeopleView) {
   return people.people.flatMap((person) => [{ ...person, kind: 'person', owner: person.id }, ...person.agents.map((agent) => ({ ...agent, kind: 'agent', owner: person.id }))]);
 }
-function defaultName(people: PeopleView, target: string): string {
-  const owner = reportingChoices(people).find((entry) => entry.id === target)?.owner;
-  const names = new Set((people.people.find((entry) => entry.id === owner)?.agents ?? []).map((entry) => entry.display_name.trim().toLowerCase()));
-  if (!names.has('new agent')) return 'New agent';
-  for (let number = 2; number <= names.size + 2; number += 1) if (!names.has('new agent ' + number)) return 'New agent ' + number;
-  throw new Error('AgentNameUnavailable: a fresh agent name could not be chosen.');
-}
 
 /** The legacy key an earlier Lys kept an unanswered registration under; nothing writes it now, and it cannot be sent again. */
 const LEGACY = 'lys.pending.register-agent';
@@ -67,9 +60,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
   const [saved] = useState(() => savedRequests(key, runKey, me.person.id, later));
   const query = new URLSearchParams(search);
   const restored = saved.walk?.registration ?? saved.pending;
-  const firstTarget = restored ? restored.answersTo ?? me.person.id : query.get('answers_to') ?? me.person.id;
-  const [name, setName] = useState(restored?.name ?? defaultName(people, firstTarget));
-  const [automaticName, setAutomaticName] = useState(!restored);
+  // The name starts empty: an agent is never added under a name nobody typed, and Add stays off until one is.
+  const [name, setName] = useState(restored?.name ?? '');
   const [person, setPerson] = useState(restored ? restored.answersTo ?? me.person.id : query.get('answers_to') ?? me.person.id);
   const [team, setTeam] = useState(restored ? restored.team ?? '' : query.get('team') ?? '');
   const [sending, setSending] = useState(false);
@@ -184,13 +176,13 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
   const locked = sending || pending !== null || walk !== null || Boolean(saved.error);
   const registrationFields = <>
     <label className="field">Name
-      <input name="display_name" value={name} autoFocus autoComplete="off" disabled={locked} onChange={(event) => { setName(event.target.value); setAutomaticName(false); setRefusal(null); }} aria-invalid={taken ? true : undefined} aria-describedby={taken ? 'add-agent-duplicate' : undefined} />
+      <input name="display_name" value={name} autoFocus autoComplete="off" disabled={locked} onChange={(event) => { setName(event.target.value); setRefusal(null); }} aria-invalid={taken ? true : undefined} aria-describedby={taken ? 'add-agent-duplicate' : undefined} />
     </label>
     {duplicate ? <p className="why-not" id="add-agent-duplicate" role="alert">{duplicate}</p> : null}
   </>;
   // Who it answers to, its access and its team: asked on a first run only under More settings, with their defaults kept.
   const moreRegistration = <>
-    <label className="field">Who this agent answers to<select name="answers_to" value={person} disabled={locked} onChange={(event) => { setPerson(event.target.value); setSelectedGrants([]); if (automaticName) setName(defaultName(people, event.target.value)); }}>
+    <label className="field">Who this agent answers to<select name="answers_to" value={person} disabled={locked} onChange={(event) => { setPerson(event.target.value); setSelectedGrants([]); }}>
       {shownTargets.filter((entry) => capability.answersTo || entry.id === me.person.id || entry.id === person).map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + (STATUS[entry.state]?.toLowerCase() ?? entry.state) : ''}</option>)}
       {!shownTargets.some((entry) => entry.id === person) ? <option value={person} disabled>{chosen ? chosen.display_name + ' · ' + chosen.state : 'Reporting target unavailable'}</option> : null}
     </select></label>

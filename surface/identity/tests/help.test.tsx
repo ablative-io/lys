@@ -3,19 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 import { GO } from '../src/shell/keys';
 import { CONCEPTS, TRACKS, conceptById, conceptGroups } from '../src/shell/help/concepts';
 import { PAGES, RAIL_REGION, pageKeyOf } from '../src/shell/help/pages';
-import { CALL_W, settle as settleCallout } from '../src/shell/help/place';
 import { goShortcuts } from '../src/shell/help/shortcuts';
 import { CLOSED_HELP, helpStateFromParams, readHelpUrl, withHelpState } from '../src/shell/help/url';
 import { $, $$, click, mount, press, settle, type, unreachable } from './harness';
 
-// jsdom lays nothing out; give every element a box on screen so the page help can place its callouts.
+// jsdom lays nothing out; give every element a box on screen so the page help can outline its regions.
 function layOut(left = 100) {
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
     x: left, y: 100, left, top: 100, right: left + 80, bottom: 120, width: 80, height: 20, toJSON: () => ({}),
   } as DOMRect);
 }
 
-const callouts = () => $$('#helpLayer [data-help-call]').map((c) => c.querySelector('.help-call-t')?.textContent?.replace(/^\d+/, ''));
+/** The notes listed in the panel, in order, by title. */
+const notes = () => $$('#helpLayer [data-help-note]').map((n) => n.querySelector('.help-call-t')?.textContent?.replace(/^\d+/, ''));
 const present = (key: string) => [...PAGES[key].regions, RAIL_REGION].filter((r) => $$(r.sel).some((e) => !e.closest('#helpLayer'))).map((r) => r.title);
 
 /** One animation frame: the page help re-measures a frame after the screen's content changes. */
@@ -42,10 +42,10 @@ describe('the page help', () => {
     expect(shown).toContain('The rail');
     // the Add buttons sit in the header on this page; a region with no element is left out, never drawn empty
     const absent = PAGES.people.regions.filter((r) => !$$(r.sel).length).map((r) => r.title);
-    expect(callouts()).toEqual(shown);
-    for (const title of absent) expect(callouts()).not.toContain(title);
-    expect($$('#helpLayer .help-n').map((n) => n.textContent)).toEqual(shown.map((_, i) => String(i + 1)));
-    expect($('[role="dialog"][aria-label="Keys for People and agents"]')).not.toBeNull();
+    expect(notes()).toEqual(shown);
+    for (const title of absent) expect(notes()).not.toContain(title);
+    expect($$('#helpLayer .help-reg .help-n').map((n) => n.textContent)).toEqual(shown.map((_, i) => String(i + 1)));
+    expect($('[role="dialog"][aria-label="Help for People and agents"]')).not.toBeNull();
     expect(readHelpUrl()).toEqual({ page: true, topic: null });
   });
 
@@ -81,34 +81,21 @@ describe('the page help', () => {
     expect($('#helpLayer')).toBeNull();
   });
 
-  it('on a phone lists the numbered notes in place of the keys, and draws no callouts over the page', async () => {
+  it('on a phone lists the same numbered notes, and nothing floats over the page', async () => {
     layOut();
     const width = innerWidth;
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
     try {
       await mount('#/people');
       await press('?', {}, document.body);
-      expect($('#helpLayer .help-kt')).toBeNull();
-      expect($$('#helpLayer [data-help-call]')).toEqual([]);
-      const notes = $$('#helpLayer [data-help-note]').map((n) => n.querySelector('.help-call-t')?.textContent?.replace(/^\d+/, ''));
-      expect(notes).toEqual(present('people'));
-      expect(notes).toContain('The list');
+      expect($$('#helpLayer .help-call')).toEqual([]);
+      expect(notes()).toEqual(present('people'));
+      expect(notes()).toContain('The list');
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
     }
   });
 
-  it('settles a callout off the keys panel and off callouts already placed', () => {
-    const bounds = { minX: 60, width: 1280, height: 800 };
-    const panel = { left: 940, top: 84, right: 1264, bottom: 784, width: 324, height: 700 };
-    const earlier = { left: 620, top: 440, right: 620 + CALL_W, bottom: 550, width: CALL_W, height: 110 };
-    const overPanel = settleCallout({ left: 1000, top: 200 }, 100, [panel], bounds);
-    expect(overPanel.left + CALL_W).toBeLessThanOrEqual(panel.left);
-    const overBoth = settleCallout({ left: 620, top: 500 }, 100, [panel, earlier], bounds);
-    const box = { left: overBoth.left, right: overBoth.left + CALL_W, top: overBoth.top, bottom: overBoth.top + 100 };
-    for (const o of [panel, earlier]) expect(box.right <= o.left || box.left >= o.right || box.bottom <= o.top || box.top >= o.bottom).toBe(true);
-    expect(settleCallout({ left: 100, top: 100 }, 100, [panel], bounds)).toEqual({ left: 100, top: 100 });
-  });
 
   it('closes on Escape and gives focus back to where it was', async () => {
     layOut();
@@ -144,12 +131,12 @@ describe('the page help', () => {
     layOut();
     await mount('#/dashboard');
     await press('?', {}, document.body);
-    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Keys for Dashboard');
+    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Dashboard');
     await go('#/network');
     await frame();
     expect($('#helpLayer')).not.toBeNull();
-    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Keys for Network');
-    expect(callouts()).toEqual(present('network'));
+    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Network');
+    expect(notes()).toEqual(present('network'));
   });
 
   it('lists the shell’s real keys: every g letter, by its screen’s name', async () => {
@@ -314,11 +301,15 @@ describe('the help registry', () => {
     expect(pageKeyOf('/file/A1/access')).toBe('file:access');
     expect(pageKeyOf('/file/A1/budgets')).toBe('file:budgets');
     expect(pageKeyOf('/file/A1/provisioning')).toBe('file:provisioning');
-    expect(pageKeyOf('/file/A1/record')).toBe('file');
+    expect(pageKeyOf('/file/A1/record')).toBe('file:record');
+    expect(pageKeyOf('/file/A1/start')).toBe('start');
+    expect(pageKeyOf('/team/A1')).toBe('start');
+    expect(pageKeyOf('/access/import')).toBe('import');
+    expect(pageKeyOf('/resources')).toBe('resources');
     expect(pageKeyOf('/access/drafts')).toBe('drafts');
     expect(pageKeyOf('/access/can')).toBe('access');
     expect(pageKeyOf('/apps/connect')).toBe('apps-connect');
-    expect(PAGES['apps-connect'].regions.map((region) => region.title)).toEqual(['The app', 'Where it sends people', 'The permissions it asks for', 'Approve or Decline']);
+    expect(PAGES['apps-connect'].regions.map((region) => region.title)).toEqual(['The app', 'Where it sends people', 'The permissions it asks for', 'Approve or Decline', 'Known apps']);
     for (const key of ['network', 'apps', 'secrets', 'settings', 'connections', 'me', 'canvas', 'graph', 'requests', 'reviews', 'roles']) expect(PAGES[pageKeyOf('/' + key)], key).toBeDefined();
   });
 });

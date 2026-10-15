@@ -3,9 +3,9 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
-import { ADA, BEA, COURIER, DIRECTORY, GRANTS, MODEL, RECEIPTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, COURIER, GRANTS, MODEL, RECEIPTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
-import { click, serve, leaveTheReachReadOutOfPosted } from './harness';
+import { click, serve, type, leaveTheReachReadOutOfPosted } from './harness';
 // These cases land on People and agents, which asks what each agent reaches; that read is not one of the flow's changes.
 leaveTheReachReadOutOfPosted();
 
@@ -52,7 +52,10 @@ async function tick() {
   if (!checkbox) throw new Error('Missing grant checkbox');
   await act(async () => { checkbox.click(); });
 }
+/** Submits as a person would: a name is typed first when the form has none, since nothing is pre-filled. */
 async function submit(form: HTMLFormElement) {
+  const name = form.querySelector<HTMLInputElement>('[name="display_name"]');
+  if (name && !name.value) await type(name, 'Courier two');
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 }
 
@@ -118,8 +121,9 @@ describe('Add-agent reporting and permissions', () => {
   });
   it('offers a live named default and only the chosen boss grants, with nothing checked', async () => {
     const { form, posted } = await open();
-    expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
-    expect(form.querySelector<HTMLInputElement>('[name="display_name"]')?.value).toBe('New agent');
+    // No name is pre-filled, so a stray press of Add adds nothing: the button is off until a name is typed.
+    expect(form.querySelector<HTMLInputElement>('[name="display_name"]')?.value).toBe('');
+    expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
     expect([...form.querySelectorAll<HTMLInputElement>('input[name="action"]')].map((entry) => entry.value)).toEqual([editChoice, viewChoice, ledgerChoice]);
     expect(form.querySelectorAll('input[type="checkbox"]:checked')).toHaveLength(0);
     expect(form.textContent).toContain('Edit this resource');
@@ -248,10 +252,5 @@ describe('Add-agent reporting and permissions', () => {
     await click(show ?? null);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + BEA + '"]')?.disabled).toBe(true);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + COURIER + '"]')?.disabled).toBe(true);
-  });
-  it('chooses a fresh default name when that reporting target already has New agent', async () => {
-    const { form } = await open({ '/directory/people': ok({ ...DIRECTORY, people: [{ ...DIRECTORY.people[0], agents: [...DIRECTORY.people[0].agents, { id: 'agent-' + 'a'.repeat(32), display_name: 'New agent', state: 'active' }] }] }) });
-    expect(form.querySelector<HTMLInputElement>('[name="display_name"]')?.value).toBe('New agent 2');
-    expect(form.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
   });
 });

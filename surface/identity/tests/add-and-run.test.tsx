@@ -120,6 +120,8 @@ async function chooseComputer(value: string) {
 async function submit(twice = false) {
   const form = $('form[aria-label="Add an agent"]');
   if (!form) throw new Error('The one-press form is missing');
+  const name = form.querySelector<HTMLInputElement>('[name="display_name"]');
+  if (name && !name.value) await type(name, 'Clover');
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); if (twice) form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
 }
 function plain(stage: Stage, code = 'StepUnavailable') {
@@ -337,8 +339,10 @@ describe('Add and run on an existing computer', () => {
   it('is live with served defaults and a known computer, without a sandbox picker', async () => {
     const computer = existingComputer();
     const { posted } = await open(service(undefined, 'running', [computer]).routes);
+    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
-    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
     expect($('[name="computer_name"]')).toBeNull();
     expect($('[name="mode"]')).toBeNull();
     // The computer is asked even when there is one, chosen for the person and named.
@@ -365,6 +369,7 @@ describe('Add and run on an existing computer', () => {
     const server = service(undefined, 'running', [existingComputer()]);
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }, { id: 'read-only', meaning: 'Reads only' }] }] });
     const { posted } = await open(server.routes);
+    await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that limits its changes to its own folder with the internet off, so it starts in its most careful mode: Reads, changes nothing. You can change this under More settings.');
     expect($('form details .first-run-mode')).toBeNull();
@@ -434,7 +439,7 @@ describe('Add and run on an existing computer', () => {
     };
     expect($('[name="computer_name"]')).toBeNull();
     expect(document.body.textContent).toContain(computer.name);
-    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
+    expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('');
     await type($('[name="display_name"]'), 'Clover');
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
     expect([$('form button[type="submit"]')?.getAttribute('aria-label'), $('form button[type="submit"]')?.textContent]).toEqual(['Add Clover and run it on this computer', 'Add and run']);
