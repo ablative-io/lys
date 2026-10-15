@@ -66,22 +66,26 @@ impl AgentCall {
     }
 
     /// The route's method.
+    #[must_use]
     pub fn method(&self) -> &str {
         &self.method
     }
 
     /// The route's path, with its query.
+    #[must_use]
     pub fn path(&self) -> &str {
         &self.path
     }
 
     /// The SHA-256 of the body the route was given, in lowercase hex.
+    #[must_use]
     pub fn body_sha256(&self) -> &str {
         &self.body_sha256
     }
 
     /// The agent's signature header over the MCP message, as it was sent;
     /// empty when the call was admitted by a run pass or a grant token.
+    #[must_use]
     pub fn signature(&self) -> &str {
         &self.signature
     }
@@ -91,6 +95,13 @@ impl<S: LeafStore> Directory<S> {
     /// Record a change `agent` asks for through MCP, before it is made,
     /// answering its receipt. The actor must be the agent acting for its
     /// responsible person.
+    ///
+    /// # Errors
+    /// Returns [`IdentityError::ChangeMismatch`] when provenance names another agent,
+    /// [`IdentityError::RandomSourceUnavailable`] when the operation id cannot be made,
+    /// or [`IdentityError::IdentityUnknown`] when the agent is absent. Propagates
+    /// operation reuse, event validation, signing, log recovery, append, flush and
+    /// receipt failures from recording the directory change.
     pub fn record_agent_call(
         &mut self,
         actor: Actor,

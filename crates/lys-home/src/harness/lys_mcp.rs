@@ -82,6 +82,7 @@ pub fn delegation_bytes(
 }
 
 /// The bytes a seat signs over its run's pass.
+#[must_use]
 pub fn pass_bytes(agent: &str, session: &str, pass: &str) -> Vec<u8> {
     format!(
         "lys-identity/seat-pass/v1\n{agent}\n{session}\n{}",
@@ -91,6 +92,7 @@ pub fn pass_bytes(agent: &str, session: &str, pass: &str) -> Vec<u8> {
 }
 
 /// Lowercase hex of `bytes`.
+#[must_use]
 pub fn hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut text = String::with_capacity(bytes.len() * 2);
@@ -102,6 +104,7 @@ pub fn hex(bytes: &[u8]) -> String {
 }
 
 /// The bytes of lowercase or uppercase hex `text`; none when it is not hex.
+#[must_use]
 pub fn unhex(text: &str) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) {
         return None;
@@ -187,6 +190,7 @@ impl fmt::Debug for Refusal {
 
 impl Refusal {
     /// The stable refusal name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Duplicate => "LysMcpDuplicate",

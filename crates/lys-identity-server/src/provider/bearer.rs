@@ -202,7 +202,9 @@ pub(crate) fn app_person_actor(
     let Some(value) = headers.get(header::AUTHORIZATION) else {
         return Ok(None);
     };
-    let value = value.to_str().map_err(|_| ProviderError::TokenUnknown)?;
+    let value = value.to_str().map_err(|error| ProviderError::PassRefused {
+        refusal: format!("authorization_header_invalid: {error}"),
+    })?;
     let Some(bearer) = value.strip_prefix("Bearer ") else {
         return Ok(None);
     };
@@ -217,6 +219,10 @@ pub(crate) fn app_person_actor(
             refusal: "mixed_credentials".to_owned(),
         }
         .into());
+    }
+    // Lys's own verified person pass keeps the sign-in's administrator authority.
+    if personal_actor(state, headers)?.is_some() {
+        return Ok(None);
     }
     let person = product_person(state, headers)?;
     let pass = presented_pass(headers).ok_or(ProviderError::TokenUnknown)?;
@@ -258,3 +264,7 @@ pub(crate) fn app_person_actor(
     })?;
     Ok(Some(actor))
 }
+
+#[cfg(test)]
+#[path = "lysfix_srv_personal_tests.rs"]
+mod lysfix_srv_personal_tests;
