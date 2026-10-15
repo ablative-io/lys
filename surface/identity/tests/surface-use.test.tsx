@@ -41,14 +41,7 @@ describe("Surface use on laptops and phones", () => {
     };
     const { container, posted } = await mount("#/agents/new", {
       ...SERVICE,
-      "/surface-contract": ok({
-        paths: {
-          ...schema.paths,
-          "/agents": {
-            post: { requestBody: { content: { "application/json": { schema: { properties: { answers_to: {} } } } } } },
-          },
-        },
-      }),
+      "/surface-contract": ok({ paths: { ...schema.paths, "/agents": { post: { requestBody: { content: { "application/json": { schema: { properties: { answers_to: {} } } } } } } } } }),
       "/network": ok({ machines: [machine(first), machine(second)], reports_served: true }),
       ["/network/machines/" + first + "/runner"]: ok({ machine: first, runner: { kind: "lys" }, answers: true }),
       ["/network/machines/" + second + "/runner"]: ok({ machine: second, runner: null }),
@@ -102,6 +95,8 @@ describe("Surface use on laptops and phones", () => {
     expect(css("styles/screen.css")).toMatch(/\.fill > \.body\.work[^}]*grid-template-columns: minmax\(0, 1fr\)/);
     expect(css("features/dashboard/dashboard.css")).toContain("container-type: inline-size");
     expect(css("features/dashboard/dashboard.css")).toMatch(/dash-widgets[^}]*auto-fit/);
-    expect(css("features/me/you.css")).toMatch(/you-account-row[^}]*auto-fit/);
+    expect(css("features/me/you.css")).toMatch(/you-account-row[^}]*column-count: 2/);
+    expect(css("features/me/you.css")).toMatch(/you-account-row[^}]*column-width: 360px/);
+    expect(css("features/me/you.css")).toMatch(/you-account-row > \.card[^}]*break-inside: avoid/);
   });
 });
