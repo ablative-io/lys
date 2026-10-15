@@ -246,6 +246,7 @@ async fn person_reads_connection_cannot_give_or_delegate_through_tools_or_direct
     assert_eq!(me["body"]["person"]["id"], table.person);
     let before = table.stored()?;
     let grants = table.grants().await?;
+    let mut refused_statuses = Vec::new();
     for (path, body) in table.requests()? {
         for tool in ["change", "read"] {
             let answer = table.tool(&token, tool, "POST", path, &body).await?;
@@ -264,10 +265,9 @@ async fn person_reads_connection_cannot_give_or_delegate_through_tools_or_direct
             assert_eq!(table.grants().await?, grants, "MCP refusal changed grants");
         }
         let (status, answer) = table.direct(&token, path, &body).await?;
-        assert!(
-            [401, 403].contains(&status),
-            "direct {path}: {status}: {answer}"
-        );
+        if ![401, 403].contains(&status) {
+            refused_statuses.push(format!("direct {path}: {status}: {answer}"));
+        }
         assert!(
             answer["refusal"].as_str().is_some(),
             "direct refusal must be named"
@@ -295,6 +295,11 @@ async fn person_reads_connection_cannot_give_or_delegate_through_tools_or_direct
             "browser grant readback"
         );
     }
+    assert!(
+        refused_statuses.is_empty(),
+        "{}",
+        refused_statuses.join("; ")
+    );
     Ok(())
 }
 
