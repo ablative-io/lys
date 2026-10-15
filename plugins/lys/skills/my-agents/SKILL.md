@@ -6,7 +6,8 @@ description: "List the agents visible to the current Lys caller, with honest aut
 Read the lys and identity skills and call `what-can-I-do` first.
 When discovery identifies `connection.mode` as `person_reads`, the person chose
 Person reads in browser consent. Use `read {"path":"/dashboard?limit=50"}` for
-that person's own agents. Follow the returned page cursor with the same filters
+that person's own agents. This read returns only agent rows and paging fields.
+Follow the returned page cursor with the same filters
 until the requested list is complete. Keep each connection/person/route receipt
 and report any page that refused. Changing agents, giving access and approvals
 as the person need the browser; this connection can only read their views.

@@ -120,7 +120,7 @@ pub(super) async fn discovery(
         .person;
     let mut answer = crate::mcp_callers::rendered(Json(json!({
         "connection":{"id":connection.agent.to_string(),"client":connection.client_id,"person":person,"mode":"person_reads"},
-        "message":"Person reads permits only your own identity, agents and directory drafts. Decisions, approvals, giving and signing need you in Lys in the browser. Product-draft reads are not available through this consent yet.",
+        "message":"Person reads permits only your own identity, agents and directory drafts. The dashboard read returns only your agent rows and paging fields. Decisions, approvals, giving and signing need you in Lys in the browser. Product-draft reads are not available through this consent yet.",
         "routes":VIEWS.iter().map(|path| json!({"method":"GET","path":path})).collect::<Vec<_>>(),
         "resources":[],
     })).into_response()).await?;
@@ -164,6 +164,7 @@ pub(super) async fn call(
         Ok(leaf) => leaf,
         Err(error) => return crate::mcp_callers::rendered(audit_refusal(&error)).await,
     };
+    let own_agents = reading.uri.path() == "/dashboard";
     let request = Request::builder()
         .method(Method::GET)
         .uri(reading.uri)
@@ -182,11 +183,43 @@ pub(super) async fn call(
         Ok(response) => response,
         Err(error) => match error {},
     };
+    let response = if own_agents {
+        agent_view(response).await?
+    } else {
+        response
+    };
     let made = response.status().is_success();
     let mut result = crate::mcp_callers::rendered(response).await?;
     crate::mcp_receipts::attach(&mut result, if made { "receipt" } else { "asked" }, leaf)
         .map_err(|error| (-32603, error.to_string()))?;
     Ok(result)
+}
+
+async fn agent_view(response: Response) -> Result<Response, (i32, String)> {
+    if !response.status().is_success() {
+        return Ok(response);
+    }
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .map_err(|error| {
+            (
+                -32603,
+                format!("the own-agent view could not be read: {error}"),
+            )
+        })?;
+    let mut view: serde_json::Map<String, Value> =
+        serde_json::from_slice(&bytes).map_err(|error| {
+            (
+                -32603,
+                format!("the own-agent view is not a JSON object: {error}"),
+            )
+        })?;
+    if !view.get("agents").is_some_and(Value::is_array) {
+        return Err((-32603, "the own-agent view has no agent list".to_owned()));
+    }
+    view.retain(|name, _| matches!(name.as_str(), "agents" | "total" | "next"));
+    Ok((status, Json(view)).into_response())
 }
 
 fn presence(endpoint: &Endpoint, path: &str) -> Response {

@@ -43,7 +43,8 @@ OAuth browser consent offers Agent mode (the existing default) or Person reads.
 Agent mode connects an app agent under its own grants. Person reads permits only
 the consenting person's `/me`, `/dashboard` and own directory `/drafts` views,
 with signed receipts naming the connection, person and route. Discovery names
-that mode as `connection.mode: person_reads`. Old tokens remain in agent mode.
+that mode as `connection.mode: person_reads`. The `/dashboard` read returns only
+agent rows and paging fields. Old tokens remain in agent mode.
 Person reads never permits changes, decisions, approvals, giving or signing as
 the person; those need Lys in the browser. Product-draft reads in this mode are
 refused by name until an own-product-draft helper is callable. A draft decision

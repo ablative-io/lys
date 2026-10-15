@@ -140,6 +140,40 @@ async fn person_connection_reads_me_agents_and_own_raised_and_waiting_drafts() -
 }
 
 #[tokio::test]
+async fn person_connection_agents_read_contains_only_own_agents_and_paging() -> Result {
+    let table = Table::start().await?;
+    let (_, other_tokens) = table.connect(&table.other).await?;
+    let other = table
+        .call(&other_tokens, "read", json!({"path":"/me"}))
+        .await?;
+    let other_connection = other["receipt"]["read"]["connection"]
+        .as_str()
+        .ok_or("no other connection")?;
+    let (_, tokens) = table.connect(&table.owner).await?;
+    for (path, expected_fields) in [
+        ("/dashboard", vec!["agents"]),
+        ("/dashboard?limit=1", vec!["agents", "next", "total"]),
+    ] {
+        let answer = table.call(&tokens, "read", json!({"path":path})).await?;
+        assert_eq!(answer["status"], 200, "own agents were refused");
+        let fields = answer["body"]
+            .as_object()
+            .ok_or("own-agent view is not an object")?
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(
+            fields, expected_fields,
+            "unconsented dashboard fields escaped"
+        );
+        assert!(!answer["body"].to_string().contains(other_connection));
+        let (_, expected) = table.service.get(path, Some(&table.owner)).await?;
+        assert_eq!(answer["body"]["agents"], expected["agents"]);
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn person_connection_refuses_each_draft_decision_with_its_browser_url() -> Result {
     let table = Table::start().await?;
     let (_, tokens) = table.connect(&table.owner).await?;
