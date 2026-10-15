@@ -83,11 +83,13 @@ pub struct LiveSet {
 
 impl LiveSet {
     /// Whether `certificate` has a valid issuance leaf and no valid revocation leaf.
+    #[must_use]
     pub fn is_live(&self, certificate: &CertificateHash) -> bool {
         self.issued.contains_key(certificate) && !self.revoked.contains_key(certificate)
     }
 
     /// The index of the first leaf the fold could not decode, if it holds one.
+    #[must_use]
     pub fn unreadable_leaf(&self) -> Option<u64> {
         self.refused
             .iter()
@@ -96,6 +98,7 @@ impl LiveSet {
     }
 
     /// The indexes of the leaves refused as `refusal`, in log order.
+    #[must_use]
     pub fn refused_as(&self, refusal: LeafRefusal) -> Vec<u64> {
         self.refused
             .iter()

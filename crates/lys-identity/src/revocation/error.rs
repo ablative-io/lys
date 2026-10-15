@@ -147,6 +147,7 @@ pub enum LeafRefusal {
 
 impl LeafRefusal {
     /// The refusal's name in the contract's table.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::CertificateChainInvalid => "certificate_chain_invalid",

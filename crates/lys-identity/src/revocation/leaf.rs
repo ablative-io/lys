@@ -53,11 +53,13 @@ pub struct CertificateHash(pub [u8; 32]);
 
 impl CertificateHash {
     /// The hash of `der`, computed from these bytes and nothing else.
+    #[must_use]
     pub fn of_der(der: &[u8]) -> Self {
         Self(Sha256::digest(der).into())
     }
 
     /// The 32 hash bytes.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
@@ -98,6 +100,7 @@ impl fmt::Debug for Revocation {
 impl Revocation {
     /// Signs the revocation of `certificate` for the log whose origin is
     /// `origin`, with the issuing authority's identity.
+    #[must_use]
     pub fn sign(origin: &str, certificate: CertificateHash, issuer: &Ed25519Identity) -> Self {
         let signature = issuer.sign(&revocation_signed_bytes(origin, certificate));
         Self {
@@ -131,6 +134,7 @@ impl Revocation {
 /// The bytes a revocation signature covers: the revocation domain tag, one
 /// zero byte, the SHA-256 of the origin's UTF-8 bytes and the certificate
 /// hash, with no length prefix anywhere.
+#[must_use]
 pub fn revocation_signed_bytes(origin: &str, certificate: CertificateHash) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(REVOCATION_DOMAIN_TAG.len() + 1 + 32 + 32);
     bytes.extend_from_slice(REVOCATION_DOMAIN_TAG);
@@ -161,6 +165,7 @@ pub enum CertificateLeaf {
 
 impl CertificateLeaf {
     /// The kind byte of this leaf.
+    #[must_use]
     pub fn kind(&self) -> u8 {
         match self {
             Self::Issuance { .. } => KIND_ISSUANCE,
@@ -170,6 +175,7 @@ impl CertificateLeaf {
     }
 
     /// The leaf's bytes: the header, then the body the kind fixes.
+    #[must_use]
     pub fn encode(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(HEADER_LEN + self.body_len());
         bytes.extend_from_slice(LEAF_DOMAIN_TAG);
