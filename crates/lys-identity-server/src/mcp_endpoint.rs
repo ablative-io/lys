@@ -13,6 +13,9 @@ use crate::error::ServerError;
 mod call;
 mod discovery;
 mod person;
+mod refusal;
+#[cfg(test)]
+mod refusal_tests;
 use call::call;
 pub(crate) use person::reading_actor;
 

@@ -160,6 +160,9 @@ async fn dispatch(
     message: &[u8],
 ) -> ResultValue {
     let mut token = None;
+    let method = call.arguments.method.clone();
+    let route = uri.clone();
+    let mut agent = signer.or_else(|| app.as_ref().map(|app| app.agent));
     if parts.headers.contains_key(crate::grant_tokens::HEADER) {
         let admitted = (|| {
             let token = crate::grant_tokens::header(&parts.headers)?;
@@ -175,9 +178,19 @@ async fn dispatch(
         match admitted {
             Ok(principal) => {
                 token = Some(principal);
+                agent = agent.or(Some(principal.holder));
                 parts.extensions.insert(principal);
             }
-            Err(error) => return crate::mcp_callers::rendered(error.into_response()).await,
+            Err(error) => {
+                return super::refusal::rendered(
+                    endpoint,
+                    &method,
+                    &route,
+                    agent,
+                    error.into_response(),
+                )
+                .await;
+            }
         }
     }
     parts.method = Method::from_bytes(call.arguments.method.as_bytes())
@@ -241,7 +254,7 @@ async fn dispatch(
         Err(error) => match error {},
     };
     let made = response.status().is_success();
-    let mut result = crate::mcp_callers::rendered(response).await?;
+    let mut result = super::refusal::rendered(endpoint, &method, &route, agent, response).await?;
     if let Some(kept) = kept {
         kept.answer(&endpoint.refused, made, &mut result)
             .map_err(|error| (-32603, format!("the kept leaf could not be named: {error}")))?;
