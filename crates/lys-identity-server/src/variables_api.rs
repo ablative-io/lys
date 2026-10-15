@@ -76,7 +76,11 @@ async fn read_own_agent(
     headers: HeaderMap,
 ) -> Result<Json<Read>, ServerError> {
     let (agent, _session) = own_run(&state, &headers)?;
-    let read = crate::variables_store::read(variables(&state)?, &Scope::Agent { id: agent })?;
+    let read = crate::variables_store::read_at(
+        variables(&state)?,
+        &Scope::Agent { id: agent },
+        state.sessions.now()?,
+    )?;
     Ok(Json(read))
 }
 
@@ -85,7 +89,11 @@ async fn read_own_session(
     headers: HeaderMap,
 ) -> Result<Json<Read>, ServerError> {
     let (_agent, session) = own_run(&state, &headers)?;
-    let read = crate::variables_store::read(variables(&state)?, &Scope::Session { id: session })?;
+    let read = crate::variables_store::read_at(
+        variables(&state)?,
+        &Scope::Session { id: session },
+        state.sessions.now()?,
+    )?;
     Ok(Json(read))
 }
 
@@ -247,7 +255,11 @@ async fn read_agent(
 ) -> Result<Json<Read>, ServerError> {
     let asker = asker(&state, &headers, ("GET", &uri, &[]))?;
     admit(&state, &headers, asker, &id, "variables.read")?;
-    let read = crate::variables_store::read(variables(&state)?, &Scope::Agent { id })?;
+    let read = crate::variables_store::read_at(
+        variables(&state)?,
+        &Scope::Agent { id },
+        state.sessions.now()?,
+    )?;
     Ok(Json(read))
 }
 
@@ -260,7 +272,11 @@ async fn read_session(
     let asker = asker(&state, &headers, ("GET", &uri, &[]))?;
     let agent = session_agent(&state, &id)?;
     admit(&state, &headers, asker, &agent, "variables.read")?;
-    let read = crate::variables_store::read(variables(&state)?, &Scope::Session { id })?;
+    let read = crate::variables_store::read_at(
+        variables(&state)?,
+        &Scope::Session { id },
+        state.sessions.now()?,
+    )?;
     Ok(Json(read))
 }
 
@@ -297,7 +313,7 @@ fn patched(
     author: IdentityId,
     body: PatchBody,
 ) -> Result<Json<Read>, ServerError> {
-    let read = crate::variables_store::patch(
+    let read = crate::variables_store::patch_at(
         variables(state)?,
         Patch {
             scope,
@@ -306,6 +322,7 @@ fn patched(
             values: body.values,
             expires_at: body.expires_at,
         },
+        state.sessions.now()?,
     )?;
     Ok(Json(read))
 }

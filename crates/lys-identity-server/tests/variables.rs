@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use identity_contract::fake_issuer::Login;
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, ManualClock, Service};
 use lys_core::Ed25519Identity;
 use lys_core::attestation::sign_attestation;
 use lys_core::ca::create_certificate_request;
@@ -57,6 +57,7 @@ fn hex(bytes: &[u8]) -> String {
 /// over a key the test signs with; the cookies of both.
 struct Table {
     service: Service,
+    clock: Arc<ManualClock>,
     beas_agent: String,
     adas_agent: String,
     ada: String,
@@ -67,9 +68,12 @@ struct Table {
 
 impl Table {
     async fn set() -> Result<Self, Box<dyn Error>> {
-        let (service, seeded) =
-            Service::start_with(|config| Ok(seed_configured(config, [ADMINISTRATOR, BEA])?))
-                .await?;
+        let clock = Arc::new(ManualClock::new(i64::try_from(now()?)?));
+        let source = Arc::clone(&clock);
+        let (service, seeded) = Service::start_with_clock(source, |config| {
+            Ok(seed_configured(config, [ADMINISTRATOR, BEA])?)
+        })
+        .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
         let bea = service.sign_in(login(BEA)).await?;
         let beas_agent = seeded.people[1].agents[0].id.to_string();
@@ -99,6 +103,7 @@ impl Table {
         }
         Ok(Self {
             service,
+            clock,
             beas_agent,
             adas_agent,
             ada,
@@ -191,12 +196,15 @@ async fn a_patch_carries_the_revision_read_and_a_stale_one_is_refused() -> TestR
 #[tokio::test]
 async fn an_expired_key_reads_as_absent_and_is_named() -> TestResult {
     let table = Table::set().await?;
-    let soon = now()? + 1;
+    let soon = now()? + 600;
     let body = json!({ "revision": 0, "values": { "lantern": "lit" }, "expires_at": soon });
     let (status, answer) = table.patch(&table.ada, &table.beas_agent, &body).await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["values"]["lantern"]["expires_at"], soon);
-    tokio::time::sleep(std::time::Duration::from_millis(1600)).await;
+    let (status, before) = table.read(&table.ada, &table.beas_agent).await?;
+    assert_eq!(status, 200, "{before}");
+    assert_eq!(before["values"]["lantern"]["value"], "lit");
+    table.clock.set(i64::try_from(soon)?);
     let (status, read) = table.read(&table.ada, &table.beas_agent).await?;
     assert_eq!(status, 200, "{read}");
     assert!(read["values"].get("lantern").is_none(), "{read}");

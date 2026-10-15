@@ -87,6 +87,13 @@ pub struct Patch {
 /// revision. Propagates journal lock, settlement and durable patch write
 /// failures.
 pub fn patch(variables: &VariablesKept, patch: Patch) -> Result<Read, ServerError> {
+    patch_at(variables, patch, now())
+}
+
+/// Keep a patch at the service owner's checked instant.
+/// # Errors
+/// Propagates validation, revision and durable journal failures.
+pub fn patch_at(variables: &VariablesKept, patch: Patch, at: u64) -> Result<Read, ServerError> {
     if patch.values.is_empty() {
         return Err(VariablesError::Malformed {
             reason: "the patch names no key: set a value, or null to remove one".to_owned(),
@@ -96,7 +103,6 @@ pub fn patch(variables: &VariablesKept, patch: Patch) -> Result<Read, ServerErro
     for name in patch.values.keys() {
         checked_name(name)?;
     }
-    let at = now();
     if patch.expires_at.is_some_and(|expiry| expiry <= at) {
         return Err(VariablesError::Malformed {
             reason: "expires_at has passed: an expiry is an instant after now".to_owned(),
@@ -136,5 +142,12 @@ pub fn patch(variables: &VariablesKept, patch: Patch) -> Result<Read, ServerErro
 /// # Errors
 /// Refuses when the variables journal cannot be settled or its lock is poisoned.
 pub fn read(variables: &VariablesKept, scope: &Scope) -> Result<Read, ServerError> {
-    variables.with(|log, _| Ok(log.held().read(scope, now())))
+    read_at(variables, scope, now())
+}
+
+/// Read expiry against the same checked instant used by the service's other boundaries.
+/// # Errors
+/// Propagates journal settlement and lock failures.
+pub fn read_at(variables: &VariablesKept, scope: &Scope, at: u64) -> Result<Read, ServerError> {
+    variables.with(|log, _| Ok(log.held().read(scope, at)))
 }
