@@ -58,8 +58,42 @@ pub struct Leader {
 /// What the proof reads of the machine's processes.
 pub trait Processes {
     /// The parent of `pid`.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if native process metadata cannot be read or a custom provider refuses the lookup.
+    /// - `RunnerError::Unsigned` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Malformed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::ProtocolMismatch` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Replayed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Misaddressed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Unreachable` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::ReplyMalformed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::State` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::StateHeld` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::AlreadyRunning` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Socket` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Key` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::DialStale` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Dial` if supplied by a custom process provider; the provider error is returned unchanged.
     fn parent(&self, pid: u32) -> Result<u32, RunnerError>;
     /// The start identity of `pid`.
+    ///
+    /// # Errors
+    /// - `RunnerError::Refused` if native process metadata cannot be read or a custom provider refuses the lookup.
+    /// - `RunnerError::Unsigned` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Malformed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::ProtocolMismatch` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Replayed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Misaddressed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Unreachable` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::ReplyMalformed` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::State` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::StateHeld` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::AlreadyRunning` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Socket` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Key` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::DialStale` if supplied by a custom process provider; the provider error is returned unchanged.
+    /// - `RunnerError::Dial` if supplied by a custom process provider; the provider error is returned unchanged.
     fn start(&self, pid: u32) -> Result<StartIdentity, RunnerError>;
 }
 
@@ -71,217 +105,30 @@ fn unproved(reason: impl Into<String>) -> RunnerError {
     RunnerError::refused("peer_unproved", reason)
 }
 
-#[cfg(target_os = "macos")]
-fn bsd_info(pid: u32) -> Result<libproc::bsd_info::BSDInfo, RunnerError> {
-    let id = i32::try_from(pid)
-        .map_err(|error| unproved(format!("{pid} is not a process id: {error}")))?;
-    libproc::proc_pid::pidinfo::<libproc::bsd_info::BSDInfo>(id, 0)
-        .map_err(|error| unproved(format!("process {pid} cannot be read: {error}")))
-}
-
-#[cfg(target_os = "linux")]
-fn stat_fields(pid: u32) -> Result<Vec<String>, RunnerError> {
-    let text = std::fs::read_to_string(format!("/proc/{pid}/stat"))
-        .map_err(|error| unproved(format!("process {pid} cannot be read: {error}")))?;
-    let (_, after) = text
-        .rsplit_once(')')
-        .ok_or_else(|| unproved(format!("process {pid}'s record does not read")))?;
-    Ok(after.split_whitespace().map(str::to_owned).collect())
-}
-
-impl Processes for System {
-    #[cfg(target_os = "macos")]
-    fn parent(&self, pid: u32) -> Result<u32, RunnerError> {
-        Ok(bsd_info(pid)?.pbi_ppid)
-    }
-
-    #[cfg(target_os = "macos")]
-    fn start(&self, pid: u32) -> Result<StartIdentity, RunnerError> {
-        let info = bsd_info(pid)?;
-        Ok(StartIdentity(format!(
-            "macos:{}.{:06}",
-            info.pbi_start_tvsec, info.pbi_start_tvusec
-        )))
-    }
-
-    #[cfg(target_os = "linux")]
-    fn parent(&self, pid: u32) -> Result<u32, RunnerError> {
-        stat_fields(pid)?
-            .get(1)
-            .and_then(|field| field.parse().ok())
-            .ok_or_else(|| unproved(format!("process {pid}'s parent does not read")))
-    }
-
-    #[cfg(target_os = "linux")]
-    fn start(&self, pid: u32) -> Result<StartIdentity, RunnerError> {
-        stat_fields(pid)?
-            .get(19)
-            .map(|field| StartIdentity(format!("linux:{field}")))
-            .ok_or_else(|| unproved(format!("process {pid}'s start does not read")))
-    }
-}
-
-/// The process id and user of the peer connected on `stream`, read from
-/// the socket.
-#[cfg(target_os = "macos")]
-pub fn peer_of(stream: &UnixStream) -> Result<(u32, u32), RunnerError> {
-    let pid = nix::sys::socket::getsockopt(stream, nix::sys::socket::sockopt::LocalPeerPid)
-        .map_err(|error| unproved(format!("the peer's process cannot be read: {error}")))?;
-    let (uid, _group) = nix::unistd::getpeereid(stream)
-        .map_err(|error| unproved(format!("the peer's user cannot be read: {error}")))?;
-    let pid = u32::try_from(pid)
-        .map_err(|error| unproved(format!("the peer names no process: {error}")))?;
-    Ok((pid, uid.as_raw()))
-}
-
-/// The process id and user of the peer connected on `stream`, read from
-/// the socket.
-#[cfg(target_os = "linux")]
-pub fn peer_of(stream: &UnixStream) -> Result<(u32, u32), RunnerError> {
-    let credentials =
-        nix::sys::socket::getsockopt(stream, nix::sys::socket::sockopt::PeerCredentials)
-            .map_err(|error| unproved(format!("the peer's credentials cannot be read: {error}")))?;
-    let pid = u32::try_from(credentials.pid())
-        .map_err(|error| unproved(format!("the peer names no process: {error}")))?;
-    Ok((pid, credentials.uid()))
-}
-
-/// The runner's own user.
-pub fn own_user() -> u32 {
-    rustix::process::getuid().as_raw()
-}
-
-/// The start identity of `pid` on this machine, recorded when a session's
-/// leader is spawned.
-pub fn start_identity(pid: u32) -> Result<StartIdentity, RunnerError> {
-    System.start(pid)
-}
-
-fn process_id(pid: u32) -> Result<rustix::process::Pid, RunnerError> {
-    i32::try_from(pid)
-        .ok()
-        .and_then(rustix::process::Pid::from_raw)
-        .filter(|id| id.as_raw_nonzero().get() > 1)
-        .ok_or_else(|| unproved(format!("{pid} is not a process id to inspect")))
-}
-
-/// Read an identity while distinguishing an exited process from an unreadable one.
-pub(crate) fn present_start(pid: u32) -> Result<Option<StartIdentity>, RunnerError> {
-    let id = process_id(pid)?;
-    match rustix::process::test_kill_process(id) {
-        Err(rustix::io::Errno::SRCH) => return Ok(None),
-        Err(error) => {
-            return Err(RunnerError::refused(
-                "process_start_unreadable",
-                format!("process {pid}: {error}"),
-            ));
-        }
-        Ok(()) => {}
-    }
-    match start_identity(pid) {
-        Ok(start) => Ok(Some(start)),
-        Err(error) => match rustix::process::test_kill_process(id) {
-            Err(rustix::io::Errno::SRCH) => Ok(None),
-            Ok(()) => Err(RunnerError::refused(
-                "process_start_unreadable",
-                error.to_string(),
-            )),
-            Err(probe) => Err(RunnerError::refused(
-                "process_start_unreadable",
-                format!("{error}; process {pid} existence check: {probe}"),
-            )),
-        },
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn start_order(start: &StartIdentity) -> Option<(u64, u64)> {
-    let (seconds, micros) = start.0.strip_prefix("macos:")?.split_once('.')?;
-    let micros: u64 = micros.parse().ok()?;
-    (micros < 1_000_000).then_some((seconds.parse().ok()?, micros))
-}
-
-#[cfg(target_os = "linux")]
-fn start_order(start: &StartIdentity) -> Option<(u64, u64)> {
-    Some((start.0.strip_prefix("linux:")?.parse().ok()?, 0))
-}
-
-/// Compare numeric kernel start times, never their textual ordering.
-pub(crate) fn started_not_before(
-    start: &StartIdentity,
-    leader: &StartIdentity,
-) -> Result<bool, RunnerError> {
-    let read = |value: &StartIdentity| {
-        start_order(value).ok_or_else(|| {
-            RunnerError::refused(
-                "process_start_unreadable",
-                "start identity does not read as a kernel start time",
-            )
-        })
-    };
-    Ok(read(start)? >= read(leader)?)
-}
-
-/// List this group's members through the kernel's group filter.
-#[cfg(target_os = "macos")]
-pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
-    libproc::processes::pids_by_type(libproc::processes::ProcFilter::ByProgramGroup {
-        pgrpid: group,
-    })
-    .map_err(|error| {
-        RunnerError::refused(
-            "process_group_unreadable",
-            format!("process group {group}: {error}"),
-        )
-    })
-}
-
-/// List this group's members from the kernel's process records.
-#[cfg(target_os = "linux")]
-pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
-    process_id(group)?;
-    let entries = std::fs::read_dir("/proc").map_err(|error| {
-        RunnerError::refused(
-            "process_group_unreadable",
-            format!("process group {group}: {error}"),
-        )
-    })?;
-    let entries = entries.map(|entry| {
-        entry
-            .map(|entry| {
-                entry
-                    .file_name()
-                    .to_str()
-                    .and_then(|name| name.parse::<u32>().ok())
-            })
-            .map_err(|error| {
-                RunnerError::refused(
-                    "process_group_unreadable",
-                    format!("process group {group}: {error}"),
-                )
-            })
-    });
-    group::members(entries, group, |pid| {
-        match rustix::process::getpgid(Some(process_id(pid)?)) {
-            Ok(found) => u32::try_from(found.as_raw_nonzero().get())
-                .map(Some)
-                .map_err(|error| {
-                    RunnerError::refused("process_group_unreadable", error.to_string())
-                }),
-            Err(rustix::io::Errno::SRCH) => Ok(None),
-            Err(error) => Err(RunnerError::refused(
-                "process_group_unreadable",
-                format!("process {pid}: {error}"),
-            )),
-        }
-    })
-}
+include!("peer/processes.rs");
 
 /// The session whose leader the peer `pid`, of user `uid`, descends from,
 /// among `leaders`, as `processes` reads them. Refused `peer_unproved`,
 /// with the reason, when the user is not `own`, when the ancestry breaks or
 /// reaches no leader, or when the leader's start identity is not the one
 /// recorded, before and after the walk alike.
+///
+/// # Errors
+/// - `RunnerError::Refused` if users differ, ancestry cycles or reaches no leader, the leader start changes, or the process provider refuses a lookup.
+/// - `RunnerError::Unsigned` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Malformed` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::ProtocolMismatch` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Replayed` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Misaddressed` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Unreachable` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::ReplyMalformed` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::State` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::StateHeld` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::AlreadyRunning` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Socket` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Key` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::DialStale` if supplied by a custom process provider; the provider error is returned unchanged.
+/// - `RunnerError::Dial` if supplied by a custom process provider; the provider error is returned unchanged.
 pub fn prove_with(
     processes: &dyn Processes,
     (pid, uid, own): (u32, u32, u32),
@@ -319,6 +166,9 @@ pub fn prove_with(
 
 /// The session the peer on `stream` belongs to, among `leaders`, proved on
 /// this machine.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `peer_unproved` if peer credentials or native ancestry cannot be read, users differ, no leader is reached, or its start identity changes.
 pub fn prove(
     stream: &UnixStream,
     leaders: &BTreeMap<String, Leader>,
@@ -409,123 +259,13 @@ pub struct Connection {
     proof: Option<Proof>,
 }
 
-impl Connection {
-    pub(crate) fn proved_with(
-        &mut self,
-        sessions: &Sessions,
-        processes: &dyn Processes,
-        (pid, uid, own): (u32, u32, u32),
-    ) -> Result<&Proof, RunnerError> {
-        if uid != own {
-            return Err(unproved("the peer and runner have different users"));
-        }
-        if let Some(proof) = self.proof.as_ref() {
-            if proof.pid != pid
-                || proof.uid != uid
-                || processes.start(pid)? != proof.start
-                || processes.start(proof.leader.pid)? != proof.leader.start
-                || !sessions.peer_matches(&proof.session, proof.generation, &proof.leader)?
-            {
-                return Err(unproved(
-                    "the connection's proved process or launch changed",
-                ));
-            }
-        } else {
-            let start = processes.start(pid)?;
-            let mut walked = BTreeSet::new();
-            let mut at = pid;
-            let (session, generation, leader) = loop {
-                if let Some(found) = sessions.peer_leader(at)? {
-                    break found;
-                }
-                if at <= 1 || !walked.insert(at) {
-                    return Err(unproved("the peer descends from no running session"));
-                }
-                at = processes.parent(at)?;
-            };
-            if processes.start(leader.pid)? != leader.start
-                || processes.start(leader.pid)? != leader.start
-                || processes.start(pid)? != start
-                || !sessions.peer_matches(&session, generation, &leader)?
-            {
-                return Err(unproved("the peer or its launch changed during proof"));
-            }
-            self.proof = Some(Proof {
-                session,
-                generation,
-                leader,
-                pid,
-                uid,
-                start,
-            });
-        }
-        self.proof
-            .as_ref()
-            .ok_or_else(|| unproved("the connection has no process proof"))
-    }
-
-    /// Answer a parsed request without repeating its ancestry walk.
-    pub fn answer(
-        &mut self,
-        sessions: &Arc<Sessions>,
-        stream: &UnixStream,
-        request: PeerRequest,
-        left: &AtomicBool,
-    ) -> Answer {
-        if request.version != PROTOCOL_VERSION {
-            return Answer::refusal(&RunnerError::ProtocolMismatch {
-                theirs: request.version,
-                ours: PROTOCOL_VERSION,
-            });
-        }
-        let proved = peer_of(stream)
-            .and_then(|(pid, uid)| self.proved_with(sessions, &System, (pid, uid, own_user())));
-        let proof = match proved {
-            Ok(proof) => proof,
-            Err(error) => {
-                return match request.peer {
-                    PeerAct::Judge(_) => Answer::Judged {
-                        verdict: crate::refusals::Verdict::denied(
-                            &error.name(),
-                            error.to_string(),
-                            "not_attributed",
-                        ),
-                    },
-                    PeerAct::Restart { .. } if error.name() == "peer_unproved" => {
-                        Answer::refusal(&RunnerError::refused("not_a_session", error.to_string()))
-                    }
-                    PeerAct::Restart { .. } | PeerAct::Collect(_) => Answer::refusal(&error),
-                };
-            }
-        };
-        match request.peer {
-            PeerAct::Restart { operation, .. } => sessions
-                .restart_proved(&proof.session, &operation, &proof.leader)
-                .map_or_else(
-                    |error| Answer::refusal(&error),
-                    |outcome| Answer::Operation { outcome },
-                ),
-            PeerAct::Judge(asked) => Answer::Judged {
-                verdict: crate::refusal_log::answer_proved(
-                    sessions,
-                    &proof.session,
-                    proof.generation,
-                    &proof.leader,
-                    &asked,
-                    left,
-                ),
-            },
-            PeerAct::Collect(collected) => {
-                sessions.collect(&proof.session, &collected).map_or_else(
-                    |error| Answer::refusal(&error),
-                    |words| Answer::Collected { words },
-                )
-            }
-        }
-    }
-}
+include!("peer/connection.rs");
 
 /// Decode the outer JSON once; typed variants retain duplicate-field validation.
+///
+/// # Errors
+/// - `RunnerError::Malformed` if the outer JSON, typed request or version field does not decode.
+/// - `RunnerError::ProtocolMismatch` if the request names another version.
 pub fn parse(line: &str) -> Result<ParsedRequest, RunnerError> {
     let request: ParsedRequest =
         serde_json::from_str(line).map_err(|error| RunnerError::Malformed {
@@ -551,6 +291,7 @@ pub fn parse(line: &str) -> Result<ParsedRequest, RunnerError> {
 }
 
 /// Whether a decoded request is a peer's rather than the server's.
+#[must_use]
 pub fn is_peer(request: &ParsedRequest) -> bool {
     matches!(request, ParsedRequest::Peer(_))
 }

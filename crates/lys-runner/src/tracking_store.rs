@@ -74,73 +74,7 @@ fn pending_usage<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Va
     }
 }
 
-/// A Codex usage object's counts, as kept between `token_count` events.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Totals {
-    /// All input tokens, cached ones among them.
-    pub input: u64,
-    /// Input tokens read from a cache.
-    pub cached: u64,
-    /// Output tokens.
-    pub output: u64,
-}
-
-impl Totals {
-    /// The totals a Codex usage object says, when it says all three.
-    pub fn of(usage: &Value) -> Option<Self> {
-        Some(Self {
-            input: count(usage, "input_tokens")?,
-            cached: count(usage, "cached_input_tokens").unwrap_or(0),
-            output: count(usage, "output_tokens")?,
-        })
-    }
-
-    /// What `self` adds over `before`; none when any count went down, which
-    /// is a reset, not spend.
-    pub fn since(&self, before: &Self) -> Option<Self> {
-        Some(Self {
-            input: self.input.checked_sub(before.input)?,
-            cached: self.cached.checked_sub(before.cached)?,
-            output: self.output.checked_sub(before.output)?,
-        })
-    }
-
-    /// The spend figures of a difference.
-    pub fn figures(&self, context: Option<u64>) -> (Figures, Vec<Unavailable>) {
-        let figures = Figures {
-            input_tokens: Some(self.input.saturating_sub(self.cached)),
-            output_tokens: Some(self.output),
-            cache_creation_tokens: None,
-            cache_read_tokens: Some(self.cached),
-            context_tokens: context,
-            running_ms: None,
-            ..Figures::default()
-        };
-        let mut notes = vec![
-            Unavailable {
-                figure: "dollars_micros".to_owned(),
-                reason:
-                    "Codex reports dollars only through its app-server; Lys does not read it yet"
-                        .to_owned(),
-            },
-            Unavailable {
-                figure: "plan_windows".to_owned(),
-                reason: "codex_rollout_has_no_reported_plan_window".to_owned(),
-            },
-            Unavailable {
-                figure: "cache_creation_tokens".to_owned(),
-                reason: "codex_reports_none".to_owned(),
-            },
-            Unavailable {
-                figure: "running_ms".to_owned(),
-                reason: "measured_from_the_session_process".to_owned(),
-            },
-        ];
-        note("context_tokens", context, "field_absent", &mut notes);
-        (figures, notes)
-    }
-}
+include!("tracking_store/totals.rs");
 
 /// A turn boundary the harness signalled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -231,6 +165,7 @@ fn failed(what: impl std::fmt::Display) -> RunnerError {
 }
 
 /// The key a refusal's attempt is kept under.
+#[must_use]
 pub fn attempt_key(session: &str, attempt: &str) -> String {
     format!("{session}\n{attempt}")
 }
@@ -238,6 +173,9 @@ pub fn attempt_key(session: &str, attempt: &str) -> String {
 impl Feed {
     /// The feed in `dir`, made when there is none; a unit a crash left
     /// without its commit is cut off and said.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if the index or feed cannot be read, decoded, recovered, truncated or durably written, or the index format is unsupported.
     pub fn open(dir: &Path) -> Result<Self, RunnerError> {
         let path = dir.join("feed.jsonl");
         let index_path = dir.join("feed.index.json");
@@ -388,22 +326,29 @@ impl Feed {
     }
 
     /// The feed's own id, which every cursor names.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.index.feed
     }
 
     /// The cursor after every committed entry.
+    #[must_use]
     pub fn end(&self) -> String {
         format!("{}:{}", self.index.feed, self.index.committed)
     }
 
     /// Session `session`'s stream as last committed.
+    #[must_use]
     pub fn source(&self, session: &str) -> Option<&SourceState> {
         self.index.sources.get(session)
     }
 
     /// The refusal kept for `key`, when one was: the first entry of the
     /// unit its attempt was committed in.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if feed records cannot be encoded, read, found at the committed offset or durably written.
+    /// - `RunnerError::Refused` if the shared durable writer cannot accept work or complete its barrier.
     pub fn attempt(&self, key: &str) -> Result<Option<RefusalRecord>, RunnerError> {
         if let Some(writer) = &self.writer {
             writer.barrier()?;
@@ -429,6 +374,10 @@ impl Feed {
     /// Append `bodies` for `session` as one unit ending in `commit`, made
     /// queued in sequence; a shared writer is fenced outside the table
     /// before answering a caller. Answers the first entry's number.
+    ///
+    /// # Errors
+    /// - `RunnerError::State` if feed records cannot be encoded, read, found at the committed offset or durably written.
+    /// - `RunnerError::Refused` if the shared durable writer cannot accept work or complete its barrier.
     pub fn append(
         &mut self,
         session: &str,

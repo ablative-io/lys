@@ -204,6 +204,7 @@ pub struct Greeting {
 
 impl Greeting {
     /// The greeting of runner `runner`, with a fresh challenge.
+    #[must_use]
     pub fn fresh(runner: &str) -> Self {
         Self {
             version: PROTOCOL_VERSION,
@@ -214,12 +215,14 @@ impl Greeting {
 
     /// Whether the runner and challenge are lowercase hex, the challenge 32
     /// bytes, so neither can carry the newline that ends a signed field.
+    #[must_use]
     pub fn well_formed(&self) -> bool {
         unhex(&self.runner).is_some_and(|bytes| !bytes.is_empty())
             && unhex(&self.challenge).is_some_and(|bytes| bytes.len() == 32)
     }
 
     /// The greeting's line.
+    #[must_use]
     pub fn line(&self) -> String {
         format!(
             "{{\"version\":{},\"runner\":{},\"challenge\":{}}}",
@@ -245,49 +248,14 @@ struct Versioned {
     version: u32,
 }
 
-/// The bytes a request's signature is over. The runner id and the
-/// challenge are hexadecimal, so no field can carry the newline that ends
-/// the one before it.
-pub fn signed_bytes(version: u32, runner: &str, challenge: &str, act: &str) -> Vec<u8> {
-    format!("{REQUEST_DOMAIN}\n{version}\n{runner}\n{challenge}\n{act}").into_bytes()
-}
-
-const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
-
-/// Lowercase hex of `bytes`.
-pub fn hex(bytes: &[u8]) -> String {
-    let mut text = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        text.push(char::from(HEX_DIGITS[usize::from(byte >> 4)]));
-        text.push(char::from(HEX_DIGITS[usize::from(byte & 0x0f)]));
-    }
-    text
-}
-
-/// The bytes `text` spells in lowercase hex, `None` when it does not.
-pub fn unhex(text: &str) -> Option<Vec<u8>> {
-    let digit = |c: u8| match c {
-        b'0'..=b'9' => Some(c - b'0'),
-        b'a'..=b'f' => Some(c - b'a' + 10),
-        _ => None,
-    };
-    let bytes = text.as_bytes();
-    if bytes.len() % 2 != 0 {
-        return None;
-    }
-    bytes
-        .chunks(2)
-        .map(|pair| Some((digit(pair[0])? << 4) | digit(pair[1])?))
-        .collect()
-}
-
-/// A fresh nonce: 16 random bytes in hex.
-pub fn nonce() -> String {
-    hex(&rand::random::<[u8; 16]>())
-}
+include!("protocol/encoding.rs");
 
 /// The greeting `line` carries, refused `runner_protocol_mismatch` when it
 /// is in another version before anything else in it is read.
+///
+/// # Errors
+/// - `RunnerError::ReplyMalformed` if greeting JSON or its runner/challenge shape is invalid.
+/// - `RunnerError::ProtocolMismatch` if the greeting names another version.
 pub fn read_greeting(line: &str) -> Result<Greeting, RunnerError> {
     let versioned: Versioned =
         serde_json::from_str(line).map_err(|error| RunnerError::ReplyMalformed {
@@ -315,6 +283,10 @@ pub fn read_greeting(line: &str) -> Result<Greeting, RunnerError> {
 
 /// The request line for `act` to the runner that gave `greeting`, signed by
 /// `key` over its runner and challenge.
+///
+/// # Errors
+/// - `RunnerError::ReplyMalformed` if the greeting runner/challenge shape is invalid.
+/// - `RunnerError::Malformed` if the act or signed request cannot be encoded.
 pub fn sign_request(
     key: &Ed25519Identity,
     greeting: &Greeting,
@@ -349,6 +321,13 @@ pub fn sign_request(
 /// The act `line` asks for, once its version is this protocol's, it names
 /// the runner and challenge of `greeting`, and its signature verifies
 /// against `server`.
+///
+/// # Errors
+/// - `RunnerError::Malformed` if request or act JSON is invalid.
+/// - `RunnerError::ProtocolMismatch` if the request names another version.
+/// - `RunnerError::Unsigned` if the signature is absent, invalid hex, or does not verify.
+/// - `RunnerError::Misaddressed` if the request names another runner.
+/// - `RunnerError::Replayed` if the request challenge differs from this connection.
 pub fn verify_request(
     line: &str,
     server: &[u8; 32],
@@ -371,6 +350,13 @@ pub fn verify_request(
 }
 
 /// Verify a decoded server request without reparsing its outer JSON.
+///
+/// # Errors
+/// - `RunnerError::Malformed` if request or act JSON is invalid.
+/// - `RunnerError::ProtocolMismatch` if the request names another version.
+/// - `RunnerError::Unsigned` if the signature is absent, invalid hex, or does not verify.
+/// - `RunnerError::Misaddressed` if the request names another runner.
+/// - `RunnerError::Replayed` if the request challenge differs from this connection.
 pub fn verify_parsed(
     request: &Request,
     server: &[u8; 32],
@@ -424,6 +410,7 @@ pub fn verify_parsed(
 }
 
 /// The reply line for `answer`.
+#[must_use]
 pub fn reply_line(answer: Answer) -> String {
     let reply = Reply {
         version: PROTOCOL_VERSION,
@@ -439,6 +426,11 @@ pub fn reply_line(answer: Answer) -> String {
 
 /// The answer `line` carries, refused `runner_protocol_mismatch` when it is
 /// in another version, and as its own refusal when the runner refused.
+///
+/// # Errors
+/// - `RunnerError::ReplyMalformed` if reply JSON or its answer shape is invalid.
+/// - `RunnerError::ProtocolMismatch` if the reply names another version.
+/// - `RunnerError::Refused` if the runner returns a named refusal, preserving its words and oldest cursor.
 pub fn read_reply(line: &str) -> Result<Answer, RunnerError> {
     let versioned: Versioned =
         serde_json::from_str(line).map_err(|error| RunnerError::ReplyMalformed {
