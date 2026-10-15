@@ -2,6 +2,9 @@
 //! every one; anyone else those they hold, those they answer for as the
 //! grant's responsible person, and those they may decide because they may
 //! grant the draft's action.
+//!
+//! Own-person readings filter by holder and recorded responsibility before
+//! paging so administrator authority cannot widen a connection's consent.
 
 use lys_identity::IdentityId;
 use lys_identity::projection::product_draft::{Closed, ProductDraftRecord};
@@ -116,10 +119,37 @@ pub(super) fn person_list(
     headers: &HeaderMap,
     page: &Page,
 ) -> Result<ProductDraftList, ServerError> {
+    if crate::mcp_endpoint::reading_actor().is_some() {
+        return own_person_list(state, headers, page);
+    }
     let seen = seen(state, headers)?;
-    let rows = seen
-        .iter()
-        .map(|record| (record.created.operation.to_string(), record));
+    page_records(seen.iter(), page)
+}
+
+/// The signed-in person's held and responsible product drafts, filtered before
+/// paging. Administrator authority never widens this own-record reading.
+pub(crate) fn own_person_list(
+    state: &AppState,
+    headers: &HeaderMap,
+    page: &Page,
+) -> Result<ProductDraftList, ServerError> {
+    let actor = crate::routes::signed_in(state, headers)?;
+    crate::routes::with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let person = crate::read_api::own_person(projection, &actor)?;
+        let own = projection.product_drafts().filter(|record| {
+            record.created.holder == IdentityId::Person(person)
+                || record.created.responsible == person
+        });
+        page_records(own, page)
+    })
+}
+
+fn page_records<'a>(
+    records: impl Iterator<Item = &'a ProductDraftRecord>,
+    page: &Page,
+) -> Result<ProductDraftList, ServerError> {
+    let rows = records.map(|record| (record.created.operation.to_string(), record));
     let (drafts, totals) = page.select(
         rows,
         None,

@@ -83,19 +83,7 @@ impl Table {
     }
 
     async fn call(&self, tokens: &Value, name: &str, arguments: Value) -> Result<Value> {
-        let client = client()?;
-        let response = client
-            .post(format!("{}/mcp", self.service.base))
-            .header("accept", "application/json, text/event-stream")
-            .bearer_auth(tokens["access_token"].as_str().ok_or("no access token")?)
-            .json(&json!({"jsonrpc":"2.0", "id":1, "method":"tools/call",
-                "params":{"name":name, "arguments":arguments}}))
-            .send()
-            .await?;
-        assert_eq!(response.status(), 200, "MCP transport refused");
-        let answer: Value = response.json().await?;
-        assert!(answer["result"].is_object(), "{answer}");
-        support::body(&answer["result"])
+        support::call(&self.service, tokens, name, arguments).await
     }
 }
 
@@ -243,7 +231,6 @@ async fn person_connection_cannot_read_another_persons_drafts_even_as_administra
         }
         for path in [
             format!("/drafts/{foreign}"),
-            "/product-drafts".to_owned(),
             format!("/directory/people/{person}/sessions"),
             "/api/me".to_owned(),
         ] {
@@ -280,7 +267,7 @@ async fn agent_mode_keeps_its_own_identity_and_cannot_read_person_views() -> Res
     assert_eq!(tree["status"], 200, "{tree}");
     assert_eq!(tree["body"]["root"]["name"], "Notes");
     assert_ne!(tree["body"]["root"]["id"], table.person);
-    for path in ["/me", "/dashboard", "/drafts"] {
+    for path in ["/me", "/dashboard", "/drafts", "/product-drafts"] {
         let answer = table.call(&tokens, "read", json!({"path":path})).await?;
         assert_ne!(answer["status"], 200, "agent gained person views: {answer}");
     }
@@ -371,7 +358,8 @@ async fn person_connection_discovery_names_only_consented_reads_and_keeps_a_sign
     assert_eq!(
         discovered["body"]["routes"],
         json!([
-            {"method":"GET", "path":"/me"}, {"method":"GET", "path":"/dashboard"}, {"method":"GET", "path":"/drafts"}
+            {"method":"GET", "path":"/me"}, {"method":"GET", "path":"/dashboard"}, {"method":"GET", "path":"/drafts"},
+            {"method":"GET", "path":"/product-drafts"}
         ])
     );
     let receipt = &discovered["receipt"];

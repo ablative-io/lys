@@ -344,7 +344,7 @@ fn initialize(params: &Value) -> ResultValue {
     };
     Ok(
         json!({"protocolVersion":version, "capabilities":{"tools":{}}, "serverInfo":{"name":"lys", "version":env!("CARGO_PKG_VERSION")},
-            "instructions":"Call what-can-I-do first with {} to read this connection's consent, declared routes and live grants. Use read for a permitted view, change for an admitted agent change, and drafts for directory draft routes. Person reads permits only the consenting person's own identity, agents and directory drafts, with receipts. Decisions, approvals, giving and signing as that person need Lys in the browser. Agent-mode calls retain each HTTP route's authority and validation; a listed route alone never grants authority."}),
+            "instructions":"Call what-can-I-do first with {} to read this connection's consent, declared routes and live grants. Use read for a permitted view, change for an admitted agent change, and drafts for directory draft routes. Person reads permits only the consenting person's own identity, agents, directory drafts and product drafts, with receipts. Decisions, approvals, giving and signing as that person need Lys in the browser. Agent-mode calls retain each HTTP route's authority and validation; a listed route alone never grants authority."}),
     )
 }
 

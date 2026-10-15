@@ -31,7 +31,7 @@ The public metadata advertises that endpoint as its protected resource and Lys
 as its authorization server. The host registers an OAuth client, uses PKCE S256,
 and opens Lys for the person to sign in and consent. Agent mode remains the
 default and uses the connected agent's own grants. Person reads is an explicit
-choice for the person's own identity, agents and directory drafts; every reading
+choice for the person's own identity, agents, directory and product drafts; every reading
 has a signed receipt naming connection, person and route. It never grants the
 person's approval, giving or signing authority. Those acts need the browser.
 Old tokens remain in agent mode. Never paste tokens
@@ -59,12 +59,15 @@ Read the `lys` skill first; discovery does not grant the routes it lists.
 | give-access | Make an authorized scoped gift, read it back and verify recipient use. |
 | drafts | Read or prepare drafts; hand personal decisions back to the browser. |
 
-In Person reads, use `/me`, `/dashboard` and `/drafts` for the consenting person's
-own views. Directory drafts support `state=waiting`, `decided` and `all`, including
-own raised drafts. Another person's drafts remain unavailable. A decision is
-refused as `PersonPresenceRequired` with `deciding a draft needs you in Lys:` and
-that draft's browser URL. Product-draft reads in this mode remain refused by name
-until a callable helper limits them to the person's own records before paging.
+In Person reads, use `/me`, `/dashboard`, `/drafts` and `/product-drafts` for
+the consenting person's own views. Directory drafts support `state=waiting`,
+`decided` and `all`, including own raised drafts. Product drafts use
+`read {"path":"/product-drafts?limit=50"}` and include only drafts held by the
+person or recorded with them as responsible, filtered before paging. Follow
+`after` cursors with the same limit; use each row's state to find waiting drafts.
+Another person's drafts remain unavailable, including for administrators. A
+decision is refused as `PersonPresenceRequired` with
+`deciding a draft needs you in Lys:` and that draft's browser URL.
 Agent mode is unchanged. Directory-draft creation requires an agent signature;
 this HTTP OAuth plugin does not supply a signing key.
 The installed `lys mcp` stdio bridge is a separate signed-agent connection and

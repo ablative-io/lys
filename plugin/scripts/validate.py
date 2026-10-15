@@ -237,6 +237,8 @@ def validate_person_reads():
         "deciding a draft needs you in Lys:" in drafts,
         "named_draft_decision_refusal_missing",
     )
+    require("/product-drafts?limit=50" in drafts, "own_product_draft_read_missing")
+    require("before paging" in drafts, "own_product_draft_page_scope_missing")
 
 
 def main():

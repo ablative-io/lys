@@ -41,13 +41,15 @@ or launch is not evidence that an application or session has run.
 
 OAuth browser consent offers Agent mode (the existing default) or Person reads.
 Agent mode connects an app agent under its own grants. Person reads permits only
-the consenting person's `/me`, `/dashboard` and own directory `/drafts` views,
+the consenting person's `/me`, `/dashboard`, directory `/drafts` and product
+`/product-drafts` views,
 with signed receipts naming the connection, person and route. Discovery names
 that mode as `connection.mode: person_reads`. The `/dashboard` read returns only
 agent rows and paging fields. Old tokens remain in agent mode.
 Person reads never permits changes, decisions, approvals, giving or signing as
-the person; those need Lys in the browser. Product-draft reads in this mode are
-refused by name until an own-product-draft helper is callable. A draft decision
+the person; those need Lys in the browser. Product drafts are limited before
+paging to drafts held by the person or recorded with them as responsible.
+Administrator authority adds no other person's drafts. A draft decision
 refuses with `PersonPresenceRequired` and the words
 `deciding a draft needs you in Lys: <url of that draft>`.
 Do not reuse the person's session, an operator credential or a different seat to

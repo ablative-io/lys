@@ -24,8 +24,13 @@ are `decided` and `all`; `q`, `team`, `after`, `limit` retain the same paging sc
 An OAuth connection consented for Person reads can read only its person's own
 directory drafts, including their raised drafts in `state=all`. Each reading has
 a signed connection/person/route receipt. Agent mode is unchanged and does not
-borrow the person's views. Product-draft reads in Person reads remain refused
-by name until an own-product-draft helper is callable.
+borrow the person's views. In Person reads, use
+`read {"path":"/product-drafts?limit=50"}` for the person's own product drafts,
+including those raised by them or their agents and those still waiting. Only
+drafts held by that person or recorded with them as responsible are included,
+filtered before paging. Follow `after` with the same limit. Use returned states
+to select waiting rows; person product reads take no `app` or `state` query.
+Administrator authority never adds another person's records.
 
 Every decision as the person stays in Lys's browser. Person reads never decides,
 approves, refuses, corrects, gives or signs for them. A decision call returns

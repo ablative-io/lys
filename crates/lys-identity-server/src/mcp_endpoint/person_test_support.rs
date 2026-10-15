@@ -118,6 +118,27 @@ pub(super) fn body(result: &Value) -> Result<Value, Box<dyn Error>> {
     )?)
 }
 
+pub(super) async fn call(
+    service: &Service,
+    tokens: &Value,
+    name: &str,
+    arguments: Value,
+) -> Result<Value, Box<dyn Error>> {
+    let client = client()?;
+    let response = client
+        .post(format!("{}/mcp", service.base))
+        .header("accept", "application/json, text/event-stream")
+        .bearer_auth(tokens["access_token"].as_str().ok_or("no access token")?)
+        .json(&json!({"jsonrpc":"2.0", "id":1, "method":"tools/call",
+            "params":{"name":name, "arguments":arguments}}))
+        .send()
+        .await?;
+    assert_eq!(response.status(), 200, "MCP transport refused");
+    let answer: Value = response.json().await?;
+    assert!(answer["result"].is_object(), "{answer}");
+    body(&answer["result"])
+}
+
 pub(super) fn unhex(value: &Value) -> Result<Vec<u8>, Box<dyn Error>> {
     let text = value.as_str().ok_or("no hex text")?;
     if !text.len().is_multiple_of(2) {

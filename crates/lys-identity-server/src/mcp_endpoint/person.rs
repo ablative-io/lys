@@ -12,7 +12,7 @@ use super::{Endpoint, ResultValue};
 use crate::error::ServerError;
 use crate::mcp_oauth::Connection;
 
-const VIEWS: [&str; 3] = ["/me", "/dashboard", "/drafts"];
+const VIEWS: [&str; 4] = ["/me", "/dashboard", "/drafts", "/product-drafts"];
 
 tokio::task_local! {
     static PERSON_READING: Actor;
@@ -120,7 +120,7 @@ pub(super) async fn discovery(
         .person;
     let mut answer = crate::mcp_callers::rendered(Json(json!({
         "connection":{"id":connection.agent.to_string(),"client":connection.client_id,"person":person,"mode":"person_reads"},
-        "message":"Person reads permits only your own identity, agents and directory drafts. The dashboard read returns only your agent rows and paging fields. Decisions, approvals, giving and signing need you in Lys in the browser. Product-draft reads are not available through this consent yet.",
+        "message":"Person reads permits only your own identity, agents, directory drafts and product drafts held by you or recorded with you as responsible. The dashboard read returns only your agent rows and paging fields. Decisions, approvals, giving and signing need you in Lys in the browser.",
         "routes":VIEWS.iter().map(|path| json!({"method":"GET","path":path})).collect::<Vec<_>>(),
         "resources":[],
     })).into_response()).await?;
@@ -151,7 +151,7 @@ pub(super) async fn call(
     if !VIEWS.contains(&reading.uri.path()) || reading.has_body {
         return crate::mcp_callers::rendered((StatusCode::FORBIDDEN, Json(json!({
             "refusal":"PersonReadNotConsented",
-            "reason":"this connection may read only your identity, own agents and own directory drafts; product drafts need a callable own-person read helper",
+            "reason":"this connection may read only your identity, own agents, own directory drafts and product drafts held by you or recorded with you as responsible",
         }))).into_response()).await;
     }
     let leaf = match receipt(

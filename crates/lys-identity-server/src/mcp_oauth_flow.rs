@@ -207,10 +207,11 @@ and you can take that away or remove it at any time from your agents in Lys.</p>
 <label><input type=\"radio\" name=\"mode\" value=\"agent\" checked> Agent mode</label>\
 <p>Use only the agent permissions chosen below.</p>\
 <label><input type=\"radio\" name=\"mode\" value=\"person_reads\"> Person reads</label>\
-<p>Read who you are, your own agents, and your own directory drafts awaiting your decision \
-or raised by you. Each read is recorded with this connection, you and the route. \
+<p>Read who you are, your own agents, your own directory drafts awaiting your decision \
+or raised by you, and product drafts held by you or recorded with you as responsible, including waiting drafts. \
+Each read is recorded with this connection, you and the route. \
 It can never decide, approve, give or sign for you. Those acts need you in Lys in the browser. \
-Product drafts cannot be read through this choice yet. Leave agent permissions unticked when choosing Person reads.</p></fieldset>\
+Leave agent permissions unticked when choosing Person reads.</p></fieldset>\
 {choices}<p>Ticking nothing connects nothing in agent mode. The agent will have no permissions.</p>\
 <button type=\"submit\" name=\"decision\" value=\"approve\">Connect {name}</button>\
 <button type=\"submit\" name=\"decision\" value=\"refuse\">Don't connect</button>\
