@@ -819,16 +819,18 @@ describe('Ask is one sentence (walk of 4 Oct)', () => {
   });
 });
 
-describe('Issue root grant is one row (walk of 4 Oct)', () => {
-  it('puts every field in one row of the one form, issues with Issue, and closes with a plain button', async () => {
+describe('Give access is one row (walk of 4 Oct)', () => {
+  it('puts every field in one row of the one form, in plain words, gives with Give access, and closes with a plain button', async () => {
     await mount('#/access/issue');
     const close = [...document.querySelectorAll('.head a')].find((a) => a.textContent === 'Close the form');
     expect(close?.classList.contains('primary')).toBe(false);
-    const form = $('.act-panel.issue-root form[aria-label="Issue root grant"]');
+    const form = $('.act-panel.issue-root form[aria-label="Give access"]');
     expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
     const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
-    expect(fields).toEqual(['Holder', 'Give them access to', 'Which one', 'As', 'May pass on', 'Expires (your local time)', 'More']);
-    expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Issue');
+    expect(fields).toEqual(['Person', 'Give them access to', 'Which one', 'They may', 'May pass on', 'Expires (your local time)', 'More']);
+    expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Give access');
+    // None of the grant model's own words reach the person giving access.
+    for (const word of ['Holder', 'root grant', 'root authority', 'relation from the permission model']) expect(form?.textContent).not.toContain(word);
   });
 });
 

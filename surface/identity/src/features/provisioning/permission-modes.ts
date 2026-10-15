@@ -16,7 +16,8 @@ export const MODES: Record<string, { name: string; warn?: true }> = {
   dontAsk: { name: 'Only what is listed, never asks' },
   bypassPermissions: { name: 'No checks at all', warn: true },
   'read-only': { name: 'Reads, changes nothing' },
-  'workspace-write': { name: 'Works in its folder' },
+  // Codex's sandbox keeps commands' changes to the folder and, as Lys starts it, the network off; it still reads every file the login can (docs/harness/catalogue/codex.json).
+  'workspace-write': { name: 'Changes only its folder, no internet' },
   'danger-full-access': { name: 'No limits', warn: true },
 };
 /** The modes shown before "More ways it can work" is opened, in this order; the rest follow in the catalogue's order. */

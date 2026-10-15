@@ -244,7 +244,7 @@ describe('Add-agent reporting and permissions', () => {
   it('hides retired reporting targets by default and keeps them disabled when shown, with registered targets still disabled', async () => {
     const { form } = await open();
     expect(form.querySelector('[name="answers_to"] option[value="' + BEA + '"]')).toBeNull();
-    const show = [...form.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show retired ('));
+    const show = [...form.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show retired and suspended ('));
     await click(show ?? null);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + BEA + '"]')?.disabled).toBe(true);
     expect(form.querySelector<HTMLOptionElement>('[name="answers_to"] option[value="' + COURIER + '"]')?.disabled).toBe(true);

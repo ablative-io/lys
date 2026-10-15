@@ -29,7 +29,9 @@ import { ClientCredentials, CustodyConfirmed, credentialRecord } from './ClientC
 import type { CredentialRecord, StoredCredentials } from './ClientCredentials';
 import { Act } from '../../shell/Act';
 import { roleChanges } from './roleChanges';
-import { KnownApps } from './ConnectApp';
+import { KNOWN_APPS, KnownApps } from './ConnectApp';
+import { ErrorWords, IdentityName, problemWords } from '../people/Words';
+import type { MeView } from '../../generated';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
@@ -78,13 +80,30 @@ function approvalAnswer(value: unknown, id: string): ApprovalAnswer {
 }
 
 const LYS = 'lys';
-export const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'service account ' + (by.id ?? '') : 'Lys at start');
+/** Who made an act, in words: a sign-in by the account name its provider gave, never a raw id. */
+export const who = (by: By) => (by.kind === 'operator' ? 'the install operator for ' + (by.login?.subject ?? 'the administrator') : by.kind === 'person' ? by.login?.subject ?? 'a person' : by.kind === 'service_account' ? 'a service account' : 'Lys at start');
+/** Whether `by` signed in with one of the signed-in person's own sign-ins: the same account, or the one account of that name they hold. */
+const isMe = (by: By, me: MeView | null): boolean => {
+  if (!me || !by.login || (by.kind !== 'person' && by.kind !== 'operator')) return false;
+  const login = by.login;
+  if (me.sign_in_identities.some((held) => held.provider === login.provider && held.subject === login.subject)) return true;
+  return me.sign_in_identities.filter((held) => held.subject === login.subject).length === 1;
+};
+/** Who made an act, named through the directory where Lys knows them: the signed-in person by name and file, anyone else in words. */
+function ByName({ by, me }: { by: By; me: MeView | null }) {
+  if (!me || !isMe(by, me)) return <>{who(by)}</>;
+  return by.kind === 'operator' ? <>the install operator for <IdentityName id={me.person.id} /></> : <IdentityName id={me.person.id} />;
+}
+/** An app's state as a person reads it. */
+const STATE_WORDS: Record<AppRecord['state'], string> = { pending: 'Waiting for your approval', approved: 'Approved', declined: 'Declined', retired: 'Retired' };
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
-/** A refusal in Lys's words, its name said once: Lys words each reason as "name: words" already. */
-export const refusalWords = (error: unknown) => {
-  if (!(error instanceof Refused)) return String(error);
+/** A refusal as a sentence a person reads: the plain reason only, never its code. A screen that can fold the code away shows ErrorWords instead. */
+export const refusalWords = (error: unknown): string => problemWords(error);
+/** A refusal with its name said once in its details: Lys words some reasons as "name: words" already. */
+const namedOnce = (error: unknown): unknown => {
+  if (!(error instanceof Refused)) return error;
   const { refusal, reason } = error.refusal;
-  return reason.startsWith(refusal + ': ') ? reason : refusal + ': ' + reason;
+  return reason.startsWith(refusal + ': ') ? new Refused(error.status, { ...error.refusal, reason: reason.slice(refusal.length + 2) }) : error;
 };
 const lines = (text: string) => text.split('\n').map((line) => line.trim()).filter(Boolean);
 
@@ -114,8 +133,11 @@ export function Apps() {
   const changed = (message: string) => { setApproved({}); setNotice(message); setRevision((value) => value + 1); };
   const [picked, setPicked] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  // The signed-in person, so an act they made is named as them; without it every act is still said in words.
+  const self = useLoad(api.me, 'me');
+  const me = self.status === 'ok' ? self.data : null;
   return <div className="page fill apps">
-    <div className="head"><div><h1>Configuration</h1><p className="sub">Every app that signs in with Lys and has its permissions checked here. Connect a known app below; nothing an app registers takes effect until you approve it here.</p></div></div>
+    <div className="head"><div><h1>Configuration</h1><p className="sub">Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here.</p></div></div>
     <ConfigTabs on="apps" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
@@ -134,8 +156,10 @@ export function Apps() {
 {app.name}</button>)}
         </nav> : null}
         <div className="pane app-pane">
-          <details className="card" aria-label="Add your own app (for developers)"><summary>Add your own app (for developers)</summary><Register changed={changed} /></details>
-          {open ? <AppCard edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: its sign-in client and its schema now take effect.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : <p className="dim">No app is registered.</p>}
+          <details className="card" aria-label="Add your own app (for developers)"><summary>Add your own app (for developers)</summary>
+            {apps.some((app) => app.id !== LYS && !KNOWN_APPS.some((known) => known.id === app.id)) ? null : <p className="dim">No other apps yet.</p>}
+            <Register changed={changed} /></details>
+          {open ? <AppCard me={me} edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: people can sign in to it, and the permissions it asked for now apply.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : null}
         </div>
       </>;
     }} />
@@ -150,26 +174,33 @@ function SignInFields({ redirects, setRedirects, profile, setProfile, app, name 
   </>;
 }
 
-function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => void; approved: (answer: AppRecord) => void; stored: StoredCredentials | null; saved: (answer: StoredCredentials) => void; app: AppRecord; changed: (message: string) => void }) {
+function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeView | null; edit: () => void; approved: (answer: AppRecord) => void; stored: StoredCredentials | null; saved: (answer: StoredCredentials) => void; app: AppRecord; changed: (message: string) => void }) {
   const [reason, setReason] = useState('');
-  const [refusal, setRefusal] = useState('');
+  const [refusal, setRefusal] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   // The settings offered to approve are the registration's; what is sent is what is kept.
   const [redirects, setRedirects] = useState(app.redirects.join('\n'));
   const [profile, setProfile] = useState(false);
   const act = async (route: string, body: Record<string, unknown>, done: (answer: unknown) => void) => {
-    setBusy(true); setRefusal('');
-    try { done(await send('POST', path(app.id, route), { operation: operationId(), ...body })); } catch (error) { setRefusal(refusalWords(error)); }
+    setBusy(true); setRefusal(null);
+    try { done(await send('POST', path(app.id, route), { operation: operationId(), ...body })); } catch (error) { setRefusal(namedOnce(error)); }
     setBusy(false);
   };
   return <article className="card app-card" aria-label={'App ' + app.id}>
-    <h3>{app.name} <span className={'app-state app-' + app.state}>{app.state}</span></h3>
-    <p className="note">Registered by {who(app.registered_by)}{app.version ? ', schema version ' + app.version : ''}{app.client_id ? ', sign-in client ' + app.client_id : ''}{app.service_account ? ', acting as ' + app.service_account : ''}.</p>
+    <h3>{app.name} <span className={'app-state app-' + app.state}>{STATE_WORDS[app.state]}</span></h3>
+    <p className="note">Registered by <ByName by={app.registered_by} me={me} />.</p>
+    <details aria-label={'Details of ' + app.id}><summary>Details</summary><dl className="app-details">
+      <dt>App id</dt><dd className="mono">{app.id}</dd>
+      {app.version ? <><dt>Permissions version</dt><dd>{app.version}</dd></> : null}
+      {app.client_id ? <><dt>Sign-in client id</dt><dd className="mono">{app.client_id}</dd></> : null}
+      {app.service_account ? <><dt>Acts as service account</dt><dd className="mono">{app.service_account}</dd></> : null}
+      {app.registered_by.login ? <><dt>Registered with the sign-in</dt><dd className="mono">{app.registered_by.login.subject} at {app.registered_by.login.provider}</dd></> : null}
+    </dl></details>
     {app.redirects.length ? <div><b>Return addresses its registration asked for</b><ul className="app-list">{app.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul></div> : null}
-    {app.sign_in ? <div aria-label={'Sign-in settings of ' + app.id}><b>Its sign-in, as last set by {who(app.sign_in.by)}</b>
+    {app.sign_in ? <div aria-label={'Sign-in settings of ' + app.id}><b>Its sign-in, as last set by <ByName by={app.sign_in.by} me={me} /></b>
       <ul className="app-list">{app.sign_in.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul>
       <p className="note">{app.sign_in.profile ? 'It is given the person’s name.' : 'It is not given the person’s name.'}</p></div> : null}
-    <div><b>{app.state === 'pending' ? 'The schema it asks for' : 'Its schema'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>
+    <div><b>{app.state === 'pending' ? 'The permissions it asks for' : 'The permissions it has'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>
     {stored ? <CustodyConfirmed answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions app-signin">
       <SignInFields app={app.id} name={app.name} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
@@ -178,7 +209,7 @@ function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => 
       <Act symbol="decline" name={'Decline ' + app.name} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }} />
     </div> : null}
     {app.pending ? <div className="app-waiting" aria-label={'Change waiting for ' + app.id}>
-      <b>A change waits for you, replacing version {app.pending.replaces}, from {who(app.pending.by)}</b>
+      <b>A change to its permissions waits for you, from <ByName by={app.pending.by} me={me} /></b>
       <RoleChanges before={app.schema} after={app.pending.schema} app={app.id} />
       <SchemaTable app={app.id} schema={app.pending.schema} label={'Schema waiting for ' + app.id} />
       <Act symbol="approve" name={'Approve the change'} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }} />
@@ -190,7 +221,7 @@ function AppCard({ app, changed, stored, saved, approved, edit }: { edit: () => 
       <Act symbol="edit" name="Edit the permission template" word="Template" onClick={edit} />
       <Act symbol="retire" name={'Retire ' + app.name} word="Retire" tone="danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: every client credential it held is refused, and its grants stay readable.')); }} />
     </div> : null}
-    {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
+    {refusal ? <ErrorWords problem={refusal} /> : null}
   </article>;
 }
 

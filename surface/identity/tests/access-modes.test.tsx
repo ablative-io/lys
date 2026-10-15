@@ -32,8 +32,8 @@ const issued = (body: unknown) => {
 };
 
 function form() {
-  const value = $('form[aria-label="Issue root grant"]');
-  if (!value) throw new Error('No Issue root grant form');
+  const value = $('form[aria-label="Give access"]');
+  if (!value) throw new Error('No Give access form');
   return value;
 }
 
@@ -115,12 +115,18 @@ describe('The kind of thing is picked from the app schemas', () => {
     expect(requests).not.toContain('/apps/drafty/schema');
     expect($('input[name="kind"]')).toBeNull();
     expect($$('select[name="kind"] optgroup').map((group) => group.getAttribute('label'))).toEqual(['Notes', 'Already granted in Lys']);
-    expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.textContent)).toEqual(['notes.doc', 'notes.folder']);
-    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['project']);
+    // Each kind is named in words; its value is the kind the grant is sent with.
+    expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.textContent)).toEqual(['Doc', 'Folder']);
+    expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.getAttribute('value'))).toEqual(['notes.doc', 'notes.folder']);
+    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['Project']);
   });
 
   it('offers the ids Lys already holds for the chosen kind', async () => {
     await mount('#/access/issue', apps);
+    // Before a kind is chosen, nothing is chosen for which one, and no id box is drawn.
+    expect(($('select[name="resource"]') as HTMLSelectElement | null)?.value).toBe('');
+    expect(($('select[name="resource"]') as HTMLSelectElement | null)?.disabled).toBe(true);
+    expect($('input[name="resource_id"]')).toBeNull();
     await choose($('select[name="kind"]'), 'project');
     expect($$('select[name="resource"] option').map((option) => option.getAttribute('value'))).toEqual(['', 'identity', 'ledger', '\u0000by-id']);
     expect($('input[name="resource_id"]')).toBeNull();
@@ -131,28 +137,43 @@ describe('The kind of thing is picked from the app schemas', () => {
   });
 });
 
+describe('Which one names what the directory knows', () => {
+  it('lists every agent of the directory by name for a directory kind, never a raw id, and still offers one by id', async () => {
+    const onAgent = { ...GRANTS[0], id: 'grant-' + 'd'.repeat(32), resource: { kind: 'agent', id: SCRIBE } };
+    await mount('#/access/issue', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, onAgent], revision: 7 }) });
+    await choose($('select[name="kind"]'), 'agent');
+    const options = $$('select[name="resource"] option');
+    expect(options.map((option) => option.textContent)).toContain('the agent Scribe');
+    expect(options.some((option) => /agent-[0-9a-f]{8}/.test(option.textContent ?? ''))).toBe(false);
+    expect(options.at(-1)?.getAttribute('value')).toBe('\u0000by-id');
+    // Directory names are known, so no free id box is drawn until "by its id" is chosen.
+    expect($('input[name="resource_id"]')).toBeNull();
+  });
+});
+
 describe('Only the root authority is offered a root grant', () => {
   it('the root authority sees the Issue entry and its form', async () => {
     await mount('#/access');
-    expect($('a[href="#/access/issue"]')?.textContent).toBe('Issue root grant');
+    expect($('a[href="#/access/issue"]')?.textContent).toBe('Give access');
     location.hash = '#/access/issue';
     await settle();
-    expect($('form[aria-label="Issue root grant"]')).not.toBeNull();
+    expect($('form[aria-label="Give access"]')).not.toBeNull();
   });
 
   it('a person who is not the root authority sees no Issue entry', async () => {
     await mount('#/access', PERSONAL);
     expect($('a[href="#/access/issue"]')).toBeNull();
     expect(text()).not.toContain('Issue root grant');
+    expect($('.head a.btn.primary')).toBeNull();
   });
 
   it('a direct entry shows RootAuthorityRefused with its reason, and no form controls', async () => {
     const { posted } = await mount('#/access/issue', PERSONAL);
-    expect($('form[aria-label="Issue root grant"]')).toBeNull();
+    expect($('form[aria-label="Give access"]')).toBeNull();
     const panel = $('.act-panel.issue-root');
     expect(panel?.querySelectorAll('input, select, textarea, button[type="submit"]')).toHaveLength(0);
     expect(panel?.querySelector('.refusal-name')?.textContent).toContain('RootAuthorityRefused');
-    expect(panel?.textContent).toContain('only it issues a root grant');
+    expect(panel?.textContent).toContain('only the administrator gives access directly');
     expect(posted).toHaveLength(0);
   });
 });

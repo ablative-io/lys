@@ -155,7 +155,7 @@ it('shows app approval from its response without relying on another list read', 
   await clickNamed(view, 'Approve Notes');
   expect(sent).toHaveLength(1);
   expect(reads).toBe(1);
-  expect(view.querySelector('article')?.textContent).toContain('approved');
+  expect(view.querySelector('article .app-state')?.textContent).toBe('Approved');
   expect([...view.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Approve Notes')).toBe(false);
 });
 
@@ -207,14 +207,15 @@ it('refuses an approval answer for a different app without displaying success or
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
     // Whole in every other way: only the app's id is another's.
     if (init?.method === 'POST') return Response.json({ app: { ...pending, id: 'another_app', state: 'approved', version: 1, versions: [1], sign_in: signIn }, client: null, credentials: null });
-    reads += 1;
+    // Only the apps list counts: the signed-in person is read beside it to name who acted.
+    if (String(_url).endsWith('/apps')) reads += 1;
     return Response.json({ apps: [pending] });
   });
   const view = await show(<Apps />);
   await clickNamed(view, 'Approve Notes');
   expect(reads).toBe(1);
   expect(view.querySelector('[role="alert"]')?.textContent).toContain('did not confirm this app’s approval');
-  expect(view.querySelector('article')?.textContent).toContain('pending');
+  expect(view.querySelector('article .app-state')?.textContent).toBe('Waiting for your approval');
   expect(view.querySelector('article')?.textContent).not.toContain('is approved');
 });
 
@@ -226,13 +227,13 @@ it('does not let the saved approval hide a later retirement answer', async () =>
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
     if (init?.method === 'POST' && String(url).endsWith('/approve')) return Response.json({ app: approved, client: null, credentials: null });
     if (init?.method === 'POST') { retired = true; return Response.json({ ...approved, state: 'retired' }); }
-    reads += 1;
+    if (String(url).endsWith('/apps')) reads += 1;
     return Response.json({ apps: [retired ? { ...approved, state: 'retired' } : pending] });
   });
   const view = await show(<Apps />);
   await clickNamed(view, 'Approve Notes');
   expect(reads).toBe(1);
   await clickNamed(view, 'Retire Notes');
-  expect(view.querySelector('article .app-state')?.textContent).toBe('retired');
+  expect(view.querySelector('article .app-state')?.textContent).toBe('Retired');
   expect([...view.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Retire Notes')).toBe(false);
 });

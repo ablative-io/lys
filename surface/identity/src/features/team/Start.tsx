@@ -33,13 +33,15 @@ interface MachineCatalogue {
 export async function readMachineHarness(
   computer: string, harness: { name: string; program: string },
   read: (path: string) => Promise<MachineCatalogue> = request,
+  /** The computer's name, as people know it; its id is said only where no name is known. */
+  computerName: string = computer,
 ): Promise<StartRefusal | null> {
   if (!commandOrAbsolutePath(harness.program)) return { refusal: 'harness_program_invalid', reason: PROGRAM_RULE };
   const program = launchCommand(harness.program);
   const catalogue = await read('/harnesses?machine=' + encodeURIComponent(computer));
   if (catalogue.machine !== computer) return {
     refusal: 'harness_catalogue_wrong_machine',
-    reason: 'The harness catalogue did not name the chosen computer ' + computer + '.',
+    reason: 'The program list Lys read did not come from ' + computerName + '.',
   };
   if (program.startsWith('/')) return null;
   if (catalogue.programs.some((choice) => choice.builds.some((copy) =>
@@ -48,7 +50,7 @@ export async function readMachineHarness(
   const reasons = catalogue.programs.flatMap((choice) => choice.not_found ? [choice.not_found] : []);
   return {
     refusal: 'harness_absent_on_machine',
-    reason: 'Computer ' + computer + ' did not report ' + program + '. ' + PROGRAM_RULE
+    reason: computerName + ' did not report ' + program + ' among its installed programs. ' + PROGRAM_RULE
       + (reasons.length ? ' ' + reasons.join('; ') : ''),
   };
 }
@@ -77,7 +79,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     const harness = provisioning.profile?.harness;
     const availability: Record<string, StartRefusal | null> = harness ? Object.fromEntries(
       await Promise.all(choices.map(async (computer) => {
-        try { return [computer.id, await readMachineHarness(computer.id, harness)]; }
+        try { return [computer.id, await readMachineHarness(computer.id, harness, request, computer.name)]; }
         catch (error) { return [computer.id, refusalOf(error)]; }
       })),
     ) : {};
@@ -169,8 +171,10 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       const detail = unavailable ? unavailable.refusal + ': ' + unavailable.reason : '';
       return <div key={computer.id}>
         <Act symbol="start" name={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} word={busy ? 'Starting…' : choices.length === 1 ? 'Start' : 'Start on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void run(computer.id); }} />
-        {unavailable ? <div className="why-not" role="alert" title={detail}>
-          <p>On {computer.name}: {problemWords(new Refused(0, unavailable))}</p>
+        {unavailable ? <div className="why-not" role="alert">
+          <p>{unavailable.refusal === 'harness_absent_on_machine' && profile?.harness
+            ? (profile.harness.name || launchCommand(profile.harness.program)) + ' is not installed on ' + computer.name + '. Choose an installed copy in ' + name + '’s settings, or another computer.'
+            : 'On ' + computer.name + ': ' + problemWords(new Refused(0, unavailable))}</p>
           <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{detail}</p></details>
         </div> : null}
       </div>;

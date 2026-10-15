@@ -45,8 +45,10 @@ export function useShellKeys(): void {
         s.explainOff();
         return;
       }
-      if (typing(e.target) || s.signedOut) return;
-      if (e.key === '?' || ((e.metaKey || e.ctrlKey) && e.key === '/')) {
+      if (s.signedOut) return;
+      // ⌘/ opens help from anywhere, a field included; ? is a character in a field, so it opens help only outside one.
+      const commandSlash = (e.metaKey || e.ctrlKey) && e.key === '/';
+      if (commandSlash || (e.key === '?' && !typing(e.target))) {
         e.preventDefault();
         if (s.explaining) s.explainOff();
         else s.explainOn();

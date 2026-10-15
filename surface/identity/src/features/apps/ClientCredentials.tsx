@@ -11,7 +11,8 @@ import { Act } from '../../shell/Act';
 import { Copy } from '../network/JoinCode';
 import { clock } from '../file/time';
 import { send } from './SchemaBuilder';
-import { refusalWords, who } from './Apps';
+import { who } from './Apps';
+import { ErrorWords } from '../people/Words';
 import type { AppRecord, By } from './Apps';
 
 /** One of an app's client credentials as Lys lists it. It never carries a value. */
@@ -79,12 +80,12 @@ export function ClientCredentials({ app }: { app: AppRecord }) {
   const [asking, setAsking] = useState<string | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const [refusal, setRefusal] = useState('');
+  const [refusal, setRefusal] = useState<unknown>(null);
   const path = (rest: string) => '/apps/' + encodeURIComponent(app.id) + rest;
   const run = async (act: () => Promise<void>) => {
     if (busy) return;
-    setBusy(true); setRefusal('');
-    try { await act(); } catch (error) { setRefusal(refusalWords(error)); }
+    setBusy(true); setRefusal(null);
+    try { await act(); } catch (error) { setRefusal(error); }
     setBusy(false);
   };
   const issue = () => run(async () => {
@@ -115,6 +116,6 @@ export function ClientCredentials({ app }: { app: AppRecord }) {
       </div> : null}
     </li>)}</ul> : <p className="dim">{open ? 'No client credential has been issued, so ' + app.name + ' cannot sign anyone in yet.' : 'No client credential was issued.'}</p>}
     {open ? <Act symbol="add" name={'Issue a client credential for ' + app.name} word="Issue" tone="primary" disabled={busy} onClick={() => void issue()} /> : null}
-    {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
+    {refusal ? <ErrorWords problem={refusal} /> : null}
   </section>;
 }

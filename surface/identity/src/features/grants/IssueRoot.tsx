@@ -1,4 +1,4 @@
-/** Root grants are requested explicitly; the server alone decides who may issue one. */
+/** Give access: the administrator gives a person access to something outright (a root grant); the server alone decides who may. */
 import { useState } from 'react';
 import { api, Refused, request, useLoad } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
@@ -33,7 +33,27 @@ export const rolesOf = (kinds: KindGroup[], kind: string): Record<string, string
 export const isRootAuthority = (people: PeopleView): boolean => people.scope === 'directory';
 
 /** The refusal POST /grants/roots answers anyone but the root authority, said before any form is drawn. */
-export const NOT_ROOT = new Refused(403, { refusal: 'RootAuthorityRefused', reason: 'you are not the root authority, and only it issues a root grant' });
+export const NOT_ROOT = new Refused(403, { refusal: 'RootAuthorityRefused', reason: 'only the administrator gives access directly' });
+
+/** A kind in words: `cambium.channel` is "Channel" under its app's name, `project` is "Project". */
+export const kindLabel = (kind: string): string => {
+  const words = kind.slice(kind.indexOf('.') + 1).replaceAll('_', ' ').replaceAll('.', ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+/** Kinds whose every item the directory names: a person or agent is chosen by name, never typed as an id. */
+const DIRECTORY_KINDS = new Set(['person', 'agent', 'identity']);
+
+/** The items of `kind` Lys knows: those already granted, then, for a directory kind, everyone the directory lists. */
+export function knownOf(kind: string, resources: ResourceRef[], people: PeopleView): ResourceRef[] {
+  const held = resources.filter((resource) => resource.kind === kind);
+  const listed = !DIRECTORY_KINDS.has(kind) ? [] : people.people.flatMap((person) => [
+    ...(kind === 'agent' ? [] : [{ kind, id: person.id }]),
+    ...(kind === 'person' ? [] : person.agents.map((agent) => ({ kind, id: agent.id }))),
+  ]);
+  const seen = new Set<string>();
+  return [...held, ...listed].filter((resource) => !seen.has(resource.id) && seen.add(resource.id));
+}
 
 /**
  * One row you put things into: holder, kind of thing, which one, relation or role, mode, may pass on, expiry, Issue.
@@ -49,13 +69,14 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
   const [which, setWhich] = useState('');
   const roles = rolesOf(kinds, kind);
   const names = resourceNames(people, [], null);
-  const known = resources.filter((resource) => resource.kind === kind).sort((a, b) => a.id.localeCompare(b.id));
-  // With none of this kind known to Lys, the only way to name one is by its id.
-  const chosenWhich = known.length ? which : BY_ID;
-  return <RecordedForm name="root-grant" title="Issue root grant" submitLabel="Issue" drawn={{ symbol: 'add', word: 'Issue' }} done={done} change={(data) => {
+  const known = knownOf(kind, resources, people).map((resource) => ({ resource, words: resourceWords(resource, names).words }))
+    .sort((a, b) => a.words.localeCompare(b.words));
+  // Nothing is chosen before a kind is; with none of the kind known to Lys, the only way to name one is by its id in its app.
+  const chosenWhich = !kind ? '' : known.length ? which : BY_ID;
+  return <RecordedForm name="root-grant" title="Give access" submitLabel="Give access" drawn={{ symbol: 'add', word: 'Give access' }} done={done} change={(data) => {
     const relation = role || field(data, 'relation');
     const actions = role ? roles[role] : model.relations[relation];
-    if (!actions) throw new Error(role ? 'Choose a role this kind names' : 'Select a relation from the permission model');
+    if (!actions) throw new Error(role ? 'Choose a role this kind names' : 'Choose what they may do');
     const chosen = field(data, 'kind');
     if (!kinds.some((group) => group.kinds.includes(chosen))) throw new Error('Choose a kind of thing from the list');
     const expires = noExpiry ? null : Date.parse(field(data, 'expires')) / 1000;
@@ -68,21 +89,21 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
       mode: field(data, 'mode'),
     } };
   }}>
-    <p className="note">You are giving this to a person; they can pass it to their agents if you tick this.</p>
-    <div className="field">Holder<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
+    <p className="note">You are giving this to a person. Tick “May pass on” and they can give it to their own agents.</p>
+    <div className="field">Person<Picker name="holder" label="Find a person" options={people.people.map((p) => ({ id: p.id, name: p.display_name, detail: p.state }))} /></div>
     <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); }}>
       <option value="" disabled>Choose a kind</option>
-      {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each}>{each}</option>)}</optgroup>)}
+      {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each} title={each}>{kindLabel(each)}</option>)}</optgroup>)}
     </select></label>
     <label className="field">Which one<select name="resource" required value={chosenWhich} disabled={!kind} onChange={(event) => setWhich(event.target.value)}>
       <option value="" disabled>{kind ? 'Choose one' : 'Choose a kind first'}</option>
-      {known.map((resource) => <option key={resource.id} value={resource.id}>{resourceWords(resource, names).words}</option>)}
-      <option value={BY_ID}>Another one, by its id in its app</option>
+      {known.map(({ resource, words }) => <option key={resource.id} value={resource.id} title={resource.id}>{words}</option>)}
+      {kind ? <option value={BY_ID}>{known.length ? 'Another one, by its id in its app' : 'One by its id in its app'}</option> : null}
     </select></label>
-    {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /></label> : null}
-    <label className="field">As<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
+    {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /><span className="hint">{known.length ? 'The id the app itself gives it.' : 'Lys knows none of these by name yet. Enter the id the app itself gives it.'}</span></label> : null}
+    <label className="field">They may<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
     {Object.keys(roles).length ? <label className="field">Role<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
-      <option value="">No role: the relation above</option>
+      <option value="">No role: what is chosen above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}
     </select><span className="hint">A role gives what it carries whenever it is checked, so a widening you approve reaches this grant.</span></label> : null}
     <div className="field">May pass on<label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
@@ -124,8 +145,8 @@ async function read(resources: ResourceRef[]) {
   return { people, model, kinds };
 }
 
-/** The form that issues a root grant, shown in the Access page above the grants. Anyone but the root authority is told so by name and given no form. */
+/** The Give access form, shown on the Access page above the grants. Anyone but the administrator is told so in words and given no form. */
 export function IssueRoot({ resources, done = () => undefined }: { resources: ResourceRef[]; done?: () => void }) {
   const load = useLoad(() => read(resources), 'root-grant');
-  return <Gate load={load} title="Issue access" renderError={(problem) => <ErrorWords problem={problem} />} ok={(data) => <Form {...data} resources={resources} done={done} />} />;
+  return <Gate load={load} title="Give access" renderError={(problem) => <ErrorWords problem={problem} />} ok={(data) => <Form {...data} resources={resources} done={done} />} />;
 }

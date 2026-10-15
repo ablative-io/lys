@@ -45,10 +45,10 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Dashboard',
     topic: 'people.dashboard',
     regions: [
-      { sel: 'section.getting-started', title: 'Getting started', text: 'What this Lys still needs, in order: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done.', at: 'below' },
+      { sel: 'section.getting-started', title: 'Getting started', text: 'What this Lys still needs, in order: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; Not this one counts as an answer.', at: 'below' },
       { sel: 'section.dash-agents', title: 'Agents', text: 'Your agents, grouped by team. Open one for its page, where Start is.', at: 'in-bl' },
       { sel: 'section[aria-label="Waiting for you"]', title: 'Waiting for you', text: 'Requests to decide, drafts to approve and reviews due; each opens its list. A count that could not be read names its refusal instead of a number.', at: 'left' },
-      { sel: 'section[aria-label="Running now"]', title: 'Running now', text: 'Every live session. Choose one to watch it beside the lists, or open it full size. Stop everything, beside the heading, stops every agent at once.', at: 'left', dy: 40 },
+      { sel: 'section[aria-label="Running now"]', title: 'Running now', text: 'Every live session. Choose one to watch it in a small picture, or open it full size. Stop all, beside the heading, stops every agent at once and asks why first.', at: 'left' },
       { sel: '.dash-widgets', title: 'Readings', text: 'Usage and the other readings, as the service reports them.', at: 'above' },
     ],
     keys: [],
@@ -68,7 +68,9 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Add an agent',
     topic: 'start.agent',
     regions: [
-      { sel: 'form.add-agent', title: 'The agent', text: 'Its name, the program it uses, the folder it works in and the computer it runs on. On a first run, who it answers to, its team and its access sit under More settings; it is given no access unless you choose some.', at: 'right' },
+      { sel: 'form.add-agent', title: 'The agent', text: 'Its name, the program it uses, the folder it works in and the computer it runs on. On a first run, Add and run adds it and starts it at once; otherwise Add, then Start on its page. It is given no access unless you choose some.', at: 'right' },
+      { sel: '.first-run-mode', title: 'Careful mode', text: 'This program has no mode that keeps it to its folder with the internet off, so it starts in its most careful mode, named here. Change it under More settings.', at: 'right' },
+      { sel: 'details.more-settings', title: 'More settings', text: 'Everything a first run does not ask: the mode it runs in, who it answers to, its team and its access. Open it to change any of them; what you leave keeps its default.', at: 'right' },
       { sel: 'fieldset.agent-grants-scope', title: 'Its access in Lys', text: 'Only access you hold and may pass to agents is offered. Cambium’s channels appear once Cambium is approved on Apps.', at: 'right' },
     ],
     keys: [],
@@ -96,6 +98,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     topic: 'access.give',
     regions: [
       { sel: '.file-section-head', title: 'Grants', text: 'What it holds. Give passes on access you hold and may pass to agents; only its responsible person can give it access.', at: 'below' },
+      { sel: '[data-act="agent-roots"]', title: 'Let me give agents access', text: 'A new administrator holds nothing to pass on, so Give does nothing yet. Press this once: Lys records the access you may pass to agents, and Give works from then on.', at: 'right' },
       { sel: '[data-cambium-first]', title: 'Cambium', text: 'Cambium’s channels can be given once Cambium is connected and approved on Apps.', at: 'below' },
       { sel: '.access-halves', title: 'What it can reach, and a check', text: 'Its reach summed up, and a question: can it do one thing? The answer shows the chain to a person, or says why not.', at: 'above' },
     ],
@@ -138,7 +141,18 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     regions: [
       { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'This service, Services and sign-in providers, and Apps.', at: 'below' },
       { sel: '[aria-label="Known apps"]', title: 'Known apps', text: 'Apps Lys knows how to connect, Cambium among them. Connect asks once for the app’s web address and reads what it asks for.', at: 'below', dy: 30 },
-      { sel: '.app-card', title: 'The app', text: 'Its state and what it asks for. Nothing it registers takes effect until you approve it here; declining asks why.', at: 'left' },
+      { sel: '.app-card', title: 'The app', text: 'Its state and what it asks for. Nothing it registers takes effect until you approve it here. Decline takes an optional reason, in Why, if you decline.', at: 'left' },
+    ],
+    keys: [],
+  },
+  'apps-connect': {
+    title: 'Connect an app',
+    topic: 'apps.apps',
+    regions: [
+      { sel: 'section[aria-label="Connect an app"] h3', title: 'The app', text: 'The app that sent you here, by the name in its manifest: the description it publishes of itself and what it asks for. Lys read it from the app’s own address.', at: 'right' },
+      { sel: '.app-addresses', title: 'Where it sends people', text: 'Its address, and the return address it sends a person back to after they sign in, and whether it is given their name.', at: 'below' },
+      { sel: 'section[aria-label="Connect an app"] table', title: 'The permissions it asks for', text: 'Each kind of thing the app keeps permissions on, and what can be done to it. Approving approves all of them; none takes effect before.', at: 'right' },
+      { sel: 'section[aria-label="Connect an app"] .app-actions', title: 'Approve or Decline', text: 'Approve connects the app in one act and sends you back to it. Decline sends you back to the app, which is told no; nothing it asked for takes effect.', at: 'below' },
     ],
     keys: [],
   },
@@ -247,5 +261,6 @@ export function pageKeyOf(pathname: string): string {
   if (view === 'file') return PAGES['file:' + b] ? 'file:' + b : 'file';
   if (view === 'access') return a === 'drafts' ? 'drafts' : 'access';
   if (view === 'resources' || view === 'model') return 'access';
+  if (view === 'apps' && a === 'connect') return 'apps-connect';
   return view;
 }

@@ -86,13 +86,14 @@ it('a refused issue and a refused revocation are said in Lys’s words, and noth
     ['POST /apps/' + APP + '/credentials/issue']: refused(502, 'SecretsUnavailable', 'the secrets broker could not be reached'),
     ['POST /apps/' + APP + '/credentials/' + ID + '/revoke']: refused(401, 'credential_refused', 'no live client credential of this app has that id') });
   await click(button('Issue a client credential for Notes fixture'));
-  expect(alert()).toContain('SecretsUnavailable');
-  expect(alert()).toContain('could not be reached');
+  expect(alert()).toContain('Lys could not reach or use its secret storage service');
+  expect(document.querySelector('details .refusal-name')?.textContent).toContain('SecretsUnavailable');
+  expect(text()).toContain('could not be reached');
   expect(text()).not.toContain('It is shown once, here');
   await click(button('Revoke credential ' + ID));
   await click(button('Revoke credential ' + ID + ' now'));
-  expect(alert()).toContain('credential_refused');
-  expect(alert()).toContain('no live client credential');
+  expect(document.querySelector('details .refusal-name')?.textContent).toContain('credential_refused');
+  expect(text()).toContain('no live client credential');
 });
 
 it('an issue answer for another app is refused in words and shows no value', async () => {

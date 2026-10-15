@@ -6,7 +6,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { api, Refused, useLoad } from '../../api';
 import type { MeView, PeopleView } from '../../generated';
-import { DirectoryGate as Gate, ErrorWords } from './Words';
+import { DirectoryGate as Gate, ErrorWords, STATUS } from './Words';
+import { ClearSavedRequest } from './SavedRequest';
 import { readTeams } from '../teams/Teams';
 import type { Team } from '../teams/contract';
 import { addAgent, newAgentRequest, readAgentRequest } from './add-agent-request';
@@ -35,18 +36,33 @@ function defaultName(people: PeopleView, target: string): string {
   throw new Error('AgentNameUnavailable: a fresh agent name could not be chosen.');
 }
 
-function Form({ me, people, teams, search, capability, runOptions, grants }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: AddAndRunCapability; runOptions: FirstRunOptions; grants: GrantChoices }) {
+/** The legacy key an earlier Lys kept an unanswered registration under; nothing writes it now, and it cannot be sent again. */
+const LEGACY = 'lys.pending.register-agent';
+
+/**
+ * The saved requests this tab holds, read once per form. `later` keeps a saved add-and-run back while a saved plain
+ * registration is sent again first: both stay kept, and the add-and-run is read again once the registration is settled.
+ */
+function savedRequests(key: string, runKey: string, person: string, later: boolean) {
+  try {
+    if (sessionStorage.getItem(LEGACY) !== null) throw new Error('SavedRequestUnreadable: an earlier registration was kept in a form this Lys cannot send again.');
+    const pending = readAgentRequest(key, person); const walk = later && pending ? null : readAddAndRun(runKey, person);
+    if (pending && walk) throw new Refused(0, { refusal: 'EarlierChangeUnresolved', reason: 'An earlier registration and an add-and-run request are both saved without a confirmed answer.' });
+    return { pending, walk, error: null, both: false };
+  } catch (error) { return { pending: null, walk: null, error, both: error instanceof Refused && error.refusal.refusal === 'EarlierChangeUnresolved' }; }
+}
+
+/** The saved records that cannot be read back: only these are released by clearing, never a readable saved request. */
+function unreadableRecords(key: string, runKey: string, person: string): string[] {
+  const reads: [string, () => unknown][] = [[key, () => readAgentRequest(key, person)], [runKey, () => readAddAndRun(runKey, person)]];
+  return [LEGACY, ...reads.filter(([, read]) => { try { read(); return false; } catch { return true; } }).map(([where]) => where)];
+}
+
+function Form({ me, people, teams, search, capability, runOptions, grants, later, restart }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: AddAndRunCapability; runOptions: FirstRunOptions; grants: GrantChoices; later: boolean; restart: (later: boolean) => void }) {
   const navigate = useNavigate();
   const key = 'lys.add-agent.' + me.person.id;
   const runKey = 'lys.add-and-run.' + me.person.id;
-  const [saved] = useState(() => {
-    try {
-      if (sessionStorage.getItem('lys.pending.register-agent') !== null) throw new Error('An earlier registration still needs its outcome checked before adding another agent. Ask the administrator to resolve that saved request.');
-      const pending = readAgentRequest(key, me.person.id); const walk = readAddAndRun(runKey, me.person.id);
-      if (pending && walk) throw new Refused(0, { refusal: 'EarlierChangeUnresolved', reason: 'An earlier registration and add-and-run request both need their outcomes checked.' });
-      return { pending, walk, error: null };
-    } catch (error) { return { pending: null, walk: null, error }; }
-  });
+  const [saved] = useState(() => savedRequests(key, runKey, me.person.id, later));
   const query = new URLSearchParams(search);
   const restored = saved.walk?.registration ?? saved.pending;
   const firstTarget = restored ? restored.answersTo ?? me.person.id : query.get('answers_to') ?? me.person.id;
@@ -173,10 +189,10 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
   // Who it answers to, its access and its team: asked on a first run only under More settings, with their defaults kept.
   const moreRegistration = <>
     <label className="field">Who this agent answers to<select name="answers_to" value={person} disabled={locked} onChange={(event) => { setPerson(event.target.value); setSelectedGrants([]); if (automaticName) setName(defaultName(people, event.target.value)); }}>
-      {shownTargets.map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + entry.state : !capability.answersTo && entry.id !== me.person.id ? ' · not served' : ''}</option>)}
+      {shownTargets.filter((entry) => capability.answersTo || entry.id === me.person.id || entry.id === person).map((entry) => <option key={entry.id} value={entry.id} disabled={entry.state !== 'active' || !capability.answersTo && entry.id !== me.person.id}>{entry.id === me.person.id ? 'You (' + entry.display_name + ')' : entry.display_name}{entry.kind === 'agent' ? ' · agent' : ''}{entry.state !== 'active' ? ' · ' + (STATUS[entry.state]?.toLowerCase() ?? entry.state) : ''}</option>)}
       {!shownTargets.some((entry) => entry.id === person) ? <option value={person} disabled>{chosen ? chosen.display_name + ' · ' + chosen.state : 'Reporting target unavailable'}</option> : null}
     </select></label>
-    {retiredCount ? <Act symbol="retire" name={showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'} word={showRetired ? 'Hide retired' : 'Show retired (' + retiredCount + ')'} aria-pressed={showRetired} disabled={locked} onClick={() => setShowRetired(!showRetired)} /> : null}
+    {retiredCount && capability.answersTo ? <Act symbol="retire" name={showRetired ? 'Hide retired and suspended' : 'Show retired and suspended (' + retiredCount + ')'} word={showRetired ? 'Hide retired and suspended' : 'Show retired and suspended (' + retiredCount + ')'} aria-pressed={showRetired} disabled={locked} onClick={() => setShowRetired(!showRetired)} /> : null}
     <fieldset className="agent-grants-scope"><legend>What this agent is given access to in Lys</legend>
       {chosen?.kind === 'agent' ? <p>This form cannot pass on {chosen.display_name}’s access. Add {name.trim() || 'this agent'} without extra access; <a href={'#/file/' + encodeURIComponent(chosen.id) + '/access'}>review {chosen.display_name}’s access</a>.</p> : <>
         {grants.model && withheldFromAgents(grants.model) !== null ? <AgentGrantPicker model={grants.model} groups={actionGroups} selected={selectedGrants} change={setSelectedGrants} disabled={locked} />
@@ -206,13 +222,22 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
     {!walk && capability.machineAdmission === false ? inUse.map((machine) => <p key={machine.id}>Choose which agents may run on {machine.name} in <a href={'#/network?computer=' + encodeURIComponent(machine.id)}>Network</a>, then start {name.trim() || 'this agent'} from its page.</p>) : null}
     {hold ? <ErrorWords problem={hold} /> : null}
     {inUse.length && (!onePress || hold || runOptions.runners.some((entry) => entry.state === 'unavailable')) ? <p><a className="btn" href="#/network">Open Network</a></p> : null}
-    {capability.problem ? <><p>The service’s registration choices could not be read. You can add an agent under You only.</p><ErrorWords problem={capability.problem} /></> : !capability.answersTo ? <p>This service can register an agent under You only.</p> : null}
+    {capability.problem ? <><p>Only “You” is offered under Who this agent answers to: Lys did not say whether it can register an agent under someone else, so the agent is added under you. You can change who it answers to afterwards, on its own page.</p><ErrorWords problem={capability.problem} /></>
+      : !capability.answersTo ? <p>Only “You” is offered under Who this agent answers to: this Lys registers a new agent under the person adding it. To have it answer to someone else, add it here, then change who it answers to on its own page.</p> : null}
     {unsupported ? <p role="alert" className="why-not">{unsupported}</p> : null}
     {invalidChoice ? <p role="alert" className="why-not">{invalidChoice}</p> : null}
     {runOptions.loading && (!runOptions.runners.some((entry) => entry.state === 'asking') || runOptions.computers.length > 0) ? <p role="status">Reading the choices for running this agent…</p> : null}
     {runOptions.problem ? <p role="alert" className="why-not">{runnerProblemReason(runOptions.problem)} <a href="#/network">Open Network</a></p> : null}
     <div aria-live="polite">{runOptions.runners.map((entry) => entry.state === 'confirmed' ? null : <p key={entry.machine.id}>{entry.machine.name}{entry.state === 'unavailable' ? ': not available: ' + entry.reason : ': asking its runner…'}</p>)}</div>
-    {refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><ErrorWords problem={refusal.problem} /></> : <ErrorWords problem={refusal} /> : null}
+    {saved.error ? saved.both
+      ? <section className="why-not" role="alert" aria-label="Saved requests"><p>This browser kept two earlier requests without a confirmed answer: a registration, and a request to add and run an agent. Until both are settled, this form stays locked.</p>
+        <p><Act symbol="retry" name="Check the saved registration first" word="Check the saved registration" tone="primary" onClick={() => restart(true)} /></p>
+        <p className="note">It is sent again exactly as it was saved, so it never adds a second agent. The add-and-run request stays kept and is checked next.</p></section>
+      : <ClearSavedRequest what="registration of an agent" keys={unreadableRecords(key, runKey, me.person.id)} cleared={() => restart(false)}
+        check={<>Look for it in <a href="#/people">People and agents</a> first. If the agent is there, it was added; if not, clear this and add it again.</>} />
+      : null}
+    {saved.error ? <ErrorWords problem={saved.error} /> : null}
+    {!saved.error && refusal ? refusal instanceof AddAndRunFailure ? <><p role="alert" className="why-not">{refusal.message}</p><ErrorWords problem={refusal.problem} /></> : <ErrorWords problem={refusal} /> : null}
     {walk ? <p role="status">Lys has not finished {addAndRunStep(walk)}. {hold ? 'Its original requests are kept.' : 'Its original requests are saved; this button continues them.'}</p> : null}
     {onePress && !walk && profileProblem ? <p className="why-not" role="alert">{profileProblem}</p> : null}
     {pending ? <p role="status">{pending.activated ? 'Your agent was added. Its team membership still needs confirmation.' : pending.agent ? 'Your agent was registered. Activation still needs confirmation.' : 'The registration has no confirmed answer yet.'} The original request is saved. Try that same request again without adding another agent.</p> : null}
@@ -228,13 +253,15 @@ function Form({ me, people, teams, search, capability, runOptions, grants }: { m
 
 function ReadyForm({ me, people, teams, search, capability, grants }: { me: MeView; people: PeopleView; teams: Team[]; search: string; capability: AddAndRunCapability; grants: GrantChoices }) {
   const [runOptions, setRunOptions] = useState<FirstRunOptions | null>(null);
+  // Each restart reads the saved requests afresh in a new form; `later` holds a saved add-and-run back for one round.
+  const [round, setRound] = useState({ count: 0, later: false });
   useEffect(() => {
     let live = true;
     const receive = (options: FirstRunOptions) => { if (live) setRunOptions(options); };
     void firstRunChoices(capability, receive).then(receive);
     return () => { live = false; };
   }, [capability]);
-  return runOptions ? <Form me={me} people={people} teams={teams} search={search} capability={capability} runOptions={runOptions} grants={grants} /> : <p role="status">Reading computers and their runners…</p>;
+  return runOptions ? <Form key={round.count} me={me} people={people} teams={teams} search={search} capability={capability} runOptions={runOptions} grants={grants} later={round.later} restart={(later) => setRound((prior) => ({ count: prior.count + 1, later }))} /> : <p role="status">Reading computers and their runners…</p>;
 }
 
 export function AddAgent() {

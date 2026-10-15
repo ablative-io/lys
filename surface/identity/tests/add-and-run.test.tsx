@@ -342,7 +342,7 @@ describe('Add and run on an existing computer', () => {
     server.routes['/harnesses'] = ok({ programs: [{ ...program, modes: [{ id: 'danger-full-access', meaning: 'All access' }, { id: 'read-only', meaning: 'Reads only' }] }] });
     const { posted } = await open(server.routes);
     expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
-    expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that keeps it to its own folder with the internet off, so it starts in its most careful mode: Reads, changes nothing. You can change this under More settings.');
+    expect($('.first-run-mode')?.textContent).toBe('Care program has no mode that limits its changes to its own folder with the internet off, so it starts in its most careful mode: Reads, changes nothing. You can change this under More settings.');
     expect($('form details .first-run-mode')).toBeNull();
     // All access stays only a choice under More settings, never on the face of the form.
     const face = $('form[aria-label="Add an agent"]')?.cloneNode(true) as HTMLElement;

@@ -116,10 +116,10 @@ describe('Add a person in one act', () => {
     expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
     const receipt = document.querySelector('[aria-label="Refused receipt"]');
     expect(receipt).not.toBeNull();
-    expect(receipt?.querySelector('.refusal-name')?.textContent).toBe('WithheldFromAgents');
+    expect(receipt?.querySelector('details .refusal-name')?.textContent).toContain('WithheldFromAgents');
     const text = receipt?.textContent ?? '';
     expect(text).toContain('no agent may hold');
-    expect(text).toContain('the grant step');
+    expect(text).toContain('Lys refused while giving their first access');
     expect([...(receipt?.querySelectorAll('li') ?? [])].map((leaf) => leaf.textContent)).toEqual([
       'Registered: directory log leaf 12', 'Sign-in bound: directory log leaf 13', 'Activated: directory log leaf 14',
     ]);

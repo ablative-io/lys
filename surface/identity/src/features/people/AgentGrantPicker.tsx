@@ -48,8 +48,10 @@ export function AgentGrantPicker({ model, groups, selected, change, disabled = f
         </tr>
         {ordered.map((choice) => <tr key={choice.id} className={choice.reason ? 'dim' : undefined}>
           <td><input type="checkbox" id={base + choice.id} name="action" value={choice.id} disabled={disabled || Boolean(choice.reason)} checked={held.has(choice.id)}
+            aria-labelledby={base + choice.id + ':words'} aria-describedby={choice.reason && !shared ? base + choice.id + ':why' : undefined}
             onChange={(event) => change(event.target.checked ? [...selected.filter((id) => id !== choice.id), choice.id] : selected.filter((id) => id !== choice.id))} /></td>
-          <td><label htmlFor={base + choice.id}>{actionWords(model, choice.resource, choice.actions)}</label>{choice.reason && !shared ? <span className="hint">{choice.reason}</span> : null}</td>
+          {/* The words are the checkbox's own label, so the row says the action once: through its checkbox, never again as the cell. */}
+          <td aria-hidden="true"><label htmlFor={base + choice.id} id={base + choice.id + ':words'}>{actionWords(model, choice.resource, choice.actions)}</label>{choice.reason && !shared ? <span className="hint" id={base + choice.id + ':why'}>{choice.reason}</span> : null}</td>
         </tr>)}
       </tbody>;
     })}

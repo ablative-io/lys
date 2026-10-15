@@ -190,7 +190,7 @@ describe('Lys setup page', () => {
     expect($('[role="alert"]')).toBeNull();
     expect($('label[for="setup-code"]')?.textContent).toBe('Setup code');
     expect($('#setup-code-where')?.textContent).toBe(
-      'The setup code is in the file named setup-code in the folder the install printed. Use the full path shown on the line “the setup code is in …”. Only the account that ran the install can read it. The copy under state/ is a verification record, not the code.');
+      'The setup code is in the file named setup-code in the folder the install printed: use the full path on the line “the setup code is in …”. Only the account that ran the install can read it.');
     expect(unstyled()).toEqual([]);
 
     await fill({ code: 'wrong' });

@@ -43,11 +43,22 @@ describe('Sign-in providers', () => {
     expect(text()).toContain('No sign-in provider is set yet');
     expect(($('#sign-in-redirect') as HTMLInputElement | null)?.value).toBe(REDIRECT);
     expect($('a[href="https://console.cloud.google.com/auth/clients/create"]')?.textContent).toContain('Create a client');
-    expect(text()).toContain('A provider already registered with the old address needs the new one added.');
+    expect($('a[href="https://console.cloud.google.com/projectcreate"]')?.textContent).toContain('Create a project');
+    expect(text()).toContain('After Create, Google shows the Client ID and Client secret once. Copy both now or download the JSON. You can add a new secret later under the client’s page.');
+    expect($('label[for="sign-in-redirect"]')?.textContent).toBe('Return address');
+    expect(button('Copy address')).not.toBeNull();
+    // With no provider set yet there is no earlier address to speak of.
+    expect(text()).not.toContain('moved to this address');
+    // Set is greyed out with its reason beside it until both are pasted.
+    expect(button('Set Google')?.hasAttribute('disabled')).toBe(true);
+    expect($('[data-set-needs]')?.textContent).toBe('Paste the Client ID and Client secret first.');
     expect($$('form[aria-label="Set a sign-in provider"] input[type="password"]')).toHaveLength(1);
     await input('form[aria-label="Set a sign-in provider"] input:not([type="password"])', '123.apps.googleusercontent.com');
     await input('form[aria-label="Set a sign-in provider"] input[type="password"]', 'GOCSPX-secret');
+    expect(button('Set Google')?.hasAttribute('disabled')).toBe(false);
+    expect($('[data-set-needs]')).toBeNull();
     await click(button('Set Google'));
+    expect(text()).toContain('A provider set up before Lys moved to this address needs this one added in its console too.');
     expect(posted).toEqual([{ path: '/sign-in-providers', body: { provider: 'google', client_id: '123.apps.googleusercontent.com', client_secret: 'GOCSPX-secret' } }]);
     expect(text()).toContain('Google is set');
     // A provider's state and client id are said once, on its card, never again in a table.

@@ -23,6 +23,7 @@ import '../people/recorded-form.css';
 import '../people/manage.css';
 import '../sign-in/sign-in.css';
 import { Act } from '../../shell/Act';
+import { ClearSavedRequest } from '../people/SavedRequest';
 
 let taken: string | null = null;
 
@@ -84,7 +85,8 @@ function CodeEntry({ refusal, take }: { refusal: string; take: (code: string) =>
     <div className="field">
       <label htmlFor="setup-code">Setup code</label>
       <input id="setup-code" name="code" autoComplete="off" spellCheck={false} required aria-describedby="setup-code-where" />
-      <p id="setup-code-where" className="note">The setup code is in the file named setup-code in the folder the install printed. Use the full path shown on the line “the setup code is in …”. Only the account that ran the install can read it. The copy under state/ is a verification record, not the code.</p>
+      <p id="setup-code-where" className="note">The setup code is in the file named setup-code in the folder the install printed: use the full path on the line “the setup code is in …”. Only the account that ran the install can read it.</p>
+      <details className="note"><summary>Found a second file with a similar name?</summary><p>Lys also keeps a file under its state folder that it uses to check the code. That file is not the code.</p></details>
     </div>
     {why ? <p role="alert" className="why-not">{why}</p> : null}
     <Act symbol="approve" name="Check the code" word="Check" tone="primary" type="submit" />
@@ -147,14 +149,13 @@ export function FirstRunSetup({ code: linked, done = () => location.replace(SIGN
 
   const firstRun = opened?.purpose !== 'password';
   return <div className="page sign-in">
-    <div className="sign-in-mark" aria-hidden="true">ID</div>
     <div className="eyebrow">Welcome to Lys</div>
     <h1>{firstRun ? 'Set up Lys' : 'Choose a new password'}</h1>
     {refusal ? <div role="alert" className="why-not"><p>{refusal}</p><a className="btn" href="/#/sign-in">Go to sign in</a></div> : null}
     {!refusal && !code ? <CodeEntry refusal={entryRefusal} take={(typed) => { setEntryRefusal(''); setCode(typed); }} /> : null}
     {!refusal && code && !opened ? <p className="dim">Opening setup…</p> : null}
     {opened ? <form className="recorded-form sign-in-form" aria-label={firstRun ? 'Set up Lys' : 'New password'} onSubmit={submit} aria-busy={busy} noValidate>
-      <p className="sub">{firstRun ? 'You will be the administrator. Choose how you sign in.' : `Set a new password for ${opened.email ?? 'the administrator'}.`}</p>
+      <p className="sub">{firstRun ? 'You will be the administrator. Set your password.' : `Set a new password for ${opened.email ?? 'the administrator'}.`}</p>
       {firstRun ? <div className="field">
         <label htmlFor="setup-given-name">First name</label>
         <input id="setup-given-name" name="given_name" autoComplete="given-name" required disabled={busy} />
@@ -197,7 +198,7 @@ function readPending(): Pending | null {
   if (!value || typeof value !== 'object' || !('operation' in value) || !('display_name' in value)
     || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)
     || typeof value.display_name !== 'string' || !value.display_name.trim()) {
-    throw new Error('The saved setup request could not be read. Keep this tab open and contact your administrator.');
+    throw new Error('SavedRequestUnreadable: the saved setup request could not be read back.');
   }
   return { operation: value.operation, display_name: value.display_name };
 }
@@ -208,7 +209,7 @@ function initial() {
 }
 
 export function Setup({ completed }: { completed: () => void }) {
-  const [saved] = useState(initial);
+  const [saved, setSaved] = useState(initial);
   const [pending, setPending] = useState(saved.pending);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(saved.error);
@@ -282,9 +283,12 @@ export function Setup({ completed }: { completed: () => void }) {
         </>}
         <p className="sec">This connects the account you just signed in with and makes you the directory administrator.</p>
         {pending && !busy ? <p role="status">Your setup request is saved. Retry checks the same request safely, without creating another account.</p> : null}
-        {error ? <div role="alert" className="why-not">
+        {saved.error ? <ClearSavedRequest what="setup request" keys={[STORAGE]}
+          check={<>If <a href="#/people">People and agents</a> opens for you, your setup finished and nothing more is needed. If not, clear it and finish setup again: Lys connects your account once, so a second request never makes a second administrator.</>}
+          cleared={() => { const next = initial(); setSaved(next); setPending(next.pending); setError(next.error); }} />
+        : error ? <div role="alert" className="why-not">
           <b>Setup could not be confirmed.</b>
-          <p>{saved.error ? 'Your saved setup request could not be restored. Keep this tab open and ask your administrator for help.' : pending ? 'Your request is saved. Choose Retry setup to check it safely.' : 'Your browser could not save the request. Nothing has been submitted. Check browser storage before trying again.'}</p>
+          <p>{pending ? 'Your request is saved. Choose Retry setup to check it safely.' : 'Your browser could not save the request. Nothing has been submitted. Check browser storage before trying again.'}</p>
           <p><small className="refusal-name">{error}</small></p>
         </div> : null}
         <Act symbol="approve" name={busy ? 'Finishing setup…' : pending ? 'Retry setup' : 'Finish setup'} word={busy ? 'Finishing…' : pending ? 'Retry' : 'Finish'} tone="primary" type="submit" disabled={busy || Boolean(saved.error)} />

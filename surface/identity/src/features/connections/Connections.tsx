@@ -23,7 +23,7 @@ export function Connections() {
     </div>
     <ConfigTabs on="connections" />
     <Gate load={load} title="Connections" ok={(data) => <div className="pane stack">
-      <p className="note">Configured means a service is selected in this installation. It does not confirm that service is reachable now.</p>
+      <p className="note">“Configured” means this installation is set up to use the service. It does not check that the service is answering right now.</p>
       {data.connections.length === 0 ? <p>The service returned no configured integrations.</p> : <div className="card-grid">{data.connections.map((connection) => <section className="card" key={connection.id}>
         <h2>{connection.name}</h2><p>{connection.purpose}</p>
         {connection.endpoint ? <p className="note mono">{connection.endpoint}</p> : null}

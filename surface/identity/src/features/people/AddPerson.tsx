@@ -4,6 +4,7 @@ import type { GrantModel } from '../../generated/grants';
 import { sendKept } from '../../kept';
 import { fullName } from './person-name';
 import { DirectoryGate, ErrorWords } from './Words';
+import { ClearSavedRequest } from './SavedRequest';
 import { identity } from '../access/Resources';
 import { actionWords } from '../grants/action-words';
 import { resourceNames, resourceWords } from './agent-resource-names';
@@ -25,7 +26,9 @@ type Asking = { given: string; family: string; email: string; kind: string; id: 
 interface Logged { step: string; log: string; index: number }
 interface Admitted { person: string; logged: Logged[] }
 const STEPS = ['register', 'account', 'bind', 'activate', 'grant'];
-const WORDS: Record<string, string> = { register: 'Registered', bind: 'Sign-in bound', activate: 'Activated', grant: 'First grant issued' };
+/** Each step as the act under way, for saying where a refusal stopped. */
+const DOING: Record<string, string> = { register: 'registering them', account: 'finding or making their sign-in account', bind: 'binding their sign-in', activate: 'activating them', grant: 'giving their first access' };
+const WORDS: Record<string, string> = { register: 'Registered', account: 'Sign-in account found or made', bind: 'Sign-in bound', activate: 'Activated', grant: 'First grant issued' };
 
 function object(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 function filled(value: Record<string, unknown>, key: string): string | null {
@@ -78,7 +81,8 @@ export function stoppedAt(error: unknown, operation: string | undefined): Stoppe
 /** A refused act said whole: its refusal by name and reason, the step it stopped at, and the leaf of each step already written. */
 function RefusedReceipt({ stopped }: { stopped: Stopped }) {
   return <section aria-label="Refused receipt" className="why-not" role="alert">
-    <p>Not added. Lys refused the {stopped.failed} step: <small className="refusal-name">{stopped.refusal}</small> {stopped.reason}</p>
+    <p>Not added. Lys refused while {DOING[stopped.failed] ?? stopped.failed}: {stopped.reason}</p>
+    <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{stopped.refusal}: {stopped.reason}</p></details>
     {stopped.logged.length
       ? <><p>Already written, and kept; asking again finishes from here and makes none of these twice:</p>
         <ul>{stopped.logged.map((leaf) => <li key={leaf.log + leaf.index} data-step={leaf.step}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log leaf {leaf.index}</li>)}</ul></>
@@ -86,16 +90,34 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
   </section>;
 }
 
-function Receipt({ admitted }: { admitted: Admitted }) {
+/** The address people sign in at. An administrator's change is accepted only from Lys's public origin
+ * (crates/lys-identity-server/src/signed_json.rs checks each signed request against it), so the page that added
+ * someone is open at that address. */
+const signInAddress = (): string => location.origin;
+
+/** The invitation, as the person adding them would send it. */
+export const invitation = (name: string, email: string, address: string): string =>
+  'Hello ' + name + ', you have been added to Lys. Sign in at ' + address + ' with ' + email + '.';
+
+function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; email: string }) {
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
+  const address = signInAddress();
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'refused'>('idle');
+  const copyInvite = async () => {
+    try { await navigator.clipboard.writeText(invitation(name, email, address)); setCopy('copied'); }
+    catch { setCopy('refused'); }
+  };
   return <section aria-label="Receipt" className="note">
-    <p>Added. One act, recorded as:</p>
-    <ul>
+    <p role="status">{name} is added. They sign in at <a href={address}>{address}</a> with {email}.</p>
+    <p><Act symbol="copy" name={'Copy the invitation for ' + name} word="Copy invite" tone="primary" onClick={() => { void copyInvite(); }} />
+      {copy === 'copied' ? <span role="status"> Copied. Send it to {name}.</span> : null}</p>
+    {copy === 'refused' ? <p role="alert" className="why-not">This browser would not copy. Send {name} this instead: {invitation(name, email, address)}</p> : null}
+    {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
+    <p><a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a></p>
+    <details><summary>What Lys recorded</summary><ul>
       {admitted.logged.map((leaf) => <li key={leaf.log + leaf.index}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log leaf {leaf.index}</li>)}
       <li>Sign-in account: the issuer account for their email, found or made there; the issuer keeps that record</li>
-    </ul>
-    {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
-    <a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a>
+    </ul></details>
   </section>;
 }
 
@@ -116,17 +138,31 @@ function grantable(view: ResourcesView): Map<string, string[]> {
 }
 
 /** A kind said as words: an app's `app.kind` reads as two words, underscores as spaces. */
-const kindWords = (kind: string) => kind.replaceAll('_', ' ').replaceAll('.', ' ');
+export const kindWords = (kind: string) => kind.replaceAll('_', ' ').replaceAll('.', ' ');
+
+/** The legacy key an earlier Lys kept an unanswered add under; nothing writes it now, and it cannot be sent again. */
+const LEGACY = 'lys.pending.register-person';
+
+function savedState(key: string): { pending: PendingPerson | null; error: unknown } {
+  try {
+    if (sessionStorage.getItem(LEGACY) !== null) throw new Error('SavedRequestUnreadable: an earlier request to add a person was kept in a form this Lys cannot send again.');
+    return { pending: restored(key), error: null };
+  } catch (error) { return { pending: null, error }; }
+}
+
+/** What stops Add, said beside it; empty when nothing does. */
+export function missing(asking: Asking, granting: boolean): string {
+  const unnamed = [asking.given.trim() ? '' : 'first name', asking.family.trim() ? '' : 'last name', asking.email.trim() ? '' : 'email'].filter(Boolean);
+  if (unnamed.length) return 'Enter their ' + (unnamed.length === 1 ? unnamed[0] : unnamed.slice(0, -1).join(', ') + ' and ' + unnamed[unnamed.length - 1]) + '.';
+  if (granting && !asking.id) return 'Choose which one they get access to, or choose No access yet.';
+  if (granting && !asking.relation) return 'Choose what they may do there, or choose No access yet.';
+  return '';
+}
 
 function PersonForm({ person, model, resources, names }: { person: string; model: GrantModel; resources: ResourcesView; names: Map<string, string> }) {
   const choices = grantable(resources);
   const key = 'lys.add-person.' + person;
-  const [saved] = useState(() => {
-    try {
-      if (sessionStorage.getItem('lys.pending.register-person') !== null) throw new Error('An earlier request still needs its outcome checked before adding another person. Ask the administrator to resolve that saved request.');
-      return { pending: restored(key), error: null };
-    } catch (error) { return { pending: null, error }; }
-  });
+  const [saved, setSaved] = useState(() => savedState(key));
   const [pending, setPending] = useState(saved.pending);
   const [asking, setAsking] = useState<Asking>(() => {
     const held = saved.pending;
@@ -134,14 +170,14 @@ function PersonForm({ person, model, resources, names }: { person: string; model
     return { given: held.given ?? held.name, family: held.family ?? '', email: held.email, kind: held.kind, id: held.id, relation: held.relation };
   });
   const [failure, setFailure] = useState<unknown>(saved.error);
-  const [admitted, setAdmitted] = useState<Admitted | null>(null);
+  const [admitted, setAdmitted] = useState<{ admitted: Admitted; name: string; email: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const sending = useRef(false);
   // A saved request is sent again as it was saved, whatever the fields now hold.
   // The first grant is optional; when a kind is chosen, the resource and how they hold it must be chosen too.
   const granting = Boolean(asking.kind);
-  const complete = pending !== null || ([asking.given, asking.family, asking.email].every((value) => value.trim())
-    && (!granting || Boolean(asking.id && asking.relation)));
+  const lacking = pending === null ? missing(asking, granting) : '';
+  const complete = pending !== null || !lacking;
   const set = (field: keyof typeof asking) => (event: { target: { value: string } }) => setAsking({ ...asking, [field]: event.target.value });
   const locked = busy || pending !== null || Boolean(saved.error);
   const submit = async () => {
@@ -160,11 +196,14 @@ function PersonForm({ person, model, resources, names }: { person: string; model
           ...(first ? { grant: { route: 'browser', resource: { kind: asked.kind, id: asked.id }, relation: asked.relation } } : {}),
         }), asked.operation, first);
       }, false);
-      setPending(null); setAdmitted(answer);
+      setPending(null); setAdmitted({ admitted: answer, name: asked.name, email: asked.email });
     } catch (error) { setFailure(error); }
     finally { sending.current = false; setBusy(false); }
   };
-  if (admitted) return <Receipt admitted={admitted} />;
+  if (admitted) return <Receipt admitted={admitted.admitted} name={admitted.name} email={admitted.email} />;
+  const clearSaved = saved.error ? <ClearSavedRequest what="request to add a person" keys={[LEGACY, key]}
+    check={<>Look for them in <a href="#/people">People and agents</a> first. If they are there, they were added; if not, clear it and add them again. Adding them again with the same email finds their sign-in account rather than making a second one.</>}
+    cleared={() => { setSaved(savedState(key)); setFailure(null); setPending(null); }} /> : null;
   return <form aria-label="Add a person" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
     {pending && !(pending.given && pending.family)
       ? <label className="field">Name<input name="display_name" value={pending.name} readOnly disabled /></label>
@@ -172,7 +211,7 @@ function PersonForm({ person, model, resources, names }: { person: string; model
         <label className="field">First name<input name="given_name" autoFocus autoComplete="given-name" required value={asking.given} disabled={locked} onChange={set('given')} /></label>
         <label className="field">Last name<input name="family_name" autoComplete="family-name" required value={asking.family} disabled={locked} onChange={set('family')} /></label>
       </>}
-    <label className="field">Email<input name="email" type="email" autoComplete="email" value={asking.email} disabled={locked} onChange={set('email')} /></label>
+    <label className="field">Email<input name="email" type="email" autoComplete="email" required value={asking.email} disabled={locked} onChange={set('email')} /></label>
     <label className="field">Give them access to<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '', relation: '' })}>
       <option value="">No access yet</option>
       {[...choices.keys()].map((kind) => <option key={kind} value={kind}>{kindWords(kind)}</option>)}
@@ -186,12 +225,13 @@ function PersonForm({ person, model, resources, names }: { person: string; model
       </select></label>
       <label className="field">As<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
         <option value="" disabled>Choose what they may do</option>
-        {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: asking.kind, id: asking.id }, actions)}</option>)}
+        {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} >{actionWords(model, { kind: asking.kind, id: asking.id }, actions)}</option>)}
       </select></label>
     </> : null}
-    <Act symbol="add" name={busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'} word={busy ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={busy || !complete || Boolean(saved.error)} />
+    <Act symbol="add" name={busy ? 'Adding…' : pending ? 'Continue adding this person' : 'Add person'} word={busy ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={busy || !complete || Boolean(saved.error)} aria-describedby={lacking ? 'add-person-missing' : undefined} />
+    {!busy && !saved.error && lacking ? <p className="why-not" role="status" id="add-person-missing">{lacking}</p> : null}
     {pending ? <p role="status">This request has no confirmed answer yet. Its original details are saved; trying again checks the same request.</p> : null}
-    {failure ? <Failure failure={failure} operation={pending?.operation} /> : null}
+    {clearSaved ?? (failure ? <Failure failure={failure} operation={pending?.operation} /> : null)}
   </form>;
 }
 

@@ -54,12 +54,14 @@ function choice(form: HTMLElement, name: string, label: string): HTMLSelectEleme
 describe('Agent registration choices', () => {
   it('shows You first and hides retired and suspended reporting targets until Show retired is pressed', async () => {
     const people = { ...DIRECTORY, people: [...DIRECTORY.people].reverse() };
-    const { form, posted } = await registration(false, { '/directory/people': ok(people) });
+    // Retired and suspended targets are listed at all only where this Lys registers an agent under someone else.
+    const answersTo = ok({ paths: { '/agents': { post: { requestBody: { content: { 'application/json': { schema: { properties: { answers_to: {} } } } } } } } } });
+    const { form, posted } = await registration(false, { '/directory/people': ok(people), '/surface-contract': answersTo });
     const select = choice(form, 'answers_to', 'Who this agent answers to');
     expect(select.options[0].value).toBe(ADA);
     expect(select.options[0].textContent).toBe('You (' + ME.person.display_name + ')');
     for (const id of [BEA, ARCHIVIST, LAMPLIGHTER]) expect([...select.options].some((option) => option.value === id)).toBe(false);
-    const show = [...form.querySelectorAll('button')].find((button) => button.textContent === 'Show retired (3)');
+    const show = [...form.querySelectorAll('button')].find((button) => button.textContent === 'Show retired and suspended (3)');
     expect(show?.getAttribute('aria-pressed')).toBe('false');
     await click(show ?? null);
     expect(show?.getAttribute('aria-pressed')).toBe('true');

@@ -1,7 +1,7 @@
 /**
  * The sign-in providers set from here: Google, Microsoft and GitHub, every
- * step shown. The redirect address to paste is the one the service answers,
- * Lys's own; saving proves the client id at the provider, and a provider
+ * step shown. The return address to paste is the one the service answers:
+ * Lys's public address and /auth/v1/providers/callback; saving proves the client id at the provider, and a provider
  * that refuses it is named with its own words.
  */
 import { useState } from 'react';
@@ -34,7 +34,7 @@ function RedirectAddress({ address }: { address: string }) {
     }
   }
   return <div className="field">
-    <label htmlFor="sign-in-redirect">Redirect address</label>
+    <label htmlFor="sign-in-redirect">Return address</label>
     <input id="sign-in-redirect" className="mono" value={address} readOnly onFocus={(event) => event.currentTarget.select()} />
     <div><Act symbol="copy" name="Copy address" word="Copy" onClick={copy} /> <span role="status">{copied}</span></div>
   </div>;
@@ -105,9 +105,9 @@ export function SignInProviders() {
           <li><h3>Prepare {guide.name}</h3>
             <ul className="prepare">{guide.prepare.map((step) => <li key={step.text}>{step.text}{step.link ? <> <a className="btn" href={step.link.href} target="_blank" rel="noreferrer">{step.link.label} ↗</a></> : null}</li>)}</ul>
           </li>
-          <li><h3>Give {guide.name} this redirect address</h3>
+          <li><h3>Give {guide.name} this return address</h3>
             <RedirectAddress address={data.redirect_address} />
-            <p className="note">A provider already registered with the old address needs the new one added.</p>
+            {data.providers.length ? <p className="note">A provider set up before Lys moved to this address needs this one added in its console too.</p> : null}
           </li>
           <li><h3>Enter what {guide.name} issued</h3>
             <form aria-label="Set a sign-in provider" onSubmit={submit}>
@@ -121,6 +121,7 @@ export function SignInProviders() {
                 <input value={tenant} onChange={(event) => setTenant(event.target.value)} disabled={busy} autoComplete="off" placeholder="contoso.onmicrosoft.com" required />
               </label> : null}
               <Act symbol="approve" name={busy ? 'Checking with ' + NAMES[provider] + '…' : 'Set ' + NAMES[provider]} word={busy ? 'Checking…' : 'Set'} tone="primary" type="submit" disabled={!ready} />
+              {ready || busy ? null : <p className="hint" data-set-needs>Paste the {provider === 'microsoft' ? guide.idLabel + ', ' + guide.secretLabel + ' and Tenant' : guide.idLabel + ' and ' + guide.secretLabel} first.</p>}
             </form>
           </li>
         </ol>

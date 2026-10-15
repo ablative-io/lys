@@ -4,7 +4,7 @@
 import { act } from 'react';
 import { expect, it } from 'vitest';
 import { click, mount, settle, text } from './harness';
-import { SERVICE, ok, refused } from './fixtures';
+import { ME, SERVICE, ok, refused } from './fixtures';
 
 /** Type into the addresses field, a textarea, as a person would. */
 async function type(el: Element | null, value: string): Promise<void> {
@@ -27,7 +27,10 @@ const button = (label: string) => [...document.querySelectorAll('button')].find(
 const addresses = () => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Return addresses of ' + APP + '"]');
 const nameTick = () => document.querySelector<HTMLInputElement>('[aria-label="Change the sign-in of ' + APP + '"] input[type="checkbox"]');
 const settings = () => document.querySelector('[aria-label="Sign-in settings of ' + APP + '"]')?.textContent ?? '';
-const alert = () => document.querySelector('[role="alert"]')?.textContent ?? '';
+/** The refusal's plain words, never its code. */
+const alert = () => document.querySelector('[role="alert"] > p')?.textContent ?? '';
+/** The refusal as Lys answered it, kept inside the Error details fold. */
+const details = () => document.querySelector('[role="alert"] details .refusal-name')?.textContent ?? '';
 
 /** A service whose one app is approved, answering a sign-in change by keeping it, as Lys does. */
 function routes(answer?: (body: { redirects: string[]; profile: boolean }) => ReturnType<typeof ok>) {
@@ -60,7 +63,10 @@ it('changes a return address through the sign-in route and shows the settings as
   await click(button('Save the sign-in of Notes fixture'));
   expect(posted).toEqual([{ path: '/apps/' + APP + '/sign_in', body: { operation: expect.stringMatching(/^op-/), redirects: [MOVED], profile: true } }]);
   expect(text()).toContain('Notes fixture’s sign-in now sends people back to ' + MOVED + ' and gives it their name.');
-  expect(settings()).toContain('as last set by ada');
+  // The sign-in that set it is the signed-in person's own, so it is named through the directory and linked to their file.
+  expect(settings()).toContain('as last set by ' + ME.person.display_name);
+  expect(document.querySelector('[aria-label="Sign-in settings of ' + APP + '"] a')?.getAttribute('href')).toBe('#/file/' + ME.person.id);
+  expect(settings()).not.toContain('as last set by ada');
   expect(settings()).toContain(MOVED);
   expect(settings()).not.toContain(BACK);
 });
@@ -87,7 +93,9 @@ it('shows a refused address in Lys’s words and keeps the settings as they were
   await type(addresses(), plain);
   await click(button('Save the sign-in of Notes fixture'));
   expect(posted).toHaveLength(1);
-  expect(alert()).toBe('redirect_invalid: ' + plain + ' is not admitted: it is not an https address');
+  expect(alert()).toBe('Lys refused: ' + plain + ' is not admitted: it is not an https address');
+  expect(alert()).not.toContain('redirect_invalid');
+  expect(details()).toBe('redirect_invalid: ' + plain + ' is not admitted: it is not an https address');
   expect(settings()).toContain(BACK);
   expect(settings()).not.toContain(plain);
   expect(text()).not.toContain('now sends people back to');
@@ -98,7 +106,8 @@ it('says a refusal’s name once when Lys’s reason already carries it', async 
   await mount('#/apps', routes(() => refused(400, 'redirect_invalid', reason)));
   await type(addresses(), 'not-an-address');
   await click(button('Save the sign-in of Notes fixture'));
-  expect(alert()).toBe(reason);
+  expect(alert()).toBe('Lys refused: `not-an-address` is not an absolute address');
+  expect(details()).toBe(reason);
 });
 
 it('shows a non-administrator’s refusal in Lys’s words and tries nothing again on its own', async () => {
@@ -106,7 +115,8 @@ it('shows a non-administrator’s refusal in Lys’s words and tries nothing aga
   await type(addresses(), MOVED);
   await click(button('Save the sign-in of Notes fixture'));
   expect(posted).toHaveLength(1);
-  expect(alert()).toBe('NotAdmitted: only the administrator sets an app’s sign-in');
+  expect(alert()).toBe('You do not have permission to do this. Ask the directory administrator to make the change.');
+  expect(details()).toBe('NotAdmitted: only the administrator sets an app’s sign-in');
   expect(settings()).toContain(BACK);
   expect(settings()).not.toContain(MOVED);
   expect(button('Save the sign-in of Notes fixture')).not.toBeNull();

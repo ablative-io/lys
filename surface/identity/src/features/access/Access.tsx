@@ -147,14 +147,14 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
   const close = () => setActing(null);
   const columns = [...grantColumns(w), { head: 'Change', cell: (g: Grant) => <ChangeButtons w={w} g={g} give open={(act, opener) => setActing({ grant: g, act, opener })} /> }];
-  // Only the root authority is offered the root-grant form; anyone else who opens its address is told so by name, with no form.
+  // Only the administrator (the root authority) is offered Give access; anyone else who opens its address is told so in words, with no form.
   const root = isRootAuthority(w.people);
-  const panel = issuing ? <ActPanel className="issue-root" label="Issue root grant" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
+  const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
     : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
   return <div className="page fill">
     <div className="head">
       <div><h1>Access</h1><p className="sub">{asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
-      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Issue root grant</a> : null}
+      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Give access</a> : null}
     </div>
     <AccessTabs on={asking ? 'ask' : 'grants'} />
     {asking ? <div className="pane">

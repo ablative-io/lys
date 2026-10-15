@@ -67,3 +67,34 @@ export function place(region: Region, b: Box, ch: number, bounds: Bounds): { lef
 /** Whether an element is drawn on screen at all: a region hidden, folded or scrolled away gets no callout. */
 export const onScreen = (b: Box, width: number, height: number): boolean =>
   b.width >= 4 && b.height >= 4 && b.bottom > 0 && b.right > 0 && b.top < height && b.left < width;
+
+/** Whether two boxes share any area, with `gap` kept clear between them. */
+const overlaps = (a: Box, b: Box, gap: number): boolean =>
+  a.left < b.right + gap && b.left < a.right + gap && a.top < b.bottom + gap && b.top < a.bottom + gap;
+
+const boxAt = (left: number, top: number, width: number, height: number): Box =>
+  ({ left, top, width, height, right: left + width, bottom: top + height });
+
+/**
+ * Moves a placed callout off everything already drawn over the page (the keys panel and the callouts placed before
+ * it), so no note is ever hidden under another. It tries left of the obstacle first, then below it, then above it,
+ * each held inside the bounds; where no clear place exists the first clear-of-the-panel place is kept.
+ */
+export function settle(at: { left: number; top: number }, ch: number, obstacles: readonly Box[], bounds: Bounds): { left: number; top: number } {
+  const m = 8;
+  const clear = (left: number, top: number) => obstacles.every((o) => !overlaps(boxAt(left, top, CALL_W, ch), o, m / 2));
+  const inside = (left: number, top: number) => left >= bounds.minX + m && left + CALL_W <= bounds.width - m && top >= m && top + ch <= bounds.height - m;
+  if (clear(at.left, at.top)) return at;
+  const tried: { left: number; top: number }[] = [];
+  for (const o of obstacles) {
+    if (!overlaps(boxAt(at.left, at.top, CALL_W, ch), o, m / 2)) continue;
+    tried.push({ left: o.left - CALL_W - m, top: at.top }, { left: at.left, top: o.bottom + m }, { left: at.left, top: o.top - ch - m });
+  }
+  // A second round: past the obstacle a first move lands on.
+  for (const first of [...tried]) {
+    for (const o of obstacles) {
+      if (overlaps(boxAt(first.left, first.top, CALL_W, ch), o, m / 2)) tried.push({ left: first.left, top: o.bottom + m }, { left: o.left - CALL_W - m, top: first.top });
+    }
+  }
+  return tried.find((p) => inside(p.left, p.top) && clear(p.left, p.top)) ?? at;
+}

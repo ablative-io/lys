@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GO } from '../src/shell/keys';
 import { CONCEPTS, TRACKS, conceptById, conceptGroups } from '../src/shell/help/concepts';
 import { PAGES, RAIL_REGION, pageKeyOf } from '../src/shell/help/pages';
+import { CALL_W, settle as settleCallout } from '../src/shell/help/place';
 import { goShortcuts } from '../src/shell/help/shortcuts';
 import { CLOSED_HELP, helpStateFromParams, readHelpUrl, withHelpState } from '../src/shell/help/url';
 import { $, $$, click, mount, press, settle, type, unreachable } from './harness';
@@ -70,6 +71,45 @@ describe('the page help', () => {
     expect($('#helpLayer')).toBeNull();
   });
 
+  it('opens on ⌘/ even from inside a field, where ? is only a character', async () => {
+    layOut();
+    await mount('#/people/new');
+    const field = $('input[name="email"]');
+    await press('/', { metaKey: true }, field);
+    expect($('#helpLayer')).not.toBeNull();
+    await press('/', { metaKey: true }, field);
+    expect($('#helpLayer')).toBeNull();
+  });
+
+  it('on a phone lists the numbered notes in place of the keys, and draws no callouts over the page', async () => {
+    layOut();
+    const width = innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 });
+    try {
+      await mount('#/people');
+      await press('?', {}, document.body);
+      expect($('#helpLayer .help-kt')).toBeNull();
+      expect($$('#helpLayer [data-help-call]')).toEqual([]);
+      const notes = $$('#helpLayer [data-help-note]').map((n) => n.querySelector('.help-call-t')?.textContent?.replace(/^\d+/, ''));
+      expect(notes).toEqual(present('people'));
+      expect(notes).toContain('The list');
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+    }
+  });
+
+  it('settles a callout off the keys panel and off callouts already placed', () => {
+    const bounds = { minX: 60, width: 1280, height: 800 };
+    const panel = { left: 940, top: 84, right: 1264, bottom: 784, width: 324, height: 700 };
+    const earlier = { left: 620, top: 440, right: 620 + CALL_W, bottom: 550, width: CALL_W, height: 110 };
+    const overPanel = settleCallout({ left: 1000, top: 200 }, 100, [panel], bounds);
+    expect(overPanel.left + CALL_W).toBeLessThanOrEqual(panel.left);
+    const overBoth = settleCallout({ left: 620, top: 500 }, 100, [panel, earlier], bounds);
+    const box = { left: overBoth.left, right: overBoth.left + CALL_W, top: overBoth.top, bottom: overBoth.top + 100 };
+    for (const o of [panel, earlier]) expect(box.right <= o.left || box.left >= o.right || box.bottom <= o.top || box.top >= o.bottom).toBe(true);
+    expect(settleCallout({ left: 100, top: 100 }, 100, [panel], bounds)).toEqual({ left: 100, top: 100 });
+  });
+
   it('closes on Escape and gives focus back to where it was', async () => {
     layOut();
     await mount('#/people');
@@ -118,7 +158,7 @@ describe('the page help', () => {
     await press('?', {}, document.body);
     const keys = $$('#helpLayer .help-kt dt').map((k) => k.textContent);
     for (const letter of Object.keys(GO)) expect(keys.some((k) => k?.split(' or ').includes('g ' + letter))).toBe(true);
-    expect(keys).toContain('? or ⌘/');
+    expect(keys).toContain('? (outside a field) or ⌘/');
     expect(keys).toContain('j / k');
   });
 
@@ -277,6 +317,8 @@ describe('the help registry', () => {
     expect(pageKeyOf('/file/A1/record')).toBe('file');
     expect(pageKeyOf('/access/drafts')).toBe('drafts');
     expect(pageKeyOf('/access/can')).toBe('access');
+    expect(pageKeyOf('/apps/connect')).toBe('apps-connect');
+    expect(PAGES['apps-connect'].regions.map((region) => region.title)).toEqual(['The app', 'Where it sends people', 'The permissions it asks for', 'Approve or Decline']);
     for (const key of ['network', 'apps', 'secrets', 'settings', 'connections', 'me', 'canvas', 'graph', 'requests', 'reviews', 'roles']) expect(PAGES[pageKeyOf('/' + key)], key).toBeDefined();
   });
 });

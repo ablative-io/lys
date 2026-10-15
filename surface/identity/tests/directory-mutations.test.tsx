@@ -124,7 +124,7 @@ describe('Directory mutations', () => {
 
   it('issues a root grant only with the explicitly selected holder, relation and lifetime', async () => {
     const { posted } = await mount('#/access/issue', { ...SERVICE, 'POST /grants/roots': (body) => recorded(body, true) });
-    const page = form('Issue root grant');
+    const page = form('Give access');
     await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
     await choose(page.querySelector('select[name="relation"]'), 'viewer');
     await choose(page.querySelector('select[name="kind"]'), 'project');

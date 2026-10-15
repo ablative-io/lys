@@ -128,7 +128,8 @@ describe('First administrator setup', () => {
     const { posted } = await mount('#/me', { ...SERVICE, '/me': needsSetup });
     await submit('Tom', 'Whiting');
     expect(posted).toHaveLength(0);
-    expect($('form button')?.hasAttribute('disabled')).toBe(true);
+    expect($('form button[type="submit"]')?.hasAttribute('disabled')).toBe(true);
+    expect($('[aria-label="Saved request"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.pending.first-setup')).toBe('{broken');
   });
 });

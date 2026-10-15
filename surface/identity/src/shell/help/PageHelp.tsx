@@ -5,7 +5,7 @@ import { Act } from '../Act';
 import { useShell } from '../ShellContext';
 import { ANY_PAGE, PAGES, RAIL_REGION, pageKeyOf } from './pages';
 import type { Region } from './pages';
-import { CALL_W, onScreen, place } from './place';
+import { CALL_W, onScreen, place, settle } from './place';
 import type { Box } from './place';
 import { SHELL_SHORTCUTS, goShortcuts } from './shortcuts';
 import './help.css';
@@ -27,11 +27,21 @@ function measure(regions: readonly Region[]): Placed[] {
   return out;
 }
 
+/** Below this width the keys panel would fill the screen and hide the notes, so the notes are listed in its place. */
+export const NARROW_HELP = 600;
+
+const boxOf = (el: Element | null): Box | null => {
+  if (!el) return null;
+  const { left, top, right, bottom, width, height } = el.getBoundingClientRect();
+  return { left, top, right, bottom, width, height };
+};
+
 /**
  * The page help (liminal's help layer): the page dims, each region of the page on screen is outlined with a
- * numbered callout beside it, and a panel lists the keys that work here. ? or ⌘/ shows and hides it; Esc, the
+ * numbered callout beside it, and a panel lists the keys that work here. ? (outside a field) or ⌘/ (anywhere) shows and hides it; Esc, the
  * close button or a click on the dim closes it, and the click never presses what is underneath. "Full help" opens
- * the help dock on this page's sheet.
+ * the help dock on this page's sheet. No callout is drawn over the keys panel or over another callout. On a narrow
+ * screen (a phone) the panel lists the numbered notes instead of the keys, which need a keyboard anyway.
  */
 export function PageHelp() {
   const shell = useShell();
@@ -41,12 +51,14 @@ export function PageHelp() {
   const [heights, setHeights] = useState<readonly number[]>([]);
   const [minX, setMinX] = useState(0);
   const [layout, setLayout] = useState(0);
+  const [keysBox, setKeysBox] = useState<Box | null>(null);
   const calls = useRef<(HTMLDivElement | null)[]>([]);
   const panel = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     setPlaced(measure([...help.regions, RAIL_REGION]));
     setMinX(document.getElementById('screen')?.getBoundingClientRect().left ?? 0);
+    setKeysBox(boxOf(panel.current));
   }, [help, layout]);
 
   // Each callout is drawn hidden first, measured, then placed by its own height before it is seen.
@@ -102,22 +114,34 @@ export function PageHelp() {
     shell.showHelp(help.topic || null);
   };
   const bounds = { minX, width: innerWidth, height: innerHeight };
+  const narrow = innerWidth < NARROW_HELP;
+  // Each callout is settled in turn: clear of the keys panel and of every callout placed before it.
+  const settled: Box[] = keysBox ? [keysBox] : [];
+  const spots = placed.map(({ region, box }, i) => {
+    const h = heights[i];
+    if (h === undefined) return null;
+    const at = settle(place(region, box, h, bounds), h, settled, bounds);
+    settled.push({ left: at.left, top: at.top, right: at.left + CALL_W, bottom: at.top + h, width: CALL_W, height: h });
+    return at;
+  });
 
   return (
     <section id="helpLayer" className="help-layer" aria-label={'Help: ' + help.title}>
       <div className="help-dim" data-help-dim="" onClick={dismiss} />
       {placed.map(({ n, region, box }) => (
         <div key={n + region.sel}>
-          <div className="help-reg" data-help-region={region.title} style={{ left: box.left, top: box.top, width: box.width, height: box.height }} />
-          <div
+          <div className="help-reg" data-help-region={region.title} style={{ left: box.left, top: box.top, width: box.width, height: box.height }}>
+            {narrow ? <span className="help-n">{n}</span> : null}
+          </div>
+          {narrow ? null : <div
             ref={(el) => { calls.current[n - 1] = el; }}
             className="help-call"
             data-help-call={n}
-            style={heights[n - 1] === undefined ? { width: CALL_W, left: 0, top: 0, visibility: 'hidden' } : { width: CALL_W, ...place(region, box, heights[n - 1] ?? 0, bounds) }}
+            style={spots[n - 1] ? { width: CALL_W, ...spots[n - 1] } : { width: CALL_W, left: 0, top: 0, visibility: 'hidden' }}
           >
             <div className="help-call-t"><span className="help-n">{n}</span>{region.title}</div>
             <div className="help-call-d">{region.text}</div>
-          </div>
+          </div>}
         </div>
       ))}
       <div className="help-keys" role="dialog" aria-label={'Keys for ' + help.title} tabIndex={-1} ref={panel}>
@@ -126,11 +150,22 @@ export function PageHelp() {
           <Act symbol="close" name="Close help" hint="Close help (Esc)" className="small quiet" data-help-close="" onClick={shell.explainOff} />
         </div>
         {help === ANY_PAGE ? <p className="dim">This page has no numbered notes; Full help explains every screen.</p> : null}
-        <dl className="help-kt">
-          {[...help.keys, ...SHELL_SHORTCUTS, ...goShortcuts()].map(([k, d]) => (
-            <div key={k} className="help-kt-row"><dt>{k}</dt><dd>{d}</dd></div>
-          ))}
-        </dl>
+        {narrow ? (
+          <ol className="help-notes" aria-label={'Notes for ' + help.title}>
+            {placed.map(({ n, region }) => (
+              <li key={n + region.sel} data-help-note={n}>
+                <div className="help-call-t"><span className="help-n">{n}</span>{region.title}</div>
+                <div className="help-call-d">{region.text}</div>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <dl className="help-kt">
+            {[...help.keys, ...SHELL_SHORTCUTS, ...goShortcuts()].map(([k, d]) => (
+              <div key={k} className="help-kt-row"><dt>{k}</dt><dd>{d}</dd></div>
+            ))}
+          </dl>
+        )}
         <div className="help-keys-foot">
           <Act symbol="help" name="Full help" hint="Every topic: getting started, how each screen works, and what to do when something isn’t working" word="Full help" tone="primary" data-help-full="" onClick={full} />
         </div>

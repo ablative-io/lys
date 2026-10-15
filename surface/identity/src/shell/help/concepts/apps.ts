@@ -8,7 +8,7 @@ export const APPS: Seed[] = [
     summary: 'Every app that signs in with Lys and has its permissions checked here.',
     body: [
       'Apps sits under Configuration. Known apps, Cambium among them, are listed with Connect. Each app shows its state; nothing an app registers takes effect until you approve it here.',
-      'Approving an app approves the permissions it asks for and the return addresses its sign-in may send a person back to. Declining asks why.',
+      'Approving an app approves the permissions it asks for and the return addresses its sign-in may send a person back to. Declining sends you back to the app, which is told no; nothing it asked for takes effect.',
       'Add your own app (for developers) registers an app by name and id and builds its permission template.',
     ],
     steps: [{ text: 'Open Apps.', href: '#/apps', link: 'Open Apps' }],

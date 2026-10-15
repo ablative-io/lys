@@ -230,6 +230,21 @@ describe('An agent\'s access on an install with no app yet', () => {
     unmountAll(); document.body.innerHTML = '';
   });
 
+  it('once Cambium is approved, sends the person to Access for Cambium access of their own, never round to Apps again', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
+    const note = $('[data-cambium-first]');
+    expect(note?.textContent).toBe('Cambium is approved. Give yourself Cambium access on Access first; its channels appear here once you hold them.');
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue');
+    expect(note?.textContent).not.toContain('Connect Cambium');
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  it('while Cambium is only waiting for approval, still says to connect it on Apps', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'pending' }] }) });
+    expect($('[data-cambium-first]')?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
+    unmountAll(); document.body.innerHTML = '';
+  });
+
   it('says nothing about Cambium once an app resource is granted', async () => {
     const appGrant = { ...GRANTS[0], id: 'grant-' + 'c'.repeat(32), resource: { kind: 'cambium.channel', id: 'general' } };
     await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, appGrant], revision: 7 }) });

@@ -21,6 +21,8 @@ const REFUSALS: Record<string, string> = {
   ServiceAccountUnknown: 'This account record could not be found or is not yours to manage. Ask the owner or administrator.',
   RequestMalformed: 'Lys could not accept these form details. Check the fields; the service’s explanation is under Error details.',
   UnreadableResponse: 'Lys answered, but its result could not be read. Keep the original change and check its outcome before sending another.',
+  SavedRequestUnreleased: 'This browser would not remove the saved request. Close this tab and open Lys in a new one: a new tab starts with no saved requests.',
+  AlarmsUnreadable: 'Lys answered, but the alarms could not be read. Reload the page; if it happens again, ask the administrator to check the service.',
   UnconfirmedReceipt: 'The answer did not confirm this change. Use Check to see whether Lys saved it before sending another.',
   StorageUncertain: 'The change may have been saved, but its outcome is unknown. Use Check to see whether Lys saved it before sending another.',
   ServiceUnreachable: 'Lys could not be reached. Ask the administrator to check the service. Keep any change whose outcome is unknown.',

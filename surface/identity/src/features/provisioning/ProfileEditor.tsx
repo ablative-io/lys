@@ -207,7 +207,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     {folderFirst ? where : null}
     {programField}
     {found ? <p className="wide first-run-copy">Lys found {program?.name} on this computer and uses <code>{launchCommand(found.program)}</code>.</p> : copyField}
-    {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that keeps it to its own folder with the internet off, so it starts in its most careful mode: {MODES[fallbackMode.id]?.name ?? fallbackMode.meaning}. You can change this under More settings.</p> : null}
+    {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that limits its changes to its own folder with the internet off, so it starts in its most careful mode: {MODES[fallbackMode.id]?.name ?? fallbackMode.meaning}. You can change this under More settings.</p> : null}
     {folderFirst ? null : where}
     <details className="wide more-settings"><summary>More settings</summary><div className="form-grid">
       {found ? copyField : null}

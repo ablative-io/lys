@@ -119,9 +119,9 @@ describe('Add-agent retry safety', () => {
   });
 
   it.each([
-    { label: 'has no answers_to field', answer: schema(false), words: 'under You only' },
-    { label: 'cannot be read', answer: ok({ broken: true }), words: 'could not be read' },
-    { label: 'is unavailable', answer: refused(503, 'StorageUnavailable', 'Not available'), words: 'could not be read' },
+    { label: 'has no answers_to field', answer: schema(false), words: 'this Lys registers a new agent under the person adding it' },
+    { label: 'cannot be read', answer: ok({ broken: true }), words: 'Lys did not say whether it can register an agent under someone else' },
+    { label: 'is unavailable', answer: refused(503, 'StorageUnavailable', 'Not available'), words: 'Lys did not say whether it can register an agent under someone else' },
   ])('still adds under You when the served schema $label', async ({ answer, words }) => {
     const { entry, posted } = await form({
       '/surface-contract': answer,
@@ -129,9 +129,11 @@ describe('Add-agent retry safety', () => {
       'POST /agents': (body) => ok({ agent: COURIER, responsible: ADA, receipt: receipt(body) }),
       ['POST /identities/' + COURIER + '/transitions']: (body) => ok({ receipt: { ...receipt(body), change_kind: 5 } }),
     });
-    const other = entry.querySelector<HTMLOptionElement>('select[name="answers_to"] option[value="' + BEA + '"]');
-    expect(other?.disabled).toBe(true);
-    expect(other?.textContent).toContain('not served');
+    // Only You is offered: someone this Lys cannot register under is never listed, and the form says why in words.
+    const offered = [...entry.querySelectorAll<HTMLOptionElement>('select[name="answers_to"] option')];
+    expect(offered.map((option) => option.value)).toEqual([ADA]);
+    expect(offered[0].disabled).toBe(false);
+    expect(entry.querySelector('select[name="answers_to"] option[value="' + BEA + '"]')).toBeNull();
     expect(entry.textContent).toContain(words);
     await type(entry.querySelector('input[name="display_name"]'), 'Care helper');
     await submit(entry);

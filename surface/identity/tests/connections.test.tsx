@@ -17,7 +17,8 @@ describe('Connections', () => {
     expect($$('section.card:not([aria-label])')).toHaveLength(3);
     expect(text()).toContain('Local to Lys');
     expect(text()).toContain('Not configured');
-    expect(text()).toContain('does not confirm that service is reachable');
+    expect(text()).toContain('“Configured” means this installation is set up to use the service. It does not check that the service is answering right now.');
+    expect(text()).not.toContain('a service is selected');
     expect(text()).toContain('http://localhost:18080');
     expect($$('details')).toHaveLength(0);
     expect(unreachable()).toEqual([]);

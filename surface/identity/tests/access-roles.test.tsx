@@ -77,8 +77,8 @@ describe('The issue form offers the kind\'s roles beside the mode', () => {
 
   it('sends the chosen role as the relation', async () => {
     const { posted } = await mount('#/access/issue', routes);
-    const page = $('form[aria-label="Issue root grant"]');
-    if (!page) throw new Error('No Issue root grant form');
+    const page = $('form[aria-label="Give access"]');
+    if (!page) throw new Error('No Give access form');
     expect($('select[name="role"]')).toBeNull();
     await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
     await choose(page.querySelector('select[name="kind"]'), KIND);

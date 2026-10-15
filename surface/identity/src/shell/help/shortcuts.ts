@@ -21,7 +21,7 @@ export function goShortcuts(): Shortcut[] {
 
 /** The keys that work everywhere, as keys.ts handles them. */
 export const SHELL_SHORTCUTS: readonly Shortcut[] = [
-  ['? or ⌘/', 'this help; Esc closes'],
+  ['? (outside a field) or ⌘/', 'this help; Esc closes'],
   ['⌘K', 'command palette: go anywhere, find anyone'],
   ['j / k, Enter', 'move through a list, open the row'],
   ['1 to 7', 'sections of a person’s or agent’s page'],

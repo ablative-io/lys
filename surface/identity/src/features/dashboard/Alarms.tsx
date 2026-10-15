@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { request, Refused } from '../../api';
 import { Act } from '../../shell/Act';
 import { SecurityEvents } from './SecurityEvents';
+import { ErrorWords } from '../people/Words';
 import { refusedPart, validAlarm } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
 
@@ -12,8 +13,9 @@ export interface Alarm {
 }
 export interface AlarmSummary { open_count: number; newest: Alarm[] }
 
+/** A failure as the service named it; one the screen found itself is named here, and shown in words, never by this name. */
 function problem(error: unknown): PartRefused {
-  return error instanceof Refused ? error.refusal : { refusal: 'AlarmsUnreadable', reason: String(error) };
+  return error instanceof Refused ? error.refusal : { refusal: 'AlarmsUnreadable', reason: error instanceof Error ? error.message : String(error) };
 }
 
 function shownAlarm(reported: Alarm, local: Alarm | undefined): Alarm {
@@ -60,7 +62,7 @@ function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
     <div className="section-h"><span>Alarms</span><b className="dash-count">{count}</b>
       {!refusedPart(summary) && all === null ? <Act symbol="more" name="Show all" word="Show all" onClick={() => void readAll()} /> : null}</div>
     <div className="you-scroll">
-      {refusedPart(summary) ? <p className="why-not" role="alert" title={summary.reason}>{summary.refusal}</p>
+      {refusedPart(summary) ? <><p className="why-not">Lys could not read the alarms.</p><ErrorWords problem={new Refused(0, summary)} /></>
         : <table className="dash-table"><tbody>{rows.map((alarm) => {
           return <tr key={alarm.id} data-alarm={alarm.id}>
             <td>{agents.find((row) => row.agent.id === alarm.agent)?.agent.display_name ?? 'Agent name unavailable'}
@@ -70,7 +72,7 @@ function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
               : <Act symbol="approve" name="Acknowledge" word="Acknowledge" disabled={busy !== null} onClick={() => void acknowledge(alarm)} />}</td>
           </tr>;
         })}{rows.length ? null : <tr className="empty"><td>No open alarms.</td></tr>}</tbody></table>}
-      {failure ? <p className="why-not" role="alert" title={failure.reason}>{failure.refusal}: {failure.reason}</p> : null}
+      {failure ? <ErrorWords problem={new Refused(0, failure)} /> : null}
     </div>
   </section>;
 }

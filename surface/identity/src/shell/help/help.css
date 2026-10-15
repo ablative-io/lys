@@ -21,3 +21,7 @@
 .help-steps { margin: 4px 0 12px; padding-left: 18px; color: var(--text-secondary); font-size: 12.5px; line-height: 1.6; }
 .help-steps a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { .help-call { animation: none; } }
+/* A narrow screen: the panel spans the width and lists the notes; each outlined region carries its note's number. */
+.help-reg > .help-n { position: absolute; top: -9px; left: -9px; }
+.help-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+@media (max-width: 599px) { .help-keys { left: 12px; right: 12px; bottom: 12px; width: auto; max-height: 55vh; } }

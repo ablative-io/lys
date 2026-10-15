@@ -481,8 +481,9 @@ describe('An agent\'s spending limit', () => {
     await type(limit + ' input[name="spending_amount"]', '25');
     await click($(limit + ' button[type="submit"]'));
     const alert = $(limit + ' [role="alert"]');
-    expect(alert?.textContent).toContain('Not saved: only the responsible person or an administrator sets this budget');
-    expect(alert?.querySelector('.refusal-name')?.textContent).toBe('not_permitted');
+    expect(alert?.textContent).toBe('The spending limit was not saved.');
+    expect($(limit + ' details .refusal-name')?.textContent).toContain('not_permitted');
+    expect($(limit)?.textContent).toContain('only the responsible person or an administrator sets this budget');
     expect(text()).not.toContain('It applies now.');
   });
 

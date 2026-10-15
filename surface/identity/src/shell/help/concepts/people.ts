@@ -56,11 +56,18 @@ export const PEOPLE: Seed[] = [
     title: 'The dashboard',
     summary: 'Your agents, what waits for you and what is running now.',
     body: [
-      'Getting started shows what a new Lys still needs, until every step is done. Agents lists yours by team. Waiting for you counts requests to decide, drafts to approve and reviews due, each linked to its list. Running now lists live sessions, with Stop everything beside its heading.',
-      'Choose a running agent to watch it beside the lists, or open it full size in Operations.',
+      'Getting started shows what a new Lys still needs, in order, until every step is done: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; "Not this one" counts as an answer.',
+      'Agents lists yours by team, with where each runs, its budget and its goals. Waiting for you counts requests to decide, drafts to approve and reviews due, each linked to its list. Running now lists live sessions; Stop all, beside its heading, stops every agent at once and asks why first.',
+      'Choose a running agent to watch it in a small picture over the corner, or open it full size in Operations.',
     ],
-    steps: [{ text: 'Open the dashboard.', href: '#/dashboard', link: 'Open the dashboard' }],
-    related: ['start.computer', 'access.drafts', 'people.operations'],
+    steps: [
+      { text: 'Choose where agents run: say yes for this computer, or Not this one.', href: '#/dashboard', link: 'Open the dashboard' },
+      { text: 'Optionally, let people sign in with Google.', href: '#/connections', link: 'Open sign-in providers' },
+      { text: 'Connect Cambium and approve what it asks for.', href: '#/apps', link: 'Open Apps' },
+      { text: 'Add your first agent; on a first run Add and run starts it at once.', href: '#/agents/new', link: 'Add an agent' },
+      { text: 'Watch it under Running now, or stop everything with Stop all.' },
+    ],
+    related: ['start.computer', 'start.google', 'start.cambium', 'start.agent', 'access.drafts', 'people.operations'],
   },
   {
     id: 'people.operations',

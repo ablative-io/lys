@@ -10,8 +10,12 @@
 .dash-body > * { min-width: 0; }
 .you-tree td:nth-child(1), .you-tree td:nth-child(2), .you-tree td:nth-child(4) { white-space: nowrap; }
 .you-tree { min-width: max-content; }
-@container surface (max-width: 850px) {
+/* Narrow: the panels stack. The query is on the dashboard's own width (the nearest container, .dash-page), never the
+   window's, so the full help docked beside it at 1280 stacks them too. Getting started keeps its whole height there:
+   as a .you-panel it would otherwise shrink to nothing and spill over the Agents table and the lists. */
+@container (max-width: 850px) {
   .dash-body { display: flex; flex-direction: column; }
+  .dash-body > .getting-started { flex: none; min-height: auto; }
   .dash-agents { flex: 0 0 300px; }
   .dash-side { flex: none; }
   .dash-side .you-scroll { max-height: 240px; }
@@ -39,10 +43,10 @@
 .dash-table a { color: var(--text-primary); }
 .dash-table .you-act { text-align: right; white-space: nowrap; }
 .dash-table .you-asked td { padding: 4px 12px 14px; }
-.dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46vw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
+.dash-picture { position: absolute; right: 20px; bottom: 20px; z-index: 30; width: min(560px, 46cqw); height: min(360px, 48vh); display: flex; flex-direction: column; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: 0 12px 32px rgb(0 0 0 / 0.28); overflow: hidden; }
 /* While the picture is shown the widgets' row is as tall as the picture and ends to its left, so it covers no row and no control. */
 .dash-watching .dash-body { grid-template-rows: minmax(0, 1fr) min(360px, 48vh); }
-.dash-watching .dash-widgets { padding-right: calc(min(560px, 46vw) + 20px); }
+.dash-watching .dash-widgets { padding-right: calc(min(560px, 46cqw) + 20px); }
 .dash-picture-bar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-bottom: 1px solid var(--border-subtle); }
 .dash-picture-bar h2 { margin: 0; font-size: 13px; }
 .dash-picture-bar .sec { flex: 1; font-size: 12px; }
