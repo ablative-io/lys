@@ -170,7 +170,7 @@ fn standing(book: &GrantBook, grant: GrantId, revision: u64) -> bool {
         }
         next = match record.grant().parts().source {
             Source::Grant(source) => Some(source),
-            Source::Root => None,
+            Source::Root | Source::Administrator => None,
         };
     }
     true

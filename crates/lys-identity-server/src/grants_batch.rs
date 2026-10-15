@@ -162,7 +162,7 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
 }
 
 /// The `via` an administrator's answer carries: allowed as the administrator, not through a grant.
-pub const ADMINISTRATOR: &str = "administrator";
+pub const ADMINISTRATOR: &str = lys_identity::grants::ADMINISTRATOR;
 
 /// Who asks: the administrator, or an app for its own kinds, as the app
 /// they act for.
@@ -241,7 +241,7 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
             allowed: mode_of(judged, permit.grant) == Some(Mode::Outright),
             mode: mode_of(judged, permit.grant).map(|mode| mode.as_str().to_owned()),
             grant: Some(permit.grant.to_string()),
-            path: permit.path.iter().map(ToString::to_string).collect(),
+            path: permit.path_names(),
             via: Some(via.to_string()),
             refusal: None,
             reason: None,

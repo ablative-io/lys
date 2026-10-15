@@ -131,6 +131,7 @@ pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     uint(out, 9);
     match parts.source {
         Source::Root => uint(out, 0),
+        Source::Administrator => text(out, super::ADMINISTRATOR),
         Source::Grant(source) => bytes(out, source.as_bytes()),
     }
     uint(out, 10);
@@ -170,6 +171,7 @@ fn mode_code(mode: Mode) -> Option<u64> {
 }
 
 /// The canonical bytes of `grant`.
+#[must_use]
 pub fn encode_grant(grant: &Grant) -> Vec<u8> {
     let mut out = Vec::new();
     write_grant(&mut out, grant);
@@ -283,6 +285,7 @@ fn read_source(value: Value) -> Result<Source, GrantError> {
     match value {
         Value::Integer(_) if as_uint(&value, SHAPE)? == 0 => Ok(Source::Root),
         Value::Bytes(_) => Ok(Source::Grant(GrantId::from_bytes(as_id(value, SHAPE)?))),
+        Value::Text(ref name) if name == super::ADMINISTRATOR => Ok(Source::Administrator),
         _ => Err(GrantError::LineageMalformed { reason: SHAPE }),
     }
 }
@@ -412,6 +415,9 @@ pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
 }
 
 /// The grant `encoded` names, refused unless the bytes are its canonical encoding.
+///
+/// # Errors
+/// Refuses malformed, incomplete or noncanonical grant bytes.
 pub fn decode_grant(encoded: &[u8]) -> Result<Grant, GrantError> {
     let value: Value = ciborium::from_reader(encoded)
         .ok()

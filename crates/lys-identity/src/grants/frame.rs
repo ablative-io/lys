@@ -172,6 +172,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Settle the log, project the relationships and read them, once, for
     /// every decision [`Grants::explain_in`] makes in the frame. `at_least`
     /// is a revision every decision must reflect.
+    ///
+    /// # Errors
+    /// Refuses unavailable, unresolved, degraded or stale grant readings.
     pub fn frame<'d>(
         &mut self,
         directory: &'d Projection,
@@ -196,6 +199,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Read one subject/resource instead of the whole-set audit frame.
+    ///
+    /// # Errors
+    /// Refuses unavailable, unresolved, degraded or stale scoped readings.
     pub fn frame_about<'d>(
         &mut self,
         directory: &'d Projection,
@@ -260,6 +266,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// The decision [`Grants::explain`] makes, against `frame`'s reading,
     /// refused `StaleDecision` when a grant event was recorded after it.
+    ///
+    /// # Errors
+    /// Refuses absent authority or any ineffective grant on the selected lineage.
     pub fn explain_in(
         &self,
         frame: &Frame<'_>,
@@ -382,6 +391,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                     return Ok(Permit {
                         grant: grant.id(),
                         path: lineage.path,
+                        administrator: lineage.administrator,
                         root_person: lineage.root_person,
                         actions: self.model.actions_of(grant).clone(),
                         // A role is judged under the version current now.

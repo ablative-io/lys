@@ -109,7 +109,7 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
 }
 
 /// Refuse unless the directory records `identity` as active.
-fn active(directory: &Projection, identity: IdentityId) -> Result<(), GrantError> {
+pub(super) fn active(directory: &Projection, identity: IdentityId) -> Result<(), GrantError> {
     let record = directory
         .record(identity)
         .ok_or_else(|| IdentityError::IdentityUnknown {
@@ -125,7 +125,7 @@ fn active(directory: &Projection, identity: IdentityId) -> Result<(), GrantError
 }
 
 /// Refuse unless `named` is the person the directory records for `identity`.
-fn responsible_is(
+pub(super) fn responsible_is(
     directory: &Projection,
     identity: IdentityId,
     named: PersonId,
@@ -143,6 +143,9 @@ fn responsible_is(
 }
 
 /// Admit a holder, or the active person answering for a boss and its direct child.
+///
+/// # Errors
+/// Refuses a machine, a caller who does not hold the source, or an inactive or unrelated boss delegation.
 pub fn delegation_authority(
     directory: &Projection,
     source: &Grant,
@@ -194,6 +197,9 @@ pub fn delegation_authority(
 /// The checked ancestry of `grant`, refused unless every grant on it is
 /// unrevoked, started and unended at `at`, held by an active identity and
 /// answered for by the person the directory records.
+///
+/// # Errors
+/// Refuses broken lineage, revoked or expired grants, inactive identities or mismatched responsibility.
 pub fn effective(
     book: &GrantBook,
     directory: &Projection,
@@ -209,6 +215,9 @@ pub fn effective(
         })?;
         active(directory, held.holder())?;
         responsible_is(directory, held.holder(), held.responsible())?;
+        if held.source() == Source::Administrator {
+            active(directory, held.parts().issuer)?;
+        }
         if let Source::Grant(source) = held.source() {
             let source = book
                 .grant(source)
@@ -224,6 +233,9 @@ pub fn effective(
 }
 
 /// Judge a root request, answering the grant it would issue.
+///
+/// # Errors
+/// Refuses a non-root caller, inactive people, unknown relations or inadmissible pass-on terms.
 pub fn judge_root(
     directory: &Projection,
     model: &Model,
@@ -305,7 +317,7 @@ fn refuse_withheld<'a>(
 
 /// Refuse, by name, any of `actions` on an object of `kind` that is a
 /// responsibility a person keeps, for `machine` (ACCESS-005 R1).
-fn refuse_kept_from_machines<'a>(
+pub(super) fn refuse_kept_from_machines<'a>(
     machine: &str,
     kind: &str,
     actions: impl IntoIterator<Item = &'a Action>,
@@ -329,9 +341,9 @@ fn refuse_kept_from_machines<'a>(
 
 /// Refuse, by name, an agent's grant that carries, or would let the agent
 /// pass on, an act no agent may hold, whatever its source.
-fn withheld_from_agents(
+pub(super) fn withheld_from_agents(
     model: &Model,
-    request: &DelegateRequest,
+    request: &super::delegation::PassOnRequest,
     actions: &BTreeSet<Action>,
 ) -> Result<(), GrantError> {
     let onward = match &request.pass_on {
@@ -349,6 +361,9 @@ fn withheld_from_agents(
 }
 
 /// Judge a request to pass on part of a grant, answering the grant it would issue.
+///
+/// # Errors
+/// Refuses ineffective sources, inadmissible recipients or terms outside the source authority.
 pub fn judge_delegation(
     book: &GrantBook,
     directory: &Projection,
@@ -364,85 +379,22 @@ pub fn judge_delegation(
         })?;
     delegation_authority(directory, source, request.caller, request.recipient)?;
     let lineage = effective(book, directory, request.source, at)?;
-    let PassOn::To {
-        actions: passable,
-        recipients,
-    } = source.pass_on()
-    else {
-        return Err(GrantError::UseOnly {
-            grant: request.source.to_string(),
-        });
-    };
-    let kind = RecipientKind::of(request.recipient);
-    if !recipients.contains(&kind) {
-        return Err(GrantError::RecipientRefused {
-            kind,
-            grant: request.source.to_string(),
-        });
-    }
-    active(directory, request.recipient)?;
-    responsible_is(directory, request.recipient, request.responsible)?;
-    if &request.resource != source.resource() {
-        return Err(GrantError::ResourceOutside {
-            requested: request.resource.to_string(),
-            source_grant: request.source.to_string(),
-        });
-    }
-    let within = model.within_on(request.resource.kind(), &request.relation, passable)?;
-    if kind == RecipientKind::Agent {
-        withheld_from_agents(model, request, &within.actions)?;
-    }
-    if kind == RecipientKind::Machine {
-        refuse_kept_from_machines(
-            &request.recipient.to_string(),
-            request.resource.kind(),
-            &within.actions,
-        )?;
-    }
-    if let PassOn::To {
-        actions: onward,
-        recipients: onward_to,
-    } = &request.pass_on
-        && onward_to.contains(&RecipientKind::Machine)
-    {
-        refuse_kept_from_machines(
-            "a grant passed on to machines",
-            request.resource.kind(),
-            onward,
-        )?;
-    }
-    if let PassOn::To {
-        actions: onward,
-        recipients: onward_to,
-    } = &request.pass_on
-        && (!onward.is_subset(passable) || !onward_to.is_subset(recipients))
-    {
-        return Err(GrantError::PassOnBeyondSource {
-            source_grant: request.source.to_string(),
-        });
-    }
+    let grant = super::delegation::judge_pass_on(
+        directory,
+        model,
+        &super::delegation::PassOnRequest::from(request),
+        &super::delegation::Authority {
+            source: Source::Grant(request.source),
+            resource: Some(source.resource()),
+            pass_on: source.pass_on(),
+            mode: source.mode(),
+        },
+        id,
+    )?;
     for ancestor in &lineage.path {
         if let Some(ancestor) = book.grant(*ancestor) {
             check_end(request.window.ends_at(), ancestor)?;
         }
     }
-    // A grant passed on carries its source's mode, so a right held by draft
-    // or by two is never handed on outright (ACCESS-001 R1; the brief does
-    // not say, and carrying never widens what the source allows).
-    let mode = source.mode();
-    Grant::new(GrantParts {
-        id,
-        issuer: request.caller,
-        holder: request.recipient,
-        responsible: request.responsible,
-        resource: request.resource.clone(),
-        relation: request.relation.clone(),
-        actions: within.actions,
-        pass_on: request.pass_on.clone(),
-        source: Source::Grant(request.source),
-        window: request.window,
-        model_version: within.model_version,
-        operation: request.operation,
-    })
-    .map(|grant| grant.with_mode(mode))
+    Ok(grant)
 }

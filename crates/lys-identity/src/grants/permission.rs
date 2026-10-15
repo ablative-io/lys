@@ -51,6 +51,7 @@ pub struct ObjectRef {
 
 impl ObjectRef {
     /// The grant `id`.
+    #[must_use]
     pub fn grant(id: GrantId) -> Self {
         Self {
             kind: "grant".to_owned(),
@@ -59,6 +60,7 @@ impl ObjectRef {
     }
 
     /// The person or agent `identity`.
+    #[must_use]
     pub fn identity(identity: IdentityId) -> Self {
         let kind = match identity {
             IdentityId::Person(_) => "person",
@@ -74,6 +76,7 @@ impl ObjectRef {
     }
 
     /// The resource `resource`.
+    #[must_use]
     pub fn resource(resource: &Resource) -> Self {
         Self {
             kind: resource.kind().to_owned(),
@@ -100,6 +103,7 @@ pub struct Relationship {
 
 impl Relationship {
     /// Whether the relationship names the grant `id`, as its resource or its subject.
+    #[must_use]
     pub fn names(&self, id: GrantId) -> bool {
         let grant = ObjectRef::grant(id);
         self.resource == grant || self.subject == grant
@@ -107,10 +111,12 @@ impl Relationship {
 }
 
 /// The relationships `grant` is written as.
+#[must_use]
 pub fn relationships_of(grant: &Grant) -> Vec<Relationship> {
     let this = ObjectRef::grant(grant.id());
     let source = match grant.source() {
         Source::Root => ObjectRef::identity(IdentityId::Person(grant.responsible())),
+        Source::Administrator => ObjectRef::identity(grant.parts().issuer),
         Source::Grant(source) => ObjectRef::grant(source),
     };
     vec![
@@ -141,6 +147,7 @@ pub fn relationships_of(grant: &Grant) -> Vec<Relationship> {
 /// The relation a resource of an app kind is placed in its parent by: the
 /// schema's `parent_` and the parent kind's name within its app, so each
 /// parent kind of a kind has a relation of its own.
+#[must_use]
 pub fn parent_relation(parent_kind: &str) -> String {
     let local = parent_kind
         .split_once('.')
@@ -151,6 +158,7 @@ pub fn parent_relation(parent_kind: &str) -> String {
 /// The relationship placing `child` in `parent`, through which the relations
 /// held on the parent flow down to the child. It carries no grant and no end:
 /// it says where a resource is, never who may act on it.
+#[must_use]
 pub fn placement(child: &Resource, parent: &Resource) -> Relationship {
     Relationship {
         resource: ObjectRef::resource(child),
@@ -165,13 +173,22 @@ pub fn placement(child: &Resource, parent: &Resource) -> Relationship {
 pub trait RelationshipStore {
     /// Refuse a resource whose kind this engine cannot project, before its
     /// grant is committed. This check performs no engine I/O.
+    ///
+    /// # Errors
+    /// Refuses a kind the permission engine cannot represent.
     fn admit_resource(&self, resource: &Resource) -> Result<(), GrantError>;
 
     /// The number of grant events the relationships reflect.
+    ///
+    /// # Errors
+    /// Reports an unavailable or unreadable permission revision.
     fn revision(&self) -> Result<u64, GrantError>;
 
     /// Delete `delete`, write `touch` and move to `revision`, all at once.
     /// `revision` is one more than the current revision, or the write is refused.
+    ///
+    /// # Errors
+    /// Refuses an out-of-order revision or an unavailable relationship store.
     fn write(
         &mut self,
         revision: u64,
@@ -180,6 +197,9 @@ pub trait RelationshipStore {
     ) -> Result<(), GrantError>;
 
     /// The subject's grants and source lineage, and the asked resource's ancestry.
+    ///
+    /// # Errors
+    /// Reports an unavailable relationship store or an incomplete scoped reading.
     fn read_about(
         &self,
         subject: IdentityId,
@@ -187,6 +207,9 @@ pub trait RelationshipStore {
     ) -> Result<BTreeSet<Relationship>, GrantError>;
 
     /// A scoped reading at the revision settled by its authority owner.
+    ///
+    /// # Errors
+    /// Reports an unavailable store or a reading that cannot reflect the selected revision.
     fn read_about_at(
         &self,
         subject: IdentityId,
@@ -202,6 +225,9 @@ pub trait RelationshipStore {
     }
 
     /// Every relationship at the current revision: the whole-set audit read.
+    ///
+    /// # Errors
+    /// Reports an unavailable or unreadable relationship store.
     fn read(&self) -> Result<BTreeSet<Relationship>, GrantError>;
 }
 
@@ -283,6 +309,7 @@ impl RelationshipStore for MemoryRelationships {
 }
 
 /// Every relationship in `held` naming one of `grants`.
+#[must_use]
 pub fn naming(held: &BTreeSet<Relationship>, grants: &BTreeSet<GrantId>) -> Vec<Relationship> {
     held.iter()
         .filter(|relationship| grants.iter().any(|grant| relationship.names(*grant)))
@@ -292,6 +319,9 @@ pub fn naming(held: &BTreeSet<Relationship>, grants: &BTreeSet<GrantId>) -> Vec<
 
 /// Refuse unless `held` gives every grant on `path` a holder whose caveat is
 /// unexpired at `at`, and a source.
+///
+/// # Errors
+/// Refuses missing holder or source relationships and expired holders.
 pub fn confirm(held: &BTreeSet<Relationship>, path: &[GrantId], at: u64) -> Result<(), GrantError> {
     for grant in path {
         let this = ObjectRef::grant(*grant);

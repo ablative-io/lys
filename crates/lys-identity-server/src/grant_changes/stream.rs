@@ -93,7 +93,7 @@ fn revoked(book: &GrantBook, acting_for: Option<&str>) -> Vec<String> {
             }
             next = match held.grant().parts().source {
                 Source::Grant(source) => Some(source),
-                Source::Root => None,
+                Source::Root | Source::Administrator => None,
             };
         }
     }

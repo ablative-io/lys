@@ -15,7 +15,7 @@ use crate::session::now;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use lys_identity::grants::{ExerciseRequest, GrantError, Mode, RootRequest, owner_of};
+use lys_identity::grants::{ExerciseRequest, GrantError, Mode, owner_of};
 use lys_identity::{IdentityError, IdentityId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -77,12 +77,13 @@ pub(super) async fn read(
 /// Refused `grant_mode_on_hot_action` when `mode` holds the grant for a
 /// draft and its relation carries an action the app's schema marks hot: a hot
 /// action is decided from the pass alone, so it is never held (D4).
-fn refuse_held_on_hot(
+pub(super) fn refuse_held_on_hot(
     judged: &Judged<'_>,
-    request: &RootRequest,
+    resource: &lys_identity::grants::Resource,
+    relation: &lys_identity::grants::Relation,
     mode: Mode,
 ) -> Result<(), ServerError> {
-    let kind = request.resource.kind();
+    let kind = resource.kind();
     let Some(schema) = judged
         .apps
         .schema(owner_of(kind))
@@ -90,7 +91,7 @@ fn refuse_held_on_hot(
     else {
         return Ok(());
     };
-    match schema.hot_action(kind, &request.relation) {
+    match schema.hot_action(kind, relation) {
         Some(action) => Err(ServerError::App(AppError::GrantModeOnHotAction {
             app: schema.app().to_owned(),
             action: action.to_string(),
@@ -111,7 +112,7 @@ pub(crate) async fn issue_root(
             &state, &headers, &judged,
         )?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
-        refuse_held_on_hot(&judged, &request, body.mode())?;
+        refuse_held_on_hot(&judged, &request.resource, &request.relation, body.mode())?;
         let recorded =
             judged
                 .grants
@@ -126,6 +127,10 @@ pub(crate) async fn delegate(
     Json(body): Json<DelegateBody>,
 ) -> Result<Json<RecordedView>, ServerError> {
     with_grants(&state, |judged| {
+        if body.is_administrator() {
+            let mut judged = judged;
+            return super::administrator::delegate(&state, &headers, &body, &mut judged).map(Json);
+        }
         let caller = crate::service_account_grants::caller(&state, &headers, &judged)?;
         let request = body.request(caller)?;
         judged.apps.admit_kind(None, request.resource.kind())?;

@@ -112,7 +112,7 @@ pub(crate) fn admission<S: LeafStore>(
             Ok((permit, via)) => {
                 verdict = Verdict::Allowed {
                     grant: permit.grant.to_string(),
-                    path: permit.path.iter().map(ToString::to_string).collect(),
+                    path: permit.path_names(),
                     scope: contract_resource(&via),
                 };
                 break;

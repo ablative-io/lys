@@ -281,7 +281,7 @@ pub(super) fn rights(
                 };
                 paths
                     .entry(permit.grant.to_string())
-                    .or_insert_with(|| permit.path.iter().map(ToString::to_string).collect());
+                    .or_insert_with(|| permit.path_names());
                 found
                     .entry((kind.clone(), id.clone(), permit.grant.to_string()))
                     .or_insert_with(|| (mode_of(mode), Vec::new()))

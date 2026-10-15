@@ -28,7 +28,7 @@ function matches(value: unknown, operation: string, grant: boolean): boolean {
 }
 
 export function confirmReceipt(value: unknown, operation: string, path: string): void {
-  if (!matches(value, operation, path.startsWith('/grants/'))) {
+  if (!matches(value, operation, path === '/grants' || path.startsWith('/grants/'))) {
     throw new Refused(200, {
       refusal: 'UnconfirmedReceipt',
       reason: `the identity service did not return a complete receipt for operation ${operation}; its outcome remains unknown`,

@@ -3,6 +3,7 @@
 //! owner every route calls, and what a person cannot give from it.
 
 pub mod about;
+mod administrator;
 pub mod admission;
 pub mod authority;
 pub mod cannot_give;
@@ -13,12 +14,14 @@ mod checkpoint_reset;
 pub mod codec;
 mod commit;
 mod decision;
+pub mod delegation;
 pub mod error;
 pub mod events;
 pub mod expiry;
 pub mod frame;
 #[cfg(test)]
 mod frame_about_tests;
+mod grant;
 pub mod lineage;
 mod mode;
 pub mod model;
@@ -51,6 +54,7 @@ pub use cannot_give::{
 pub use channel_membership::{identity_kind, placed_within};
 pub use checkpoint_reset::refusal_name;
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
+pub use delegation::{ADMINISTRATOR, PassOnRequest};
 pub use error::GrantError;
 pub use events::{
     GrantChange, GrantEvent, SignedGrantEvent, decode_event_body, encode_event_body,

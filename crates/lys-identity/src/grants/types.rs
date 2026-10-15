@@ -15,6 +15,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use super::error::GrantError;
+pub use super::grant::{Grant, Mode};
 use crate::id::{ID_LEN, IdentityId, PersonId, from_hex, random_bytes, to_hex};
 use crate::operation::OperationId;
 
@@ -36,16 +37,21 @@ impl GrantId {
     const PREFIX: &'static str = "grant-";
 
     /// A new grant id from the secure random source.
+    ///
+    /// # Errors
+    /// Reports a failed secure random source.
     pub fn generate() -> Result<Self, GrantError> {
         Ok(Self(random_bytes()?))
     }
 
     /// The grant id these bytes are, as read back from an encoded grant.
+    #[must_use]
     pub fn from_bytes(bytes: [u8; ID_LEN]) -> Self {
         Self(bytes)
     }
 
     /// The grant id's bytes, as an encoded grant carries them.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8; ID_LEN] {
         &self.0
     }
@@ -107,11 +113,15 @@ pub struct Action(String);
 
 impl Action {
     /// The action `name`, refused unless it is a token.
+    ///
+    /// # Errors
+    /// Refuses invalid tokens or bounds for the declared grant member.
     pub fn new(name: &str) -> Result<Self, GrantError> {
         token("action", name, ACTION_MAX_BYTES, name_byte).map(Self)
     }
 
     /// The action's name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -130,11 +140,15 @@ pub struct Relation(String);
 
 impl Relation {
     /// The relation `name`, refused unless it is a token.
+    ///
+    /// # Errors
+    /// Refuses invalid tokens or bounds for the declared grant member.
     pub fn new(name: &str) -> Result<Self, GrantError> {
         token("relation", name, RELATION_MAX_BYTES, name_byte).map(Self)
     }
 
     /// The relation's name.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -156,6 +170,9 @@ pub struct Resource {
 impl Resource {
     /// The resource `id` of `kind`, each refused unless it is a token: the
     /// kind lowercase, the id as the product names it, case and all.
+    ///
+    /// # Errors
+    /// Refuses invalid tokens or bounds for the declared grant member.
     pub fn new(kind: &str, id: &str) -> Result<Self, GrantError> {
         Ok(Self {
             kind: token("resource kind", kind, RESOURCE_KIND_MAX_BYTES, name_byte)?,
@@ -164,11 +181,13 @@ impl Resource {
     }
 
     /// The resource's kind.
+    #[must_use]
     pub fn kind(&self) -> &str {
         &self.kind
     }
 
     /// The resource's id within its kind.
+    #[must_use]
     pub fn id(&self) -> &str {
         &self.id
     }
@@ -197,6 +216,7 @@ pub enum RecipientKind {
 
 impl RecipientKind {
     /// The kind `identity` is.
+    #[must_use]
     pub fn of(identity: IdentityId) -> Self {
         match identity {
             IdentityId::Person(_) => Self::Person,
@@ -236,6 +256,9 @@ pub enum PassOn {
 
 impl PassOn {
     /// Pass-on of `actions` to `recipients`, refused if either is empty.
+    ///
+    /// # Errors
+    /// Refuses empty pass-on actions or recipient kinds.
     pub fn to(
         actions: BTreeSet<Action>,
         recipients: BTreeSet<RecipientKind>,
@@ -257,6 +280,7 @@ impl PassOn {
     }
 
     /// The actions that may be passed on, or none for a use-only grant.
+    #[must_use]
     pub fn actions(&self) -> Option<&BTreeSet<Action>> {
         match self {
             Self::UseOnly => None,
@@ -265,6 +289,7 @@ impl PassOn {
     }
 
     /// Whether the grant may be passed on to a recipient of `kind`.
+    #[must_use]
     pub fn permits(&self, kind: RecipientKind) -> bool {
         match self {
             Self::UseOnly => false,
@@ -280,6 +305,8 @@ pub enum Source {
     Root,
     /// A grant derived from another grant.
     Grant(GrantId),
+    /// A grant passed on from the administrator's standing.
+    Administrator,
 }
 
 /// When a grant may be exercised: from `starts_at`, until before `ends_at`.
@@ -292,6 +319,9 @@ pub struct Window {
 impl Window {
     /// The window from `starts_at` to `ends_at`, or with no end of its own,
     /// in seconds since the Unix epoch. Refused unless it ends after it starts.
+    ///
+    /// # Errors
+    /// Refuses invalid tokens or bounds for the declared grant member.
     pub fn new(starts_at: u64, ends_at: Option<u64>) -> Result<Self, GrantError> {
         if ends_at.is_some_and(|ends| ends <= starts_at) {
             return Err(GrantError::WindowInvalid {
@@ -302,16 +332,19 @@ impl Window {
     }
 
     /// When the grant starts.
+    #[must_use]
     pub fn starts_at(&self) -> u64 {
         self.starts_at
     }
 
     /// When the grant ends, if it has an end of its own.
+    #[must_use]
     pub fn ends_at(&self) -> Option<u64> {
         self.ends_at
     }
 
     /// Whether `at` is inside the window: at or after the start, before the end.
+    #[must_use]
     pub fn contains(&self, at: u64) -> bool {
         at >= self.starts_at && self.ends_at.is_none_or(|ends| at < ends)
     }
@@ -344,183 +377,4 @@ pub struct GrantParts {
     pub model_version: u64,
     /// The operation of the event that authorised it.
     pub operation: OperationId,
-}
-
-/// How a grant's actions may be exercised (ACCESS-001 R1, D3): outright, or
-/// held until a draft is approved, by one approver or by two.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum Mode {
-    /// Exercised at once. Every grant written before the mode existed is outright.
-    Outright,
-    /// Exercised through a draft one approver approves.
-    ByDraft,
-    /// Exercised through a draft two approvers approve.
-    ByTwo,
-}
-
-impl Mode {
-    /// The mode in words, as the API and the console name it.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Outright => "outright",
-            Self::ByDraft => "by_draft",
-            Self::ByTwo => "by_two",
-        }
-    }
-
-    /// Whether exercise is held for approval.
-    pub fn is_held(self) -> bool {
-        self != Self::Outright
-    }
-}
-
-/// A checked grant: every member present, pass-on inside exercise, lineage well formed.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Grant {
-    parts: GrantParts,
-    once: bool,
-    mode: Mode,
-    role: bool,
-}
-
-impl Grant {
-    /// The grant `parts` describe, refused by name if they break the contract.
-    pub fn new(parts: GrantParts) -> Result<Self, GrantError> {
-        if parts.actions.is_empty() {
-            return Err(GrantError::AuthorityAbsent { member: "actions" });
-        }
-        if let PassOn::To {
-            actions,
-            recipients,
-        } = &parts.pass_on
-        {
-            PassOn::to(actions.clone(), recipients.clone())?;
-            if !actions.is_subset(&parts.actions) {
-                return Err(GrantError::PassOnOutside);
-            }
-        }
-        if parts.model_version == 0 {
-            return Err(GrantError::ModelInvalid {
-                reason: "a model version is 1 or more",
-            });
-        }
-        match parts.source {
-            Source::Root if parts.holder != IdentityId::Person(parts.responsible) => {
-                Err(GrantError::LineageMalformed {
-                    reason: "a root grant is held by its responsible person",
-                })
-            }
-            Source::Grant(source) if source == parts.id => Err(GrantError::LineageMalformed {
-                reason: "a grant does not derive from itself",
-            }),
-            Source::Root | Source::Grant(_) => Ok(Self {
-                parts,
-                once: false,
-                mode: Mode::Outright,
-                role: false,
-            }),
-        }
-    }
-
-    /// The one-time grant `parts` describe: spent by its first exercise,
-    /// and use-only, since what may be used once is never passed on.
-    pub fn once(parts: GrantParts) -> Result<Self, GrantError> {
-        if parts.pass_on != PassOn::UseOnly {
-            return Err(GrantError::UseOnly {
-                grant: parts.id.to_string(),
-            });
-        }
-        let mut grant = Self::new(parts)?;
-        grant.once = true;
-        Ok(grant)
-    }
-
-    /// Whether the grant is spent by its first exercise.
-    pub fn is_once(&self) -> bool {
-        self.once
-    }
-
-    /// The grant exercised in `mode`.
-    #[must_use]
-    pub fn with_mode(mut self, mode: Mode) -> Self {
-        self.mode = mode;
-        self
-    }
-
-    /// How the grant's actions may be exercised.
-    pub fn mode(&self) -> Mode {
-        self.mode
-    }
-
-    /// The grant naming, as its relation, a role of its resource's kind
-    /// (ACCESS-004 R1): judged as the role's actions under the schema
-    /// version current when it is judged. Its own actions are the role's
-    /// when it was issued, kept as the record of what it first gave.
-    #[must_use]
-    pub fn as_role(mut self) -> Self {
-        self.role = true;
-        self
-    }
-
-    /// Whether the grant's relation names a role of its kind.
-    pub fn names_role(&self) -> bool {
-        self.role
-    }
-
-    /// Refused `ModeHeld` unless the grant is exercised at once: a held
-    /// grant's act is taken through an approved draft.
-    pub fn exercisable(&self) -> Result<(), GrantError> {
-        if self.mode.is_held() {
-            return Err(GrantError::ModeHeld {
-                grant: self.parts.id.to_string(),
-                mode: self.mode.as_str(),
-            });
-        }
-        Ok(())
-    }
-
-    /// Every member of the grant.
-    pub fn parts(&self) -> &GrantParts {
-        &self.parts
-    }
-
-    /// The grant's id.
-    pub fn id(&self) -> GrantId {
-        self.parts.id
-    }
-
-    /// The identity that holds it.
-    pub fn holder(&self) -> IdentityId {
-        self.parts.holder
-    }
-
-    /// The person responsible for the holder.
-    pub fn responsible(&self) -> PersonId {
-        self.parts.responsible
-    }
-
-    /// The object it is on.
-    pub fn resource(&self) -> &Resource {
-        &self.parts.resource
-    }
-
-    /// The actions the holder may exercise.
-    pub fn actions(&self) -> &BTreeSet<Action> {
-        &self.parts.actions
-    }
-
-    /// What the holder may pass on.
-    pub fn pass_on(&self) -> &PassOn {
-        &self.parts.pass_on
-    }
-
-    /// What it derives from.
-    pub fn source(&self) -> Source {
-        self.parts.source
-    }
-
-    /// When it may be exercised.
-    pub fn window(&self) -> Window {
-        self.parts.window
-    }
 }

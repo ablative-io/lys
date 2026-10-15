@@ -194,7 +194,7 @@ pub async fn bind(
                 let lineage = effective(book, judged.directory, id, at)?;
                 dependencies.push(Dependency {
                     grant: text.clone(),
-                    path: lineage.path.iter().map(ToString::to_string).collect(),
+                    path: lineage.path_names(),
                 });
             }
             if judged.grants.revision() != revision {

@@ -167,7 +167,7 @@ pub(crate) fn judge<S: LeafStore>(
         Ok((permit, via)) => match mode_of(judged, permit.grant) {
             Some(Mode::Outright) => Verdict::Allowed {
                 grant: permit.grant.to_string(),
-                path: permit.path.iter().map(ToString::to_string).collect(),
+                path: permit.path_names(),
                 scope: contract_resource(&via),
             },
             Some(mode) => Verdict::Held {

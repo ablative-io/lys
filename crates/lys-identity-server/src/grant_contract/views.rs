@@ -186,7 +186,7 @@ pub struct GrantView {
     pub actions: Vec<String>,
     /// What it lets the holder pass on.
     pub pass_on: PassOnView,
-    /// The grant it derives from, or null for a root.
+    /// The source grant, administrator standing, or null for a person root.
     pub source: Option<String>,
     /// When it may be exercised.
     pub window: WindowView,
@@ -239,6 +239,7 @@ impl GrantView {
             pass_on: PassOnView::from(&parts.pass_on),
             source: match parts.source {
                 Source::Root => None,
+                Source::Administrator => Some(lys_identity::grants::ADMINISTRATOR.to_owned()),
                 Source::Grant(id) => Some(id.to_string()),
             },
             window: WindowView {
@@ -393,7 +394,7 @@ impl From<&Permit> for PermitView {
         Self {
             permitted: true,
             grant: permit.grant.to_string(),
-            path: permit.path.iter().map(ToString::to_string).collect(),
+            path: permit.path_names(),
             responsible: permit.root_person.to_string(),
             scope: names(&permit.actions),
             model_version: permit.model_version,

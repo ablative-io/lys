@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use lys_identity::grants::{
-    Action, CannotGiveRequest, DelegateRequest, GrantId, Mode, PassOn, RecipientKind, Relation,
-    Resource, RevokeRequest, RootRequest, Route, Window,
+    Action, CannotGiveRequest, DelegateRequest, GrantId, Mode, PassOn, PassOnRequest,
+    RecipientKind, Relation, Resource, RevokeRequest, RootRequest, Route, Window,
 };
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::{Deserialize, Deserializer};
@@ -212,8 +212,12 @@ impl RootBody {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DelegateBody {
+    /// A standing gift may choose its mode; a held grant carries its source mode.
+    #[serde(default)]
+    mode: Option<ModeWire>,
     operation: String,
     route: RouteWire,
+    /// A held grant id, or administrator standing for the signed-in administrator.
     source: String,
     recipient: String,
     responsible: String,
@@ -224,12 +228,43 @@ pub struct DelegateBody {
 }
 
 impl DelegateBody {
+    pub(crate) fn is_administrator(&self) -> bool {
+        self.source == lys_identity::grants::ADMINISTRATOR
+    }
+
+    pub(crate) fn mode(&self) -> Mode {
+        self.mode.map_or(Mode::Outright, Mode::from)
+    }
+
+    pub(crate) fn standing_request(
+        &self,
+        caller: IdentityId,
+    ) -> Result<PassOnRequest, ServerError> {
+        Ok(PassOnRequest {
+            operation: operation(&self.operation)?,
+            caller,
+            route: self.route.into(),
+            recipient: identity_id(&self.recipient)?,
+            responsible: PersonId::from_str(&self.responsible)?,
+            resource: self.resource.resource()?,
+            relation: Relation::new(&self.relation)?,
+            pass_on: self.pass_on.pass_on()?,
+            window: self.window.window()?,
+        })
+    }
+
     /// The request, made by `caller`.
     ///
     /// # Errors
     /// Refuses malformed operation, source, recipient or responsible ids,
     /// resource, relation, pass-on terms or time window.
     pub fn request(&self, caller: IdentityId) -> Result<DelegateRequest, ServerError> {
+        if self.mode.is_some() {
+            return Err(ServerError::RequestMalformed {
+                reason: "a grant passed on carries its source's mode; only standing chooses a mode"
+                    .to_owned(),
+            });
+        }
         Ok(DelegateRequest {
             operation: operation(&self.operation)?,
             caller,

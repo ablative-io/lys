@@ -75,6 +75,8 @@ pub struct Permit {
     pub grant: GrantId,
     /// The grant and every ancestor, from the grant to its root.
     pub path: Vec<GrantId>,
+    /// Whether the ancestry starts at administrator standing.
+    pub administrator: bool,
     /// The person the root grant is held by.
     pub root_person: PersonId,
     /// The actions the grant carries.
@@ -89,6 +91,14 @@ pub struct Permit {
     pub use_event: Option<Result<u64, GrantError>>,
     /// The shared original failure of the selected relationship reading.
     pub degraded: Option<Arc<ProjectionDegraded>>,
+}
+
+impl Permit {
+    /// The complete ancestry in the wire's names, including standing.
+    #[must_use]
+    pub fn path_names(&self) -> Vec<String> {
+        super::lineage::path_names(&self.path, self.administrator)
+    }
 }
 
 /// A recorded grant change and where it stands.
@@ -147,6 +157,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// snapshot, reading only the leaves after it, fold every event into the
     /// book, and project what the relationships lack. A snapshot is written
     /// every [`SNAPSHOT_EVERY`] entries.
+    ///
+    /// # Errors
+    /// Reports unreadable logs, invalid snapshots, signatures or permission projection failures.
     pub fn open(
         reopen: Reopen<S>,
         key: Ed25519Identity,
@@ -165,6 +178,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// As [`Grants::open`], writing a snapshot every `every` entries.
+    ///
+    /// # Errors
+    /// Reports unreadable logs, invalid snapshots, signatures or permission projection failures.
     pub fn open_with(
         reopen: Reopen<S>,
         key: Ed25519Identity,
@@ -240,6 +256,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// Every committed grant event with its receipt, in log order, built from
     /// the log in one pass.
+    ///
+    /// # Errors
+    /// Reports an unreadable or unverifiable log entry.
     pub fn events(&self) -> Result<Vec<(SignedGrantEvent, GrantReceipt)>, GrantError> {
         Ok(self
             .ledger
@@ -254,6 +273,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// The receipt of the event at log index `index`, built from the log from
     /// the nearest checkpoint. `None` past the events folded.
+    ///
+    /// # Errors
+    /// Reports an unreadable or unverifiable log entry.
     pub fn receipt(&self, index: u64) -> Result<Option<GrantReceipt>, GrantError> {
         if index >= self.folded {
             return Ok(None);
@@ -286,6 +308,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Issue a root grant to a person, as the root authority.
+    ///
+    /// # Errors
+    /// Refuses an unauthorized caller, invalid grant terms, operation reuse or a failed commit.
     pub fn issue_root(
         &mut self,
         directory: &Projection,
@@ -317,6 +342,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Pass on part of a grant the caller holds.
+    ///
+    /// # Errors
+    /// Refuses an ineffective source, invalid delegation terms, operation reuse or a failed commit.
     pub fn delegate(
         &mut self,
         directory: &Projection,
@@ -328,6 +356,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// Pass on part of a grant as [`Grants::delegate`] does, as a one-time
     /// grant: use-only, and spent by its first exercise.
+    ///
+    /// # Errors
+    /// Refuses invalid delegation terms, further pass-on, operation reuse or a failed commit.
     pub fn delegate_once(
         &mut self,
         directory: &Projection,
@@ -383,6 +414,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Revoke a grant, and with it everything derived from it.
+    ///
+    /// # Errors
+    /// Refuses an unauthorized revocation, operation reuse or a failed commit.
     pub fn revoke(&mut self, request: &RevokeRequest, at: u64) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
         let change = GrantChange::Revoke {

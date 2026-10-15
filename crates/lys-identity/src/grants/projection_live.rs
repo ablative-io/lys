@@ -56,7 +56,7 @@ impl GrantBook {
             }
             next = match record.grant.source() {
                 Source::Grant(source) => Some(source),
-                Source::Root => None,
+                Source::Root | Source::Administrator => None,
             };
         }
         true
@@ -137,6 +137,7 @@ impl GrantBook {
     /// How many entries the live indexes keep: (holder, grant) pairs and
     /// (resource, grant) pairs. Both return to their earlier value when
     /// the last live chain a revocation reaches is pruned.
+    #[must_use]
     pub fn live_entries(&self) -> (usize, usize) {
         (
             entries(&self.live.by_holder),

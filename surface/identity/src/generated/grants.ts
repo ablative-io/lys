@@ -88,6 +88,8 @@ export type RouteWire = 'browser' | 'api' | 'tool';
 
 /** POST /grants: `DelegateBody`. */
 export interface DelegateBody {
+  /** Only administrator standing chooses a mode; a held grant carries its source mode. */
+  mode?: GrantMode;
   operation: string;
   route: RouteWire;
   source: string;

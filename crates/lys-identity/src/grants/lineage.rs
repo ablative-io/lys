@@ -20,10 +20,27 @@ use crate::id::{IdentityId, PersonId};
 pub struct Lineage {
     /// The grant and every ancestor, from the grant to its root.
     pub path: Vec<GrantId>,
+    /// Whether this chain starts at administrator standing.
+    pub administrator: bool,
     /// The person the root grant is held by: the human authority of the chain.
     pub root_person: PersonId,
     /// The earliest end on the path, and the grant it belongs to.
     pub ends: Option<(u64, GrantId)>,
+}
+
+impl Lineage {
+    /// The complete ancestry in the wire's names, including standing.
+    #[must_use]
+    pub fn path_names(&self) -> Vec<String> {
+        path_names(&self.path, self.administrator)
+    }
+}
+
+pub(super) fn path_names(path: &[GrantId], administrator: bool) -> Vec<String> {
+    path.iter()
+        .map(ToString::to_string)
+        .chain(administrator.then(|| super::ADMINISTRATOR.to_owned()))
+        .collect()
 }
 
 /// Whether `identity` is an agent, whose responsible person may pass on
@@ -39,6 +56,9 @@ pub(super) fn is_agent(identity: IdentityId) -> bool {
 }
 
 /// Refuse `grant` unless it lies within what `source` let be passed on.
+///
+/// # Errors
+/// Refuses an issuer, resource, action, recipient or expiry outside the source.
 pub fn check_hop(grant: &Grant, source: &Grant) -> Result<(), GrantError> {
     let parts = grant.parts();
     let responsible_pass = is_agent(source.holder())
@@ -100,6 +120,9 @@ pub fn check_hop(grant: &Grant, source: &Grant) -> Result<(), GrantError> {
 
 /// Refuse an end later than `source`'s own end. A missing end under a source
 /// that ends is later than it, and nothing is clamped.
+///
+/// # Errors
+/// Refuses an unbounded or later end under a source that ends.
 pub fn check_end(requested: Option<u64>, source: &Grant) -> Result<(), GrantError> {
     let Some(bound) = source.window().ends_at() else {
         return Ok(());
@@ -116,6 +139,9 @@ pub fn check_end(requested: Option<u64>, source: &Grant) -> Result<(), GrantErro
 
 /// Walk `start` to its root through `lookup`, checking every hop. An
 /// ancestry of any length is walked; a grant met twice is a cycle.
+///
+/// # Errors
+/// Refuses unknown sources, cycles or any hop outside its source.
 pub fn resolve<'a>(
     start: GrantId,
     lookup: impl Fn(GrantId) -> Option<&'a Grant>,
@@ -143,6 +169,20 @@ pub fn resolve<'a>(
                 };
                 return Ok(Lineage {
                     path,
+                    administrator: false,
+                    root_person: person,
+                    ends,
+                });
+            }
+            Source::Administrator => {
+                let IdentityId::Person(person) = current.parts().issuer else {
+                    return Err(GrantError::LineageMalformed {
+                        reason: "administrator standing is passed on by a person",
+                    });
+                };
+                return Ok(Lineage {
+                    path,
+                    administrator: true,
                     root_person: person,
                     ends,
                 });

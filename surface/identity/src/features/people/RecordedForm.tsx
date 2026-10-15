@@ -25,7 +25,7 @@ const pendingPaths: Record<string, RegExp> = {
   'bind-login': /^\/people\/[^/?#]+\/logins$/,
   'change-profile': /^\/identities\/[^/?#]+\/profile$/,
   lifecycle: /^\/identities\/[^/?#]+\/transitions$/,
-  'root-grant': /^\/grants\/roots$/,
+  'root-grant': /^\/grants(?:\/roots)?$/,
 };
 function restored(value: unknown, name: string): PendingChange | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;

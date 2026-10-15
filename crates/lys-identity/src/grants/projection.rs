@@ -65,16 +65,19 @@ pub struct GrantRecord {
 
 impl GrantRecord {
     /// The grant.
+    #[must_use]
     pub fn grant(&self) -> &Grant {
         &self.grant
     }
 
     /// The index of the event that issued it.
+    #[must_use]
     pub fn index(&self) -> u64 {
         self.index
     }
 
     /// When it was last seen exercised.
+    #[must_use]
     pub fn last_use(&self) -> LastUse {
         self.last_use
     }
@@ -83,11 +86,13 @@ impl GrantRecord {
     /// recorded uses, not a claim that it was never exercised: an exercise
     /// whose use event could not be recorded is not in this count, and is
     /// named by [`Usage::unreported`](super::usage::Usage::unreported).
+    #[must_use]
     pub fn uses(&self) -> u64 {
         self.uses
     }
 
     /// Its own revocation, if it was revoked directly.
+    #[must_use]
     pub fn revoked(&self) -> Option<&Revocation> {
         self.revoked.as_ref()
     }
@@ -124,11 +129,13 @@ thread_local! { static RECORD_VISITS: std::cell::Cell<usize> = const { std::cell
 
 impl GrantBook {
     /// An empty book.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// The grant `id`, if the book holds it.
+    #[must_use]
     pub fn record(&self, id: GrantId) -> Option<&GrantRecord> {
         self.records.get(&id)
     }
@@ -196,6 +203,7 @@ impl GrantBook {
     }
 
     /// Every grant derived from `id`, directly or through others, in the order reached.
+    #[must_use]
     pub fn descendants(&self, id: GrantId) -> Vec<GrantId> {
         let mut found = Vec::new();
         let mut next = vec![id];
@@ -209,21 +217,29 @@ impl GrantBook {
     }
 
     /// The checked ancestry of `id`.
+    ///
+    /// # Errors
+    /// Refuses an unknown source, cycle or invalid delegation hop.
     pub fn lineage(&self, id: GrantId) -> Result<Lineage, GrantError> {
         lineage::resolve(id, |grant| self.grant(grant))
     }
 
     /// The index of the event an operation made, whether it applied or was refused.
+    #[must_use]
     pub fn operation(&self, operation: OperationId) -> Option<u64> {
         self.operations.get(&operation).copied()
     }
 
     /// The committed events the book refused, by index.
+    #[must_use]
     pub fn refused(&self) -> &BTreeMap<u64, (OperationId, GrantError)> {
         &self.refused
     }
 
     /// Whether `event` would apply to the book as it stands, refused by name if not.
+    ///
+    /// # Errors
+    /// Refuses reused operations, duplicate grants, invalid hops or invalid revocations.
     pub fn check(&self, event: &GrantEvent) -> Result<(), GrantError> {
         if self.operations.contains_key(&event.operation()) {
             return Err(GrantError::OperationReused {
@@ -238,7 +254,7 @@ impl GrantBook {
                     });
                 }
                 match grant.source() {
-                    Source::Root => Ok(()),
+                    Source::Root | Source::Administrator => Ok(()),
                     Source::Grant(source) => {
                         let source =
                             self.grant(source)
@@ -286,6 +302,9 @@ impl GrantBook {
     }
 
     /// Advance the book by `event`, committed at `index`.
+    ///
+    /// # Errors
+    /// Refuses any event that fails the book checks before applying it.
     pub fn apply(&mut self, event: &GrantEvent, index: u64) -> Result<(), GrantError> {
         self.check(event)?;
         self.operations.insert(event.operation(), index);

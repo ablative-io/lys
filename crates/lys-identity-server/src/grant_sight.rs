@@ -57,7 +57,7 @@ pub(crate) fn sees_with(
         }
         next = match parts.source {
             Source::Grant(id) => book.grant(id),
-            Source::Root => None,
+            Source::Root | Source::Administrator => None,
         };
     }
     for id in walked {
@@ -94,7 +94,7 @@ pub(crate) fn on_callers_path(judged: &Judged<'_>, caller: IdentityId, id: Grant
             }
             next = match grant.source() {
                 Source::Grant(source) => book.grant(source),
-                Source::Root => None,
+                Source::Root | Source::Administrator => None,
             };
         }
         false

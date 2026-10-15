@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { api, Refused, request, useLoad } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
-import type { PeopleView } from '../../generated';
+import type { PeopleView, MeView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm } from '../people/RecordedForm';
 import { ErrorWords, STATUS } from '../people/Words';
@@ -60,10 +60,13 @@ export function knownOf(kind: string, resources: ResourceRef[], people: PeopleVi
  * A role is sent as the relation; the grant is judged as the role's actions whenever it is judged, so a widening
  * the administrator approves reaches it.
  */
-function Form({ people, model, kinds, resources, done }: { people: PeopleView; model: GrantModel; kinds: KindGroup[]; resources: ResourceRef[]; done: () => void }) {
+function Form({ people, me, model, kinds, resources, done }: { people: PeopleView; me: MeView; model: GrantModel; kinds: KindGroup[]; resources: ResourceRef[]; done: () => void }) {
   // A root grant has no expiry unless the issuer gives one.
   const [noExpiry, setNoExpiry] = useState(true);
   const [kind, setKind] = useState('');
+  const [toAgent, setToAgent] = useState(false);
+  const agents = people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state === 'active') ?? [];
+  const relations = model.kinds?.[kind]?.relations ?? model.relations;
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
   const [which, setWhich] = useState('');
@@ -75,22 +78,26 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
   const chosenWhich = !kind ? '' : known.length ? which : BY_ID;
   return <RecordedForm name="root-grant" title="Give access" submitLabel="Give access" drawn={{ symbol: 'add', word: 'Give access' }} done={done} change={(data) => {
     const relation = role || field(data, 'relation');
-    const actions = role ? roles[role] : model.relations[relation];
+    const actions = role ? roles[role] : relations[relation];
     if (!actions) throw new Error(role ? 'Choose a role this kind names' : 'Choose what they may do');
     const chosen = field(data, 'kind');
     if (!kinds.some((group) => group.kinds.includes(chosen))) throw new Error('Choose a kind of thing from the list');
     const expires = noExpiry ? null : Date.parse(field(data, 'expires')) / 1000;
     if (expires !== null && !Number.isFinite(expires)) throw new Error('Enter a valid expiry');
-    return { path: '/grants/roots', body: {
-      route: 'browser', holder: field(data, 'holder'),
+    const holder = field(data, 'holder');
+    if (toAgent && !agents.some((agent) => agent.id === holder)) throw new Error('Choose one of your active agents');
+    return { path: toAgent ? '/grants' : '/grants/roots', body: {
+      route: 'browser', ...(toAgent ? { source: 'administrator', recipient: holder, responsible: me.person.id } : { holder }),
       resource: { kind: chosen, id: field(data, 'resource') === BY_ID ? field(data, 'resource_id') : field(data, 'resource') }, relation,
       pass_on: data.get('delegate') === 'on' ? { kind: 'to', actions, recipients: ['agent'] } : { kind: 'use_only' },
       window: { starts_at: Math.floor(Date.now() / 1000), ends_at: expires },
       mode: field(data, 'mode'),
     } };
   }}>
-    <p className="note">You are giving this to a person. Tick “May pass on” and they can give it to their own agents.</p>
-    <div className="field">Person<Picker name="holder" label="Find a person" options={people.people.filter((p) => p.state !== 'retired').map((p) => ({ id: p.id, name: p.display_name, detail: STATUS[p.state] ?? p.state }))} /></div>
+    <p className="note">Give a person or one of your agents access. You can give to your agents directly as the administrator.</p>
+    <div className="field">{toAgent ? 'Agent' : 'Person'}<select aria-label="Give to" value={toAgent ? 'agent' : 'person'} onChange={(event) => setToAgent(event.target.value === 'agent')}>
+      <option value="person">A person</option><option value="agent">One of my agents</option>
+    </select><Picker key={toAgent ? 'agent' : 'person'} name="holder" label={toAgent ? 'Find one of your agents' : 'Find a person'} options={toAgent ? agents.map((agent) => ({ id: agent.id, name: agent.display_name })) : people.people.filter((p) => p.state !== 'retired').map((p) => ({ id: p.id, name: p.display_name, detail: STATUS[p.state] ?? p.state }))} /></div>
     <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); }}>
       <option value="" disabled>Choose a kind</option>
       {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each} title={each}>{kindLabel(each)}</option>)}</optgroup>)}
@@ -101,7 +108,7 @@ function Form({ people, model, kinds, resources, done }: { people: PeopleView; m
       {kind ? <option value={BY_ID}>{known.length ? 'Another one, by its id in its app' : 'One by its id in its app'}</option> : null}
     </select></label>
     {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /><span className="hint">{known.length ? 'The id the app itself gives it.' : 'Lys knows none of these by name yet. Enter the id the app itself gives it.'}</span></label> : null}
-    <label className="field">They may<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
+    <label className="field">They may<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
     {Object.keys(roles).length ? <label className="field">Role<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
       <option value="">No role: what is chosen above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}
@@ -141,8 +148,8 @@ export async function readKinds(resources: ResourceRef[]): Promise<KindGroup[]> 
 async function read(resources: ResourceRef[]) {
   const people = await api.people();
   if (!isRootAuthority(people)) throw NOT_ROOT;
-  const [model, kinds] = await Promise.all([api.model(), readKinds(resources)]);
-  return { people, model, kinds };
+  const [me, model, kinds] = await Promise.all([api.me(), api.model(), readKinds(resources)]);
+  return { people, me, model, kinds };
 }
 
 /** The Give access form, shown on the Access page above the grants. Anyone but the administrator is told so in words and given no form. */
