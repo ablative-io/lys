@@ -91,3 +91,7 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 .folder-chooser .folder-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; overflow-x: hidden; }
 .folder-chooser .folder-list li .act { width: 100%; justify-content: flex-start; overflow-wrap: anywhere; text-align: left; }
 .folder-chooser .folder-browser-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 8px 0 0; }
+.mcp-servers .mcp-paste { display: grid; gap: 8px; margin: 12px 0; }
+.mcp-servers .mcp-paste textarea { width: 100%; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.mcp-servers .mcp-paste .act { justify-self: start; }
+.mcp-servers .mcp-paste-read { margin: 0; padding-left: 18px; overflow-wrap: anywhere; }

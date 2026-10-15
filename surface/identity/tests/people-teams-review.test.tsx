@@ -172,7 +172,7 @@ describe('Connected tools', () => {
     expect(row?.querySelector('input[name="server-name"]')?.closest('label')?.textContent).toContain('Name');
     expect(row?.querySelector('select[name="server-kind"]')?.closest('label')?.textContent).toContain('How they are reached');
     await chooseIn(row?.querySelector('select[name="server-kind"]') ?? null, 'program');
-    expect(row?.querySelector('input[name="server-program"]')?.closest('label')?.textContent).toContain('The program’s full path');
+    expect(row?.querySelector('input[name="server-program"]')?.closest('label')?.textContent).toContain('The command that starts it');
     expect(row?.querySelector('textarea[name="server-args"]')?.closest('label')?.textContent).toContain('What it is started with');
     expect(row?.querySelector('textarea[name="server-args"]')?.getAttribute('placeholder')).toBeNull();
   });
