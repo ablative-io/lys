@@ -1,0 +1,18 @@
+{
+  "name": "lys",
+  "version": "0.1.0",
+  "description": "Use Lys identity, access, drafts, agents and service routes through its remote OAuth MCP server.",
+  "author": {
+    "name": "Ablative"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./config/lys-mcp.json",
+  "interface": {
+    "displayName": "Lys",
+    "shortDescription": "Use Lys in Codex.",
+    "developerName": "Ablative",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use Lys."
+  }
+}

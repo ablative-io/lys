@@ -1,0 +1,20 @@
+{
+  "name": "lys-local",
+  "interface": {
+    "displayName": "Lys Local"
+  },
+  "plugins": [
+    {
+      "name": "lys",
+      "source": {
+        "source": "local",
+        "path": "./plugins/lys"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

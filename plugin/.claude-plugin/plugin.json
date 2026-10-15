@@ -1,0 +1,16 @@
+{
+  "name": "lys",
+  "version": "0.1.0",
+  "description": "Use Lys identity, access, drafts, agents and service routes through its remote OAuth MCP server.",
+  "author": {
+    "name": "Ablative"
+  },
+  "keywords": [
+    "lys",
+    "identity",
+    "access",
+    "agents",
+    "drafts"
+  ],
+  "mcpServers": "./config/lys-mcp.json"
+}

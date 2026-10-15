@@ -1,0 +1,14 @@
+{
+  "name": "lys-local",
+  "description": "Lys identity, access and agent tools for Claude Code.",
+  "owner": {
+    "name": "Ablative"
+  },
+  "plugins": [
+    {
+      "name": "lys",
+      "source": "./plugin",
+      "description": "Lys HTTP MCP, operating skills, commands and companion agents."
+    }
+  ]
+}
