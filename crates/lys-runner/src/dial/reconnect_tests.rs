@@ -84,7 +84,10 @@ fn reconnect_stop_signal_cancels_a_pending_backoff() -> Result<(), Box<dyn std::
     wait.stop()?;
     let error = worker
         .join()
-        .map_err(|_| "the backoff waiter panicked")?
+        .map_err(|error| {
+            drop(error);
+            "the backoff waiter panicked"
+        })?
         .err()
         .ok_or("the stop signal did not end the backoff")?;
     assert_eq!(error.name(), "runner_dial_stopped");

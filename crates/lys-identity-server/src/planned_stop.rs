@@ -196,7 +196,7 @@ mod tests {
     async fn planned_stop_announces_its_return_to_every_waiting_browser_and_runner()
     -> Result<(), Box<dyn std::error::Error>> {
         let stop = PlannedStop::new();
-        let app = Router::new().fallback(|| std::future::pending::<Response>());
+        let app = Router::new().fallback(std::future::pending::<Response>);
         let app = router(app, stop.clone());
         let browser = app
             .clone()

@@ -29,7 +29,10 @@ fn cli_reconnect_sends_the_wake_command_to_the_saved_runner_socket() -> Result<(
     });
     lys::commands::runner::run(command)?;
     assert_eq!(
-        worker.join().map_err(|_| "control fixture panicked")??,
+        worker.join().map_err(|error| {
+            drop(error);
+            "control fixture panicked"
+        })??,
         b'R'
     );
     Ok(())

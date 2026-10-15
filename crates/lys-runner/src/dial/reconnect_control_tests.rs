@@ -28,7 +28,10 @@ fn reconnect_ends_backoff_on_its_signal() -> Result<(), Box<dyn std::error::Erro
     if pending {
         wait.stop()?;
     }
-    let result = worker.join().map_err(|_| "backoff waiter panicked")?;
+    let result = worker.join().map_err(|error| {
+        drop(error);
+        "backoff waiter panicked"
+    })?;
     assert!(!pending, "Reconnect left the registered backoff active");
     result?;
     Ok(())

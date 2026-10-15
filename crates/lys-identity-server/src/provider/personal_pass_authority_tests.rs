@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use crate::apps_state::{Approved, By, Client, Line, Registered};
 use axum::body::{Body, to_bytes};
 use axum::http::{Request, header};
 use lys_identity::{Actor, AuthMethod, OperationId, Provenance};
@@ -116,7 +117,6 @@ async fn other_app_person_pass_cannot_suspend_or_register_for_others() -> TestRe
         .next()
         .ok_or("session absent")?
         .id;
-    use crate::apps_state::{Approved, By, Client, Line, Registered};
     crate::apps_api::with_apps(&state, |apps, _| {
         apps.keep(Line::Registered(Registered {
             operation: "register-fixture".to_owned(), app: "fixture_app".to_owned(), name: "Fixture".to_owned(),
