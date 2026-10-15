@@ -124,7 +124,10 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
             ),
         ));
     }
-    let address = install::ports::Ports::load(&layout)?.service_url();
+    let address =
+        install::ports::PersonAddress::load(&layout, install::ports::Ports::load(&layout)?)?;
+    address.say_fallback(&mut emitter);
+    let address = address.origin;
     if json {
         emitter.field("address", "url", address);
     } else {

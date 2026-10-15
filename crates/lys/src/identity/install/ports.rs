@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use super::layout::{BROKER_PORT, Layout, PROXY_PORT, SERVICE_PORT};
 use super::server_config;
+use crate::commands::output::Emitter;
 use crate::identity::error::{ErrorKind, IdentityError, IdentityResult};
 
 /// The local listeners, retained in the service's existing configuration.
@@ -226,6 +227,98 @@ impl Ports {
     /// The setup page on this listener.
     pub fn setup_url(self) -> String {
         format!("{}/setup", self.service_url())
+    }
+}
+
+/// The address a person opens: the deployment's public origin, or the local
+/// listener with the reason it was used in its place.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersonAddress {
+    /// The origin, scheme and authority, with no closing slash.
+    pub origin: String,
+    /// Why the local listener stands in for a public origin; `None` when
+    /// the origin is the one `issuer.public_origin` names.
+    pub fallback: Option<String>,
+}
+
+impl PersonAddress {
+    /// The origin a person opens for this install. Sign-in completes only at
+    /// the public origin the issuer names (an https origin trusts its proxy
+    /// alone), so that origin is every person-facing address; the local
+    /// listener is used only when the deployment names no public origin, and
+    /// then `fallback` says so.
+    pub fn load(layout: &Layout, ports: Ports) -> IdentityResult<Self> {
+        let path = layout.deployment_config();
+        let local = |reason: String| Self {
+            origin: ports.service_url(),
+            fallback: Some(reason),
+        };
+        let text = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(local(format!(
+                    "{} does not exist, so it names no public origin",
+                    path.display()
+                )));
+            }
+            Err(error) => {
+                return Err(IdentityError::new(
+                    ErrorKind::ConfigInvalid,
+                    "read public origin",
+                    "deployment.toml",
+                    error.to_string(),
+                )
+                .at(&path));
+            }
+        };
+        let deployment: toml::Table = toml::from_str(&text).map_err(|error| {
+            IdentityError::new(
+                ErrorKind::ConfigInvalid,
+                "read public origin",
+                "deployment.toml",
+                error.to_string(),
+            )
+            .at(&path)
+        })?;
+        let origin = deployment
+            .get("issuer")
+            .and_then(|issuer| issuer.get("public_origin"))
+            .and_then(toml::Value::as_str)
+            .map(|origin| origin.trim().trim_end_matches('/'))
+            .filter(|origin| !origin.is_empty());
+        Ok(match origin {
+            Some(origin) => Self {
+                origin: origin.to_string(),
+                fallback: None,
+            },
+            None => local(format!("{} names no issuer.public_origin", path.display())),
+        })
+    }
+
+    /// The setup page at this origin.
+    pub fn setup_url(&self) -> String {
+        format!("{}/setup", self.origin)
+    }
+
+    /// The line said when the local listener stands in, naming why.
+    pub fn fallback_note(&self) -> Option<String> {
+        self.fallback.as_ref().map(|reason| {
+            format!(
+                "using the local address {} because {reason}; sign-in completes only at a public origin, so set issuer.public_origin for anyone reaching Lys from elsewhere",
+                self.origin
+            )
+        })
+    }
+
+    /// Say, in a line and as the `address_fallback` field, why the local
+    /// listener stands in; says nothing for a public origin.
+    pub fn say_fallback(&self, emitter: &mut Emitter) {
+        if let Some(note) = self.fallback_note() {
+            emitter.note(&note);
+            if emitter.is_json() {
+                emitter.field("address fallback", "address_fallback", note);
+            }
+        }
     }
 }
 

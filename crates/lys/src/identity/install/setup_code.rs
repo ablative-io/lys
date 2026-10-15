@@ -88,6 +88,12 @@ fn write_pending(state_dir: &Path, purpose: Purpose, code: &str) -> IdentityResu
     Ok(())
 }
 
+/// The address a person opens for this install: its public origin, or the
+/// local listener with the reason.
+fn person_address(layout: &Layout) -> IdentityResult<super::ports::PersonAddress> {
+    super::ports::PersonAddress::load(layout, super::ports::Ports::load(layout)?)
+}
+
 /// The setup page's address carrying `code` in its fragment.
 pub fn address_with(code: &str, setup: &str) -> String {
     format!("{setup}#code={code}")
@@ -123,7 +129,9 @@ pub fn hand_over(
     open: &dyn Fn(&str) -> bool,
     emitter: &mut Emitter,
 ) -> IdentityResult<()> {
-    let setup = super::ports::Ports::load(layout)?.setup_url();
+    let address = person_address(layout)?;
+    address.say_fallback(emitter);
+    let setup = address.setup_url();
     if open(&address_with(code, &setup)) {
         emitter.note("the setup page is open in your browser");
         return Ok(());
@@ -139,11 +147,7 @@ pub fn hand_over(
         .at(&requested)
     })?;
     private_files::write(&path, code.as_bytes())?;
-    emitter.note(&format!(
-        "no browser could be opened: the setup code is in {} (only you can read it); open {} and enter it in the Setup code field",
-        path.display(),
-        setup
-    ));
+    emitter.note(&headless_line(&path, &setup));
     if emitter.is_json() {
         emitter.field(
             "setup code file",
@@ -154,6 +158,15 @@ pub fn hand_over(
     Ok(())
 }
 
+/// The one line said when no browser takes the code: the file holding it
+/// and the setup page to enter it on.
+pub fn headless_line(path: &Path, setup: &str) -> String {
+    format!(
+        "no browser could be opened: the setup code is in {} (only you can read it); open {setup} and enter it in the Setup code field",
+        path.display()
+    )
+}
+
 /// Hand over the first-run code only when issuance returned one.
 pub(super) fn hand_over_first_run(
     layout: &Layout,
@@ -161,11 +174,7 @@ pub(super) fn hand_over_first_run(
     emitter: &mut Emitter,
 ) -> IdentityResult<()> {
     if let Some(code) = code {
-        emitter.field(
-            "setup",
-            "setup",
-            super::ports::Ports::load(layout)?.setup_url(),
-        );
+        emitter.field("setup", "setup", person_address(layout)?.setup_url());
         hand_over(layout, code.expose(), &open_in_browser, emitter)?;
     }
     Ok(())
@@ -234,11 +243,7 @@ fn issue_with(
         Purpose::FirstRun
     };
     let code = issue_pending(layout, purpose, presence)?;
-    emitter.field(
-        "setup",
-        "setup",
-        super::ports::Ports::load(layout)?.setup_url(),
-    );
+    emitter.field("setup", "setup", person_address(layout)?.setup_url());
     emitter.field("purpose", "purpose", purpose.word());
     hand_over(layout, code.expose(), open, emitter)?;
     Ok(())

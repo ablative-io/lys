@@ -379,10 +379,12 @@ pub fn start(options: &StartOptions, json: bool) -> IdentityResult<()> {
     super::install::start_installed(&layout, ports, &units, &mut |line| {
         emitter.note(line);
     })?;
+    let address = super::install::ports::PersonAddress::load(&layout, ports)?;
+    address.say_fallback(&mut emitter);
     if json {
-        emitter.field("address", "url", ports.service_url());
+        emitter.field("address", "url", address.origin);
     } else {
-        write_address(&mut std::io::stdout(), &ports.service_url()).map_err(|error| {
+        write_address(&mut std::io::stdout(), &address.origin).map_err(|error| {
             IdentityError::new(
                 ErrorKind::PrivateFileIo,
                 "print",

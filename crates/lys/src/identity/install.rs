@@ -478,8 +478,13 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
     proxy::start(&layout, ports, &sibling("lys")?, &mut |line| {
         emitter.note(line);
     })?;
-    emitter.field("open", "url", ports.service_url());
-    emitter.field("sign-in for products", "issuer", ports.service_url());
+    let address = ports::PersonAddress::load(&layout, ports)?;
+    // The setup code's handover says the same when a code is handed over.
+    if code.is_none() {
+        address.say_fallback(&mut emitter);
+    }
+    emitter.field("open", "url", address.origin.clone());
+    emitter.field("sign-in for products", "issuer", address.origin);
     setup_code::hand_over_first_run(&layout, code, &mut emitter)?;
     if !surface_present {
         emitter.note("no screens placed: pass --surface with a compiled screens package");
