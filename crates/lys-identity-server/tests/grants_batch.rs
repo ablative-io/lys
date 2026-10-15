@@ -226,3 +226,39 @@ async fn a_check_naming_the_revision_of_a_just_made_grant_sees_it() -> TestResul
     assert_eq!(stale["results"][0]["refusal"], "StaleDecision", "{stale}");
     Ok(())
 }
+
+#[tokio::test]
+async fn the_administrator_is_allowed_on_every_resource_of_an_app_with_no_grant_made_first()
+-> TestResult {
+    let (service, seeded) = seeded().await?;
+    let admin = service.sign_in(login(ADMINISTRATOR)).await?;
+    let administrator = seeded.people[0].id.to_string();
+    let bea = seeded.people[1].id.to_string();
+    let credential = registered(&service, &admin, NOTES).await?;
+    let doc = format!("{NOTES}.doc");
+    // A fresh install: nobody holds anything on this resource, and the app asks about the person who runs Lys.
+    let checks = json!({"checks": [
+        check(&administrator, &doc, "never-granted", "read"),
+        check(&administrator, &doc, "never-granted", "write"),
+        check(&bea, &doc, "never-granted", "read"),
+        check(&administrator, &format!("{NOTES}.nothing"), "1", "read"),
+    ]});
+    let answer = ok(post(
+        &service,
+        "/grants/check/batch",
+        Auth::Bearer(&credential),
+        &checks,
+    )
+    .await?)?;
+    let results = answer["results"].as_array().ok_or("no results")?;
+    assert_eq!(results[0]["allowed"], true, "{answer}");
+    assert_eq!(results[0]["via"], "administrator", "{answer}");
+    assert_eq!(results[0]["mode"], "outright", "{answer}");
+    assert_eq!(results[1]["allowed"], true, "{answer}");
+    // Everyone else still needs a grant, and a kind the app never declared is still refused, administrator or not.
+    assert_eq!(results[2]["allowed"], false, "{answer}");
+    assert_eq!(results[2]["refusal"], "NotHeld", "{answer}");
+    assert_eq!(results[3]["allowed"], false, "{answer}");
+    assert_eq!(results[3]["refusal"], "kind_not_registered", "{answer}");
+    Ok(())
+}

@@ -161,6 +161,9 @@ pub(crate) fn unanswered(error: &GrantError) -> bool {
     )
 }
 
+/// The `via` an administrator's answer carries: allowed as the administrator, not through a grant.
+pub const ADMINISTRATOR: &str = "administrator";
+
 /// Who asks: the administrator, or an app for its own kinds, as the app
 /// they act for.
 pub(crate) fn asker(state: &AppState, headers: &HeaderMap) -> Result<Option<String>, ServerError> {
@@ -217,6 +220,20 @@ pub(crate) fn one<S: lys_log_store::LeafStore>(
         Ok(request) => request,
         Err(error) => return refused(error),
     };
+    // The administrator holds everything: an app asking about the person who runs Lys is answered yes on every one
+    // of its own resources, with no grant to make first, so a fresh install never locks its administrator out.
+    if request.caller == IdentityId::Person(judged.root) {
+        return CheckAnswer {
+            allowed: true,
+            grant: None,
+            path: Vec::new(),
+            via: Some(ADMINISTRATOR.to_owned()),
+            refusal: None,
+            reason: None,
+            mode: Some(Mode::Outright.as_str().to_owned()),
+            degraded: None,
+        };
+    }
     match decide(judged, &request, at, at_least, Decision::Explain) {
         Ok((permit, via)) => CheckAnswer {
             allowed: mode_of(judged, permit.grant) == Some(Mode::Outright),
