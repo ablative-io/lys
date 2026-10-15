@@ -506,7 +506,7 @@ async fn an_agent_with_no_limit_is_warned_at_20_and_38_and_compacted_at_40() -> 
     assert_eq!(
         typed(1)?,
         Some(lys_runner::operations::TextDigest::of(
-            "[Lys context watch] You're at 38% of your context window (380,000 of 1,000,000 tokens); this session compacts at 40% (400,000 tokens), about a minute from now. Wrap up what you're holding and note anything you need after compaction."
+            "[Lys context watch] You're at 38% of your context window (380,000 of 1,000,000 tokens); this session compacts at 40% (400,000 tokens), at the first turn boundary past that level. Wrap up what you're holding and note anything you need after compaction."
         ))
     );
     table.stop_runner()

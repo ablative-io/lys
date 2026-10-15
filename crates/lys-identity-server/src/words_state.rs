@@ -136,7 +136,7 @@ impl Slot {
                 Some("[Lys context watch] You're at {{context_figures}}; {{compaction}}. {{goals}}")
             }
             Self::Preparation => Some(
-                "[Lys context watch] You're at {{context_figures}}; this session compacts at {{compaction_figures}}, about a minute from now. Wrap up what you're holding and note anything you need after compaction.",
+                "[Lys context watch] You're at {{context_figures}}; this session compacts at {{compaction_figures}}, at the first turn boundary past that level. Wrap up what you're holding and note anything you need after compaction.",
             ),
             Self::Compaction => None,
             Self::WakeUp => Some("[Lys] {{message}}"),

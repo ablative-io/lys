@@ -112,6 +112,11 @@ pub enum Answer {
         /// The name of each folder in it, in order.
         folders: Vec<String>,
     },
+    /// The folder a person picked in this computer's own dialog, absolute.
+    FolderChosen {
+        /// The folder picked.
+        folder: String,
+    },
     /// The connection is held as the grant channel from here on.
     GrantChannel,
     /// A stop of everything: the sessions it ended, each recorded with who

@@ -26,7 +26,9 @@
 /* Each outlined region carries its note's number at its corner; the notes sit in the panel, each a button that scrolls its region into view. */
 .help-reg > .help-n { position: absolute; top: -9px; left: -9px; }
 .help-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.help-note { display: block; width: 100%; text-align: left; background: none; border: 1px solid transparent; border-radius: var(--radius-md); padding: 6px 8px; color: inherit; font: inherit; line-height: 1.5; cursor: pointer; }
-.help-note:hover, .help-note:focus-visible { border-color: var(--border-default); background: rgba(255, 255, 255, .04); outline: none; }
+.help-note { padding: 6px 8px; border: 1px solid transparent; border-radius: var(--radius-md); }
+.help-note:hover { border-color: var(--border-default); background: rgba(255, 255, 255, .04); }
+.help-note .help-call-t { justify-content: space-between; }
+.help-note-show { margin-left: auto; }
 /* A narrow screen (a phone): the panel sits across the bottom instead of down the side. */
 @media (max-width: 599px) { .help-keys { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 55vh; } }

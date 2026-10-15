@@ -432,6 +432,7 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             follow: false,
         },
         Act::Folders { under: None },
+        Act::ChooseFolder { start: None },
         Act::GrantChannel,
         Act::StopEverything {
             by: "person".to_owned(),
@@ -513,6 +514,9 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         Answer::Folders {
             under: "/".to_owned(),
             folders: Vec::new(),
+        },
+        Answer::FolderChosen {
+            folder: "/".to_owned(),
         },
         Answer::GrantChannel,
         Answer::StoppedEverything {

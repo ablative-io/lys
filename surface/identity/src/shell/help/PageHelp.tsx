@@ -125,11 +125,10 @@ export function PageHelp() {
         {placed.length ? (
           <ol className="help-notes" aria-label={'Notes for ' + help.title}>
             {placed.map(({ n, region }) => (
-              <li key={n + region.sel} data-help-note={n}>
-                <button type="button" className="help-note" onClick={() => show(region)}>
-                  <div className="help-call-t"><span className="help-n">{n}</span>{region.title}</div>
-                  <div className="help-call-d">{region.text}</div>
-                </button>
+              <li key={n + region.sel} data-help-note={n} className="help-note">
+                <div className="help-call-t"><span className="help-n">{n}</span>{region.title}
+                  <Act symbol="open" name={'Show ' + region.title + ' on the page'} hint="Scroll the page to it" className="small quiet help-note-show" onClick={() => show(region)} /></div>
+                <div className="help-call-d">{region.text}</div>
               </li>
             ))}
           </ol>

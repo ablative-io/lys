@@ -81,7 +81,8 @@ function offered(container: HTMLElement): string[] {
 async function ready(container: HTMLElement, name = 'Clover') {
   await type(form(container).querySelector('input[name="display_name"]'), name);
   await click(form(container).querySelector('button[aria-label="Choose a folder"]'));
-  await click(form(container).querySelector('button[aria-label="Work in srv"]'));
+  await type(form(container).querySelector('input[name="folder-path"]'), '/srv');
+  await click(form(container).querySelector('button[aria-label="Open the folder typed"]'));
   expect(form(container).querySelector('.works-in code')?.textContent).toBe('/srv');
 }
 
@@ -220,7 +221,8 @@ describe('Add-agent runner availability', () => {
       expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.selectedOptions[0]?.textContent).toBe(local.name);
       expect(form(container).textContent).toContain(laptop.name + ': not available: ' + reason);
       await click(form(container).querySelector('button[aria-label="Choose a folder"]'));
-      await click(form(container).querySelector('button[aria-label="Work in srv"]'));
+      await type(form(container).querySelector('input[name="folder-path"]'), '/srv');
+      await click(form(container).querySelector('button[aria-label="Open the folder typed"]'));
       expect(submit(container).disabled).toBe(false);
     } finally {
       laptopReply.answer(refused(503, 'RunnerUnreachable', reason));
@@ -280,7 +282,8 @@ describe('Add-agent runner availability', () => {
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
       await choose(form(container).querySelector('select[name="computer"]'), local.id);
       await click(form(container).querySelector('button[aria-label="Choose a folder"]'));
-      await click(form(container).querySelector('button[aria-label="Work in srv"]'));
+      await type(form(container).querySelector('input[name="folder-path"]'), '/srv');
+      await click(form(container).querySelector('button[aria-label="Open the folder typed"]'));
       expect(submit(container).disabled).toBe(false);
 
       laptopReply.answer(refused(503, 'RunnerUnreachable', reason));

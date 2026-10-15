@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Listing } from "../src/shell/Listing";
 import { createRoot } from "react-dom/client";
-import { mount } from "./harness";
+import { mount, type } from "./harness";
 import { SERVICE, ok, ADA } from "./fixtures";
 
 const css = (file: string) => readFileSync(new URL("../src/" + file, import.meta.url), "utf8");
@@ -57,6 +57,9 @@ describe("Surface use on laptops and phones", () => {
     });
     expect(container.querySelector(".add-agent-two")).not.toBeNull();
     const form = container.querySelector("form");
+    // No name is pre-filled, so Add is off until one is typed; once it is, the confirmed computer alone keeps the form live.
+    expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    await type(form?.querySelector('input[name="display_name"]') ?? null, "Clover");
     expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
     expect(form?.querySelector<HTMLSelectElement>('select[name="computer"]')?.selectedOptions[0]?.textContent).toBe("Own computer");
     expect(form?.textContent).toContain("Ward laptop: not available: The computer’s runner is missing or could not be confirmed.");

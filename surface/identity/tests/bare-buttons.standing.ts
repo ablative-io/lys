@@ -15,7 +15,6 @@ export const STANDING: Record<string, number> = {
   'features/network/AddMachine.tsx': 1,
   'features/network/Network.tsx': 2,
   'features/people/People.tsx': 1,
-  'features/provisioning/FolderChooser.tsx': 1,
   'features/requests/Requests.tsx': 1,
   'features/runtime/CanvasDock.tsx': 4,
   'features/runtime/CanvasMarks.tsx': 4,

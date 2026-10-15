@@ -4,10 +4,15 @@
 //! types a path. With no `under`, the runner looks in its own home folder
 //! and the answer says which folder that is.
 //!
-//! An administrator asks it, the same person who saves an agent's settings.
-//! The machine must be kept (`MachineUnknown`) and name a runner
-//! (`runner_absent`); a folder the runner cannot read is the runner's own
-//! refusal, by its name.
+//! `POST /network/machines/{id}/choose-folder` `{"start"?}`: the computer's
+//! own folder dialog, opened on its screen by its runner, answered with the
+//! folder the person picks there. The answer waits for the person; a cancel
+//! is the runner's `folder_choice_cancelled`.
+//!
+//! An administrator asks either, the same person who saves an agent's
+//! settings. The machine must be kept (`MachineUnknown`) and name a runner
+//! (`runner_absent`); a folder the runner cannot read, or a dialog it cannot
+//! show, is the runner's own refusal, by its name.
 
 use std::sync::Arc;
 
@@ -43,9 +48,71 @@ pub(crate) struct FoldersView {
     folders: Vec<String>,
 }
 
-/// The folders route.
+/// Where the computer's folder dialog opens.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ChooseFolderBody {
+    /// An absolute folder on the machine the dialog opens in; its runner's home folder when absent.
+    #[serde(default)]
+    start: Option<String>,
+}
+
+/// The folder picked in a machine's own dialog.
+#[derive(Serialize, utoipa::ToSchema)]
+pub(crate) struct FolderChosenView {
+    /// The machine asked.
+    machine: String,
+    /// The folder picked, absolute.
+    folder: String,
+}
+
+/// The folders and folder-dialog routes.
 pub(crate) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route("/network/machines/{id}/folders", post(folders))
+    Router::new()
+        .route("/network/machines/{id}/folders", post(folders))
+        .route("/network/machines/{id}/choose-folder", post(choose_folder))
+}
+
+/// The machine's runner, when the machine is kept and names one.
+fn runner_of(state: &Arc<AppState>, id: &str) -> Result<crate::runner_client::RunnerRecord, ServerError> {
+    with_network(state, |store| {
+        store.machine(id).ok_or(ServerError::MachineUnknown)?;
+        Ok(store.runner(id).cloned())
+    })?
+    .ok_or_else(|| ServerError::RunnerAbsent {
+        machine: id.to_owned(),
+    })
+}
+
+async fn choose_folder(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    given: Result<Json<ChooseFolderBody>, JsonRejection>,
+) -> Result<Json<FolderChosenView>, ServerError> {
+    let actor = signed_in(&state, &headers)?;
+    crate::routes::administrator(&state, &actor)?;
+    let Json(body) = given.map_err(|refused| ServerError::RequestMalformed {
+        reason: refused.body_text(),
+    })?;
+    let start = body
+        .start
+        .map(|given| crate::provisioning_api::folder("start", given))
+        .transpose()?;
+    let runner = runner_of(&state, &id)?;
+    match crate::runner_client::ask(&state, &id, runner, Act::ChooseFolder { start }).await? {
+        Answer::FolderChosen { folder } => Ok(Json(FolderChosenView {
+            machine: id,
+            folder,
+        })),
+        other => Err(ServerError::Runner {
+            refusal: "runner_answer_unexpected".to_owned(),
+            words: format!(
+                "the folder dialog answered {}",
+                crate::runner_sessions::kind(&other)
+            ),
+        }),
+    }
 }
 
 async fn folders(
@@ -63,13 +130,7 @@ async fn folders(
         .under
         .map(|given| crate::provisioning_api::folder("under", given))
         .transpose()?;
-    let runner = with_network(&state, |store| {
-        store.machine(&id).ok_or(ServerError::MachineUnknown)?;
-        Ok(store.runner(&id).cloned())
-    })?
-    .ok_or_else(|| ServerError::RunnerAbsent {
-        machine: id.clone(),
-    })?;
+    let runner = runner_of(&state, &id)?;
     match crate::runner_client::ask(&state, &id, runner, Act::Folders { under }).await? {
         Answer::Folders { under, folders } => Ok(Json(FoldersView {
             machine: id,

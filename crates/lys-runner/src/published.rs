@@ -12,7 +12,7 @@ use crate::dial::{
 use crate::protocol::{PROTOCOL_VERSION, REQUEST_DOMAIN};
 
 /// Every act the protocol defines, by its tag.
-pub const ACTS: [&str; 18] = [
+pub const ACTS: [&str; 19] = [
     "read_bytes",
     "input_bytes",
     "start",
@@ -27,6 +27,7 @@ pub const ACTS: [&str; 18] = [
     "outcome",
     "feed",
     "folders",
+    "choose_folder",
     "grant_channel",
     "stop_everything",
     "liveness",
@@ -34,10 +35,11 @@ pub const ACTS: [&str; 18] = [
 ];
 
 /// Every answer the protocol defines, by its kind.
-pub const ANSWERS: [&str; 15] = [
+pub const ANSWERS: [&str; 16] = [
     "bytes",
     "feed",
     "folders",
+    "folder_chosen",
     "grant_channel",
     "started",
     "delivered",
@@ -106,6 +108,7 @@ pub fn section() -> Value {
                 "outcome": {"operation": "string"},
                 "feed": {"cursor": "optional string: the last page's cursor", "follow": "bool: answer once an entry is committed after the cursor"},
                 "folders": {"under": "optional string: an absolute folder on this computer, the runner's own home folder when absent; answered as folders {under, folders}, the name of each folder directly inside it"},
+                "choose_folder": {"start": "optional string: the absolute folder this computer's own folder dialog opens in, the runner's home folder when absent; answered as folder_chosen {folder} once the person picks one, or refused folder_choice_cancelled when they cancel, folder_dialog_unavailable when this computer cannot show a dialog"},
                 "grant_channel": {"description": "the connection becomes the grant channel: each question is written as one line, and its answer is read as one line"},
                 "stop_everything": {"by": "string: who pulled the cord", "reason": "string: why", "kill": "bool: end each proved process group at once; an ask while sessions an earlier one stopped still run does so too", "settling": "bool: the server's own ask again under a pull in force, for a start that crossed it; a session an earlier ask already stopped is left as it is, with no signal and no wait on its exit, and is answered ended or running as it stands", "answered": "stopped_everything {sessions, running}: every session this act ended, each recorded ended stopped with {by, reason, at}, and those not ended when it answered: only when the caller left before every exit was seen, or a settling ask left a session as an earlier ask had it"},
                 "liveness": {"session": "optional string", "answered": "liveness {sessions: [{session, pid: optional u32, alive: bool, managed: bool, harness_session: optional string, turn_active: bool, last_signal_at: optional u64 ms, started_at: u64 ms, ended: bool}]}, from the runner's own knowledge: alive is a held process not seen to exit that still answers a null signal; last_signal_at is its last output, managed frame, hook or status line"},

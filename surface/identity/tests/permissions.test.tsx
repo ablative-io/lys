@@ -344,7 +344,9 @@ describe('Codex', () => {
     const { element, posted } = await shown(codex, { default_mode: 'workspace-write' }, undefined, { ['POST /network/machines/' + computer + '/folders']: ok({ machine: computer, under: '/Users/ada', folders: ['notes'] }) });
     await click(button(element, 'Add an extra folder'));
     await settle();
-    await click(button(element, 'Add ada'));
+    await type(element.querySelector('input[name="folder-path"]'), '/Users/ada');
+    await click(button(element, 'Open the folder typed'));
+    await settle();
     expect(latest.additional_directories).toEqual(['/Users/ada']);
     expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + computer + '/folders']);
   });

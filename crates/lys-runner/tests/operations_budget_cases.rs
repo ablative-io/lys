@@ -112,13 +112,13 @@ async fn preparation_is_the_last_of_multiple_warnings_below_compaction() -> Test
     assert_eq!(
         sessions.outcome(id)?.text,
         Some(TextDigest::of(
-            "[Lys context watch] You're at 46% of your context window; this session compacts at 50%, about a minute from now. Wrap up what you're holding and note anything you need after compaction."
+            "[Lys context watch] You're at 46% of your context window; this session compacts at 50%, at the first turn boundary past that level. Wrap up what you're holding and note anything you need after compaction."
         ))
     );
     table
         .waited(
             &session,
-            "this session compacts at 50%, about a minute from now",
+            "this session compacts at 50%, at the first turn boundary past that level",
         )
         .await?;
     table.end(&session).await?;

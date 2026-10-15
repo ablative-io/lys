@@ -238,6 +238,7 @@ pub(super) fn perform(
             Ok(Answer::Feed { page })
         }
         Act::Folders { under } => crate::folders::inside(under.as_deref()),
+        Act::ChooseFolder { start } => crate::folders::chosen(start.as_deref()),
         Act::AsCaller { caller, done } => as_caller(sessions, server, &caller, *done, left),
         Act::GrantChannel => Err(RunnerError::refused(
             "grant_channel_unheld",

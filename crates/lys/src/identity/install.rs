@@ -145,7 +145,10 @@ pub(super) fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
 /// restarted here, since a restart ends every session it holds.
 /// Places the runner, `lys`, in the install's `bin/` from the build folder
 /// `source` names, with its containment helper beside it when that folder
-/// holds one, and says what was placed. The runner is started from `bin/`
+/// holds one, and says what was placed. The runner starts a contained seat
+/// through `lys runner managed-entry` from its own executable; the helper
+/// is placed beside it so `bin/` holds the same pair as the host's client
+/// release under `clients/`. The runner is started from `bin/`
 /// only: a runner started from the build folder re-executes itself from
 /// there for every seat it owns, and `lys identity start` found no `bin/lys`
 /// after a fresh install on 15 Oct 2026. Answers whether the helper was placed.
@@ -165,7 +168,7 @@ pub(super) fn place_runner(
         return Ok(true);
     }
     say(&format!(
-        "{helper} is not in the build folder beside lys, so it was not placed: contained seats need it in {}",
+        "{helper} is not in the build folder beside lys, so it was not placed beside lys in {}",
         layout.bin_dir().display()
     ));
     Ok(false)

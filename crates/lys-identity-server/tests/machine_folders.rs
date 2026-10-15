@@ -104,6 +104,35 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
         .await?;
     refused(&unnamed, 409, "runner_absent");
 
+    // The computer's own folder dialog is asked the same way and refused by the same names before any
+    // runner is reached; with a runner named it would open a dialog on this computer's screen, so the
+    // dialog itself is never opened here.
+    let dialog = format!("/network/machines/{machine}/choose-folder");
+    let dialog_unnamed = service
+        .post(&dialog, Some(&ada), &json!({ "start": named }))
+        .await?;
+    refused(&dialog_unnamed, 409, "runner_absent");
+    let dialog_by_bea = service
+        .post(&dialog, Some(&bea), &json!({}))
+        .await?;
+    refused(&dialog_by_bea, 403, "NotAdmitted");
+    let dialog_relative = service
+        .post(&dialog, Some(&ada), &json!({ "start": "held/receipts" }))
+        .await?;
+    refused(&dialog_relative, 400, "RequestMalformed");
+    let dialog_unknown_field = service
+        .post(&dialog, Some(&ada), &json!({ "under": named }))
+        .await?;
+    refused(&dialog_unknown_field, 400, "RequestMalformed");
+    let dialog_unknown = service
+        .post(
+            &format!("/network/machines/{}/choose-folder", operation()?),
+            Some(&ada),
+            &json!({}),
+        )
+        .await?;
+    refused(&dialog_unknown, 404, "MachineUnknown");
+
     let runner = service
         .post(
             &format!("/network/machines/{machine}/runner"),

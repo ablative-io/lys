@@ -25,7 +25,8 @@ async function open(extra: Record<string, Route>, chooseFolder = true) {
   const chooser = result.container.querySelector<HTMLButtonElement>('button[aria-label="Choose a folder"]');
   if (chooseFolder && chooser && !chooser.disabled) {
     await click(chooser);
-    await click(result.container.querySelector('button[aria-label="Work in srv"]'));
+    await type(result.container.querySelector('input[name="folder-path"]'), '/srv');
+    await click(result.container.querySelector('button[aria-label="Open the folder typed"]'));
     expect(result.container.querySelector('.works-in code')?.textContent).toBe('/srv');
     // Folder reads arrange a valid profile before measuring the save action.
     result.posted.length = 0;

@@ -6,7 +6,7 @@ import { CannotStart, whyNot } from '../src/features/runtime/CannotStart';
 import type { StartRefusal } from '../src/features/runtime/CannotStart';
 import type { Machine, NetworkView } from '../src/features/network/contract';
 import { request } from '../src/api';
-import { click, serve, settle } from './harness';
+import { click, serve, settle, type } from './harness';
 import { ADA, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
@@ -238,20 +238,9 @@ describe('an agent with no folder to work in', () => {
     expect(posted).toEqual([]);
     await click(button(host, 'Choose a folder'));
     await settle();
-    await settle();
-    expect(host.textContent).toContain('On Ada’s laptop, in /Users/ada');
-    expect(buttons(host)).toEqual(expect.arrayContaining(['Developer', 'Music']));
-    expect(buttons(host)).not.toContain('.cache');
-    await click(button(host, 'Developer'));
-    await settle();
-    expect(host.textContent).toContain('On Ada’s laptop, in /Users/ada/Developer');
-    expect(buttons(host)).toContain('receipts');
-    expect(buttons(host)).not.toContain('.git');
-    expect(buttons(host)).toContain('Back to ada');
-    await click(button(host, 'receipts'));
-    await settle();
-    expect(host.textContent).toContain('There are no folders inside this one.');
-    await click(button(host, 'Work in receipts'));
+    expect(host.textContent).toContain('Choose on Ada’s laptop');
+    await type(host.querySelector('input[name="folder-path"]'), '/Users/ada/Developer/receipts');
+    await click(button(host, 'Open the folder typed'));
     await settle();
     await settle();
     const saved = posted.find((entry) => entry.path === provisioning)?.body as Record<string, unknown>;
@@ -270,7 +259,10 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('Lys could not look at the folders there.');
+    await type(host.querySelector('input[name="folder-path"]'), '/Users/ada');
+    await click(button(host, 'Open the folder typed'));
+    await settle();
+    expect(host.textContent).toContain('Lys could not ask Ada’s laptop about its folders.');
     expect(host.textContent).toContain('runner_absent');
     expect(posted.some((entry) => entry.path === provisioning)).toBe(false);
     expect(calls.again).toBe(0);
@@ -298,8 +290,9 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('On Ward desk, in /home/ward');
-    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + other + '/folders']);
+    expect(host.textContent).toContain('Choose on Ward desk');
+    expect(host.querySelector('select[name="folder-computer"]')).toBeNull();
+    expect(posted).toEqual([]);
   });
 
   it('looks on the one computer a role the agent holds allows it on, and not on one a role it no longer holds allowed', async () => {
@@ -314,8 +307,9 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    expect(host.textContent).toContain('On Ward desk, in /home/ward');
-    expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + other + '/folders']);
+    expect(host.textContent).toContain('Choose on Ward desk');
+    expect(host.querySelector('select[name="folder-computer"]')).toBeNull();
+    expect(posted).toEqual([]);
   });
 
   it('sends every setting it read back unchanged, with the folder, when it saves', async () => {
@@ -330,12 +324,13 @@ describe('an agent with no folder to work in', () => {
     });
     await click(button(host, 'Choose a folder'));
     await settle();
-    await click(button(host, 'Work in ada'));
+    await type(host.querySelector('input[name="folder-path"]'), '/Users/ada/Developer');
+    await click(button(host, 'Open the folder typed'));
     await settle();
     await settle();
     const saved = posted.find((entry) => entry.path === provisioning)?.body as Record<string, unknown>;
     const { operation, from_version, note, working_folder, ...kept } = saved;
-    expect(working_folder).toBe('/Users/ada');
+    expect(working_folder).toBe('/Users/ada/Developer');
     expect(from_version).toBe(2);
     expect(typeof operation).toBe('string');
     expect(note).toBe('Choose the folder this agent works in');

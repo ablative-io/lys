@@ -116,7 +116,7 @@ function AddRule({ lists, computers, computer, enforcer, add, addPolicy }: {
     <td>
       {folder ? <>
         {given ? <p className="works-in">The folder <code>{given}</code></p> : null}
-        <FolderChooser computers={computers} preferred={computer} chosen={given} choose={setGiven} label={given ? 'Choose a different folder for this rule' : 'Choose the folder for this rule'} confirm="Use" />
+        <FolderChooser computers={computers} preferred={computer} chosen={given} choose={setGiven} label={given ? 'Choose a different folder for this rule' : 'Choose the folder for this rule'} />
       </> : null}
       {typed ? <label className="field">{typed.label}<input name={typed.name} aria-label={typed.label} placeholder={typed.hint} value={given} onChange={(event) => setGiven(event.target.value)} onKeyDown={noEnter} autoComplete="off" spellCheck={false} /></label> : null}
       {rule ? <p className="rule-row">{wordsFor(rule)} <small><code>{rule}</code></small></p> : null}
@@ -208,7 +208,7 @@ function Editor({ agent, program, value, change, computers, computer, tools = []
       {folders.length ? null : <tr><td colSpan={2} className="dim">{kept ? 'Not available with Kept to its folder: that setting keeps the agent to its one working folder.' : 'None. It works in its working folder only.'}</td></tr>}
       {kept && folders.length ? <tr><td colSpan={2} className="dim">Not available with Kept to its folder: that setting keeps the agent to its one working folder. Remove these before it can start as Kept to its folder.</td></tr> : null}
     </tbody>
-    {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" word="Add" confirm="Add" /></td></tr></tfoot>}
+    {kept ? null : <tfoot><tr><td colSpan={2}><FolderChooser computers={computers} preferred={computer} chosen="" choose={(folder) => add('additional_directories', folder)} label="Add an extra folder" word="Add" /></td></tr></tfoot>}
   </table></TableScroll>;
   return <div className="permissions wide" role="group" aria-label="What this agent may do">
     {program ? <TableScroll label="How it works"><table className="usage-table modes" aria-label="How it works">

@@ -329,6 +329,7 @@ pub fn kind(answer: &Answer) -> &'static str {
         Answer::ControlReceipts { .. } => "control_receipts",
         Answer::Feed { .. } => "feed",
         Answer::Folders { .. } => "folders",
+        Answer::FolderChosen { .. } => "folder_chosen",
         Answer::GrantChannel => "grant_channel",
         Answer::StoppedEverything { .. } => "stopped_everything",
         Answer::Refused { .. } => "refused",

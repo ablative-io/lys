@@ -215,6 +215,14 @@ pub enum Act {
         #[serde(default)]
         under: Option<String>,
     },
+    /// Open this computer's own folder dialog, starting in `start` or the
+    /// runner's home folder, and name the folder the person picks there.
+    /// The answer waits for the person; cancelling the dialog is a refusal.
+    ChooseFolder {
+        /// The folder the dialog opens in.
+        #[serde(default)]
+        start: Option<String>,
+    },
     /// Hold this connection as the live grant authority's channel: the
     /// runner answers `grant_channel`, then writes each grantable question
     /// as one line and reads the answer line to it, until the connection

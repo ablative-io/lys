@@ -103,26 +103,28 @@ describe('The folder an agent works in', () => {
       '/network': ok({ machines: [computer], reports_served: true }),
       [folders]: (value) => {
         const request = value as { under?: string };
-        return request.under ? refused(409, code, 'the saved folder cannot be opened')
+        return request.under === saved ? refused(409, code, 'the saved folder cannot be opened')
           : ok({ machine: computer.id, under: '/home/ward', folders: ['notes'] });
       },
     });
     await click(button('Choose another folder'));
     const recovery = document.querySelector('.folder-recovery');
     const warning = recovery?.querySelector('[role="alert"]');
-    expect(recovery?.querySelector('p')?.textContent).toContain(saved + ', could not be read. Lys asked for the computer’s home folder instead.');
-    expect(recovery?.textContent).toContain('Choose a readable folder or ask its owner to check access.');
+    expect(recovery?.querySelector('p')?.textContent).toContain(saved + ', could not be read on Ward desk.');
+    expect(recovery?.textContent).toContain('Choose a readable folder, or ask its owner to check access.');
     expect(warning?.querySelector('p')?.textContent).toBe(words);
     expect(warning?.querySelector('p')?.textContent).not.toContain(code);
     expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(warning?.querySelector('details')?.textContent).toContain(code + ': the saved folder cannot be opened');
-    expect(document.querySelector('.folder-chooser[role="group"]')?.textContent).toContain('On Ward desk, in /home/ward');
-    expect(posted.map((entry) => entry.body)).toEqual([{ under: saved }, {}]);
-    await click(button('Work in ward'));
+    // The dialog and the typed path are still offered; nothing else is asked until one is used.
+    expect(document.querySelector('.folder-chooser[role="group"]')?.textContent).toContain('Choose on Ward desk');
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: saved }]);
+    await typeInto('[name="folder-path"]', '/home/ward');
+    await submitForm('form.folder-path');
     expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward');
     expect(posted.every((entry) => entry.path.endsWith('/folders'))).toBe(true);
   });
-  it('opens a typed path on the computer, goes back up by any part of it, and works in the folder chosen', async () => {
+  it('takes a typed path once the computer has opened it, with no second press', async () => {
     const listing: Record<string, string[]> = { '/home/ward': ['Developer'], '/home/ward/Developer/receipts': ['src'], '/home/ward/Developer': ['receipts'] };
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
       ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
@@ -130,15 +132,45 @@ describe('The folder an agent works in', () => {
       [folders]: (value) => { const under = (value as { under?: string }).under ?? '/home/ward'; return listing[under] ? ok({ machine: computer.id, under, folders: listing[under] }) : refused(409, 'folder_unreadable', 'no such folder'); },
     });
     await click(button('Choose a folder'));
-    expect((document.querySelector('select[name="folder-computer"]') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('Ward desk');
+    // The computer is the one the agent runs on, so it is not asked again.
+    expect(document.querySelector('select[name="folder-computer"]')).toBeNull();
+    expect(text()).toContain('Or type the folder on Ward desk');
     await typeInto('[name="folder-path"]', '/home/ward/Developer/receipts/');
     await submitForm('form.folder-path');
-    expect(text()).toContain('On Ward desk, in /home/ward/Developer/receipts');
     expect(posted.at(-1)?.body).toEqual({ under: '/home/ward/Developer/receipts' });
-    await click(button('Back to Developer'));
-    expect(text()).toContain('On Ward desk, in /home/ward/Developer');
-    await click(button('Work in Developer'));
-    expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward/Developer');
+    expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward/Developer/receipts');
+    expect(document.querySelector('.folder-chooser[role="group"]')).toBeNull();
+  });
+  it('takes the folder picked in the computer’s own dialog, started in the folder chosen before', async () => {
+    const dialog = 'POST /network/machines/' + computer.id + '/choose-folder';
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id, working_folder: '/home/ward' } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: ok({ machine: computer.id, under: '/home/ward', folders: ['Developer'] }),
+      [dialog]: ok({ machine: computer.id, folder: '/home/ward/Developer/receipts' }),
+    });
+    await click(button('Choose another folder'));
+    await click(button('Choose the folder on Ward desk'));
+    expect(posted.at(-1)?.path).toBe('/network/machines/' + computer.id + '/choose-folder');
+    expect(posted.at(-1)?.body).toEqual({ start: '/home/ward' });
+    expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward/Developer/receipts');
+    expect(document.querySelector('.folder-chooser[role="group"]')).toBeNull();
+  });
+  it.each([
+    ['folder_choice_cancelled', 'Cancelled on Ward desk. The folder is unchanged.'],
+    ['folder_dialog_unavailable', 'Ward desk could not show its folder dialog. Type the path below instead.'],
+  ])('says so when the dialog answers %s, and changes nothing', async (code, words) => {
+    const dialog = 'POST /network/machines/' + computer.id + '/choose-folder';
+    await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [dialog]: refused(409, code, 'the dialog said so'),
+    });
+    await click(button('Choose a folder'));
+    await click(button('Choose the folder on Ward desk'));
+    expect(document.querySelector('.folder-notice')?.textContent).toBe(words);
+    expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
+    expect(document.querySelector('.folder-chooser[role="group"]')).not.toBeNull();
   });
   it('says plainly when a typed path is not a folder there, and keeps the folder shown', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
@@ -149,9 +181,9 @@ describe('The folder an agent works in', () => {
     await click(button('Choose a folder'));
     await typeInto('[name="folder-path"]', '/nowhere/at/all');
     await submitForm('form.folder-path');
-    expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toBe('There is no folder Lys can open at /nowhere/at/all on this computer. Check the path, or choose from the folders below.');
-    expect(text()).toContain('On Ward desk, in /home/ward');
-    expect(posted.map((entry) => entry.body)).toEqual([{}, { under: '/nowhere/at/all' }]);
+    expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toBe('There is no folder Lys can open at /nowhere/at/all on this computer. Check the path, or choose it in the dialog.');
+    expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
+    expect(posted.map((entry) => entry.body)).toEqual([{ under: '/nowhere/at/all' }]);
   });
   it('asks for a whole path before asking the computer anything', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
@@ -163,7 +195,7 @@ describe('The folder an agent works in', () => {
     await typeInto('[name="folder-path"]', 'Developer/receipts');
     await submitForm('form.folder-path');
     expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toContain('Type the whole path, starting with /');
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(0);
   });
   it('explains a folder read refusal with a next action and keeps the server code in details', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
@@ -172,29 +204,32 @@ describe('The folder an agent works in', () => {
       [folders]: refused(409, 'runner_absent', 'machine names no runner'),
     });
     await click(button('Choose a folder'));
+    await typeInto('[name="folder-path"]', '/home/ward');
+    await submitForm('form.folder-path');
     const failure = document.querySelector('.folder-problem');
     const warning = failure?.querySelector('[role="alert"]');
-    expect(failure?.querySelector('p')?.textContent).toBe('Lys could not look at the folders there. Check the computer’s runner, then close and reopen this chooser to try again.');
+    expect(failure?.querySelector('p')?.textContent).toBe('Lys could not ask Ward desk about its folders. Check the computer’s runner, then try again.');
     expect(warning?.querySelector('p')?.textContent).toBe('This computer has no connected Lys runner. Connect its runner before continuing.');
     expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(warning?.querySelector('details')?.textContent).toContain('runner_absent: machine names no runner');
     expect(posted.map((entry) => entry.path)).toEqual(['/network/machines/' + computer.id + '/folders']);
     expect(document.querySelector('.works-in')?.textContent).toBe('No folder chosen yet.');
   });
-  it('names both failed reads when the saved folder and the home folder are unreadable', async () => {
+  it('names the unreadable saved folder, and then a dialog the runner cannot start in its home', async () => {
+    const dialog = 'POST /network/machines/' + computer.id + '/choose-folder';
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
       ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id, working_folder: '/srv/removed' } }),
       '/network': ok({ machines: [computer], reports_served: true }),
-      [folders]: (value) => (value as { under?: string }).under
-        ? refused(409, 'folder_unreadable', 'the saved folder is gone')
-        : refused(409, 'home_unknown', 'the runner account has no home folder'),
+      [folders]: refused(409, 'folder_unreadable', 'the saved folder is gone'),
+      [dialog]: refused(409, 'home_unknown', 'the runner account has no home folder'),
     });
     await click(button('Choose another folder'));
     expect(document.querySelector('.folder-recovery [role="alert"] > p')?.textContent).toContain('Choose a readable folder');
-    expect(document.querySelector('.folder-problem [role="alert"] > p')?.textContent).toBe('The runner could not find its home folder. Ask the administrator to check the account it runs under.');
     expect(document.querySelector('.folder-recovery details')?.textContent).toContain('folder_unreadable: the saved folder is gone');
+    // The dialog is not started in a folder that cannot be read, so the runner is left to its home folder, and says when it has none.
+    await click(button('Choose the folder on Ward desk'));
+    expect(document.querySelector('.folder-problem [role="alert"] > p')?.textContent).toBe('The runner could not find its home folder. Ask the administrator to check the account it runs under.');
     expect(document.querySelector('.folder-problem details')?.textContent).toContain('home_unknown: the runner account has no home folder');
-    expect(button('Work in removed')).toBeNull();
     expect(posted.map((entry) => entry.body)).toEqual([{ under: '/srv/removed' }, {}]);
     expect(document.querySelector('.works-in code')?.textContent).toBe('/srv/removed');
   });
