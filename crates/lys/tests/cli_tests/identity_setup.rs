@@ -101,10 +101,8 @@ fn nothing_about_a_person_is_taken_from_the_machine() -> TestResult {
     for (path, bytes) in &written {
         assert!(!contains(bytes, MARKER), "{path} holds the machine's email");
     }
-    for output in [&prepared] {
-        assert!(!contains(&output.stdout, MARKER));
-        assert!(!contains(&output.stderr, MARKER));
-    }
+    assert!(!contains(&prepared.stdout, MARKER));
+    assert!(!contains(&prepared.stderr, MARKER));
     let deployment = std::fs::read_to_string(root.path().join("deployment.toml"))?;
     assert!(
         !deployment.contains("admin_email"),

@@ -28,8 +28,9 @@ fn admission_refusal(body: &[u8]) -> Option<ProviderRefusal> {
         .and_then(|text| text.strip_suffix("' already exists but is not linked to this provider."));
     let name = match (error, message) {
         ("Disabled", Some("User is not enabled")) => "AccountDisabled",
-        ("NotFound", Some("User not found")) => "NotAdmittedYet",
-        ("BadRequest", Some("Invalid E-Mail")) => "NotAdmittedYet",
+        ("NotFound", Some("User not found")) | ("BadRequest", Some("Invalid E-Mail")) => {
+            "NotAdmittedYet"
+        }
         ("Forbidden", _) if unlinked.is_some() => "NotAdmittedYet",
         _ => return None,
     };

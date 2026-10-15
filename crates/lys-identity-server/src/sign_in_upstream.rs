@@ -223,7 +223,7 @@ impl IssuerSignIn {
         upstream: &str,
         address: IpAddr,
         browser: [u8; 32],
-    ) -> Result<(Actor, Option<Continuation>), Refused> {
+    ) -> Result<(Actor, Option<Continuation>), Box<Refused>> {
         let held = self
             .upstream
             .lock()
@@ -234,7 +234,7 @@ impl IssuerSignIn {
             // Another browser answered: the continuation was asked for by
             // the browser that began, so it is not handed to this one.
             oidc.abandon(&held.state).map_err(Refused::dropping)?;
-            return Err(Refused::dropping(ServerError::SignInStateUnknown));
+            return Err(Refused::dropping(ServerError::SignInStateUnknown).into());
         }
         let continuation = held.continuation.clone();
         match self.settle(oidc, code, upstream, address, held).await {
@@ -243,7 +243,8 @@ impl IssuerSignIn {
                 error: refused.error,
                 email: refused.email,
                 continuation,
-            }),
+            }
+            .into()),
         }
     }
 
@@ -418,11 +419,9 @@ async fn finish(
     extensions: &Extensions,
     back: Back,
     headers: &HeaderMap,
-) -> Result<(String, Option<Continuation>), Refused> {
+) -> Result<(String, Option<Continuation>), Box<Refused>> {
     let (Some(code), Some(upstream)) = (back.code, back.state) else {
-        return Err(Refused::dropping(failed(
-            "the provider did not sign the person in",
-        )));
+        return Err(Refused::dropping(failed("the provider did not sign the person in")).into());
     };
     let address = state
         .sign_in
@@ -439,7 +438,8 @@ async fn finish(
             error,
             email: None,
             continuation,
-        }),
+        }
+        .into()),
     }
 }
 

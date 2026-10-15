@@ -195,7 +195,10 @@ pub(crate) async fn issue(
         with_directory(&state, |directory| {
             let projection = directory.projection()?;
             let person = crate::read_api::own_person(projection, &actor)?;
-            let agent = id.parse().map_err(|_| ServerError::AgentNotVisible)?;
+            let agent = id.parse().map_err(|error| {
+                drop(error);
+                ServerError::AgentNotVisible
+            })?;
             let record = projection
                 .record(IdentityId::Agent(agent))
                 .filter(|record| record.responsible() == Some(person))

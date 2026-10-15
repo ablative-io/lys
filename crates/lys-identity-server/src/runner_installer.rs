@@ -209,7 +209,10 @@ async fn install(
     let root = root(&state)?;
     let held = tokio::task::spawn_blocking(move || held(&root, kind))
         .await
-        .map_err(|_| refused("installer_build_failed", "the client preparation stopped"))??;
+        .map_err(|error| {
+            drop(error);
+            refused("installer_build_failed", "the client preparation stopped")
+        })??;
     // Preparation can take time; a retired computer must not receive a new join.
     let by = computer_owner(&state, &actor, &id)?;
     let operation = OperationId::generate()?.to_string();
@@ -234,7 +237,8 @@ async fn install(
     })?;
     let bytes = tokio::task::spawn_blocking(move || held.package(kind, &pending))
         .await
-        .map_err(|_| {
+        .map_err(|error| {
+            drop(error);
             refused(
                 "installer_build_failed",
                 "the installer preparation stopped",
