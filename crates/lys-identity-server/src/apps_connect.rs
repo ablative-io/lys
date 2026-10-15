@@ -42,7 +42,7 @@ use crate::session::now;
 /// How long a connect code is exchangeable, in milliseconds.
 const CODE_LIFETIME_MS: u64 = 10 * 60 * 1000;
 
-#[path = "lysfix_srv_connect_state.rs"]
+#[path = "apps_connect_checkpoint.rs"]
 mod checkpoint;
 
 /// The connect routes, merged into the app routes.

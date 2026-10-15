@@ -37,7 +37,7 @@ fn live(app: &Value) -> TestResult<Vec<String>> {
 }
 
 #[tokio::test]
-async fn lysfix_srv_connect_retry_returns_the_first_outcome_and_one_live_credential() -> TestResult
+async fn connect_retry_returns_the_first_outcome_and_one_live_credential() -> TestResult
 {
     let (mut service, _) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -122,7 +122,7 @@ async fn lysfix_srv_connect_retry_returns_the_first_outcome_and_one_live_credent
 }
 
 #[tokio::test]
-async fn lysfix_srv_connect_initializes_checkpoints_for_an_existing_app_install() -> TestResult {
+async fn connect_initializes_checkpoints_for_an_existing_app_install() -> TestResult {
     let (service, _) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     identity_contract::apps::registered(&service, &admin, NOTES).await?;
@@ -195,7 +195,7 @@ async fn proxy(State(state): State<Proxy>, request: Request) -> Response {
 }
 
 #[tokio::test]
-async fn lysfix_srv_connect_failure_between_issue_and_revoke_keeps_the_old_credential_live()
+async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live()
 -> TestResult {
     let custody = identity_contract::app_custody::serve().await?;
     let state = Proxy {

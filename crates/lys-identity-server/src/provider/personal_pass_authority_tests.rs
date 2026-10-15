@@ -67,7 +67,7 @@ fn pass(
 }
 
 #[tokio::test]
-async fn lysfix_srv_administrator_personal_pass_suspends_another_identity() -> TestResult {
+async fn administrator_personal_pass_suspends_another_identity() -> TestResult {
     let (_dir, mut state, _, _, _, target) =
         crate::grant_settlement_tests::person_fixture().await?;
     let administrator = Actor::new(
@@ -95,7 +95,7 @@ async fn lysfix_srv_administrator_personal_pass_suspends_another_identity() -> T
 }
 
 #[tokio::test]
-async fn lysfix_srv_other_app_person_pass_cannot_suspend_or_register_for_others() -> TestResult {
+async fn other_app_person_pass_cannot_suspend_or_register_for_others() -> TestResult {
     let (_dir, mut state, _, _, _, target) =
         crate::grant_settlement_tests::person_fixture().await?;
     let administrator = Actor::new(

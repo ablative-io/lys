@@ -59,8 +59,8 @@ pub mod surface;
 
 use layout::{BINARIES, Layout};
 
-mod lysfix_srv_security;
-use lysfix_srv_security::{operator_token, provider_key};
+mod security;
+use security::{operator_token, provider_key};
 
 mod options;
 pub use options::{Options, Profile};
@@ -490,5 +490,5 @@ fn install(options: &Options, json: bool) -> IdentityResult<()> {
 mod tests;
 
 #[cfg(test)]
-#[path = "install/lysfix_srv_presence_tests.rs"]
-mod lysfix_srv_presence_tests;
+#[path = "install/presence_tests.rs"]
+mod presence_tests;

@@ -266,5 +266,5 @@ pub(crate) fn app_person_actor(
 }
 
 #[cfg(test)]
-#[path = "lysfix_srv_personal_tests.rs"]
-mod lysfix_srv_personal_tests;
+#[path = "personal_pass_authority_tests.rs"]
+mod personal_pass_authority_tests;

@@ -24,7 +24,7 @@ impl Presence for LinuxOperator {
 }
 
 #[test]
-fn lysfix_srv_linux_presence_refuses_a_background_or_different_user() {
+fn linux_presence_refuses_a_background_or_different_user() {
     use crate::identity::presence::linux::Operator;
     for operator in [
         Operator {
@@ -57,7 +57,7 @@ fn lysfix_srv_linux_presence_refuses_a_background_or_different_user() {
 }
 
 #[test]
-fn lysfix_srv_linux_present_operator_produces_first_run_and_recovery_codes()
+fn linux_present_operator_produces_first_run_and_recovery_codes()
 -> Result<(), Box<dyn std::error::Error>> {
     for purpose in [Purpose::FirstRun, Purpose::Password] {
         let root = tempfile::tempdir()?;
@@ -77,7 +77,7 @@ fn lysfix_srv_linux_present_operator_produces_first_run_and_recovery_codes()
 }
 
 #[test]
-fn lysfix_srv_linux_absent_operator_refuses_without_replacing_a_code()
+fn linux_absent_operator_refuses_without_replacing_a_code()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     let layout = Layout::at(root.path().to_path_buf());

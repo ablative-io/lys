@@ -22,7 +22,7 @@ pub(crate) fn refused(kind: ErrorKind, detail: impl Into<String>) -> IdentityErr
 #[path = "presence_macos.rs"]
 mod macos;
 
-#[path = "lysfix_srv_presence_linux.rs"]
+#[path = "presence_linux.rs"]
 pub(crate) mod linux;
 
 impl Presence for SystemPresence {
