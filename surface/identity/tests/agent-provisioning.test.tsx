@@ -1,4 +1,5 @@
 /** Agent handles disclose metadata only; provisioning changes retain their operation and reviewed version. */
+import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { click, mount, text } from './harness';
 import { ADA, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
@@ -11,6 +12,16 @@ const profile: ProvisioningProfile = { version: 1, operation: 'op-' + 'a'.repeat
   permissions: { allow: ['Read'], deny: ['Bash(rm:*)'], ask: ['Edit'], default_mode: 'acceptEdits', additional_directories: ['/srv/a', '/srv/b'] } };
 const answer: ProvisioningAnswer = { agent: SCRIBE, profile, versions: [{ version: 1, set_by: ADA, set_at: 1790000000, note: 'Initial profile' }], enforced: false };
 const routes = { ...SERVICE, [path]: ok(answer) };
+async function typeInto(selector: string, value: string) {
+  const field = document.querySelector(selector);
+  if (!(field instanceof HTMLInputElement)) throw new Error(selector + ' is missing');
+  await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value); field.dispatchEvent(new Event('input', { bubbles: true })); });
+}
+async function submitForm(selector: string) {
+  const form = document.querySelector(selector);
+  if (!(form instanceof HTMLFormElement)) throw new Error(selector + ' is missing');
+  await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+}
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label) ?? null;
 describe('Agent credential handles', () => {
   it('reads the named agent and renders metadata without any secret-shaped extra members', async () => {
@@ -99,6 +110,49 @@ describe('The folder an agent works in', () => {
     await click(button('Work in ward'));
     expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward');
     expect(posted.every((entry) => entry.path.endsWith('/folders'))).toBe(true);
+  });
+  it('opens a typed path on the computer, goes back up by any part of it, and works in the folder chosen', async () => {
+    const listing: Record<string, string[]> = { '/home/ward': ['Developer'], '/home/ward/Developer/receipts': ['src'], '/home/ward/Developer': ['receipts'] };
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: (value) => { const under = (value as { under?: string }).under ?? '/home/ward'; return listing[under] ? ok({ machine: computer.id, under, folders: listing[under] }) : refused(409, 'folder_unreadable', 'no such folder'); },
+    });
+    await click(button('Choose a folder'));
+    expect((document.querySelector('select[name="folder-computer"]') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('Ward desk');
+    await typeInto('[name="folder-path"]', '/home/ward/Developer/receipts/');
+    await submitForm('form.folder-path');
+    expect(text()).toContain('On Ward desk, in /home/ward/Developer/receipts');
+    expect(posted.at(-1)?.body).toEqual({ under: '/home/ward/Developer/receipts' });
+    await click(button('Back to Developer'));
+    expect(text()).toContain('On Ward desk, in /home/ward/Developer');
+    await click(button('Work in Developer'));
+    expect(document.querySelector('.works-in code')?.textContent).toBe('/home/ward/Developer');
+  });
+  it('says plainly when a typed path is not a folder there, and keeps the folder shown', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: (value) => (value as { under?: string }).under ? refused(409, 'folder_unreadable', 'no such folder') : ok({ machine: computer.id, under: '/home/ward', folders: ['notes'] }),
+    });
+    await click(button('Choose a folder'));
+    await typeInto('[name="folder-path"]', '/nowhere/at/all');
+    await submitForm('form.folder-path');
+    expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toBe('There is no folder Lys can open at /nowhere/at/all on this computer. Check the path, or choose from the folders below.');
+    expect(text()).toContain('On Ward desk, in /home/ward');
+    expect(posted.map((entry) => entry.body)).toEqual([{}, { under: '/nowhere/at/all' }]);
+  });
+  it('asks for a whole path before asking the computer anything', async () => {
+    const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {
+      ...routes, [path]: ok({ ...answer, profile: { ...profile, runs_on: computer.id } }),
+      '/network': ok({ machines: [computer], reports_served: true }),
+      [folders]: ok({ machine: computer.id, under: '/home/ward', folders: [] }),
+    });
+    await click(button('Choose a folder'));
+    await typeInto('[name="folder-path"]', 'Developer/receipts');
+    await submitForm('form.folder-path');
+    expect(document.querySelector('.folder-path [role="alert"]')?.textContent).toContain('Type the whole path, starting with /');
+    expect(posted).toHaveLength(1);
   });
   it('explains a folder read refusal with a next action and keeps the server code in details', async () => {
     const { posted } = await mount('#/file/' + SCRIBE + '/provisioning', {

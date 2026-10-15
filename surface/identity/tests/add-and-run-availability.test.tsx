@@ -98,7 +98,7 @@ describe('Add-agent runner availability', () => {
 
     expect(form(container).textContent).toContain(laptop.name + ': not available: ' + reason);
     expect(offered(container)).not.toContain(laptop.id);
-    expect(form(container).textContent).toContain('Computer: ' + local.name);
+    expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.selectedOptions[0]?.textContent).toBe(local.name);
     expect(form(container).textContent).not.toContain('Ask the administrator to check the computer');
     await ready(container);
     expect(submit(container).textContent).toBe('Add and run');
@@ -158,7 +158,7 @@ describe('Add-agent runner availability', () => {
       // The first runner to answer is offered, never chosen for the person: other runners have not answered yet.
       expect(offered(container)).toEqual(['', local.id]);
       expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe('');
-      expect(form(container).textContent).not.toContain('Computer: ' + local.name);
+      expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe('');
       expect(form(container).textContent).not.toContain(local.name + ': asking its runner…');
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
       expect(form(container).textContent).toContain(terminal.name + ': asking its runner…');
@@ -217,7 +217,7 @@ describe('Add-agent runner availability', () => {
       localReply.answer(confirmed(local));
       await settle();
       expect(form(container).querySelector<HTMLInputElement>('input[name="display_name"]')?.value).toBe('Clover named before confirmation');
-      expect(form(container).textContent).toContain('Computer: ' + local.name);
+      expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.selectedOptions[0]?.textContent).toBe(local.name);
       expect(form(container).textContent).toContain(laptop.name + ': not available: ' + reason);
       await click(form(container).querySelector('button[aria-label="Choose a folder"]'));
       await click(form(container).querySelector('button[aria-label="Work in srv"]'));
@@ -268,7 +268,7 @@ describe('Add-agent runner availability', () => {
       expect(requests).toContain(runnerPath(local));
       expect(requests).toContain(runnerPath(laptop));
       expect(offered(container)).toEqual(['', local.id]);
-      expect(form(container).textContent).not.toContain('Computer: ' + local.name);
+      expect(form(container).querySelector<HTMLSelectElement>('select[name="computer"]')?.value).toBe('');
       expect(form(container).textContent).toContain(laptop.name + ': asking its runner…');
       expect(form(container).querySelector('select[name="program"]')).toBeNull();
       expect(submit(container).disabled).toBe(true);

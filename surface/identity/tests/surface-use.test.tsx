@@ -58,7 +58,7 @@ describe("Surface use on laptops and phones", () => {
     expect(container.querySelector(".add-agent-two")).not.toBeNull();
     const form = container.querySelector("form");
     expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
-    expect(form?.textContent).toContain("Computer: Own computer");
+    expect(form?.querySelector<HTMLSelectElement>('select[name="computer"]')?.selectedOptions[0]?.textContent).toBe("Own computer");
     expect(form?.textContent).toContain("Ward laptop: not available: The computer’s runner is missing or could not be confirmed.");
     expect(form?.querySelector('select[name="computer"] option[value="' + second + '"]')).toBeNull();
     expect(form?.textContent).toContain("runner");

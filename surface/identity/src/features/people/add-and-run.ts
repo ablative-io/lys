@@ -52,10 +52,12 @@ export function profileFromSettings(value: Record<string, unknown>): Provisionin
   if (!isRecord(permissions) || typeof permissions.default_mode !== 'string') return unreadable('permissions.default_mode must be text');
   if (value.instructions_mode !== undefined && value.instructions_mode !== 'keep' && value.instructions_mode !== 'append' && value.instructions_mode !== 'replace') return unreadable('instructions_mode must be keep, append or replace');
   if (value.working_folder !== undefined && (typeof value.working_folder !== 'string' || !value.working_folder.startsWith('/'))) return unreadable('working_folder must be an absolute path');
+  if (value.resume !== undefined && (typeof value.resume !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value.resume))) return unreadable('resume must be a 36-character session or thread id');
   return { version: 0, operation: '', harness: { name: harness.name, program: harness.program, package: harness.package, description: harness.description },
     model_access: value.model_access, permissions: { default_mode: permissions.default_mode }, tools: [], skills: [], mcp_servers: [],
     instructions: value.instructions, instructions_mode: value.instructions_mode ?? (value.instructions ? 'append' : 'keep'), note: value.note, set_by: '', set_at: 0, session: null,
-    ...(typeof value.working_folder === 'string' ? { working_folder: value.working_folder } : {}) };
+    ...(typeof value.working_folder === 'string' ? { working_folder: value.working_folder } : {}),
+    ...(typeof value.resume === 'string' ? { resume: value.resume } : {}) };
 }
 function placementOf(value: unknown, registration: PendingAgent, step: AddAndRun['step']): Placement {
   if (!isRecord(value)) return unreadable('placement must be an object');

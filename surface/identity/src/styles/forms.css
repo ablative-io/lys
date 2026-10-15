@@ -61,6 +61,15 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 .refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; }
 .folder-chooser { margin: 8px 0; }
 .folder-chooser .folders { list-style: none; margin: 8px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+/* The path is typed on its own full-width line, its Open beside it; the path's parts below go back up it. */
+.folder-chooser .folder-path { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin: 8px 0; }
+.folder-chooser .folder-path .field { flex: 1 1 320px; min-width: 0; margin: 0; }
+.folder-chooser .folder-path input { width: 100%; font-family: "JetBrains Mono", ui-monospace, monospace; }
+.folder-chooser .folder-path .why-not { flex-basis: 100%; margin: 0; }
+.folder-chooser .folder-where code { font-family: "JetBrains Mono", ui-monospace, monospace; overflow-wrap: anywhere; }
+.folder-chooser .folder-trail { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 6px 0; }
+.folder-chooser .folder-trail > * + *::before { content: "›"; margin: 0 6px 0 2px; color: var(--text-muted); }
+.folder-chooser .folder-trail [aria-current] { color: var(--text-primary); font-weight: 600; }
 .works-in code { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .mode-words p { margin: 4px 0; color: var(--text-muted); }
 .mode-words code { font-family: "JetBrains Mono", ui-monospace, monospace; color: var(--text-primary); }

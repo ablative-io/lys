@@ -37,6 +37,9 @@ export function ProfileEditor({ id, profile, choices, people, readOnly = false, 
  */
 export const RESTRICTIVE = ['workspace-write', 'default', 'read-only', 'plan'] as const;
 
+/** A Claude Code session or Codex thread id, as Lys's server takes it: 8-4-4-4-12 hexadecimal. */
+const CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, more, render }: {
   /** Only the model and the computer are shown; everything else is kept as saved. */
   brief?: boolean;
@@ -80,6 +83,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const [prompt, setPrompt] = useState(firstRun ? profile?.instructions_mode ?? firstPrompt(program) : strict ? profile?.instructions_mode ?? (program?.instructions_modes?.length === 1 ? program.instructions_modes[0] : '') : profile?.instructions ? profile.instructions_mode ?? 'append' : 'keep');
   const [promptChanged, setPromptChanged] = useState(false);
   const [folder, setFolder] = useState(profile?.working_folder ?? '');
+  // An existing Claude Code session or Codex thread this agent continues, when one is named: its 36-character id.
+  const [resume, setResume] = useState(profile?.resume ?? '');
   // The computer it runs on is a saved setting like the rest; empty leaves it to be settled when the agent starts.
   // Where folders and plugins are read: the computer the profile is saved to run on, else the one the screen already knows.
   const [instructions, setInstructions] = useState(profile?.instructions ?? '');
@@ -139,6 +144,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   else if (prompt === 'replace' && !instructions.trim()) refusal = 'Type the prompt this agent uses instead, or choose another prompt setting.';
   else if (choices.skills && skills.some((name) => !choices.skills?.includes(name))) refusal = 'Lys keeps no skill named ' + skills.find((name) => !choices.skills?.includes(name)) + '. Remove it from this agent’s skills.';
   else if (folderFirst && !folder) refusal = 'Choose the folder this agent works in.';
+  else if (resume.trim() && !CONVERSATION_ID.test(resume.trim())) refusal = 'A conversation to continue is named by its 36-character id, such as 0a1b2c3d-4e5f-6789-abcd-ef0123456789.';
   const settings: Record<string, unknown> = {
     model_access: profile?.model_access[0] === model ? profile.model_access : [model],
     tools, skills, ...(profile && profile.plugins === undefined && plugins.length === 0 ? {} : { plugins }), mcp_servers: servers,
@@ -147,6 +153,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     permissions, ...(program?.instructions_modes ? { instructions_mode: !promptChanged && profile ? profile.instructions_mode ?? 'append' : prompt } : {}),
     ...(preferred ? { runs_on: preferred } : {}), ...(profile?.writable ? { writable: profile.writable } : {}),
     ...(folder ? { working_folder: folder } : {}),
+    ...(resume.trim() ? { resume: resume.trim().toLowerCase() } : {}),
     session: requiresControls
       ? { sensitive: false, ...profile?.session, requires_controls: true }
       : profile?.session ? Object.fromEntries(Object.entries(profile.session).filter(([name]) => name !== 'requires_controls')) : profile?.session ?? null,
@@ -154,6 +161,10 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const where = <div className="wide">
     {folder ? <p className="works-in">Works in <code>{folder}</code></p> : <p className="works-in">No folder chosen yet.{firstRun && !folderFirst ? ' Choose one now, or when you start this agent.' : ''}</p>}
     {canChoose ? <FolderChooser computers={machines} preferred={preferred} chosen={folder} choose={setFolder} /> : null}
+    <label className="field wide resume-field">Continue an existing conversation <span className="dim">(optional)</span>
+      <input name="resume" value={resume} disabled={!canChoose} onChange={(event) => setResume(event.target.value)} placeholder="Session or thread id, e.g. 0a1b2c3d-4e5f-6789-abcd-ef0123456789" autoComplete="off" autoCapitalize="off" spellCheck={false} />
+      <span className="hint">Leave empty to start a new conversation. To carry on one that already exists, paste its id: for Claude Code, the session id that /status shows, which is also the name of its file under ~/.claude/projects; for Codex, the thread id that codex resume lists. The agent then continues that conversation, in the folder above, when it starts.</span>
+    </label>
   </div>;
   // The two choices the Overview also offers: the same fields, the same state, the same saver.
   const modelField = <label className="field">Model this agent uses<select name="model" value={model} onChange={(event) => setModel(event.target.value)}>{!program?.models.some((entry) => entry.id === model) ? <option value={model}>{model || 'Choose a model'}</option> : null}{program?.models.map((entry) => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>;

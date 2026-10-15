@@ -28,6 +28,7 @@ export async function saveFolder(agent: string, folder: string, operation: strin
     // Permissions are sent whole, exactly as read: every rule list, the mode and the extra folders.
     ...(profile.permissions ? { permissions: profile.permissions } : {}), ...(profile.session ? { session: profile.session } : {}),
     ...(profile.runs_on ? { runs_on: profile.runs_on } : {}), ...(profile.writable ? { writable: profile.writable } : {}),
+    ...(profile.resume ? { resume: profile.resume } : {}),
   });
   if (saved.agent !== agent || saved.recorded?.operation !== operation || saved.profile?.working_folder !== folder) {
     throw new Refused(200, { refusal: 'ProfileReceiptMismatch', reason: 'The answer did not confirm the folder was saved.' });

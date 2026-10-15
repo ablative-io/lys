@@ -235,6 +235,28 @@ describe('Add and run on the first computer', () => {
     expect(location.hash).toBe('#/agents/new');
   });
 
+  it('continues the named conversation: the id is saved with the agent, lower-cased', async () => {
+    const { posted } = await open(service().routes); await names();
+    await type($('[name="resume"]'), '0A1B2C3D-4E5F-6789-ABCD-EF0123456789');
+    await submit();
+    expect(posted[2].path).toBe(prefix + '/provisioning');
+    expect(posted[2].body).toMatchObject({ resume: '0a1b2c3d-4e5f-6789-abcd-ef0123456789' });
+  });
+
+  it('refuses a conversation id that is not 36 characters of its shape, before anything is sent', async () => {
+    const { posted } = await open(service().routes); await names();
+    await type($('[name="resume"]'), 'callie-session');
+    expect(($('form button[type="submit"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(document.body.textContent).toContain('A conversation to continue is named by its 36-character id');
+    await submit();
+    expect(posted).toEqual([]);
+  });
+
+  it('starts a new conversation when no id is named: nothing about resuming is sent', async () => {
+    const { posted } = await open(service().routes); await names(); await submit();
+    expect(posted[2].body).not.toHaveProperty('resume');
+  });
+
   it('records all seven stages in order and lands on the real running session', async () => {
     const server = service(); const { posted } = await open(server.routes); await names(); await submit(true);
     expect(posted).toHaveLength(7);
@@ -319,7 +341,9 @@ describe('Add and run on an existing computer', () => {
     expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('New agent');
     expect($('[name="computer_name"]')).toBeNull();
     expect($('[name="mode"]')).toBeNull();
-    expect(document.body.textContent).toContain('Computer: Front desk');
+    // The computer is asked even when there is one, chosen for the person and named.
+    const asked = $('select[name="computer"]') as HTMLSelectElement;
+    expect(asked.selectedOptions[0]?.textContent).toBe('Front desk');
     expect(document.body.textContent).toContain('Works in its own folder; no internet.');
     expect(document.body.textContent).not.toContain('Choose the settings before adding');
     expect(posted).toEqual([]);
@@ -360,8 +384,10 @@ describe('Add and run on an existing computer', () => {
     const face = $('form[aria-label="Add an agent"]')?.cloneNode(true) as HTMLElement;
     for (const folded of face.querySelectorAll('details.more-settings')) folded.remove();
     const asked = [...face.querySelectorAll('input, select, textarea')].map((field) => field.getAttribute('name')).filter(Boolean);
-    expect(asked).toEqual(['display_name', 'program']);
-    expect(face.textContent).toContain('Computer: Front desk');
+    // The conversation to continue is offered on the face, optional and empty: an agent starts a new one unless one is named.
+    expect(asked).toEqual(['display_name', 'computer', 'program', 'resume']);
+    expect(($('[name="resume"]') as HTMLInputElement).value).toBe('');
+    expect(($('select[name="computer"]') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('Front desk');
     expect(face.textContent).toContain('No folder chosen yet.');
     // The found copy is chosen for the person: no path is asked.
     expect(face.querySelector('.first-run-copy')?.textContent).toBe('Lys found Care program on this computer and uses /opt/bin/care.');
