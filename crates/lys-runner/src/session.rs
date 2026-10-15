@@ -495,5 +495,6 @@ pub(crate) mod control_history {
     }
 }
 
+pub mod kept_on_stop;
 /// Retained launches for a controlled runner replacement.
 pub mod upgrade;
