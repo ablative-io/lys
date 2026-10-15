@@ -17,9 +17,9 @@ import { IdentityName, STATUS } from '../people/Words';
 import { DirectoryGate as Gate } from '../people/Words';
 import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
-import { Delegate } from '../grants/Delegate';
-import { ActPanel, GrantTable } from '../grants/GrantTable';
-import { grantNo, onText, passesToAgents } from '../grants/model';
+import { GiveAccess } from './GiveAccess';
+import { GrantTable } from '../grants/GrantTable';
+import { onText, passesToAgents } from '../grants/model';
 import { changeWords } from './receipt-words';
 import { Pill } from '../people/Pill';
 import { calledBy, firstName } from '../people/directory';
@@ -99,10 +99,8 @@ function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }
   );
 }
 
-function Access({ data, reload }: { data: FileData; reload: () => void }) {
+function Access({ data, reload, giveQuery }: { data: FileData; reload: () => void; giveQuery: string }) {
   const shell = useShell();
-  const [giving, setGiving] = useState<HTMLElement | null>(null);
-  const [sourceId, setSourceId] = useState('');
   const { x, grants: w } = data;
   const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
@@ -113,44 +111,10 @@ function Access({ data, reload }: { data: FileData; reload: () => void }) {
     reach.set(key, [...new Set([...(reach.get(key) ?? []), ...g.actions])]);
   }
   const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on));
-  const source = passable.find((grant) => grant.id === sourceId);
   const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <>
-      {/* The button sits beside the heading, not inside it, so it keeps every other button's font. */}
-      <div className="file-section-head">
-        <span className="section-h">Grants</span>
-        {x.kind === 'agent' && x.state !== 'retired' ? (
-          <Act
-            symbol="send"
-            name="Give access"
-            word="Give"
-            data-act="grant"
-            onClick={(event) => {
-              if (mineToGive && passable.length) {
-                setSourceId('');
-                setGiving(event.currentTarget);
-              } else shell.toast(mineToGive ? 'You hold no access you can give an agent. The button below records directory access only; Cambium needs a separate grant.' : `Only ${name}’s responsible person can give it access.`);
-            }}
-          />
-        ) : null}
-      </div>
-      {giving && passable.length ? (
-        <ActPanel label="Give" opener={giving} close={() => setGiving(null)}>
-          <label className="field">
-            Access to give
-            <select aria-label="Grant to give" value={source?.id ?? ''} onChange={(event) => setSourceId(event.target.value)}>
-              <option value="">Choose access to give</option>
-              {passable.map((grant) => (
-                <option key={grant.id} value={grant.id}>
-                  {onText(grant)} · {grant.relation} · {grantNo(grant.id)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {source ? <Delegate key={source.id} w={w} source={source} to={x.id} done={reload} close={() => setGiving(null)} /> : <p className="hint">Choose a grant to see which actions you can give.</p>}
-        </ActPanel>
-      ) : null}
+      <GiveAccess key={x.id + giveQuery} x={x} w={w} query={giveQuery} reload={reload} />
       <GrantTable w={w} grants={held} done={reload} give={false} />
       {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <CambiumFirst /> : null}
       {mineToGive && !passable.length ? (
@@ -308,7 +272,7 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
   );
 }
 
-export function TabBody({ tab, data, reload }: { tab: string; data: FileData; reload: () => void }) {
+export function TabBody({ tab, data, reload, giveQuery = '' }: { tab: string; data: FileData; reload: () => void; giveQuery?: string }) {
   const person = data.x.kind === 'person';
   switch (tab) {
     case 'budgets':
@@ -320,7 +284,7 @@ export function TabBody({ tab, data, reload }: { tab: string; data: FileData; re
         </section>
       );
     case 'access':
-      return <Access data={data} reload={reload} />;
+      return <Access data={data} reload={reload} giveQuery={giveQuery} />;
     case 'provisioning':
       return person ? (
         <Profile data={data} />

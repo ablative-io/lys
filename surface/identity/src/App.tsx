@@ -3,6 +3,7 @@ import { FirstRunSetup, setupCode } from './features/setup/Setup';
 import { SetupBoundary } from './features/setup/SetupBoundary';
 import { SignIn } from './features/sign-in/SignIn';
 import { Callback } from './features/signin/Gate';
+import { ProviderFileReturn, takeFileReturn } from './features/signin/fileReturn';
 import { Terminal } from './features/runtime/Terminal';
 import './features/runtime/terminal.css';
 import './features/runtime/session-canvas.css';
@@ -14,7 +15,7 @@ import { NavigationGate, NavigationProvider } from './shell/NavigationAccess';
 /** Lys's own sign-in page, outside the signed-in shell. */
 function SignInScreen() {
   const navigate = useNavigate();
-  return <SignIn signedIn={() => navigate('/')} />;
+  return <SignIn signedIn={() => navigate(takeFileReturn()?.slice(1) ?? '/')} />;
 }
 
 /** One session's terminal alone in its own browser window, outside the shell: the screen takes the whole window. */
@@ -29,6 +30,7 @@ export function App() {
   if (location.pathname === '/setup') return <FirstRunSetup code={setupCode()} />;
   return (
     <HashRouter>
+      <ProviderFileReturn />
       <Routes>
         <Route path="/sign-in" element={<SignInScreen />} />
         <Route path="/window/:session" element={<TerminalWindow />} />

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { Refused, api, useLoad } from '../../api';
 import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
@@ -9,6 +9,7 @@ import { DirectoryGate as Gate, ErrorWords, refusalWords, ACTION, ACTION_SHORT, 
 import type { Entry } from '../people/directory';
 import { Pill } from '../people/Pill';
 import { TabBody } from './sections';
+import { MissingGive } from './GiveAccess';
 import { ACTIONS, MERGED, tabsFor } from './tabs';
 import { RecordedForm } from '../people/RecordedForm';
 import { day } from './time';
@@ -70,9 +71,9 @@ function ReadProblems({ problems }: { problems: Refused[] }) {
   </div>)}</section> : null;
 }
 
-function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void;
+function File({ data, tab, reload, stop, stopped, notice, note, giveQuery }: { data: FileData; tab: string; reload: () => void; stop: StopAnswer | null; stopped: (answer: StopAnswer) => void;
   /** What the last change in the head did, kept while the file is read again. */
-  notice: string; note: (words: string) => void }) {
+  notice: string; note: (words: string) => void; giveQuery: string }) {
   const { agent } = data;
   const x = stop?.agent === data.x.id && stop.state === 'suspended' ? { ...data.x, state: 'suspended' as const } : data.x;
   const kind = x.kind;
@@ -125,7 +126,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
         <div className="pane">
           {agent && tab === 'profile' ? <AgentOverview key={x.id} agent={agent} added={since ? day(since) : undefined} rename={() => setChanging(changing === 'name' ? null : 'name')} details={(problems) => <><ReadProblems problems={problems} /><AssignedRoles id={x.id} /></>} />
             : agent && tab === 'record' ? <AgentEvidence data={{ ...data, x }} tab="record" reload={reload} />
-            : <TabBody tab={tab} data={{ ...data, x }} reload={reload} />}
+            : <TabBody tab={tab} data={{ ...data, x }} reload={reload} giveQuery={giveQuery} />}
         </div>
       </div>
     </div>
@@ -134,6 +135,7 @@ function File({ data, tab, reload, stop, stopped, notice, note }: { data: FileDa
 
 export function IdentityFile() {
   const { id = '', tab: asked = 'profile' } = useParams();
+  const { search } = useLocation();
   // An address naming no section of this file opens its Overview, never a section of its own.
   const merged = MERGED[asked] ?? asked;
   const tab = tabsFor(id).some(([key]) => key === merged) ? merged : 'profile';
@@ -145,11 +147,12 @@ export function IdentityFile() {
     return (
       <div className="page">
         <h1>Not found</h1>
+        {tab === 'access' && search ? <MissingGive key={id + search} id={id} reason={load.refused.refusal.reason} /> : null}
         <p className="sub">This person or agent is not in the directory, or is not among the records you can see. Ask the administrator to check your access.</p>
         <ErrorWords problem={load.refused} />
         <p><a href="#/people">Open People and agents</a></p>
       </div>
     );
   }
-  return <Gate load={load} title="this person or agent’s file" ok={(data) => <File notice={notice} note={setNotice} data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); }} />} />;
+  return <Gate load={load} title="this person or agent’s file" ok={(data) => <File giveQuery={search} notice={notice} note={setNotice} data={data} tab={tab} reload={() => setVersion((v) => v + 1)} stop={stop} stopped={(answer) => { setStop(answer); }} />} />;
 }

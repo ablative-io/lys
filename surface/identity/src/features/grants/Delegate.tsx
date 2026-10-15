@@ -1,4 +1,5 @@
-import { ActionPicker, RELATION_CHOICE, agentMayHold, appAgentCarriers, appAgentRefusal, singleActionCarriers, withheldFromAgents } from './ActionPicker';
+import { ActionPicker, RELATION_CHOICE, appAgentRefusal } from './ActionPicker';
+import { delegateChoices } from './delegateChoices';
 import { actionWords } from './action-words';
 import { pendingGrantKey, readPendingGrant, readPendingRest, restKey } from './pendingGrant';
 import { useRef, useState } from 'react';
@@ -41,7 +42,7 @@ type Outcome =
  * to 2.4). Every decision is the service's: this form only asks, and shows its
  * answer, including what the chosen recipient cannot be given.
  */
-export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source: Grant; to?: string; done: () => void; close: () => void }) {
+export function Delegate({ w, source, to, initialChoices = [], done, close }: { w: GrantWorld; source: Grant; to?: string; initialChoices?: string[]; done: () => void; close: () => void }) {
   const shell = useShell();
   const me = w.me.person.id;
   const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
@@ -54,7 +55,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
   const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
   const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');
-  const [picked, setPicked] = useState<string[]>([]);
+  const [picked, setPicked] = useState<string[]>(initialChoices);
   const [lasts, setLasts] = useState('7 days');
   const [pass, setPass] = useState('no');
   const [outcome, setOutcome] = useState<Outcome>({ at: 'editing' });
@@ -66,22 +67,7 @@ export function Delegate({ w, source, to, done, close }: { w: GrantWorld; source
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
   const toAgent = w.who.get(recipient)?.kind !== 'person';
-  const passable = source.pass_on.kind === 'to' && source.pass_on.recipients.includes('agent')
-    ? source.actions.filter((action) => (source.pass_on as { actions: string[] }).actions.includes(action)) : [];
-  const known = declared !== null || withheldFromAgents(w.model) !== null;
-  const offered = known ? passable.filter((action) => agentMayHold(w.model, source.resource.kind, [action])).sort() : [];
-  const carriers = singleActionCarriers(w.model, source.resource.kind);
-  const appChoices = app ? appAgentCarriers(w.model, source.resource.kind, offered) : [];
-  const carried = offered.filter((action) => carriers.has(action) || appChoices.some(([, actions]) => actions.includes(action)));
-  // App choices retain every action their registered relation carries; relation keys are prefixed so none overwrites an action's.
-  const choices = new Map<string, { relation: string; actions: string[] }>();
-  for (const action of carried) {
-    const carrier = carriers.get(action);
-    if (carrier !== undefined) choices.set(action, { relation: carrier, actions: [action] });
-  }
-  for (const [relation, actions] of appChoices) {
-    if (!actions.every((action) => choices.has(action))) choices.set(RELATION_CHOICE + relation, { relation, actions });
-  }
+  const { known, offered, carried, choices } = delegateChoices(w.model, source);
   const noActions = kindProblem ?? (declared !== null && declared.agents.length === 0 ? appAgentRefusal
     : offered.length > 0 ? app ? 'The app has no relation carrying only the agent actions you may pass on.' : 'The permission model has no relation carrying these actions alone.'
       : 'You hold nothing on this resource that an agent could be given');
