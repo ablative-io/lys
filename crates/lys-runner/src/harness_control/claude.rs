@@ -6,6 +6,9 @@ use super::{Boundary, Controller, Kind, Observation, Pending, Update};
 use crate::error::RunnerError;
 
 /// Add the machine protocol flags without changing the existing settings.
+///
+/// # Errors
+/// - `RunnerError::Refused` with `control_launch_invalid` if supplied flags replace managed conversation or stream-protocol arguments.
 pub fn arguments(given: &[String], conversation: &str) -> Result<Vec<String>, RunnerError> {
     for argument in given {
         let flag = argument.split('=').next().unwrap_or(argument);

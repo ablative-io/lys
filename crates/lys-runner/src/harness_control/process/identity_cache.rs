@@ -108,6 +108,7 @@ fn remember(path: &Path, metadata: &Metadata, change: impl FnOnce(&mut Known)) {
 
 /// The SHA-256 of the opened file at `path`, if it was learned while the file
 /// had this identity.
+#[must_use]
 pub fn sha256(path: &Path, metadata: &Metadata) -> Option<String> {
     known(path, metadata)?.sha256
 }
@@ -121,6 +122,7 @@ pub fn remember_sha256(path: &Path, metadata: &Metadata, sha256: &str) {
 
 /// What `--version` printed for the file at `path`, if it was asked while the
 /// file had its present identity and the probe exited zero.
+#[must_use]
 pub fn version(path: &Path) -> Option<String> {
     let metadata = std::fs::metadata(path).ok()?;
     known(path, &metadata)?.version
