@@ -220,6 +220,25 @@ def validate_live(catalog, api_path, tools_path):
             )
 
 
+def validate_person_reads():
+    for name, route in (
+        ("whoami", "/me"),
+        ("my-agents", "/dashboard"),
+        ("drafts", "/drafts"),
+    ):
+        _, body = frontmatter(BASES[0] / "commands" / f"{name}.md")
+        words = body.lower()
+        require("person reads" in words, f"person_read_consent_missing: {name}")
+        require("agent mode" in words, f"agent_mode_boundary_missing: {name}")
+        require("browser" in words, f"person_presence_boundary_missing: {name}")
+        require(route in body, f"person_read_route_missing: {name}")
+    _, drafts = frontmatter(BASES[0] / "commands/drafts.md")
+    require(
+        "deciding a draft needs you in Lys:" in drafts,
+        "named_draft_decision_refusal_missing",
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--openapi", type=Path)
@@ -227,6 +246,7 @@ def main():
     args = parser.parse_args()
     try:
         catalog, commands = validate_packages()
+        validate_person_reads()
         validate_live(catalog, args.openapi, args.tools_list)
     except (OSError, ValueError, KeyError, TypeError) as error:
         if isinstance(error, ValueError) and not isinstance(

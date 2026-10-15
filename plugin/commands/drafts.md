@@ -1,16 +1,28 @@
 ---
-description: "List, prepare or decide Lys drafts through the correct draft family and responsible authority."
+description: "List and prepare Lys drafts; hand personal decisions back to the browser."
 disable-model-invocation: true
 ---
 
 Read the lys and draft-workflow skills. The requested draft act is: $ARGUMENTS
-Call `what-can-I-do` first. With no requested mutation, list waiting directory
-drafts using `drafts {"path":"/drafts?state=waiting"}` if this personal connection
-is admitted. For a product draft, use its declared `/product-drafts` read route.
-Prepare or submit only the act the user requested. Inspect its live body schema,
-read the draft id and immutable creation hash, and preserve exact prepared bytes.
-Directory creation needs an agent signature; personal decisions need the actual
-responsible person's connection. The plugin's OAuth agent does not supply either
-person authority or a signing key. Hand back the concrete prepared request if
-this connection cannot make the act. Approval records a decision only. Never
-report execution without a separate application receipt and state read-back.
+Call `what-can-I-do` first. When `connection.mode` is `person_reads`, the person
+chose Person reads in browser consent. List their own waiting directory drafts
+with `drafts {"path":"/drafts?state=waiting"}`. Use `state=all` to include their
+own raised and decided directory drafts. Follow cursors with the same filters
+and keep the connection/person/route receipts. Another person's drafts are never
+available through this consent, including when its person is an administrator.
+
+Deciding, approving, refusing, correcting, giving or signing as the person needs
+the browser. A decision call returns `PersonPresenceRequired` with
+`deciding a draft needs you in Lys: <url of that draft>`. Give the person that
+URL; never submit a browser decision or substitute a credential on their behalf.
+Product-draft reads through Person reads are currently refused by name because
+the own-product-draft helper is unavailable. Hand back the browser drafts page
+for that family; never present an administrator's product list as an own list.
+
+In agent mode, existing agent admission is unchanged. Directory creation needs
+an agent signature; this OAuth plugin supplies no signing key. Use `read` for an
+admitted `/product-drafts` reading in that mode. Prepare only the requested act,
+inspect its live schema and preserve exact bytes, id and creation hash. Hand
+back the prepared request when the connection cannot submit it. Never approve
+as the person. Approval records a decision only; execution needs its own receipt
+and state read-back.

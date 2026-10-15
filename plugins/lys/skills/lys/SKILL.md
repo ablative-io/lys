@@ -39,8 +39,16 @@ operation id for that intended act; a different act needs a different id.
 Read the changed record and its receipt after a mutation. A recorded approval
 or launch is not evidence that an application or session has run.
 
-OAuth sign-in connects an app agent answering to its approving person. It does
-not lend the person's authority. Grants must be given to that connected agent.
+OAuth browser consent offers Agent mode (the existing default) or Person reads.
+Agent mode connects an app agent under its own grants. Person reads permits only
+the consenting person's `/me`, `/dashboard` and own directory `/drafts` views,
+with signed receipts naming the connection, person and route. Discovery names
+that mode as `connection.mode: person_reads`. Old tokens remain in agent mode.
+Person reads never permits changes, decisions, approvals, giving or signing as
+the person; those need Lys in the browser. Product-draft reads in this mode are
+refused by name until an own-product-draft helper is callable. A draft decision
+refuses with `PersonPresenceRequired` and the words
+`deciding a draft needs you in Lys: <url of that draft>`.
 Do not reuse the person's session, an operator credential or a different seat to
 work around a refusal. Run passes, signed seats and grant tokens are alternative
 credentials for their own purposes; never combine them with OAuth bearer tokens.

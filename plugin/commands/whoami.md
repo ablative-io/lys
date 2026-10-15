@@ -4,10 +4,12 @@ disable-model-invocation: true
 ---
 
 Read the lys and identity skills. Call `what-can-I-do` with `{}` first.
-For a personal connection, ask `read {"path":"/me"}`. Report only the caller's
-returned identity and authentication kind needed to answer the user.
-A signed agent or OAuth connected app is an agent, not its responsible person.
-If this connection is an agent, report the identity supplied by the host's
-connection or its admitted own-grant reading; discovery alone contains no holder
-id. Do not claim `/me` works for an agent. Report its refusal if asked and do not
-switch to a person's credential to make the command succeed.
+When discovery identifies `connection.mode` as `person_reads`, the person chose
+Person reads in Lys's browser consent. Ask `read {"path":"/me"}`. Report the
+returned person as the person this connection reads on behalf of, and name the
+connection from its read receipt. This never grants approval or signing authority.
+In agent mode, a connected app or signed agent keeps its own identity. Report
+only the host's supplied identity or an admitted own-grant reading; ordinary
+agent discovery does not supply a holder id. Do not claim `/me` works in agent
+mode or replace its credential. To enable own-person reads, reconnect and choose
+Person reads in the browser. Agent mode remains the default for existing consent.

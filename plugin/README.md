@@ -25,9 +25,12 @@ service, SSH tunnel, private key, prefilled token or dependency install.
 
 The public metadata advertises that endpoint as its protected resource and Lys
 as its authorization server. The host registers an OAuth client, uses PKCE S256,
-and opens Lys for the person to sign in and approve the connection. Consent makes
-an app agent answering to that person. It does not copy the person's authority.
-Give that agent the specific resource access it needs in Lys. Never paste tokens
+and opens Lys for the person to sign in and consent. Agent mode remains the
+default and uses the connected agent's own grants. Person reads is an explicit
+choice for the person's own identity, agents and directory drafts; every reading
+has a signed receipt naming connection, person and route. It never grants the
+person's approval, giving or signing authority. Those acts need the browser.
+Old tokens remain in agent mode. Never paste tokens
 or a seat file into chat. Installed plugins do not modify or restart Lys or Cambium.
 
 The server's four tools are `what-can-I-do`, `read`, `change`, `drafts`.
@@ -50,15 +53,19 @@ Read the `lys` skill first; discovery does not grant the routes it lists.
 | my-agents | Read a person's own dashboard if this connection is admitted. |
 | read-route | Ask a declared reading route using its current schema. |
 | give-access | Make an authorized scoped gift, read it back and verify recipient use. |
-| drafts | List, prepare or decide the correct draft family under its own authority. |
+| drafts | Read or prepare drafts; hand personal decisions back to the browser. |
 
-Personal `/me`, `/dashboard` and directory-draft decisions require the person
-connection their routes admit. Connected-app OAuth is an agent connection. It
-cannot be presented as the approving person's session. Directory-draft creation
-requires an agent signature; this HTTP OAuth plugin does not supply a signing key.
+In Person reads, use `/me`, `/dashboard` and `/drafts` for the consenting person's
+own views. Directory drafts support `state=waiting`, `decided` and `all`, including
+own raised drafts. Another person's drafts remain unavailable. A decision is
+refused as `PersonPresenceRequired` with `deciding a draft needs you in Lys:` and
+that draft's browser URL. Product-draft reads in this mode remain refused by name
+until a callable helper limits them to the person's own records before paging.
+Agent mode is unchanged. Directory-draft creation requires an agent signature;
+this HTTP OAuth plugin does not supply a signing key.
 The installed `lys mcp` stdio bridge is a separate signed-agent connection and
 currently accepts numeric loopback HTTP only. It cannot be pointed at the remote
-HTTPS address. Product drafts use `/product-drafts` through `read`/`change`;
+HTTPS address. In agent mode, product drafts use `/product-drafts` through `read`/`change`;
 the `drafts` tool itself accepts only `/drafts` routes.
 
 Live verification found all four tools and successful discovery (92 routes, zero

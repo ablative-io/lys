@@ -21,8 +21,18 @@ plugin. Report that boundary; do not claim its OAuth token is a signing key.
 
 Directory listing (`drafts`, GET `/drafts?state=waiting`) is personal. Other states
 are `decided` and `all`; `q`, `team`, `after`, `limit` retain the same paging scope.
-Only the responsible person's own connection may decide a directory draft. An
-agent must hand back the draft id, creation hash and exact prepared request.
+An OAuth connection consented for Person reads can read only its person's own
+directory drafts, including their raised drafts in `state=all`. Each reading has
+a signed connection/person/route receipt. Agent mode is unchanged and does not
+borrow the person's views. Product-draft reads in Person reads remain refused
+by name until an own-product-draft helper is callable.
+
+Every decision as the person stays in Lys's browser. Person reads never decides,
+approves, refuses, corrects, gives or signs for them. A decision call returns
+`PersonPresenceRequired`: `deciding a draft needs you in Lys: <url of that draft>`.
+Hand back that URL, the draft id, creation hash and exact prepared request.
+The following decision bodies describe the browser API, not permission for an
+AI to submit a person's approval.
 
 Approve POST `/drafts/{id}/approve` with `operation`, `creation_hash`, `application`.
 Refuse POST `/drafts/{id}/refuse` with `operation`, `creation_hash`, `reason`.

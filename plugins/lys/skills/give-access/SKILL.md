@@ -5,7 +5,11 @@ description: "Prepare and apply an authorized Lys grant, then verify its receipt
 
 Read the lys and access skills. The user's requested recipient, resource and
 access are: the user's invocation arguments
-Call `what-can-I-do` first. Read the live `/grants/model`, visible source grants,
+Call `what-can-I-do` first. If it names `connection.mode: person_reads`, giving as the person needs
+Lys in the browser. Return that named boundary and the requested scope; never
+submit the person's gift through another credential. Agent mode continues under
+the connected agent's own authority, as below.
+Read the live `/grants/model`, visible source grants,
 recipient identity and responsible person. Inspect the live POST `/grants` schema.
 Resolve `source`, `recipient`, `responsible`, `resource`, `relation`, `pass_on` and
 `window` from those reads and the user's scope. Use `route: "tool"` and a fresh
