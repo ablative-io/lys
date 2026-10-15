@@ -158,7 +158,7 @@ function PasteServers({ kinds, taken, add }: { kinds: ServerKind[]; taken: strin
     </label>
     {servers.length ? <ul className="mcp-paste-read">{servers.map((server) => <li key={server.name}><b>{server.name}</b> {serverWords(server)}</li>)}</ul> : null}
     {read && 'problem' in read ? <p className="why-not" role="alert">{read.problem}</p> : null}
-    <Act symbol="add" name={servers.length === 1 ? 'Add ' + servers[0].name : 'Add these ' + String(servers.length) + ' servers'} word={servers.length > 1 ? 'Add all ' + String(servers.length) : 'Add'} tone="primary" disabled={!servers.length} onClick={() => { add(servers); setText(''); }} />
+    <Act symbol="add" name={servers.length === 1 ? 'Add ' + servers[0].name : servers.length ? 'Add these ' + String(servers.length) + ' servers' : 'Add the pasted tools'} word={servers.length > 1 ? 'Add all ' + String(servers.length) : 'Add'} tone="primary" disabled={!servers.length} onClick={() => { add(servers); setText(''); }} />
   </div>;
 }
 
