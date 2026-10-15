@@ -7,6 +7,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { App } from '../src/App';
+import { KindNode } from '../src/features/apps/kind-builder';
 import { GRANTS, LEDGER_G, MODEL, SCRIBE, SERVICE, ok } from './fixtures';
 import { serve } from './harness';
 
@@ -267,4 +268,34 @@ it.each([1440, 1024])('drives the agent action fieldset with a long action at %i
   expect(getComputedStyle(fieldset).flexWrap).toBe('wrap');
   for (const label of fieldset.querySelectorAll('label')) expect(getComputedStyle(label).whiteSpace).not.toBe('nowrap');
   await evidence('builder', width, '[aria-label="Agent actions on record"]');
+});
+
+it('wraps every action name only at shared identifier boundaries and keeps layout in the stylesheet', async () => {
+  const identifier = 'read_clinical.records-for:assigned/wards';
+  const record = { name: 'record', actions: [identifier], relations: [], parents: [], agents: [identifier] };
+  const draft = { kinds: [record] };
+  await act(async () => {
+    root.render(<KindNode app="cambium" draft={draft} kind={record} seen={[]} change={(edit) => edit(draft)} />);
+  });
+  const fieldset = element<HTMLFieldSetElement>('[aria-label="Agent actions on record"]');
+  const label = fieldset.querySelector('label');
+  if (!label) throw new Error('The agent action label was not rendered');
+  const name = label.querySelector('span');
+  if (!name) throw new Error('The agent action name was not rendered');
+  expect(name.querySelectorAll('wbr')).toHaveLength(5);
+  const names = document.querySelectorAll<HTMLElement>('.sb-action-name');
+  expect(names).toHaveLength(3);
+  for (const shown of names) {
+    expect(shown.textContent).toBe(identifier);
+    expect([...shown.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE).map((node) => node.textContent)).toEqual(['read_', 'clinical.', 'records-', 'for:', 'assigned/', 'wards']);
+    expect(shown.querySelectorAll('wbr')).toHaveLength(5);
+    const css = getComputedStyle(shown);
+    expect(css.whiteSpace).toBe('normal');
+    expect(css.overflowWrap).toBe('normal');
+    expect(css.wordBreak).toBe('normal');
+    expect(css.hyphens).toBe('none');
+  }
+  expect(document.querySelector('.sb-node')?.querySelectorAll('[style]')).toHaveLength(0);
+  expect(Number.parseFloat(getComputedStyle(fieldset).minWidth)).toBe(0);
+  expect(getComputedStyle(fieldset).maxWidth).toBe('100%');
 });

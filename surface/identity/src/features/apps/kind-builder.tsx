@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Act } from '../../shell/Act';
+import { breakable } from '../grants/GrantTable';
 import type { Draft, DraftKind } from './SchemaBuilder';
 
 export function KindNode({ app, draft, kind, seen, change }: { app: string; draft: Draft; kind: DraftKind; seen: string[]; change: (edit: (next: Draft) => void) => void }) {
@@ -7,7 +8,7 @@ export function KindNode({ app, draft, kind, seen, change }: { app: string; draf
   const children = draft.kinds.filter((other) => other.parents[0] === kind.name && !seen.includes(other.name));
   return (
     <div className="sb-node">
-      <fieldset className="sb-kind" aria-label={'Kind ' + kind.name} style={{ gridTemplateColumns: 'minmax(0, 1fr)' }}>
+      <fieldset className="sb-kind" aria-label={'Kind ' + kind.name}>
         <legend>
           <span className="sb-prefix">{app}.</span>
           <input
@@ -28,7 +29,7 @@ export function KindNode({ app, draft, kind, seen, change }: { app: string; draf
           <span className="note">Actions</span>
           {kind.actions.map((action) => (
             <span className="sb-chip" key={action}>
-              {action}
+              <span className="sb-action-name">{breakable(action)}</span>
               <Act
                 symbol="close"
                 name={'Remove action ' + action + ' from ' + kind.name}
@@ -55,10 +56,10 @@ export function KindNode({ app, draft, kind, seen, change }: { app: string; draf
             }
           />
         </div>
-        <fieldset className="sb-row" aria-label={'Agent actions on ' + kind.name} style={{ minWidth: 0, width: '100%', maxWidth: '100%', margin: 0 }}>
+        <fieldset className="sb-row sb-agent-actions" aria-label={'Agent actions on ' + kind.name}>
           <legend className="note">Actions agents may hold</legend>
           {kind.actions.map((action) => (
-            <label className="sb-chip" key={action} style={{ minWidth: 0, maxWidth: '100%', whiteSpace: 'normal' }}>
+            <label className="sb-chip sb-agent-action" key={action}>
               <input
                 type="checkbox"
                 className="sb-tick"
@@ -72,7 +73,7 @@ export function KindNode({ app, draft, kind, seen, change }: { app: string; draf
                   });
                 }}
               />
-              <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{action}</span>
+              <span className="sb-action-name">{breakable(action)}</span>
             </label>
           ))}
           <span className="hint">Only checked actions may be held by agents. No actions checked means agents may hold none.</span>
@@ -83,7 +84,7 @@ export function KindNode({ app, draft, kind, seen, change }: { app: string; draf
               <th scope="col">Relation</th>
               {kind.actions.map((action) => (
                 <th scope="col" key={action}>
-                  {action}
+                  <span className="sb-action-name">{breakable(action)}</span>
                 </th>
               ))}
               <th />
