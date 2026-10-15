@@ -5,7 +5,7 @@ use crate::tracking::Harness;
 use std::collections::BTreeMap;
 
 #[test]
-fn a_claude_peer_restart_resumes_its_proved_transcript_instead_of_reusing_session_id()
+fn a_claude_peer_restart_resumes_its_conversation_by_id_instead_of_reusing_session_id()
 -> Result<(), Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     let folder = root.path().canonicalize()?;
@@ -49,13 +49,10 @@ fn a_claude_peer_restart_resumes_its_proved_transcript_instead_of_reusing_sessio
     };
     super::prepare_restart(&mut launch, Some(&uuid))?;
     assert_eq!(launch.arguments, ["--model", "model", "--resume", &uuid]);
+    // Without a transcript Lys can see, the restart still asks Claude Code to resume that conversation.
     std::fs::remove_file(project.join(format!("{uuid}.jsonl")))?;
-    assert_eq!(
-        super::prepare_restart(&mut launch, Some(&uuid))
-            .unwrap_err()
-            .name(),
-        "pty_resume_missing"
-    );
+    super::prepare_restart(&mut launch, Some(&uuid))?;
+    assert_eq!(launch.arguments, ["--model", "model", "--resume", &uuid]);
     launch.arguments = vec!["--model".to_owned(), "model".to_owned()];
     super::prepare_restart(&mut launch, None)?;
     assert_eq!(launch.arguments[2], "--session-id");

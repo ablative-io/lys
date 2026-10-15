@@ -4,7 +4,6 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 
-use serde_json::json;
 
 use super::prepare;
 use crate::launch_config::Config;
@@ -114,50 +113,30 @@ fn malformed_or_duplicate_explicit_native_ids_are_refused_without_fresh_replacem
 }
 
 #[test]
-fn native_resume_is_preflighted_and_preserved_without_becoming_a_fresh_operation() -> TestResult {
+fn a_named_conversation_goes_to_claude_code_as_resume_whether_or_not_lys_can_see_its_transcript()
+-> TestResult {
     let directory = tempfile::tempdir()?;
     let cwd = directory.path().canonicalize()?;
-    let cwd_text = cwd
-        .to_str()
-        .ok_or("fixture working directory is not UTF-8")?;
-    let config = cwd.join("claude-config");
-    let transcript = config
-        .join("projects")
-        .join(lys_home::harness::claude_code::projects_slug(cwd_text))
-        .join(format!("{UUID}.jsonl"));
-    std::fs::create_dir_all(
-        transcript
-            .parent()
-            .ok_or("fixture transcript has no parent")?,
-    )?;
     let mut prepared = launch();
-    prepared.directory = cwd_text.to_owned();
-    prepared
-        .environment
-        .insert("CLAUDE_CONFIG_DIR".to_owned(), config.display().to_string());
+    prepared.directory = cwd.display().to_string();
+    // Claude Code keeps its conversations where it chooses; Lys never looks, and never swaps the conversation.
+    prepared.environment.insert(
+        "CLAUDE_CONFIG_DIR".to_owned(),
+        cwd.join("nothing-here").display().to_string(),
+    );
     prepared
         .arguments
         .extend(["--resume".to_owned(), UUID.to_owned()]);
     let before = prepared.clone();
     prepare(&mut prepared)?;
+    assert_eq!(prepared.arguments, before.arguments);
     assert!(
-        prepared
+        !prepared
             .arguments
             .iter()
             .any(|argument| argument == "--session-id")
     );
-    assert_eq!(
-        prepared
-            .environment
-            .get("LYS_PTY_STATUS_NOTE")
-            .map(String::as_str),
-        Some("the earlier conversation left no transcript; started a new one")
-    );
-    prepared = before.clone();
-    let metadata = json!({"sessionId": UUID, "cwd": cwd_text});
-    std::fs::write(transcript, format!("{metadata}\n"))?;
-    prepare(&mut prepared)?;
-    assert_eq!(prepared, before);
+    assert_eq!(prepared.environment.get("LYS_PTY_STATUS_NOTE"), None);
     Ok(())
 }
 
@@ -221,8 +200,7 @@ fn invalid_operation_ids_and_fresh_continue_fork_or_no_persistence_flags_are_ref
 }
 
 #[test]
-fn a_known_conversation_without_a_transcript_starts_fresh_and_names_the_lost_history() -> TestResult
-{
+fn a_conversation_from_another_folder_is_still_resumed_by_its_id() -> TestResult {
     let directory = tempfile::tempdir()?;
     let cwd = directory.path().canonicalize()?;
     let mut prepared = launch();
@@ -238,14 +216,13 @@ fn a_known_conversation_without_a_transcript_starts_fresh_and_names_the_lost_his
     prepare(&mut prepared)?;
     assert_eq!(
         prepared.arguments,
-        ["--model", "chosen", "--session-id", UUID]
+        [
+            "--model",
+            "chosen",
+            "--resume",
+            "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee"
+        ]
     );
-    assert_eq!(
-        prepared
-            .environment
-            .get("LYS_PTY_STATUS_NOTE")
-            .map(String::as_str),
-        Some("the earlier conversation left no transcript; started a new one")
-    );
+    assert_eq!(prepared.environment.get("LYS_PTY_STATUS_NOTE"), None);
     Ok(())
 }

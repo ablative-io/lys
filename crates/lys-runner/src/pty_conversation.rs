@@ -386,12 +386,15 @@ fn claude_resume(arguments: &[String]) -> Result<Option<&str>, RunnerError> {
 /// Refuses ambiguous resume arguments or unproved local identity and folder.
 pub fn preflight(launch: &Launch) -> Result<(), RunnerError> {
     match launch.config.as_ref().and_then(|config| config.harness) {
+        // Only the arguments' own shape is checked. Whether the conversation can be resumed is the program's to
+        // say: Claude Code and Codex each resume by id from wherever they keep their conversations, and say so
+        // in the terminal when they cannot. Lys never second-guesses that, and never swaps in a new conversation.
         Some(crate::tracking::Harness::ClaudeCode) => {
-            if let Some(conversation) = claude_resume(&launch.arguments)? {
-                preflight_claude_resume(launch, conversation)?;
-            }
+            claude_resume(&launch.arguments)?;
         }
-        Some(crate::tracking::Harness::Codex) => codex::preflight(launch)?,
+        Some(crate::tracking::Harness::Codex) => {
+            codex::requested(&launch.arguments)?;
+        }
         None => {}
     }
     Ok(())

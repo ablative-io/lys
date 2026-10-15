@@ -182,14 +182,13 @@ impl Fixture {
 }
 
 #[test]
-fn terminal_preflight_dispatches_only_the_declared_harness_and_requires_no_transcript_for_fresh()
--> TestResult {
+fn terminal_preflight_checks_only_the_arguments_and_never_requires_a_transcript() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.launch.arguments = vec!["--resume".to_owned(), UUID.to_owned()];
     preflight(&fixture.launch)?;
     fixture.declare_harness(crate::tracking::Harness::ClaudeCode);
-    let error = preflight(&fixture.launch).unwrap_err();
-    assert_eq!(error.name(), "pty_resume_missing", "{error}");
+    // A resume with no transcript Lys can see is the program's to answer, never Lys's to refuse.
+    preflight(&fixture.launch)?;
     fixture.launch.arguments = claude_arguments(&[], UUID, false)?;
     preflight(&fixture.launch)?;
     fixture.write(&[fixture.metadata()])?;

@@ -30,7 +30,7 @@ struct Binding {
     session_id: Option<String>,
 }
 
-fn requested(arguments: &[String]) -> Result<Option<&str>, RunnerError> {
+pub(super) fn requested(arguments: &[String]) -> Result<Option<&str>, RunnerError> {
     let Some(at) = arguments.iter().position(|argument| argument == "resume") else {
         return Ok(None);
     };
