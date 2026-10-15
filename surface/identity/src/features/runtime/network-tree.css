@@ -50,7 +50,7 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-start .note { margin: 0; }
 /* The chosen agent's terminal is what Operations is for: it fills the pane's whole height and width, with one slim
    line of name and acts above it, never a fixed-height box under a large heading. */
-.network-pane { padding: 8px; }
+.network-pane { padding: 44px 8px 8px; }
 .network-pane > .terminal { flex: 1; min-height: 0; margin: 0; padding: 6px; gap: 6px; border-radius: var(--radius-md); }
 .network-pane > .terminal .terminal-head { gap: 8px; }
 .network-pane > .terminal .terminal-head h2 { font-size: 14px; line-height: 20px; margin: 0; }
@@ -59,3 +59,5 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-pane > .terminal .terminal-state { margin: 0 0 0 auto; font-size: 12px; }
 .network-pane .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .network-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }
+/* The running terminal sits inside the pane's own box: one box, stretched, never a second card inside the first. */
+.network-terminal > .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; border: 0; background: none; }
