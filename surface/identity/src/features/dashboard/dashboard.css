@@ -3,7 +3,7 @@
 .dash-page > .head { flex: none; margin-bottom: 8px; }
 .dash-body { flex: 1; min-height: 0; overflow: auto; display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(300px, 1fr); grid-template-rows: minmax(260px, 1fr) auto; gap: 20px 24px; }
 /* The widgets: one row of cards under the agents, each scrolling inside itself. */
-.dash-widgets { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 16px; align-items: start; }
+.dash-widgets { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 16px; align-items: start; }
 .dash-widget { min-width: 0; max-height: 300px; }
 .dash-widget td { overflow-wrap: normal; }
 .dash-widget .section-h { flex-wrap: wrap; }
@@ -12,6 +12,7 @@
    wraps its own text, a long name or folder breaking where it must; the last column, the row's own act, keeps its width. */
 .you-tree { width: 100%; table-layout: auto; }
 .you-tree td, .you-tree th { overflow-wrap: anywhere; word-break: normal; }
+.you-agent-context { display: block; margin-top: 3px; font-size: 12px; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; }
 .you-tree td:nth-child(1) { min-width: 12ch; }
 .you-tree td.you-budget { min-width: 10ch; max-width: 46ch; }
 .you-tree td.you-goals { min-width: 8ch; max-width: 30ch; }

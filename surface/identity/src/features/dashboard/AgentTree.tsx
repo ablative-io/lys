@@ -10,6 +10,7 @@ import { api, request, useLoad } from '../../api';
 import { keyable } from '../../shell/keyable';
 import { pref, setPref } from '../../shell/prefs';
 import type { Entry } from '../people/directory';
+import { fileNo } from '../people/directory';
 import type { Branch } from '../people/tree';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
@@ -33,6 +34,7 @@ export interface Asked { agent: string; what: 'start' | 'stop' | 'started'; pres
 /** What every row needs from the page: the one read, the person, the asked row, and the picture. */
 export interface RowContext {
   rows: Map<string, DashboardAgent>;
+  numbers?: ReadonlyMap<string, string>;
   me: string;
   asked: Asked | null;
   ask: (next: Asked | null) => void;
@@ -54,6 +56,34 @@ const FOLDED = 'you-folded';
 const readFolded = () => new Set(pref(FOLDED, '').split(',').filter(Boolean));
 const depth = (level: number) => ({ '--depth': level } as CSSProperties);
 const COLUMNS = 5;
+
+/** A duplicate name keeps its record number, extended when a short number is shared. */
+function recordNumbers(rows: Iterable<DashboardAgent>): ReadonlyMap<string, string> {
+  const names = new Map<string, DashboardAgent[]>();
+  for (const row of rows) {
+    const group = names.get(row.agent.display_name);
+    if (group) group.push(row);
+    else names.set(row.agent.display_name, [row]);
+  }
+  const numbers = new Map<string, string>();
+  for (const group of names.values()) {
+    if (group.length < 2) continue;
+    const counts = new Map<string, number>();
+    for (const row of group) {
+      const number = fileNo(row.agent.id);
+      counts.set(number, (counts.get(number) ?? 0) + 1);
+    }
+    for (const row of group) {
+      const number = fileNo(row.agent.id);
+      numbers.set(row.agent.id, counts.get(number) === 1 ? number : 'A/' + row.agent.id.slice(row.agent.id.indexOf('-') + 1));
+    }
+  }
+  return numbers;
+}
+
+function AgentName({ entry, number }: { entry: Entry; number: string | undefined }) {
+  return <>{entry.display_name}{number ? <span className="you-agent-context" title={entry.id}>Record {number}</span> : null}</>;
+}
 
 /** Table rows cannot be wrapped in an element, so a keyed fragment stands in. */
 function FragmentRows({ children }: { children: ReactNode }) { return <>{children}</>; }
@@ -125,7 +155,7 @@ function AgentRow({ entry, level, place, open, context }: { entry: Entry; level:
   const teamsRefused = row && refusedPart(row.teams) ? row.teams : null;
   return <>
     <tr data-href={'#/file/' + entry.id} {...keyable(() => open(entry.id))}>
-      <td style={depth(level)} className="you-agent"><span className={'dot ' + (live.length ? 's-active' : 's-retired')} aria-label={sessionsRefused ? 'not known' : live.length ? 'running' : 'not running'} />{entry.display_name}
+      <td style={depth(level)} className="you-agent"><span role="img" className={'dot ' + (live.length ? 's-active' : 's-retired')} aria-label={sessionsRefused ? 'not known' : live.length ? 'running' : 'not running'} /><AgentName entry={entry} number={context.numbers?.get(entry.id)} />
         {teamsRefused ? <Unread part={teamsRefused} words="Its teams could not be read" /> : null}</td>
       <td className="sec you-where">{sessionsRefused ? <Unread part={sessionsRefused} words="Not known" />
         : live.length ? live.map((session) => <span className="dash-line" key={session.session}>{whereOf(session)}</span>)
@@ -177,7 +207,7 @@ export function AgentTree({ branches, context }: { branches: Branch[]; context: 
     <thead><tr><th>Agent</th><th>Running</th><th>Budget</th><th>Goals</th><th aria-label="Actions" /></tr></thead>
     <tbody>
       {context.rows.size
-        ? <AgentRows branches={branches} level={0} place="tree" folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} context={context} />
+        ? <AgentRows branches={branches} level={0} place="tree" folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} context={{ ...context, numbers: recordNumbers(context.rows.values()) }} />
         : <tr><td colSpan={COLUMNS} className="dim">You have no agents yet. <a href="#/agents/new">Add an agent</a></td></tr>}
     </tbody>
   </table>;
@@ -185,6 +215,7 @@ export function AgentTree({ branches, context }: { branches: Branch[]; context: 
 
 /** Running now: one row for each live session, with its own Watch and Stop. */
 export function RunningNow({ rows, context, first = null }: { rows: DashboardAgent[]; context: RowContext; first?: ReactNode }) {
+  const numbers = recordNumbers(rows);
   const running = rows.flatMap((row) => liveOf(row).map((session) => ({ entry: entryOf(row), session })));
   // An agent whose sessions could not be read is not counted as stopped: the panel names it and says why.
   const unread = rows.flatMap((row) => refusedPart(row.sessions) ? [{ entry: entryOf(row), refusal: row.sessions }] : []);
@@ -193,14 +224,14 @@ export function RunningNow({ rows, context, first = null }: { rows: DashboardAge
       const place = 'running/' + session.session;
       return <Fragment key={session.session}>
         <tr data-running={session.session} data-agent={entry.id}>
-          <td>{entry.display_name}</td><td className="sec">{whereOf(session)}</td>
+          <td><AgentName entry={entry} number={numbers.get(entry.id)} /></td><td className="sec">{whereOf(session)}</td>
           <td className="you-act"><RunningActs entry={entry} session={session} context={context} place={place} /></td>
         </tr>
         <AskedRow entry={entry} place={place} context={context} columns={3} />
       </Fragment>;
     }) : unread.length ? null : <tr className="empty"><td className="dim">Nothing is running.</td></tr>}
     {unread.map(({ entry, refusal }) => <tr key={entry.id} data-unread={entry.id}>
-      <td>{entry.display_name}</td><td colSpan={2}><Unread part={refusal} words="Whether it is running could not be read" /></td>
+      <td><AgentName entry={entry} number={numbers.get(entry.id)} /></td><td colSpan={2}><Unread part={refusal} words="Whether it is running could not be read" /></td>
     </tr>)}</tbody>
   </table>;
 }
