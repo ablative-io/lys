@@ -14,10 +14,11 @@
  * the API are the same record, and an uploaded schema opens here to edit.
  */
 import { useEffect, useState } from 'react';
-import { Refused, operationId, send } from '../../api';
+import { operationId, send } from '../../api';
 import { SchemaBench } from './SchemaBench';
 import './schema-builder.css';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 /** A kind as the schema JSON writes it. */
 export interface SchemaKindJson { actions: string[]; relations?: Record<string, string[]>; parents?: string[]; hot?: string[]; roles?: Record<string, string[]> }
@@ -121,19 +122,20 @@ export function SchemaBuilder({ app, version, initial, onSaved, register }: { ap
   const [opened] = useState(() => { try { return { draft: initial ? fromSchema(app, initial) : { kinds: [] }, error: '' }; } catch (error) { return { draft: { kinds: [] }, error: String(error) }; } });
   const [draft, setDraft] = useState<Draft>(() => kept(app, opened.draft));
   const [check, setCheck] = useState<SchemaCheck | null>(null);
-  const [refusal, setRefusal] = useState<string>(opened.error);
+  // What failed: a problem said through ErrorWords, its code kept under Error details.
+  const [refusal, setRefusal] = useState<unknown>(opened.error ? new Error(opened.error.replace(/^Error:\s*/, '')) : null);
   const [busy, setBusy] = useState(false);
   useEffect(() => { sessionStorage.setItem(storageKey(app), JSON.stringify(draft)); }, [app, draft]);
   const change = (edit: (next: Draft) => void) => { const next = copy(draft); edit(next); setDraft(next); setCheck(null); };
   const schema = toSchema(app, draft);
-  const refused = (error: unknown) => setRefusal(error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));
+  const refused = (error: unknown) => setRefusal(error);
   const dryRun = async () => {
-    setBusy(true); setRefusal('');
+    setBusy(true); setRefusal(null);
     try { setCheck(await send<SchemaCheck>('POST', '/apps/' + encodeURIComponent(app) + '/schema/check', { replaces: version, schema })); } catch (error) { refused(error); }
     setBusy(false);
   };
   const save = async () => {
-    setBusy(true); setRefusal('');
+    setBusy(true); setRefusal(null);
     try {
       if (version === null) { await register?.(schema); } else { await send('PUT', '/apps/' + encodeURIComponent(app) + '/schema', { operation: operationId(), replaces: version, schema }); }
       sessionStorage.removeItem(storageKey(app)); setCheck(null);
@@ -141,6 +143,10 @@ export function SchemaBuilder({ app, version, initial, onSaved, register }: { ap
     } catch (error) { refused(error); }
     setBusy(false);
   };
+  // A greyed act always says why, beside it.
+  const saveWhyNot = busy ? '' : !draft.kinds.length ? 'Add a kind, or start from a template, to build the permissions.'
+    : version !== null && !check ? 'Check the change first: Lys shows what it adds and removes before it can be saved.'
+    : version !== null && check && !check.applies ? 'This change cannot be saved as it is; the check above says why.' : '';
   return <section className="sb" aria-label={'Permission template for ' + app}>
     <div className="sb-templates" role="group" aria-label="Start from a template">
       <span className="note">Start from</span>
@@ -157,7 +163,8 @@ export function SchemaBuilder({ app, version, initial, onSaved, register }: { ap
       {version === null ? null : <Act symbol="again" name="Check the change" word="Check" disabled={busy || !draft.kinds.length} onClick={() => { void dryRun(); }} />}
       {version !== null && check ? <CheckAnswer check={check} /> : null}
       <Act symbol={version === null ? 'add' : 'save'} name={version === null ? 'Register the app' : 'Save version ' + (version + 1)} word={version === null ? 'Register' : 'Save'} tone="primary" disabled={busy || !draft.kinds.length || (version !== null && (!check || !check.applies))} onClick={() => { void save(); }} />
-      {refusal ? <p role="alert" className="sb-refused">{refusal}</p> : null}
+      {saveWhyNot ? <p className="hint sb-why-not">{saveWhyNot}</p> : null}
+      {refusal ? <div className="sb-refused"><ErrorWords problem={refusal} /></div> : null}
     </div>
   </section>;
 }

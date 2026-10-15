@@ -28,6 +28,9 @@ async function readYou(): Promise<YouData> {
   return { kind: 'active', me: w.me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired'), w };
 }
 
+/** A service account's state as a person reads it; a state Lys has not named here is said as not known, never as its code. */
+const SERVICE_ACCOUNT_STATE: Record<string, string> = { registered: 'Awaiting activation', active: 'Registered', suspended: 'Suspended', retired: 'Retired' };
+
 /** An issuer URL named by its host, as a provider is shown. */
 const providerName = (provider: string): string => {
   try {
@@ -73,13 +76,13 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
         ))}
       </div>
       <div className="card" id="service-accounts">
-        <h2>Your service-account records</h2><a className="btn" href="#/people/view/accounts">Manage service accounts</a>
+        <div className="row"><h2>Your service-account records</h2><a className="btn" href="#/people/view/accounts">Manage service accounts</a></div>
         <div className="note" style={{ margin: '2px 0 6px' }}>These records name accounts. Permission to use or lend their credentials is checked separately.</div>
         {me.service_accounts.length ? (
           me.service_accounts.map((s) => (
             <div className="row" style={{ alignItems: 'flex-start' }} key={s.id}>
               <span>{s.name}<p className="note">{s.description}</p></span>
-              <span>{s.state === 'retired' ? 'Retired' : s.state === 'active' ? 'Registered' : s.state}</span>
+              <span>{SERVICE_ACCOUNT_STATE[s.state] ?? 'State not known'}</span>
             </div>
           ))
         ) : (

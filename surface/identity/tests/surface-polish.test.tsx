@@ -48,7 +48,7 @@ describe("Surface polish for new users", () => {
     expect($('.listing [data-col="Recorded change"]')?.textContent).toBe("Change 3");
     const link = $('.listing a[href*="?secret="]');
     expect(link?.getAttribute("href")).toBe("#/secrets/entries?secret=" + encodeURIComponent(key));
-    expect(link?.textContent).toBe("Visibility");
+    expect(link?.textContent).toBe("Manage");
   });
   it("shows the selected question on Ask", async () => {
     await mount("#/access/ask", SERVICE);

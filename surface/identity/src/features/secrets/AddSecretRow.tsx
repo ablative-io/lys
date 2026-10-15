@@ -11,6 +11,10 @@ import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { secretsApi } from './secretsApi';
 import type { AddedClass, SecretAdded, SecretAsked } from './secretsApi';
 import { Act } from '../../shell/Act';
+import { ClearSavedRequest } from '../people/SavedRequest';
+import { problemWords } from '../people/Words';
+import { SecretProblem } from './SecretProblem';
+import './secrets.css';
 
 /** What a pending addition keeps: everything but the value. */
 export interface PendingAddition { version: 1; operation: string; asked: SecretAsked }
@@ -46,15 +50,15 @@ export function confirmAdded(answer: unknown, pending: PendingAddition): SecretA
   throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'The service answered, but not with ' + pending.asked.name + ' added.' });
 }
 
-/** A refusal of an addition in the row's own words. */
+/** A refusal of an addition in the row's own words; any other is said by what it means, never by its code. */
 export function additionWords(error: unknown, name: string): string {
-  if (!(error instanceof Refused)) return String(error);
+  if (!(error instanceof Refused)) return problemWords(error);
   switch (error.refusal.refusal) {
     case 'SecretRetired': return 'The name ' + name + ' belonged to a secret that was retired, and a retired name is never used again. Choose another name.';
     case 'SecretExists': return 'A secret named ' + name + ' exists already. Choose another name, or change that secret’s value from its row.';
     case 'ValueEmpty': return 'Type the value to add.';
     case 'RouteInvalid': return 'Where it is used: ' + error.refusal.reason;
-    default: return error.refusal.refusal + ': ' + error.refusal.reason;
+    default: return problemWords(error);
   }
 }
 
@@ -74,13 +78,16 @@ const EMPTY: SecretAsked = { name: '', class: 'credential', upstream: '', header
 export function AddSecretRow({ person, changed }: { person: string; changed: (message: string) => void }) {
   const key = additionKey(person);
   const [restored] = useState(() => {
-    try { return { pending: savedAddition(key), error: '' }; }
-    catch (error) { return { pending: null, error: error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error) }; }
+    try { return { pending: savedAddition(key), unreadable: false }; }
+    catch { return { pending: null, unreadable: true }; }
   });
   const [pending, setPending] = useState<PendingAddition | null>(restored.pending);
   const [asked, setAsked] = useState<SecretAsked>(restored.pending?.asked ?? EMPTY);
   const [value, setValue] = useState('');
-  const [failure, setFailure] = useState(restored.error);
+  // A kept addition this tab cannot read back locks the row until it is checked and cleared.
+  const [unreadable, setUnreadable] = useState(restored.unreadable);
+  // A sentence of the row's own, or a problem said with its code folded under Error details.
+  const [failure, setFailure] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
   const release = () => { releaseRecord(key); setPending(null); };
@@ -90,7 +97,7 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (working.current || pending || restored.error) return;
+    if (working.current || pending || unreadable) return;
     const typed = { ...asked, name: asked.name.trim(), upstream: asked.upstream.trim(), header: asked.header.trim() };
     if (!plain(typed.name)) { setFailure('Give the secret a name, without control characters.'); return; }
     if (!plain(typed.upstream)) { setFailure('Say where it is used: the address its calls go to.'); return; }
@@ -98,7 +105,7 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
     if (!value) { setFailure('Type the value to add.'); return; }
     const sending: PendingAddition = { version: 1, operation: operationId(), asked: typed };
     try { keepRecord(key, sending); } catch (error) { setFailure('The addition could not be kept in this tab, so it was not sent: ' + String(error)); return; }
-    working.current = true; setBusy(true); setFailure(''); setPending(sending);
+    working.current = true; setBusy(true); setFailure(null); setPending(sending);
     const typedValue = value;
     // The value leaves the form as it is sent: it is never kept, so it is never sent again.
     setValue('');
@@ -106,12 +113,12 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
       added(confirmAdded(await secretsApi.add(typed, typedValue, sending.operation), sending));
     } catch (error) {
       if (answeredNo(error) && error instanceof Refused) release();
-      setFailure(additionWords(error, typed.name));
+      setFailure(error instanceof Refused && ['SecretRetired', 'SecretExists', 'ValueEmpty', 'RouteInvalid'].includes(error.refusal.refusal) ? additionWords(error, typed.name) : error);
     } finally { working.current = false; setBusy(false); }
   };
   const check = async () => {
     if (!pending || working.current) return;
-    working.current = true; setBusy(true); setFailure('');
+    working.current = true; setBusy(true); setFailure(null);
     try {
       const found = await checkAddition(pending);
       if (found === 'added') {
@@ -128,28 +135,37 @@ export function AddSecretRow({ person, changed }: { person: string; changed: (me
       setFailure('Lys could not tell whether ' + pending.asked.name + ' was added: ' + additionWords(error, pending.asked.name));
     } finally { working.current = false; setBusy(false); }
   };
-  const blocked = busy || pending !== null || Boolean(restored.error);
+  const blocked = busy || pending !== null || unreadable;
   const id = 'add-secret-' + person.replace(/[^A-Za-z0-9_-]/g, '_');
   const set = (part: Partial<SecretAsked>) => setAsked({ ...asked, ...part });
+  // One row across the whole table: a labelled field for each part, the address it is sent to given the room a web address needs.
   return <tr className="listing-add" data-add="secret">
-    <td><form id={id} aria-label="Add a secret" onSubmit={(event) => { void submit(event); }}>
-      <input name="name" aria-label="Name of the secret to add" placeholder="Name" value={asked.name} disabled={blocked} onChange={(event) => set({ name: event.target.value })} />
-    </form></td>
-    <td><select form={id} name="class" aria-label="Kind of secret" value={asked.class} disabled={blocked} onChange={(event) => set({ class: event.target.value === 'key' ? 'key' : 'credential' as AddedClass })}>
-      <option value="credential">A credential</option><option value="key">A key</option>
-    </select></td>
-    {/* Where a secret is used is entered here and never listed: the cell spans the two columns a secret not yet added has nothing for, and each input says what it is. */}
-    <td colSpan={2} className="secret-where">
-      <label className="sec">Sent to <input form={id} name="upstream" aria-label="Where it is used" placeholder="https://…" value={asked.upstream} disabled={blocked} onChange={(event) => set({ upstream: event.target.value })} /></label>
-      <label className="sec">In the header <input form={id} name="header" aria-label="Header it travels in" value={asked.header} disabled={blocked} onChange={(event) => set({ header: event.target.value })} /></label>
-      <label className="sec">After the text <input form={id} name="prefix" aria-label="Text before it in that header" value={asked.prefix} disabled={blocked} onChange={(event) => set({ prefix: event.target.value })} /></label>
-    </td>
-    <td>
-      <input form={id} name="value" type="password" autoComplete="new-password" aria-label="Value" placeholder="Value, shown never again" value={value} disabled={blocked} onChange={(event) => setValue(event.target.value)} />
-      {pending ? <div role="status"><p>Adding {pending.asked.name} is not confirmed. What you entered is kept, except the value, which is never kept.</p>
-        <Act symbol="again" name="Check whether it was added" word="Check" disabled={busy} onClick={() => { void check(); }} /></div> : null}
-      {failure ? <p className="why-not" role="alert">{failure}</p> : null}
-      <Act symbol="add" name="Add this secret" word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
+    <td colSpan={5}>
+      <form id={id} className="add-secret" aria-label="Add a secret" noValidate onSubmit={(event) => { void submit(event); }}>
+        <h3>Add a secret</h3>
+        <div className="form-grid">
+          <div className="field"><label htmlFor={id + '-name'}>Name</label>
+            <input id={id + '-name'} name="name" aria-label="Name of the secret to add" value={asked.name} disabled={blocked} onChange={(event) => set({ name: event.target.value })} /></div>
+          <div className="field"><label htmlFor={id + '-class'}>Kind</label>
+            <select id={id + '-class'} name="class" aria-label="Kind of secret" value={asked.class} disabled={blocked} onChange={(event) => set({ class: event.target.value === 'key' ? 'key' : 'credential' as AddedClass })}>
+              <option value="credential">A credential</option><option value="key">A key</option>
+            </select></div>
+          <div className="field wide"><label htmlFor={id + '-upstream'}>Sent to <span className="hint">the web address its calls go to</span></label>
+            <input id={id + '-upstream'} name="upstream" type="url" inputMode="url" aria-label="Where it is used" placeholder="https://api.example.com" value={asked.upstream} disabled={blocked} onChange={(event) => set({ upstream: event.target.value })} /></div>
+          <div className="field"><label htmlFor={id + '-header'}>In the header</label>
+            <input id={id + '-header'} name="header" aria-label="Header it travels in" value={asked.header} disabled={blocked} onChange={(event) => set({ header: event.target.value })} /></div>
+          <div className="field"><label htmlFor={id + '-prefix'}>After the text <span className="hint">such as “Bearer ”; may be empty</span></label>
+            <input id={id + '-prefix'} name="prefix" aria-label="Text before it in that header" value={asked.prefix} disabled={blocked} onChange={(event) => set({ prefix: event.target.value })} /></div>
+          <div className="field"><label htmlFor={id + '-value'}>Value <span className="hint">sent once, then kept sealed</span></label>
+            <input id={id + '-value'} name="value" type="password" autoComplete="new-password" aria-label="Value" value={value} disabled={blocked} onChange={(event) => setValue(event.target.value)} /></div>
+        </div>
+        {pending ? <div role="status"><p>Adding {pending.asked.name} is not confirmed. What you entered is kept, except the value, which is never kept.</p>
+          <Act symbol="again" name="Check whether it was added" word="Check" disabled={busy} onClick={() => { void check(); }} /></div> : null}
+        {unreadable ? <ClearSavedRequest what="secret addition" keys={[key]} cleared={() => setUnreadable(false)}
+          check="Look for the secret in the list above: if it is there, it was added. Then clear the saved addition to add another." /> : null}
+        <SecretProblem problem={failure} />
+        <Act symbol="add" name="Add this secret" word="Add" tone="primary" type="submit" disabled={blocked} />
+      </form>
     </td>
   </tr>;
 }

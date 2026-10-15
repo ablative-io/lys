@@ -12,7 +12,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { operationId } from '../../api';
 import { Act } from '../../shell/Act';
 import { send } from './SchemaBuilder';
-import { SchemaTable, refusalWords } from './Apps';
+import { STATE_WORDS, SchemaTable, refusalWords } from './Apps';
 import type { AppRecord } from './Apps';
 
 /** An app Lys knows how to connect, built into the surface. */
@@ -46,7 +46,7 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
   // The address takes the card's whole width on its own line, its label above it and the acts under it.
   return <div aria-label={'Known app ' + known.id}>
     <div className="row">
-      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ?? 'not connected'}</span></span>
+      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ? STATE_WORDS[state] : 'Not connected'}</span></span>
       {asking ? null : <Act symbol="add" name={'Connect ' + known.name} word={state === 'approved' ? 'Connect again' : 'Connect'} tone="primary" onClick={() => setAsking(true)} />}
     </div>
     {asking ? <div className="app-connect">
@@ -138,5 +138,6 @@ export function ConnectApp() {
       </div>
     </> : refusal ? null : <p className="dim">Reading the app’s manifest…</p>}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
+    {refusal && !manifest ? <p><a className="btn" href="#/apps">Back to Apps</a></p> : null}
   </section></div>;
 }

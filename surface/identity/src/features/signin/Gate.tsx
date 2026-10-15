@@ -5,6 +5,7 @@ import type { Load, Refused } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
 import { AccountHelp } from './AccountHelp';
 import { LysMark } from '../../shell/LysMark';
+import { ErrorWords } from '../people/Words';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
@@ -29,19 +30,27 @@ export function SignIn() {
   );
 }
 
-/** A refusal shown with the service's own name and reason. */
+/** The heading a refusal page carries: what happened, in words, never the refusal's code. */
+function refusedHeading(refused: Refused): string {
+  if (refused.status === 0 || refused.status >= 500) return 'The service could not complete this request';
+  if (refused.refusal.refusal === 'NoPerson') return 'Your account needs access';
+  if (refused.status === 403) return 'You do not have access to this';
+  if (refused.status === 404) return 'This could not be found';
+  return 'Lys could not open this';
+}
+
+/** A refusal shown in plain words, its code and the service's own reason kept in the Error details fold. */
 export function RefusedPage({ refused, title }: { refused: Refused; title: string }) {
   if (refused.status === 401) return <SignIn />;
   const serviceFailure = refused.status === 0 || refused.status >= 500;
   return (
     <div className="page">
       <div className="eyebrow">{title}</div>
-      <h1>{serviceFailure ? 'The service could not complete this request' : refused.refusal.refusal === 'NoPerson' ? 'Your account needs access' : 'Refused'}</h1>
+      <h1>{refusedHeading(refused)}</h1>
       {serviceFailure ? <p>If you were making a change, keep its original request until its outcome is confirmed. Do not submit it again as a new change.</p> : null}
       {refused.refusal.refusal === 'NoPerson' ? <p>Your sign-in worked, but your account has not been connected to the directory yet. Ask your administrator to connect it on the Credentials tab of your page in People and agents.</p> : null}
-      <div className="why-not">
-        <b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span>
-      </div>
+      <ErrorWords problem={refused} />
+      <p><a className="btn" href="#/">Back to the start</a></p>
     </div>
   );
 }

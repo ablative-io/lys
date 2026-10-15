@@ -289,7 +289,7 @@ export function Setup({ completed }: { completed: () => void }) {
         : error ? <div role="alert" className="why-not">
           <b>Setup could not be confirmed.</b>
           <p>{pending ? 'Your request is saved. Choose Retry setup to check it safely.' : 'Your browser could not save the request. Nothing has been submitted. Check browser storage before trying again.'}</p>
-          <p><small className="refusal-name">{error}</small></p>
+          <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{error}</p></details>
         </div> : null}
         <Act symbol="approve" name={busy ? 'Finishing setup…' : pending ? 'Retry setup' : 'Finish setup'} word={busy ? 'Finishing…' : pending ? 'Retry' : 'Finish'} tone="primary" type="submit" disabled={busy || Boolean(saved.error)} />
         <p role="status" aria-live="polite">{busy ? 'Saving your account. You can stay on this page.' : ''}</p>

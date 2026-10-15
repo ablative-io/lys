@@ -6,10 +6,10 @@
  * page, whatever else an answer carries.
  */
 import { useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Refused, useLoad } from '../../api';
 import { clock } from '../file/time';
-import { IdentityName } from '../people/Words';
+import { IdentityName, refusalWords } from '../people/Words';
 import { Gate } from '../signin/Gate';
 import type {
   Recipients,
@@ -25,13 +25,14 @@ import { pendingKey, unconfirmed } from './pendingChange';
 import { useOwnerChange } from './useOwnerChange';
 import type { PendingStore } from './pendingChange';
 import { Act } from '../../shell/Act';
+import { SecretProblem } from './SecretProblem';
 
 const refusedOf = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
 
-/** A refusal by its name and the service's reason. */
+/** A refusal in plain words; its name and the service's reason are kept under Error details. */
 export function RefusalLine({ refused }: { refused: Refused }) {
-  return <div className="why-not"><b>{refused.refusal.refusal}</b> <span className="sec">{refused.refusal.reason}</span></div>;
+  return <SecretProblem problem={refused} />;
 }
 
 /** The tab already names the view; this says what it holds. */
@@ -88,15 +89,21 @@ const KIND_WORDS: Record<SecretAuditKind, string> = {
   spawn_login: 'Seat sign-in handed over',
 };
 
+/** What came of an audit line, in words; a refusal by what it means, its name kept for hovering. */
+const OUTCOME_WORDS: Record<string, string> = { issued: 'Issued', admitted: 'Allowed', dropped: 'Ended' };
+export function outcomeWords(outcome: string): string {
+  return OUTCOME_WORDS[outcome] ?? refusalWords(outcome) ?? 'Refused';
+}
+
 /** The log's lines by index, highest first: the broker numbers lines in the order it wrote them. */
 export function AuditRows({ log, check }: { log: SecretAuditLog; check?: (handle: string) => Promise<RevocationAnswer> }) {
   if (!log.lines.length) return <p className="note">Nothing is recorded yet on the secrets you can see.</p>;
   const lines = [...log.lines].sort((a, b) => b.index - a.index);
-  return <table><thead><tr><th>#</th><th>When</th><th>What</th><th>Secret</th><th>For</th><th>Handle id</th><th>Uses so far</th><th>Outcome</th>{check ? <th>Revocation</th> : null}</tr></thead>
+  return <table><thead><tr><th>Line</th><th>When</th><th>What</th><th>Secret</th><th>For</th><th>Handle</th><th>Uses so far</th><th>Outcome</th>{check ? <th>Revocation</th> : null}</tr></thead>
     <tbody>{lines.map((line) => <tr key={line.index}>
       <td>{line.index}</td><td>{clock(Math.floor(line.at_ms / 1000))}</td><td>{KIND_WORDS[line.kind] ?? line.kind}</td>
       <td>{line.secret ?? ''}</td><td>{line.identity ? <IdentityName id={line.identity} /> : ''}</td><td>{line.handle ?? ''}</td>
-      <td>{line.uses === null ? '' : line.uses}</td><td>{line.outcome}</td>
+      <td>{line.uses === null ? '' : line.uses}</td><td title={line.outcome}>{outcomeWords(line.outcome)}</td>
       {check ? <td>{line.handle ? <RevocationCheck handle={line.handle} check={check} /> : null}</td> : null}
     </tr>)}</tbody>
   </table>;
@@ -170,7 +177,7 @@ export const maySend = (outcome: ChangeOutcome<unknown>): boolean => outcome.at 
 
 const UNKNOWN_NOTE = 'It is not known whether this change was made. Its original request is retained. Retry original change checks that same operation without creating another change.';
 
-export function ChangeView<T>({ outcome, done }: { outcome: ChangeOutcome<T>; done: (answer: T) => string }) {
+export function ChangeView<T>({ outcome, done }: { outcome: ChangeOutcome<T>; done: (answer: T) => ReactNode }) {
   switch (outcome.at) {
     case 'editing': return null;
     case 'sending': return <p className="note">Saving…</p>;
@@ -221,6 +228,13 @@ export function scopeWords(scope: string): string {
   return scope;
 }
 
+/** A scope said in words, a person named by their name and never by their id. */
+export function ScopeName({ scope }: { scope: string }) {
+  const [kind, ...rest] = scope.split('/');
+  if (kind === 'person' && rest.length) return <>the person <IdentityName id={rest.join('/')} /></>;
+  return <>{scopeWords(scope)}</>;
+}
+
 const SCOPE_KINDS: readonly ScopeKind[] = ['personal', 'team', 'organisation'];
 const RECIPIENTS: readonly Recipients[] = ['anyone', 'people_only'];
 
@@ -268,7 +282,7 @@ export function ScopeChange({ change, secret: initial = '', store = tabStore(), 
     {teams ? <datalist id="scope-teams">{teams.map((team) => <option key={team} value={team} />)}</datalist> : null}
     <Act symbol="save" name="Save who can see this secret" word="Save" tone="primary" type="submit" disabled={!maySend(outcome) || !ready} />
     {retry ? <Act symbol="retry" name="Retry original change" word="Retry" onClick={retry} /> : null}
-    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${scopeWords(answer.scope)}.`} />
+    <ChangeView outcome={outcome} done={(answer) => <>{answer.secret} is now visible to <ScopeName scope={answer.scope} />.</>} />
   </form>;
 }
 
@@ -302,6 +316,6 @@ export function RecipientsChange({ change, secret: initial = '', store = tabStor
     </select></label>
     <Act symbol="save" name="Save who it can be handed to" word="Save" tone="primary" type="submit" disabled={!maySend(outcome) || !ready} />
     {retry ? <Act symbol="retry" name="Retry original change" word="Retry" onClick={retry} /> : null}
-    <ChangeView outcome={outcome} done={(answer) => `${answer.secret}: confirmed change to ${RECIPIENT_WORDS[answer.recipients]}.`} />
+    <ChangeView outcome={outcome} done={(answer) => `${answer.secret} can now be handed to ${RECIPIENT_WORDS[answer.recipients]}.`} />
   </form>;
 }

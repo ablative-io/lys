@@ -10,6 +10,8 @@ import { operationId, Refused } from '../../api';
 import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import { secretsApi } from './secretsApi';
 import { Act } from '../../shell/Act';
+import { SecretProblem } from './SecretProblem';
+import { ClearSavedRequest } from '../people/SavedRequest';
 
 /** A kept change of one secret: its operation, never a value. */
 export interface PendingChange { version: 1; operation: string; secret: string }
@@ -30,16 +32,17 @@ export function savedChange(key: string, secret: string): PendingChange | null {
   return { version: 1, operation: value.operation, secret };
 }
 
-const words = (error: unknown): string => error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error);
-
 /** The kept change under `key`, what failed, and whether a send is in flight. */
 function useKept(key: string, secret: string) {
   const [restored] = useState(() => {
-    try { return { pending: savedChange(key, secret), error: '' }; }
-    catch (error) { return { pending: null, error: words(error) }; }
+    try { return { pending: savedChange(key, secret), unreadable: false }; }
+    catch { return { pending: null, unreadable: true }; }
   });
   const [pending, setPending] = useState<PendingChange | null>(restored.pending);
-  const [failure, setFailure] = useState(restored.error);
+  // A kept change this tab cannot read back locks the form until it is checked and cleared; nothing is guessed from it.
+  const [unreadable, setUnreadable] = useState(restored.unreadable);
+  // A sentence the form says itself, or a problem said through ErrorWords with its code folded away.
+  const [failure, setFailure] = useState<unknown>(null);
   const [done, setDone] = useState('');
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
@@ -48,10 +51,22 @@ function useKept(key: string, secret: string) {
   /** Run `act` once at a time, saying what failed. */
   const once = async (act: () => Promise<void>) => {
     if (working.current) return;
-    working.current = true; setBusy(true); setFailure(''); setDone('');
-    try { await act(); } catch (error) { setFailure(words(error)); } finally { working.current = false; setBusy(false); }
+    working.current = true; setBusy(true); setFailure(null); setDone('');
+    try { await act(); } catch (error) { setFailure(error); } finally { working.current = false; setBusy(false); }
   };
-  return { pending, failure, setFailure, done, setDone, busy, keep, release, once, blocked: busy || pending !== null || Boolean(restored.error) };
+  return { key, pending, failure, setFailure, done, setDone, busy, keep, release, once, unreadable, cleared: () => setUnreadable(false), blocked: busy || pending !== null || unreadable };
+}
+
+/** What failed, said once: a sentence of the form's own, or a problem with its code folded under Error details. */
+function Failure({ failure }: { failure: unknown }) {
+  return <SecretProblem problem={failure} />;
+}
+
+/** A kept change that cannot be read back: where to look, and the one act that unlocks the form. */
+function Unreadable({ kept, what }: { kept: ReturnType<typeof useKept>; what: string }) {
+  if (!kept.unreadable) return null;
+  return <ClearSavedRequest what={what} keys={[kept.key]} cleared={kept.cleared}
+    check="Look at this secret’s current settings and its Activity to see whether the change was made before you clear it." />;
 }
 
 /** A new value for `secret`, from its owner. */
@@ -97,7 +112,8 @@ export function ReplaceValue({ secret, changed }: { secret: string; changed: () 
     {kept.pending ? <div role="status"><p>This change is not confirmed. The new value was not kept, so it is not sent again.</p>
       <Act symbol="again" name="Check whether it was changed" word="Check" disabled={kept.busy} onClick={check} /></div> : null}
     {kept.done ? <p className="note" role="status">{kept.done}</p> : null}
-    {kept.failure ? <p className="why-not" role="alert">{kept.failure}</p> : null}
+    <Failure failure={kept.failure} />
+    <Unreadable kept={kept} what={'change of ' + secret + '’s value'} />
   </form>;
 }
 
@@ -135,6 +151,7 @@ export function RetireSecret({ secret, retired }: { secret: string; retired: (me
     <Act symbol="retire" name="Retire this secret" word="Retire" tone="danger" type="submit" disabled={kept.blocked || !sure} />
     {kept.pending ? <div role="status"><p>Retiring {secret} is not confirmed. Its original request is kept.</p>
       <Act symbol="again" name="Check whether it was retired" word="Check" disabled={kept.busy} onClick={() => { if (kept.pending) send(kept.pending); }} /></div> : null}
-    {kept.failure ? <p className="why-not" role="alert">{kept.failure}</p> : null}
+    <Failure failure={kept.failure} />
+    <Unreadable kept={kept} what={'retirement of ' + secret} />
   </form>;
 }

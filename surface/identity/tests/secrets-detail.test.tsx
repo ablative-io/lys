@@ -1,4 +1,5 @@
 /** The secrets detail screens render chosen metadata only, and name every refusal. */
+import { refusalWords } from '../src/features/people/Words';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { Refused } from '../src/api';
@@ -54,8 +55,11 @@ describe('Secret audit', () => {
   ] };
   it('renders each line with its fields, newest (highest index) first, and not the verifying key', () => {
     const html = renderToStaticMarkup(<AuditRows log={log} />);
-    for (const text of ['Handle issued', 'Used', 'calendar', 'agent-reader', 'a1b2c3', 'issued', 'LeaseExhausted']) expect(html).toContain(text);
-    expect(html.indexOf('LeaseExhausted')).toBeLessThan(html.indexOf('>issued<'));
+    for (const text of ['Handle issued', 'Used', 'calendar', 'agent-reader', 'a1b2c3', '>Issued<', '>' + (refusalWords('LeaseExhausted') ?? 'Refused') + '<']) expect(html).toContain(text);
+    // Each outcome is said in words; its name is kept for hovering, never as the cell's words.
+    expect(html).not.toContain('>LeaseExhausted<');
+    expect(html).not.toContain('>issued<');
+    expect(html.indexOf('title="LeaseExhausted"')).toBeLessThan(html.indexOf('title="issued"'));
     expect(html).not.toContain('audit-public-key');
   });
   it('never renders extra credential-shaped fields', () => {

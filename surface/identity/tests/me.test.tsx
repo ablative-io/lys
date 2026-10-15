@@ -53,7 +53,10 @@ describe('You', () => {
 
   it('names the refusal when the login is bound to no person', async () => {
     await mount('#/me', { ...SERVICE, '/me': refused(403, 'NoPerson', 'NoPerson: the signed-in login is bound to no person') });
-    expect($('.why-not b')?.textContent).toBe('NoPerson');
+    expect($('h1')?.textContent).toBe('Your account needs access');
+    // The refusal's name is kept under Error details, never said in the sentence a person reads.
+    expect($('.why-not details .refusal-name')?.textContent).toContain('NoPerson');
+    expect($('.why-not > p')?.textContent).not.toContain('NoPerson');
   });
 });
 

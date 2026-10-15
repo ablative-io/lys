@@ -18,7 +18,7 @@ it('shows Cambium as a known app with its state and a Connect button that asks f
   await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [] }) });
   const card = document.querySelector('[aria-label="Known apps"]');
   expect(card?.textContent).toContain('Cambium');
-  expect(card?.textContent).toContain('not connected');
+  expect(card?.textContent).toContain('Not connected');
   await click(button('Connect Cambium'));
   const field = document.querySelector<HTMLInputElement>('input[aria-label="Cambium web address"]');
   expect(field?.placeholder).toBe('https://cambium.example.com');

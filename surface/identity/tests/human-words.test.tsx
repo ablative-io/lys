@@ -234,6 +234,10 @@ it('does not let the saved approval hide a later retirement answer', async () =>
   await clickNamed(view, 'Approve Notes');
   expect(reads).toBe(1);
   await clickNamed(view, 'Retire Notes');
+  // Retiring is asked about first: nothing is sent until it is confirmed.
+  expect(retired).toBe(false);
+  expect(view.querySelector('[role="group"][aria-label="Retire Notes?"]')?.textContent).toContain('This cannot be undone.');
+  await clickNamed(view, 'Retire Notes for good');
   expect(view.querySelector('article .app-state')?.textContent).toBe('Retired');
   expect([...view.querySelectorAll('button')].some((entry) => entry.getAttribute('aria-label') === 'Retire Notes')).toBe(false);
 });

@@ -95,7 +95,7 @@ function ByName({ by, me }: { by: By; me: MeView | null }) {
   return by.kind === 'operator' ? <>the install operator for <IdentityName id={me.person.id} /></> : <IdentityName id={me.person.id} />;
 }
 /** An app's state as a person reads it. */
-const STATE_WORDS: Record<AppRecord['state'], string> = { pending: 'Waiting for your approval', approved: 'Approved', declined: 'Declined', retired: 'Retired' };
+export const STATE_WORDS: Record<AppRecord['state'], string> = { pending: 'Waiting for your approval', approved: 'Approved', declined: 'Declined', retired: 'Retired' };
 const path = (id: string, rest: string) => '/apps/' + encodeURIComponent(id) + rest;
 /** A refusal as a sentence a person reads: the plain reason only, never its code. A screen that can fold the code away shows ErrorWords instead. */
 export const refusalWords = (error: unknown): string => problemWords(error);
@@ -152,6 +152,7 @@ export function Apps() {
       return <>
         <KnownApps apps={apps} />
         {apps.length ? <nav className="app-picker" aria-label="Apps">
+          <span className="note">Apps on this Lys</span>
           {apps.map((app) => <button type="button" key={app.id} className={'app-choice' + (app.id === open?.id ? ' on' : '')} aria-pressed={app.id === open?.id} onClick={() => setPicked(app.id)}>
 {app.name}</button>)}
         </nav> : null}
@@ -169,13 +170,15 @@ export function Apps() {
 /** The sign-in settings' two fields: the return addresses, one to a line, and whether the app is given the person's name. */
 function SignInFields({ redirects, setRedirects, profile, setProfile, app, name }: { redirects: string; setRedirects: (text: string) => void; profile: boolean; setProfile: (on: boolean) => void; app: string; name: string }) {
   return <>
-    <label className="field">Return addresses the sign-in may send a person back to, one to a line<textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} aria-label={'Return addresses of ' + app} /></label>
+    <label className="field app-addresses-field">Return addresses the sign-in may send a person back to, one to a line<textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} aria-label={'Return addresses of ' + app} /></label>
     <label className="tick" title={app}><input type="checkbox" checked={profile} onChange={(event) => setProfile(event.target.checked)} /> Give {name} the person’s name</label>
   </>;
 }
 
 function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeView | null; edit: () => void; approved: (answer: AppRecord) => void; stored: StoredCredentials | null; saved: (answer: StoredCredentials) => void; app: AppRecord; changed: (message: string) => void }) {
   const [reason, setReason] = useState('');
+  // Retiring ends every client credential the app holds, so it is asked about first, with its reason, and can be cancelled.
+  const [retiring, setRetiring] = useState(false);
   const [refusal, setRefusal] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   // The settings offered to approve are the registration's; what is sent is what is kept.
@@ -204,7 +207,7 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
     {stored ? <CustodyConfirmed answer={stored} /> : null}
     {app.state === 'pending' ? <div className="app-actions app-signin">
       <SignInFields app={app.id} name={app.name} redirects={redirects} setRedirects={setRedirects} profile={profile} setProfile={setProfile} />
-      <label className="field">Why, if you decline<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
+      <label className="field">Why, if you decline <span className="hint">optional; the app is told</span><input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
       <Act symbol="approve" name={'Approve ' + app.name} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/approve', { redirects: lines(redirects), profile }, (answer) => { const approval = approvalAnswer(answer, app.id); if (approval.credentials) saved(approval.credentials); approved(approval.app); }); }} />
       <Act symbol="decline" name={'Decline ' + app.name} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/decline', { reason }, () => changed(app.name + ' was declined and never took effect.')); }} />
     </div> : null}
@@ -212,6 +215,7 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
       <b>A change to its permissions waits for you, from <ByName by={app.pending.by} me={me} /></b>
       <RoleChanges before={app.schema} after={app.pending.schema} app={app.id} />
       <SchemaTable app={app.id} schema={app.pending.schema} label={'Schema waiting for ' + app.id} />
+      {app.state === 'pending' ? null : <label className="field">Why, if you decline the change <span className="hint">optional; the app is told</span><input value={reason} onChange={(event) => setReason(event.target.value)} /></label>}
       <Act symbol="approve" name={'Approve the change'} word="Approve" tone="primary" disabled={busy} onClick={() => { void act('/schema/approve', {}, () => changed('The change to ' + app.name + ' is approved.')); }} />
       <Act symbol="decline" name={'Decline the change'} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }} />
     </div> : null}
@@ -219,7 +223,13 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
     {(app.state === 'approved' || app.state === 'retired') && app.id !== LYS ? <ClientCredentials app={app} /> : null}
     {app.state === 'approved' && app.id !== LYS ? <div className="app-actions">
       <Act symbol="edit" name="Edit the permission template" word="Template" onClick={edit} />
-      <Act symbol="retire" name={'Retire ' + app.name} word="Retire" tone="danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: every client credential it held is refused, and its grants stay readable.')); }} />
+      {retiring ? null : <Act symbol="retire" name={'Retire ' + app.name} word="Retire" tone="danger" disabled={busy} onClick={() => { setReason(''); setRetiring(true); }} />}
+    </div> : null}
+    {app.state === 'approved' && app.id !== LYS && retiring ? <div className="app-actions app-retire" role="group" aria-label={'Retire ' + app.name + '?'}>
+      <p>Retire {app.name}? Nobody can sign in to it with Lys again, and every client credential it holds is refused. Its grants stay readable. This cannot be undone.</p>
+      <label className="field">Why <span className="hint">optional; kept with the retirement</span><input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
+      <Act symbol="retire" name={'Retire ' + app.name + ' for good'} word="Retire for good" tone="danger" disabled={busy} onClick={() => { void act('/retire', { reason }, () => changed(app.name + ' is retired: every client credential it held is refused, and its grants stay readable.')); }} />
+      <Act symbol="close" name={'Keep ' + app.name} word="Cancel" disabled={busy} onClick={() => setRetiring(false)} />
     </div> : null}
     {refusal ? <ErrorWords problem={refusal} /> : null}
   </article>;
@@ -252,14 +262,21 @@ function Register({ changed }: { changed: (message: string) => void }) {
   const register = async (schema: SchemaJson) => {
     await send('POST', '/apps', { operation: operationId(), id, name: name.trim(), redirects: redirects.map((address) => address.trim()).filter(Boolean), schema });
   };
+  const idWhy = id === '' ? 'Give the app an id.' : id === LYS ? 'The id lys is Lys’s own. Choose another.'
+    : /^[a-z][a-z0-9_]{2,39}$/.test(id) ? '' : 'An id is 3 to 40 characters: lowercase letters, digits and underscores, starting with a letter.';
   return <section className="card" aria-label="Register an app">
     <h3>Register an app</h3>
-    <label className="field">App id, its kinds' prefix<input value={id} onChange={(event) => setId(event.target.value.trim())} placeholder="lowercase letters, digits and underscores" /></label>
-    <label className="field">Name<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-    <fieldset className="field"><legend>Return addresses it asks for</legend>
-      {redirects.map((address, at) => <input key={at} value={address} aria-label={'Return address ' + (at + 1)} placeholder="https://app.example.com/callback" onChange={(event) => setRedirects(redirects.map((held, index) => (index === at ? event.target.value : held)))} />)}
+    <div className="form-grid">
+      <label className="field">App id <span className="hint">3 to 40 lowercase letters, digits or underscores; it starts every permission name the app uses, such as notes.document</span><input value={id} onChange={(event) => setId(event.target.value.trim())} autoComplete="off" spellCheck={false} required aria-invalid={id !== '' && idWhy !== ''} /></label>
+      <label className="field">Name <span className="hint">as people will see it</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label>
+    </div>
+    <fieldset className="field"><legend>Return addresses it asks for <span className="hint">where the app’s sign-in sends a person back to</span></legend>
+      {redirects.map((address, at) => <div className="app-address-row" key={at}>
+        <input value={address} type="url" inputMode="url" aria-label={'Return address ' + (at + 1)} placeholder="https://app.example.com/callback" onChange={(event) => setRedirects(redirects.map((held, index) => (index === at ? event.target.value : held)))} />
+        {redirects.length > 1 ? <Act symbol="remove" name={'Remove return address ' + (at + 1)} onClick={() => setRedirects(redirects.filter((_, index) => index !== at))} /> : null}
+      </div>)}
       <Act symbol="add" name="Add another address" word="Add another address" onClick={() => setRedirects([...redirects, ''])} />
     </fieldset>
-    {ready ? <SchemaBuilder key={id} app={id} version={null} register={register} onSaved={changed} /> : <p className="note">Name the app and give it an id to build its permission template.</p>}
+    {ready ? <SchemaBuilder key={id} app={id} version={null} register={register} onSaved={changed} /> : <p className="note why-not">{idWhy || 'Give the app a name.'} Its permission template is built here once it has an id and a name.</p>}
   </section>;
 }

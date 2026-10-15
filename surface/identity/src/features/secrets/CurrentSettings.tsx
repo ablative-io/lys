@@ -1,7 +1,7 @@
 /** Read current broker settings without treating a read as a receipt for an uncertain write. */
 import { useLoad } from '../../api';
 import { Gate } from '../signin/Gate';
-import { scopeWords } from './SecretsDetail';
+import { ScopeName } from './SecretsDetail';
 import { secretsApi } from './secretsApi';
 
 export function CurrentSettings({ secret, revision }: { secret: string; revision: number }) {
@@ -15,9 +15,9 @@ export function CurrentSettings({ secret, revision }: { secret: string; revision
   }, 'secret-settings:' + secret + ':' + revision);
   return <section className="card" aria-label="Current secret settings">
     <h2>Current settings</h2><Gate load={load} title="Secret settings" ok={(settings) => <>
-      <p>Visible to: {settings.scope === null ? 'no scope recorded' : scopeWords(settings.scope)}.</p>
+      <p>Visible to: {settings.scope === null ? 'not set yet' : <ScopeName scope={settings.scope} />}.</p>
       <p>May be handed to: {settings.recipients === 'people_only' ? 'people only' : 'anyone who is permitted'}.</p>
     </>} />
-    <p className="note">These are the broker's current values. A change with an unknown outcome remains held until its own result is confirmed.</p>
+    <p className="note">This is what Lys secrets holds now. A change whose outcome is not known stays held below until it is confirmed.</p>
   </section>;
 }

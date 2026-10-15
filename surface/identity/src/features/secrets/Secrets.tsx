@@ -32,6 +32,9 @@ export interface SecretListing {
 
 type Secret = SecretListing['secrets'][number];
 
+/** What kind of secret each is, in words. */
+export const CLASS_WORDS: Record<Secret['class'], string> = { credential: 'Credential', key: 'Key', memory: 'Agent memory', oauth: 'Sign-in token' };
+
 export function Secrets({ read }: { read: () => Promise<SecretListing> }) {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState('');
@@ -59,16 +62,16 @@ export function SecretRows({ listing, people, teams = [], me = '', whose = { kin
   const groups = groupByTeam(scoped, held, teams, whose, (id) => names.get(id) ?? 'someone outside your view');
   const columns: Column<Secret>[] = [
     { head: 'Name', cell: (entry) => <RecordName id={entry.name} name={secretName(entry.name, names)} /> },
-    { head: 'Kind', cell: (entry) => <span className="sec">{entry.class}</span> },
+    { head: 'Kind', cell: (entry) => <span className="sec">{CLASS_WORDS[entry.class] ?? 'Other'}</span> },
     { head: 'Owner', cell: (entry) => <IdentityName id={entry.owner} people={people} /> },
     { head: 'Recorded change', cell: (entry) => <span className="sec">Change {entry.sequence}</span> },
-    { head: 'Change', cell: (entry) => <a className="btn" aria-label="Visibility and who may receive it" title="Visibility and who may receive it" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Visibility</a> },
+    { head: 'Change', cell: (entry) => <a className="btn" aria-label={'Manage ' + secretName(entry.name, names)} title="Who can see it, who it can be handed to, its value, or retire it" href={'#/secrets/entries?secret=' + encodeURIComponent(entry.name)}>Manage</a> },
   ];
   return <>
     <SecretControls listing={listing} changed={changed} />
     <div className="body one">
     <Listing<Secret> groups={groups} columns={columns} id={(entry) => entry.name} href={(entry) => '#/secrets/entries?secret=' + encodeURIComponent(entry.name)}
-      words={(entry) => entry.name + ' ' + entry.class + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" empty="No secret is visible to this account." holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
+      words={(entry) => entry.name + ' ' + secretName(entry.name, names) + ' ' + (CLASS_WORDS[entry.class] ?? '') + ' ' + (names.get(entry.owner) ?? '')} noun="secrets" empty="No secret is visible to this account." holds={(items) => items.length + (items.length === 1 ? ' secret' : ' secrets')}
       selected={null} select={() => undefined} tools={tools}
       foot={me && changed ? <AddSecretRow person={me} changed={changed} /> : undefined} />
     </div>

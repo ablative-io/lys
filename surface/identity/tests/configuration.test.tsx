@@ -4,7 +4,7 @@ import { $, $$, click, mount, settle, text, type, unreachable } from './harness'
 import { SERVICE, ok, refused } from './fixtures';
 const settings = { source: 'startup_configuration', mutable_in_browser: false, sign_in: { provider_origin: 'https://login.test', session_seconds: 3600, secure_cookie: true }, directory: { roles_configured: true }, permissions: { model_version: 8, projection: 'spicedb' }, secrets: { configured: true }, runtimes: { machines_configured: true, provisioning_configured: true }, storage: { directory_format: 'signed_leaf_log', grant_format: 'signed_leaf_log', requests_configured: true }, client_secret: 'never-render-this-extra-value' };
 describe('Effective configuration', () => {
-  it.each([['signin', '1 hour'], ['directory', 'Role records'], ['permissions', 'SpiceDB'], ['secrets', 'Broker: Configured'], ['runtimes', 'Provisioning records'], ['storage', 'Signed record log']])('reads %s from the configured service', async (section, expected) => {
+  it.each([['signin', '1 hour'], ['directory', 'Role records'], ['permissions', 'SpiceDB'], ['secrets', 'Secret storage: Set up'], ['runtimes', 'Provisioning records'], ['storage', 'Signed record log']])('reads %s from the configured service', async (section, expected) => {
     const { posted, requests } = await mount('#/settings/' + section, { ...SERVICE, '/configuration': ok(settings) });
     expect(requests).toContain('/configuration'); expect(text()).toContain(expected);
     if (section === 'storage') expect($$('[title="signed_leaf_log"]').length).toBe(2);
@@ -42,6 +42,10 @@ describe('Effective configuration', () => {
     expect($$('[data-model]')).toEqual([]);
     await click($('[data-act="save-model-windows"]'));
     await settle();
-    expect(text()).toContain('The table was not saved. ConfigurationVersionConflict the setting changed since it was read');
+    expect($('[role="alert"].why-not')?.textContent).toBe('The table was not saved. Someone changed this setting after this page read it. Read it again, then make your change once more.');
+    // The code is said only inside the Error details fold.
+    expect($('.model-windows-refused details .refusal-name')?.textContent).toBe('ConfigurationVersionConflict: the setting changed since it was read');
+    expect($('.model-windows-refused > p')?.textContent).not.toContain('ConfigurationVersionConflict');
+    expect($('[aria-label="Read the table again"]')).not.toBeNull();
   });
 });

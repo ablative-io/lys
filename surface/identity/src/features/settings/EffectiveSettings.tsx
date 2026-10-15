@@ -4,6 +4,7 @@ import { Gate } from '../signin/Gate';
 import { duration } from '../file/time';
 import { useState } from 'react';
 import { ModelWindows } from './ModelWindows';
+import { ErrorWords } from '../people/Words';
 import type { Organisation } from './ModelWindows';
 
 interface Configuration {
@@ -18,6 +19,7 @@ interface Configuration {
   storage: { directory_format: string; grant_format: string; requests_configured: boolean };
 }
 const configured = (value: boolean) => value ? 'Configured' : 'Not configured';
+const setUp = (value: boolean) => value ? 'Set up' : 'Not set up';
 
 /** Every section of the startup configuration, or the one named. */
 export function EffectiveSettings({ section }: { section?: string }) {
@@ -30,12 +32,12 @@ export function EffectiveSettings({ section }: { section?: string }) {
     <p className="note">These are the settings this service started with. Changing startup configuration requires an administrator to update the service configuration and restart it. This screen does not pretend to apply those changes live.</p>
     {show('signin') ? <><h2>Sign-in</h2><dl className="facts"><dt>Provider</dt><dd>{settings.sign_in.provider_origin}</dd><dt>Session duration</dt><dd>{duration(settings.sign_in.session_seconds)}</dd><dt>HTTPS-only session cookie</dt><dd>{settings.sign_in.secure_cookie ? 'Yes' : 'No'}</dd></dl></> : null}
     {show('directory') ? <><h2>Directory</h2><dl className="facts"><dt>Role records</dt><dd>{configured(settings.directory.roles_configured)}</dd></dl></> : null}
-    {show('permissions') ? <><h2>Permissions</h2><dl className="facts"><dt>Model version</dt><dd>{settings.permissions.model_version}</dd><dt>Permission projection</dt><dd>{settings.permissions.projection === 'spicedb' ? 'SpiceDB' : 'Local'}</dd></dl></> : null}
-    {show('secrets') ? <><h2>Secrets</h2><p>Broker: {configured(settings.secrets.configured)}.</p><p>Credential values are never included in these settings.</p></> : null}
+    {show('permissions') ? <><h2>Permissions</h2><dl className="facts"><dt>Model version</dt><dd>{settings.permissions.model_version}</dd><dt>Where permissions are checked</dt><dd>{settings.permissions.projection === 'spicedb' ? 'SpiceDB, the permission service' : 'Inside Lys'}</dd></dl></> : null}
+    {show('secrets') ? <><h2>Secrets</h2><p>Secret storage: {setUp(settings.secrets.configured)}.</p><p>Credential values are never included in these settings.</p></> : null}
     {show('runtimes') ? <><h2>Machines and profiles</h2><dl className="facts"><dt>Machine records</dt><dd>{configured(settings.runtimes.machines_configured)}</dd><dt>Provisioning records</dt><dd>{configured(settings.runtimes.provisioning_configured)}</dd></dl><p>Configured records do not prove that a runtime is connected or applying profiles.</p></> : null}
     {show('models') && settings.organisation ? <ModelWindows key={settings.organisation.version} organisation={settings.organisation} undeclared={settings.models_undeclared ?? []} saved={() => setRound((now) => now + 1)} /> : null}
     {show('build') ? <><h2>Build</h2><dl className="facts"><dt>Running build</dt><dd>{authority.status === 'ok' ? <code>{authority.data.build}</code>
-      : authority.status === 'loading' ? 'Reading…' : authority.refused.refusal.refusal + ': ' + authority.refused.refusal.reason}</dd></dl></> : null}
+      : authority.status === 'loading' ? 'Reading…' : <ErrorWords problem={authority.refused} />}</dd></dl></> : null}
     {show('storage') ? <><h2>Storage and keys</h2><dl className="facts"><dt>Directory records</dt><dd title={settings.storage.directory_format}>{settings.storage.directory_format === 'signed_leaf_log' ? 'Signed record log' : settings.storage.directory_format}</dd><dt>Grant records</dt><dd title={settings.storage.grant_format}>{settings.storage.grant_format === 'signed_leaf_log' ? 'Signed record log' : settings.storage.grant_format}</dd><dt>Access request storage</dt><dd>{configured(settings.storage.requests_configured)}</dd></dl><p>Signing keys, credentials and private file paths are not returned to the screen.</p></> : null}
   </section>} />;
 }

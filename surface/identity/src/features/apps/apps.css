@@ -36,3 +36,12 @@
 .apps fieldset.field > legend { padding: 0; margin-bottom: 6px; }
 /* An app's addresses are whole web addresses: they break anywhere rather than run out of the card. */
 .apps .app-addresses .mono { overflow-wrap: anywhere; }
+/* Every web address on the Apps screen breaks anywhere rather than run out of its card. */
+.apps .app-list .mono, .apps .app-details .mono { overflow-wrap: anywhere; }
+.apps .app-picker > .note { align-self: center; margin: 0 4px 0 0; }
+/* The return addresses take the whole width of the card: each is a whole web address. */
+.apps .app-signin .app-addresses-field { flex: 1 1 100%; }
+.apps .app-address-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.apps .app-address-row input { flex: 1; min-width: 0; }
+.apps .app-retire { padding: 10px 12px; border: 1px solid rgba(248,113,113,.25); border-radius: var(--radius-md); }
+.apps .app-retire > p { flex-basis: 100%; margin: 0; }

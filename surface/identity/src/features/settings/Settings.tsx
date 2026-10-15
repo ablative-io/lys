@@ -23,7 +23,7 @@ export function Settings() {
   return (
     <div className="page fill">
       <div className="head"><div><h1>Configuration</h1>
-        <p className="sub">How this service runs. It stands on its own; nothing else needs to be installed for it to be useful.</p></div></div>
+        <p className="sub">Where the menu sits for you, and the settings this Lys started with.</p></div></div>
       <ConfigTabs on="settings" />
       <div className="card pane" data-section={sec}>
         <h2>Layout</h2>

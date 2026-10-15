@@ -144,7 +144,7 @@ describe('A settled owner change', () => {
     await submit(container);
     await submit(container);
     expect(asked).toEqual(['people_only']);
-    expect(container.textContent).toContain('calendar: confirmed change to people only, never agents.');
+    expect(container.textContent).toContain('calendar can now be handed to people only, never agents.');
     expect(store.entries.size).toBe(0);
     await act(async () => {
       const select = container.querySelector('select');
@@ -195,7 +195,7 @@ describe('Owner operation receipts', () => {
     expect(calls).toHaveLength(2);
     expect(calls[1]).toEqual(calls[0]);
     expect(store.entries.size).toBe(0);
-    expect(next.textContent).toContain('confirmed change');
+    expect(next.textContent).toContain('calendar can now be handed to people only, never agents.');
   });
 
   it('does not accept matching values carrying a different operation id', async () => {

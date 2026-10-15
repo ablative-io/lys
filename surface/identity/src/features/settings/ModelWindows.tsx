@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { Refused, request } from '../../api';
 import { Act } from '../../shell/Act';
+import { ErrorWords } from '../people/Words';
 
 /** The organisation setting as the service keeps it. */
 export interface Organisation { zone: string; version: number; model_windows?: Record<string, number | null> }
@@ -52,9 +53,15 @@ export function ModelWindows({ organisation, undeclared, saved }: { organisation
         <td><Act symbol="remove" name={'Remove ' + row.model} data-act="remove-model" onClick={() => setRows((now) => now.filter((each) => each.model !== row.model))} /></td></tr>)}
       <tr className="add"><td><input type="text" aria-label="Another model's name" placeholder="Model name, as its calls name it" value={fresh} onChange={(event) => setFresh(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); add(); } }} /></td>
-        <td colSpan={2}></td><td><Act symbol="add" name="Add this model" word="Add" data-act="add-model" disabled={!name || rows.some((row) => row.model === name)} onClick={add} /></td></tr>
+        <td colSpan={2}></td><td><Act symbol="add" name="Add this model" word="Add" data-act="add-model" disabled={!name || rows.some((row) => row.model === name)} onClick={add} />
+          {name && rows.some((row) => row.model === name) ? <small className="hint"> {name} is in the table already.</small> : null}</td></tr>
     </tbody></table>
     <p><Act symbol="save" name={busy ? 'Saving…' : 'Save the table'} word={busy ? 'Saving…' : 'Save'} tone="primary" data-act="save-model-windows" disabled={busy || wrong.length > 0} onClick={save} />
-      {refused ? <span className="why-not" role="alert"> The table was not saved. <small className="refusal-name" title={refused.refusal.reason}>{refused.refusal.refusal}</small> {refused.refusal.reason}</span> : null}</p>
+      {wrong.length ? <small className="hint"> Correct the window marked above to save.</small> : null}</p>
+    {refused ? <div className="model-windows-refused"><p className="why-not" role="alert">The table was not saved. {refused.refusal.refusal === 'ConfigurationVersionConflict'
+      ? 'Someone changed this setting after this page read it. Read it again, then make your change once more.'
+      : 'Nothing in it was changed.'}</p>
+      {refused.refusal.refusal === 'ConfigurationVersionConflict' ? <Act symbol="again" name="Read the table again" word="Read again" onClick={saved} /> : null}
+      <ErrorWords problem={refused} /></div> : null}
   </>;
 }

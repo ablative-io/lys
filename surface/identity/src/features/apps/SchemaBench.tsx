@@ -13,6 +13,7 @@ import { Refused } from '../../api';
 import { send } from './SchemaBuilder';
 import type { Draft, SchemaJson } from './SchemaBuilder';
 import { Act } from '../../shell/Act';
+import { ErrorWords, refusalWords } from '../people/Words';
 
 /** An example holding: X holds a relation on a resource. */
 interface Holding { subject: string; relation: string; kind: string; id: string }
@@ -29,7 +30,7 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [question, setQuestion] = useState({ subject: '', action: '', kind: '', id: '' });
   const [answer, setAnswer] = useState<BenchAnswer | null>(null);
-  const [refusal, setRefusal] = useState('');
+  const [refusal, setRefusal] = useState<unknown>(null);
   const bench = useRef<{ id: string; schema: string } | null>(null);
   const drafted = JSON.stringify(schema);
   const close = (id: string) => send('POST', '/apps/bench/' + encodeURIComponent(id) + '/close');
@@ -43,7 +44,7 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
   const actionsOf = (kind: string) => draft.kinds.find((entry) => entry.name === kind)?.actions ?? [];
   const full = (kind: string) => app + '.' + kind;
   const ask = async () => {
-    setRefusal(''); setAnswer(null);
+    setRefusal(null); setAnswer(null);
     try {
       if (bench.current && bench.current.schema !== drafted) { const earlier = bench.current.id; bench.current = null; await close(earlier); }
       if (!bench.current) {
@@ -57,7 +58,7 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
       });
       setAnswer(asked);
     } catch (error) {
-      setRefusal(error instanceof Refused ? error.refusal.refusal + ': ' + error.refusal.reason : String(error));
+      setRefusal(error);
     }
   };
   const pick = (label: string, value: string, options: string[], set: (value: string) => void) => <select className="sb-name" aria-label={label} value={value} onChange={(event) => set(event.target.value)}><option value="">{label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
@@ -97,10 +98,13 @@ export function SchemaBench({ app, schema, draft }: { app: string; schema: Schem
       {typed('Resource id asked about', question.id, (id) => setQuestion({ ...question, id }))}
       <Act symbol="send" name="Ask the draft" word="Ask" tone="primary" disabled={!question.subject || !question.action || !question.kind || !question.id} onClick={() => { void ask(); }} />
     </div>
+    {!question.subject || !question.action || !question.kind || !question.id ? <p className="hint">Fill in who asks, the kind, the action and the resource id to ask.</p> : null}
     {answer ? <div className={'sb-answer ' + (answer.allowed ? 'sb-allowed' : 'sb-refused')} role="status">
-      <b>{answer.allowed ? 'Allowed' : 'Refused' + (answer.refusal ? ' (' + answer.refusal + ')' : '')}</b>
+      <b>{answer.allowed ? 'Allowed' : 'Not allowed'}</b>
+      {!answer.allowed && answer.refusal && refusalWords(answer.refusal) ? <p>{refusalWords(answer.refusal)}</p> : null}
       <ol>{answer.path.map((step, index) => <li key={index}>{step}</li>)}</ol>
+      {!answer.allowed && answer.refusal ? <details><summary>Error details</summary><p className="refusal-name">{answer.refusal}</p></details> : null}
     </div> : null}
-    {refusal ? <p role="alert" className="sb-refused">{refusal}</p> : null}
+    {refusal ? <div className="sb-refused"><ErrorWords problem={refusal} /></div> : null}
   </aside>;
 }
