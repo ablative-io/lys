@@ -18,8 +18,8 @@
   word-break: normal;
   hyphens: none;
 }
-.grant-cols td[data-col='Grant'],
-.grant-cols td[data-col='Relation'] {
+.grant-cols td[data-col="Grant"],
+.grant-cols td[data-col="Relation"] {
   width: 1%;
   white-space: nowrap;
 }
@@ -113,11 +113,11 @@
   align-items: center;
   gap: 8px;
 }
-.issue-root .recorded-form .expires input[type='datetime-local'] {
+.issue-root .recorded-form .expires input[type="datetime-local"] {
   flex: 1 1 210px;
   min-width: 0;
 }
-.issue-root .recorded-form button[type='submit'] {
+.issue-root .recorded-form button[type="submit"] {
   margin-top: 4px;
   grid-column: 1 / -1;
   justify-self: start;
@@ -132,6 +132,45 @@
 }
 .grant-acts > p {
   flex-basis: 100%;
+}
+/* Reviews need the whole row for the agent, access and responsible person. */
+.page.reviews-page > .body.reviews-work {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: auto;
+}
+.reviews-work > .listing,
+.reviews-work > .detail {
+  flex: none;
+  min-width: 0;
+}
+.reviews-work .listing .table-scroll {
+  flex: 0 1 auto;
+  max-height: 36vh;
+}
+.reviews-work .listing table {
+  width: 100%;
+  table-layout: fixed;
+}
+.reviews-work .listing th,
+.reviews-work .listing td {
+  max-width: none;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.reviews-work .listing th:nth-child(1) {
+  width: 20%;
+}
+.reviews-work .listing th:nth-child(2) {
+  width: 45%;
+}
+.reviews-work .listing th:nth-child(3) {
+  width: 22%;
+}
+.reviews-work .listing th:nth-child(4) {
+  width: 13%;
 }
 /* Each field of the question carries its visible name above it; the words of the sentence stay on the line. */
 .ask-line {

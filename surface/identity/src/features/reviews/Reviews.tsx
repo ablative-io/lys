@@ -17,7 +17,7 @@ import { readTeams } from '../teams/Teams';
 import type { Grant } from '../../generated/grants';
 import { clock } from '../file/time';
 import { Gate } from '../signin/Gate';
-import { ActForm, ActPanel } from '../grants/GrantTable';
+import { ActForm, ActPanel, breakable } from '../grants/GrantTable';
 import { Chain } from '../grants/Chain';
 import { chainOf, lastUsedText, mayText, nameOf, readGrantWorld, resourceName, resourceTitle, voidOf, whoTitle, windowText } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
@@ -50,7 +50,7 @@ export function Reviews() {
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'reviews:' + revision);
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
-  return <div className="page fill">
+  return <div className="page fill reviews-page">
     <div className="head"><div><h1>Access</h1>
       <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
     <AccessTabs on="reviews" />
@@ -75,7 +75,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
   const last = (due: Due) => { const answer = confirmed[due.grant.id]; return answer ? { by: answer.kept_by, at: answer.at, note: answer.note } : due.last_kept ?? null; };
   const columns: Column<Due>[] = [
     { head: 'Agent', cell: (due) => due.agent.display_name },
-    { head: 'Access', cell: (due) => <span className="sec">{due.grant.relation} on {due.grant.resource.kind} {names.get(due.grant.resource.id) ?? due.grant.resource.id}</span> },
+    { head: 'Access', cell: (due) => <span className="sec">{breakable(due.grant.relation)} on {breakable(due.grant.resource.kind)} {breakable(names.get(due.grant.resource.id) ?? due.grant.resource.id)}</span> },
     { head: 'Responsible person', cell: (due) => <span className="sec">{due.reviewer.display_name}</span> },
     { head: 'Last kept', cell: (due) => { const at = last(due); return at ? <span className="sec">{clock(at.at)}</span> : <span className="dim">never</span>; } },
   ];
@@ -86,14 +86,14 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
       {view.unanswered.map(({ agent, person }) => <p key={agent.id}><Link to={'/file/' + encodeURIComponent(agent.id)}>{agent.display_name}</Link> answers to {person.display_name}, whose account is {OWNER_STATE[person.state] ?? 'not active'}.</p>)}
     </section> : null}
     {teams.refused ? <p className="why-not">Teams cannot be read, so access is listed without its team. {teams.refused}</p> : null}
-    {view.due.length ? <div className="body work">
+    {view.due.length ? <div className="body work reviews-work">
       <Listing<Due> groups={groups} columns={columns} id={(due) => due.grant.id} href={(due) => '#/reviews?grant=' + due.grant.id}
         words={(due) => due.agent.display_name + ' ' + due.grant.resource.id + ' ' + due.reviewer.display_name} noun="grants to review"
         holds={(items) => items.length + (items.length === 1 ? ' grant' : ' grants')}
         selected={open?.grant.id ?? null} select={() => undefined} open={(due) => { setPicked(due.grant.id); setRevoking(null); }}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
       <div className="detail">{open ? <section className="card" aria-label="Grant to review">
-        {/* The chosen grant as facts, one line each, so it reads whole beside the list; the list row already says who is responsible and when it was last kept, so the panel says who kept it and why. */}
+        {/* The selected grant stays below the full-width list; its facts add who kept it and why. */}
         {drawn && world.status === 'ok' ? <GrantFacts w={world.data} g={drawn} agent={open.agent} />
           : <dl className="facts grant-facts">
             <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></dd>
