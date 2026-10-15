@@ -66,12 +66,11 @@ pub(crate) async fn admit(
     let Some(rotation) = accounts(version, &held)? else {
         return Ok(None);
     };
-    let inventory = crate::secrets_api::ask(
+    let inventory = crate::start_checks::inventory(
         state,
         headers,
-        axum::http::Method::GET,
-        "/_lys/secrets",
-        axum::body::Bytes::new(),
+        agent,
+        crate::start_checks::Inventory::ProviderRoutes,
     )
     .await?;
     routed(version, &rotation, &held, &inventory).map(Some)

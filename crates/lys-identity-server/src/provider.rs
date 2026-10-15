@@ -59,6 +59,8 @@ use token_store::Tokens;
 mod agent_issue;
 mod agent_tokens;
 mod bearer;
+mod person_app;
+pub(crate) use person_app::agent as app_person_agent;
 mod client_auth;
 mod endpoints;
 mod exchange;

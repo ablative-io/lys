@@ -113,6 +113,27 @@ pub(crate) fn admitted(
     action: &str,
     url: &str,
 ) -> Result<(SeatAdmission, Standing), ServerError> {
+    if action == START
+        && let Some(person) = crate::provider::app_person_agent(state, headers, &seat.added.agent)?
+    {
+        let caller = person.to_string();
+        return Ok((
+            SeatAdmission {
+                action: action.to_owned(),
+                caller: caller.clone(),
+                by: "responsible".to_owned(),
+                grant: None,
+                use_event: None,
+            },
+            Standing {
+                asker: IdentityId::Person(person),
+                administrator: false,
+                responsible: Some(caller),
+                is_responsible: true,
+                pass: false,
+            },
+        ));
+    }
     let standing = standing(state, headers, seat)?;
     let admission = |by: &str, grant: Option<String>, use_event: Option<u64>| SeatAdmission {
         action: action.to_owned(),

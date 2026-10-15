@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::Table;
 use axum::http::HeaderMap;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -120,3 +121,6 @@ async fn every_approved_app_audience_can_register_an_own_agent() -> TestResult {
 
 #[path = "app_person_refusals_tests.rs"]
 mod refusals;
+
+#[path = "personapp_start_tests.rs"]
+mod personapp_start_tests;

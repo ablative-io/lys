@@ -114,6 +114,33 @@ pub(crate) fn reviewed(version: &Version) -> Result<(), ServerError> {
     Ok(())
 }
 
+/// The broker metadata a launch needs, without any credential value.
+pub(crate) enum Inventory {
+    /// The handles held by the selected agent.
+    Handles,
+    /// Provider metadata used to check its reviewed accounts.
+    ProviderRoutes,
+}
+
+/// Keep the responsible person check at every app pass broker read.
+pub(crate) async fn inventory(
+    state: &AppState,
+    headers: &HeaderMap,
+    agent: &str,
+    kind: Inventory,
+) -> Result<Value, ServerError> {
+    let path = match kind {
+        Inventory::Handles => format!("/_lys/handles?holder={agent}"),
+        Inventory::ProviderRoutes => "/_lys/secrets".to_owned(),
+    };
+    if let Some(person) = crate::provider::app_person_agent(state, headers, agent)? {
+        crate::secrets_api::ask_as(state, &person.to_string(), Method::GET, &path, Bytes::new())
+            .await
+    } else {
+        crate::secrets_api::ask(state, headers, Method::GET, &path, Bytes::new()).await
+    }
+}
+
 /// The handles `agent` holds that are not dropped, as the broker lists them
 /// to the signed-in person, each with the variable the launch sets.
 pub(crate) async fn handles(
@@ -121,8 +148,7 @@ pub(crate) async fn handles(
     headers: &HeaderMap,
     agent: &str,
 ) -> Result<Vec<HandleName>, ServerError> {
-    let path = format!("/_lys/handles?holder={agent}");
-    let answer = crate::secrets_api::ask(state, headers, Method::GET, &path, Bytes::new()).await?;
+    let answer = inventory(state, headers, agent, Inventory::Handles).await?;
     let unread = |reason: &str| ServerError::SecretsUnavailable {
         reason: format!("the broker's handle list does not read: {reason}"),
     };
