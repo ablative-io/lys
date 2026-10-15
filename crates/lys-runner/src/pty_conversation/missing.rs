@@ -33,7 +33,8 @@ pub(crate) fn fresh_native(launch: &Launch) -> Result<Option<String>, RunnerErro
             .map_or((argument.as_str(), None), |(flag, value)| {
                 (flag, Some(value))
             });
-        if flag == "--session-id" {
+        // The conversation the program was started in, whether new (--session-id) or resumed (--resume).
+        if matches!(flag, "--session-id" | "--resume" | "-r") {
             let id = attached
                 .or_else(|| launch.arguments.get(at + 1).map(String::as_str))
                 .ok_or_else(|| {

@@ -9,7 +9,7 @@ use std::error::Error;
 use support::{Table, operation};
 
 #[tokio::test(flavor = "multi_thread")]
-async fn optional_native_ids_validate_and_missing_transcripts_start_fresh_before_recording()
+async fn optional_native_ids_validate_and_a_named_conversation_is_resumed_by_its_id()
 -> Result<(), Box<dyn Error>> {
     let table = Table::set().await?;
     let machine = table.lys_machine("Fixture").await?;
@@ -38,13 +38,16 @@ async fn optional_native_ids_validate_and_missing_transcripts_start_fresh_before
         assert_eq!(status, 200, "{reply}");
         assert_eq!(reply["admission"]["by"], "administrator");
         assert_eq!(reply["admission"]["action"], "seat.start");
-        assert!(reply["start"]["conversation"].is_null());
         let native = reply["start"]["native_conversation"]
             .as_str()
-            .ok_or("the fresh conversation was not recorded")?;
+            .ok_or("the conversation was not recorded")?;
         if let Some(conversation) = conversation {
-            assert_ne!(native, conversation);
-            assert_eq!(reply["start"]["runner"]["started_fresh"], true);
+            // A named conversation goes to the program to resume, whether or not Lys can see its transcript.
+            assert_eq!(reply["start"]["conversation"], conversation);
+            assert_eq!(native, conversation);
+            assert_ne!(reply["start"]["runner"]["started_fresh"], true);
+        } else {
+            assert!(reply["start"]["conversation"].is_null());
         }
         assert_eq!(reply["seat"]["transport"], "pty");
         let session = reply["session"].as_str().ok_or("no admitted session")?;

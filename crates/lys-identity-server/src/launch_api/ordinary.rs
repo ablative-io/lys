@@ -256,6 +256,11 @@ pub(crate) async fn chosen(
         if crate::launch_template::requires_controls(version) {
             return Ok(None);
         }
+        // A conversation named in the agent's settings is the one it continues, every time: the program resumes
+        // it in place under the same id, and the start already carries it as the program's own resume.
+        if version.settings.resume.is_some() {
+            return Ok(None);
+        }
         Ok(version
             .settings
             .harness
