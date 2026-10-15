@@ -15,7 +15,7 @@ import type { ProvidersView } from '../connections/SignInProviders';
 
 interface AppsView { apps: { id: string; state: string }[] }
 /**
- * What Getting started reads. `google` is true only when Google is set up and switched on, as Configuration → Services
+ * What Getting started reads. `google` is true only when Google is set up and switched on, as Settings → Services
  * and sign-in providers shows it. Only administrators read or see that step.
  */
 interface Standing { machines: number; cambium: string | null; google: boolean; read: boolean; administrator: boolean }
@@ -93,7 +93,7 @@ export function GettingStarted({ person, agents, standing, reread }: { person: s
       body: standing.administrator ? <ThisComputer person={person} done={reread} decline={decline} />
         : <p>Open <a href="#/network">Network</a>, choose Another computer, then download its installer and open it on your computer.</p> },
     ...(standing.administrator ? [{ key: 'google', done: standing.google, optional: true, title: 'Let people sign in with Google',
-      body: <p>So nobody needs a Lys password: add Google under <a href="#/connections">Configuration → services and sign-in providers</a>.</p> }] : []),
+      body: <p>So nobody needs a Lys password: add Google under <a href="#/connections">Settings → services and sign-in providers</a>.</p> }] : []),
     { key: 'cambium', done: standing.cambium === 'approved', title: 'Connect Cambium',
       body: <p>{standing.cambium === 'pending' ? 'Cambium has asked to connect. Review what it asks for and approve it on ' : 'Connect your team’s chat to Lys on '}<a href="#/apps">Apps</a>.</p> },
     { key: 'agent', done: agents > 0, title: 'Add your first agent',

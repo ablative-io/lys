@@ -23,7 +23,7 @@ const READS = {
   graph: { title: 'Graph', read: graphRead },
   secrets: { title: 'Secrets', read: () => request('/secrets') },
   network: { title: 'Network', read: () => request('/network') },
-  settings: { title: 'Configuration', read: () => request('/configuration') },
+  settings: { title: 'Settings', read: () => request('/configuration') },
 };
 type Place = keyof typeof READS;
 type Access = Record<Place, Load<void>>;

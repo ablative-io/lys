@@ -19,7 +19,7 @@ export const RAIL: RailItem[] = [
   {"t": "a", "title": "Network (g t)", "label": "Network", "svg": "<rect x=\"3\" y=\"4\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"14\" y=\"4\" width=\"7\" height=\"5\" rx=\"1\"/><rect x=\"8.5\" y=\"15\" width=\"7\" height=\"5\" rx=\"1\"/><path d=\"M6.5 9v3h11V9M12 12v3\"/>", "href": "#/network", "nav": "network", "kbd": "g t"},
   {"t": "grow"},
   {"t": "button", "title": "Help (?)", "label": "Help", "svg": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.01\"/>", "dock": "help", "kbd": "?"},
-  {"t": "a", "title": "Configuration (g s)", "label": "Configuration", "svg": "<path d=\"M4 7h10M18 7h2M4 17h4M12 17h8\"/><circle cx=\"16\" cy=\"7\" r=\"2\"/><circle cx=\"10\" cy=\"17\" r=\"2\"/>", "href": "#/settings", "nav": "settings", "kbd": "g s"},
+  {"t": "a", "title": "Settings (g s)", "label": "Settings", "svg": "<path d=\"M4 7h10M18 7h2M4 17h4M12 17h8\"/><circle cx=\"16\" cy=\"7\" r=\"2\"/><circle cx=\"10\" cy=\"17\" r=\"2\"/>", "href": "#/settings", "nav": "settings", "kbd": "g s"},
   {"t": "sep"},
   {"t": "button", "title": "Command palette (⌘K)", "label": "Command", "svg": "<path d=\"M9 6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3z\"/>", "id": "palBtn", "kbd": "⌘K"},
   {"t": "button", "title": "Menu labels ([)", "label": "Collapse", "svg": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M9 4v16\"/>", "id": "railBtn", "kbd": "["},

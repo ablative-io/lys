@@ -137,7 +137,7 @@ export function Apps() {
   const self = useLoad(api.me, 'me');
   const me = self.status === 'ok' ? self.data : null;
   return <div className="page fill apps">
-    <div className="head"><div><h1>Configuration</h1><p className="sub">Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here.</p></div></div>
+    <div className="head"><div><h1>Settings</h1><p className="sub">Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here.</p></div></div>
     <ConfigTabs on="apps" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {

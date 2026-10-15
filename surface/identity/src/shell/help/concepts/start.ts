@@ -70,12 +70,12 @@ export const START: Seed[] = [
     title: 'Google sign-in',
     summary: 'Let people sign in with their Google account instead of a Lys password.',
     body: [
-      'Google is added under Configuration, on Services and sign-in providers. It is optional; the dashboard lists it as an optional step, and the step is done once Google is set up and switched on there.',
+      'Google is added under Settings, on Services and sign-in providers. It is optional; the dashboard lists it as an optional step, and the step is done once Google is set up and switched on there.',
       'A Google login reaches Lys only for a person already added with that email address; it never creates an account.',
     ],
     steps: [
       {
-        text: 'Open Configuration → Services and sign-in providers and add Google.',
+        text: 'Open Settings → Services and sign-in providers and add Google.',
         href: '#/connections',
         link: 'Open sign-in providers'
       },
@@ -88,12 +88,12 @@ export const START: Seed[] = [
     title: 'Connect Cambium',
     summary: 'Cambium is the team chat; connecting it lets you give agents its channels.',
     body: [
-      'Apps, under Configuration, lists the apps Lys knows how to connect, Cambium among them, each with Connect. Connect asks once for Cambium’s web address; Continue to Cambium sends your browser there, and Cambium brings you back to Lys to approve what it asks for.',
+      'Apps, under Settings, lists the apps Lys knows how to connect, Cambium among them, each with Connect. Connect asks once for Cambium’s web address; Continue to Cambium sends your browser there, and Cambium brings you back to Lys to approve what it asks for.',
       'Nothing an app asks for takes effect until you approve it on Apps. If Cambium has already asked, the dashboard says so: review what it asks for and approve it.',
       'Until Cambium is approved, an agent’s Access tab says "Connect Cambium on Apps first; its channels appear here once it is approved."',
     ],
     steps: [
-      { text: 'Open Apps under Configuration and press Connect beside Cambium.', href: '#/apps', link: 'Open Apps' },
+      { text: 'Open Apps under Settings and press Connect beside Cambium.', href: '#/apps', link: 'Open Apps' },
       { text: 'Give Cambium’s web address, such as https://cambium.example.com.' },
       { text: 'Review the permissions it asks for, then approve it.' }
     ],

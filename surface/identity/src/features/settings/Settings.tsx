@@ -25,7 +25,7 @@ export function Settings() {
     <div className="page fill">
       <div className="head">
         <div>
-          <h1>Configuration</h1>
+          <h1>Settings</h1>
           <p className="sub">{sec === 'account' ? 'Your sign-in email and password.' : 'Where the menu sits for you, and the settings this Lys started with.'}</p>
         </div>
       </div>

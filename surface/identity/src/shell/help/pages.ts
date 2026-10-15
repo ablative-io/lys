@@ -229,7 +229,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Apps',
     topic: 'apps.apps',
     regions: [
-      { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'This service (layout and settings in effect), Services and sign-in providers (Google sign-in is added there), and Apps (what is connected to Lys).', at: 'below' },
+      { sel: 'nav[aria-label="Settings views"]', title: 'Settings', text: 'This service (layout and settings in effect), Services and sign-in providers (Google sign-in is added there), and Apps (what is connected to Lys).', at: 'below' },
       { sel: 'nav[aria-label="Apps"]', title: 'Which app', text: 'Every app Lys knows, by state: approved, waiting for approval, declined or retired. Choose one to see it.', at: 'below', dy: 30 },
       { sel: '[aria-label="Known apps"]', title: 'Known apps', text: 'Apps Lys knows how to connect, Cambium among them. Connect asks once for the app’s web address, reads what it asks for, and brings you to approve it.', at: 'below', dy: 30 },
       { sel: '.app-card', title: 'The app', text: 'Its state, the permission template it asked for, its sign-in settings and its client credentials. Nothing it registers takes effect until approved here. Decline takes an optional reason in Why.', at: 'left' },
@@ -346,10 +346,10 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     keys: ROWS,
   },
   settings: {
-    title: 'Configuration',
+    title: 'Settings',
     topic: 'apps.configuration',
     regions: [
-      { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'Your account changes your sign-in email and password. This service shows startup settings; Services and sign-in providers adds providers such as Google; Apps lists connected apps.', at: 'below' },
+      { sel: 'nav[aria-label="Settings views"]', title: 'Settings', text: 'Your account changes your sign-in email and password. This service shows startup settings; Services and sign-in providers adds providers such as Google; Apps lists connected apps.', at: 'below' },
       { sel: '[aria-label="Your account"]', title: 'Your account', text: 'Choose Change email or Change password to open an empty form. Save applies the change and closes the form; Cancel closes it without saving.', at: 'right' },
       { sel: '#screen .card.pane h2:first-of-type', title: 'Layout', text: 'Which side the menu and Help sit on, and whether the menu shows a name beside every icon (Icons or Labels). These are yours, for this browser.', at: 'right' },
       { sel: '.model-windows', title: 'Model context windows', text: 'How many tokens each model’s context holds, which Lys needs to work out an agent’s % of context. Side work marks a model whose calls are not an agent’s own context. Add a model by the name its calls use.', at: 'right' },
@@ -361,7 +361,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Services and sign-in providers',
     topic: 'start.google',
     regions: [
-      { sel: 'nav[aria-label="Configuration views"]', title: 'Configuration', text: 'This service, Services and sign-in providers, and Apps.', at: 'below' },
+      { sel: 'nav[aria-label="Settings views"]', title: 'Settings', text: 'This service, Services and sign-in providers, and Apps.', at: 'below' },
       { sel: '[aria-label="Sign-in providers"]', title: 'Sign-in providers', text: 'How people sign in besides a Lys password: pick a provider (Google), follow the three steps shown (prepare it, give it Lys’s return address with Copy, enter the client id and secret it issued). The secret is sent once and never shown again.', at: 'right' },
       { sel: '#screen .pane', title: 'Services', text: 'The services this Lys is configured to use, each with its purpose and address.', at: 'c' },
     ],

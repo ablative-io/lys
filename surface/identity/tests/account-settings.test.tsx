@@ -69,7 +69,7 @@ describe('Account changes belong in Settings', () => {
     expect($$('input[type="email"]')).toHaveLength(0);
     expect($('button[aria-label="Change email"]')).not.toBeNull();
     expect($('button[aria-label="Change password"]')).not.toBeNull();
-    expect($('nav[aria-label="Configuration views"] a[aria-current="page"]')?.getAttribute('href')).toBe('#/settings/account');
+    expect($('nav[aria-label="Settings views"] a[aria-current="page"]')?.getAttribute('href')).toBe('#/settings/account');
   });
 
   it.each(['Change email', 'Change password'])('opens %s empty, cancels without a write, and opens empty again', async (name) => {

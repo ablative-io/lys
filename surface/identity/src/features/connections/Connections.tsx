@@ -18,7 +18,7 @@ const labels = { configured: 'Configured', local: 'Local to Lys', unconfigured: 
 export function Connections() {
   const load = useLoad(readConnections, 'connections');
   return <div className="page fill">
-    <div className="head"><div><h1>Configuration</h1>
+    <div className="head"><div><h1>Settings</h1>
       <p className="sub">The services this Lys installation is configured to use, and the accounts people sign in with.</p></div>
     </div>
     <ConfigTabs on="connections" />
