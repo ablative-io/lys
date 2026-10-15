@@ -60,38 +60,7 @@ fn row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_exten
     later.window = Window::new(T0 + 200, Some(T0 + 300))?;
     let later = world.delegate(&later)?.event.grant();
 
-    let newer = Model::new(
-        2,
-        [
-            (Relation::new("tern")?, actions(&["read", "write"])?),
-            (Relation::new("wren")?, actions(&["read"])?),
-        ],
-    )?;
-    assert!(matches!(
-        world.grants.set_model(support_model_again()?),
-        Err(GrantError::ModelInvalid { .. })
-    ));
-    world.grants.set_model(newer)?;
-    world.now = T0 + 499;
-    assert!(
-        matches!(
-            world.exercise(agent, "write", Route::Tool),
-            Err(GrantError::NotHeld { .. })
-        ),
-        "a newer version of the relation does not widen a grant held"
-    );
-    let widened = world.request(tom, to_tom, agent, "tern", PassOn::UseOnly, Some(T0 + 500))?;
-    assert!(matches!(
-        world.delegate(&widened),
-        Err(GrantError::ActionsOutside {
-            model_version: 2,
-            ..
-        })
-    ));
-    let lengthened = world.request(tom, to_tom, agent, "wren", PassOn::UseOnly, Some(T0 + 600))?;
-    assert!(
-        matches!(world.delegate(&lengthened), Err(GrantError::ExpiryBeyondSource { source_ends, .. }) if source_ends == T0 + 500)
-    );
+    assert_model_change_keeps_grant_bounds(&mut world, to_tom)?;
 
     let boundaries = [
         (agent, T0 + 499, None),
@@ -136,6 +105,47 @@ fn row_2_6_grant_expiry_every_end_binds_at_its_boundary_and_no_role_change_exten
         Some(Some(T0 + 500))
     );
     assert_eq!(boundaries.len(), 10);
+    Ok(())
+}
+
+fn assert_model_change_keeps_grant_bounds(world: &mut World, to_tom: GrantId) -> TestResult {
+    let (tom, agent) = (
+        IdentityId::Person(world.tom),
+        IdentityId::Agent(world.tom_agent),
+    );
+    let newer = Model::new(
+        2,
+        [
+            (Relation::new("tern")?, actions(&["read", "write"])?),
+            (Relation::new("wren")?, actions(&["read"])?),
+        ],
+    )?;
+    assert!(matches!(
+        world.grants.set_model(support_model_again()?),
+        Err(GrantError::ModelInvalid { .. })
+    ));
+    world.grants.set_model(newer)?;
+    world.now = T0 + 499;
+    assert!(
+        matches!(
+            world.exercise(agent, "write", Route::Tool),
+            Err(GrantError::NotHeld { .. })
+        ),
+        "a newer version of the relation does not widen a grant held"
+    );
+    let widened = world.request(tom, to_tom, agent, "tern", PassOn::UseOnly, Some(T0 + 500))?;
+    assert!(matches!(
+        world.delegate(&widened),
+        Err(GrantError::ActionsOutside {
+            model_version: 2,
+            ..
+        })
+    ));
+    let lengthened = world.request(tom, to_tom, agent, "wren", PassOn::UseOnly, Some(T0 + 600))?;
+    assert!(
+        matches!(world.delegate(&lengthened), Err(GrantError::ExpiryBeyondSource { source_ends, .. }) if source_ends == T0 + 500)
+    );
+
     Ok(())
 }
 
