@@ -194,6 +194,10 @@ async fn exercise_given(
         assert_eq!(batch.checks[&(subject, resource.clone(), read)], Ok(true));
     }
     assert_eq!(batch.checks[&(subject, resource, write)], Ok(false));
+    assert_snapshot_calls(&heard)
+}
+
+fn assert_snapshot_calls(heard: &Mutex<Vec<(String, Value)>>) -> Result<(), Box<dyn Error>> {
     let heard = heard.lock().map_err(|error| error.to_string())?;
     for path in ["/v1/relationships/exportbulk", "/v1/permissions/checkbulk"] {
         let calls: Vec<_> = heard.iter().filter(|(asked, _)| asked == path).collect();
