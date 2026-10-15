@@ -110,6 +110,7 @@ pub enum RunnerError {
 
 impl RunnerError {
     /// The stable refusal name, independent of its explanatory words.
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
             Self::Unsigned { .. } => "runner_request_unsigned",

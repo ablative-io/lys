@@ -19,11 +19,13 @@ pub struct PlanWindow {
 }
 
 /// A nonnegative decimal rounded to the nearest scaled integer, with overflow refused.
+#[must_use]
 pub fn scaled(number: &Number, places: i32) -> Option<u64> {
     projection(number, places, true)
 }
 
 /// A boundary amount must be represented exactly, rather than rounded into a limit.
+#[must_use]
 pub fn scaled_exact(number: &Number, places: i32) -> Option<u64> {
     projection(number, places, false)
 }
@@ -72,6 +74,7 @@ fn projection(number: &Number, places: i32, rounded: bool) -> Option<u64> {
 }
 
 /// Validate the provider's ordinary numeric percentage without inventing a missing figure.
+#[must_use]
 pub fn percent(value: &Value) -> Option<Number> {
     let percent = value.as_f64()?;
     if !(0.0..=100.0).contains(&percent) {

@@ -55,6 +55,7 @@ pub fn note(figure: &str, present: Option<u64>, reason: &str, notes: &mut Vec<Un
 
 /// The context in use a usage object says: input, cache writes and cache
 /// reads together, when all three are there.
+#[must_use]
 pub fn context_of(usage: &Value) -> Option<u64> {
     let input = count(usage, "input_tokens")?;
     let created = count(usage, "cache_creation_input_tokens")?;
@@ -63,6 +64,7 @@ pub fn context_of(usage: &Value) -> Option<u64> {
 }
 
 /// The figures of a Claude Code `message.usage` object, and each missing.
+#[must_use]
 pub fn claude_figures(usage: &Value) -> (Figures, Vec<Unavailable>) {
     let figures = Figures {
         input_tokens: count(usage, "input_tokens"),
@@ -102,6 +104,7 @@ pub fn claude_figures(usage: &Value) -> (Figures, Vec<Unavailable>) {
 
 /// The figures a Claude Code status line's input carries: snapshots of the
 /// context in use and the running time, each null when it is.
+#[must_use]
 pub fn status_figures(input: &Value) -> (Figures, Vec<Unavailable>) {
     let window = input.get("context_window");
     let usage = window

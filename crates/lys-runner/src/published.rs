@@ -64,6 +64,7 @@ pub const REQUEST_REFUSALS: [&str; 5] = [
 ];
 
 /// The runner's section.
+#[must_use]
 pub fn section() -> Value {
     json!({
         "openapi": "3.1.0",

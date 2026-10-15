@@ -48,6 +48,7 @@ pub enum Key {
 
 impl Key {
     /// The bytes the key sends to a terminal.
+    #[must_use]
     pub fn bytes(self) -> &'static [u8] {
         match self {
             Self::Enter => b"\r",
