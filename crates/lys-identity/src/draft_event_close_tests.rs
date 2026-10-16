@@ -164,7 +164,7 @@ fn an_old_draft_log_reopens_and_its_closing_event_survives_a_snapshot() -> Resul
     let hash = crate::encoding::payload_commitment(&encode(&creation));
     {
         let mut directory = open()?;
-        directory.record_draft(creation.clone())?;
+        directory.record_draft(creation)?;
         directory.record_draft(approved(hash)?)?;
     }
     let mut directory = open()?;

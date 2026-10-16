@@ -75,6 +75,7 @@ impl Fixture {
             seat_file: seat.display().to_string(),
             seat_file_sha256: digest(b"opaque seat bytes"),
             adapter: "acp/1".to_owned(),
+            model_wire: None,
         };
         let pass = dir.path().join("agent-pass.json");
         std::fs::write(&pass, "fixture proof")?;
