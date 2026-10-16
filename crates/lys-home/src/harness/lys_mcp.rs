@@ -219,7 +219,10 @@ fn check(entry: &LysMcp) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn claude(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
+/// The `lys` entry in a Claude Code run's `mcp.json`; `seat` is the one
+/// seat header this run carries, signed once by the caller so the file and
+/// the environment hold the same bytes.
+fn claude(text: &str, entry: &LysMcp, seat: Option<&str>) -> Result<String, Refusal> {
     let mut root: serde_json::Value = serde_json::from_str(text).map_err(Refusal::Json)?;
     let root = root.as_object_mut().ok_or(Refusal::ConfigInvalid)?;
     let servers = root.entry("mcpServers").or_insert_with(|| json!({}));
@@ -229,11 +232,8 @@ fn claude(text: &str, entry: &LysMcp) -> Result<String, Refusal> {
     }
     let mut headers = serde_json::Map::new();
     headers.insert("lys-agent-pass".to_owned(), json!(entry.pass));
-    if let Some(seat) = &entry.seat {
-        headers.insert(
-            SEAT_HEADER.to_owned(),
-            json!(seat_header(seat, &entry.pass)?),
-        );
+    if let Some(header) = seat {
+        headers.insert(SEAT_HEADER.to_owned(), json!(header));
     }
     servers.insert(
         "lys".to_owned(),
@@ -331,8 +331,11 @@ fn codex(
 
 /// Add the reserved entry. A launch that names `--mcp-config` is Claude
 /// Code's and gets the entry in its `mcp.json`; any other launch is Codex's
-/// and gets a `-c mcp_servers.lys=` setting. Both receive the run pass in
-/// their environment, so their other MCP children may request an audience.
+/// and gets a `-c mcp_servers.lys=` setting. Both receive the run pass and,
+/// when the run has a seat, the seat header in their environment
+/// (`LYS_AGENT_PASS`, `LYS_SEAT`), so their other MCP children may request an
+/// audience; a child with the pass alone is refused once a certificate log is
+/// on, which is what a Claude Code run's children met before 16 Oct 2026.
 /// A seat keeps its run proof in a file, preserving its reviewed arguments.
 /// Errors change nothing.
 ///
@@ -373,7 +376,9 @@ pub fn render(
         environment.insert(CODEX_PASS_VARIABLE.to_owned(), "agent-pass.json".to_owned());
         return Ok(());
     }
-    if environment.contains_key(CODEX_PASS_VARIABLE) {
+    if environment.contains_key(CODEX_PASS_VARIABLE)
+        || environment.contains_key(CODEX_SEAT_VARIABLE)
+    {
         return Err(Refusal::Duplicate);
     }
     if !arguments.iter().any(|argument| argument == "--mcp-config") {
@@ -384,11 +389,23 @@ pub fn render(
     if selected.next().is_some() {
         return Err(Refusal::ConfigInvalid);
     }
-    let text = claude(&file.text, entry)?;
+    // The seat header a Claude Code run's own stdio MCP children present
+    // beside the pass (`lys-seat` is required of every run-pass call once a
+    // certificate log is on): computed before the file changes, so a refusal
+    // changes nothing.
+    let seat_header_value = entry
+        .seat
+        .as_ref()
+        .map(|seat| seat_header(seat, &entry.pass))
+        .transpose()?;
+    let text = claude(&file.text, entry, seat_header_value.as_deref())?;
     Hash::of(text.as_bytes())
         .as_str()
         .clone_into(&mut file.sha256);
     file.text = text;
     environment.insert(CODEX_PASS_VARIABLE.to_owned(), entry.pass.clone());
+    if let Some(header) = seat_header_value {
+        environment.insert(CODEX_SEAT_VARIABLE.to_owned(), header);
+    }
     Ok(())
 }

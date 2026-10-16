@@ -210,10 +210,18 @@ fn a_seated_run_carries_the_runners_signature_over_the_pass_and_never_its_key() 
                 .to_owned()
         } else {
             let root: Value = serde_json::from_str(&text)?;
-            root["mcpServers"]["lys"]["headers"][lys_mcp::SEAT_HEADER]
+            let in_file = root["mcpServers"]["lys"]["headers"][lys_mcp::SEAT_HEADER]
                 .as_str()
                 .ok_or("no seat header")?
-                .to_owned()
+                .to_owned();
+            // A Claude Code run's own stdio MCP children read the same
+            // header from the environment, exactly as a Codex run's do.
+            assert_eq!(
+                environment.get(lys_mcp::CODEX_SEAT_VARIABLE),
+                Some(&in_file),
+                "the seat header is in the Claude run's environment"
+            );
+            in_file
         };
         let words: Vec<&str> = header.split(' ').collect();
         let [serial, not_after, public, carried, signature] = words.as_slice() else {
