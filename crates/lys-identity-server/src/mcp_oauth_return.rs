@@ -20,6 +20,7 @@ pub(super) fn address(
         .map(|address| address.to_canonical())
 }
 
+#[derive(Clone, Copy)]
 pub(super) struct Return<'a> {
     pub(super) redirect: &'a str,
     pub(super) pairs: &'a [(&'a str, &'a str)],

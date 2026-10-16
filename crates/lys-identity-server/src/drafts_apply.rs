@@ -93,19 +93,36 @@ pub(crate) async fn apply(
             application: approved.application,
             drafted_by: held.created.actor.provenance().agent(),
         });
-    let bytes = match serde_json::from_slice::<serde_json::Value>(&held.created.body) {
+    let bytes = prepared_body(held, approved.application)?;
+    let response = dispatch(state, headers, held, &actor, &bytes).await?;
+    let outcome = applied_outcome(state, held, &actor, &bytes, response).await?;
+    close(state, held, actor, &outcome)?;
+    Ok(outcome)
+}
+
+fn prepared_body(held: &DraftRecord, application: OperationId) -> Result<Vec<u8>, ServerError> {
+    match serde_json::from_slice::<serde_json::Value>(&held.created.body) {
         Ok(serde_json::Value::Object(mut object)) => {
             if object.contains_key("operation") {
                 object.insert(
                     "operation".into(),
-                    serde_json::Value::String(approved.application.to_string()),
+                    serde_json::Value::String(application.to_string()),
                 );
             }
             serde_json::to_vec(&object)
-                .map_err(|error| fault(&format!("the prepared body cannot be rendered: {error}")))?
+                .map_err(|error| fault(&format!("the prepared body cannot be rendered: {error}")))
         }
-        _ => held.created.body.clone(),
-    };
+        _ => Ok(held.created.body.clone()),
+    }
+}
+
+async fn dispatch(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    held: &DraftRecord,
+    actor: &Actor,
+    bytes: &[u8],
+) -> Result<axum::response::Response, ServerError> {
     let mut request = Request::builder()
         .method(held.created.method.as_str())
         .uri(&held.created.path)
@@ -113,11 +130,13 @@ pub(crate) async fn apply(
     if let Some(cookie) = headers.get(header::COOKIE) {
         request = request.header(header::COOKIE, cookie);
     }
-    let request = request.body(Body::from(bytes.clone())).map_err(|error| {
-        fault(&format!(
-            "the prepared request cannot be dispatched: {error}"
-        ))
-    })?;
+    let request = request
+        .body(Body::from(bytes.to_owned()))
+        .map_err(|error| {
+            fault(&format!(
+                "the prepared request cannot be dispatched: {error}"
+            ))
+        })?;
     let router = state
         .draft_execution
         .router
@@ -125,12 +144,21 @@ pub(crate) async fn apply(
         .and_then(Weak::upgrade)
         .ok_or_else(|| fault("the admitted draft router is absent"))?;
     let router = router.as_ref().clone();
-    let response = APPROVER
+    Ok(APPROVER
         .scope(
             actor.clone(),
             crate::mcp_endpoint::dispatch(router, request),
         )
-        .await;
+        .await)
+}
+
+async fn applied_outcome(
+    state: &Arc<AppState>,
+    held: &DraftRecord,
+    actor: &Actor,
+    bytes: &[u8],
+    response: axum::response::Response,
+) -> Result<Outcome, ServerError> {
     let status = response.status();
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
@@ -139,15 +167,19 @@ pub(crate) async fn apply(
                 "the applied route's answer could not be read: {error}"
             ))
         })?;
-    let outcome = if status.is_success() {
+    if status.is_success() {
+        let application = actor
+            .draft()
+            .ok_or_else(|| fault("the applied act has no draft provenance"))?
+            .application;
         let receipt_index = with_directory(state, |directory| {
-            if let Some(index) = directory.projection()?.operation(approved.application) {
+            if let Some(index) = directory.projection()?.operation(application) {
                 return Ok(index);
             }
             let call = lys_identity::agent_call::AgentCall::new(
                 &held.created.method,
                 &held.created.path,
-                &crate::mcp_receipts::digest(&bytes),
+                &crate::mcp_receipts::digest(bytes),
                 "",
             )?;
             Ok(directory
@@ -155,10 +187,10 @@ pub(crate) async fn apply(
                 .coordinate()
                 .index)
         })?;
-        Outcome::Executed {
+        Ok(Outcome::Executed {
             status: status.as_u16(),
             receipt_index,
-        }
+        })
     } else {
         let answer: serde_json::Value = serde_json::from_slice(&body).map_err(|error| {
             fault(&format!(
@@ -171,18 +203,31 @@ pub(crate) async fn apply(
         let reason = answer["reason"]
             .as_str()
             .ok_or_else(|| fault("the applied route's refusal has no words"))?;
-        Outcome::RefusedOnExecution {
+        Ok(Outcome::RefusedOnExecution {
             refusal: refusal.to_owned(),
             reason: reason.to_owned(),
-        }
-    };
+        })
+    }
+}
+
+fn close(
+    state: &Arc<AppState>,
+    held: &DraftRecord,
+    actor: Actor,
+    outcome: &Outcome,
+) -> Result<(), ServerError> {
+    let approved = &held
+        .approved
+        .as_ref()
+        .ok_or_else(|| fault("the draft has no approval"))?
+        .0;
     with_directory(state, |directory| {
         let operation = OperationId::generate()?;
         let recorded_at = crate::session::now();
         let draft = held.created.operation;
         let draft_hash = held.hash;
         let application = approved.application;
-        let event = match &outcome {
+        let event = match outcome {
             Outcome::Executed {
                 status,
                 receipt_index,
@@ -211,6 +256,5 @@ pub(crate) async fn apply(
         };
         directory.record_draft(event)?;
         Ok(())
-    })?;
-    Ok(outcome)
+    })
 }
