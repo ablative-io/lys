@@ -179,7 +179,7 @@ pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
         .agent()
         .map(|id| *id.as_bytes())
         .or_else(|| provenance.service_account().map(|id| *id.as_bytes()));
-    map(out, if principal.is_some() { 5 } else { 4 });
+    map(out, if value.draft().is_some() {6} else if principal.is_some() { 5 } else { 4 });
     uint(out, 1);
     text(out, value.binding().issuer());
     uint(out, 2);
@@ -199,9 +199,14 @@ pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
             text(out, session);
         }
     }
-    if let Some(principal) = principal {
-        uint(out, 5);
-        bytes(out, &principal);
+    if value.draft().is_some() || principal.is_some() {
+        uint(out,5);
+        if let Some(principal)=principal { bytes(out,&principal); } else {out.push(0xf6);}
+    }
+    if let Some(draft)=value.draft() {
+        uint(out,6); head(out,MAJOR_ARRAY,3);
+        text(out,&draft.draft.to_string()); text(out,&draft.application.to_string());
+        if let Some(agent)=draft.drafted_by {text(out,&agent.to_string());} else {out.push(0xf6);}
     }
 }
 

@@ -17,6 +17,7 @@ mod refusal;
 #[cfg(test)]
 mod refusal_tests;
 use call::call;
+pub(crate) use call::dispatch_router as dispatch;
 pub(crate) use person::reading_actor;
 
 #[path = "mcp_endpoint/run_refusal.rs"]

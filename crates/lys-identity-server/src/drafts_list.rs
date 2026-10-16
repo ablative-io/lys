@@ -160,6 +160,8 @@ pub struct DraftView {
     /// The decision, absent while it waits.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub decided: Option<DraftDecision>,
+    /// The admitted route's durable outcome, absent until execution closes.
+    pub execution: Option<crate::drafts_apply::Outcome>,
 }
 
 /// The answer of `GET /drafts`.
@@ -342,7 +344,8 @@ fn view(
         note: created.note.clone(),
         created_at: created.recorded_at,
         creation_hash: hex(&held.hash),
-        state,
+        state:if held.executed.is_some() || held.refused_on_execution.is_some() {held.state()} else {state},
+        execution:crate::drafts_apply::outcome(held),
         decided: decision,
     })
 }

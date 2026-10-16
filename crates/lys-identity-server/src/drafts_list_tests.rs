@@ -112,7 +112,8 @@ async fn decided_drafts_leave_the_waiting_list_and_carry_their_decision() -> Res
             .ok_or("decided draft missing")
     };
     let approved = row(&created[0].0)?;
-    assert_eq!(approved["state"], "approved");
+    assert_eq!(approved["state"], "refused_on_execution");
+    assert_eq!(approved["execution"]["refusal"], "RequestMalformed");
     assert_eq!(approved["decided"]["by"]["id"], table.person);
     assert!(approved["decided"]["application"].as_str().is_some());
     assert!(approved["decided"]["at"].as_u64().is_some());

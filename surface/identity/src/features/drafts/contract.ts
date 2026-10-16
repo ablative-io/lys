@@ -7,7 +7,8 @@ export interface Named { id: string; display_name: string }
 /** The resource and action the prepared request names. */
 export interface DraftTarget { kind: string; id: string; action: string }
 
-export type DraftState = 'waiting' | 'approved' | 'refused' | 'corrected';
+export type DraftState = 'waiting' | 'approved' | 'refused' | 'corrected' | 'executed' | 'refused_on_execution';
+export type DraftExecution = { state: 'executed'; status: number; receipt_index: number } | { state: 'refused_on_execution'; refusal: string; reason: string };
 
 /** The agent that prepared a draft; its name is null when the directory no longer holds it. */
 export interface DraftAgent { id: string; display_name: string | null }
@@ -43,6 +44,7 @@ export interface Draft {
   /** The digest a decision names, so it decides exactly this creation. */
   creation_hash: string;
   state: DraftState;
+  execution?: DraftExecution | null;
   decided?: DraftDecision;
 }
 

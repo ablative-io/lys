@@ -220,6 +220,7 @@ async fn make_state(
         .clone()
         .map(crate::spicedb::SpiceDbEngine::new);
     Ok(Arc::new(AppState {
+        draft_execution:Default::default(),
         changes: crate::changes::Changes::new()?,
         kept_responsibilities: primary.kept_responsibilities,
         import_credential_file: config.import_credential_file.clone(),
@@ -446,6 +447,7 @@ fn served_routes(
         Arc::clone(&state),
         crate::operator::guard,
     ));
+    state.draft_execution.attach(dispatcher.clone())?;
     let api = api.merge(crate::mcp_oauth::challenged(
         crate::mcp_endpoint::run_refusals(
             guarded(crate::mcp_endpoint::admitted_routes(

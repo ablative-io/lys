@@ -1,4 +1,4 @@
-//! Draft admission records immutable words and decisions without executing them.
+//! Immutable prepared acts execute through the admitted router at approval.
 
 use std::str::FromStr;
 use std::sync::Arc;
@@ -40,7 +40,7 @@ pub struct DraftBody {
     note: String,
 }
 
-/// An approval reserves an application operation but performs no application.
+/// An approval reserves the operation used by its prepared request.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DraftApproveBody {
@@ -78,6 +78,7 @@ pub struct DraftAnswer {
     tree_size: u64,
     leaf_hash: String,
     replacement: Option<String>,
+    execution: Option<crate::drafts_apply::Outcome>,
 }
 
 /// The four draft mutations and the list of drafts a person may decide.
@@ -174,23 +175,6 @@ fn creation_hash(text: &str) -> Result<[u8; 32], ServerError> {
     })
 }
 
-fn matches_path(pattern: &str, path: &str) -> bool {
-    let mut actual = path.split('/');
-    for segment in pattern.split('/') {
-        let Some(given) = actual.next() else {
-            return false;
-        };
-        if segment.starts_with('{') && segment.ends_with('}') {
-            if given.is_empty() {
-                return false;
-            }
-        } else if segment != given {
-            return false;
-        }
-    }
-    actual.next().is_none()
-}
-
 fn creation(
     body: DraftBody,
     actor: Actor,
@@ -198,17 +182,13 @@ fn creation(
     at: u64,
     corrects: Option<OperationId>,
 ) -> Result<Created, ServerError> {
-    if !crate::openapi_table::TABLE.iter().any(|route| {
-        let method = match route.0 {
-            lys_openapi::Method::Get => "GET",
-            lys_openapi::Method::Post => "POST",
-            lys_openapi::Method::Put => "PUT",
-        };
-        method == body.method && method != "GET" && matches_path(route.1, &body.path)
-    }) {
-        return Err(malformed(
-            "the prepared request must name a registered mutation route",
-        ));
+    let (resource,action)=crate::openapi_table::token_scope(&body.method,&body.path).map_err(|_|ServerError::SecretsRefused {
+        status:axum::http::StatusCode::CONFLICT,refusal:"DraftChangeInvalid".to_owned(),
+        reason:format!("target {}:{} {} names no declared mutation scope for {} {}",body.target.kind,body.target.id,body.target.action,body.method,body.path),
+    })?;
+    if body.method=="GET" || body.target.kind!=resource.kind() || body.target.id!=resource.id() || body.target.action!=action.as_str() {
+        return Err(ServerError::SecretsRefused {status:axum::http::StatusCode::CONFLICT,refusal:"DraftChangeInvalid".to_owned(),
+            reason:format!("target {}:{} {} differs from route scope {}:{} {}",body.target.kind,body.target.id,body.target.action,resource.kind(),resource.id(),action.as_str())});
     }
     Ok(Created {
         operation: OperationId::from_str(&body.operation)?,
@@ -399,6 +379,7 @@ fn append(
         tree_size: coordinate.tree_size,
         leaf_hash: hex(&coordinate.leaf_hash),
         replacement: replacement.map(|id| id.to_string()),
+        execution:None,
     }))
 }
 
@@ -412,19 +393,28 @@ async fn approve(
     let body: DraftApproveBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
-    with_directory(&state, |directory| {
-        responsible(directory, (&actor, by_app), draft)?;
-        let event = DraftEvent::Approved(Arc::new(Approved {
-            operation: OperationId::from_str(&body.operation)?,
-            actor,
-            recorded_at: crate::session::now(),
-            draft,
-            draft_hash: hash,
-            application: OperationId::from_str(&body.application)?,
-            evidence: None,
-        }));
-        append(directory, event, draft, hash, None)
-    })
+    if crate::drafts_apply::actor().is_some() {
+        return Err(malformed("a prepared request cannot approve another draft"));
+    }
+    let execution_guard=state.draft_execution.gate.lock().await;
+    let application=OperationId::from_str(&body.application)?;
+    let operation=OperationId::from_str(&body.operation)?;
+    let (mut answer,held)=with_directory(&state,|directory| {
+        responsible(directory,(&actor,by_app),draft)?;
+        let held=directory.projection()?.draft(draft).ok_or_else(||lys_identity::IdentityError::DraftNotFound{draft:draft.to_string()})?.clone();
+        let event=if let Some((approved,_))=&held.approved {
+            if approved.application!=application || approved.operation!=operation || held.hash!=hash {
+                return Err(lys_identity::IdentityError::DraftNotPending{draft:draft.to_string()}.into());
+            }
+            DraftEvent::Approved(Arc::clone(approved))
+        } else { DraftEvent::Approved(Arc::new(Approved {operation,actor:actor.clone(),recorded_at:crate::session::now(),draft,draft_hash:hash,application,evidence:None})) };
+        let answer=append(directory,event,draft,hash,None)?;
+        let held=directory.projection()?.draft(draft).ok_or_else(||lys_identity::IdentityError::DraftNotFound{draft:draft.to_string()})?.clone();
+        Ok((answer,held))
+    })?;
+    answer.execution=Some(Box::pin(crate::drafts_apply::apply(&state,&headers,&held,actor)).await?);
+    drop(execution_guard);
+    Ok(answer)
 }
 
 async fn refuse(

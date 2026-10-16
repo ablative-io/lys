@@ -69,7 +69,7 @@ describe('Drafts under Access', () => {
     expect(row()).toBeNull();
     expect(text().split('Nothing is waiting.')).toHaveLength(2);
     await click(button('Decided'));
-    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Approved by Ada (test person), ' + clock(1790000100));
+    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Approved, not carried out by Ada (test person), ' + clock(1790000100));
     expect(sessionStorage.length).toBe(0);
   });
 

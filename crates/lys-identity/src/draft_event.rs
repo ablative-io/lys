@@ -134,11 +134,57 @@ pub struct Correction {
     pub corrected_hash: [u8; 32],
 }
 
+/// The durable outcome of carrying out an approved draft.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Executed {
+    /// The closing event's operation.
+    pub operation: OperationId,
+    /// The approving person, authenticated independently of the author.
+    pub actor: Actor,
+    /// The closing instant in seconds.
+    pub recorded_at: u64,
+    /// The immutable draft being closed.
+    pub draft: OperationId,
+    /// The creation payload commitment.
+    pub draft_hash: [u8; 32],
+    /// The operation reserved at approval.
+    pub application: OperationId,
+    /// The successful route status.
+    pub status: u16,
+    /// The applied route's durable receipt index.
+    pub receipt_index: u64,
+}
+
+/// The durable outcome of carrying out an approved draft.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefusedOnExecution {
+    /// The closing event's operation.
+    pub operation: OperationId,
+    /// The approving person, authenticated independently of the author.
+    pub actor: Actor,
+    /// The closing instant in seconds.
+    pub recorded_at: u64,
+    /// The immutable draft being closed.
+    pub draft: OperationId,
+    /// The creation payload commitment.
+    pub draft_hash: [u8; 32],
+    /// The operation reserved at approval.
+    pub application: OperationId,
+    /// The route's own refusal name.
+    pub refusal: String,
+    /// The route's own refusal words.
+    pub reason: String,
+}
+
 /// A draft creation or a hash-bound approval in the directory log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DraftEvent {
     /// Record the immutable prepared change.
     Created(Arc<Created>),
+    /// The route carried out the approved request.
+    Executed(Arc<Executed>),
+    /// The route refused the approved request.
+    RefusedOnExecution(Arc<RefusedOnExecution>),
     /// Record a decision bound to that creation's payload.
     Approved(Arc<Approved>),
     /// Refuse the original change without applying it.
@@ -205,6 +251,8 @@ impl DraftEvent {
     pub fn operation(&self) -> OperationId {
         match self {
             Self::Created(event) => event.operation,
+            Self::Executed(event) => event.operation,
+            Self::RefusedOnExecution(event) => event.operation,
             Self::Approved(event) => event.operation,
             Self::Refused(event) => event.operation,
             Self::Correction(event) => event.operation,
@@ -218,6 +266,14 @@ impl DraftEvent {
     /// - `IdentityError::DraftHashMismatch` if a correction does not commit to its corrected creation payload.
     pub fn validate(&self) -> Result<(), IdentityError> {
         match self {
+            Self::Executed(event) => {
+                if !(200..300).contains(&event.status) { return Err(invalid("an execution needs a successful status")); }
+                closing(event.operation, event.draft, event.application, &event.actor)
+            }
+            Self::RefusedOnExecution(event) => {
+                if event.refusal.trim().is_empty() || event.reason.trim().is_empty() { return Err(invalid("an execution refusal needs its name and words")); }
+                closing(event.operation, event.draft, event.application, &event.actor)
+            }
             Self::Created(event) => {
                 if !token(&event.target.kind)
                     || !resource_id(&event.target.id)
@@ -286,7 +342,7 @@ impl DraftEvent {
     pub fn version(&self) -> u64 {
         match self {
             Self::Created(event) if event.request_signature.is_some() => 2,
-            Self::Refused(_) | Self::Correction(_) => 2,
+            Self::Refused(_) | Self::Correction(_) | Self::Executed(_) | Self::RefusedOnExecution(_) => 2,
             Self::Created(_) | Self::Approved(_) => 1,
         }
     }
@@ -295,6 +351,8 @@ impl DraftEvent {
         match self {
             Self::Created(_) => None,
             Self::Approved(event) => Some((event.draft, event.draft_hash)),
+            Self::Executed(event) => Some((event.draft, event.draft_hash)),
+            Self::RefusedOnExecution(event) => Some((event.draft, event.draft_hash)),
             Self::Refused(event) => Some((event.draft, event.draft_hash)),
             Self::Correction(event) => Some((event.draft, event.draft_hash)),
         }
@@ -305,7 +363,7 @@ impl DraftEvent {
         let creation = match self {
             Self::Created(event) => Some(event),
             Self::Correction(event) => Some(&event.corrected),
-            Self::Approved(_) | Self::Refused(_) => None,
+            Self::Approved(_) | Self::Refused(_) | Self::Executed(_) | Self::RefusedOnExecution(_) => None,
         };
         if creation
             .is_some_and(|event| event.evidence.is_some() && event.request_signature.is_none())
@@ -318,65 +376,16 @@ impl DraftEvent {
     }
 }
 
-impl RequestSignature {
-    fn check(&self, proof: &RequestEvidence) -> Result<(), IdentityError> {
-        if !self.header.is_ascii()
-            || self
-                .header
-                .iter()
-                .any(|byte| byte.is_ascii_control() && *byte != b'\t')
-        {
-            return Err(invalid("the original signature header must be ASCII"));
-        }
-        let header = std::str::from_utf8(&self.header)
-            .ok()
-            .ok_or_else(|| invalid("the signature header is not UTF-8"))?;
-        let words: Vec<_> = header.split_ascii_whitespace().collect();
-        let [agent, at, nonce, cose] = words.as_slice() else {
-            return Err(invalid("the signature header must contain four fields"));
-        };
-        let timestamp = at.parse::<u64>().ok();
-        let cose_bytes = cose
-            .as_bytes()
-            .chunks_exact(2)
-            .map(|pair| {
-                std::str::from_utf8(pair)
-                    .ok()
-                    .and_then(|text| u8::from_str_radix(text, 16).ok())
-            })
-            .collect::<Option<Vec<_>>>();
-        if *agent != proof.agent.to_string()
-            || timestamp != Some(proof.signed_at_ms)
-            || *nonce != proof.nonce
-            || cose.len() % 2 != 0
-            || cose_bytes.as_deref() != Some(proof.cose_sign1.as_slice())
-        {
-            return Err(invalid(
-                "the retained signature header disagrees with the verified evidence",
-            ));
-        }
-        let expected = format!(
-            "lys-identity/agent-request/v1\n{}\n{}\n{}\n{}\n{}",
-            proof.method,
-            proof.path,
-            crate::id::to_hex(&crate::encoding::payload_commitment(&proof.body)),
-            proof.signed_at_ms,
-            proof.nonce
-        );
-        if self.payload != expected.as_bytes() {
-            return Err(invalid(
-                "the retained payload is not the exact signed request payload",
-            ));
-        }
-        if lys_core::attestation::verify_attestation_bytes(&proof.cose_sign1, &self.payload)
-            .is_err()
-        {
-            return Err(invalid("the retained request signature is invalid"));
-        }
-        Ok(())
-    }
-}
+#[path="draft_request_signature.rs"]
+mod signature;
 
 #[cfg(test)]
 #[path="draft_event_close_tests.rs"]
 mod close_tests;
+
+fn closing(operation:OperationId,draft:OperationId,application:OperationId,actor:&Actor)->Result<(),IdentityError> {
+    if operation==draft || operation==application || draft==application || actor.provenance().agent().is_some() {
+        return Err(invalid("a close needs distinct operations and the approving person's authority"));
+    }
+    Ok(())
+}

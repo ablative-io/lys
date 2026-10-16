@@ -32,6 +32,9 @@ impl<S: LeafStore> Directory<S> {
                         reason: format!("operation {operation} names missing leaf {index}"),
                     })?;
             if matches!(held.entry(), Entry::Draft(draft) if draft.as_ref() == &event) {
+                if let Some((draft,_))=event.decision().filter(|_|matches!(event,DraftEvent::Executed(_) | DraftEvent::RefusedOnExecution(_))) {
+                    return Err(IdentityError::DraftNotPending {draft:draft.to_string()});
+                }
                 return Ok(coordinate);
             }
             return Err(IdentityError::OperationReused {

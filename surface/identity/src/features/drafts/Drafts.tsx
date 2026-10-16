@@ -50,9 +50,11 @@ const deciderOf = (decided: NonNullable<Draft['decided']>): string =>
   decided.by?.display_name ?? (RAW_ID.test(decided.login.subject) || !/[A-Za-z]/.test(decided.login.subject) || /^[0-9a-f-]{20,}$/i.test(decided.login.subject) ? 'someone outside your view' : decided.login.subject);
 
 function Decided({ draft, listed }: { draft: Draft; listed: (id: string) => boolean }) {
-  const said = draft.state === 'approved' ? 'Approved' : draft.state === 'refused' ? 'Refused' : draft.state === 'corrected' ? 'Corrected' : draft.state;
+  const said = draft.state === 'executed' ? 'Carried out' : draft.state === 'refused_on_execution' ? 'Refused when carried out' : draft.state === 'approved' ? 'Approved, not carried out' : draft.state === 'refused' ? 'Refused' : draft.state === 'corrected' ? 'Corrected' : draft.state;
   const replacement = draft.decided?.replacement ?? null;
-  return <span className="sec">{said}{draft.decided ? ' by ' + deciderOf(draft.decided) + ', ' + clock(draft.decided.at) : ''}
+  return <span className="sec" role={draft.state === 'approved' ? 'alert' : undefined}>{said}{draft.decided ? ' by ' + deciderOf(draft.decided) + ', ' + clock(draft.decided.at) : ''}
+    {draft.execution?.state === 'executed' && <span className="draft-reason"><a href={'/api/receipts/' + draft.execution.receipt_index}>View receipt</a></span>}
+    {draft.execution?.state === 'refused_on_execution' && <span className="draft-reason">{draft.execution.refusal}: {draft.execution.reason}</span>}
     {draft.decided?.reason ? <span className="draft-reason">{draft.decided.reason}</span> : null}
     {replacement ? <span className="draft-reason">{listed(replacement)
       ? <>Replaced by <a href={'#/access/drafts?draft=' + encodeURIComponent(replacement)} data-act="replacement">the corrected draft</a>.</>

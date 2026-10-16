@@ -18,6 +18,15 @@ use crate::sessions_api::SessionLogin;
 /// The actor a receipt was signed for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ReceiptActorView {
+    /// The approved draft whose request this receipt carries.
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub draft:Option<String>,
+    /// The operation reserved for the prepared request.
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub application:Option<String>,
+    /// The draft's author, separately from the person's authentication.
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub drafted_by:Option<String>,
     /// How the actor authenticated; a service account never claims an OIDC sign-in.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authentication: Option<String>,
@@ -84,6 +93,9 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
         version: receipt.version(),
         operation: receipt.operation().to_string(),
         actor: ReceiptActorView {
+            draft:actor.draft().map(|d|d.draft.to_string()),
+            application:actor.draft().map(|d|d.application.to_string()),
+            drafted_by:actor.draft().and_then(|d|d.drafted_by).map(|id|id.to_string()),
             authentication: actor
                 .provenance()
                 .run()
@@ -97,7 +109,7 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
                 .or_else(|| {
                     (actor.provenance().method() == lys_identity::AuthMethod::Operator)
                         .then(|| "operator".to_owned())
-                }),
+                }).or_else(||actor.draft().map(|_|"oidc".to_owned())),
             service_account: actor
                 .provenance()
                 .service_account()

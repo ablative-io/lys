@@ -92,6 +92,7 @@ pub mod dashboard_api;
 pub mod dev_seed;
 pub mod directory_views;
 pub mod drafts_api;
+pub mod drafts_apply;
 #[cfg(test)]
 mod drafts_api_tests;
 pub mod drafts_list;
@@ -359,3 +360,6 @@ mod seat_program_review_tests;
 
 #[cfg(test)]
 mod drafts_apply_tests;
+
+#[cfg(test)]
+mod drafts_test_support;

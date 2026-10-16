@@ -244,19 +244,13 @@ async fn dispatch(
     if app.is_some() {
         parts.headers.remove(header::AUTHORIZATION);
     }
-    let relay = endpoint
-        .router
-        .clone()
-        .oneshot(Request::from_parts(parts, body));
+    let relay = dispatch_router(endpoint.router.clone(), Request::from_parts(parts, body));
     let answered = match (relayed, token) {
         (Some(relayed), _) => crate::agent_signature::relayed(relayed, relay).await,
         (None, Some(principal)) => crate::agent_signature::token_scoped(principal, relay).await,
         (None, None) => relay.await,
     };
-    let response = match answered {
-        Ok(response) => response,
-        Err(error) => match error {},
-    };
+    let response = answered;
     let made = response.status().is_success();
     let mut result = super::refusal::rendered(endpoint, &method, &route, agent, response).await?;
     if let Some(kept) = kept {
@@ -329,4 +323,8 @@ mod validation_tests {
         assert!(parsed(&json!({"name":"what-can-I-do","arguments":{"path":"/people"}})).is_err());
         assert!(parsed(&json!({"name":"what-can-I-do","arguments":{}})).is_ok());
     }
+}
+
+pub(crate) async fn dispatch_router(router:axum::Router,request:Request)->axum::response::Response {
+    match router.oneshot(request).await {Ok(response)=>response,Err(error)=>match error {}}
 }

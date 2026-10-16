@@ -150,9 +150,28 @@ impl Provenance {
 pub struct Actor {
     binding: LoginBinding,
     provenance: Provenance,
+    draft: Option<DraftProvenance>,
+}
+
+/// The prepared act's origin, separate from the approver's authentication.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DraftProvenance {
+    /// The immutable draft id.
+    pub draft: crate::OperationId,
+    /// The reserved application operation.
+    pub application: crate::OperationId,
+    /// The agent that prepared the act, absent for a person's correction.
+    pub drafted_by: Option<AgentId>,
 }
 
 impl Actor {
+    /// Attach the approved act's origin without changing authentication.
+    #[must_use]
+    pub fn with_draft(mut self, draft:DraftProvenance)->Self { self.draft=Some(draft); self }
+    /// The prepared act carried by this authenticated person.
+    #[must_use]
+    pub fn draft(&self)->Option<&DraftProvenance> { self.draft.as_ref() }
+
     /// The human named by `binding`, one of their logins, authenticated as
     /// `provenance` says.
     #[must_use]
@@ -160,6 +179,7 @@ impl Actor {
         Self {
             binding,
             provenance,
+            draft: None,
         }
     }
 

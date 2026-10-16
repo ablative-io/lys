@@ -11,6 +11,8 @@ use std::sync::Arc;
 
 #[path = "draft_decision_encoding.rs"]
 mod decisions;
+#[path="draft_close_encoding.rs"]
+mod closes;
 
 fn nullable_operation(out: &mut Vec<u8>, value: Option<OperationId>) {
     if let Some(value) = value {
@@ -84,6 +86,7 @@ pub fn encode(event: &DraftEvent) -> Vec<u8> {
             text(&mut out, &value.application.to_string());
             evidence(&mut out, value.evidence.as_ref());
         }
+        DraftEvent::Executed(_) | DraftEvent::RefusedOnExecution(_) => closes::write(&mut out,event),
         DraftEvent::Refused(value) => decisions::write_refused(&mut out, value),
         DraftEvent::Correction(value) => decisions::write_correction(&mut out, value),
     }
@@ -247,6 +250,7 @@ pub fn decode(body: &[u8]) -> Result<DraftEvent, IdentityError> {
         (1, 1) => approved(value)?,
         (2, 2) => decisions::refused(value)?,
         (2, 3) => decisions::correction(value)?,
+        (2, 4 | 5) => closes::read(value)?,
         _ => return Err(malformed("the draft version and kind are not supported")),
     };
     event.validate()?;

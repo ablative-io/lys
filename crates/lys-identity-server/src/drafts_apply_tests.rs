@@ -1,4 +1,4 @@
-use crate::drafts_api_tests::Table;
+use crate::drafts_test_support::Table;
 use lys_identity::{OperationId, AuthMethod};
 use serde_json::{Value,json};
 use std::error::Error;
@@ -84,6 +84,27 @@ async fn draft_target_must_equal_the_declared_route_kind_action_and_id() -> Resu
         assert!(reason.contains(value));
         assert!(reason.contains(&table.agent));
         assert_eq!(table.service.log_size().await?,before);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn execution_keeps_the_routes_own_not_held_and_unknown_profile_refusals() -> Result<(),Box<dyn Error>> {
+    let table=Table::start().await?;
+    for (path,target,body,expected) in [
+        ("/grants/check".to_owned(),json!({"kind":"grant","id":"all","action":"grant.check"}),json!({"route":"api","resource":{"kind":"person","id":table.person},"action":"write"}),"NotHeld"),
+        (format!("/agents/{}/provisioning/999/review",table.agent),json!({"kind":"agent","id":table.agent,"action":"agent.provisioning.review"}),json!({"operation":OperationId::generate()?.to_string()}),"ProfileVersionUnknown"),
+    ] {
+        let (id,created)=draft(&table,&path,target,body).await?;
+        let body=json!({"operation":OperationId::generate()?.to_string(),"application":OperationId::generate()?.to_string(),"creation_hash":created["creation_hash"]});
+        let (status,answer)=table.service.post(&format!("/drafts/{id}/approve"),Some(&table.owner),&body).await?;
+        assert_eq!(status,200,"{answer}");
+        assert_eq!(answer["execution"]["state"],"refused_on_execution");
+        assert_eq!(answer["execution"]["refusal"],expected,"{answer}");
+        let (_,listed)=table.service.get("/drafts?state=decided",Some(&table.owner)).await?;
+        let row=listed["drafts"].as_array().and_then(|rows|rows.iter().find(|row|row["id"]==id)).ok_or("draft absent")?;
+        assert_eq!(row["execution"]["refusal"],expected);
+        assert!(row["execution"]["reason"].as_str().is_some_and(|s|!s.is_empty()));
     }
     Ok(())
 }

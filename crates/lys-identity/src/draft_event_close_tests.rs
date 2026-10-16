@@ -45,3 +45,26 @@ fn a_refused_draft_cannot_close_as_executed() -> Result<(),Box<dyn Error>> {
     assert!(matches!(projection.check_draft(&close(hash,false)?),Err(IdentityError::DraftNotPending{..})));
     Ok(())
 }
+
+#[test]
+fn an_old_draft_log_reopens_and_its_closing_event_survives_a_snapshot() -> Result<(),Box<dyn Error>> {
+    let home=tempfile::tempdir()?;
+    let key=home.path().join("key");
+    lys_core::Ed25519Identity::load_or_generate(&key)?;
+    let log=home.path().join("log");
+    lys_log_store::FileLeafStore::create(&log,"example.test/drafts")?;
+    let open=|| -> Result<crate::Directory<lys_log_store::FileLeafStore>,Box<dyn Error>> {
+        let log=log.clone();
+        Ok(crate::Directory::open_with(Box::new(move ||lys_log_store::FileLeafStore::open(&log)),lys_core::Ed25519Identity::load(&key)?,std::num::NonZeroU64::new(1).ok_or("snapshot interval absent")?)?)
+    };
+    let creation=created()?;
+    let hash=crate::encoding::payload_commitment(&encode(&creation));
+    {let mut directory=open()?;directory.record_draft(creation.clone())?;directory.record_draft(approved(hash)?)?;}
+    let mut directory=open()?;
+    assert_eq!(directory.projection()?.draft(op(1)).ok_or("draft absent")?.state(),"approved");
+    directory.record_draft(close(hash,false)?)?;
+    assert!(matches!(directory.record_draft(close(hash,false)?),Err(IdentityError::DraftNotPending{..})));
+    drop(directory);
+    assert_eq!(open()?.projection()?.draft(op(1)).ok_or("draft absent")?.state(),"executed");
+    Ok(())
+}

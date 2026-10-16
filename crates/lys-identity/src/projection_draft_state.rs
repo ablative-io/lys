@@ -25,6 +25,7 @@ pub(in crate::projection) fn encode(projection: &Projection) -> Value {
                         array(vec![bytes(&draft_event::encode(&decision)), uint(index)])
                     })),
                     nullable(record.replacement_of.map(operation)),
+                    nullable(record.executed.as_ref().map(|(e,i)|(DraftEvent::Executed(Arc::clone(e)),*i)).or_else(||record.refused_on_execution.as_ref().map(|(e,i)|(DraftEvent::RefusedOnExecution(Arc::clone(e)),*i))).map(|(e,i)|array(vec![bytes(&draft_event::encode(&e)),uint(i)]))),
                 ])
             })
             .collect(),
@@ -51,7 +52,8 @@ pub(in crate::projection) fn decode(
         if fields.len() == 3 {
             fields.push(Value::Null);
         }
-        let [created, index, decision, replacement] = tuple::<4>(array(fields), "a draft record")?;
+        if fields.len()==4 { fields.push(Value::Null); }
+        let [created, index, decision, replacement, closing] = tuple::<5>(array(fields), "a draft record")?;
         let (created, hash) = event(created)?;
         let DraftEvent::Created(created) = created else {
             return Err("a draft record starts with a creation".to_owned());
@@ -65,6 +67,8 @@ pub(in crate::projection) fn decode(
             created,
             hash,
             created_index,
+            executed:None,
+            refused_on_execution:None,
             approved: None,
             refused: None,
             correction: None,
@@ -85,9 +89,23 @@ pub(in crate::projection) fn decode(
                 DraftEvent::Approved(value) => record.approved = Some((value, index)),
                 DraftEvent::Refused(value) => record.refused = Some((value, index)),
                 DraftEvent::Correction(value) => record.correction = Some((value, index)),
-                DraftEvent::Created(_) => {
+                DraftEvent::Created(_) | DraftEvent::Executed(_) | DraftEvent::RefusedOnExecution(_) => {
                     return Err("a creation is not a draft decision".to_owned());
                 }
+            }
+        }
+        if let Some(closing)=read_nullable(closing) {
+            let [value,index]=tuple::<2>(closing,"a draft closing event")?;
+            let (event,_)=event(value)?;
+            let index=read_uint(&index,"a closing position")?;
+            let application=record.approved.as_ref().ok_or("an execution has no approval")?.0.application;
+            if event.decision()!=Some((record.created.operation,hash)) || projection.operation(event.operation())!=Some(index) {
+                return Err("an execution disagrees with its draft".to_owned());
+            }
+            match event {
+                DraftEvent::Executed(e) if e.application==application=>record.executed=Some((e,index)),
+                DraftEvent::RefusedOnExecution(e) if e.application==application=>record.refused_on_execution=Some((e,index)),
+                _=>return Err("a closing event disagrees with its approval".to_owned()),
             }
         }
         if Arc::make_mut(&mut projection.drafts)
