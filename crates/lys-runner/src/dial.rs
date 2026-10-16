@@ -187,8 +187,8 @@ impl Dial {
     /// greeting `greeting` of a connection to its runner.
     ///
     /// # Errors
-    /// - `RunnerError::Dial` if server/TLS setup fails, the epoch or request is not text, or the response omits its ticket.
-    /// - `RunnerError::Unreachable` if server transport fails or closes.
+    /// - `RunnerError::Dial` if server/TLS setup fails, or the epoch or request is not text.
+    /// - `RunnerError::Unreachable` if server transport fails or closes, or an answer carries no ticket.
     /// - `RunnerError::DialStale` if the server refuses the signed epoch.
     /// - `RunnerError::Refused` if the server returns a named refusal or transport state cannot be held.
     pub fn next(&self, greeting: &str) -> Result<(String, String), RunnerError> {
@@ -204,6 +204,24 @@ impl Dial {
             key: Arc::clone(&self.key),
         })
     }
+}
+
+/// The ticket a long poll was answered with. An answer without one did not
+/// come from Lys's dial: a restarting server, or something in front of it,
+/// answered. That is a lost connection, so the bridge reconnects rather than
+/// ending while its runner keeps serving.
+fn ticket(answer: &Response) -> Result<String, RunnerError> {
+    answer
+        .header(TICKET_HEADER)
+        .map(str::to_owned)
+        .ok_or_else(|| RunnerError::Unreachable {
+            reason: format!(
+                "the server answered HTTP {} without a ticket ({}, {} bytes): something other than Lys's dial answered",
+                answer.status,
+                answer.header("content-type").unwrap_or("no content type"),
+                answer.body.len()
+            ),
+        })
 }
 
 fn control_request(line: &str) -> bool {
@@ -234,10 +252,7 @@ impl Signer {
 
     fn next(&self, epoch: &str, greeting: &str) -> Result<(String, String), RunnerError> {
         let answer = self.post(&next_route(&self.machine), epoch, greeting.as_bytes())?;
-        let ticket = answer
-            .header(TICKET_HEADER)
-            .ok_or_else(|| failed("the server named no ticket"))?
-            .to_owned();
+        let ticket = ticket(&answer)?;
         let line = String::from_utf8(answer.body)
             .map_err(|error| failed(format!("the request is not text: {error}")))?;
         Ok((ticket, line))
@@ -280,3 +295,6 @@ mod control_status_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod ticketless_tests;

@@ -21,10 +21,7 @@ impl Signer {
             })?;
             return Ok(Frame::GoingAway(expected));
         }
-        let ticket = answer
-            .header(super::super::TICKET_HEADER)
-            .ok_or_else(|| super::super::failed("the server named no ticket"))?
-            .to_owned();
+        let ticket = super::super::ticket(&answer)?;
         let line = String::from_utf8(answer.body)
             .map_err(|error| super::super::failed(format!("the request is not text: {error}")))?;
         Ok(Frame::Request(ticket, line))
