@@ -70,4 +70,3 @@ Leave agent permissions unticked when choosing Person reads.</p></fieldset>\
     )
         .into_response())
 }
-

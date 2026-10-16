@@ -92,9 +92,9 @@ pub mod dashboard_api;
 pub mod dev_seed;
 pub mod directory_views;
 pub mod drafts_api;
-pub mod drafts_apply;
 #[cfg(test)]
 mod drafts_api_tests;
+pub mod drafts_apply;
 pub mod drafts_list;
 pub mod error;
 pub mod error_agents;

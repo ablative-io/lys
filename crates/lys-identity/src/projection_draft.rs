@@ -1,7 +1,9 @@
 //! Draft records retain immutable creation hashes and hash-bound decisions.
 
 use super::Projection;
-use crate::draft_event::{Approved, Correction, Created, DraftEvent, Executed, RefusedOnExecution, Refused};
+use crate::draft_event::{
+    Approved, Correction, Created, DraftEvent, Executed, Refused, RefusedOnExecution,
+};
 use crate::encoding::payload_commitment;
 use crate::{IdentityError, OperationId};
 use std::sync::Arc;
@@ -27,18 +29,28 @@ pub struct DraftRecord {
     /// The original when this record is the corrector's own change.
     pub replacement_of: Option<OperationId>,
     /// The successful route answer and closing position.
-    pub executed: Option<(Arc<Executed>,u64)>,
+    pub executed: Option<(Arc<Executed>, u64)>,
     /// The route refusal and closing position.
-    pub refused_on_execution: Option<(Arc<RefusedOnExecution>,u64)>,
+    pub refused_on_execution: Option<(Arc<RefusedOnExecution>, u64)>,
 }
 
 impl DraftRecord {
     /// The current state, including the route's durable outcome.
     #[must_use]
-    pub fn state(&self)->&'static str {
-        if self.executed.is_some() {"executed"} else if self.refused_on_execution.is_some() {"refused_on_execution"}
-        else if self.approved.is_some() {"approved"} else if self.correction.is_some() {"corrected"}
-        else if self.refused.is_some() {"refused"} else {"waiting"}
+    pub fn state(&self) -> &'static str {
+        if self.executed.is_some() {
+            "executed"
+        } else if self.refused_on_execution.is_some() {
+            "refused_on_execution"
+        } else if self.approved.is_some() {
+            "approved"
+        } else if self.correction.is_some() {
+            "corrected"
+        } else if self.refused.is_some() {
+            "refused"
+        } else {
+            "waiting"
+        }
     }
 
     /// Whether this original still awaits a decision.
@@ -100,8 +112,21 @@ impl Projection {
             if held.hash != hash {
                 return Err(IdentityError::DraftHashMismatch);
             }
-            let application=match event {DraftEvent::Executed(e)=>Some(e.application),DraftEvent::RefusedOnExecution(e)=>Some(e.application),_=>None};
-            let permitted=application.map_or_else(||held.is_pending(),|application|held.approved.as_ref().is_some_and(|(a,_)|a.application==application) && held.executed.is_none() && held.refused_on_execution.is_none());
+            let application = match event {
+                DraftEvent::Executed(e) => Some(e.application),
+                DraftEvent::RefusedOnExecution(e) => Some(e.application),
+                _ => None,
+            };
+            let permitted = application.map_or_else(
+                || held.is_pending(),
+                |application| {
+                    held.approved
+                        .as_ref()
+                        .is_some_and(|(a, _)| a.application == application)
+                        && held.executed.is_none()
+                        && held.refused_on_execution.is_none()
+                },
+            );
             if !permitted {
                 return Err(IdentityError::DraftNotPending {
                     draft: draft.to_string(),
@@ -109,7 +134,14 @@ impl Projection {
             }
         }
         if let DraftEvent::Approved(approval) = event {
-            if self.operation(approval.application).is_some() {
+            if self.operation(approval.application).is_some()
+                || self.drafts().any(|record| {
+                    record
+                        .approved
+                        .as_ref()
+                        .is_some_and(|(held, _)| held.application == approval.application)
+                })
+            {
                 return Err(IdentityError::OperationReused {
                     operation: approval.application.to_string(),
                 });
@@ -146,8 +178,8 @@ impl Projection {
                     created: Arc::clone(created),
                     hash: payload_commitment(&crate::draft_event::encode(event)),
                     created_index: index,
-                    executed:None,
-                    refused_on_execution:None,
+                    executed: None,
+                    refused_on_execution: None,
                     approved: None,
                     refused: None,
                     correction: None,
@@ -155,13 +187,21 @@ impl Projection {
                 };
                 Arc::make_mut(&mut self.drafts).insert(created.operation, Arc::new(record));
             }
-            DraftEvent::Executed(event)=>{
-                let held=Arc::make_mut(&mut self.drafts).get_mut(&event.draft).ok_or_else(||IdentityError::DraftNotFound{draft:event.draft.to_string()})?;
-                Arc::make_mut(held).executed=Some((Arc::clone(event),index));
+            DraftEvent::Executed(event) => {
+                let held = Arc::make_mut(&mut self.drafts)
+                    .get_mut(&event.draft)
+                    .ok_or_else(|| IdentityError::DraftNotFound {
+                        draft: event.draft.to_string(),
+                    })?;
+                Arc::make_mut(held).executed = Some((Arc::clone(event), index));
             }
-            DraftEvent::RefusedOnExecution(event)=>{
-                let held=Arc::make_mut(&mut self.drafts).get_mut(&event.draft).ok_or_else(||IdentityError::DraftNotFound{draft:event.draft.to_string()})?;
-                Arc::make_mut(held).refused_on_execution=Some((Arc::clone(event),index));
+            DraftEvent::RefusedOnExecution(event) => {
+                let held = Arc::make_mut(&mut self.drafts)
+                    .get_mut(&event.draft)
+                    .ok_or_else(|| IdentityError::DraftNotFound {
+                        draft: event.draft.to_string(),
+                    })?;
+                Arc::make_mut(held).refused_on_execution = Some((Arc::clone(event), index));
             }
             DraftEvent::Approved(approved) => {
                 let held = Arc::make_mut(&mut self.drafts)
@@ -192,9 +232,9 @@ impl Projection {
                         created: Arc::clone(&correction.corrected),
                         hash: correction.corrected_hash,
                         created_index: index,
-                        executed:None,
-                    refused_on_execution:None,
-                    approved: None,
+                        executed: None,
+                        refused_on_execution: None,
+                        approved: None,
                         refused: None,
                         correction: None,
                         replacement_of: Some(correction.draft),

@@ -267,12 +267,26 @@ impl DraftEvent {
     pub fn validate(&self) -> Result<(), IdentityError> {
         match self {
             Self::Executed(event) => {
-                if !(200..300).contains(&event.status) { return Err(invalid("an execution needs a successful status")); }
-                closing(event.operation, event.draft, event.application, &event.actor)
+                if !(200..300).contains(&event.status) {
+                    return Err(invalid("an execution needs a successful status"));
+                }
+                closing(
+                    event.operation,
+                    event.draft,
+                    event.application,
+                    &event.actor,
+                )
             }
             Self::RefusedOnExecution(event) => {
-                if event.refusal.trim().is_empty() || event.reason.trim().is_empty() { return Err(invalid("an execution refusal needs its name and words")); }
-                closing(event.operation, event.draft, event.application, &event.actor)
+                if event.refusal.trim().is_empty() || event.reason.trim().is_empty() {
+                    return Err(invalid("an execution refusal needs its name and words"));
+                }
+                closing(
+                    event.operation,
+                    event.draft,
+                    event.application,
+                    &event.actor,
+                )
             }
             Self::Created(event) => {
                 if !token(&event.target.kind)
@@ -342,7 +356,10 @@ impl DraftEvent {
     pub fn version(&self) -> u64 {
         match self {
             Self::Created(event) if event.request_signature.is_some() => 2,
-            Self::Refused(_) | Self::Correction(_) | Self::Executed(_) | Self::RefusedOnExecution(_) => 2,
+            Self::Refused(_)
+            | Self::Correction(_)
+            | Self::Executed(_)
+            | Self::RefusedOnExecution(_) => 2,
             Self::Created(_) | Self::Approved(_) => 1,
         }
     }
@@ -363,7 +380,10 @@ impl DraftEvent {
         let creation = match self {
             Self::Created(event) => Some(event),
             Self::Correction(event) => Some(&event.corrected),
-            Self::Approved(_) | Self::Refused(_) | Self::Executed(_) | Self::RefusedOnExecution(_) => None,
+            Self::Approved(_)
+            | Self::Refused(_)
+            | Self::Executed(_)
+            | Self::RefusedOnExecution(_) => None,
         };
         if creation
             .is_some_and(|event| event.evidence.is_some() && event.request_signature.is_none())
@@ -376,16 +396,27 @@ impl DraftEvent {
     }
 }
 
-#[path="draft_request_signature.rs"]
+#[path = "draft_request_signature.rs"]
 mod signature;
 
 #[cfg(test)]
-#[path="draft_event_close_tests.rs"]
+#[path = "draft_event_close_tests.rs"]
 mod close_tests;
 
-fn closing(operation:OperationId,draft:OperationId,application:OperationId,actor:&Actor)->Result<(),IdentityError> {
-    if operation==draft || operation==application || draft==application || actor.provenance().agent().is_some() {
-        return Err(invalid("a close needs distinct operations and the approving person's authority"));
+fn closing(
+    operation: OperationId,
+    draft: OperationId,
+    application: OperationId,
+    actor: &Actor,
+) -> Result<(), IdentityError> {
+    if operation == draft
+        || operation == application
+        || draft == application
+        || actor.provenance().agent().is_some()
+    {
+        return Err(invalid(
+            "a close needs distinct operations and the approving person's authority",
+        ));
     }
     Ok(())
 }

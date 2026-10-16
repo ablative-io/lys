@@ -15,8 +15,8 @@ use sha2::{Digest, Sha256};
 
 use super::consent::{Mode, answer};
 use super::{
-    APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, REGISTRATION, UNNAMED, digest,
-    encoded, held, malformed, random, redirect_allowed,
+    APPROVAL_SECONDS, Apps, Asking, CODE_SECONDS, Code, REGISTRATION, UNNAMED, digest, encoded,
+    held, malformed, random, redirect_allowed,
 };
 use crate::error::ServerError;
 use crate::mcp_oauth_store::{App, Kind, PersonReads};
@@ -226,21 +226,19 @@ pub(super) async fn consent(
             };
             let code = random()?;
             let at = apps.state.sessions.now()?;
-            expires_at = Some(at.saturating_add(CODE_SECONDS));
             {
                 let mut codes = held(&apps.codes)?;
                 codes.retain(|_, held_code| held_code.expires_at > at);
-                codes.insert(
-                    code.clone(),
-                    Code {
-                        agent,
-                        client_id: asking.client_id.clone(),
-                        redirect_uri: asking.redirect_uri.clone(),
-                        challenge: asking.challenge.clone(),
-                        expires_at: at.saturating_add(CODE_SECONDS),
-                        person_reads,
-                    },
-                );
+                let pending = Code {
+                    agent,
+                    client_id: asking.client_id.clone(),
+                    redirect_uri: asking.redirect_uri.clone(),
+                    challenge: asking.challenge.clone(),
+                    expires_at: at.saturating_add(CODE_SECONDS),
+                    person_reads,
+                };
+                expires_at = Some(pending.expires_at);
+                codes.insert(code.clone(), pending);
             }
             with_state(vec![("code", code)])
         }
@@ -250,7 +248,13 @@ pub(super) async fn consent(
         .iter()
         .map(|(name, value)| (*name, value.as_str()))
         .collect();
-    super::return_page::finish(&apps, &asking, super::return_page::address(&apps, peer, &headers)?, &pairs, expires_at)
+    super::return_page::finish(
+        &apps,
+        &asking,
+        super::return_page::address(&apps, peer, &headers)?,
+        &pairs,
+        expires_at,
+    )
 }
 
 #[derive(Deserialize)]
@@ -322,7 +326,7 @@ fn exchange(apps: &Apps, asked: &Exchange) -> Result<Response, Refusal> {
     let held_code = held(&apps.codes)?
         .remove(code)
         .ok_or(Refusal::Grant("the code is unknown or was used"))?;
-    if held_code.expires_at <= now() {
+    if held_code.expires_at <= apps.state.sessions.now()? {
         return Err(Refusal::Grant("the code is past its instant"));
     }
     if held_code.client_id != asked.client_id || held_code.redirect_uri != *redirect_uri {

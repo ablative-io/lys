@@ -9,10 +9,10 @@ use crate::{AgentId, IdentityError, IdentityId, OperationId, PersonId, ServiceAc
 use ciborium::Value;
 use std::sync::Arc;
 
+#[path = "draft_close_encoding.rs"]
+mod closes;
 #[path = "draft_decision_encoding.rs"]
 mod decisions;
-#[path="draft_close_encoding.rs"]
-mod closes;
 
 fn nullable_operation(out: &mut Vec<u8>, value: Option<OperationId>) {
     if let Some(value) = value {
@@ -86,7 +86,8 @@ pub fn encode(event: &DraftEvent) -> Vec<u8> {
             text(&mut out, &value.application.to_string());
             evidence(&mut out, value.evidence.as_ref());
         }
-        DraftEvent::Executed(_) | DraftEvent::RefusedOnExecution(_) => closes::write(&mut out,event),
+        DraftEvent::Executed(value) => closes::executed(&mut out, value),
+        DraftEvent::RefusedOnExecution(value) => closes::refused(&mut out, value),
         DraftEvent::Refused(value) => decisions::write_refused(&mut out, value),
         DraftEvent::Correction(value) => decisions::write_correction(&mut out, value),
     }

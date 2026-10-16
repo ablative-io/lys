@@ -155,7 +155,7 @@ pub struct DraftView {
     pub created_at: u64,
     /// The SHA-256 of its creation, in hex, which an approval or refusal names.
     pub creation_hash: String,
-    /// `waiting`, `approved`, `refused` or `corrected`.
+    /// The draft decision and its executed or refused_on_execution outcome.
     pub state: &'static str,
     /// The decision, absent while it waits.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -344,8 +344,12 @@ fn view(
         note: created.note.clone(),
         created_at: created.recorded_at,
         creation_hash: hex(&held.hash),
-        state:if held.executed.is_some() || held.refused_on_execution.is_some() {held.state()} else {state},
-        execution:crate::drafts_apply::outcome(held),
+        state: if held.executed.is_some() || held.refused_on_execution.is_some() {
+            held.state()
+        } else {
+            state
+        },
+        execution: crate::drafts_apply::outcome(held),
         decided: decision,
     })
 }

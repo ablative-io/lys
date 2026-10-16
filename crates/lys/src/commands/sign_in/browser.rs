@@ -1,8 +1,8 @@
 //! Open the public sign-in page with the platform browser.
-use std::process::{Command, Stdio};
 use super::errors::source_refused;
 use crate::commands::error::CliResult;
 use crate::commands::seat_client::refused;
+use std::process::{Command, Stdio};
 
 pub(super) fn browser(address: &str) -> CliResult<()> {
     let program = if cfg!(target_os = "macos") {
@@ -31,4 +31,3 @@ pub(super) fn browser(address: &str) -> CliResult<()> {
     }
     Ok(())
 }
-

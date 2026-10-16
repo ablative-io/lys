@@ -148,7 +148,9 @@ pub(crate) async fn relayed<F: std::future::Future>(relay: Relay, work: F) -> F:
 
 /// The agent the call being served was relayed for, if any.
 pub(crate) fn relayed_agent() -> Option<AgentId> {
-    if crate::drafts_apply::actor().is_some() {return None;}
+    if crate::drafts_apply::actor().is_some() {
+        return None;
+    }
     RELAYED.try_with(|relay| relay.agent).ok()
 }
 

@@ -387,7 +387,9 @@ pub fn sign_in_at(
         )
     })?;
     open(&format!("{}?{query}", endpoint("authorization_endpoint")?))?;
-    eprintln!("If you approve on another computer, finish here with lys sign-in --finish and the address from the page.");
+    eprintln!(
+        "If you approve on another computer, finish here with lys sign-in --finish and the address from the page."
+    );
     let code = callback(&listener, &state)?;
     let tokens = exchange(
         token_endpoint,
@@ -407,12 +409,15 @@ pub fn sign_in_at(
 /// # Errors
 /// Returns the code flow's named refusal without exposing any credential.
 pub fn run(args: &SignInArgs, json: bool) -> CliResult<()> {
-    if let Some(address)=&args.finish {
+    if let Some(address) = &args.finish {
         finish::finish(address)?;
         println!("finished");
         return Ok(());
     }
-    let server=args.server.as_deref().ok_or_else(||refused("server_base_invalid","name --server or --finish"))?;
+    let server = args
+        .server
+        .as_deref()
+        .ok_or_else(|| refused("server_base_invalid", "name --server or --finish"))?;
     let signed = sign_in_at(server, &Layout::discover()?.root, browser)?;
     let mut emitter = Emitter::new(json);
     emitter.field("signed in as", "person", signed.person);

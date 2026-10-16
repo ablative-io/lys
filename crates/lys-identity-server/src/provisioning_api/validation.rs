@@ -111,8 +111,18 @@ pub(super) fn settings(body: SetBody) -> Result<Settings, ServerError> {
         harness.description.rendering_contract == lys_home::harness::seat_program::CONTRACT
     }) {
         lys_home::harness::seat_program::check_seat(&seat).map_err(malformed)?;
-        if settings.session.as_ref().and_then(|session|session.accounts.as_ref()).is_some()
-            && settings.harness.as_ref().and_then(|h|h.description.seat_program.as_ref()).and_then(|s|s.model_wire).is_none() {
+        if settings
+            .session
+            .as_ref()
+            .and_then(|session| session.accounts.as_ref())
+            .is_some()
+            && settings
+                .harness
+                .as_ref()
+                .and_then(|h| h.description.seat_program.as_ref())
+                .and_then(|s| s.model_wire)
+                .is_none()
+        {
             return Err(ServerError::SecretsRefused {
                 status: axum::http::StatusCode::BAD_REQUEST,
                 refusal: "ModelWireMissing".to_owned(),

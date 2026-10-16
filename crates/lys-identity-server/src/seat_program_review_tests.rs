@@ -22,13 +22,22 @@ async fn seat_program_rereview_keeps_old_inputs_and_atomically_reviews_the_found
                 "permissions":{"modes":[],"rule_forms":[]},
                 "mcp":{"transports":[],"working_directory":false,"handle_variables":false,"channel_policies":[]}}}});
     ok(post(&service, &path, Auth::Cookie(&cookie), &body).await?)?;
-    ok(post(&service, &format!("{path}/1/review"), Auth::Cookie(&cookie), &json!({"operation":op()?})).await?)?;
+    ok(post(
+        &service,
+        &format!("{path}/1/review"),
+        Auth::Cookie(&cookie),
+        &json!({"operation":op()?}),
+    )
+    .await?)?;
     let operation = op()?;
     let changed = json!({"operation":operation, "executable_sha256":"c".repeat(64), "seat_file_sha256":"d".repeat(64)});
     let endpoint = format!("{path}/1/seat-program-review");
     let answer = ok(post(&service, &endpoint, Auth::Cookie(&cookie), &changed).await?)?;
     assert_eq!(answer["recorded"]["version"], 2);
-    assert_eq!(answer["profile"]["reviewed_by"], people.people[0].id.to_string());
+    assert_eq!(
+        answer["profile"]["reviewed_by"],
+        people.people[0].id.to_string()
+    );
     let (_, read) = service.get(&path, Some(&cookie)).await?;
     let found = &read["profile"]["harness"]["description"]["seat_program"];
     assert_eq!(found["executable_sha256"], "c".repeat(64));
@@ -38,7 +47,13 @@ async fn seat_program_rereview_keeps_old_inputs_and_atomically_reviews_the_found
     }
     let retry = ok(post(&service, &endpoint, Auth::Cookie(&cookie), &changed).await?)?;
     assert_eq!(retry["recorded"], answer["recorded"]);
-    assert_eq!(retry["versions"].as_array().ok_or("versions missing")?.len(), 2);
+    assert_eq!(
+        retry["versions"]
+            .as_array()
+            .ok_or("versions missing")?
+            .len(),
+        2
+    );
     Ok(())
 }
 
@@ -56,7 +71,12 @@ async fn seat_program_account_requires_model_wire_at_set_time() -> Result<(), Bo
     let (status, refused) = post(&service, &path, Auth::Cookie(&cookie), &body).await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "ModelWireMissing");
-    assert!(refused["reason"].as_str().is_some_and(|s|s.contains("model_wire")), "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|s| s.contains("model_wire")),
+        "{refused}"
+    );
     body.as_object_mut().ok_or("body absent")?.remove("session");
     ok(post(&service, &path, Auth::Cookie(&cookie), &body).await?)?;
     Ok(())

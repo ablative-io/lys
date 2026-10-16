@@ -167,10 +167,15 @@ pub struct DraftProvenance {
 impl Actor {
     /// Attach the approved act's origin without changing authentication.
     #[must_use]
-    pub fn with_draft(mut self, draft:DraftProvenance)->Self { self.draft=Some(draft); self }
+    pub fn with_draft(mut self, draft: DraftProvenance) -> Self {
+        self.draft = Some(draft);
+        self
+    }
     /// The prepared act carried by this authenticated person.
     #[must_use]
-    pub fn draft(&self)->Option<&DraftProvenance> { self.draft.as_ref() }
+    pub fn draft(&self) -> Option<&DraftProvenance> {
+        self.draft.as_ref()
+    }
 
     /// The human named by `binding`, one of their logins, authenticated as
     /// `provenance` says.

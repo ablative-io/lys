@@ -1,5 +1,5 @@
 //! Retained evidence must reproduce the authenticated request exactly.
-use super::{RequestSignature,RequestEvidence,IdentityError,invalid};
+use super::{IdentityError, RequestEvidence, RequestSignature, invalid};
 
 impl RequestSignature {
     pub(super) fn check(&self, proof: &RequestEvidence) -> Result<(), IdentityError> {

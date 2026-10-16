@@ -325,6 +325,12 @@ mod validation_tests {
     }
 }
 
-pub(crate) async fn dispatch_router(router:axum::Router,request:Request)->axum::response::Response {
-    match router.oneshot(request).await {Ok(response)=>response,Err(error)=>match error {}}
+pub(crate) async fn dispatch_router(
+    router: axum::Router,
+    request: Request,
+) -> axum::response::Response {
+    match router.oneshot(request).await {
+        Ok(response) => response,
+        Err(error) => match error {},
+    }
 }

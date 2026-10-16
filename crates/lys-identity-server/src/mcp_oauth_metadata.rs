@@ -1,8 +1,8 @@
 //! OAuth discovery describes the same native and registered client flow.
-use super::{Apps,native};
-use std::sync::Arc;
-use axum::{Json,extract::State};
+use super::{Apps, native};
+use axum::{Json, extract::State};
 use serde_json::json;
+use std::sync::Arc;
 
 pub(super) async fn resource(State(apps): State<Arc<Apps>>) -> Json<serde_json::Value> {
     Json(json!({
@@ -27,4 +27,3 @@ pub(super) async fn server(State(apps): State<Arc<Apps>>) -> Json<serde_json::Va
         "native_client_id": native::CLIENT,
     }))
 }
-

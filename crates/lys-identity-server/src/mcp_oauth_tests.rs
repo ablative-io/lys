@@ -22,33 +22,44 @@ pub(super) async fn service() -> Result<(Service, String), Box<dyn Error>> {
     service_with_trusted(Vec::new()).await
 }
 
-pub(super) async fn service_with_trusted(trusted:Vec<std::net::IpAddr>) -> Result<(Service,String),Box<dyn Error>> {
+pub(super) async fn service_with_trusted(
+    trusted: Vec<std::net::IpAddr>,
+) -> Result<(Service, String), Box<dyn Error>> {
     use lys_identity::{
         Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance,
     };
-    let (service, ()) = Service::start_adjusted(identity_contract::harness::GRANT_MODEL,None,None,None,move |config| {config.trusted_proxies=trusted;}, |config| {
-        lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
-        let path = config.log_dir.clone();
-        let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
-        lys_identity::directory_migration::migrate(
-            lys_log_store::FileLeafStore::open(&path)?,
-            &key,
-        )?;
-        let mut directory = Directory::open(
-            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
-            key,
-        )?;
-        directory.setup_person(
-            Actor::new(
-                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                Provenance::new(AuthMethod::Oidc, 1),
-            ),
-            OperationId::generate()?,
-            Profile::new("Owner")?,
-            1,
-        )?;
-        Ok(())
-    })
+    let (service, ()) = Service::start_adjusted(
+        identity_contract::harness::GRANT_MODEL,
+        None,
+        None,
+        None,
+        move |config| {
+            config.trusted_proxies = trusted;
+        },
+        |config| {
+            lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+            let path = config.log_dir.clone();
+            let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
+            lys_identity::directory_migration::migrate(
+                lys_log_store::FileLeafStore::open(&path)?,
+                &key,
+            )?;
+            let mut directory = Directory::open(
+                Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+                key,
+            )?;
+            directory.setup_person(
+                Actor::new(
+                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                    Provenance::new(AuthMethod::Oidc, 1),
+                ),
+                OperationId::generate()?,
+                Profile::new("Owner")?,
+                1,
+            )?;
+            Ok(())
+        },
+    )
     .await?;
     let cookie = service
         .sign_in(identity_contract::apps::login(ADMINISTRATOR))
@@ -63,8 +74,13 @@ fn client() -> Result<reqwest::Client, Box<dyn Error>> {
 }
 
 async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
-    let body=response.text().await?;
-    let address=body.split("readonly value=\"").nth(1).and_then(|s|s.split('"').next()).ok_or("no finishing address")?.replace("&amp;","&");
+    let body = response.text().await?;
+    let address = body
+        .split("readonly value=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .ok_or("no finishing address")?
+        .replace("&amp;", "&");
     Ok(reqwest::Url::parse(&address)?)
 }
 

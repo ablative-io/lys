@@ -17,7 +17,10 @@ fn seat_program_model_wire_round_trips_both_reviewed_wires() -> Result<(), Box<d
         assert_eq!(serde_json::to_value(parsed)?, value);
     }
     let value = spec();
-    assert_eq!(serde_json::to_value(serde_json::from_value::<SeatProgram>(value.clone())?)?, value);
+    assert_eq!(
+        serde_json::to_value(serde_json::from_value::<SeatProgram>(value.clone())?)?,
+        value
+    );
     Ok(())
 }
 
@@ -25,7 +28,9 @@ fn seat_program_model_wire_round_trips_both_reviewed_wires() -> Result<(), Box<d
 fn seat_program_model_wire_unknown_names_the_allowed_values() {
     let mut value = spec();
     value["model_wire"] = json!("gpt");
-    let error = serde_json::from_value::<SeatProgram>(value).expect_err("invalid wire admitted").to_string();
+    let error = serde_json::from_value::<SeatProgram>(value)
+        .expect_err("invalid wire admitted")
+        .to_string();
     for word in ["model_wire", "openai-responses", "anthropic-messages"] {
         assert!(error.contains(word), "{error}");
     }

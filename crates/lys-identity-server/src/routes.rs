@@ -35,7 +35,7 @@ pub(crate) mod people_giving_tests;
 /// Everything a request is served from.
 pub struct AppState {
     /// In-process admitted draft application.
-    pub draft_execution:crate::drafts_apply::Executor,
+    pub draft_execution: crate::drafts_apply::Executor,
     pub(crate) changes: crate::changes::Changes,
     /// The directory, one caller at a time.
     pub directory: Mutex<Directory<FileLeafStore>>,
@@ -278,7 +278,9 @@ pub(crate) fn cookie_header(headers: &HeaderMap) -> Option<&str> {
 /// The signed-in actor, or a refusal: the administrator for a request
 /// carrying the install's operator token, else the session's actor.
 pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
-    if let Some(actor)=crate::drafts_apply::actor() {return Ok(actor);}
+    if let Some(actor) = crate::drafts_apply::actor() {
+        return Ok(actor);
+    }
     if let Some(actor) = crate::mcp_oauth::native_actor(state, headers)? {
         return Ok(actor);
     }

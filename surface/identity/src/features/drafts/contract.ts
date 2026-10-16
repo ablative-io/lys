@@ -59,7 +59,7 @@ export interface ApproveBody { operation: string; creation_hash: string; applica
 export interface RefuseBody { operation: string; creation_hash: string; reason: string }
 
 /** What either decision answers: where it was recorded, never that anything was applied. */
-export interface DraftAnswer { draft: string; operation: string; creation_hash: string; index: number; tree_size: number; leaf_hash: string; replacement: string | null }
+export interface DraftAnswer { draft: string; operation: string; creation_hash: string; index: number; tree_size: number; leaf_hash: string; replacement: string | null; execution?: DraftExecution }
 
 /** Every draft in `filter`, every page of it. */
 export async function readDrafts(filter: DraftFilter): Promise<Draft[]> {

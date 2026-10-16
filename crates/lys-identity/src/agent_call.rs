@@ -96,10 +96,25 @@ impl<S: LeafStore> Directory<S> {
     ///
     /// # Errors
     /// Propagates missing draft provenance, validation and durable append failures.
-    pub fn record_draft_call(&mut self, actor:Actor, call:AgentCall, recorded_at:u64)->Result<Receipt,IdentityError> {
-        let draft=actor.draft().ok_or(IdentityError::ChangeMismatch{reason:"a draft call needs its approved origin"})?;
-        let agent=draft.drafted_by.ok_or(IdentityError::ChangeMismatch{reason:"a draft call needs its author"})?;
-        self.commit_change(actor.clone(),draft.application,IdentityId::Agent(agent),Change::AgentCall(call),recorded_at)
+    pub fn record_draft_call(
+        &mut self,
+        actor: Actor,
+        call: AgentCall,
+        recorded_at: u64,
+    ) -> Result<Receipt, IdentityError> {
+        let draft = actor.draft().ok_or(IdentityError::ChangeMismatch {
+            reason: "a draft call needs its approved origin",
+        })?;
+        let agent = draft.drafted_by.ok_or(IdentityError::ChangeMismatch {
+            reason: "a draft call needs its author",
+        })?;
+        self.commit_change(
+            actor.clone(),
+            draft.application,
+            IdentityId::Agent(agent),
+            Change::AgentCall(call),
+            recorded_at,
+        )
     }
 
     /// Record a change `agent` asks for through MCP, before it is made,

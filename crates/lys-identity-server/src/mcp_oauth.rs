@@ -156,7 +156,6 @@ fn redirect_allowed(uri: &str) -> bool {
     }
 }
 
-
 impl Apps {
     /// The door for the install whose directory log is at `log_dir`, whose
     /// origin is `origin` and whose MCP door answers at `mcp_path`.
@@ -342,9 +341,9 @@ pub(crate) fn challenged(router: Router, metadata: String) -> Router {
     ))
 }
 
-#[path="mcp_oauth_metadata.rs"]
+#[path = "mcp_oauth_metadata.rs"]
 mod metadata;
-use metadata::{resource,server};
+use metadata::{resource, server};
 
 #[path = "mcp_oauth_flow.rs"]
 mod flow;

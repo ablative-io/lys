@@ -220,7 +220,7 @@ async fn make_state(
         .clone()
         .map(crate::spicedb::SpiceDbEngine::new);
     Ok(Arc::new(AppState {
-        draft_execution:Default::default(),
+        draft_execution: Default::default(),
         changes: crate::changes::Changes::new()?,
         kept_responsibilities: primary.kept_responsibilities,
         import_credential_file: config.import_credential_file.clone(),
@@ -421,8 +421,13 @@ fn served_routes(
     } else {
         "/mcp"
     };
-    let apps =
-        crate::mcp_oauth::Apps::open(Arc::clone(&state), &config.log_dir, &origin, mcp_path, &config.trusted_proxies)?;
+    let apps = crate::mcp_oauth::Apps::open(
+        Arc::clone(&state),
+        &config.log_dir,
+        &origin,
+        mcp_path,
+        &config.trusted_proxies,
+    )?;
     let provider_callback = crate::sign_in::callback_routes(Arc::clone(&state))
         .merge(crate::provider::routes(Arc::clone(&state)))
         .merge(crate::mcp_oauth::routes(Arc::clone(&apps)));

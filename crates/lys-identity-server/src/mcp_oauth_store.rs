@@ -35,7 +35,14 @@ pub(crate) struct App {
     pub(crate) name: String,
     pub(crate) redirect_uris: Vec<String>,
     pub(crate) registered_at: u64,
+    #[serde(deserialize_with = "required_host")]
     pub(crate) client_host: Option<std::net::IpAddr>,
+}
+
+fn required_host<'de, D: serde::Deserializer<'de>>(
+    input: D,
+) -> Result<Option<std::net::IpAddr>, D::Error> {
+    Option::<std::net::IpAddr>::deserialize(input)
 }
 
 /// Which kind of token a digest is of.
@@ -103,9 +110,28 @@ impl Store {
     /// Open the store at `path`, empty when no file is there yet.
     pub(crate) fn open(path: &Path) -> Result<Self, ServerError> {
         let held = match std::fs::read(path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|error| {
-                unavailable(&format!("{} does not read: {error}", path.display()))
-            })?,
+            Ok(bytes) => {
+                let mut value: serde_json::Value =
+                    serde_json::from_slice(&bytes).map_err(|error| {
+                        unavailable(&format!("{} does not read: {error}", path.display()))
+                    })?;
+                if matches!(
+                    value.get("format").and_then(serde_json::Value::as_u64),
+                    None | Some(1 | 2)
+                ) && let Some(apps) = value
+                    .get_mut("apps")
+                    .and_then(serde_json::Value::as_object_mut)
+                {
+                    for app in apps.values_mut() {
+                        if let Some(app) = app.as_object_mut() {
+                            app.insert("client_host".to_owned(), serde_json::Value::Null);
+                        }
+                    }
+                }
+                serde_json::from_value(value).map_err(|error| {
+                    unavailable(&format!("{} does not read: {error}", path.display()))
+                })?
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Held::default(),
             Err(error) => return Err(unavailable(&format!("{}: {error}", path.display()))),
         };
@@ -115,17 +141,24 @@ impl Store {
         };
         match store.held.format {
             1 | 2 => {
-                if store.held.format == 1 && store
-                    .held
-                    .tokens
-                    .values()
-                    .any(|token| token.person_reads.is_some())
+                if store.held.format == 1
+                    && store
+                        .held
+                        .tokens
+                        .values()
+                        .any(|token| token.person_reads.is_some())
                 {
                     return Err(unavailable("an old store cannot hold person-read consent"));
                 }
-                let previous=store.path.with_extension(format!("v{}.json",store.held.format));
+                let previous = store
+                    .path
+                    .with_extension(format!("v{}.json", store.held.format));
                 if !previous.exists() {
-                    std::fs::copy(&store.path,&previous).map_err(|error|unavailable(&error.to_string()))?;
+                    std::fs::copy(&store.path, &previous)
+                        .map_err(|error| unavailable(&error.to_string()))?;
+                    std::fs::File::open(&previous)
+                        .and_then(|file| file.sync_all())
+                        .map_err(|error| unavailable(&error.to_string()))?;
                 }
                 store.held.format = FORMAT;
                 store.save()?;

@@ -100,19 +100,36 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
 /// is the operator; code 3 with a 16-byte key 5 is a service account.
 pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
     const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names a principal";
-    let (value,draft)=if matches!(&value,Value::Map(pairs) if pairs.len()==6) {
-        let [issuer,subject,method,at,principal,origin]=fields::<6>(value,SHAPE)?;
-        let Value::Array(parts)=origin else {return Err(malformed("draft provenance is an array"));};
-        let [draft,application,agent]:[Value;3]=parts.try_into().map_err(|_|malformed("draft provenance has three fields"))?;
-        let origin=crate::provenance::DraftProvenance {
-            draft:as_text(draft,"a draft id is text")?.parse()?,
-            application:as_text(application,"an application id is text")?.parse()?,
-            drafted_by:if agent==Value::Null {None} else {Some(as_text(agent,"a draft author is text")?.parse()?)},
+    let (value, draft) = if matches!(&value,Value::Map(pairs) if pairs.len()==6) {
+        let [issuer, subject, method, at, principal, origin] = fields::<6>(value, SHAPE)?;
+        let Value::Array(parts) = origin else {
+            return Err(malformed("draft provenance is an array"));
         };
-        let mut pairs=vec![(1.into(),issuer),(2.into(),subject),(3.into(),method),(4.into(),at)];
-        if principal!=Value::Null {pairs.push((5.into(),principal));}
-        (Value::Map(pairs),Some(origin))
-    } else {(value,None)};
+        let [draft, application, agent]: [Value; 3] = parts
+            .try_into()
+            .map_err(|_| malformed("draft provenance has three fields"))?;
+        let origin = crate::provenance::DraftProvenance {
+            draft: as_text(draft, "a draft id is text")?.parse()?,
+            application: as_text(application, "an application id is text")?.parse()?,
+            drafted_by: if agent == Value::Null {
+                None
+            } else {
+                Some(as_text(agent, "a draft author is text")?.parse()?)
+            },
+        };
+        let mut pairs = vec![
+            (1.into(), issuer),
+            (2.into(), subject),
+            (3.into(), method),
+            (4.into(), at),
+        ];
+        if principal != Value::Null {
+            pairs.push((5.into(), principal));
+        }
+        (Value::Map(pairs), Some(origin))
+    } else {
+        (value, None)
+    };
     let named = matches!(&value, Value::Map(pairs) if pairs.len() == 5);
     let ([issuer, subject, method, authenticated_at], agent) = if named {
         let [issuer, subject, method, authenticated_at, agent] = fields::<5>(value, SHAPE)?;
@@ -144,14 +161,18 @@ pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, Identity
         }
         time => Provenance::new(method, as_uint(&time, "an authentication time is seconds")?),
     };
-    let actor=Actor::new(
+    let actor = Actor::new(
         LoginBinding::new(
             &as_text(issuer, "an actor's issuer is text")?,
             &as_text(subject, "an actor's subject is text")?,
         )?,
         provenance,
     );
-    Ok(if let Some(draft)=draft {actor.with_draft(draft)} else {actor})
+    Ok(if let Some(draft) = draft {
+        actor.with_draft(draft)
+    } else {
+        actor
+    })
 }
 
 /// The event an event body's bytes name, refused unless the bytes are its canonical encoding.

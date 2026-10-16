@@ -9,7 +9,7 @@ use axum::http::{HeaderMap, Uri, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::draft_event::{
-    Approved, Correction, Created, DraftEvent, Refused, RequestEvidence, RequestSignature, Target,
+    Approved, Correction, DraftEvent, Refused, RequestEvidence, RequestSignature,
 };
 use lys_identity::projection::draft::DraftRecord;
 use lys_identity::{Actor, AuthMethod, Directory, IdentityId, OperationId, PersonId, Provenance};
@@ -78,6 +78,7 @@ pub struct DraftAnswer {
     tree_size: u64,
     leaf_hash: String,
     replacement: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     execution: Option<crate::drafts_apply::Outcome>,
 }
 
@@ -175,40 +176,9 @@ fn creation_hash(text: &str) -> Result<[u8; 32], ServerError> {
     })
 }
 
-fn creation(
-    body: DraftBody,
-    actor: Actor,
-    reviewer: IdentityId,
-    at: u64,
-    corrects: Option<OperationId>,
-) -> Result<Created, ServerError> {
-    let (resource,action)=crate::openapi_table::token_scope(&body.method,&body.path).map_err(|_|ServerError::SecretsRefused {
-        status:axum::http::StatusCode::CONFLICT,refusal:"DraftChangeInvalid".to_owned(),
-        reason:format!("target {}:{} {} names no declared mutation scope for {} {}",body.target.kind,body.target.id,body.target.action,body.method,body.path),
-    })?;
-    if body.method=="GET" || body.target.kind!=resource.kind() || body.target.id!=resource.id() || body.target.action!=action.as_str() {
-        return Err(ServerError::SecretsRefused {status:axum::http::StatusCode::CONFLICT,refusal:"DraftChangeInvalid".to_owned(),
-            reason:format!("target {}:{} {} differs from route scope {}:{} {}",body.target.kind,body.target.id,body.target.action,resource.kind(),resource.id(),action.as_str())});
-    }
-    Ok(Created {
-        operation: OperationId::from_str(&body.operation)?,
-        actor,
-        recorded_at: at,
-        target: Target {
-            kind: body.target.kind,
-            id: body.target.id,
-            action: body.target.action,
-        },
-        method: body.method,
-        path: body.path,
-        body: body.body.into_bytes(),
-        note: body.note,
-        reviewer,
-        corrects,
-        evidence: None,
-        request_signature: None,
-    })
-}
+#[path = "drafts_prepare.rs"]
+mod prepared;
+use prepared::creation;
 
 async fn create(
     State(state): State<Arc<AppState>>,
@@ -323,8 +293,7 @@ pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, S
 }
 
 /// Who decides a draft: the person's own session, or the person pass an
-/// approved app holds for them (Apollo's ASSIST-002 ask, for the haematite
-/// door's assistant). The pass decides only its own person's drafts; the
+/// approved app holds for them. The pass decides only its own person's drafts; the
 /// flag says the actor came from one.
 pub(crate) fn decider(state: &AppState, headers: &HeaderMap) -> Result<(Actor, bool), ServerError> {
     if let Some(actor) = crate::provider::app_person_actor(state, headers)? {
@@ -379,7 +348,7 @@ fn append(
         tree_size: coordinate.tree_size,
         leaf_hash: hex(&coordinate.leaf_hash),
         replacement: replacement.map(|id| id.to_string()),
-        execution:None,
+        execution: None,
     }))
 }
 
@@ -396,23 +365,52 @@ async fn approve(
     if crate::drafts_apply::actor().is_some() {
         return Err(malformed("a prepared request cannot approve another draft"));
     }
-    let execution_guard=state.draft_execution.gate.lock().await;
-    let application=OperationId::from_str(&body.application)?;
-    let operation=OperationId::from_str(&body.operation)?;
-    let (mut answer,held)=with_directory(&state,|directory| {
-        responsible(directory,(&actor,by_app),draft)?;
-        let held=directory.projection()?.draft(draft).ok_or_else(||lys_identity::IdentityError::DraftNotFound{draft:draft.to_string()})?.clone();
-        let event=if let Some((approved,_))=&held.approved {
-            if approved.application!=application || approved.operation!=operation || held.hash!=hash {
-                return Err(lys_identity::IdentityError::DraftNotPending{draft:draft.to_string()}.into());
+    let execution_guard = state.draft_execution.gate.lock().await;
+    let application = OperationId::from_str(&body.application)?;
+    let operation = OperationId::from_str(&body.operation)?;
+    let (mut answer, held) = with_directory(&state, |directory| {
+        responsible(directory, (&actor, by_app), draft)?;
+        let held = directory
+            .projection()?
+            .draft(draft)
+            .ok_or_else(|| lys_identity::IdentityError::DraftNotFound {
+                draft: draft.to_string(),
+            })?
+            .clone();
+        let event = if let Some((approved, _)) = &held.approved {
+            if approved.application != application
+                || approved.operation != operation
+                || held.hash != hash
+            {
+                return Err(lys_identity::IdentityError::DraftNotPending {
+                    draft: draft.to_string(),
+                }
+                .into());
             }
             DraftEvent::Approved(Arc::clone(approved))
-        } else { DraftEvent::Approved(Arc::new(Approved {operation,actor:actor.clone(),recorded_at:crate::session::now(),draft,draft_hash:hash,application,evidence:None})) };
-        let answer=append(directory,event,draft,hash,None)?;
-        let held=directory.projection()?.draft(draft).ok_or_else(||lys_identity::IdentityError::DraftNotFound{draft:draft.to_string()})?.clone();
-        Ok((answer,held))
+        } else {
+            DraftEvent::Approved(Arc::new(Approved {
+                operation,
+                actor: actor.clone(),
+                recorded_at: crate::session::now(),
+                draft,
+                draft_hash: hash,
+                application,
+                evidence: None,
+            }))
+        };
+        let answer = append(directory, event, draft, hash, None)?;
+        let held = directory
+            .projection()?
+            .draft(draft)
+            .ok_or_else(|| lys_identity::IdentityError::DraftNotFound {
+                draft: draft.to_string(),
+            })?
+            .clone();
+        Ok((answer, held))
     })?;
-    answer.execution=Some(Box::pin(crate::drafts_apply::apply(&state,&headers,&held,actor)).await?);
+    answer.execution =
+        Some(Box::pin(crate::drafts_apply::apply(&state, &headers, &held, actor)).await?);
     drop(execution_guard);
     Ok(answer)
 }

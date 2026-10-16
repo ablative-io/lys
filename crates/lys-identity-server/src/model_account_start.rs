@@ -188,9 +188,15 @@ pub(crate) async fn bind(
         &provider,
     )
     .await?;
-    wire(&version)?.bind(&mut launch.environment, rotation.accounts.first().ok_or_else(|| ServerError::LaunchUnrenderable {
-        reason: "account rotation empty".to_owned(),
-    })?);
+    wire(&version)?.bind(
+        &mut launch.environment,
+        rotation
+            .accounts
+            .first()
+            .ok_or_else(|| ServerError::LaunchUnrenderable {
+                reason: "account rotation empty".to_owned(),
+            })?,
+    );
     Ok(())
 }
 
@@ -238,15 +244,19 @@ use lys_home::harness::seat_program::ModelWire;
 
 pub(crate) fn wire(version: &Version) -> Result<Wire, ServerError> {
     let declared = version.settings.harness.as_ref();
-    let model = match declared.map(|h|h.description.rendering_contract.as_str()) {
+    let model = match declared.map(|h| h.description.rendering_contract.as_str()) {
         Some("codex/template-v1") => Some(ModelWire::OpenaiResponses),
         Some("claude-code/template-v1") => Some(ModelWire::AnthropicMessages),
-        Some("seat-program/v1") => declared.and_then(|h|h.description.seat_program.as_ref()).and_then(|s|s.model_wire),
+        Some("seat-program/v1") => declared
+            .and_then(|h| h.description.seat_program.as_ref())
+            .and_then(|s| s.model_wire),
         _ => None,
     };
-    model.map(Wire).ok_or_else(|| ServerError::LaunchUnrenderable {
-        reason: "account harness unsupported or model_wire missing".to_owned(),
-    })
+    model
+        .map(Wire)
+        .ok_or_else(|| ServerError::LaunchUnrenderable {
+            reason: "account harness unsupported or model_wire missing".to_owned(),
+        })
 }
 
 pub(crate) struct Wire(ModelWire);
@@ -254,12 +264,19 @@ pub(crate) struct Wire(ModelWire);
 impl Wire {
     fn providers(&self) -> &'static [&'static str] {
         match self.0 {
-            ModelWire::OpenaiResponses => &["https://api.openai.com", "https://chatgpt.com/backend-api/codex"],
+            ModelWire::OpenaiResponses => &[
+                "https://api.openai.com",
+                "https://chatgpt.com/backend-api/codex",
+            ],
             ModelWire::AnthropicMessages => &["https://api.anthropic.com"],
         }
     }
 
-    pub(crate) fn bind(&self, environment: &mut std::collections::BTreeMap<String, String>, account: &str) {
+    pub(crate) fn bind(
+        &self,
+        environment: &mut std::collections::BTreeMap<String, String>,
+        account: &str,
+    ) {
         let variable = match self.0 {
             ModelWire::OpenaiResponses => "CODEX_API_KEY",
             ModelWire::AnthropicMessages => {

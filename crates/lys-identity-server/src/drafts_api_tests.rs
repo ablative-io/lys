@@ -97,7 +97,8 @@ async fn a_signature_plus_a_cookie_is_refused_before_consuming_the_nonce() -> Re
 }
 
 #[tokio::test]
-async fn decisions_record_their_outcome_and_refusals_keep_the_prepared_action_unapplied() -> Result {
+async fn decisions_record_their_outcome_and_refusals_keep_the_prepared_action_unapplied() -> Result
+{
     let table = Table::start().await?;
     for decision in ["approve", "refuse", "correct"] {
         let (draft, _, _, created) = table.create().await?;
@@ -126,7 +127,10 @@ async fn decisions_record_their_outcome_and_refusals_keep_the_prepared_action_un
             )
             .await?;
         assert_eq!(status, 200, "{answer}");
-        assert_eq!(table.service.log_size().await?, before + if decision=="approve" {2} else {1});
+        assert_eq!(
+            table.service.log_size().await?,
+            before + if decision == "approve" { 2 } else { 1 }
+        );
         let mut directory = table.directory()?;
         let projection = directory.projection()?;
         let held = projection.draft(draft).ok_or("decided draft missing")?;
