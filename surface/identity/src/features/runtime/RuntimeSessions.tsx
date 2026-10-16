@@ -3,10 +3,16 @@ import { api, request, useLoad } from '../../api';
 import { entries } from '../people/directory';
 import { Gate } from '../signin/Gate';
 import { clock } from '../file/time';
+export interface SeatProgramEvidence {
+  provisioning_version: number; contract: 'seat-program/v1'; executable: string; seat_file: string;
+  reviewed_executable_sha256: string; reviewed_seat_file_sha256: string;
+  found_executable_sha256: string; found_seat_file_sha256: string;
+}
 export interface RuntimeSession {
   session: string; agent: string | null; machine: string; machine_name: string | null; runtime: string | null;
   shown: 'unconfirmed' | 'running' | 'stopped'; last_reported: string; first_report_at: number; last_report_at: number;
   what: string; stopped: null | { at: number; confirmation: string }; reported_by: string; stop_asked_at?: number | null;
+  seat_program?: SeatProgramEvidence | null;
 }
 export function RuntimeSessions({ agent, found = false }: { agent?: string; found?: boolean }) {
   const path = agent ? '/agents/' + encodeURIComponent(agent) + '/runtime/sessions' : found ? '/runtime/found' : '/runtime/sessions';

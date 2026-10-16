@@ -29,6 +29,7 @@ function routes(identities: MachineIdentity[], extra: Record<string, Route> = {}
     ...SERVICE,
     '/network': ok({ machines: [computer], reports_served: true }),
     ['/network/machines/' + computer.id + '/runner']: ok({ machine: computer.id, runner: { kind: 'dialled', key: KEY, runner: 'r' }, answers: true }),
+    ['/network/machines/' + computer.id + '/connection']: ok({ state: 'connected', retry: null }),
     '/network/machine-identities': ok({ machines: identities, revision: 7 }),
     '/grants': ok({ grants: [...GRANTS, toMachines], revision: 7 }),
     '/grants/model': ok(MODEL),

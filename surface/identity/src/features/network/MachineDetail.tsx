@@ -185,6 +185,6 @@ function RunnerConnection({ machine, name }: { machine: string; name: string }) 
     } catch (error) { setFailure(error); }
     finally { setBusy(false); }
   };
-  return <div ref={host}><p role="status">{retry ? retryWords(retry, now) : words}</p>{retry?.reason ? <p>{retry.reason}</p> : null}<button type="button" aria-label={'Reconnect ' + name} disabled={busy} onClick={() => void reconnect()}>Reconnect</button>
+  return <div ref={host}><p role="status">{retry ? retryWords(retry, now) : words}</p>{retry?.reason ? <p>{retry.reason}</p> : null}<Act symbol="retry" name={'Reconnect ' + name} word="Reconnect" disabled={busy} onClick={() => void reconnect()} />
     {failure ? <ErrorWords problem={failure} /> : null}</div>;
 }

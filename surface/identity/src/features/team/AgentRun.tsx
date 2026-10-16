@@ -9,6 +9,7 @@ import './team.css';
 import { answeredNo } from '../../kept';
 import { Act } from '../../shell/Act';
 import { ErrorWords } from '../people/Words';
+import { SeatProgramChange } from '../provisioning/SeatProgramChange';
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
@@ -89,6 +90,7 @@ export function AgentRun({ entry }: { entry: Entry }) {
       <Act symbol="stop" name="Stop" word="Stop" tone="danger" data-act="stop" onClick={() => setAsking('stop')} />
     </div>
     {session.stop_asked_at && !session.stopped ? <p className="why-not">A stop was requested. The runner has not confirmed it ended.</p> : null}
+    {session.seat_program ? <SeatProgramChange key={session.session + ':' + session.seat_program.provisioning_version} id={entry.id} evidence={session.seat_program} canReview={admin || entry.person?.id === me} changed={changed} /> : null}
     {asking === 'stop' ? <Stop entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
     {asking === 'restart' ? <Restart entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
   </section>;
