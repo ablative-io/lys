@@ -29,6 +29,7 @@ use super::services;
 
 /// A base as the start line names it: scheme, host, port and path, without
 /// any user, password or query it carried.
+#[must_use]
 pub fn shown(base: &str) -> String {
     let (scheme, rest) = base.split_once("://").unwrap_or(("", base));
     let rest = rest.split(['?', '#']).next().unwrap_or_default();
@@ -56,11 +57,15 @@ pub struct Upstream {
 }
 
 /// Where the recorded upstream is kept.
+#[must_use]
 pub fn upstream_file(layout: &Layout) -> PathBuf {
     layout.data_dir().join("proxy").join("upstream.json")
 }
 
 /// Whether the service's configuration in place names a model proxy.
+///
+/// # Errors
+/// Returns named account configuration, credential or proxy-process failures.
 pub fn configured(layout: &Layout) -> IdentityResult<bool> {
     let path = layout.service_config();
     let Some(bytes) = private_files::read(&path)? else {
@@ -81,6 +86,9 @@ pub fn configured(layout: &Layout) -> IdentityResult<bool> {
 /// Records the proxy's upstream from the login, owner-only, and says where
 /// it came from. `true` when the record changed, so a running proxy is
 /// started again on it.
+///
+/// # Errors
+/// Returns named account configuration, credential or proxy-process failures.
 pub fn configure(
     layout: &Layout,
     environment: &Environment,
@@ -157,6 +165,9 @@ pub fn unit(layout: &Layout, ports: Ports) -> Unit {
 /// Records the upstream, then starts the proxy from `program` unless it
 /// already runs on the same upstream, and waits for its start line. A
 /// running proxy is otherwise left alone, as the runner is.
+///
+/// # Errors
+/// Returns named account configuration, credential or proxy-process failures.
 pub fn start(
     layout: &Layout,
     ports: Ports,

@@ -39,6 +39,9 @@ pub struct SurfaceBuild {
 
 /// Reads what `bin/` and the placed screens are, writes it to
 /// `install/build.json` and says it.
+///
+/// # Errors
+/// Returns the named failure if build evidence cannot be read or recorded.
 pub fn record_build(
     layout: &Layout,
     names: &[&str],

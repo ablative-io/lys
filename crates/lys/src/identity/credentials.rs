@@ -34,6 +34,7 @@ pub struct Credential {
 
 impl Credential {
     /// Generates a fresh credential of `shape` from the thread CSPRNG.
+    #[must_use]
     pub fn generate(name: &str, shape: Shape) -> Self {
         let mut value = Zeroizing::new(String::new());
         match shape {
@@ -61,6 +62,9 @@ impl Credential {
     /// Reads a credential back from the bytes of the file that holds it,
     /// refusing anything that is not of `shape`. A trailing newline an
     /// operator's editor added is tolerated; nothing else is.
+    ///
+    /// # Errors
+    /// Refuses a missing or malformed stored credential.
     pub fn from_stored(name: &str, bytes: &[u8], shape: Shape) -> IdentityResult<Self> {
         let trimmed = bytes.strip_suffix(b"\n").unwrap_or(bytes);
         let text = std::str::from_utf8(trimmed).map_err(|utf8| {
@@ -81,6 +85,7 @@ impl Credential {
 
     /// Wraps a credential another service generated, such as a client
     /// secret Rauthy returns.
+    #[must_use]
     pub fn received(name: &str, value: Zeroizing<String>) -> Self {
         Self {
             name: name.to_string(),
@@ -89,11 +94,13 @@ impl Credential {
     }
 
     /// The credential's name, which is safe to print.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
 
     /// The secret itself, for the one place that must hand it on.
+    #[must_use]
     pub fn expose(&self) -> &str {
         &self.value
     }

@@ -52,6 +52,9 @@ pub struct RecordedSettings {
 
 /// What the service configuration written under `layout` says the settings
 /// are, or nothing for each it does not name.
+///
+/// # Errors
+/// Refuses an unreadable or malformed recorded install setting.
 pub fn recorded(layout: &Layout) -> IdentityResult<RecordedSettings> {
     let path = layout.service_config();
     let Some(bytes) = private_files::read(&path)? else {

@@ -34,6 +34,7 @@ pub struct LogCursor {
 impl LogCursor {
     /// A cursor on `path` standing at `offset`, the length the log had when
     /// its process opened it.
+    #[must_use]
     pub fn at(path: &Path, offset: u64) -> Self {
         Self {
             path: path.to_path_buf(),
@@ -80,6 +81,9 @@ impl LogCursor {
 /// `what`, naming the log. The log is watched before the first check, so a
 /// change made after it is never missed.
 #[cfg(unix)]
+///
+/// # Errors
+/// Returns the named log-read or notification failure instead of claiming readiness.
 pub fn wait_until(
     what: &str,
     log: &Path,

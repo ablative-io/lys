@@ -64,6 +64,7 @@ pub fn check_postgres(target: &str) -> Check {
 }
 
 /// Checks Rauthy's own health answer at `admin_url`.
+#[must_use]
 pub fn check_rauthy(admin_url: &str) -> Check {
     let failure = match RauthyApi::new(admin_url, None).and_then(|api| api.health()) {
         Err(error) if error.kind() == ErrorKind::RauthyUnreachable => {
@@ -88,6 +89,7 @@ pub fn check_rauthy(admin_url: &str) -> Check {
 }
 
 /// Checks `SpiceDB`'s readiness endpoint on the loopback `port`.
+#[must_use]
 pub fn check_spicedb(port: u16) -> Check {
     let authority = Authority {
         host: "127.0.0.1".to_string(),
@@ -115,6 +117,7 @@ pub fn check_spicedb(port: u16) -> Check {
 }
 
 /// Checks every declared service of `config`.
+#[must_use]
 pub fn check_all(config: &DeploymentConfig) -> [Check; 3] {
     [
         check_postgres(&config.database.check_address),
@@ -124,6 +127,9 @@ pub fn check_all(config: &DeploymentConfig) -> [Check; 3] {
 }
 
 /// Runs `lys identity health` against the configuration at `config_path`.
+///
+/// # Errors
+/// Returns the named failure when a required service does not answer its health check.
 pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     let config = DeploymentConfig::load(config_path)?;
     let checks = check_all(&config);

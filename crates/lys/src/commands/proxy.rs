@@ -15,6 +15,9 @@ use crate::identity::install::proxy::{ANTHROPIC, Upstream, shown};
 
 /// The Anthropic upstream and where it came from: `--anthropic`, else the
 /// record `--upstream` names, else Anthropic's API. Never the environment.
+///
+/// # Errors
+/// Returns named configuration, credential, recording or proxy transport failures.
 pub fn anthropic_upstream(
     flag: Option<String>,
     record: Option<&Path>,
@@ -69,6 +72,9 @@ fn parsed(base: &str) -> Result<Base, ProxyError> {
 }
 
 /// Runs `lys proxy`.
+///
+/// # Errors
+/// Returns named configuration, credential, recording or proxy transport failures.
 pub fn run(command: ProxyCommand) -> CliResult<()> {
     let ProxyCommand::Serve {
         listen,

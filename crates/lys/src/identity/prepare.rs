@@ -101,6 +101,7 @@ pub const SECRETS: [SecretSpec; 9] = [
 pub const API_KEY_SECRET: SecretSpec = SECRETS[7];
 
 /// The file names of every private artifact prepare declares.
+#[must_use]
 pub fn declared_private_files() -> Vec<&'static str> {
     SECRETS
         .iter()
@@ -111,6 +112,9 @@ pub fn declared_private_files() -> Vec<&'static str> {
 
 /// Reads a declared credential from the state directory, refusing a missing
 /// one by name.
+///
+/// # Errors
+/// Returns named secret-file, template or materialisation failures.
 pub fn read_secret(state_dir: &Path, spec: SecretSpec) -> IdentityResult<Credential> {
     let path = state_dir.join(spec.file);
     match private_files::read(&path)? {
@@ -159,6 +163,7 @@ fn materialise(
 /// written by the install. The directory service never holds this key: the
 /// install makes it one of its own with the API key rights, without Secrets
 /// update or any right over keys (`install::directory_key`).
+#[must_use]
 pub fn bootstrap_api_key() -> String {
     let request = serde_json::json!({
         "name": API_KEY_NAME,
@@ -195,6 +200,9 @@ fn passkey_origin(config: &DeploymentConfig) -> String {
 }
 
 /// Renders the compose environment from the configuration and credentials.
+///
+/// # Errors
+/// Returns named secret-file, template or materialisation failures.
 pub fn render_env(
     config: &DeploymentConfig,
     credentials: &[(SecretSpec, Credential)],
@@ -286,6 +294,9 @@ pub fn render_env(
 
 /// Materialises every declared credential and the compose environment for
 /// `config`, answering each private file with its outcome, in order.
+///
+/// # Errors
+/// Returns named secret-file, template or materialisation failures.
 pub fn materialise_all(config: &DeploymentConfig) -> IdentityResult<Vec<(&'static str, Outcome)>> {
     let state_dir = config.state_dir();
     private_files::ensure_dir(&state_dir)?;
@@ -303,6 +314,9 @@ pub fn materialise_all(config: &DeploymentConfig) -> IdentityResult<Vec<(&'stati
 }
 
 /// Runs `lys identity prepare` against the configuration at `config_path`.
+///
+/// # Errors
+/// Returns named secret-file, template or materialisation failures.
 pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     let config = DeploymentConfig::load(config_path)?;
     let mut emitter = Emitter::new(json);

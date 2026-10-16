@@ -46,6 +46,7 @@ pub const SESSION_SECONDS: u64 = 28_800;
 
 /// Rauthy's issuer for the deployment's public origin: the origin, `/auth/v1`
 /// and a trailing slash, exactly as its discovery document states it.
+#[must_use]
 pub fn issuer(config: &DeploymentConfig) -> String {
     format!(
         "{}/auth/v1/",
@@ -61,6 +62,7 @@ pub fn issuer(config: &DeploymentConfig) -> String {
 /// configuration accepts for every host that is not loopback (plain `http`
 /// is refused for any other), gives `<public origin>/api/callback`. A
 /// loopback `http` origin is the service's own listener, as before.
+#[must_use]
 pub fn redirect_url(config: &DeploymentConfig, ports: Ports) -> String {
     if config.public_tls() {
         format!(
@@ -131,6 +133,7 @@ pub const MEMBERSHIP_SETTINGS: [&str; 4] = [
 /// settings of the configuration it wrote: the values it names, each setting
 /// it leaves out said as unset, or, when it names none, that every page is
 /// refused until the operator names them. No value is chosen here.
+#[must_use]
 pub fn membership_readback(membership: Option<&Value>) -> String {
     let Some(named) = membership.filter(|named| !named.is_null()) else {
         return format!(
@@ -162,6 +165,9 @@ const LARGEST_SEEN: &str = "provider: the largest pass rights document so far is
 /// the configuration names, or unset, and the largest rights document the
 /// running service has measured, the last such line in `log`, so the ceiling
 /// is raised on evidence. A log not yet written says no pass is measured.
+///
+/// # Errors
+/// Refuses unreadable provider answers or configuration that cannot be carried into the install.
 pub fn provider_readback(rights_bytes: Option<&Value>, log: &Path) -> IdentityResult<String> {
     let cap = rights_bytes
         .filter(|cap| !cap.is_null())
@@ -195,6 +201,9 @@ pub fn provider_readback(rights_bytes: Option<&Value>, log: &Path) -> IdentityRe
 
 /// What the configuration written under `layout` names that a run again
 /// keeps, or `None` when no configuration has been written.
+///
+/// # Errors
+/// Refuses unreadable provider answers or configuration that cannot be carried into the install.
 pub fn carried(layout: &Layout) -> IdentityResult<Option<Carried>> {
     let path = layout.service_config();
     let Some(bytes) = private_files::read(&path)? else {
@@ -295,6 +304,9 @@ fn message_service(earlier: &Value, path: &std::path::Path) -> IdentityResult<Op
 /// The message service connection in the JSON file at `path`, checked as
 /// the service checks it when it starts, so a wrong one is refused before
 /// anything is stopped.
+///
+/// # Errors
+/// Refuses unreadable provider answers or configuration that cannot be carried into the install.
 pub fn messages_from(path: &Path) -> IdentityResult<Value> {
     let refused = |reason: String| {
         IdentityError::new(ErrorKind::ConfigInvalid, "read", "message_service", reason).at(path)

@@ -6,6 +6,7 @@
 //! payload hashes — never for seeds or signatures' private inputs.
 
 /// Lowercase hex encoding of a byte slice.
+#[must_use]
 pub fn hex_lower(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
@@ -21,6 +22,7 @@ pub fn hex_lower(bytes: &[u8]) -> String {
 /// Accepts upper- or lowercase digits; any other length or character yields
 /// `None`. Used to parse public keys supplied on the command line (the
 /// format `lys key inspect` prints).
+#[must_use]
 pub fn parse_hex_32(text: &str) -> Option<[u8; 32]> {
     let bytes = text.as_bytes();
     if bytes.len() != 64 {

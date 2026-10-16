@@ -48,6 +48,7 @@ pub enum Purpose {
 
 impl Purpose {
     /// The purpose as the code file names it.
+    #[must_use]
     pub fn word(self) -> &'static str {
         match self {
             Self::FirstRun => "first-run",
@@ -57,11 +58,13 @@ impl Purpose {
 }
 
 /// A fresh code, wiped from memory when dropped.
+#[must_use]
 pub fn generate() -> Credential {
     Credential::generate("setup code", Shape::Alphanumeric(CODE_LENGTH))
 }
 
 /// Lowercase hex SHA-256 of `code`.
+#[must_use]
 pub fn digest(code: &str) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let hash = Sha256::digest(code.as_bytes());
@@ -74,6 +77,7 @@ pub fn digest(code: &str) -> String {
 }
 
 /// The code file's text for `code` with `purpose`.
+#[must_use]
 pub fn pending_text(purpose: Purpose, code: &str) -> String {
     serde_json::json!({ "purpose": purpose.word(), "sha256": digest(code) }).to_string()
 }
@@ -95,6 +99,7 @@ fn person_address(layout: &Layout) -> IdentityResult<super::ports::PersonAddress
 }
 
 /// The setup page's address carrying `code` in its fragment.
+#[must_use]
 pub fn address_with(code: &str, setup: &str) -> String {
     format!("{setup}#code={code}")
 }
@@ -102,6 +107,7 @@ pub fn address_with(code: &str, setup: &str) -> String {
 /// Open `address` in the person's browser, answering whether a browser
 /// opener took it. Nothing the opener writes is shown, so the address is
 /// never printed.
+#[must_use]
 pub fn open_in_browser(address: &str) -> bool {
     if std::env::var_os("SSH_CONNECTION").is_some() {
         return false;
@@ -123,6 +129,9 @@ pub fn open_in_browser(address: &str) -> bool {
 /// Hand `code` to the browser through `open`, or, when no browser takes it,
 /// write it to the install root's owner-only headless file and say so in
 /// one line naming that file. The code is never printed.
+///
+/// # Errors
+/// Returns named setup-code, administrator-read or delivery failures.
 pub fn hand_over(
     layout: &Layout,
     code: &str,
@@ -160,6 +169,7 @@ pub fn hand_over(
 
 /// The one line said when no browser takes the code: the file holding it
 /// and the setup page to enter it on.
+#[must_use]
 pub fn headless_line(path: &Path, setup: &str) -> String {
     format!(
         "no browser could be opened: the setup code is in {} (only you can read it); open {setup} and enter it in the Setup code field",
@@ -182,6 +192,9 @@ pub(super) fn hand_over_first_run(
 
 /// Whether the install has an administrator: one first-run setup recorded,
 /// or one its configuration names.
+///
+/// # Errors
+/// Returns named setup-code, administrator-read or delivery failures.
 pub fn has_administrator(layout: &Layout) -> IdentityResult<bool> {
     if layout.administrator_file().exists() {
         return Ok(true);
@@ -216,6 +229,9 @@ pub fn has_administrator(layout: &Layout) -> IdentityResult<bool> {
 
 /// Runs `lys identity setup-code`. A failure is said in Lys's words,
 /// because the person setting Lys up reads it.
+///
+/// # Errors
+/// Returns named setup-code, administrator-read or delivery failures.
 pub fn run(root: Option<std::path::PathBuf>, json: bool) -> IdentityResult<()> {
     issue(root, json).map_err(IdentityError::said_in_lys_words)
 }

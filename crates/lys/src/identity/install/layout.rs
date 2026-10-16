@@ -50,12 +50,16 @@ pub struct Layout {
 
 impl Layout {
     /// The layout rooted at `root`.
+    #[must_use]
     pub fn at(root: PathBuf) -> Self {
         Self { root }
     }
 
     /// The layout at the platform's application data path for this user,
     /// or at `LYS_IDENTITY_HOME` when that is set.
+    ///
+    /// # Errors
+    /// Refuses when the required directory or configured data root cannot be determined.
     pub fn discover() -> IdentityResult<Self> {
         let read = |name: &str| std::env::var_os(name).filter(|value| !value.is_empty());
         let root = data_root(
@@ -68,129 +72,156 @@ impl Layout {
     }
 
     /// The compose file and its database initialisation.
+    #[must_use]
     pub fn deploy_dir(&self) -> PathBuf {
         self.root.join("deploy")
     }
 
     /// The deployment configuration `prepare`, `configure` and `health` read.
+    #[must_use]
     pub fn deployment_config(&self) -> PathBuf {
         self.root.join("deployment.toml")
     }
 
     /// The directory service's signing key.
+    #[must_use]
     pub fn service_key(&self) -> PathBuf {
         self.root.join("keys").join("service.key")
     }
 
     /// This computer's private key, shared by installation and runner joins.
+    #[must_use]
     pub fn runner_machine_key(&self) -> PathBuf {
         self.root.join("keys").join("runner-machine.key")
     }
 
     /// The secrets broker's store.
+    #[must_use]
     pub fn broker_root(&self) -> PathBuf {
         self.root.join("secrets")
     }
 
     /// The secrets broker's keys, outside its store as it requires.
+    #[must_use]
     pub fn broker_keys(&self) -> PathBuf {
         self.root.join("secrets-keys")
     }
 
     /// The compiled screens the service serves.
+    #[must_use]
     pub fn surface_dir(&self) -> PathBuf {
         self.root.join("surface")
     }
 
     /// The screens an upgrade replaced, kept to return to.
+    #[must_use]
     pub fn surface_previous_dir(&self) -> PathBuf {
         self.root.join("surface.previous")
     }
 
     /// The binaries the broker and the service run from.
+    #[must_use]
     pub fn bin_dir(&self) -> PathBuf {
         self.root.join("bin")
     }
 
     /// The binaries an upgrade replaced, kept to return to.
+    #[must_use]
     pub fn bin_previous_dir(&self) -> PathBuf {
         self.root.join("bin.previous")
     }
 
     /// The installed binary `name`.
+    #[must_use]
     pub fn binary(&self, name: &str) -> PathBuf {
         self.bin_dir().join(name)
     }
 
     /// What the install knows about itself.
+    #[must_use]
     pub fn install_dir(&self) -> PathBuf {
         self.root.join("install")
     }
 
     /// The build running: each binary's commit and the screens' digest.
+    #[must_use]
     pub fn build_record(&self) -> PathBuf {
         self.install_dir().join("build.json")
     }
 
     /// An upgrade under way: its builds and each step as it completes.
+    #[must_use]
     pub fn upgrade_intent(&self) -> PathBuf {
         self.install_dir().join("upgrade.json")
     }
 
     /// The configuration and compose files an upgrade replaced, kept to
     /// return to.
+    #[must_use]
     pub fn config_previous_dir(&self) -> PathBuf {
         self.root.join("config.previous")
     }
 
     /// The directory service's configuration.
+    #[must_use]
     pub fn service_config(&self) -> PathBuf {
         self.root.join("identity.json")
     }
 
     /// The permission model file.
+    #[must_use]
     pub fn grant_model(&self) -> PathBuf {
         self.root.join("model.json")
     }
 
     /// Where the running processes write their output.
+    #[must_use]
     pub fn logs_dir(&self) -> PathBuf {
         self.root.join("logs")
     }
 
     /// Where the running processes' identifiers are kept.
+    #[must_use]
     pub fn run_dir(&self) -> PathBuf {
         self.root.join("run")
     }
 
     /// The runner's Unix socket, in the run folder.
+    #[must_use]
     pub fn runner_socket(&self) -> PathBuf {
         self.run_dir().join("runner.sock")
     }
 
     /// The directory service's data, one directory per store.
+    #[must_use]
     pub fn data_dir(&self) -> PathBuf {
         self.root.join("data")
     }
 
     /// The data an upgrade started from, kept for a put-back.
+    #[must_use]
     pub fn data_previous_dir(&self) -> PathBuf {
         self.root.join("data.previous")
     }
 
     /// The file the administrator first-run setup made is recorded in.
+    #[must_use]
     pub fn administrator_file(&self) -> PathBuf {
         self.data_dir().join("administrator.json")
     }
 
     /// The file a headless install writes the setup code to, owner-only, in
     /// the install root, because no browser was there to hand it to.
+    #[must_use]
     pub fn headless_setup_code(&self) -> PathBuf {
         self.root.join("setup-code")
     }
 }
 
 /// The data root for `os`, given the variables that may name it.
+///
+/// # Errors
+/// Refuses when the required directory or configured data root cannot be determined.
 pub fn data_root(
     os: &str,
     named: Option<PathBuf>,
@@ -218,6 +249,7 @@ pub fn data_root(
 /// The deployment configuration text, naming `admin_email` when an
 /// unattended install was given one and no administrator otherwise, with
 /// the state directory beside it.
+#[must_use]
 pub fn render_deployment(admin_email: Option<&str>) -> String {
     render_deployment_at(admin_email, SERVICE_PORT)
 }

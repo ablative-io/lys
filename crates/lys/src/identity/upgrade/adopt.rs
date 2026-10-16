@@ -36,6 +36,9 @@ fn refuse(kind: ErrorKind, what: &str, detail: impl Into<String>) -> IdentityErr
 
 /// The commit `program`'s `--version` names, or [`UNSTAMPED`] when it
 /// cannot answer.
+///
+/// # Errors
+/// Returns named installed-build, process-control or adoption-validation failures.
 pub fn commit_or_unstamped(program: &Path, name: &str) -> IdentityResult<String> {
     match version(program, name) {
         Ok(commit) => Ok(commit),
@@ -145,6 +148,9 @@ fn recorded_commits(layout: &Layout) -> IdentityResult<BTreeMap<String, String>>
 /// upgraded like any other. A binary `bin/` lacks is adopted from its
 /// running process first, and its build is read from the file that process
 /// runs, which the placed copy equals.
+///
+/// # Errors
+/// Returns named installed-build, process-control or adoption-validation failures.
 pub fn installed(
     layout: &Layout,
     units: &[Unit],
@@ -278,6 +284,9 @@ fn stop_through_pid(pid: u32, pid_file: &Path) -> IdentityResult<()> {
 
 /// Stops `unit`'s process, through its exit lock when it has one and
 /// through its pid when it has none, and says which.
+///
+/// # Errors
+/// Returns named installed-build, process-control or adoption-validation failures.
 pub fn stop(unit: &Unit, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
     if exit_wait::lock_path(&unit.pid).exists() {
         if services::stop(&unit.pid)? {
@@ -301,6 +310,9 @@ pub fn stop(unit: &Unit, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
 /// than the one `source` names for each binary: install never restarts a
 /// placed build on a new configuration, and an upgrade is the way to a new
 /// build.
+///
+/// # Errors
+/// Returns named installed-build, process-control or adoption-validation failures.
 pub fn check_placed_build(
     layout: &Layout,
     names: &[&str],
@@ -347,6 +359,9 @@ fn started_word(started: bool, replace: bool) -> &'static str {
 /// started again. A placed screen package reloads the service's immutable
 /// cache; a screen-only change leaves the broker running. Records and
 /// returns the build that then runs.
+///
+/// # Errors
+/// Returns named installed-build, process-control or adoption-validation failures.
 pub fn settle(
     layout: &Layout,
     units: &[Unit],

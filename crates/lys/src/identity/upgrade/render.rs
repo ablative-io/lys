@@ -69,6 +69,9 @@ impl RenderedFile {
 pub trait Render {
     /// The files for `build` (each binary's commit) under `layout`, with the
     /// screens served when `screens` is true.
+    ///
+    /// # Errors
+    /// Returns named configuration or rendering failures for the requested install files.
     fn render(
         &self,
         layout: &Layout,

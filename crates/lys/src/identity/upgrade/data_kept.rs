@@ -70,6 +70,9 @@ fn copy_tree(from: &Path, to: &Path) -> IdentityResult<()> {
 
 /// Copies `data/` to a fresh `data.previous/`, through a temporary name so
 /// a crash never leaves a partial copy under the kept name.
+///
+/// # Errors
+/// Returns the named failure when installed data cannot be retained or restored.
 pub fn keep(layout: &Layout, intent: &mut Intent) -> IdentityResult<()> {
     let (data, kept) = (layout.data_dir(), layout.data_previous_dir());
     let partial = layout.data_dir().with_file_name("data.previous.partial");
@@ -86,6 +89,9 @@ pub fn keep(layout: &Layout, intent: &mut Intent) -> IdentityResult<()> {
 
 /// Puts the kept data back in place of `data/`, when this upgrade kept it.
 /// The kept copy stays, so a put-back that stops part-way can run again.
+///
+/// # Errors
+/// Returns the named failure when installed data cannot be retained or restored.
 pub fn restore(layout: &Layout, intent: &Intent, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
     let kept = layout.data_previous_dir();
     if !intent.has(Step::DataKept) || !kept.is_dir() {

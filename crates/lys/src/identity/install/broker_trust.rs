@@ -8,6 +8,9 @@ use super::services::{run_to_end, sibling};
 /// Trusts the screen service `name` with the secrets broker by the public
 /// half of the service key, replacing any key it was trusted by before, so
 /// the service may ask on a signed-in person's behalf.
+///
+/// # Errors
+/// Returns the named failure if the broker trust cannot be read or recorded.
 pub fn trust(layout: &Layout, name: &str) -> IdentityResult<()> {
     let program = sibling("lys-secrets")?;
     let public_key = run_to_end(

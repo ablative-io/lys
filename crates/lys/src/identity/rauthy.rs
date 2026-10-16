@@ -93,6 +93,9 @@ pub struct RauthyApi {
 impl RauthyApi {
     /// The API at `admin_url` (`http://host:port`), presenting the bootstrap
     /// API key secret when one is given.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn new(admin_url: &str, credential: Option<Credential>) -> IdentityResult<Self> {
         let authority = Authority::from_http_url(admin_url).map_err(|rule| {
             IdentityError::new(
@@ -173,6 +176,9 @@ impl RauthyApi {
 
     /// `GET /auth/v1/health`. Rauthy answers 500 with the same body when a
     /// part is unhealthy, so both statuses are read.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn health(&self) -> IdentityResult<Health> {
         let answer = self.exchange("GET", "/auth/v1/health", None, "rauthy")?;
         if answer.status != 200 && answer.status != 500 {
@@ -187,12 +193,18 @@ impl RauthyApi {
     }
 
     /// `GET /auth/v1/clients`.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn list_clients(&self) -> IdentityResult<Vec<Value>> {
         let answer = self.call("GET", "/auth/v1/clients", None, "clients")?;
         Self::json(&answer, "clients")
     }
 
     /// `GET /auth/v1/clients/{id}`, `None` when Rauthy has no such client.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn get_client(&self, id: &str) -> IdentityResult<Option<Value>> {
         let path = format!("/auth/v1/clients/{id}");
         let answer = self.exchange("GET", &path, None, id)?;
@@ -208,6 +220,9 @@ impl RauthyApi {
     /// Creates a client once. A lost response is resolved by reading the
     /// client back; the create is repeated only when the read-back proves it
     /// did not happen. Returns the client and whether read-back decided it.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn create_client(&self, request: &NewClient) -> IdentityResult<(Value, bool)> {
         let body = serde_json::to_value(request).map_err(|error| {
             IdentityError::new(
@@ -237,6 +252,9 @@ impl RauthyApi {
     }
 
     /// `PUT /auth/v1/clients/{id}`, confirmed by reading the client back.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn update_client(&self, id: &str, body: &Value) -> IdentityResult<Value> {
         let path = format!("/auth/v1/clients/{id}");
         match self.call("PUT", &path, Some(body), id) {
@@ -255,6 +273,9 @@ impl RauthyApi {
     }
 
     /// `POST /auth/v1/clients/{id}/secret`: the confidential client's secret.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn client_secret(&self, id: &str) -> IdentityResult<Credential> {
         let path = format!("/auth/v1/clients/{id}/secret");
         let answer = self.call("POST", &path, None, id)?;
@@ -275,6 +296,9 @@ impl RauthyApi {
 
     /// `POST /auth/v1/theme/{id}`: the client's theme, or Rauthy's default
     /// when none is set.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn get_theme(&self, id: &str) -> IdentityResult<Theme> {
         let path = format!("/auth/v1/theme/{id}");
         let answer = self.call("POST", &path, None, id)?;
@@ -285,6 +309,9 @@ impl RauthyApi {
     /// policy set to `policy` whole, answering the policy it stored. The
     /// sign-in service answers the stored policy to this call alone, so the
     /// answer is the read-back.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn put_password_policy(&self, policy: &Value) -> IdentityResult<Value> {
         let answer = self.call(
             "PUT",
@@ -297,6 +324,9 @@ impl RauthyApi {
 
     /// `GET /auth/v1/api_keys`: every API key, by name and rights. Rauthy
     /// never answers a key's secret here.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn list_api_keys(&self) -> IdentityResult<Vec<Value>> {
         let answer = self.call("GET", "/auth/v1/api_keys", None, "api_keys")?;
         let listed: Value = Self::json(&answer, "api_keys")?;
@@ -316,6 +346,9 @@ impl RauthyApi {
 
     /// `POST /auth/v1/api_keys`: a new key made from `request`, answering
     /// its token, the key's name, a dollar sign and its secret.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn create_api_key(&self, name: &str, request: &Value) -> IdentityResult<Credential> {
         let answer = self.call("POST", "/auth/v1/api_keys", Some(request), name)?;
         Self::token(&answer, name)
@@ -323,6 +356,9 @@ impl RauthyApi {
 
     /// `PUT /auth/v1/api_keys/{name}`: the key's rights set to `request`'s.
     /// What was stored is for the caller to read back.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn update_api_key(&self, name: &str, request: &Value) -> IdentityResult<()> {
         let path = format!("/auth/v1/api_keys/{name}");
         self.call("PUT", &path, Some(request), name).map(drop)
@@ -330,6 +366,9 @@ impl RauthyApi {
 
     /// `PUT /auth/v1/api_keys/{name}/secret`: a new secret for the key,
     /// answering its token. The old secret stops working.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn renew_api_key_secret(&self, name: &str) -> IdentityResult<Credential> {
         let path = format!("/auth/v1/api_keys/{name}/secret");
         let answer = self.call("PUT", &path, None, name)?;
@@ -363,6 +402,9 @@ impl RauthyApi {
     }
 
     /// `PUT /auth/v1/theme/{id}`, confirmed by reading the theme back.
+    ///
+    /// # Errors
+    /// Returns a named provider transport, response-decoding or API refusal.
     pub fn put_theme(&self, theme: &Theme) -> IdentityResult<Theme> {
         let path = format!("/auth/v1/theme/{}", theme.client_id);
         let body = serde_json::to_value(theme).map_err(|error| {

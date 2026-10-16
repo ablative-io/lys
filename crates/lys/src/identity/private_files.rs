@@ -36,6 +36,7 @@ pub enum Outcome {
 
 impl Outcome {
     /// The word printed for this outcome.
+    #[must_use]
     pub fn word(self) -> &'static str {
         match self {
             Self::Created => "created",
@@ -56,6 +57,9 @@ fn io_error(operation: &'static str, path: &Path, source: &std::io::Error) -> Id
 }
 
 /// The permission bits of `path`, or `None` when it does not exist.
+///
+/// # Errors
+/// Returns the named filesystem or private-access refusal for the requested path.
 pub fn mode_of(path: &Path) -> IdentityResult<Option<u32>> {
     match fs::metadata(path) {
         Ok(metadata) => Ok(Some(permission_bits(&metadata))),
@@ -96,6 +100,9 @@ fn refuse_open_mode(path: &Path, mode: u32) -> IdentityResult<()> {
 
 /// Creates the private state directory owner-only, or checks that an
 /// existing one is.
+///
+/// # Errors
+/// Returns the named filesystem or private-access refusal for the requested path.
 pub fn ensure_dir(path: &Path) -> IdentityResult<()> {
     if let Some(mode) = mode_of(path)? {
         return refuse_open_mode(path, mode);
@@ -126,6 +133,9 @@ fn create_dir(path: &Path) -> IdentityResult<()> {
 
 /// Reads a private file, refusing one others may read. `None` when it does
 /// not exist.
+///
+/// # Errors
+/// Returns the named filesystem or private-access refusal for the requested path.
 pub fn read(path: &Path) -> IdentityResult<Option<Zeroizing<Vec<u8>>>> {
     let Some(mode) = mode_of(path)? else {
         return Ok(None);
@@ -146,6 +156,9 @@ fn temporary_path(path: &Path) -> PathBuf {
 
 /// Writes `bytes` to `path` owner-only and durably, reconciling whatever an
 /// earlier interrupted write left.
+///
+/// # Errors
+/// Returns the named filesystem or private-access refusal for the requested path.
 pub fn write(path: &Path, bytes: &[u8]) -> IdentityResult<Outcome> {
     let partial = temporary_path(path);
     match fs::remove_file(&partial) {

@@ -32,6 +32,9 @@ fn refuse(action: &'static str, resource: &str, detail: impl Into<String>) -> Id
 
 /// Runs `program` with `args` to completion, refusing by name when it is
 /// missing or exits unsuccessfully.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn run_to_end(program: &Path, args: &[String], resource: &str) -> IdentityResult<String> {
     let environment = login::login()?;
     let output = Command::new(program)
@@ -64,6 +67,9 @@ pub fn run_to_end(program: &Path, args: &[String], resource: &str) -> IdentityRe
 
 /// Refuses, naming the fix, unless Docker with its compose plugin is
 /// installed and its engine is running. `docker` names the program to ask.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn require_docker(docker: &Path) -> IdentityResult<()> {
     let version = Command::new(docker)
         .args(["compose", "version"])
@@ -135,6 +141,9 @@ fn compose_args(layout: &Layout, config: &DeploymentConfig) -> Vec<String> {
 }
 
 /// `docker compose up -d --wait` for the deployment under `layout`.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn compose_up(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     let args = up_args(layout, config, false);
     run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
@@ -145,6 +154,9 @@ pub fn compose_up(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<
 /// Compose recreates a changed network without recreating a container whose
 /// own definition is unchanged, which leaves that container off the network
 /// under its service name, so an upgrade makes every service again.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn compose_recreate(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     let args = up_args(layout, config, true);
     run_to_end(Path::new("docker"), &args, "compose").map(|_| ())
@@ -152,6 +164,9 @@ pub fn compose_recreate(layout: &Layout, config: &DeploymentConfig) -> IdentityR
 
 /// `docker compose stop` for the deployment under `layout`: the database,
 /// the sign-in service and the permission service stop and keep their data.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn compose_stop(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     let mut args = compose_args(layout, config);
     args.push("stop".to_string());
@@ -181,6 +196,9 @@ fn unready_services(config: &DeploymentConfig) -> Vec<String> {
 /// now; when any is not, the compose output is followed and they are
 /// checked once on each piece of it that arrives. `say` hears one line
 /// naming what the wait is for, and one as each service becomes ready.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn wait_ready(
     layout: &Layout,
     config: &DeploymentConfig,
@@ -232,6 +250,9 @@ pub fn wait_ready(
 /// Checks `unready` once on each piece of `output` that arrives, until
 /// nothing in `waiting` is unready; `say` hears each service as it becomes
 /// ready. The output ending first is refused, naming what was not ready.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn ready_on_output(
     output: &mut dyn Read,
     mut waiting: Vec<String>,
@@ -273,6 +294,9 @@ pub fn ready_on_output(
 }
 
 /// The sibling binary `name` beside the running `lys`.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn sibling(name: &str) -> IdentityResult<PathBuf> {
     let own = std::env::current_exe().map_err(|error| {
         refuse(
@@ -293,6 +317,9 @@ pub fn sibling(name: &str) -> IdentityResult<PathBuf> {
 }
 
 /// Makes the secrets broker's store when there is none yet.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn broker_init(layout: &Layout) -> IdentityResult<bool> {
     if layout.broker_root().join("audit").exists() || layout.broker_root().join("store").exists() {
         return Ok(false);
@@ -315,6 +342,7 @@ pub fn broker_init(layout: &Layout) -> IdentityResult<bool> {
 /// Whether the process a pid file names is alive. A process that has exited
 /// but not yet been reaped (a zombie) counts as gone, and so does one whose
 /// exit lock is free: the kernel releases it as the exit begins.
+#[must_use]
 pub fn alive(pid_file: &Path) -> bool {
     let Ok(text) = std::fs::read_to_string(pid_file) else {
         return false;
@@ -342,6 +370,9 @@ pub fn alive(pid_file: &Path) -> bool {
 
 /// Stops the process a pid file names and waits for its exit. `false`
 /// when none was alive.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn stop(pid_file: &Path) -> IdentityResult<bool> {
     stop_with(pid_file, &mut alive)
 }
@@ -349,6 +380,9 @@ pub fn stop(pid_file: &Path) -> IdentityResult<bool> {
 /// [`stop`], asking `alive` whether the process lives. It is asked once,
 /// before the process is told to stop; the exit is then waited on as an
 /// event and nothing is asked again.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn stop_with(pid_file: &Path, alive: &mut dyn FnMut(&Path) -> bool) -> IdentityResult<bool> {
     if !alive(pid_file) {
         return Ok(false);
@@ -371,6 +405,9 @@ pub fn stop_with(pid_file: &Path, alive: &mut dyn FnMut(&Path) -> bool) -> Ident
 /// the pid file already names alive is left alone, unless `replace` asks
 /// for it to be stopped and started afresh. It starts with the [`login::login`]
 /// environment and nothing of the invoking process's own.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn start_detached(
     program: &Path,
     args: &[String],
@@ -382,6 +419,9 @@ pub fn start_detached(
 }
 
 /// [`start_detached`] with `environment` as the service's whole environment.
+///
+/// # Errors
+/// Returns named command, service-readiness or process-control failures.
 pub fn start_detached_in(
     program: &Path,
     args: &[String],
@@ -436,6 +476,7 @@ fn detach(command: &mut Command) {
 fn detach(_command: &mut Command) {}
 
 /// Whether the loopback service on `port` answers `path` with a status.
+#[must_use]
 pub fn answers(port: u16, path: &str) -> bool {
     let authority = Authority {
         host: "127.0.0.1".to_string(),

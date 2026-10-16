@@ -35,6 +35,9 @@ pub struct Authority {
 impl Authority {
     /// Parses `host:port` or `[v6]:port`; `default_port` stands in for an
     /// absent port, and with none an absent port is refused.
+    ///
+    /// # Errors
+    /// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
     pub fn parse(authority: &str, default_port: Option<u16>) -> Result<Self, &'static str> {
         let (host, port) = if let Some(rest) = authority.strip_prefix('[') {
             let (host, after) = rest
@@ -70,6 +73,9 @@ impl Authority {
     }
 
     /// Parses `http://host[:port]`, with or without a closing slash.
+    ///
+    /// # Errors
+    /// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
     pub fn from_http_url(url: &str) -> Result<Self, &'static str> {
         let authority = url
             .strip_prefix("http://")
@@ -79,6 +85,9 @@ impl Authority {
     }
 
     /// Opens a connection, trying every address the host resolves to.
+    ///
+    /// # Errors
+    /// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
     pub fn connect(&self) -> Result<TcpStream, String> {
         let addresses: Vec<SocketAddr> = (self.host.as_str(), self.port)
             .to_socket_addrs()
@@ -103,6 +112,9 @@ impl fmt::Display for Authority {
 
 /// Connects to the first of `addresses` that accepts. A refusal is known
 /// at once and names every address tried with its cause.
+///
+/// # Errors
+/// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn connect_any(addresses: &[SocketAddr]) -> Result<TcpStream, String> {
     let mut refused = Vec::with_capacity(addresses.len());
     for address in addresses {
@@ -150,6 +162,9 @@ pub enum Failure {
 }
 
 /// Sends `request` to `authority` and reads the whole response.
+///
+/// # Errors
+/// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response, Failure> {
     let mut stream = authority.connect().map_err(Failure::Unreachable)?;
     let mut raw = Zeroizing::new(Vec::new());
@@ -187,6 +202,9 @@ pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response
 
 /// The status code of an HTTP/1.x status line: the version, one space and
 /// exactly three digits, then the end or a space and the reason.
+///
+/// # Errors
+/// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn parse_status_line(line: &str) -> Result<u16, &'static str> {
     let rest = line
         .strip_prefix("HTTP/1.1 ")
@@ -206,6 +224,9 @@ pub fn parse_status_line(line: &str) -> Result<u16, &'static str> {
 
 /// Parses a whole response: status line, headers, and the body by its
 /// declared length or chunked encoding.
+///
+/// # Errors
+/// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn parse_response(raw: &[u8]) -> Result<Response, &'static str> {
     let split = raw
         .windows(4)

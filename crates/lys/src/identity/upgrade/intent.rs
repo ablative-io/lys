@@ -108,6 +108,9 @@ fn commits(build: &BTreeMap<String, String>) -> String {
 
 impl Intent {
     /// The record of the upgrade stopped part-way under `layout`, if any.
+    ///
+    /// # Errors
+    /// Returns named filesystem or intent-decoding failures without discarding the recorded intent.
     pub fn read(layout: &Layout) -> IdentityResult<Option<Self>> {
         let Some(bytes) = private_files::read(&layout.upgrade_intent())? else {
             return Ok(None);
@@ -119,6 +122,9 @@ impl Intent {
 
     /// Writes the record as it stands, whole, by a temporary name and a
     /// rename.
+    ///
+    /// # Errors
+    /// Returns named filesystem or intent-decoding failures without discarding the recorded intent.
     pub fn write(&self, layout: &Layout) -> IdentityResult<()> {
         let text = serde_json::to_vec_pretty(self).map_err(|error| {
             IdentityError::new(
@@ -134,17 +140,24 @@ impl Intent {
     }
 
     /// Records `step` as completed.
+    ///
+    /// # Errors
+    /// Returns named filesystem or intent-decoding failures without discarding the recorded intent.
     pub fn done(&mut self, layout: &Layout, step: Step) -> IdentityResult<()> {
         self.steps.push(step);
         self.write(layout)
     }
 
     /// Whether `step` was recorded as completed.
+    #[must_use]
     pub fn has(&self, step: Step) -> bool {
         self.steps.contains(&step)
     }
 
     /// Removes the record: the upgrade has ended.
+    ///
+    /// # Errors
+    /// Returns named filesystem or intent-decoding failures without discarding the recorded intent.
     pub fn clear(layout: &Layout) -> IdentityResult<()> {
         let path = layout.upgrade_intent();
         match std::fs::remove_file(&path) {
@@ -161,6 +174,7 @@ impl Intent {
     }
 
     /// The upgrade named by its builds: `from A to B`.
+    #[must_use]
     pub fn describe(&self) -> String {
         format!("from {} to {}", commits(&self.from), commits(&self.to))
     }

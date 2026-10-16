@@ -16,6 +16,7 @@ pub enum Profile {
 
 impl Profile {
     /// The word the service's configuration carries.
+    #[must_use]
     pub fn word(self) -> &'static str {
         match self {
             Self::Service => "service",
@@ -24,6 +25,7 @@ impl Profile {
     }
 
     /// The profile a configuration's word names; none for any other word.
+    #[must_use]
     pub fn from_word(word: &str) -> Option<Self> {
         match word {
             "service" => Some(Self::Service),

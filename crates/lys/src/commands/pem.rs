@@ -29,12 +29,14 @@ const LINE_WIDTH: usize = 64;
 
 /// Encodes certificate DER as a PEM `CERTIFICATE` block with a trailing
 /// newline, base64 body wrapped at 64 characters.
+#[must_use]
 pub fn encode_certificate(der: &[u8]) -> String {
     encode_labelled(CERTIFICATE_LABEL, der)
 }
 
 /// Encodes request DER as a PEM `CERTIFICATE REQUEST` block, the label
 /// `openssl req` and every other standard tool expects.
+#[must_use]
 pub fn encode_certificate_request(der: &[u8]) -> String {
     encode_labelled(CERTIFICATE_REQUEST_LABEL, der)
 }

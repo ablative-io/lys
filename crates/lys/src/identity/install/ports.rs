@@ -76,6 +76,9 @@ fn port(value: &Value, field: &str) -> IdentityResult<u16> {
 
 impl Ports {
     /// Read listener choices from the existing service configuration.
+    ///
+    /// # Errors
+    /// Refuses unreadable port settings or values outside the supported port shape.
     pub fn from_value(value: &Value) -> IdentityResult<Self> {
         let mut ports = Self {
             service_recorded: true,
@@ -96,6 +99,9 @@ impl Ports {
     }
 
     /// Read recorded listeners, retaining defaults for a new install.
+    ///
+    /// # Errors
+    /// Refuses unreadable port settings or values outside the supported port shape.
     pub fn load(layout: &Layout) -> IdentityResult<Self> {
         if let Some(carried) = server_config::carried(layout)? {
             return Ok(carried.ports);
@@ -157,6 +163,9 @@ impl Ports {
     }
 
     /// Apply explicit choices after refusing zero or shared listener ports.
+    ///
+    /// # Errors
+    /// Refuses unreadable port settings or values outside the supported port shape.
     pub fn chosen(
         self,
         service: Option<u16>,
@@ -214,17 +223,20 @@ impl Ports {
     }
 
     /// The browser origin for this listener.
+    #[must_use]
     pub fn service_url(self) -> String {
         format!("http://localhost:{}", self.service)
     }
 
     /// The Anthropic address of the model proxy, which a Claude Code run
     /// Lys starts is given as its base URL.
+    #[must_use]
     pub fn proxy_url(self) -> String {
         format!("http://127.0.0.1:{}{PROXY_PATH}", self.proxy)
     }
 
     /// The setup page on this listener.
+    #[must_use]
     pub fn setup_url(self) -> String {
         format!("{}/setup", self.service_url())
     }
@@ -247,6 +259,9 @@ impl PersonAddress {
     /// alone), so that origin is every person-facing address; the local
     /// listener is used only when the deployment names no public origin, and
     /// then `fallback` says so.
+    ///
+    /// # Errors
+    /// Refuses unreadable port settings or values outside the supported port shape.
     pub fn load(layout: &Layout, ports: Ports) -> IdentityResult<Self> {
         let path = layout.deployment_config();
         let local = |reason: String| Self {
@@ -296,11 +311,13 @@ impl PersonAddress {
     }
 
     /// The setup page at this origin.
+    #[must_use]
     pub fn setup_url(&self) -> String {
         format!("{}/setup", self.origin)
     }
 
     /// The line said when the local listener stands in, naming why.
+    #[must_use]
     pub fn fallback_note(&self) -> Option<String> {
         self.fallback.as_ref().map(|reason| {
             format!(

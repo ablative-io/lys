@@ -19,6 +19,7 @@ fn refused(kind: ErrorKind, detail: impl Into<String>) -> IdentityError {
 }
 
 /// Where install and upgrade place the loader's independent bearer.
+#[must_use]
 pub fn credential_path(layout: &Layout) -> PathBuf {
     layout.root.join("keys").join("identity-loader.credential")
 }
@@ -27,6 +28,9 @@ pub fn credential_path(layout: &Layout) -> PathBuf {
 /// is validated and reused, and exclusive creation never overwrites a key
 /// made by another process. An incomplete write is a named refusal.
 #[cfg(unix)]
+///
+/// # Errors
+/// Returns named configuration, credential-file or provider API failures.
 pub fn prepare_credential(layout: &Layout) -> IdentityResult<()> {
     use rand::RngCore;
     use std::io::Write;
@@ -194,6 +198,9 @@ fn endpoint(layout: &Layout, address: Option<&str>) -> IdentityResult<(Authority
 }
 
 /// Execute the CLI's one import request and preserve a named failure.
+///
+/// # Errors
+/// Returns named configuration, credential-file or provider API failures.
 pub fn run(
     file: &Path,
     root: Option<PathBuf>,

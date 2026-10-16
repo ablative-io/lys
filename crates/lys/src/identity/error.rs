@@ -90,6 +90,7 @@ pub enum ErrorKind {
 
 impl ErrorKind {
     /// The stable name printed at the start of every diagnostic.
+    #[must_use]
     pub fn name(self) -> &'static str {
         match self {
             Self::PresenceRefused => "presence_refused",
@@ -134,6 +135,7 @@ impl ErrorKind {
     /// The name a person reads when the failure reaches them through
     /// `lys identity install`: the same kind, with the sign-in service
     /// named by what it does rather than by the product it is.
+    #[must_use]
     pub fn lys_name(self) -> &'static str {
         match self {
             Self::RauthyUnreachable => "sign_in_service_unreachable",
@@ -150,6 +152,7 @@ impl ErrorKind {
 
 /// `text` as a person reads it: every service named by what it does, never
 /// by the product it is. Operator log files keep the products' names.
+#[must_use]
 pub fn in_lys_words(text: &str) -> String {
     [
         ("PostgreSQL", "database"),
@@ -215,6 +218,7 @@ impl IdentityError {
     }
 
     /// The stable kind of this failure.
+    #[must_use]
     pub fn kind(&self) -> ErrorKind {
         self.kind
     }

@@ -67,6 +67,9 @@ fn relative(entry: &str) -> IdentityResult<PathBuf> {
 
 /// Reads and checks the manifest at `package`, returning every file with
 /// its verified bytes.
+///
+/// # Errors
+/// Returns named surface validation or placement failures.
 pub fn verify(package: &Path) -> IdentityResult<(Manifest, Verified)> {
     let manifest_path = package.join(MANIFEST);
     let text = std::fs::read_to_string(&manifest_path).map_err(|error| {
@@ -106,6 +109,9 @@ pub fn verify(package: &Path) -> IdentityResult<(Manifest, Verified)> {
 
 /// Verifies the package at `package` and places it at `destination`,
 /// replacing whatever was there.
+///
+/// # Errors
+/// Returns named surface validation or placement failures.
 pub fn place(package: &Path, destination: &Path) -> IdentityResult<Manifest> {
     let (manifest, files) = verify(package)?;
     let fresh = destination.with_extension("placing");

@@ -88,6 +88,7 @@ fn canonical(value: &Value, out: &mut String) {
 }
 
 /// The stable identifier of making `desired` true of `resource`.
+#[must_use]
 pub fn operation_id(kind: &str, resource: &str, desired: &Value) -> String {
     let mut text = String::new();
     canonical(desired, &mut text);
@@ -108,6 +109,7 @@ pub fn operation_id(kind: &str, resource: &str, desired: &Value) -> String {
 
 /// The managed fields `client` should hold, with empty lists as absent the
 /// way Rauthy stores them.
+#[must_use]
 pub fn desired_fields(client: &Client) -> Value {
     let optional = |items: &[String]| {
         if items.is_empty() {
@@ -130,6 +132,7 @@ pub fn desired_fields(client: &Client) -> Value {
 }
 
 /// The managed fields as `current` holds them.
+#[must_use]
 pub fn current_fields(current: &Value) -> Value {
     let mut fields = Map::new();
     for key in MANAGED_FIELDS {
@@ -260,6 +263,7 @@ fn reconcile_theme(
 
 /// Lys's `policy` as Rauthy's password policy request carries it. Lys's
 /// policy has no expiry, so `valid_days` is always absent.
+#[must_use]
 pub fn issuer_policy(policy: &PasswordPolicy) -> Value {
     json!({
         "length_min": policy.length_min,
@@ -286,6 +290,9 @@ fn stored_as_written(stored: &Value, written: &Value) -> bool {
 /// Writes Lys's password policy to Rauthy through `api` and checks the
 /// policy Rauthy stored is the one written. A key without the right to
 /// write it is refused by name, with the step that grants it.
+///
+/// # Errors
+/// Returns named configuration or provider API failures while reconciling the declared settings.
 pub fn reconcile_password_policy(
     api: &RauthyApi,
     policy: &PasswordPolicy,
@@ -322,6 +329,9 @@ pub fn reconcile_password_policy(
 
 /// Writes the password policy `config` declares to Rauthy with the
 /// install's configure key.
+///
+/// # Errors
+/// Returns named configuration or provider API failures while reconciling the declared settings.
 pub fn apply_password_policy(config: &DeploymentConfig) -> IdentityResult<Operation> {
     let credential = read_secret(&config.state_dir(), API_KEY_SECRET)?;
     let api = RauthyApi::new(&config.issuer.admin_url, Some(credential))?;
@@ -339,6 +349,9 @@ fn record_of(operations: &[Operation]) -> Vec<Value> {
 }
 
 /// Runs `lys identity configure` against the configuration at `config_path`.
+///
+/// # Errors
+/// Returns named configuration or provider API failures while reconciling the declared settings.
 pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     let config = DeploymentConfig::load(config_path)?;
     let (api, mapping, operations) = reconcile(&config)?;
@@ -349,6 +362,9 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
 /// declares them and records the operations, saying nothing: the API it
 /// spoke to, the theme mapping and the operations are answered for a
 /// caller to report.
+///
+/// # Errors
+/// Returns named configuration or provider API failures while reconciling the declared settings.
 pub fn reconcile(
     config: &DeploymentConfig,
 ) -> IdentityResult<(RauthyApi, ThemeMapping, Vec<Operation>)> {

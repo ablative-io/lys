@@ -36,11 +36,13 @@ if [ \"$1\" = -l ]; then shift; fi\n\
 exec /bin/sh \"$@\"\n";
 
 /// The test login's shell, as `SHELL` names it.
+#[must_use]
 pub fn shell() -> PathBuf {
     Path::new(ROOT).join("shell")
 }
 
 /// The test login's home, as `HOME` names it.
+#[must_use]
 pub fn home() -> PathBuf {
     Path::new(ROOT).join("home")
 }

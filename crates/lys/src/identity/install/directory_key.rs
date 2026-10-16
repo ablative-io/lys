@@ -34,6 +34,7 @@ pub const DIRECTORY_KEY_NAME: &str = "lys_directory";
 /// The directory service's rights: read, create and update on clients,
 /// users and sign-in providers, and read on secrets. Never Secrets update
 /// and never a right over API keys.
+#[must_use]
 pub fn directory_key_access() -> Value {
     json!([
         {"group": "Clients", "access_rights": ["read", "create", "update"]},
@@ -231,6 +232,9 @@ fn holds_directory_token(held: &[u8]) -> bool {
 /// Makes or narrows the directory key through `api`, reads its rights back,
 /// and answers a new token for the service when `held`, the token the
 /// service's key file holds, is not already this key's.
+///
+/// # Errors
+/// Refuses unreadable key material, incorrect access or a failed key reconciliation.
 pub fn reconcile(api: &RauthyApi, held: Option<&[u8]>) -> IdentityResult<Option<Credential>> {
     let wanted = rights(&directory_key_access())?;
     let token = match listed(api)? {
@@ -260,6 +264,9 @@ pub fn reconcile(api: &RauthyApi, held: Option<&[u8]>) -> IdentityResult<Option<
 /// writes its token where the service reads it, answering whether the file
 /// changed. The token is written as the sign-in service reads it: the
 /// key's name, a dollar sign and its secret.
+///
+/// # Errors
+/// Refuses unreadable key material, incorrect access or a failed key reconciliation.
 pub fn provide(config: &DeploymentConfig) -> IdentityResult<Outcome> {
     let state = config.state_dir();
     let path = state.join(server_config::PROVIDERS_KEY_FILE);
@@ -278,6 +285,9 @@ pub fn provide(config: &DeploymentConfig) -> IdentityResult<Outcome> {
 /// it made first, as the install makes it: the install refuses a build
 /// other than the placed one, so only the upgrade can. A key that exists is
 /// never changed here.
+///
+/// # Errors
+/// Refuses unreadable key material, incorrect access or a failed key reconciliation.
 pub fn verify(config: &DeploymentConfig) -> IdentityResult<()> {
     let state = config.state_dir();
     let api = RauthyApi::new(

@@ -52,6 +52,7 @@ fn client_commit<'a>(host: &std::path::Path, stamp: &'a str) -> IdentityResult<&
 }
 
 /// The Rust target of the host client that was built beside this installer.
+#[must_use]
 pub fn host_platform() -> String {
     let suffix = if cfg!(target_os = "macos") {
         "apple-darwin"
@@ -184,6 +185,9 @@ impl ClientSet {
     }
 
     /// The manifest is replaced by the existing configuration transaction, so rollback restores its old set.
+    ///
+    /// # Errors
+    /// Returns named manifest, platform or client-release validation failures.
     pub fn manifest(
         &self,
         layout: &Layout,
@@ -201,6 +205,9 @@ impl ClientSet {
 }
 
 /// Read a placed manifest. An old install has no clients until this installer supplies them.
+///
+/// # Errors
+/// Returns named manifest, platform or client-release validation failures.
 pub fn client_releases(
     layout: &Layout,
 ) -> IdentityResult<std::collections::BTreeMap<String, ClientRelease>> {

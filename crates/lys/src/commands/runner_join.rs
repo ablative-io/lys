@@ -111,6 +111,9 @@ fn io(context: String) -> impl FnOnce(std::io::Error) -> CliError {
 }
 
 /// Runs `lys runner join`.
+///
+/// # Errors
+/// Returns named connection, join-code or runner-start failures.
 pub fn run(
     server: &str,
     machine: &str,
@@ -203,6 +206,9 @@ pub(crate) fn start_saved(layout: &Layout, scrollback: usize) -> CliResult<()> {
 /// The connection code: one line of `input`, asked for on standard error
 /// when `asking`, since standard input is then a person at a terminal.
 /// Refused `runner_join_code_missing` when the line is empty.
+///
+/// # Errors
+/// Returns named connection, join-code or runner-start failures.
 pub fn read_code(input: &mut impl BufRead, asking: bool) -> CliResult<Zeroizing<String>> {
     if asking {
         let mut said = std::io::stderr();

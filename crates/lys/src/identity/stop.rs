@@ -80,6 +80,9 @@ fn console_person() -> IdentityResult<String> {
 }
 
 /// Runs `lys identity stop`.
+///
+/// # Errors
+/// Returns named install-state, process-inspection or service-control failures.
 pub fn run(options: &StopOptions, json: bool) -> IdentityResult<()> {
     let reason = options.reason.trim().to_owned();
     if reason.is_empty() {
@@ -370,6 +373,9 @@ pub struct StartOptions {
 /// the same steps the install starts it with, and leaves running whatever
 /// runs. A cord pulled in the service stays pulled until the administrator
 /// lets agents start again.
+///
+/// # Errors
+/// Returns named install-state, process-inspection or service-control failures.
 pub fn start(options: &StartOptions, json: bool) -> IdentityResult<()> {
     let layout = layout_at(options.root.as_ref())?;
     let mut emitter = Emitter::new(json);

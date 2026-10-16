@@ -106,6 +106,7 @@ pub struct Pair {
 
 impl Pair {
     /// Whether the ratio meets the tier.
+    #[must_use]
     pub fn passes(&self) -> bool {
         self.ratio >= self.tier
     }
@@ -121,6 +122,7 @@ fn invalid(resource: &str, detail: impl Into<String>) -> IdentityError {
 }
 
 /// The pinned Rauthy's dark defaults for every field the mapping leaves a gap.
+#[must_use]
 pub fn rauthy_dark_defaults() -> ThemeCss {
     ThemeCss {
         text: [34, 5, 75],
@@ -138,11 +140,17 @@ pub fn rauthy_dark_defaults() -> ThemeCss {
 
 impl ThemeMapping {
     /// Parses and validates the declared mapping.
+    ///
+    /// # Errors
+    /// Refuses malformed theme values, unavailable configuration or invalid contrast inputs.
     pub fn declared() -> IdentityResult<Self> {
         Self::parse(DECLARED)
     }
 
     /// Parses and validates a mapping.
+    ///
+    /// # Errors
+    /// Refuses malformed theme values, unavailable configuration or invalid contrast inputs.
     pub fn parse(text: &str) -> IdentityResult<Self> {
         let mapping: Self =
             serde_json::from_str(text).map_err(|error| invalid("mapping", error.to_string()))?;
@@ -224,6 +232,9 @@ impl ThemeMapping {
     }
 
     /// The client mapping for `role`.
+    ///
+    /// # Errors
+    /// Refuses malformed theme values, unavailable configuration or invalid contrast inputs.
     pub fn client(&self, role: ClientRole) -> IdentityResult<&ClientTheme> {
         self.clients
             .get(role.key())
@@ -243,6 +254,7 @@ impl ThemeMapping {
 
     /// The theme `current` becomes: the four mapped dark fields replaced,
     /// every other field left exactly as Rauthy holds it.
+    #[must_use]
     pub fn apply(&self, role: ClientRole, current: &Theme) -> Theme {
         Theme {
             client_id: current.client_id.clone(),
@@ -258,6 +270,9 @@ fn is_purple(hsl: [u16; 3]) -> bool {
 }
 
 /// Converts `#RRGGBB` to whole-number HSL, or names why it cannot.
+///
+/// # Errors
+/// Refuses malformed theme values, unavailable configuration or invalid contrast inputs.
 pub fn hex_to_hsl(hex: &str) -> Result<[u16; 3], String> {
     let malformed = || format!("{hex} is not #RRGGBB");
     let digits = hex
@@ -344,6 +359,7 @@ fn relative_luminance(rgb: [f64; 3]) -> f64 {
 }
 
 /// The WCAG contrast ratio of two opaque colours.
+#[must_use]
 pub fn contrast_ratio(a: [f64; 3], b: [f64; 3]) -> f64 {
     let (la, lb) = (relative_luminance(a), relative_luminance(b));
     (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
@@ -352,6 +368,7 @@ pub fn contrast_ratio(a: [f64; 3], b: [f64; 3]) -> f64 {
 /// Resolves one of Rauthy's CSS colour values against the mode it sits in:
 /// `hsl(var(--x))`, `hsla(var(--x) / alpha)`, `white` or `black`, composited
 /// over the page background when it carries an alpha.
+#[must_use]
 pub fn resolve_css(value: &str, mode: &ThemeCss) -> Option<[f64; 3]> {
     let value = value.trim();
     match value {
@@ -385,6 +402,9 @@ pub fn resolve_css(value: &str, mode: &ThemeCss) -> Option<[f64; 3]> {
 
 /// The six pairs of one client's dark mode, with every value as `dark`
 /// holds it.
+///
+/// # Errors
+/// Refuses malformed theme values, unavailable configuration or invalid contrast inputs.
 pub fn contrast_pairs(dark: &ThemeCss) -> IdentityResult<Vec<Pair>> {
     let resolve = |name: &str, value: &str| {
         resolve_css(value, dark).ok_or_else(|| invalid(name, format!("cannot resolve {value}")))

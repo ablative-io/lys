@@ -40,6 +40,7 @@ fn refuse(action: &'static str, detail: impl Into<String>, path: &Path) -> Ident
 }
 
 /// The exit lock beside `pid_file`.
+#[must_use]
 pub fn lock_path(pid_file: &Path) -> PathBuf {
     pid_file.with_extension("exit")
 }
@@ -48,6 +49,9 @@ pub fn lock_path(pid_file: &Path) -> PathBuf {
 /// The file returned is handed to the service as its standard input, which
 /// carries the lock with it. A lock still held by an earlier process is
 /// waited on until that process has exited, so two never run at once.
+///
+/// # Errors
+/// Returns named process-identity, exit-notification or filesystem failures.
 pub fn hold(pid_file: &Path) -> IdentityResult<File> {
     let path = lock_path(pid_file);
     let file = OpenOptions::new()
@@ -73,6 +77,9 @@ impl ExitWatch {
     /// Opens the watch on the service `pid_file` names. A pid file without
     /// an exit lock beside it is refused, naming the pid, since no exit of
     /// that process can be seen.
+    ///
+    /// # Errors
+    /// Returns named process-identity, exit-notification or filesystem failures.
     pub fn open(pid_file: &Path) -> IdentityResult<Self> {
         let path = lock_path(pid_file);
         match File::open(&path) {
@@ -95,6 +102,9 @@ impl ExitWatch {
     /// The watch asks for a shared lock, which the service's exclusive one
     /// refuses and another watch's does not, and releases it before the
     /// answer, so it keeps nothing a later start would have to wait for.
+    ///
+    /// # Errors
+    /// Returns named process-identity, exit-notification or filesystem failures.
     pub fn exited(&self) -> IdentityResult<bool> {
         let exited = self.lock(FlockOperation::NonBlockingLockShared)?;
         if exited {
@@ -106,6 +116,9 @@ impl ExitWatch {
     /// Blocks until the service has exited: the kernel grants the lock the
     /// moment the service's last descriptor of it closes. The lock is
     /// released before this returns.
+    ///
+    /// # Errors
+    /// Returns named process-identity, exit-notification or filesystem failures.
     pub fn wait(&self) -> IdentityResult<()> {
         self.lock(FlockOperation::LockShared)?;
         self.release()

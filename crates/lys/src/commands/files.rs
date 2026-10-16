@@ -19,6 +19,9 @@ use crate::commands::error::{CliError, CliResult};
 
 /// Read a file fully into memory, describing the file's role (`what`, e.g.
 /// "payload file") and its path in any error.
+///
+/// # Errors
+/// Returns the I/O failure with the file role and path.
 pub fn read_file(path: &Path, what: &str) -> CliResult<Vec<u8>> {
     std::fs::read(path).map_err(|source| CliError::Io {
         context: format!("failed to read {what} {}", path.display()),
@@ -28,6 +31,9 @@ pub fn read_file(path: &Path, what: &str) -> CliResult<Vec<u8>> {
 
 /// Write bytes to a file, describing the file's role (`what`, e.g.
 /// "attestation file") and its path in any error.
+///
+/// # Errors
+/// Returns the I/O failure with the file role and path.
 pub fn write_file(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
     std::fs::write(path, contents).map_err(|source| CliError::Io {
         context: format!("failed to write {what} {}", path.display()),
@@ -48,6 +54,9 @@ pub fn write_file(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
 /// *loading* an over-permissive key — that is a different path, and the
 /// earlier version of this comment cited it as precedent for not tightening
 /// here, which was the wrong analog.)
+///
+/// # Errors
+/// Returns the I/O failure with the file role and path.
 pub fn write_file_private(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
     #[cfg(unix)]
     {

@@ -89,6 +89,9 @@ fn rename(from: &Path, to: &Path, action: &'static str) -> IdentityResult<()> {
 /// Copies `source` into `dir` as `name`: to a temporary name, read back and
 /// compared with the source, then renamed, so `dir/name` is never a
 /// half-written or differing binary.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn place_binary(source: &Path, dir: &Path, name: &str) -> IdentityResult<()> {
     place_binary_with(source, dir, name, &mut |from, to| {
         std::fs::copy(from, to).map(drop)
@@ -96,6 +99,9 @@ pub fn place_binary(source: &Path, dir: &Path, name: &str) -> IdentityResult<()>
 }
 
 /// [`place_binary`], copying with `copy`.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn place_binary_with(
     source: &Path,
     dir: &Path,
@@ -133,6 +139,9 @@ fn create(path: &Path, private: bool) -> std::io::Result<File> {
 
 /// Writes `bytes` to `target` (owner-only when `private`): to a temporary
 /// name, synced, read back and compared, then renamed over `target`.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn place_file(target: &Path, bytes: &[u8], private: bool) -> IdentityResult<()> {
     let name = target
         .file_name()
@@ -160,6 +169,9 @@ pub fn place_file(target: &Path, bytes: &[u8], private: bool) -> IdentityResult<
 }
 
 /// Stops the service and then the broker.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn stop_all(units: &[Unit], say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
     announce_restart(units, true)?;
     for unit in units.iter().rev() {
@@ -183,6 +195,9 @@ fn start_all(layout: &Layout, units: &[Unit], say: &mut dyn FnMut(&str)) -> Resu
 }
 
 /// Moves `bin/` to `bin.previous/`, replacing an older one.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn keep_binaries(layout: &Layout, intent: &mut Intent) -> IdentityResult<()> {
     remove_dir(&layout.bin_previous_dir())?;
     rename(
@@ -195,12 +210,18 @@ pub fn keep_binaries(layout: &Layout, intent: &mut Intent) -> IdentityResult<()>
 
 /// Makes `bin/` when it is missing. Binaries hold no secret, so a `bin/`
 /// others may read is used as it is, never refused as a private file.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn ensure_bin(layout: &Layout) -> IdentityResult<()> {
     let bin = layout.bin_dir();
     std::fs::create_dir_all(&bin).map_err(|error| io("make bin/", &bin, &error))
 }
 
 /// Places each of `names` from `from` into a fresh `bin/`.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn place_binaries(
     layout: &Layout,
     from: &Path,
@@ -314,6 +335,9 @@ fn swap_in(
 
 /// Swaps the new build in and starts it, recording each step in `intent`.
 /// The failure is the words that name what broke.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn forward(
     layout: &Layout,
     plan: &Plan<'_>,
@@ -342,6 +366,9 @@ pub fn forward(
 
 /// Puts back what `intent` and the disk say was replaced, and starts the
 /// previous build and waits for it ready.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn back(
     layout: &Layout,
     intent: &Intent,
@@ -390,6 +417,9 @@ pub fn back(
 /// Ends an upgrade that stopped part-way, before anything else is done: one
 /// whose new build had started is finished, any other is put back. Each
 /// says which, and the build then running is recorded.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn recover(
     layout: &Layout,
     units: &[Unit],
@@ -408,6 +438,9 @@ pub fn recover(
 }
 
 /// Recovers with the runner already checked before any upgrade mutation.
+///
+/// # Errors
+/// Returns named filesystem, service-control or recovery failures for the upgrade step.
 pub fn recover_with_runner(
     layout: &Layout,
     units: &[Unit],
