@@ -232,6 +232,7 @@ async fn make_state(
         setup: config.setup.clone(),
         password_policy: config.password_policy.clone(),
         model_proxy: config.model_proxy.clone(),
+        dialled_model_proxy: crate::model_proxy_route::dialled(config)?,
         proxy_dir: config.proxy_dir.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
         sessions: sessions(config, clock)?,
@@ -468,7 +469,13 @@ fn served_routes(
         .merge(guarded(provider_callback))
         .merge(issuer_admin::routes(config)?)
         .layer(axum::middleware::from_fn_with_state(
-            state,
+            Arc::clone(&state),
             crate::operator::guard,
+        ))
+        // Outermost: a keyed model call from a run on a dialled-in computer
+        // is admitted by its run key at the proxy, never by a Lys session.
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            crate::model_proxy_route::carry,
         )))
 }

@@ -37,8 +37,7 @@ fn live(app: &Value) -> TestResult<Vec<String>> {
 }
 
 #[tokio::test]
-async fn connect_retry_returns_the_first_outcome_and_one_live_credential() -> TestResult
-{
+async fn connect_retry_returns_the_first_outcome_and_one_live_credential() -> TestResult {
     let (mut service, _) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let body = body(&op()?);
@@ -195,8 +194,7 @@ async fn proxy(State(state): State<Proxy>, request: Request) -> Response {
 }
 
 #[tokio::test]
-async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live()
--> TestResult {
+async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live() -> TestResult {
     let custody = identity_contract::app_custody::serve().await?;
     let state = Proxy {
         upstream: custody.base,

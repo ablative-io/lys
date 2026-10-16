@@ -292,7 +292,7 @@ pub(crate) async fn start_as(
             version: &version,
             skills: &skills,
             policy: policy.as_ref(),
-            model_proxy: state.model_proxy.as_deref(),
+            model_proxy: crate::model_proxy_route::for_machine(state, machine)?,
         },
         &handles,
     )?;

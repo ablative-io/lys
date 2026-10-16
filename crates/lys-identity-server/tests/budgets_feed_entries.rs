@@ -188,7 +188,7 @@ macro_rules! budgets_feed_entries {
                 sign_in: $crate::sign_in::IssuerSignIn::configured(&config)?,
                 provider: None, setup: None, setup_lock: tokio::sync::Mutex::new(()),
                 import_credential_file: None, identity_upstream: "http://127.0.0.1".to_owned(),
-                estate_plan_file: path.join("estate"), password_policy: None, model_proxy: None, proxy_dir: None,
+                estate_plan_file: path.join("estate"), password_policy: None, model_proxy: None, dialled_model_proxy: None, proxy_dir: None,
                 sessions: $crate::session::Sessions::new(300, false),
                 admission: $crate::admission::Admission::new(Some(binding), config.link_audit_binding()?),
                 grants: Mutex::new(None),
