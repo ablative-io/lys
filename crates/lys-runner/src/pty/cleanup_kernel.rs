@@ -238,7 +238,7 @@ impl Operations for Kernel {
             }
             loop {
                 match poll(&mut descriptors, PollTimeout::NONE) {
-                    Err(nix::errno::Errno::EINTR) => continue,
+                    Err(nix::errno::Errno::EINTR) => {}
                     result => {
                         result.map_err(refused)?;
                         break;

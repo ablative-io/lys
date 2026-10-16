@@ -3,7 +3,7 @@ use crate::error::RunnerError;
 use crate::operations::{
     Operation, OperationOutcome, OperationRequest, OperationState, TextDigest, unavailable,
 };
-use crate::session::{Table, now_ms};
+use crate::session::{Session, Table, now_ms};
 
 /// Accept `operation` on the table, answering how it stands.
 pub(crate) fn accept(
@@ -11,26 +11,8 @@ pub(crate) fn accept(
     operation: Operation,
 ) -> Result<OperationOutcome, RunnerError> {
     table.operations.prune(now_ms());
-    if let Some(held) = table.operations.get(&operation.operation) {
-        let same = held.session == operation.session
-            && held.request == operation.request.name()
-            && match table.operations.original_request(&operation.operation) {
-                Some(original) => original == &operation.request.identity()?,
-                None => {
-                    table.operations.original_text(&operation.operation)
-                        == operation.request.text().map(TextDigest::of).as_ref()
-                }
-            };
-        if !same {
-            return Err(RunnerError::refused(
-                "operation_reused",
-                format!(
-                    "operation {} already names another act",
-                    operation.operation
-                ),
-            ));
-        }
-        return Ok(held.clone());
+    if let Some(held) = replayed(table, &operation)? {
+        return Ok(held);
     }
     table.operations.repeated(&operation.operation)?;
     let session = table.sessions.get(&operation.session).ok_or_else(|| {
@@ -39,32 +21,7 @@ pub(crate) fn accept(
             format!("no session {} is held", operation.session),
         )
     })?;
-    if let OperationRequest::WakeUp { compaction, .. } = &operation.request {
-        if operation.operation != format!("wake-up-{compaction}")
-            || compaction == &operation.operation
-        {
-            return Err(RunnerError::refused(
-                "wake_up_identity_invalid",
-                "wake occurrence must name its compaction exactly",
-            ));
-        }
-        if session.managed.is_some() {
-            return Err(RunnerError::refused(
-                "control_transport_unsupported",
-                "this wake occurrence is for a terminal session",
-            ));
-        }
-        if table
-            .operations
-            .get(compaction)
-            .is_some_and(|held| held.session != operation.session || held.request != "compact")
-        {
-            return Err(RunnerError::refused(
-                "wake_up_compaction_invalid",
-                "wake occurrence names another session or request",
-            ));
-        }
-    }
+    check_wake_up(table, session, &operation)?;
     if session.ended.is_none() {
         crate::harness_control::events::accepts(table, &operation.session, &operation.request)?;
     }
@@ -72,32 +29,7 @@ pub(crate) fn accept(
         .sessions
         .get(&operation.session)
         .ok_or_else(|| RunnerError::refused("session_unknown", "session is not held"))?;
-    let (state, words) = if session.ended.is_some() {
-        (
-            OperationState::Refused,
-            "session_ended: the session has ended and does nothing more".to_owned(),
-        )
-    } else {
-        let words = match &operation.request {
-            OperationRequest::WakeUp { compaction, .. } => {
-                format!("wake_up compaction={compaction}; accepted")
-            }
-            _ if (session.guard.tracking.is_some() || session.guard.boundary_observed)
-                && !session.guard.idle
-                && operation.request != OperationRequest::Stop =>
-            {
-                "accepted awaiting turn boundary".to_owned()
-            }
-            _ => "accepted".to_owned(),
-        };
-        (OperationState::Accepted, words)
-    };
-    let words = match &operation.request {
-        OperationRequest::WakeUp { compaction, .. } if !words.starts_with("wake_up ") => {
-            format!("wake_up compaction={compaction}; {words}")
-        }
-        _ => words,
-    };
+    let (state, words) = answer(session, &operation);
     let outcome = OperationOutcome {
         operation: operation.operation.clone(),
         session: operation.session.clone(),
@@ -157,4 +89,101 @@ pub(crate) fn accept(
         .get(&operation.operation)
         .cloned()
         .ok_or_else(|| unavailable("accepted operation record disappeared"))
+}
+
+/// The outcome already held for this operation id when the same act is asked
+/// again; a held id naming another act is refused.
+fn replayed(
+    table: &Table,
+    operation: &Operation,
+) -> Result<Option<OperationOutcome>, RunnerError> {
+    let Some(held) = table.operations.get(&operation.operation) else {
+        return Ok(None);
+    };
+    let same = held.session == operation.session
+        && held.request == operation.request.name()
+        && match table.operations.original_request(&operation.operation) {
+            Some(original) => original == &operation.request.identity()?,
+            None => {
+                table.operations.original_text(&operation.operation)
+                    == operation.request.text().map(TextDigest::of).as_ref()
+            }
+        };
+    if !same {
+        return Err(RunnerError::refused(
+            "operation_reused",
+            format!(
+                "operation {} already names another act",
+                operation.operation
+            ),
+        ));
+    }
+    Ok(Some(held.clone()))
+}
+
+/// A wake occurrence names its own compaction exactly, on a terminal session,
+/// and that compaction, if held, is this session's.
+fn check_wake_up(
+    table: &Table,
+    session: &Session,
+    operation: &Operation,
+) -> Result<(), RunnerError> {
+    let OperationRequest::WakeUp { compaction, .. } = &operation.request else {
+        return Ok(());
+    };
+    if operation.operation != format!("wake-up-{compaction}") || compaction == &operation.operation
+    {
+        return Err(RunnerError::refused(
+            "wake_up_identity_invalid",
+            "wake occurrence must name its compaction exactly",
+        ));
+    }
+    if session.managed.is_some() {
+        return Err(RunnerError::refused(
+            "control_transport_unsupported",
+            "this wake occurrence is for a terminal session",
+        ));
+    }
+    if table
+        .operations
+        .get(compaction)
+        .is_some_and(|held| held.session != operation.session || held.request != "compact")
+    {
+        return Err(RunnerError::refused(
+            "wake_up_compaction_invalid",
+            "wake occurrence names another session or request",
+        ));
+    }
+    Ok(())
+}
+
+/// How the act stands on `session` and the words that say so.
+fn answer(session: &Session, operation: &Operation) -> (OperationState, String) {
+    let (state, words) = if session.ended.is_some() {
+        (
+            OperationState::Refused,
+            "session_ended: the session has ended and does nothing more".to_owned(),
+        )
+    } else {
+        let words = match &operation.request {
+            OperationRequest::WakeUp { compaction, .. } => {
+                format!("wake_up compaction={compaction}; accepted")
+            }
+            _ if (session.guard.tracking.is_some() || session.guard.boundary_observed)
+                && !session.guard.idle
+                && operation.request != OperationRequest::Stop =>
+            {
+                "accepted awaiting turn boundary".to_owned()
+            }
+            _ => "accepted".to_owned(),
+        };
+        (OperationState::Accepted, words)
+    };
+    let words = match &operation.request {
+        OperationRequest::WakeUp { compaction, .. } if !words.starts_with("wake_up ") => {
+            format!("wake_up compaction={compaction}; {words}")
+        }
+        _ => words,
+    };
+    (state, words)
 }

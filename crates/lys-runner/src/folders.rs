@@ -155,7 +155,9 @@ fn dialog(start: &str) -> Result<Command, RunnerError> {
             ));
         }
         let environment = std::str::from_utf8(&desktop.stdout)
-            .map_err(|_| dialog_unavailable("the desktop environment is not valid UTF-8"))?;
+            .map_err(|error| {
+                dialog_unavailable(&format!("the desktop environment is not valid UTF-8: {error}"))
+            })?;
         let environment = desktop_environment(environment, |name| std::env::var(name).ok())?;
         for name in DESKTOP_VARIABLES {
             command.env_remove(name);
