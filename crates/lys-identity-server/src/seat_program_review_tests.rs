@@ -41,3 +41,23 @@ async fn seat_program_rereview_keeps_old_inputs_and_atomically_reviews_the_found
     assert_eq!(retry["versions"].as_array().ok_or("versions missing")?.len(), 2);
     Ok(())
 }
+
+#[tokio::test]
+async fn seat_program_account_requires_model_wire_at_set_time() -> Result<(), Box<dyn Error>> {
+    let (service, people) = seeded().await?;
+    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
+    let path = format!("/agents/{}/provisioning", people.people[0].agents[0].id);
+    let mut body = json!({"operation":op()?,"from_version":0,"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"",
+        "harness":{"name":"seat","program":"/opt/seat/host","package":"seat 1","description":{
+            "rendering_contract":"seat-program/v1","models":{"minimum":0,"maximum":0,"further_encoding":{"kind":"array"}},
+            "permissions":{"modes":[],"rule_forms":[]},"mcp":{"transports":[],"working_directory":false,"handle_variables":false,"channel_policies":[]},
+            "seat_program":{"executable":"/opt/seat/host","executable_sha256":"a".repeat(64),"arguments":["{seat_file}"],"seat_file":"/opt/seat/seat.json","seat_file_sha256":"b".repeat(64),"adapter":"acp/1"}}},
+        "session":{"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}});
+    let (status, refused) = post(&service, &path, Auth::Cookie(&cookie), &body).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "RequestMalformed");
+    assert!(refused["reason"].as_str().is_some_and(|s|s.contains("ModelWireMissing")), "{refused}");
+    body.as_object_mut().ok_or("body absent")?.remove("session");
+    ok(post(&service, &path, Auth::Cookie(&cookie), &body).await?)?;
+    Ok(())
+}

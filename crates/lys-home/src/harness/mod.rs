@@ -32,3 +32,6 @@ mod rendering_permissions;
 
 #[cfg(test)]
 mod seat_program_tests;
+
+#[cfg(test)]
+mod seat_program_wire_tests;

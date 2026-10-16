@@ -7,7 +7,7 @@ import { ADA, SCRIBE, SERVICE, ok } from '../../../tests/fixtures';
 
 it('shows every reviewed seat program field and no native settings', async () => {
   const posted: { path: string; body: unknown }[] = [];
-  const spec = { executable: '/opt/seat/host', executable_sha256: 'a'.repeat(64), arguments: ['run', '--config', '{seat_file}'], seat_file: '/opt/seat/seat.json', seat_file_sha256: 'b'.repeat(64), adapter: 'acp/1' };
+  const spec = { executable: '/opt/seat/host', executable_sha256: 'a'.repeat(64), arguments: ['run', '--config', '{seat_file}'], seat_file: '/opt/seat/seat.json', seat_file_sha256: 'b'.repeat(64), adapter: 'acp/1', model_wire: 'openai-responses' };
   serve({ ...SERVICE,
     ['/agents/' + SCRIBE + '/provisioning']: ok({ agent: SCRIBE, enforced: false, versions: [], profile: {
       version: 1, operation: 'op-review', model_access: [], tools: [], skills: [], mcp_servers: [], instructions: '', note: '', set_by: ADA, set_at: 1,
@@ -22,7 +22,7 @@ it('shows every reviewed seat program field and no native settings', async () =>
   const root = createRoot(container);
   await act(async () => { root.render(<Provisioning id={SCRIBE} />); });
   try {
-    for (const value of [spec.executable, spec.executable_sha256, spec.seat_file, spec.seat_file_sha256, spec.adapter, '{seat_file}']) expect(text()).toContain(value);
+    for (const value of [spec.executable, spec.executable_sha256, spec.seat_file, spec.seat_file_sha256, spec.adapter, spec.model_wire, '{seat_file}']) expect(text()).toContain(value);
     expect(document.querySelector('select[name="model"]')).toBeNull();
     expect(document.querySelector('select[name="mode"]')).toBeNull();
     expect(document.querySelector('input[name="config_dir"]')).toBeNull();

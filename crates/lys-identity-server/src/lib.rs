@@ -351,3 +351,8 @@ pub mod error_app_pass;
 
 #[cfg(test)]
 mod mcp_test_answer;
+
+#[cfg(test)]
+mod model_account_wire_tests;
+#[cfg(test)]
+mod seat_program_review_tests;
