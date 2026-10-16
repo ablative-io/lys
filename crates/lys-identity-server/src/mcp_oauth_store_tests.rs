@@ -155,3 +155,19 @@ fn person_connection_upgrade_preserves_agent_only_legacy_tokens()
     );
     Ok(())
 }
+
+#[test]
+fn registration_host_migration_keeps_the_old_install_file() -> Result<(), Box<dyn std::error::Error>> {
+    let dir=tempfile::tempdir()?;
+    let path=dir.path().join("connected-apps.json");
+    let old=serde_json::to_vec(&json!({"format":2,"apps":{"client":{"name":"App","redirect_uris":["https://app.test/back"],"registered_at":1}},"connections":{},"tokens":{}}))?;
+    std::fs::write(&path,&old)?;
+    let store=Store::open(&path)?;
+    assert!(store.app("client").ok_or("client absent")?.client_host.is_none());
+    assert_eq!(std::fs::read(path.with_extension("v2.json"))?,old);
+    let saved:Value=serde_json::from_slice(&std::fs::read(&path)?)?;
+    assert_eq!(saved["format"],3);
+    assert!(saved["apps"]["client"].as_object().ok_or("client absent")?.contains_key("client_host"));
+    Store::open(&path)?;
+    Ok(())
+}
