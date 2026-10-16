@@ -128,6 +128,11 @@
       "brief": "ACCESS-001"
     },
     {
+      "path": "surface/identity/src/features/drafts/",
+      "note": "Drafts page: a draft on a Lys route shows whether it was carried out",
+      "brief": "ACCESS-008"
+    },
+    {
       "path": "surface/identity/src/features/apps/",
       "note": "Apps screen: schema roles and restricted placements",
       "brief": "ACCESS-004"

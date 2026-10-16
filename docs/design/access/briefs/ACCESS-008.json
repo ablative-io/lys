@@ -1,0 +1,121 @@
+{
+  "id": "ACCESS-008",
+  "cluster": "access",
+  "title": "An approved draft on a Lys route is carried out by Lys, once, and its outcome is recorded",
+  "depends_on": [],
+  "blocked_by": [
+    "Found 17 Oct 2026 04:0x AEDT when Apollo asked who carries out an approved draft whose prepared request is POST /agents/{id}/provisioning. Read at 5d5d2986: crates/lys-identity-server/src/drafts_api.rs records Created (the prepared method, path and body with the agent's signed request as evidence), Approved (with a reserved application operation id), Refused and Correction, and nothing else; DraftEvent (crates/lys-identity/src/draft_event.rs) has no executed or refused-on-execution event; the application id is read only by projection_draft.rs (reuse check) and drafts_list.rs (shown). No code in lys-identity-server, lys-identity or lys-home applies an approved directory draft. The surface says it plainly: ProductDrafts.tsx shows 'Approved, not yet executed'. Product drafts (ProductDraftEvent) do close as Executed or RefusedOnExecution, pulled by each product through lys-pass drafts.rs execute_once (PERMISSIONS-ACROSS-THE-STACK D5); Lys, as the product that owns its own routes, never wrote its own runner."
+  ],
+  "checklist": [],
+  "stories": [],
+  "design_anchor": [],
+  "purpose": "A draft is how an agent asks to do a deliberate act on a person's behalf: the person reads the exact prepared request and approves it. Today an approval on a Lys route is recorded and then nothing happens, so every agent that follows the profiles sequence (create the agent, set its provisioning, record the grant plan) waits forever on a draft Tom has already approved, and the dashboard shows nothing wrong. Tom's rule is that a draft nobody executes is never silent (D5); this one is silent by construction. The haematite and liminal assistants both stand on this path tonight.",
+  "task": "Authoring START 2026-10-17 04:05 AEDT; source base 5d5d2986b83a326e02a16ec9f11caf09fe7778a3 / tree 8bf398508f9304baa6cf595608ad3762314bd027. Waffles, from Apollo's question. Decisions taken here by Tom's rules, with their reasons: (1) Lys carries out its own drafts at the approval, in the same request, not by a separate pull runner: Lys is the authority and the executor in one process, so a pull loop would be a second moving part with a wait in it (no fixed waits, 15 Oct), and the approver sees the outcome on the click. Products keep pulling theirs (D5 unchanged). (2) The prepared request runs in process through the same admitted router the MCP door uses (crates/lys-identity-server/src/mcp_endpoint/call.rs dispatch), so every route's validation, scope check and refusal applies unchanged; nothing is re-implemented per route. (3) It runs with the approving person's authority, carrying the draft's provenance (drafted by the agent, approved by the person, draft id and application id): the person is the one deciding, the agent's words are the request, and a route the person may not take is refused at execution by that route's own scope, never widened by the draft. (4) The application operation id reserved at approval is the prepared request's operation, so a retried approval or a crash between approval and execution never applies twice. (5) A draft's target must equal the scope the prepared route declares (kind, action and the id from the path), checked at creation, so a draft cannot show the person one target and act on another.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The draft log can say a draft was carried out or refused on execution",
+      "spec": "THE SYSTEM SHALL add two closing events to DraftEvent in crates/lys-identity/src/draft_event.rs, Executed (draft, draft_hash, application, the answered status and the receipt index the applied route wrote) and RefusedOnExecution (draft, draft_hash, application, the refusal name and its words), encoded in crates/lys-identity/src/draft_event_encoding.rs, folded in crates/lys-identity/src/projection_draft.rs so a draft's state reads executed or refused_on_execution, and SHALL refuse either event on a draft that is not approved or is already closed.",
+      "acceptance": [
+        "Red: an Executed event on an approved draft folds to state executed with its receipt index; today the event does not exist.",
+        "Red: Executed or RefusedOnExecution on a waiting, refused, corrected or already closed draft is refused DraftNotPending; a second Executed with the same application id is refused, and the log holds one.",
+        "Red: both events round-trip through encode and decode byte for byte, and a log written before this brief still folds unchanged."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/src/draft_event_close_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/draft_event.rs",
+          "crates/lys-identity/src/draft_event_encoding.rs",
+          "crates/lys-identity/src/projection_draft.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R2",
+      "title": "Approval carries the draft out once, through the admitted router, with the approver's authority",
+      "spec": "THE SYSTEM SHALL, in POST /drafts/{id}/approve (crates/lys-identity-server/src/drafts_api.rs), after recording Approved, run the draft's prepared method, path and body in process through the admitted router used by crates/lys-identity-server/src/mcp_endpoint/call.rs, as the approving person, with the application operation id as the prepared request's operation and the draft id carried in the provenance of every receipt it writes; and SHALL record Executed with the answered status and receipt index when the route answers success, or RefusedOnExecution with the route's own refusal name and words when it refuses. The approve answer SHALL carry the outcome. The execution code SHALL live in a new crates/lys-identity-server/src/drafts_apply.rs so drafts_api.rs stays under the 500-line gate.",
+      "acceptance": [
+        "Red: an agent drafts POST /agents/{id}/provisioning for an agent its responsible person owns; the person approves; the agent's provisioning reads the drafted version and the draft reads executed with that receipt index; today the provisioning is unchanged and the draft reads approved forever.",
+        "Red: a draft whose route the approving person may not take (scope not held) is recorded RefusedOnExecution with the route's own refusal name (NotHeld), and nothing is applied.",
+        "Red: a draft whose prepared body the route refuses (for example ProfileVersionUnknown on POST /seats) is recorded RefusedOnExecution with that name.",
+        "Red: approving the same draft twice with the same application id applies once and answers the recorded outcome the second time; a crash simulated after Approved and before execution is carried out on the next approve retry with the same application id, once.",
+        "Red: the receipt the applied route writes names the draft id and the approving person, and its authentication reads as the person's session, never as the agent's signature replayed."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/drafts_apply.rs",
+          "crates/lys-identity-server/src/drafts_apply_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/drafts_api.rs",
+          "crates/lys-identity-server/src/mcp_endpoint/call.rs",
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R3",
+      "title": "A draft's target is the route's declared scope",
+      "spec": "THE SYSTEM SHALL, at POST /drafts (creation in crates/lys-identity-server/src/drafts_api.rs), refuse a draft whose target kind, action or id differs from the scope the prepared route declares in crates/lys-identity-server/src/openapi_table.rs (the scope's kind and action, and its id taken from the named path segment), with DraftChangeInvalid naming both, so the target the person reads is the act carried out.",
+      "acceptance": [
+        "Red: a draft naming target agent X with action agent.provisioning.set over path /agents/Y/provisioning is refused DraftChangeInvalid naming X and Y; today it is recorded.",
+        "Red: a draft whose target action differs from the route's declared action is refused; a matching draft is recorded as today.",
+        "Red: every existing drafts_api_tests and drafts_mcp_tests case passes unchanged or is amended only where its target did not match its route, each amendment named in the handback."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/drafts_api.rs",
+          "crates/lys-identity-server/src/drafts_api_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    },
+    {
+      "id": "R4",
+      "title": "The person sees what happened",
+      "spec": "THE SYSTEM SHALL answer executed and refused_on_execution states with their receipt index or refusal in GET /drafts (crates/lys-identity-server/src/drafts_list.rs), and the Drafts page (surface/identity/src/features/drafts/Drafts.tsx, contract.ts) SHALL show 'Carried out' with a link to the receipt, or 'Refused when carried out' with the refusal's name and words; an approved draft with no closing event SHALL show 'Approved, not carried out' as a fault, never a resting state.",
+      "acceptance": [
+        "Red: GET /drafts lists an executed draft with its receipt index and a refused-on-execution draft with its refusal name and words.",
+        "Red (vitest): the Drafts page renders 'Carried out' with the receipt link, 'Refused when carried out' with the refusal, and 'Approved, not carried out' marked as a fault."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/tests/drafts-outcome.test.tsx"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/drafts_list.rs",
+          "crates/lys-identity-server/src/drafts_list_tests.rs",
+          "surface/identity/src/features/drafts/Drafts.tsx",
+          "surface/identity/src/features/drafts/contract.ts"
+        ],
+        "delete": []
+      },
+      "checklist": [],
+      "stories": []
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT add a pull runner, a poll, a retry timer or any fixed wait for Lys's own drafts; the approval is the event that carries it out (no fixed waits, 15 Oct 2026).",
+    "SHALL NOT widen any route's authority for a drafted request: execution runs as the approving person through the route's own scope check, and a person who could not take the route by hand cannot take it by approving a draft.",
+    "SHALL NOT replay the agent's request signature as authentication, and SHALL NOT re-implement any route's handling in the executor.",
+    "SHALL NOT change product drafts (ProductDraftEvent, lys-pass execute_once, D5) or the shape of POST /drafts creation beyond R3's refusal.",
+    "SHALL NOT be built or tested until every line is written (the 3 Oct rule); one battery, one install."
+  ],
+  "verification": [
+    "sh scripts/design/gate.sh at the committed source; parse the validate, coverage and rendered-comparison lines, keeping only failures, never the exit code alone.",
+    "cargo nextest run -p lys-identity -p lys-identity-server at the head, counts stated per crate; cargo test --doc; clippy pedantic -D warnings on the touched crates; cargo fmt; ast-grep; file-length gate 500 lines (ADR-111) on every touched file; vitest for surface/identity.",
+    "Walk on the install: an agent drafts its own provisioning, Tom approves it in Drafts, the page shows 'Carried out' and GET /agents/{id}/provisioning answers the drafted version.",
+    "Worst credible failure if this were used in a hospital: a drafted act carried out with more authority than the approving person holds, or carried out twice, changing who can reach a patient's records without anyone deciding it; it could affect every person in that workspace, so execution runs under the person's own scope check, once per application id, and both are tested red first."
+  ]
+}

@@ -68,6 +68,7 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `crates/lys/src/identity/install/` | install settings: the pass lifetime | ACCESS-002 |
 | `crates/lys/tests/identity_install/` | the real-install tests | ACCESS-002 |
 | `surface/identity/src/features/access/` | Access screens: mode, roles, drafts, machines | ACCESS-001 |
+| `surface/identity/src/features/drafts/` | Drafts page: a draft on a Lys route shows whether it was carried out | ACCESS-008 |
 | `surface/identity/src/features/apps/` | Apps screen: schema roles and restricted placements | ACCESS-004 |
 | `surface/identity/src/features/network/` | Network screen: machines as holders | ACCESS-005 |
 | `surface/identity/tests/` | screen tests | ACCESS-001 |
