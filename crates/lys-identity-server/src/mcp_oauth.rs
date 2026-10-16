@@ -61,6 +61,7 @@ struct Asking {
     challenge: String,
     state: Option<String>,
     expires_at: u64,
+    client_host: Option<std::net::IpAddr>,
 }
 
 /// A code an approval answered with, exchanged once for tokens.
@@ -84,6 +85,7 @@ pub(crate) struct Connection {
 pub(crate) struct Apps {
     state: Arc<AppState>,
     origin: String,
+    trusted: Vec<std::net::IpAddr>,
     resource: String,
     store: Mutex<Store>,
     asking: Mutex<HashMap<String, Asking>>,
@@ -155,17 +157,6 @@ fn redirect_allowed(uri: &str) -> bool {
     }
 }
 
-fn back_to(redirect_uri: &str, pairs: &[(&str, &str)]) -> Result<Response, ServerError> {
-    let mut url = reqwest::Url::parse(redirect_uri)
-        .map_err(|_unread| ServerError::Provider(ProviderError::RedirectUnregistered))?;
-    {
-        let mut query = url.query_pairs_mut();
-        for (name, value) in pairs {
-            query.append_pair(name, value);
-        }
-    }
-    Ok((StatusCode::SEE_OTHER, [(header::LOCATION, url.to_string())]).into_response())
-}
 
 impl Apps {
     /// The door for the install whose directory log is at `log_dir`, whose
@@ -175,12 +166,14 @@ impl Apps {
         log_dir: &std::path::Path,
         origin: &str,
         mcp_path: &str,
+        trusted: &[std::net::IpAddr],
     ) -> Result<Arc<Self>, ServerError> {
         let folder = log_dir.parent().ok_or_else(|| ServerError::ConfigInvalid {
             reason: "the directory log has no containing folder for connected apps".to_owned(),
         })?;
         Ok(Arc::new(Self {
             state,
+            trusted: trusted.to_vec(),
             origin: origin.to_owned(),
             resource: format!("{origin}{mcp_path}"),
             store: Mutex::new(Store::open(&folder.join("connected-apps.json"))?),
@@ -381,3 +374,12 @@ use flow::{authorize, consent, register, token};
 #[cfg(test)]
 #[path = "mcp_oauth_tests.rs"]
 mod tests;
+
+#[path = "mcp_oauth_return.rs"]
+mod return_page;
+#[cfg(test)]
+#[path = "mcp_oauth_return_tests.rs"]
+mod return_tests;
+
+#[path = "mcp_oauth_screen.rs"]
+mod screen;

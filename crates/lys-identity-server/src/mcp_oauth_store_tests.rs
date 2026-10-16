@@ -16,6 +16,7 @@ fn app(registered_at: u64) -> App {
         name: "Notes".to_owned(),
         redirect_uris: vec!["https://app.example/callback".to_owned()],
         registered_at,
+        client_host: None,
     }
 }
 

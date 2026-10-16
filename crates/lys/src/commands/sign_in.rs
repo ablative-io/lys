@@ -2,7 +2,6 @@
 
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -22,6 +21,11 @@ use lys_runner::dial::HttpClient;
 #[path = "sign_in/callback.rs"]
 mod callback;
 use callback::callback;
+#[path = "sign_in/finish.rs"]
+mod finish;
+#[path = "sign_in/browser.rs"]
+mod opener;
+use opener::browser;
 
 #[path = "sign_in/errors.rs"]
 mod errors;
@@ -383,6 +387,7 @@ pub fn sign_in_at(
         )
     })?;
     open(&format!("{}?{query}", endpoint("authorization_endpoint")?))?;
+    eprintln!("If you approve on another computer, finish here with lys sign-in --finish and the address from the page.");
     let code = callback(&listener, &state)?;
     let tokens = exchange(
         token_endpoint,
@@ -397,40 +402,18 @@ pub fn sign_in_at(
     save(root, &server, &tokens)
 }
 
-fn browser(address: &str) -> CliResult<()> {
-    let program = if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    let status = Command::new(program)
-        .arg(address)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|error| {
-            source_refused(
-                "sign_in_browser_unavailable",
-                "the browser could not be opened",
-                error,
-            )
-        })?;
-    if !status.success() {
-        return Err(refused(
-            "sign_in_browser_unavailable",
-            "the browser opener refused the sign-in",
-        ));
-    }
-    Ok(())
-}
-
 /// Sign in and print only the public person and file receipt.
 ///
 /// # Errors
 /// Returns the code flow's named refusal without exposing any credential.
 pub fn run(args: &SignInArgs, json: bool) -> CliResult<()> {
-    let signed = sign_in_at(&args.server, &Layout::discover()?.root, browser)?;
+    if let Some(address)=&args.finish {
+        finish::finish(address)?;
+        println!("finished");
+        return Ok(());
+    }
+    let server=args.server.as_deref().ok_or_else(||refused("server_base_invalid","name --server or --finish"))?;
+    let signed = sign_in_at(server, &Layout::discover()?.root, browser)?;
     let mut emitter = Emitter::new(json);
     emitter.field("signed in as", "person", signed.person);
     emitter.field(

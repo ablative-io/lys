@@ -168,6 +168,7 @@ async fn receive(mut stream: tokio::net::TcpStream, expected: &str) -> CliResult
             })?;
         return Ok(Received::Unrelated);
     }
+    let outcome=(|| -> CliResult<Zeroizing<String>> {
     let mut values = std::collections::BTreeMap::new();
     for pair in target.trim_start_matches("/lys/sign-in?").split('&') {
         let (key, value) = pair.split_once('=').ok_or_else(|| {
@@ -206,6 +207,18 @@ async fn receive(mut stream: tokio::net::TcpStream, expected: &str) -> CliResult
                 )
             })?,
     );
+        Ok(code)
+    })();
+    let code=match outcome {
+        Ok(code)=>code,
+        Err(error)=>{
+            let words=error.to_string();
+            let name=words.split(':').next().filter(|name|name.starts_with("sign_in_")).ok_or_else(||refused("sign_in_callback_invalid","the receiver refusal has no name"))?;
+            let response=format!("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{name}",name.len());
+            stream.write_all(response.as_bytes()).await.map_err(|error|source_refused("sign_in_callback_unavailable","the receiver refusal could not be answered",error))?;
+            return Err(error);
+        }
+    };
     let body = "Approval received. Return to your terminal to see whether sign-in completed.";
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",

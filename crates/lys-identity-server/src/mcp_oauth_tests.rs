@@ -58,13 +58,10 @@ fn client() -> Result<reqwest::Client, Box<dyn Error>> {
         .build()?)
 }
 
-fn located(response: &reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
-    let location = response
-        .headers()
-        .get("location")
-        .ok_or("no location")?
-        .to_str()?;
-    Ok(reqwest::Url::parse(location)?)
+async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
+    let body=response.text().await?;
+    let address=body.split("readonly value=\"").nth(1).and_then(|s|s.split('"').next()).ok_or("no finishing address")?.replace("&amp;","&");
+    Ok(reqwest::Url::parse(&address)?)
 }
 
 fn pair(url: &reqwest::Url, name: &str) -> Option<String> {
@@ -116,8 +113,8 @@ async fn connected(service: &Service, cookie: &str) -> Result<(String, Value), B
         .form(&[("asking", asking.as_str()), ("decision", "approve")])
         .send()
         .await?;
-    assert_eq!(answered.status(), StatusCode::SEE_OTHER);
-    let back = located(&answered)?;
+    assert_eq!(answered.status(), StatusCode::OK);
+    let back = located(answered).await?;
     assert_eq!(pair(&back, "state").as_deref(), Some("kept"));
     let code = pair(&back, "code").ok_or("no code")?;
     let tokens: Value = client

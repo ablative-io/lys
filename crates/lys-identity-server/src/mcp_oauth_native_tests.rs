@@ -67,14 +67,8 @@ async fn native_pkce_approves_the_same_person_after_browser_session_renewal_and_
         .form(&[("asking", asking), ("decision", "approve")])
         .send()
         .await?;
-    assert_eq!(response.status(), 303);
-    let back = reqwest::Url::parse(
-        response
-            .headers()
-            .get("location")
-            .ok_or("redirect absent")?
-            .to_str()?,
-    )?;
+    assert_eq!(response.status(), 200);
+    let back = crate::mcp_oauth::tests::located(response).await?;
     let code = back
         .query_pairs()
         .find(|(name, _)| name == "code")

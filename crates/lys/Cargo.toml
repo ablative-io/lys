@@ -26,6 +26,7 @@ required-features = ["clock-fixture"]
 test = false
 
 [dependencies]
+url.workspace = true
 lys-core.workspace = true
 lys-log-store.workspace = true
 lys-identity.workspace = true

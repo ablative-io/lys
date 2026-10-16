@@ -119,8 +119,8 @@ async fn consent_groups_duplicate_grants_by_resource_and_says_what_an_empty_choi
         ])
         .send()
         .await?;
-    assert_eq!(approval.status(), 303);
-    let code = pair(&located(&approval)?, "code").ok_or("no code")?;
+    assert_eq!(approval.status(), 200);
+    let code = pair(&located(approval).await?, "code").ok_or("no code")?;
     let token: Value = client
         .post(format!("{}/oauth/mcp/token", service.base))
         .form(&[

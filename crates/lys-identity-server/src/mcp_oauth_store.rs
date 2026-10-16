@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
 
-const FORMAT: u8 = 2;
+const FORMAT: u8 = 3;
 
 fn legacy_format() -> u8 {
     1
@@ -35,6 +35,7 @@ pub(crate) struct App {
     pub(crate) name: String,
     pub(crate) redirect_uris: Vec<String>,
     pub(crate) registered_at: u64,
+    pub(crate) client_host: Option<std::net::IpAddr>,
 }
 
 /// Which kind of token a digest is of.
@@ -113,14 +114,18 @@ impl Store {
             held,
         };
         match store.held.format {
-            1 => {
-                if store
+            1 | 2 => {
+                if store.held.format == 1 && store
                     .held
                     .tokens
                     .values()
                     .any(|token| token.person_reads.is_some())
                 {
                     return Err(unavailable("an old store cannot hold person-read consent"));
+                }
+                let previous=store.path.with_extension(format!("v{}.json",store.held.format));
+                if !previous.exists() {
+                    std::fs::copy(&store.path,&previous).map_err(|error|unavailable(&error.to_string()))?;
                 }
                 store.held.format = FORMAT;
                 store.save()?;
