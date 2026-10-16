@@ -54,20 +54,7 @@ impl Proxy {
             Ok(drawn) => drawn,
             Err(error) => return refusal(StatusCode::FORBIDDEN, &error.to_string()),
         };
-        // A Codex signed in with ChatGPT sends its account's id, and is
-        // answered by ChatGPT's Codex backend, whose paths carry no `/v1`.
-        // One header lookup; the machine's own Codex sign-in decides.
-        let chatgpt = provider == "openai"
-            && (request.headers().contains_key(CHATGPT_ACCOUNT)
-                || binding
-                    .as_ref()
-                    .is_some_and(|b| b.provider == self.chatgpt.as_str()));
-        let (base, rest) = if chatgpt {
-            let rest = rest.strip_prefix("/v1").unwrap_or(&rest).to_owned();
-            (&self.chatgpt, rest)
-        } else {
-            (base, rest)
-        };
+        let (base, rest) = self.upstream_for(provider, base, rest, &request, binding.as_ref());
         let Some(api) = api else {
             // Not a model call: forwarded as it came, and not recorded.
             let request = request.map(BodyExt::boxed_unsync);
@@ -132,6 +119,29 @@ impl Proxy {
                     &format!("lys-proxy: {error}"),
                 )
             }
+        }
+    }
+
+    /// Where a call is answered. A Codex signed in with `ChatGPT` sends its
+    /// account's id, and is answered by `ChatGPT`'s Codex backend, whose paths
+    /// carry no `/v1`. One header lookup; the machine's own Codex sign-in
+    /// decides.
+    fn upstream_for<'a>(
+        &'a self,
+        provider: &str,
+        base: &'a Base,
+        rest: String,
+        request: &Request<Incoming>,
+        binding: Option<&crate::proxy::account_runs::Binding>,
+    ) -> (&'a Base, String) {
+        let chatgpt = provider == "openai"
+            && (request.headers().contains_key(CHATGPT_ACCOUNT)
+                || binding.is_some_and(|b| b.provider == self.chatgpt.as_str()));
+        if chatgpt {
+            let rest = rest.strip_prefix("/v1").unwrap_or(&rest).to_owned();
+            (&self.chatgpt, rest)
+        } else {
+            (base, rest)
         }
     }
 
