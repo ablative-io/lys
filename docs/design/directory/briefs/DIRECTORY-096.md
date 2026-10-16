@@ -1,0 +1,137 @@
+---
+type: brief
+id: DIRECTORY-096
+cluster: directory
+title: A sign-in finished on another computer: the consent answer carries the finishing address, auto-returns only where the client lives, and lys sign-in takes a pasted finish
+---
+
+# DIRECTORY-096: A sign-in finished on another computer: the consent answer carries the finishing address, auto-returns only where the client lives, and lys sign-in takes a pasted finish
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-085
+> **Design anchor:**
+> - ADR-115 — Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown — Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.
+> - ADR-116 — Every app registers with Lys through one published API; Lys depends on no app — An app is a record in Lys: an id, a name, its sign-in client, and a permission schema it owns (resource kinds under the app's own prefix, each kind's actions, relations carrying actions, and parent kinds whose relations flow down). An app registers and changes its schema only through the API, is approved by an administrator on a Lys screen before it has any effect, and cannot touch another app's kinds. Lys's own model is the schema of the app 'lys'. The API is described by one OpenAPI document generated from the routes and their types, never written by hand. The MCP server is a face over that same API with three tools, the caller's own identity on every call, and no credential or authority of its own. Lys depends on no app. It holds no app's name, kind, schema or code; it never calls an app, waits on one or reads one's store. Every app depends on Lys through this API alone, and Lys runs the same with no apps registered as with twenty.
+> - ADR-120 — Lys is installed by opening an app: a person downloads Lys, opens it, and finishes in the browser, never in a terminal — Lys ships for macOS as a signed, notarised Lys.app in a disk image. Opening it runs the same install service as `lys identity install`, in the process, showing each step on a Lys page in the browser, and hands over to the first-run setup page (DIRECTORY-047). Lys then starts at login, opening the app again opens Lys, a newer app upgrades through DIRECTORY-045 with its way back, and uninstalling is a Lys screen. Nothing on the path asks for a terminal, a file edit, a port or a password file. Whether the container engine is removed (running the issuer, the permission service and the database as native processes shipped in the app) is put to Tom separately; until he decides, a missing or stopped engine is a Lys page that says what to do in plain words and continues by itself when the engine appears.
+> **Checklist:**
+> - C734 — Every consent decision answers 200 text/html from mcp_oauth_return.rs with the finishing address once in a readonly field and once in a Return link, under the consent screen's headers and with no script; back_to and its 303 are gone (DIRECTORY-096 R1).
+> - C735 — Registration records the client's connecting address (the peer, or the forwarded client address only under the configured reverse-proxy rule), the consent decision compares the browser's host with it, and the page carries a meta refresh to the finishing address only when they are equal; lys-cli compares against its authorize request's address (DIRECTORY-096 R2).
+> - C736 — lys sign-in --finish <address> refuses by name any address that is not http, loopback, ported and /lys/sign-in with a query, then makes one GET to the waiting receiver and reports its outcome; no second callback parser exists (DIRECTORY-096 R3).
+> - C737 — The return page states that the address works once and until the code's expiry, the remaining time derived from the pending code's expires_at at render, with no new constant (DIRECTORY-096 R4).
+> - C738 — A consent whose browser host differs from the client's writes one warn line naming the client and the word elsewhere, carrying no code, state, address or host; a same-host consent writes none (DIRECTORY-096 R4).
+> **Stories:**
+> - S418 (Person or agent using Lys through an AI assistant, Reads and changes Lys through an MCP client, with only their own rights) — As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
+> - S419 (Person who signs in, Keeps their sign-in identities to themselves) — As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
+## Purpose
+
+On 17 October 2026 Tom signed in to Hermes' Lys MCP connection from Dean's Mac while the Claude Code session that started the sign-in ran on his own Mac. Lys answered the approval with a 303 to http://localhost:51566/callback?code=…&state=… (mcp_oauth.rs back_to), the browser on Dean's Mac found nothing at that address, and Safari showed "can't connect to the server" with the finishing address in its address bar. Tom copied that address into a chat; it carries a one-time authorization code, so that is the wrong place for it, and nothing on the page told him where it belonged. People will sign in from their own devices while Lys runs on a dedicated server and their Claude Code sessions run wherever they run (a laptop, a server over ssh, a Lys-started seat), so the approval answer must say where the sign-in finishes and finish it there itself whenever the browser and the client share a computer. Claude Code's own MCP client already takes the finishing address: its complete_authentication tool says "ask the user for the URL from the page this sign-in opened, then retry". Lys's own native client, lys sign-in, has no such path at all: its loopback receiver (crates/lys/src/commands/sign_in/callback.rs) is reached only by the browser on the same computer.
+
+## Task
+
+Answer every consent decision with a return page that holds the finishing address and says what to do with it (R1); record where each registered app's client lives and return automatically only when the approving browser lives there too (R2); give lys sign-in a --finish that hands a pasted finishing address to the waiting receiver on the client's computer (R3); keep the finishing address good once and for the code's lifetime, say so on the page, and log a sign-in finished elsewhere by client name and never by code (R4). Out of scope: the device authorization grant (RFC 8628) for clients that can open no browser at all, which Claude Code's MCP client does not speak and which gets its own brief; any change to which redirect addresses registration admits (loopback http and https only, unchanged); the screens' look beyond the one page this brief adds.
+
+## Requirements
+
+### R1: The consent decision answers with a return page that carries the finishing address
+
+Behavioural. When the person approves or refuses on the consent screen, Lys answers 200 text/html, not 303, for every client (a registered MCP app and the built-in native client lys-cli alike). The page is built in a new module, crates/lys-identity-server/src/mcp_oauth_return.rs, from the same inputs back_to takes today: the registered redirect address and the pairs (code and state, or error and state); the address it shows is byte-for-byte the one back_to would have put in Location, so the code travels in exactly one form. The page is served with the consent screen's headers (Cache-Control no-store, X-Frame-Options DENY, a Content-Security-Policy with no script source), so it carries no script: the address sits in a readonly text field a person can select and copy, and beneath it a link whose href is that address, labelled Return to <app name> for a registered app and Return to lys sign-in for lys-cli. Under the link the page says, in plain words, where the address belongs when this browser is not on the computer running the client: for a Claude Code MCP connection, that the Claude Code session that started the sign-in takes it (its complete_authentication tool asks for the URL from the page the sign-in opened); for lys-cli, the exact command of R3 with the address filled in. A refusal (error=access_denied) is answered by the same page with the same link and no field, since there is no code to copy. back_to is removed; nothing in mcp_oauth answers a redirect any more.
+
+**Acceptance:**
+- At main the approve answer is a 303 whose Location is the loopback address with code and state; after the change it is 200 text/html whose body contains that same address once in the field's value and once in the link's href, and no Location header.
+- The page's Content-Security-Policy names no script source and the body contains no script element.
+- A refusal answers the same page with the link carrying error=access_denied and state, and no field.
+- For lys-cli the page names the R3 command with the address; for a registered app it names the app's registered client_name and complete_authentication.
+
+**Files:**
+- create: crates/lys-identity-server/src/mcp_oauth_return.rs
+- create: crates/lys-identity-server/src/mcp_oauth_return_tests.rs
+- modify: crates/lys-identity-server/src/mcp_oauth.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_flow.rs
+
+**Checklist:**
+- C734 — Every consent decision answers 200 text/html from mcp_oauth_return.rs with the finishing address once in a readonly field and once in a Return link, under the consent screen's headers and with no script; back_to and its 303 are gone (DIRECTORY-096 R1).
+
+**Stories:**
+- S418 (Person or agent using Lys through an AI assistant, Reads and changes Lys through an MCP client, with only their own rights) — As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
+- S419 (Person who signs in, Keeps their sign-in identities to themselves) — As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
+### R2: Lys returns automatically only where the client lives
+
+Behavioural. At dynamic registration (POST /oauth/mcp/register) Lys records, beside the app's redirect addresses, the address the registering client connected from: the socket peer address, or, exactly when the install is configured behind its own reverse proxy, the client address the proxy's forwarded header names, under the same trust rule issuer_admin.rs applies to forwarded headers today; never a header from an unconfigured install. At the consent decision Lys takes the approving browser's address the same way and compares the two hosts. When they are equal, the R1 page carries a meta refresh with delay 0 to the finishing address, so a browser on the client's computer returns at once and the field and link stand beneath for a browser that refuses the refresh; when they differ, the page carries no refresh and the finishing block leads. The built-in native client registers nothing, so for lys-cli the comparison is against the address that started the authorization request (GET /oauth/authorize for client lys-cli), recorded with the pending request; the same rule follows. The recorded addresses are kept only as long as the registration or the pending request they belong to and are never shown on any screen or written to any log.
+
+**Acceptance:**
+- Registration from one address and consent from the same host answers a page with meta refresh to the finishing address; registration from one address and consent from another answers a page without it, both through the test door with its peer addresses set.
+- With the proxy configured, the forwarded client address is the one compared; without it, a forwarded header on the request changes nothing.
+- For lys-cli the authorize request's address stands in for the registration address and the same two outcomes hold.
+
+**Files:**
+- modify: crates/lys-identity-server/src/mcp_oauth_store.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_flow.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_native.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_return.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_return_tests.rs
+
+**Checklist:**
+- C735 — Registration records the client's connecting address (the peer, or the forwarded client address only under the configured reverse-proxy rule), the consent decision compares the browser's host with it, and the page carries a meta refresh to the finishing address only when they are equal; lys-cli compares against its authorize request's address (DIRECTORY-096 R2).
+
+**Stories:**
+- S418 (Person or agent using Lys through an AI assistant, Reads and changes Lys through an MCP client, with only their own rights) — As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
+- S419 (Person who signs in, Keeps their sign-in identities to themselves) — As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
+### R3: lys sign-in --finish hands a pasted finishing address to the waiting receiver
+
+Behavioural. lys sign-in gains --finish <address>, run on the computer where a lys sign-in is waiting. It parses the address and refuses by name, writing nothing, unless the scheme is http, the host is 127.0.0.1 or [::1], a port is present and the path is /lys/sign-in with a query (sign_in_finish_invalid); it then makes one GET of exactly that address to the loopback receiver, so the receiver's own checks (state, error, code) judge it through the one path the browser already uses (callback.rs), and reports the receiver's answer: finished, or the receiver's refusal name. No second parser of the callback exists; the waiting side is unchanged except that its printed words now say that a sign-in approved on another computer is finished here with lys sign-in --finish and the address from the page. Nothing in --finish reads or prints the code.
+
+**Acceptance:**
+- A fixture receiver (the one callback_tests.rs drives) given a finish of its own state and a code completes; a finish with the wrong state is refused as sign_in_state_wrong by the receiver, and --finish reports that name.
+- Addresses with https, a non-loopback host, no port, another path, or no query are refused by name before any connection is made.
+- The waiting sign-in's printed words name the --finish command.
+
+**Files:**
+- create: crates/lys/src/commands/sign_in/finish.rs
+- create: crates/lys/src/commands/sign_in/finish_tests.rs
+- modify: crates/lys/src/commands/sign_in.rs
+
+**Checklist:**
+- C736 — lys sign-in --finish <address> refuses by name any address that is not http, loopback, ported and /lys/sign-in with a query, then makes one GET to the waiting receiver and reports its outcome; no second callback parser exists (DIRECTORY-096 R3).
+
+**Stories:**
+- S419 (Person who signs in, Keeps their sign-in identities to themselves) — As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
+### R4: The address is good once and for the code's lifetime, the page says so, and a sign-in finished elsewhere is logged by client name
+
+Behavioural. The authorization code's single use and its expiry are what the store already enforces (CodeUsed, CodeExpired on /oauth/token and /oauth/mcp/token); this brief adds no second check. The R1 page states, in words, that the address works once and until the code's expiry, with the remaining time derived from the pending code's expires_at at render, never from a new constant. When the consent decision's browser host differs from the client's (R2), Lys writes one warn line through the identity log naming the client (its registered client_name, or lys-cli) and the word elsewhere; the line carries no code, no state, no address and no host. The R1 page is never cached and never answers a second time for the same pending request: a reload after the decision answers the existing refusal for a decided request.
+
+**Acceptance:**
+- The page names a remaining time equal to the pending code's expires_at minus the render instant, in the test door with a fixed clock.
+- A consent from a different host writes exactly one warn line, with the client name and none of code, state, address or host; a consent from the same host writes none.
+- A second GET of the decision after it is taken answers the existing decided-request refusal, not the page again.
+
+**Files:**
+- modify: crates/lys-identity-server/src/mcp_oauth_return.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_return_tests.rs
+- modify: crates/lys-identity-server/src/mcp_oauth_flow.rs
+
+**Checklist:**
+- C737 — The return page states that the address works once and until the code's expiry, the remaining time derived from the pending code's expires_at at render, with no new constant (DIRECTORY-096 R4).
+- C738 — A consent whose browser host differs from the client's writes one warn line naming the client and the word elsewhere, carrying no code, state, address or host; a same-host consent writes none (DIRECTORY-096 R4).
+
+**Stories:**
+- S418 (Person or agent using Lys through an AI assistant, Reads and changes Lys through an MCP client, with only their own rights) — As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
+
+## Boundaries
+
+- SHALL NOT change which redirect addresses registration admits, the code's lifetime, its single use, or any refusal name on /oauth/token or /oauth/mcp/token.
+- SHALL NOT put a script on the page, a copy button that needs one, or loosen the consent screen's Content-Security-Policy.
+- SHALL NOT show, log or keep a code, a state, a finishing address or a client address anywhere beyond the page itself and the pending request's record.
+- SHALL NOT trust a forwarded header unless the install is configured behind its own reverse proxy by the rule issuer_admin.rs already applies.
+- SHALL NOT add a timeout, deadline, sleep, poll interval, #[allow], #[ignore], unsafe code or any bypass; the sign-in waits on the receiver, never on a clock.
+- SHALL NOT grow mcp_oauth.rs, mcp_oauth_flow.rs or sign_in.rs past their line counts at main (383, 432 and 443); the page and the finish live in their own modules.
+
+## Verification
+
+- The design gate, parsed: every cluster clean, no FAIL, every file valid, the one design.json violation at main (743a6d9b) not grown.
+- Each requirement's red at main quoted in the handback: the 303 at R1, the absent meta refresh distinction at R2, the absent --finish flag at R3, the absent warn line at R4.
+- The piece's one Lys battery on the Mac, judged by parsed output: whole-crate nextest, cargo test --doc, ast-grep, file length, fmt and clippy pedantic in both configurations, 0 failed.
+- Walked once live: a sign-in started by a Claude Code session on one computer and approved in a browser on another finishes through complete_authentication with the address from the page; the same with lys sign-in --finish.

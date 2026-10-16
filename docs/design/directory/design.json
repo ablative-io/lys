@@ -6119,6 +6119,36 @@
       "path": "docs/design/directory/briefs/DIRECTORY-095.md",
       "note": "rendered markdown",
       "brief": "DIRECTORY-095"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_return.rs",
+      "note": "The consent decision's return page: the finishing address, the Return link, the finish-elsewhere words, the refresh only where the client lives.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_return_tests.rs",
+      "note": "Return page tests: 200 not 303, same address twice, no script, refresh by address equality, remaining time, the elsewhere warn line.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys/src/commands/sign_in/finish.rs",
+      "note": "lys sign-in --finish: a pasted finishing address handed to the waiting loopback receiver on the client's computer.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys/src/commands/sign_in/finish_tests.rs",
+      "note": "Finish tests: address refusals by name, the fixture receiver round trip, the receiver's refusal names reported.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/mcp_oauth_native.rs",
+      "note": "The built-in native client lys-cli and its authorize address.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys/src/commands/sign_in.rs",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
     }
   ],
   "inventory": [
