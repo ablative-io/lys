@@ -452,7 +452,7 @@ async fn an_upstream_that_drops_mid_request_sees_one_request_and_the_call_is_par
     });
     let harness = Harness::start(upstream).await?;
     let (response, _connection) = send(harness.addr, messages_request(Some(KEY), false)?).await?;
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     let report = harness.report()?;
     assert_eq!(report.status, CallStatus::Partial);
     assert_eq!(accepted.load(Ordering::SeqCst), 1);

@@ -16,7 +16,7 @@ type Failed = (StatusCode, SecretsError);
 
 fn upstream(context: &'static str, reason: String) -> Failed {
     (
-        StatusCode::BAD_GATEWAY,
+        StatusCode::SERVICE_UNAVAILABLE,
         SecretsError::Encoding { context, reason },
     )
 }
@@ -123,7 +123,7 @@ async fn refresh(
     }
     grant
         .apply_refresh(&answer, now)
-        .map_err(|error| (StatusCode::BAD_GATEWAY, error))
+        .map_err(|error| (StatusCode::SERVICE_UNAVAILABLE, error))
 }
 
 /// Asks the provider to revoke `grant`. Answers `Ok` when it confirmed,

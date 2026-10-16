@@ -303,7 +303,7 @@ async fn a_start_the_runner_refused_answers_the_refusal_by_name_beside_the_start
     let (status, answer) = served
         .start_under(Plan::Refused("runner_protocol_mismatch"))
         .await?;
-    assert_eq!(status, 502, "{answer}");
+    assert_eq!(status, 503, "{answer}");
     assert_eq!(answer["error"], "runner_protocol_mismatch", "{answer}");
     assert!(
         answer["words"]

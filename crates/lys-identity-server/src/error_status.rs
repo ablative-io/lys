@@ -31,6 +31,10 @@ macro_rules! unavailable_refusals {
             | ServerError::SignInProvidersUnavailable { .. }
             | ServerError::SetupUnavailable { .. }
             | ServerError::ReviewsUnavailable { .. }
+            | ServerError::SignInFailed { .. }
+            | ServerError::IssuerRefused { .. }
+            | ServerError::SecretsUnavailable { .. }
+            | ServerError::SignInProvidersRefused { .. }
     };
 }
 
@@ -270,10 +274,6 @@ impl ServerError {
             | Self::PolicyUnrepresentable { .. }
             | Self::SkillUnknown { .. }
             | Self::PolicyRefused { .. } => StatusCode::BAD_REQUEST,
-            Self::SignInFailed { .. }
-            | Self::IssuerRefused { .. }
-            | Self::SecretsUnavailable { .. }
-            | Self::SignInProvidersRefused { .. } => StatusCode::BAD_GATEWAY,
             unavailable_refusals!() => StatusCode::SERVICE_UNAVAILABLE,
             Self::SecretsRefused { status, .. } => *status,
             Self::Runner { refusal, .. } => runner_status(refusal),
@@ -295,7 +295,9 @@ impl ServerError {
 }
 
 /// How a runner's refusal is answered: one the runner never gave, because
-/// it could not be reached or spoke another protocol, is the gateway's; a
+/// it could not be reached or spoke another protocol, is a dependency that is
+/// unavailable (503, never 502: a proxy in front of Lys, such as Cloudflare,
+/// replaces a 502's body with its own page, and the refusal's name is lost); a
 /// session it does not hold is not found; the rest conflict with the
 /// session's state.
 fn runner_status(refusal: &str) -> StatusCode {
@@ -304,7 +306,7 @@ fn runner_status(refusal: &str) -> StatusCode {
         | "runner_reply_malformed"
         | "runner_protocol_mismatch"
         | "runner_request_unsigned"
-        | "runner_request_replayed" => StatusCode::BAD_GATEWAY,
+        | "runner_request_replayed" => StatusCode::SERVICE_UNAVAILABLE,
         "session_unknown" | "runner_reply_unknown" => StatusCode::NOT_FOUND,
         "runner_reply_expired" => StatusCode::GONE,
         "pattern_invalid" | "size_invalid" | "cursor_ahead" | "session_invalid"

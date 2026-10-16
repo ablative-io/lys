@@ -223,7 +223,7 @@ async fn a_screen_route_answers_while_a_permission_check_is_held_open() -> TestR
     gate.release();
     assert_eq!(
         proxied.await?,
-        StatusCode::BAD_GATEWAY,
+        StatusCode::SERVICE_UNAVAILABLE,
         "the held call was admitted once let go, and its upstream does not listen"
     );
     served.dir.close()?;

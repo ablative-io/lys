@@ -150,7 +150,7 @@ async fn approval_with_broker_down_keeps_app_pending() -> TestResult {
         held["state"], "pending",
         "broker-down approval activated the app without credential custody"
     );
-    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.0, 503, "{}", answer.1);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     assert!(answer.1.get("client").is_none());
     Ok(())
@@ -177,7 +177,7 @@ async fn wrong_broker_custody_receipt_keeps_app_pending() -> TestResult {
         &json!({"operation":op()?, "redirects": [BACK], "profile": false}),
     )
     .await?;
-    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.0, 503, "{}", answer.1);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     let held = ok(get(
         &setup.service,
@@ -218,7 +218,7 @@ async fn approval_without_configured_broker_keeps_app_pending() -> TestResult {
         held["state"], "pending",
         "missing-broker approval activated the app without credential custody"
     );
-    assert_eq!(answer.0, 502, "{}", answer.1);
+    assert_eq!(answer.0, 503, "{}", answer.1);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     assert!(answer.1.get("client").is_none());
     Ok(())

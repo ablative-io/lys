@@ -96,7 +96,7 @@ async fn an_unreachable_proxy_is_named_never_hung() -> Result<(), Box<dyn std::e
         .uri(format!("/{KEY}/anthropic/v1/messages"))
         .body(Body::empty())?;
     let response = super::forward(&format!("http://{address}/anthropic"), request).await;
-    assert_eq!(response.status(), StatusCode::BAD_GATEWAY);
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     let text = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
     assert!(String::from_utf8(text.to_vec())?.contains("could not reach its model proxy"));
     Ok(())

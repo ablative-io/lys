@@ -107,10 +107,12 @@ pub async fn forward(local: &str, request: Request) -> Response {
             }
             response
                 .body(Body::from_stream(answer.bytes_stream()))
-                .unwrap_or_else(|error| refused(StatusCode::BAD_GATEWAY, &error.to_string()))
+                .unwrap_or_else(|error| {
+                    refused(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
+                })
         }
         Err(error) => refused(
-            StatusCode::BAD_GATEWAY,
+            StatusCode::SERVICE_UNAVAILABLE,
             &format!("Lys could not reach its model proxy at {local}: {error}"),
         ),
     }

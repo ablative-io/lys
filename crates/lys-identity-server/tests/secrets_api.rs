@@ -429,7 +429,7 @@ async fn without_a_broker_configured_the_routes_say_so() -> TestResult {
         Service::start_with(|config| Ok(seed_configured(config, [ADA, BEA])?)).await?;
     let cookie = service.sign_in(login(ADA)).await?;
     let (status, body) = service.get("/secrets", Some(&cookie)).await?;
-    assert_eq!(status, 502, "{body}");
+    assert_eq!(status, 503, "{body}");
     assert_eq!(body["refusal"], "SecretsUnavailable");
     Ok(())
 }

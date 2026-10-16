@@ -234,7 +234,7 @@ async fn a_kept_start_without_its_runner_is_refused_without_rewriting_it() -> Te
     let path = format!("/agents/{}/start-command", table.agent());
     let body = json!({ "machine": machine, "operation": operation()? });
     let (status, refused) = table.service.post(&path, Some(&table.ada), &body).await?;
-    assert_eq!(status, 502, "{refused}");
+    assert_eq!(status, 503, "{refused}");
     assert_eq!(refused["refusal"], "runner_unreachable", "{refused}");
     let (status, kept) = table
         .service
@@ -312,7 +312,7 @@ async fn a_runner_on_another_protocol_version_is_refused_by_name() -> TestResult
         )
         .await?;
     let (status, refused) = table.start(&table.agent(), &start_body(&machine)?).await?;
-    assert_eq!(status, 502, "{refused}");
+    assert_eq!(status, 503, "{refused}");
     assert_eq!(refused["refusal"], "runner_protocol_mismatch", "{refused}");
     answering
         .join()

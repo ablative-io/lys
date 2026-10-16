@@ -2077,7 +2077,7 @@ async fn controls_documents_an_unreachable_runner() -> TestResult {
         .service
         .get("/runtime/sessions/session/controls", Some(&table.cookie))
         .await?;
-    assert_eq!(status, 502, "{answer}");
+    assert_eq!(status, 503, "{answer}");
     assert_eq!(answer["refusal"], "runner_unreachable", "{answer}");
     table.finish(&[]).await
 }

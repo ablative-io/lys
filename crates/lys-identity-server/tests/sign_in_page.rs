@@ -626,11 +626,11 @@ impl tracing::field::Visit for RefusalFields<'_> {
 
 #[tokio::test]
 async fn a_future_forbidden_challenge_names_the_issuer_refusal() -> TestResult {
-    issuer_refusal(403, "Forbidden", 4_102_444_800, "IssuerRefused", 502, 1).await
+    issuer_refusal(403, "Forbidden", 4_102_444_800, "IssuerRefused", 503, 1).await
 }
 #[tokio::test]
 async fn a_bad_request_names_the_issuer_refusal() -> TestResult {
-    issuer_refusal(400, "BadRequest", 4_102_444_800, "IssuerRefused", 502, 1).await
+    issuer_refusal(400, "BadRequest", 4_102_444_800, "IssuerRefused", 503, 1).await
 }
 #[tokio::test]
 async fn an_unauthorized_credential_answer_names_the_password_refusal() -> TestResult {
@@ -644,10 +644,10 @@ async fn a_challenge_already_expired_never_posts_credentials() -> TestResult {
 #[tokio::test]
 async fn the_public_password_route_names_refusals_without_retry_or_private_data() -> TestResult {
     let cases = [
-        (403, "Forbidden", 4_102_444_800, "IssuerRefused", 502, 1),
-        (400, "BadRequest", 4_102_444_800, "IssuerRefused", 502, 1),
+        (403, "Forbidden", 4_102_444_800, "IssuerRefused", 503, 1),
+        (400, "BadRequest", 4_102_444_800, "IssuerRefused", 503, 1),
         (401, "Unauthorized", 4_102_444_800, "SignInRefused", 401, 1),
-        (401, "Forbidden", 4_102_444_800, "IssuerRefused", 502, 1),
+        (401, "Forbidden", 4_102_444_800, "IssuerRefused", 503, 1),
         (
             429,
             "TooManyRequests",

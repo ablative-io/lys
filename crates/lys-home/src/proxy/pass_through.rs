@@ -13,7 +13,7 @@ use super::{Base, ProxyBody, Upstream, refusal};
 /// response head arrives (or the upstream fails): its method, its path
 /// (never its query), its status and the milliseconds until the head, and
 /// never a header value or a body byte. A failure to reach the upstream is
-/// answered 502, naming the failure.
+/// answered 503, naming the failure.
 pub async fn pass_through(
     upstream: &Upstream,
     base: &Base,
@@ -30,8 +30,11 @@ pub async fn pass_through(
     let (status, response) = match upstream.send(base, &path_and_query, request).await {
         Ok(response) => (response.status(), response.map(BodyExt::boxed_unsync)),
         Err(error) => (
-            StatusCode::BAD_GATEWAY,
-            refusal(StatusCode::BAD_GATEWAY, &format!("pass-through: {error}")),
+            StatusCode::SERVICE_UNAVAILABLE,
+            refusal(
+                StatusCode::SERVICE_UNAVAILABLE,
+                &format!("pass-through: {error}"),
+            ),
         ),
     };
     let duration_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);

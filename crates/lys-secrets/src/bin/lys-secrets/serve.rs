@@ -432,7 +432,7 @@ async fn call_upstream(
         .await
         .map_err(|error| {
             (
-                StatusCode::BAD_GATEWAY,
+                StatusCode::SERVICE_UNAVAILABLE,
                 SecretsError::Encoding {
                     context: "upstream call",
                     reason: redactor.redact_text(&error.to_string()),
@@ -457,7 +457,7 @@ async fn call_upstream(
     headers.remove("transfer-encoding");
     let answer = redacted_answer(upstream, &redactor)
         .await
-        .map_err(|error| (StatusCode::BAD_GATEWAY, error))?;
+        .map_err(|error| (StatusCode::SERVICE_UNAVAILABLE, error))?;
     let mut response = Response::new(Body::from(answer));
     *response.status_mut() = status;
     *response.headers_mut() = headers;

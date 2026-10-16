@@ -81,7 +81,7 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
         )
         .await?;
     answering.join().expect("runner stand-in panicked")?;
-    assert_eq!(status, 502, "{refused}");
+    assert_eq!(status, 503, "{refused}");
     assert_eq!(refused["refusal"], "runner_reply_malformed", "{refused}");
     assert!(
         refused["reason"]

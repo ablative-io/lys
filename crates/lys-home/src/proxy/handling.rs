@@ -76,7 +76,10 @@ impl Proxy {
                 .await
             {
                 Ok(response) => response.map(BodyExt::boxed_unsync),
-                Err(error) => refusal(StatusCode::BAD_GATEWAY, &format!("lys-proxy: {error}")),
+                Err(error) => refusal(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &format!("lys-proxy: {error}"),
+                ),
             };
         };
         let mut open = OpenCall {
@@ -124,7 +127,10 @@ impl Proxy {
             }
             Err(error) => {
                 call.finish(End::Failed);
-                refusal(StatusCode::BAD_GATEWAY, &format!("lys-proxy: {error}"))
+                refusal(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    &format!("lys-proxy: {error}"),
+                )
             }
         }
     }
