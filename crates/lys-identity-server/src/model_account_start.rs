@@ -86,19 +86,7 @@ pub fn routed(
     held: &[HandleName],
     inventory: &serde_json::Value,
 ) -> Result<String, ServerError> {
-    let contract = version
-        .settings
-        .harness
-        .as_ref()
-        .map_or("", |h| h.description.rendering_contract.as_str());
-    let providers: &[&str] = match contract {
-        "claude-code/template-v1" => &["https://api.anthropic.com"],
-        "codex/template-v1" => &[
-            "https://api.openai.com",
-            "https://chatgpt.com/backend-api/codex",
-        ],
-        _ => &[],
-    };
+    let providers = wire(version)?.providers();
     let entries = inventory
         .get("secrets")
         .and_then(serde_json::Value::as_array)
@@ -200,43 +188,9 @@ pub(crate) async fn bind(
         &provider,
     )
     .await?;
-    let variable = match version
-        .settings
-        .harness
-        .as_ref()
-        .map(|h| h.description.rendering_contract.as_str())
-    {
-        Some("claude-code/template-v1") => "ANTHROPIC_AUTH_TOKEN",
-        Some("codex/template-v1") => "CODEX_API_KEY",
-        _ => {
-            return Err(ServerError::LaunchUnrenderable {
-                reason: "account harness unsupported".to_owned(),
-            });
-        }
-    };
-    if variable == "ANTHROPIC_AUTH_TOKEN" {
-        launch
-            .environment
-            .insert("CLAUDE_CODE_OAUTH_TOKEN".to_owned(), String::new());
-        launch
-            .environment
-            .insert("ANTHROPIC_API_KEY".to_owned(), String::new());
-    }
-    launch
-        .environment
-        .insert("LYS_ACCOUNT_VARIABLE".to_owned(), variable.to_owned());
-    launch.environment.insert(
-        variable.to_owned(),
-        format!(
-            "lys-account.{}",
-            rotation
-                .accounts
-                .first()
-                .ok_or_else(|| ServerError::LaunchUnrenderable {
-                    reason: "account rotation empty".to_owned()
-                })?
-        ),
-    );
+    wire(&version)?.bind(&mut launch.environment, rotation.accounts.first().ok_or_else(|| ServerError::LaunchUnrenderable {
+        reason: "account rotation empty".to_owned(),
+    })?);
     Ok(())
 }
 
@@ -278,4 +232,43 @@ async fn held(
             })
         })
         .collect::<Result<Vec<_>, ServerError>>()
+}
+
+use lys_home::harness::seat_program::ModelWire;
+
+pub(crate) fn wire(version: &Version) -> Result<Wire, ServerError> {
+    let declared = version.settings.harness.as_ref();
+    let model = match declared.map(|h|h.description.rendering_contract.as_str()) {
+        Some("codex/template-v1") => Some(ModelWire::OpenaiResponses),
+        Some("claude-code/template-v1") => Some(ModelWire::AnthropicMessages),
+        Some("seat-program/v1") => declared.and_then(|h|h.description.seat_program.as_ref()).and_then(|s|s.model_wire),
+        _ => None,
+    };
+    model.map(Wire).ok_or_else(|| ServerError::LaunchUnrenderable {
+        reason: "account harness unsupported or model_wire missing".to_owned(),
+    })
+}
+
+pub(crate) struct Wire(ModelWire);
+
+impl Wire {
+    fn providers(&self) -> &'static [&'static str] {
+        match self.0 {
+            ModelWire::OpenaiResponses => &["https://api.openai.com", "https://chatgpt.com/backend-api/codex"],
+            ModelWire::AnthropicMessages => &["https://api.anthropic.com"],
+        }
+    }
+
+    pub(crate) fn bind(&self, environment: &mut std::collections::BTreeMap<String, String>, account: &str) {
+        let variable = match self.0 {
+            ModelWire::OpenaiResponses => "CODEX_API_KEY",
+            ModelWire::AnthropicMessages => {
+                environment.insert("CLAUDE_CODE_OAUTH_TOKEN".into(), String::new());
+                environment.insert("ANTHROPIC_API_KEY".into(), String::new());
+                "ANTHROPIC_AUTH_TOKEN"
+            }
+        };
+        environment.insert("LYS_ACCOUNT_VARIABLE".into(), variable.into());
+        environment.insert(variable.into(), format!("lys-account.{account}"));
+    }
 }

@@ -55,8 +55,8 @@ async fn seat_program_account_requires_model_wire_at_set_time() -> Result<(), Bo
         "session":{"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}});
     let (status, refused) = post(&service, &path, Auth::Cookie(&cookie), &body).await?;
     assert_eq!(status, 400, "{refused}");
-    assert_eq!(refused["refusal"], "RequestMalformed");
-    assert!(refused["reason"].as_str().is_some_and(|s|s.contains("ModelWireMissing")), "{refused}");
+    assert_eq!(refused["refusal"], "ModelWireMissing");
+    assert!(refused["reason"].as_str().is_some_and(|s|s.contains("model_wire")), "{refused}");
     body.as_object_mut().ok_or("body absent")?.remove("session");
     ok(post(&service, &path, Auth::Cookie(&cookie), &body).await?)?;
     Ok(())

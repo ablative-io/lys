@@ -12,7 +12,7 @@ export type Setting = string | number | boolean | { handle: string };
 export interface McpServer { name: string; url?: string; command?: { program: string; args?: string[]; cwd?: string; env?: Record<string, Setting> }; channel?: 'off' | 'wake' }
 export interface SeatProgram {
   executable: string; executable_sha256: string; arguments: string[];
-  seat_file: string; seat_file_sha256: string; adapter: string;
+  seat_file: string; seat_file_sha256: string; adapter: string; model_wire?: 'openai-responses' | 'anthropic-messages';
 }
 export interface HarnessDescription {
   seat_program?: SeatProgram;
@@ -67,6 +67,7 @@ function SeatProgramReview({ id, profile, canReview }: { id: string; profile: Pr
       <dt>Arguments, in order</dt><dd><ol>{seat.arguments.map((argument, index) => <li key={index}><code>{JSON.stringify(argument)}</code></li>)}</ol></dd>
       <dt>Seat file</dt><dd>{seat.seat_file}</dd>
       <dt>Seat file SHA-256</dt><dd>{seat.seat_file_sha256}</dd>
+      {seat.model_wire && <><dt>Model wire</dt><dd>{seat.model_wire}</dd></>}
       <dt>Adapter</dt><dd>{seat.adapter}</dd>
     </dl>
     {reviewed ? <p>Reviewed</p> : canReview && <Act symbol="approve" name="Review these settings" word="Review" disabled={pending} onClick={() => void review()} />}

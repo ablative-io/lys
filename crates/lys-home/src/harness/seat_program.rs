@@ -15,6 +15,17 @@ pub const CONTRACT: &str = "seat-program/v1";
 /// Signed metadata kept separately from the opaque product file.
 pub const FILE: &str = "seat-program.json";
 
+/// The reviewed model protocol, shared with native account routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ModelWire {
+    /// The OpenAI Responses protocol.
+    #[serde(rename = "openai-responses")]
+    OpenaiResponses,
+    /// The Anthropic Messages protocol.
+    #[serde(rename = "anthropic-messages")]
+    AnthropicMessages,
+}
+
 /// Exact process inputs retained with the person's reviewed description.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "Value")]
@@ -31,6 +42,9 @@ pub struct SeatProgram {
     pub seat_file_sha256: String,
     /// The versioned standard-stream adapter.
     pub adapter: String,
+    /// The model protocol explicitly reviewed for an account-backed run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model_wire: Option<ModelWire>,
 }
 
 impl TryFrom<Value> for SeatProgram {
@@ -48,6 +62,7 @@ impl TryFrom<Value> for SeatProgram {
                 "seat_file",
                 "seat_file_sha256",
                 "adapter",
+                "model_wire",
             ]
             .contains(&field.as_str())
             {
@@ -79,6 +94,11 @@ impl TryFrom<Value> for SeatProgram {
             seat_file: text("seat_file")?,
             seat_file_sha256: text("seat_file_sha256")?,
             adapter: text("adapter")?,
+            model_wire: object.get("model_wire").map(|value| {
+                serde_json::from_value(value.clone()).map_err(|_| {
+                    "seat_program.model_wire: expected openai-responses or anthropic-messages".to_owned()
+                })
+            }).transpose()?,
         };
         spec.check()?;
         Ok(spec)
