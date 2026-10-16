@@ -73,7 +73,7 @@ fn client() -> Result<reqwest::Client, Box<dyn Error>> {
         .build()?)
 }
 
-async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
+pub(super) async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
     let body = response.text().await?;
     let address = body
         .split("readonly value=\"")

@@ -213,3 +213,105 @@ async fn forwarded_hosts_are_compared_only_from_a_configured_proxy() -> Result<(
     }
     Ok(())
 }
+
+#[tokio::test]
+async fn the_return_page_and_code_expiry_share_the_test_doors_clock() -> Result<(), Box<dyn Error>>
+{
+    use identity_contract::harness::{ADMINISTRATOR, ManualClock, Service};
+    use lys_identity::{
+        Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance,
+    };
+    let at = crate::session::now();
+    let clock = std::sync::Arc::new(ManualClock::new(i64::try_from(at)?));
+    let supplied = std::sync::Arc::clone(&clock);
+    let (service, ()) = Service::start_with_clock(supplied, |config| {
+        lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
+        let path = config.log_dir.clone();
+        let key = lys_identity::signer::load_service_key(&config.event_key_file)?;
+        lys_identity::directory_migration::migrate(
+            lys_log_store::FileLeafStore::open(&path)?,
+            &key,
+        )?;
+        let mut directory = Directory::open(
+            Box::new(move || lys_log_store::FileLeafStore::open(&path)),
+            key,
+        )?;
+        directory.setup_person(
+            Actor::new(
+                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+                Provenance::new(AuthMethod::Oidc, 1),
+            ),
+            OperationId::generate()?,
+            Profile::new("Owner")?,
+            1,
+        )?;
+        Ok(())
+    })
+    .await?;
+    let cookie = service
+        .sign_in(identity_contract::apps::login(ADMINISTRATOR))
+        .await?;
+    let client = reqwest::Client::builder()
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let redirect = "http://127.0.0.1:23456/lys/sign-in";
+    let page = client
+        .get(format!("{}/oauth/mcp/authorize", service.base))
+        .header("cookie", &cookie)
+        .query(&[
+            ("response_type", "code"),
+            ("client_id", "lys-cli"),
+            ("redirect_uri", redirect),
+            ("code_challenge", &"a".repeat(43)),
+            ("code_challenge_method", "S256"),
+        ])
+        .send()
+        .await?
+        .text()
+        .await?;
+    let asking = page
+        .split("name=\"asking\" value=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .ok_or("asking absent")?;
+    let answer = client
+        .post(format!("{}/oauth/mcp/consent", service.base))
+        .header("cookie", &cookie)
+        .form(&[("asking", asking), ("decision", "approve")])
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 200);
+    let page = answer.text().await?;
+    assert!(page.contains(&format!("for {} seconds", super::CODE_SECONDS)));
+    let address = page
+        .split("readonly value=\"")
+        .nth(1)
+        .and_then(|s| s.split('"').next())
+        .ok_or("address absent")?
+        .replace("&amp;", "&");
+    let address = reqwest::Url::parse(&address)?;
+    let code = address
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .ok_or("code absent")?
+        .1
+        .into_owned();
+    clock.set(i64::try_from(at + super::CODE_SECONDS)?);
+    let answer: serde_json::Value = client
+        .post(format!("{}/oauth/mcp/token", service.base))
+        .form(&[
+            ("grant_type", "authorization_code"),
+            ("client_id", "lys-cli"),
+            ("redirect_uri", redirect),
+            ("code", &code),
+            ("code_verifier", "fixture"),
+        ])
+        .send()
+        .await?
+        .json()
+        .await?;
+    assert_eq!(answer["error"], "invalid_grant");
+    assert_eq!(answer["error_description"], "the code is past its instant");
+    Ok(())
+}
