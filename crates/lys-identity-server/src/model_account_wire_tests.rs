@@ -76,3 +76,6 @@ fn seat_program_accounts_share_native_provider_and_selector_mapping() -> Result<
     }
     Ok(())
 }
+
+#[path = "model_account_bind_tests.rs"]
+mod binding;

@@ -47,6 +47,15 @@ async fn approval_applies_provisioning_once_as_the_person_and_lists_its_receipt(
         .await?;
     assert_eq!(receipt["receipt"]["actor"]["draft"], id);
     assert_eq!(receipt["receipt"]["actor"]["authentication"], "oidc");
+    assert_eq!(
+        receipt["receipt"]["actor"]["subject"],
+        identity_contract::harness::ADMINISTRATOR
+    );
+    assert_eq!(receipt["receipt"]["actor"]["drafted_by"], table.agent);
+    assert_eq!(
+        receipt["receipt"]["actor"]["application"],
+        body["application"]
+    );
     let size = table.service.log_size().await?;
     let (_, retry) = table
         .service
