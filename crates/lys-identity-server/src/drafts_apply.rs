@@ -18,9 +18,11 @@ pub struct Executor {
 }
 impl Executor {
     pub(crate) fn attach(&self, router: Weak<Router>) -> Result<(), ServerError> {
-        self.router
-            .set(router)
-            .map_err(|_| fault("the draft router was attached twice"))
+        if let Err(duplicate) = self.router.set(router) {
+            drop(duplicate);
+            return Err(fault("the draft router was attached twice"));
+        }
+        Ok(())
     }
 }
 
@@ -100,7 +102,7 @@ pub(crate) async fn apply(
                 );
             }
             serde_json::to_vec(&object)
-                .map_err(|_| fault("the prepared body cannot be rendered"))?
+                .map_err(|error| fault(&format!("the prepared body cannot be rendered: {error}")))?
         }
         _ => held.created.body.clone(),
     };
@@ -111,9 +113,11 @@ pub(crate) async fn apply(
     if let Some(cookie) = headers.get(header::COOKIE) {
         request = request.header(header::COOKIE, cookie);
     }
-    let request = request
-        .body(Body::from(bytes.clone()))
-        .map_err(|_| fault("the prepared request cannot be dispatched"))?;
+    let request = request.body(Body::from(bytes.clone())).map_err(|error| {
+        fault(&format!(
+            "the prepared request cannot be dispatched: {error}"
+        ))
+    })?;
     let router = state
         .draft_execution
         .router
@@ -130,7 +134,11 @@ pub(crate) async fn apply(
     let status = response.status();
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
         .await
-        .map_err(|_| fault("the applied route's answer could not be read"))?;
+        .map_err(|error| {
+            fault(&format!(
+                "the applied route's answer could not be read: {error}"
+            ))
+        })?;
     let outcome = if status.is_success() {
         let receipt_index = with_directory(state, |directory| {
             if let Some(index) = directory.projection()?.operation(approved.application) {
@@ -152,8 +160,11 @@ pub(crate) async fn apply(
             receipt_index,
         }
     } else {
-        let answer: serde_json::Value = serde_json::from_slice(&body)
-            .map_err(|_| fault("the applied route did not answer a named JSON refusal"))?;
+        let answer: serde_json::Value = serde_json::from_slice(&body).map_err(|error| {
+            fault(&format!(
+                "the applied route did not answer a named JSON refusal: {error}"
+            ))
+        })?;
         let refusal = answer["refusal"]
             .as_str()
             .ok_or_else(|| fault("the applied route's refusal has no name"))?;

@@ -13,12 +13,12 @@ pub(super) fn creation(
     corrects: Option<OperationId>,
 ) -> Result<Created, ServerError> {
     let (resource, action) =
-        crate::openapi_table::token_scope(&body.method, &body.path).map_err(|_| {
+        crate::openapi_table::token_scope(&body.method, &body.path).map_err(|error| {
             ServerError::SecretsRefused {
                 status: axum::http::StatusCode::CONFLICT,
                 refusal: "DraftChangeInvalid".to_owned(),
                 reason: format!(
-                    "target {}:{} {} names no declared mutation scope for {} {}",
+                    "target {}:{} {} names no declared mutation scope for {} {}: {error}",
                     body.target.kind, body.target.id, body.target.action, body.method, body.path
                 ),
             }

@@ -10,7 +10,12 @@ fn validate(address: &str) -> CliResult<(&str, &str)> {
             "name an http numeric loopback address with a port, /lys/sign-in and a query",
         )
     };
-    let url = url::Url::parse(address).map_err(|_| invalid())?;
+    let url = url::Url::parse(address).map_err(|error| {
+        refused(
+            "sign_in_finish_invalid",
+            &format!("the finishing address cannot be parsed: {error}"),
+        )
+    })?;
     let (authority, target) = address
         .strip_prefix("http://")
         .and_then(|s| s.split_once('/'))

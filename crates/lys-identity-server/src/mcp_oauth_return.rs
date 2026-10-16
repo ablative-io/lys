@@ -59,8 +59,11 @@ pub(super) fn finish(
 }
 
 pub(super) fn page(given: Return<'_>) -> Result<Response, ServerError> {
-    let mut url = reqwest::Url::parse(given.redirect)
-        .map_err(|_| malformed("the registered redirect address is unreadable"))?;
+    let mut url = reqwest::Url::parse(given.redirect).map_err(|error| {
+        malformed(&format!(
+            "the registered redirect address is unreadable: {error}"
+        ))
+    })?;
     for (key, value) in given.pairs {
         url.query_pairs_mut().append_pair(key, value);
     }
