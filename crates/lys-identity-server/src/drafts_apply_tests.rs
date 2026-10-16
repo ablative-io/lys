@@ -95,7 +95,7 @@ async fn approval_applies_provisioning_once_as_the_person_and_lists_its_receipt(
 async fn a_crash_after_approval_resumes_once_and_route_refusals_close_the_draft()
 -> Result<(), Box<dyn Error>> {
     use lys_identity::draft_event::{Approved, DraftEvent};
-    let table = Table::start().await?;
+    let mut table = Table::start().await?;
     let (id,created)=draft(&table,&format!("/agents/{}/provisioning",table.agent),json!({"kind":"agent","id":table.agent,"action":"agent.provisioning.set"}),json!({"operation":OperationId::generate()?.to_string(),"from_version":88,"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":""})).await?;
     let operation = OperationId::generate()?;
     let application = OperationId::generate()?;
@@ -119,6 +119,7 @@ async fn a_crash_after_approval_resumes_once_and_route_refusals_close_the_draft(
         evidence: None,
     })))?;
     drop(directory);
+    table.service.restart().await?;
     let body = json!({"operation":operation.to_string(),"application":application.to_string(),"creation_hash":created["creation_hash"]});
     let (status, answer) = table
         .service
