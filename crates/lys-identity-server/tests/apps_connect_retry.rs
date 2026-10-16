@@ -168,9 +168,8 @@ async fn proxy(State(state): State<Proxy>, request: Request) -> Response {
         )
             .into_response();
     }
-    let bytes = match to_bytes(body, 1_048_576).await {
-        Ok(bytes) => bytes,
-        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+    let Ok(bytes) = to_bytes(body, 1_048_576).await else {
+        return StatusCode::BAD_REQUEST.into_response();
     };
     let response = reqwest::Client::new()
         .request(parts.method, format!("{}{}", state.upstream, parts.uri))
@@ -273,7 +272,7 @@ async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live(
     .await?)?;
     let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
     worker.abort();
-    assert_eq!(live(&app)?, [replacement_id.clone()]);
+    assert_eq!(live(&app)?, [replacement_id.as_str()]);
     assert!(
         !state.client_issued.load(Ordering::SeqCst),
         "retry issued another client credential"

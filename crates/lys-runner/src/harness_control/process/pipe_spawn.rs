@@ -3,7 +3,7 @@
 use super::qualification;
 use super::{
     Binding, BufReader, Command, Entry, Executable, Leader, PathBuf, Pid, PipeChild, Ready,
-    RunnerError, Spawned, Stdio, executable, failed, frame, getpgid, getsid,
+    RunnerError, Spawned, Stdio, executable, failed, frame,
 };
 use std::io::Write;
 
@@ -134,10 +134,12 @@ fn enter(
     .ok_or_else(|| failed("control_process_unproved", "child pid is invalid"))?;
     if ready.pid != pid
         || ready.executable != harness
-        || getsid(Some(native)).map_err(|error| failed("control_process_unproved", error))?
-            != native
-        || getpgid(Some(native)).map_err(|error| failed("control_process_unproved", error))?
-            != native
+        || crate::process_group::session_of(native)
+            .map_err(|error| failed("control_process_unproved", error))?
+            != Some(native)
+        || crate::process_group::group_of(native)
+            .map_err(|error| failed("control_process_unproved", error))?
+            != Some(native)
     {
         return Err(failed(
             "control_process_unproved",

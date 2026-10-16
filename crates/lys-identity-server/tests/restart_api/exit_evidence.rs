@@ -42,6 +42,11 @@ async fn an_end_without_exit_evidence_does_not_start_another_session() -> TestRe
                 Act::Liveness { .. } => Answer::Liveness {
                     sessions: Vec::new(),
                 },
+                // Restart reads the session's control before it ends it.
+                Act::ControlStatus { session } => Answer::ControlStatus {
+                    session,
+                    control: None,
+                },
                 Act::Feed { .. } => Answer::Refused {
                     refusal: "feed_not_kept".to_owned(),
                     words: "this fixture keeps no feed".to_owned(),

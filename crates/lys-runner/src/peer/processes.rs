@@ -196,13 +196,15 @@ pub(crate) fn group_members(group: u32) -> Result<Vec<u32>, RunnerError> {
             })
     });
     group::members(entries, group, |pid| {
-        match rustix::process::getpgid(Some(process_id(pid)?)) {
-            Ok(found) => u32::try_from(found.as_raw_nonzero().get())
+        // An exiting process the kernel has taken out of its group is in
+        // no group, as one that is already gone.
+        match crate::process_group::group_of(process_id(pid)?) {
+            Ok(Some(found)) => u32::try_from(found.as_raw_nonzero().get())
                 .map(Some)
                 .map_err(|error| {
                     RunnerError::refused("process_group_unreadable", error.to_string())
                 }),
-            Err(rustix::io::Errno::SRCH) => Ok(None),
+            Ok(None) | Err(rustix::io::Errno::SRCH) => Ok(None),
             Err(error) => Err(RunnerError::refused(
                 "process_group_unreadable",
                 format!("process {pid}: {error}"),

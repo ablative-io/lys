@@ -49,11 +49,11 @@ async fn owner_and_administrator_receive_checked_packages_whose_codes_replace_an
         let member = data
             .get(&format!("usr/lib/lys/{name}"))
             .ok_or("client missing")?;
-        assert!(member.bytes == fixture_executable(LINUX, name));
+        assert_eq!(member.bytes, fixture_executable(LINUX, name));
     }
     let archive = download(&service, &admin, &id, "arch").await?;
     let second = pending(&members(&archive)?)?;
-    assert!(first.code != second.code);
+    assert_ne!(first.code, second.code);
     assert_eq!(second.machine, id);
     let store = joins(&service)?;
     assert_eq!(store.records().len(), 3);
@@ -88,7 +88,7 @@ async fn owner_and_administrator_receive_checked_packages_whose_codes_replace_an
         assert!(
             heard
                 .lock()
-                .map_err(|_| "fixture lock poisoned")?
+                .map_err(|poisoned| format!("fixture lock poisoned: {poisoned}"))?
                 .iter()
                 .all(|line| !line.contains(code))
         );
@@ -104,7 +104,10 @@ async fn installer_admission_kind_body_retirement_and_get_refuse_without_issuing
         .err()
         .ok_or("a checked client was overwritten")?;
     assert_eq!(error.name(), "installer_build_failed");
-    assert!(std::fs::read(staging.path().join("lys"))? == b"original executable");
+    assert_eq!(
+        std::fs::read(staging.path().join("lys"))?,
+        b"original executable"
+    );
     let service = service(&Heard::default()).await?;
     let owner = service
         .sign_in(identity_contract::apps::login(OWNER))
@@ -230,7 +233,7 @@ async fn missing_platform_and_changed_executables_never_replace_a_join() -> Test
         assert_eq!(answer.1["refusal"], "client_digest_mismatch");
         std::fs::write(path, original)?;
     }
-    assert!(joins(&service)?.records() == before);
+    assert_eq!(joins(&service)?.records(), before);
     Ok(())
 }
 
@@ -242,8 +245,11 @@ fn mac_clients_need_only_checked_apple_silicon_executables() -> TestResult {
         return Err("Mac clients missing".into());
     };
     assert_eq!(commit, COMMIT);
-    assert!(arm.lys == fixture_executable(ARM, "lys"));
-    assert!(arm.containment == fixture_executable(ARM, "lys-containment-entry"));
+    assert_eq!(arm.lys, fixture_executable(ARM, "lys"));
+    assert_eq!(
+        arm.containment,
+        fixture_executable(ARM, "lys-containment-entry")
+    );
     Ok(())
 }
 

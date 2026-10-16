@@ -5,7 +5,7 @@ use lys_identity::{AgentId, IdentityId, PersonId};
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
 
-pub(super) fn refused(resource: &str) -> ServerError {
+pub(crate) fn refused(resource: &str) -> ServerError {
     ServerError::NotPermitted {
         reason: format!(
             "the person-app pass may act only for its own person; this {resource} belongs to another person"

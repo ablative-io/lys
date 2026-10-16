@@ -23,18 +23,13 @@ pub(super) async fn pass_rights_and_refusals(
         );
     }
     let app_pass = fixture::signed_in(service, admin, NOTES).await?;
+    let gift = give(person, agent)?;
     for token in [
         app_pass["access_token"].as_str().ok_or("no person pass")?,
         answer["pass"].as_str().ok_or("no agent pass")?,
     ] {
         refused(
-            &post(
-                service,
-                "/grants",
-                Auth::Bearer(token),
-                &give(person, agent)?,
-            )
-            .await?,
+            &post(service, "/grants", Auth::Bearer(token), &gift).await?,
             403,
             "RootAuthorityRefused",
         )?;
@@ -50,13 +45,8 @@ pub(super) async fn revoke_independently(
     grant: &str,
     app_pass: &Value,
 ) -> TestResult {
-    let sibling = ok(post(
-        service,
-        "/grants",
-        Auth::Cookie(admin),
-        &give(person, agent)?,
-    )
-    .await?)?;
+    let gift = give(person, agent)?;
+    let sibling = ok(post(service, "/grants", Auth::Cookie(admin), &gift).await?)?;
     let revoked = ok(post(
         service,
         &format!("/grants/{grant}/revoke"),

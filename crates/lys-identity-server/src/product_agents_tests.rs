@@ -11,7 +11,7 @@ use tower::ServiceExt;
 type TestResult = Result<(), Box<dyn Error>>;
 
 struct Table {
-    _dir: tempfile::TempDir,
+    dir: tempfile::TempDir,
     state: Arc<crate::routes::AppState>,
     session: String,
     person: PersonId,
@@ -35,7 +35,7 @@ impl Table {
             "https://fixture.test".to_owned(),
         )?);
         Ok(Self {
-            _dir: dir,
+            dir,
             state: Arc::new(state),
             session,
             person,

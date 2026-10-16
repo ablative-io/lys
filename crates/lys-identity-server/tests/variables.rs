@@ -196,7 +196,9 @@ async fn a_patch_carries_the_revision_read_and_a_stale_one_is_refused() -> TestR
 #[tokio::test]
 async fn an_expired_key_reads_as_absent_and_is_named() -> TestResult {
     let table = Table::set().await?;
-    let soon = now()? + 600;
+    // Inside the harness's 600-second sign-in, so moving the clock to the
+    // key's expiry ends the key and never the session reading it.
+    let soon = now()? + 300;
     let body = json!({ "revision": 0, "values": { "lantern": "lit" }, "expires_at": soon });
     let (status, answer) = table.patch(&table.ada, &table.beas_agent, &body).await?;
     assert_eq!(status, 200, "{answer}");

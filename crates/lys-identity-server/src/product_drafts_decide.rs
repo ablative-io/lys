@@ -169,7 +169,8 @@ pub(super) async fn approve(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<ProductDecision>, ServerError> {
-    let actor = crate::drafts_api::personal(&state, &headers)?;
+    // A person-app pass decides as its own person, under the same rules.
+    let (actor, _) = crate::drafts_api::decider(&state, &headers)?;
     let body: ProductApproveBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let digest = digest32(&body.request_digest, "request_digest")?;
     let draft = OperationId::from_str(&id)?;
@@ -222,7 +223,8 @@ pub(super) async fn refuse(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<ProductDecision>, ServerError> {
-    let actor = crate::drafts_api::personal(&state, &headers)?;
+    // A person-app pass decides as its own person, under the same rules.
+    let (actor, _) = crate::drafts_api::decider(&state, &headers)?;
     let body: ProductRefuseBody = crate::signed_json::read(&state, &headers, &bytes)?;
     if body.reason.trim().is_empty() {
         return Err(malformed("a refusal says why"));

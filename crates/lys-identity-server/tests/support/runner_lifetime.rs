@@ -18,7 +18,7 @@ impl Lifetime {
     }
 
     pub fn signal(&self) -> Arc<AtomicBool> {
-        self.ended.clone()
+        Arc::clone(&self.ended)
     }
 
     pub fn finish(&self) -> std::io::Result<()> {

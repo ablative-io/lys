@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use portable_pty::{Child, ChildKiller, ExitStatus};
-use rustix::process::{Pid, getpgid, getsid};
+use rustix::process::Pid;
 use serde::{Deserialize, Serialize};
 
 use super::{Binding, Executable, Transport};

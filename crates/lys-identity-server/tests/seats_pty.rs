@@ -29,7 +29,7 @@ async fn seated(exits: bool) -> Result<Table, Box<dyn Error>> {
     std::fs::write(
         &program,
         format!(
-            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 2.1.285; exit 0; fi\nstty -echo\nprintf 'pty-ready\\n'\nwhile IFS= read -r line; do\ncase \"$line\" in /exit) {exit};; *) printf 'received:%s\\n' \"$line\";; esac\ndone\n"
+            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 2.1.285; exit 0; fi\nstty -echo\nprintf 'pty-ready\\n'\nesc=$(printf '\\033')\nwhile IFS= read -r line; do\nline=${{line#\"$esc[200~\"}}\nline=${{line%\"$esc[201~\"}}\ncase \"$line\" in /exit) {exit};; *) printf 'received:%s\\n' \"$line\";; esac\ndone\n"
         ),
     )?;
     std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;

@@ -43,12 +43,12 @@ impl Table {
         let key = Arc::new(Ed25519Identity::load(&state.grant_setup.key_file)?);
         state.certificates = Some(Mutex::new(
             crate::certificates_store::CertificateStore::open(
-                &table._dir.path().join("certificates"),
+                &table.dir.path().join("certificates"),
                 Arc::clone(&key),
             )?,
         ));
         state.policies = Some(Mutex::new(crate::agent_policy_store::PolicyStore::open(
-            &table._dir.path().join("policies"),
+            &table.dir.path().join("policies"),
             key,
         )?));
         for app in ["cambium", "fixture_product"] {
@@ -132,7 +132,7 @@ impl Table {
             directory
                 .projection()?
                 .record(id)
-                .and_then(|record| record.responsible())
+                .and_then(lys_identity::projection::Record::responsible)
                 .map(|person| person.to_string())
                 .ok_or(crate::error::ServerError::NoPerson)
         })?)

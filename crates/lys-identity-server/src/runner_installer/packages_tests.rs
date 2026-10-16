@@ -38,7 +38,10 @@ struct Member {
     bytes: Vec<u8>,
 }
 
-fn ar_members(bytes: &[u8]) -> Result<Vec<(String, Vec<u8>)>, Box<dyn Error>> {
+/// An ar archive's members in order: each name with its bytes.
+type ArMembers = Vec<(String, Vec<u8>)>;
+
+fn ar_members(bytes: &[u8]) -> Result<ArMembers, Box<dyn Error>> {
     assert!(bytes.starts_with(b"!<arch>\n"));
     let mut offset = 8;
     let mut members = Vec::new();
@@ -149,9 +152,12 @@ fn deb_has_ordered_members_metadata_executables_and_private_pending() -> Result<
     assert_linux_install_script(script);
     let data = tar_members(&ar[2].1)?;
     assert_eq!(data["usr/lib/lys/lys"].mode, 0o755);
-    assert!(data["usr/lib/lys/lys"].bytes == b"runner");
+    assert_eq!(data["usr/lib/lys/lys"].bytes, b"runner");
     assert_eq!(data["usr/lib/lys/lys-containment-entry"].mode, 0o755);
-    assert!(data["usr/lib/lys/lys-containment-entry"].bytes == b"containment");
+    assert_eq!(
+        data["usr/lib/lys/lys-containment-entry"].bytes,
+        b"containment"
+    );
     let saved = &data["usr/lib/lys/runner-pending.json"];
     assert_eq!(saved.mode, 0o600);
     let document: serde_json::Value = serde_json::from_slice(&saved.bytes)?;

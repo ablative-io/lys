@@ -93,10 +93,7 @@ pub(crate) fn accept(
 
 /// The outcome already held for this operation id when the same act is asked
 /// again; a held id naming another act is refused.
-fn replayed(
-    table: &Table,
-    operation: &Operation,
-) -> Result<Option<OperationOutcome>, RunnerError> {
+fn replayed(table: &Table, operation: &Operation) -> Result<Option<OperationOutcome>, RunnerError> {
     let Some(held) = table.operations.get(&operation.operation) else {
         return Ok(None);
     };

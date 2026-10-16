@@ -154,10 +154,11 @@ fn dialog(start: &str) -> Result<Command, RunnerError> {
                 "systemctl --user show-environment could not read the desktop environment",
             ));
         }
-        let environment = std::str::from_utf8(&desktop.stdout)
-            .map_err(|error| {
-                dialog_unavailable(&format!("the desktop environment is not valid UTF-8: {error}"))
-            })?;
+        let environment = std::str::from_utf8(&desktop.stdout).map_err(|error| {
+            dialog_unavailable(&format!(
+                "the desktop environment is not valid UTF-8: {error}"
+            ))
+        })?;
         let environment = desktop_environment(environment, |name| std::env::var(name).ok())?;
         for name in DESKTOP_VARIABLES {
             command.env_remove(name);

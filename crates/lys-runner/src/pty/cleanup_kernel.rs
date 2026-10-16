@@ -101,8 +101,13 @@ impl Operations for Kernel {
     ) -> Result<(), RunnerError> {
         let member = group(pid)?;
         let recorded = group(leader.pid)?;
-        if rustix::process::getsid(Some(member)).map_err(refused)? != recorded
-            || rustix::process::getpgid(Some(member)).map_err(refused)? != recorded
+        // A member the kernel has already taken out of its session and group
+        // is exiting; its exit is still observed and recorded. One the kernel
+        // places in another session or group is not this session's.
+        let elsewhere =
+            |placed: Option<rustix::process::Pid>| placed.is_some_and(|at| at != recorded);
+        if elsewhere(crate::process_group::session_of(member).map_err(refused)?)
+            || elsewhere(crate::process_group::group_of(member).map_err(refused)?)
         {
             return Err(RunnerError::refused(
                 "process_session_mismatch",
@@ -119,8 +124,18 @@ impl Operations for Kernel {
         let path = std::path::PathBuf::from(
             libproc::proc_pid::pidpath(group(pid)?.as_raw_nonzero().get()).map_err(refused)?,
         );
+        // An exited member not yet reaped has lost its executable link but
+        // keeps its command name until it is reaped; its exit is observed
+        // below as any member's is.
         #[cfg(target_os = "linux")]
-        let path = std::fs::read_link(format!("/proc/{pid}/exe")).map_err(refused)?;
+        let path = match std::fs::read_link(format!("/proc/{pid}/exe")) {
+            Ok(path) => path,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let name = std::fs::read_to_string(format!("/proc/{pid}/comm")).map_err(refused)?;
+                std::path::PathBuf::from(name.trim_end())
+            }
+            Err(error) => return Err(refused(error)),
+        };
         path.file_name()
             .and_then(std::ffi::OsStr::to_str)
             .map(str::to_owned)

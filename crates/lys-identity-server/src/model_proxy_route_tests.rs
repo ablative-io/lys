@@ -16,15 +16,26 @@ fn only_a_keyed_model_call_is_carried() {
     assert!(!super::keyed_call(&format!("/{KEY}/_lys/account/bind")));
     assert!(!super::keyed_call("/_lys/account/key"));
     assert!(!super::keyed_call("/api/me"));
-    assert!(!super::keyed_call("/0123456789ABCDEF0123456789ABCDEF/anthropic/v1/messages"));
+    assert!(!super::keyed_call(
+        "/0123456789ABCDEF0123456789ABCDEF/anthropic/v1/messages"
+    ));
 }
 
 #[test]
 fn the_dialled_address_is_the_public_origin_with_the_proxy_path() {
-    assert_eq!(super::path_of("http://127.0.0.1:8484/anthropic"), "/anthropic");
+    assert_eq!(
+        super::path_of("http://127.0.0.1:8484/anthropic"),
+        "/anthropic"
+    );
     assert_eq!(super::path_of("http://127.0.0.1:8484"), "");
-    assert_eq!(super::origin_of("http://127.0.0.1:8484/anthropic"), "http://127.0.0.1:8484");
-    let public = format!("https://lys.example{}", super::path_of("http://127.0.0.1:8484/anthropic"));
+    assert_eq!(
+        super::origin_of("http://127.0.0.1:8484/anthropic"),
+        "http://127.0.0.1:8484"
+    );
+    let public = format!(
+        "https://lys.example{}",
+        super::path_of("http://127.0.0.1:8484/anthropic")
+    );
     assert_eq!(
         lys_home::harness::rendering::keyed(&public, KEY).as_deref(),
         Some(format!("https://lys.example/{KEY}/anthropic").as_str())
@@ -121,7 +132,11 @@ async fn a_start_on_a_dialled_in_computer_is_given_the_public_proxy()
     network.name_runner(
         "near",
         Some(RunnerRecord::Socket {
-            path: dir.path().join("runner.sock").to_string_lossy().into_owned(),
+            path: dir
+                .path()
+                .join("runner.sock")
+                .to_string_lossy()
+                .into_owned(),
         }),
     )?;
     network.name_runner(

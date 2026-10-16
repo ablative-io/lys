@@ -251,7 +251,10 @@ async fn resumes(harness: &str, flag: &str) -> TestResult {
         );
         Ok::<(), Box<dyn Error>>(())
     }
-    .await;
+    .await
+    // Held as its words across the fixture's end below: a boxed error is
+    // not Send, and this future is.
+    .map_err(|error| error.to_string());
     task.abort();
     match task.await {
         Err(error) if error.is_cancelled() => {}
@@ -260,7 +263,7 @@ async fn resumes(harness: &str, flag: &str) -> TestResult {
         Ok(Ok(())) => return Err("the runner fixture stopped before cleanup".into()),
     }
     held.close()?;
-    result
+    Ok(result?)
 }
 
 #[tokio::test(flavor = "multi_thread")]

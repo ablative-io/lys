@@ -96,54 +96,96 @@ fn decision(path: &str, mut body: Value, approve: bool) -> (String, Value) {
     }
 }
 
-#[tokio::test]
-async fn personapp_decide_admits_its_persons_operator_and_product_drafts() -> Result {
-    let table = Table::app_fixture().await?;
-    let pass = table.pass("fixture_product", false, true)?;
-    let mut decisions = 0;
-    for product in [false, true] {
-        for approve in [false, true] {
-            let (path, body) = draft(&table, table.person, product)?;
-            let (path, body) = decision(&path, body, approve);
-            let (status, answer) = table.send("POST", &path, &pass, &body, &[]).await?;
-            assert_eq!(
-                status, 200,
-                "the own person's draft decision was refused: {answer}"
-            );
-            decisions += 1;
-        }
+/// Each decision, approve then refuse, on a fresh draft for `responsible`,
+/// sent with `pass`: the statuses and refusal names answered.
+async fn decide_both(
+    table: &Table,
+    pass: &str,
+    responsible: PersonId,
+    product: bool,
+) -> Result<Vec<(u16, Value)>> {
+    let mut answers = Vec::new();
+    for approve in [false, true] {
+        let (path, body) = draft(table, responsible, product)?;
+        let (path, body) = decision(&path, body, approve);
+        answers.push(table.send("POST", &path, pass, &body, &[]).await?);
     }
-    assert_eq!(decisions, 4);
-    Ok(())
+    Ok(answers)
 }
 
-async fn refuses_another_person(product: bool) -> Result {
-    let mut table = Table::app_fixture().await?;
-    let other = PersonId::from_str(&table.other_person()?)?;
-    table.administrator()?;
+#[tokio::test]
+async fn personapp_decide_admits_its_persons_operator_draft() -> Result {
+    let table = Table::app_fixture().await?;
     let pass = table.pass("fixture_product", false, true)?;
-    let mut refusals = 0;
-    for approve in [false, true] {
-        let (path, body) = draft(&table, other, product)?;
-        let (path, body) = decision(&path, body, approve);
-        let (status, answer) = table.send("POST", &path, &pass, &body, &[]).await?;
+    for (status, answer) in decide_both(&table, &pass, table.person, false).await? {
         assert_eq!(
-            status, 403,
-            "a person-app pass decided another person's draft: {answer}"
+            status, 200,
+            "the own person's draft decision was refused: {answer}"
         );
-        assert_eq!(answer["refusal"], "not_permitted");
-        refusals += 1;
     }
-    assert_eq!(refusals, 2);
     Ok(())
 }
 
 #[tokio::test]
 async fn personapp_decide_refuses_another_persons_operator_draft() -> Result {
-    refuses_another_person(false).await
+    let mut table = Table::app_fixture().await?;
+    let other = PersonId::from_str(&table.other_person()?)?;
+    table.administrator()?;
+    let pass = table.pass("fixture_product", false, true)?;
+    for (status, answer) in decide_both(&table, &pass, other, false).await? {
+        assert_eq!(
+            status, 403,
+            "a person-app pass decided another person's draft: {answer}"
+        );
+        assert_eq!(answer["refusal"], "not_permitted");
+    }
+    Ok(())
+}
+
+/// A product draft is decided by a person who may grant its action, never
+/// by the grant's responsible person: the pass decides as its own person
+/// under exactly those rules.
+#[tokio::test]
+async fn personapp_decide_admits_a_product_draft_its_person_may_grant() -> Result {
+    let mut table = Table::app_fixture().await?;
+    let other = PersonId::from_str(&table.other_person()?)?;
+    table.administrator()?;
+    let pass = table.pass("fixture_product", false, true)?;
+    for (status, answer) in decide_both(&table, &pass, other, true).await? {
+        assert_eq!(
+            status, 200,
+            "the administrator's pass could not decide: {answer}"
+        );
+    }
+    Ok(())
 }
 
 #[tokio::test]
-async fn personapp_decide_refuses_another_persons_product_draft() -> Result {
-    refuses_another_person(true).await
+async fn personapp_decide_refuses_its_persons_own_product_draft() -> Result {
+    let mut table = Table::app_fixture().await?;
+    table.administrator()?;
+    let pass = table.pass("fixture_product", false, true)?;
+    for (status, answer) in decide_both(&table, &pass, table.person, true).await? {
+        assert_eq!(
+            status, 403,
+            "a pass decided its own person's draft: {answer}"
+        );
+        assert_eq!(answer["refusal"], "product_draft_approver_refused");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn personapp_decide_refuses_a_product_draft_its_person_may_not_grant() -> Result {
+    let table = Table::app_fixture().await?;
+    let other = PersonId::from_str(&table.other_person()?)?;
+    let pass = table.pass("fixture_product", false, true)?;
+    for (status, answer) in decide_both(&table, &pass, other, true).await? {
+        assert_eq!(
+            status, 403,
+            "a pass decided a draft its person may not grant: {answer}"
+        );
+        assert_eq!(answer["refusal"], "product_draft_approver_refused");
+    }
+    Ok(())
 }

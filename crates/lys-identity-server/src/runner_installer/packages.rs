@@ -4,7 +4,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
@@ -130,12 +130,17 @@ fn tar_file(tar: &mut Vec<u8>, path: &str, bytes: &[u8], mode: u32) -> Result<()
     Ok(())
 }
 
-fn gzip_tar(mut tar: Zeroizing<Vec<u8>>) -> Result<Vec<u8>, ServerError> {
+fn gzip_tar(tar: Zeroizing<Vec<u8>>) -> Result<Vec<u8>, ServerError> {
+    gzip_into(tar, Vec::new())
+}
+
+/// The ended tar, gzipped into `into`; a writer that refuses is named.
+fn gzip_into<W: Write>(mut tar: Zeroizing<Vec<u8>>, into: W) -> Result<W, ServerError> {
     let ended = tar.len() + 1024;
     tar.resize(ended, 0);
     let mut gzip = flate2::GzBuilder::new()
         .mtime(0)
-        .write(Vec::new(), flate2::Compression::default());
+        .write(into, flate2::Compression::default());
     gzip.write_all(&tar)
         .map_err(|error| refused("installer_archive_failed", error))?;
     gzip.finish()
@@ -389,44 +394,6 @@ fn productbuild_command(root: &Path) -> Command {
     command
 }
 
-fn run_tool(mut command: Command, name: &str) -> Result<(), ServerError> {
-    let output = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|error| {
-            refused(
-                &format!("installer_{name}_unavailable"),
-                format!("the {name} package tool could not be started: {error}"),
-            )
-        })?;
-    if !output.status.success() {
-        // The tool's own last words say why; the connection code never reaches its arguments or output.
-        let said = String::from_utf8_lossy(&output.stderr);
-        let last: Vec<&str> = said
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .collect();
-        let tail = last[last.len().saturating_sub(3)..].join(" | ");
-        return Err(refused(
-            &format!("installer_{name}_failed"),
-            if tail.is_empty() {
-                format!(
-                    "the {name} package tool failed with {} and said nothing",
-                    output.status
-                )
-            } else {
-                format!(
-                    "the {name} package tool failed with {}: {tail}",
-                    output.status
-                )
-            },
-        ));
-    }
-    Ok(())
-}
-
 /// The Mac installer carries the Apple silicon build only: Apple stopped selling Intel Macs years ago (Tom, 15 Oct).
 pub(crate) fn macos_pkg(
     pending: &Pending,
@@ -455,25 +422,27 @@ pub(crate) fn macos_pkg(
         .prefix("lys-runner-package-")
         .tempdir()
         .map_err(|error| refused("installer_staging_failed", error))?;
-    let result = build_macos(directory.path(), &pending, [lys, entry], &version);
-    let cleanup = directory
-        .close()
-        .map_err(|error| refused("installer_cleanup_failed", error));
-    match (result, cleanup) {
-        (Ok(bytes), Ok(())) => Ok(bytes),
-        (Err(error), Ok(())) | (Ok(_), Err(error)) => Err(error),
-        (Err(build), Err(cleanup)) => Err(refused(
-            "installer_cleanup_failed",
-            format!("{build}; {cleanup}"),
-        )),
-    }
+    let result = build_macos(
+        directory.path(),
+        &pending,
+        [lys, entry],
+        &version,
+        |root, version| {
+            run_tool(pkgbuild_command(root, version), "pkgbuild")?;
+            run_tool(productbuild_command(root), "productbuild")
+        },
+    );
+    settled(result, directory.close())
 }
 
+/// Stages the Mac package under `root` and has `package` (pkgbuild then
+/// productbuild) write `root/lys.pkg`, which must be a flat xar installer.
 fn build_macos(
     root: &Path,
     pending: &[u8],
     binaries: [&Path; 2],
     version: &str,
+    package: impl FnOnce(&Path, &str) -> Result<(), ServerError>,
 ) -> Result<Vec<u8>, ServerError> {
     let payload = root.join("payload/Library/Application Support/Lys");
     for path in [root.join("scripts"), payload.clone()] {
@@ -500,8 +469,7 @@ fn build_macos(
         fs::set_permissions(output, fs::Permissions::from_mode(0o755))
             .map_err(|error| refused("installer_staging_failed", error))?;
     }
-    run_tool(pkgbuild_command(root, version), "pkgbuild")?;
-    run_tool(productbuild_command(root), "productbuild")?;
+    package(root, version)?;
     let bytes = fs::read(root.join("lys.pkg"))
         .map_err(|error| refused("installer_package_unreadable", error))?;
     if !bytes.starts_with(b"xar!") {
@@ -513,6 +481,14 @@ fn build_macos(
     Ok(bytes)
 }
 
+#[path = "packages_tools.rs"]
+mod tools;
+use tools::{run_tool, settled};
+
 #[cfg(test)]
 #[path = "packages_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "packages_refusals_tests.rs"]
+mod refusals_tests;

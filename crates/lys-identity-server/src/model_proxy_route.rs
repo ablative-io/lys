@@ -42,10 +42,7 @@ pub fn dialled(config: &Config) -> Result<Option<String>, ServerError> {
 ///
 /// # Errors
 /// Names a network store that cannot be read.
-pub fn for_machine<'a>(
-    state: &'a AppState,
-    machine: &str,
-) -> Result<Option<&'a str>, ServerError> {
+pub fn for_machine<'a>(state: &'a AppState, machine: &str) -> Result<Option<&'a str>, ServerError> {
     let dialled = matches!(
         crate::runner_sessions::machine_runner(state, machine)?,
         Some(RunnerRecord::Dialled { .. })

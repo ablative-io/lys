@@ -61,6 +61,7 @@ mod agent_tokens;
 mod bearer;
 mod person_app;
 pub(crate) use person_app::agent as app_person_agent;
+pub(crate) use person_app::refused as app_person_refused;
 mod client_auth;
 mod endpoints;
 mod exchange;

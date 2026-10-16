@@ -271,7 +271,14 @@ fn batch(
                             .checked_add(1)
                             .ok_or_else(|| std::io::Error::other("sync count overflows"))?;
                     }
-                    file.sync_data()
+                    // A pipe or device holds nothing to make durable: the
+                    // bytes are its reader's once written, and Linux refuses
+                    // to sync one (EINVAL). Every feed file is synced.
+                    if file.metadata()?.file_type().is_file() {
+                        file.sync_data()
+                    } else {
+                        Ok(())
+                    }
                 }),
             WriteKind::Replace(bytes) => {
                 #[cfg(test)]

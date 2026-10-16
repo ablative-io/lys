@@ -139,13 +139,13 @@ mod tests {
             .stdout(std::process::Stdio::null())
             .spawn()?;
         let pid = child.id();
-        let (begun, began) = std::sync::mpsc::channel();
+        let (start_sender, started) = std::sync::mpsc::channel();
         let (complete, completed) = std::sync::mpsc::channel();
         let watcher = std::thread::spawn(move || {
-            begun.send(()).map_err(|error| error.to_string())?;
+            start_sender.send(()).map_err(|error| error.to_string())?;
             complete.send(wait(pid)).map_err(|error| error.to_string())
         });
-        began.recv()?;
+        started.recv()?;
         assert!(matches!(
             completed.try_recv(),
             Err(std::sync::mpsc::TryRecvError::Empty)

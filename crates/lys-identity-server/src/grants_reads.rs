@@ -116,23 +116,34 @@ fn prepare_reach(
         .keys()
         .map(|(holder, resource, _)| (*holder, resource.clone()))
         .collect();
-    let (subject, resource, _) =
-        asked
-            .keys()
-            .next()
-            .ok_or_else(|| GrantError::PermissionEngineUnavailable {
-                reason: "the reach reading has no question for its frame".to_owned(),
-            })?;
+    let (subject, resource) = asked
+        .keys()
+        .next()
+        .map(|(subject, resource, _)| (*subject, resource.clone()))
+        .ok_or_else(|| GrantError::PermissionEngineUnavailable {
+            reason: "the reach reading has no question for its frame".to_owned(),
+        })?;
     let questions = asked.keys().cloned().collect();
     // Carried answers share the exported graph's certified snapshot in one bulk call.
-    let batch = engine
-        .read_batch(stamp.revision(), covered, &questions, at)
-        .inspect_err(|error| {
+    let batch = match engine.read_batch(stamp.revision(), covered, &questions, at) {
+        Ok(batch) => batch,
+        Err(error) => {
             *measured.reason.borrow_mut() = Some(error.to_string());
-        })?;
+            if stamp.degradation().is_none() {
+                return Err(error);
+            }
+            // The engine refused to take a committed change, so this settlement
+            // stands at an older revision. Judged grant by grant, a grant that
+            // change touched is named pending, which is what it is; the engine
+            // is named only if it cannot answer for the rest.
+            let mut prepared = preparation::from_batch(engine, stamp, asked, at, None)?;
+            prepared.reads_elapsed_ms = started.elapsed().as_millis();
+            return Ok(prepared);
+        }
+    };
     measured.batches.set(1);
     *measured.reason.borrow_mut() = None;
-    let mut prepared = whole_reach(stamp, batch, *subject, resource)?;
+    let mut prepared = whole_reach(stamp, batch, subject, &resource)?;
     prepared.reads_elapsed_ms = started.elapsed().as_millis();
     Ok(prepared)
 }

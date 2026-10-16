@@ -32,7 +32,7 @@ fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), B
         for worker in workers {
             worker
                 .join()
-                .map_err(|_| "native fixture panicked".to_owned())??;
+                .map_err(|panic| format!("native fixture panicked: {panic:?}"))??;
         }
         Ok(())
     });
@@ -79,7 +79,7 @@ fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), B
         for worker in workers {
             worker
                 .join()
-                .map_err(|_| "remote fixture panicked".to_owned())??;
+                .map_err(|panic| format!("remote fixture panicked: {panic:?}"))??;
         }
         Ok(())
     });
@@ -96,15 +96,19 @@ fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), B
     release.wait();
     let refusal = bridge
         .join()
-        .map_err(|_| "bridge panicked")?
+        .map_err(|panic| format!("bridge panicked: {panic:?}"))?
         .err()
         .ok_or("an admission refusal did not end the bridge")?;
     assert!(
         matches!(refusal, crate::RunnerError::Dial { .. }),
         "{refusal}"
     );
-    remote.join().map_err(|_| "remote fixture panicked")??;
-    native.join().map_err(|_| "native fixture panicked")??;
+    remote
+        .join()
+        .map_err(|panic| format!("remote fixture panicked: {panic:?}"))??;
+    native
+        .join()
+        .map_err(|panic| format!("native fixture panicked: {panic:?}"))??;
     dir.close()?;
     Ok(())
 }
@@ -185,6 +189,8 @@ fn a_lost_reply_connection_is_not_a_refusal_and_is_not_replayed() -> Result<(), 
         &finished,
         &disconnected,
     )?;
-    remote.join().map_err(|_| "reply fixture panicked")??;
+    remote
+        .join()
+        .map_err(|panic| format!("reply fixture panicked: {panic:?}"))??;
     Ok(())
 }

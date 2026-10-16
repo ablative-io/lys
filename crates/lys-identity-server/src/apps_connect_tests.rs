@@ -18,7 +18,7 @@ fn answer() -> Exchanged {
 fn apps_connect_code_is_single_use() -> Result<(), Box<dyn std::error::Error>> {
     let (code, digest) = new_secret()?;
     keep_code(digest, 1_000, answer())?;
-    let first = take(&code, 2_000)?.map_err(|refusal| refusal.to_owned())?;
+    let first = take(&code, 2_000)?.map_err(ToOwned::to_owned)?;
     assert_eq!(first.client_id, "connect_fixture");
     assert_eq!(take(&code, 3_000)?.err(), Some("connect_code_used"));
     assert_eq!(

@@ -342,6 +342,17 @@ pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, S
     Ok(actor)
 }
 
+/// Who decides a draft: the person's own session, or the person pass an
+/// approved app holds for them (Apollo's ASSIST-002 ask, for the haematite
+/// door's assistant). The pass decides only its own person's drafts; the
+/// flag says the actor came from one.
+pub(crate) fn decider(state: &AppState, headers: &HeaderMap) -> Result<(Actor, bool), ServerError> {
+    if let Some(actor) = crate::provider::app_person_actor(state, headers)? {
+        return Ok((actor, true));
+    }
+    Ok((personal(state, headers)?, false))
+}
+
 /// Whether `person` may decide `held`: they are its responsible person.
 pub(crate) fn decides(held: &DraftRecord, person: PersonId) -> bool {
     held.created.reviewer == IdentityId::Person(person)
@@ -349,7 +360,7 @@ pub(crate) fn decides(held: &DraftRecord, person: PersonId) -> bool {
 
 fn responsible(
     directory: &mut Directory<FileLeafStore>,
-    actor: &Actor,
+    (actor, by_app): (&Actor, bool),
     draft: OperationId,
 ) -> Result<IdentityId, ServerError> {
     let projection = directory.projection()?;
@@ -361,6 +372,9 @@ fn responsible(
                 draft: draft.to_string(),
             })?;
     if !decides(held, person) {
+        if by_app {
+            return Err(crate::provider::app_person_refused("draft"));
+        }
         return Err(ServerError::NotAdmitted {
             reason: "only the draft's responsible person may decide it",
         });
@@ -394,12 +408,12 @@ async fn approve(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    let actor = personal(&state, &headers)?;
+    let (actor, by_app) = decider(&state, &headers)?;
     let body: DraftApproveBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
     with_directory(&state, |directory| {
-        responsible(directory, &actor, draft)?;
+        responsible(directory, (&actor, by_app), draft)?;
         let event = DraftEvent::Approved(Arc::new(Approved {
             operation: OperationId::from_str(&body.operation)?,
             actor,
@@ -419,12 +433,12 @@ async fn refuse(
     Path(id): Path<String>,
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
-    let actor = personal(&state, &headers)?;
+    let (actor, by_app) = decider(&state, &headers)?;
     let body: DraftRefuseBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
     with_directory(&state, |directory| {
-        responsible(directory, &actor, draft)?;
+        responsible(directory, (&actor, by_app), draft)?;
         let event = DraftEvent::Refused(Arc::new(Refused {
             operation: OperationId::from_str(&body.operation)?,
             actor,
@@ -449,7 +463,7 @@ async fn correct(
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
     with_directory(&state, |directory| {
-        let reviewer = responsible(directory, &actor, draft)?;
+        let reviewer = responsible(directory, (&actor, false), draft)?;
         let at = crate::session::now();
         let corrected = Arc::new(creation(
             body.replacement,
