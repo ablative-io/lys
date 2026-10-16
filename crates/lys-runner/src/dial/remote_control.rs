@@ -24,11 +24,14 @@ pub(super) struct Remote {
 }
 
 impl Remote {
-    pub(super) fn open(dial: &Dial, stopping: &super::Stopping) -> Result<Self, RunnerError> {
-        let control = Arc::new(dial.signer()?);
+    pub(super) fn open(
+        dial: &Dial,
+        stopping: &super::Stopping,
+        probe: &Signer,
+    ) -> Result<(Self, String), RunnerError> {
         let (epoch, supported) = stopping.ready(
             || {
-                let response = control.channel.send("GET", EPOCH_ROUTE, &[], b"")?;
+                let response = probe.channel.send("GET", EPOCH_ROUTE, &[], b"")?;
                 let supported = response.header("x-lys-runner-control") == Some("v1");
                 let epoch =
                     String::from_utf8(response.body).map_err(|error| failed(error.to_string()))?;
@@ -40,14 +43,19 @@ impl Remote {
             crate::error::said(
                 "runner_control_unsupported: this Lys build offers no remote Reconnect control; lys runner reconnect remains available on this computer",
             );
-            return Ok(Self {
-                control: None,
-                reporter: None,
-                retry: Arc::clone(&stopping.retry),
-                worker: None,
-            });
+            return Ok((
+                Self {
+                    control: None,
+                    reporter: None,
+                    retry: Arc::clone(&stopping.retry),
+                    worker: None,
+                },
+                epoch,
+            ));
         }
+        let control = Arc::new(dial.signer()?);
         let reporter = Arc::new(dial.signer()?);
+        let listening_epoch = epoch.clone();
         let (held, reports, retry) = (
             Arc::clone(&control),
             Arc::clone(&reporter),
@@ -56,19 +64,22 @@ impl Remote {
         let worker = std::thread::Builder::new()
             .name("runner-remote-reconnect".to_owned())
             .spawn(move || {
-                let outcome = listen(&held, &reports, &retry, epoch);
+                let outcome = listen(&held, &reports, &retry, listening_epoch);
                 if let Err(error) = &outcome {
                     crate::error::said(&format!("runner_remote_control_ended: {error}"));
                 }
                 outcome
             })
             .map_err(|error| failed(format!("runner_control_start_failed: {error}")))?;
-        Ok(Self {
-            control: Some(control),
-            reporter: Some(reporter),
-            retry: Arc::clone(&stopping.retry),
-            worker: Some(worker),
-        })
+        Ok((
+            Self {
+                control: Some(control),
+                reporter: Some(reporter),
+                retry: Arc::clone(&stopping.retry),
+                worker: Some(worker),
+            },
+            epoch,
+        ))
     }
 
     pub(super) fn reporter(&self) -> Option<Arc<Signer>> {

@@ -171,6 +171,7 @@ pub mod mcp_requests_store;
 pub mod memory_api;
 pub mod message_edges;
 pub mod model_account_start;
+pub mod model_proxy_route;
 pub mod network_api;
 pub mod network_join;
 mod network_machines;

@@ -75,6 +75,7 @@ struct Stopping {
 struct Lane {
     outbox: Arc<Outbox>,
     signer: Arc<Signer>,
+    initial_epoch: Option<String>,
     local: Arc<Mutex<BTreeMap<String, crate::client::Closer>>>,
 }
 
@@ -109,10 +110,11 @@ fn stop(lanes: &[Lane], stopping: &Stopping) {
 
 pub(super) fn run(dial: &Dial) -> Result<(), RunnerError> {
     let outbox = Arc::new(Outbox::open(&dial.socket)?);
-    let lanes = lanes(dial, &outbox)?;
+    let mut lanes = lanes(dial, &outbox)?;
     let mut stopping = Stopping::default();
     let control = control::Control::open(&dial.socket, Arc::clone(&stopping.retry))?;
-    let remote = remote_control::Remote::open(dial, &stopping)?;
+    let (remote, initial_epoch) = remote_control::Remote::open(dial, &stopping, &lanes[0].signer)?;
+    lanes[0].initial_epoch = Some(initial_epoch);
     stopping.reporter = remote.reporter();
     let disconnected = Arc::new(AtomicBool::new(false));
     let finished_reply = Arc::new(AtomicBool::new(false));
@@ -197,11 +199,13 @@ fn lanes(dial: &Dial, outbox: &Arc<Outbox>) -> Result<[Lane; 2], RunnerError> {
         Lane {
             outbox: Arc::clone(outbox),
             signer: Arc::new(dial.signer()?),
+            initial_epoch: None,
             local: Arc::default(),
         },
         Lane {
             outbox: Arc::clone(outbox),
             signer: Arc::new(dial.signer()?),
+            initial_epoch: None,
             local: Arc::default(),
         },
     ])
@@ -224,7 +228,10 @@ fn poll(
             signer.epoch()
         }
     };
-    let mut current = stopping.ready(epoch, disconnected)?;
+    let mut current = match &lane.initial_epoch {
+        Some(accepted) => accepted.clone(),
+        None => stopping.ready(epoch, disconnected)?,
+    };
     flush_replies(signer, &current, &lane.outbox, finished_reply, disconnected)?;
     loop {
         if stopping.state.load(Ordering::Acquire) {

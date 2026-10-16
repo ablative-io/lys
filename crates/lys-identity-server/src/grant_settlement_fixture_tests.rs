@@ -316,6 +316,7 @@ impl Table {
             password_policy: None,
             model_proxy: None,
             proxy_dir: None,
+            dialled_model_proxy: None,
             sessions: crate::session::Sessions::new(300, false),
             admission: crate::admission::Admission::new(
                 Some(administrator),

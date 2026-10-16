@@ -124,3 +124,6 @@ mod refusals;
 
 #[path = "personapp_start_tests.rs"]
 mod personapp_start_tests;
+
+#[path = "personapp_decide_tests.rs"]
+mod personapp_decide_tests;
