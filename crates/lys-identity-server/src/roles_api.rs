@@ -202,7 +202,10 @@ fn said(state: &AppState, body: &VersionBody) -> Result<Words, ServerError> {
     for template in &body.grant_templates {
         let resource = Resource::new(&template.resource.kind, &template.resource.id)?;
         let relation = Relation::new(&template.relation)?;
-        state.grant_setup.model()?.actions(&relation)?;
+        state
+            .grant_setup
+            .model()?
+            .actions_on(resource.kind(), &relation)?;
         if template.days == Some(0) {
             return Err(malformed(
                 "a template's days is 1 or more, or null for no end of its own",

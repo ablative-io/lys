@@ -135,7 +135,10 @@ impl Weighed {
         let seeker = identity_id(&asked.asked_by)?;
         let resource = Resource::new(&asked.resource_kind, &asked.resource_id)?;
         let relation = Relation::new(&asked.relation)?;
-        let needed = judged.grants.model().actions(&relation)?;
+        let needed = judged
+            .grants
+            .model()
+            .actions_on(resource.kind(), &relation)?;
         let kind = RecipientKind::of(seeker);
         let book = judged.grants.book();
         let mut approvers = Vec::new();
@@ -193,7 +196,10 @@ impl Weighed {
         let summary = |person: PersonId| {
             person_record(judged.directory, person).map(|record| person_summary(person, record))
         };
-        let actions = judged.grants.model().actions(&self.relation)?;
+        let actions = judged
+            .grants
+            .model()
+            .actions_on(self.resource.kind(), &self.relation)?;
         Ok(RequestView {
             id: asked.id.clone(),
             asked_by: asked.asked_by.clone(),

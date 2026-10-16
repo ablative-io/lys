@@ -19,6 +19,7 @@ fn prepare_stores(
     origin: &str,
     key_file: &std::path::Path,
     apps: &std::path::Path,
+    registered: &[&str],
 ) -> TestResult {
     let key = std::sync::Arc::new(lys_identity::signer::load_service_key(key_file)?);
     if !log.exists() {
@@ -36,7 +37,10 @@ fn prepare_stores(
         &log.with_file_name("launch-records"),
         lys_identity::signer::load_service_key(key_file)?,
     )?;
-    let apps = crate::apps_store::AppStore::open(apps, key)?;
+    let mut apps = crate::apps_store::AppStore::open(apps, key)?;
+    for app in registered {
+        requests_app_kind_tests::register(&mut apps, app)?;
+    }
     if let Some(reason) = [
         acts.snapshot_failure(),
         launches.snapshot_failure(),
@@ -53,6 +57,15 @@ fn prepare_stores(
 }
 
 async fn fixture() -> TestResult<(Service, String, String, String, String)> {
+    fixture_with(&[]).await
+}
+
+/// The fixture with `apps` registered and approved before the service starts,
+/// so their kinds are in the grant model it boots with; with apps named the
+/// role store is kept too, for the role templates that name those kinds.
+async fn fixture_with(
+    apps: &'static [&'static str],
+) -> TestResult<(Service, String, String, String, String)> {
     let (service, (pass, cookie, person, agent)) = Service::start_adjusted(
         PASS_MODEL,
         None,
@@ -61,7 +74,9 @@ async fn fixture() -> TestResult<(Service, String, String, String, String)> {
         |config| {
             config.certificates_dir = None;
             config.network_file = None;
-            config.roles_file = None;
+            if apps.is_empty() {
+                config.roles_file = None;
+            }
             config.provisioning_file = None;
             config.homes_dir = None;
             config.runtime_dir = Some(config.log_dir.with_file_name("runtime"));
@@ -79,6 +94,7 @@ async fn fixture() -> TestResult<(Service, String, String, String, String)> {
                 &config.log_origin,
                 &config.event_key_file,
                 &config.apps_dir(),
+                apps,
             )?;
             let log_dir = config.log_dir.clone();
             if !log_dir.exists() {
@@ -466,6 +482,7 @@ async fn an_unknown_kept_route_refuses_service_startup() -> TestResult {
                 &config.log_origin,
                 &config.event_key_file,
                 &config.apps_dir(),
+                &[],
             )?;
             std::fs::write(
                 config.log_dir.with_file_name("kept-responsibilities.json"),
@@ -481,3 +498,6 @@ async fn an_unknown_kept_route_refuses_service_startup() -> TestResult {
     assert!(error.to_string().contains("unknown kept route"), "{error}");
     Ok(())
 }
+
+#[path = "requests_app_kind_tests.rs"]
+mod requests_app_kind_tests;
