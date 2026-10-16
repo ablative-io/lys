@@ -177,7 +177,7 @@ pub(crate) async fn apply(
                 receipt_index,
             } => DraftEvent::Executed(Arc::new(Executed {
                 operation,
-                actor: actor.clone(),
+                actor,
                 recorded_at,
                 draft,
                 draft_hash,

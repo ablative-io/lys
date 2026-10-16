@@ -23,6 +23,9 @@ async fn finishing_page_carries_one_address_and_no_script_or_redirect() -> Resul
             assert_eq!(response.headers()["x-frame-options"], "DENY");
             let csp = response.headers()["content-security-policy"].to_str()?;
             assert!(!csp.contains("script-src"));
+            if native {
+                assert_eq!(csp, "default-src 'none'; form-action 'self'");
+            }
             let body = String::from_utf8(
                 axum::body::to_bytes(response.into_body(), usize::MAX)
                     .await?

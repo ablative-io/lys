@@ -108,9 +108,10 @@ impl<S: LeafStore> Directory<S> {
         let agent = draft.drafted_by.ok_or(IdentityError::ChangeMismatch {
             reason: "a draft call needs its author",
         })?;
+        let application = draft.application;
         self.commit_change(
-            actor.clone(),
-            draft.application,
+            actor,
+            application,
             IdentityId::Agent(agent),
             Change::AgentCall(call),
             recorded_at,

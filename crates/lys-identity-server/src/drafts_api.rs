@@ -388,7 +388,7 @@ async fn approve(
         } else {
             DraftEvent::Approved(Arc::new(Approved {
                 operation,
-                actor: actor.clone(),
+                actor,
                 recorded_at: crate::session::now(),
                 draft,
                 draft_hash: hash,

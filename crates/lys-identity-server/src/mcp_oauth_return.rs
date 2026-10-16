@@ -1,5 +1,5 @@
 //! The finishing address stays on the consent answer until its client takes it.
-use super::{Apps, Asking, escaped, held, malformed};
+use super::{Apps, Asking, escaped, malformed};
 use crate::ServerError;
 use axum::extract::{ConnectInfo, Extension};
 use axum::http::{HeaderMap, header};
@@ -43,15 +43,7 @@ pub(super) fn finish(
     expires_at: Option<u64>,
 ) -> Result<Response, ServerError> {
     let native = asking.client_id == super::native::CLIENT;
-    let (name, client_host) = if native {
-        ("lys-cli".to_owned(), asking.client_host)
-    } else {
-        let store = held(&apps.store)?;
-        let app = store
-            .app(&asking.client_id)
-            .ok_or_else(|| malformed("the registered client is no longer held"))?;
-        (app.name.clone(), app.client_host)
-    };
+    let (name, client_host) = super::native::finishing_client(apps, asking)?;
     let same_host = client_host == Some(browser);
     elsewhere(&name, same_host);
     page(Return {
@@ -90,7 +82,12 @@ pub(super) fn page(given: Return<'_>) -> Result<Response, ServerError> {
     } else {
         "When this browser is on another computer, give this address to the Claude Code session that started the sign-in. Its complete_authentication tool asks for the URL from the page the sign-in opened. Keep it out of chat.".to_owned()
     };
+    let policy = if given.native {
+        "default-src 'none'; form-action 'self'"
+    } else {
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https: http:"
+    };
     Ok(([(header::CACHE_CONTROL,"no-store"),(header::X_FRAME_OPTIONS,"DENY"),
-        (header::CONTENT_SECURITY_POLICY,"default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https: http:")],
+        (header::CONTENT_SECURITY_POLICY,policy)],
         Html(format!("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">{refresh}<title>Finish sign-in</title></head><body><h1>Finish sign-in</h1>{field}<p><a href=\"{address}\">Return to {name}</a></p><p>{instructions}</p></body></html>"))).into_response())
 }

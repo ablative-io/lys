@@ -106,6 +106,20 @@ pub(super) fn known(apps: &super::Apps, client: &str, uri: &str) -> Result<Strin
     Ok(app.name.clone())
 }
 
+pub(super) fn finishing_client(
+    apps: &super::Apps,
+    asking: &super::Asking,
+) -> Result<(String, Option<std::net::IpAddr>), ServerError> {
+    if asking.client_id == CLIENT {
+        return Ok((CLIENT.to_owned(), asking.client_host));
+    }
+    let store = held(&apps.store)?;
+    let app = store
+        .app(&asking.client_id)
+        .ok_or_else(|| super::malformed("the registered client is no longer held"))?;
+    Ok((app.name.clone(), app.client_host))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
