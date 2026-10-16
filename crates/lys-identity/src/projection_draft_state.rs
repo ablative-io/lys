@@ -111,31 +111,7 @@ pub(in crate::projection) fn decode(
             }
         }
         if let Some(closing) = read_nullable(closing) {
-            let [value, index] = tuple::<2>(closing, "a draft closing event")?;
-            let (event, _) = event(value)?;
-            let index = read_uint(&index, "a closing position")?;
-            let (approved, approved_index) = record
-                .approved
-                .as_ref()
-                .ok_or("an execution has no approval")?;
-            let application = approved.application;
-            if index <= *approved_index {
-                return Err("an execution precedes its approval".to_owned());
-            }
-            if event.decision() != Some((record.created.operation, hash))
-                || projection.operation(event.operation()) != Some(index)
-            {
-                return Err("an execution disagrees with its draft".to_owned());
-            }
-            match event {
-                DraftEvent::Executed(e) if e.application == application => {
-                    record.executed = Some((e, index))
-                }
-                DraftEvent::RefusedOnExecution(e) if e.application == application => {
-                    record.refused_on_execution = Some((e, index))
-                }
-                _ => return Err("a closing event disagrees with its approval".to_owned()),
-            }
+            read_close(projection, &mut record, closing)?;
         }
         if Arc::make_mut(&mut projection.drafts)
             .insert(record.created.operation, Arc::new(record))
@@ -168,6 +144,39 @@ pub(in crate::projection) fn decode(
                 return Err("a replacement has no corresponding correction".to_owned());
             }
         }
+    }
+    Ok(())
+}
+
+fn read_close(
+    projection: &Projection,
+    record: &mut DraftRecord,
+    closing: Value,
+) -> Result<(), Unreadable> {
+    let [value, index] = tuple::<2>(closing, "a draft closing event")?;
+    let (event, _) = event(value)?;
+    let index = read_uint(&index, "a closing position")?;
+    let (approved, approved_index) = record
+        .approved
+        .as_ref()
+        .ok_or("an execution has no approval")?;
+    let application = approved.application;
+    if index <= *approved_index {
+        return Err("an execution precedes its approval".to_owned());
+    }
+    if event.decision() != Some((record.created.operation, record.hash))
+        || projection.operation(event.operation()) != Some(index)
+    {
+        return Err("an execution disagrees with its draft".to_owned());
+    }
+    match event {
+        DraftEvent::Executed(e) if e.application == application => {
+            record.executed = Some((e, index));
+        }
+        DraftEvent::RefusedOnExecution(e) if e.application == application => {
+            record.refused_on_execution = Some((e, index));
+        }
+        _ => return Err("a closing event disagrees with its approval".to_owned()),
     }
     Ok(())
 }

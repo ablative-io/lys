@@ -150,7 +150,7 @@ impl Provenance {
 pub struct Actor {
     binding: LoginBinding,
     provenance: Provenance,
-    draft: Option<DraftProvenance>,
+    draft: Option<Box<DraftProvenance>>,
 }
 
 /// The prepared act's origin, separate from the approver's authentication.
@@ -168,13 +168,13 @@ impl Actor {
     /// Attach the approved act's origin without changing authentication.
     #[must_use]
     pub fn with_draft(mut self, draft: DraftProvenance) -> Self {
-        self.draft = Some(draft);
+        self.draft = Some(Box::new(draft));
         self
     }
     /// The prepared act carried by this authenticated person.
     #[must_use]
     pub fn draft(&self) -> Option<&DraftProvenance> {
-        self.draft.as_ref()
+        self.draft.as_deref()
     }
 
     /// The human named by `binding`, one of their logins, authenticated as

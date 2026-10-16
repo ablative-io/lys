@@ -55,7 +55,8 @@ pub(super) fn read(value: Value) -> Result<DraftEvent, IdentityError> {
     let draft = operation_from(draft)?;
     let draft_hash = as_bytes(hash, "a draft hash is bytes")?
         .try_into()
-        .map_err(|_| malformed("a draft hash is 32 bytes"))?;
+        .ok()
+        .ok_or_else(|| malformed("a draft hash is 32 bytes"))?;
     let application = operation_from(application)?;
     match as_uint(&kind, "a close kind is unsigned")? {
         4 => Ok(DraftEvent::Executed(Arc::new(Executed {
@@ -66,7 +67,8 @@ pub(super) fn read(value: Value) -> Result<DraftEvent, IdentityError> {
             draft_hash,
             application,
             status: u16::try_from(as_uint(&one, "an answered status is unsigned")?)
-                .map_err(|_| malformed("an answered status is u16"))?,
+                .ok()
+                .ok_or_else(|| malformed("an answered status is u16"))?,
             receipt_index: as_uint(&two, "a receipt index is unsigned")?,
         }))),
         5 => Ok(DraftEvent::RefusedOnExecution(Arc::new(

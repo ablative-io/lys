@@ -107,7 +107,8 @@ pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, Identity
         };
         let [draft, application, agent]: [Value; 3] = parts
             .try_into()
-            .map_err(|_| malformed("draft provenance has three fields"))?;
+            .ok()
+            .ok_or_else(|| malformed("draft provenance has three fields"))?;
         let origin = crate::provenance::DraftProvenance {
             draft: as_text(draft, "a draft id is text")?.parse()?,
             application: as_text(application, "an application id is text")?.parse()?,

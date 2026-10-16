@@ -16,7 +16,8 @@ pub(super) fn address(
         .0
         .0
         .ip();
-    crate::sign_in_address::resolve(peer, headers, &apps.trusted).map(IpAddr::to_canonical)
+    crate::sign_in_address::resolve(peer, headers, &apps.trusted)
+        .map(|address| address.to_canonical())
 }
 
 pub(super) struct Return<'a> {

@@ -18,7 +18,7 @@ pub const FILE: &str = "seat-program.json";
 /// The reviewed model protocol, shared with native account routing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelWire {
-    /// The OpenAI Responses protocol.
+    /// The `OpenAI` Responses protocol.
     #[serde(rename = "openai-responses")]
     OpenaiResponses,
     /// The Anthropic Messages protocol.
@@ -95,8 +95,8 @@ impl TryFrom<Value> for SeatProgram {
             seat_file_sha256: text("seat_file_sha256")?,
             adapter: text("adapter")?,
             model_wire: object.get("model_wire").map(|value| {
-                serde_json::from_value(value.clone()).map_err(|_| {
-                    "seat_program.model_wire: expected openai-responses or anthropic-messages".to_owned()
+                serde_json::from_value(value.clone()).map_err(|error| {
+                    format!("seat_program.model_wire: expected openai-responses or anthropic-messages: {error}")
                 })
             }).transpose()?,
         };
