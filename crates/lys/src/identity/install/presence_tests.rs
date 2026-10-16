@@ -77,8 +77,8 @@ fn linux_present_operator_produces_first_run_and_recovery_codes()
 }
 
 #[test]
-fn linux_absent_operator_refuses_without_replacing_a_code()
--> Result<(), Box<dyn std::error::Error>> {
+fn linux_absent_operator_refuses_without_replacing_a_code() -> Result<(), Box<dyn std::error::Error>>
+{
     let root = tempfile::tempdir()?;
     let layout = Layout::at(root.path().to_path_buf());
     std::fs::write(layout.deployment_config(), render_deployment(None))?;

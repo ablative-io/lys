@@ -1323,6 +1323,12 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/warn_lines.rs` | the subscriber installed as main installs it, a warn from another thread said, a second install refused by name | DIRECTORY-095 |
 | `docs/design/directory/briefs/DIRECTORY-095.json` | the brief | DIRECTORY-095 |
 | `docs/design/directory/briefs/DIRECTORY-095.md` | rendered markdown | DIRECTORY-095 |
+| `crates/lys-identity-server/src/mcp_oauth_return.rs` | The consent decision's return page: the finishing address, the Return link, the finish-elsewhere words, the refresh only where the client lives. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/mcp_oauth_return_tests.rs` | Return page tests: 200 not 303, same address twice, no script, refresh by address equality, remaining time, the elsewhere warn line. | DIRECTORY-096 |
+| `crates/lys/src/commands/sign_in/finish.rs` | lys sign-in --finish: a pasted finishing address handed to the waiting loopback receiver on the client's computer. | DIRECTORY-096 |
+| `crates/lys/src/commands/sign_in/finish_tests.rs` | Finish tests: address refusals by name, the fixture receiver round trip, the receiver's refusal names reported. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/mcp_oauth_native.rs` | The built-in native client lys-cli and its authorize address. | DIRECTORY-096 |
+| `crates/lys/src/commands/sign_in.rs` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 
 ## Inventory
 

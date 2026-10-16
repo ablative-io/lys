@@ -579,3 +579,11 @@
 ## The identity server's warnings reach its log (DIRECTORY-095)
 
 - [x] **C733** — lys-identity-server installs one tracing subscriber at start that says every WARN and ERROR event, with its target and fields, through the say sink into identity.log; info and below are off (DIRECTORY-095 R1).
+
+## A sign-in finished on another computer (DIRECTORY-096)
+
+- [ ] **C734** — Every consent decision answers 200 text/html from mcp_oauth_return.rs with the finishing address once in a readonly field and once in a Return link, under the consent screen's headers and with no script; back_to and its 303 are gone (DIRECTORY-096 R1).
+- [ ] **C735** — Registration records the client's connecting address (the peer, or the forwarded client address only under the configured reverse-proxy rule), the consent decision compares the browser's host with it, and the page carries a meta refresh to the finishing address only when they are equal; lys-cli compares against its authorize request's address (DIRECTORY-096 R2).
+- [ ] **C736** — lys sign-in --finish <address> refuses by name any address that is not http, loopback, ported and /lys/sign-in with a query, then makes one GET to the waiting receiver and reports its outcome; no second callback parser exists (DIRECTORY-096 R3).
+- [ ] **C737** — The return page states that the address works once and until the code's expiry, the remaining time derived from the pending code's expires_at at render, with no new constant (DIRECTORY-096 R4).
+- [ ] **C738** — A consent whose browser host differs from the client's writes one warn line naming the client and the word elsewhere, carrying no code, state, address or host; a same-host consent writes none (DIRECTORY-096 R4).

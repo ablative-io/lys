@@ -138,6 +138,8 @@
 
 **S264.** As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start.
 
+**S419.** As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
 ## Directory administrator — Resolves a refused act
 
 **S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
@@ -281,6 +283,8 @@
 **S269.** As a person whose records an assistant reads through Lys, I want every token to work only where it was meant and every read to be recorded, so that I can see who read what and nothing reaches a server it was not meant for.
 
 **S270.** As a person whose agent talks to many servers, I want what my agent signs for one server to be useless at Lys, so that no server it talks to can act or read as my agent.
+
+**S418.** As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
 
 ## Person running a team of agents — Starts, watches, talks to and stops agents from Lys
 
