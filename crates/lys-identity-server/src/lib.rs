@@ -356,3 +356,6 @@ mod mcp_test_answer;
 mod model_account_wire_tests;
 #[cfg(test)]
 mod seat_program_review_tests;
+
+#[cfg(test)]
+mod drafts_apply_tests;

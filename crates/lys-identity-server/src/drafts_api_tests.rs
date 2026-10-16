@@ -19,12 +19,12 @@ use serde_json::{Value, json};
 type Failure = Box<dyn Error>;
 type Result<T = ()> = std::result::Result<T, Failure>;
 
-struct Table {
-    service: Service,
-    agent: String,
-    person: String,
-    owner: String,
-    other: String,
+pub(super) struct Table {
+    pub(super) service: Service,
+    pub(super) agent: String,
+    pub(super) person: String,
+    pub(super) owner: String,
+    pub(super) other: String,
     key: Arc<Ed25519Identity>,
 }
 
@@ -33,7 +33,7 @@ fn operation() -> Result<String> {
 }
 
 impl Table {
-    async fn start() -> Result<Self> {
+    pub(super) async fn start() -> Result<Self> {
         let (service, (agent, person, key, owner, other)) = Service::start_adjusted(
             GRANT_MODEL,
             None,
@@ -163,7 +163,7 @@ impl Table {
         })
     }
 
-    fn body(&self, draft: OperationId) -> Value {
+    pub(super) fn body(&self, draft: OperationId) -> Value {
         json!({
             "operation": draft.to_string(),
             "target": {"kind": "person", "id": self.person, "action": "write"},
@@ -174,7 +174,7 @@ impl Table {
         })
     }
 
-    fn header(&self, body: &[u8]) -> Result<(String, Vec<u8>)> {
+    pub(super) fn header(&self, body: &[u8]) -> Result<(String, Vec<u8>)> {
         let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
         let nonce = crate::routes::hex(OperationId::generate()?.as_bytes()).to_uppercase();
         let payload = crate::agent_signature::payload("POST", "/drafts", body, at, &nonce);
@@ -189,7 +189,7 @@ impl Table {
         ))
     }
 
-    async fn create(&self) -> Result<(OperationId, Vec<u8>, String, Value)> {
+    pub(super) async fn create(&self) -> Result<(OperationId, Vec<u8>, String, Value)> {
         let draft = OperationId::generate()?;
         let body = self.body(draft).to_string().into_bytes();
         let (header, _) = self.header(&body)?;
@@ -205,7 +205,7 @@ impl Table {
         Ok((draft, body, header, answer))
     }
 
-    fn directory(&self) -> Result<Directory<FileLeafStore>> {
+    pub(super) fn directory(&self) -> Result<Directory<FileLeafStore>> {
         let path = self.service.dir.path().join("log");
         Ok(Directory::open(
             Box::new(move || FileLeafStore::open(&path)),

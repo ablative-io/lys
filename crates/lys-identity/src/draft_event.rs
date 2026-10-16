@@ -376,3 +376,7 @@ impl RequestSignature {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path="draft_event_close_tests.rs"]
+mod close_tests;
