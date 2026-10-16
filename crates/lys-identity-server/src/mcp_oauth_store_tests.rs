@@ -140,7 +140,7 @@ fn person_connection_upgrade_preserves_agent_only_legacy_tokens()
     assert_eq!(store.connection("client", "person"), Some("agent"));
     let migrated: Value = serde_json::from_slice(&std::fs::read(&path)?)?;
     assert_eq!(
-        migrated["format"], 2,
+        migrated["format"], 3,
         "legacy connected-app store was not migrated"
     );
     assert!(

@@ -72,3 +72,20 @@ fn elsewhere_warning_names_only_the_client_once() -> Result<(), Box<dyn Error>> 
     for secret in ["code=","state=","http:","127.0.0.1","host="] { assert!(!lines[0].contains(secret)); }
     Ok(())
 }
+
+#[tokio::test]
+async fn forwarded_hosts_are_compared_only_from_a_configured_proxy() -> Result<(),Box<dyn Error>> {
+    for trusted in [false,true] {
+        let (service,cookie)=super::tests::service_with_trusted(if trusted {vec!["127.0.0.1".parse()?]} else {Vec::new()}).await?;
+        let client=reqwest::Client::builder().no_proxy().redirect(reqwest::redirect::Policy::none()).build()?;
+        let app:serde_json::Value=client.post(format!("{}/oauth/mcp/register",service.base)).header("x-forwarded-for","192.0.2.1").json(&serde_json::json!({"client_name":"App","redirect_uris":["https://app.test/back"]})).send().await?.json().await?;
+        for host in ["192.0.2.1","192.0.2.2"] {
+            let page=client.get(format!("{}/oauth/mcp/authorize",service.base)).header("cookie",&cookie).query(&[("client_id",app["client_id"].as_str().ok_or("client absent")?),("redirect_uri","https://app.test/back"),("response_type","code"),("code_challenge",&"a".repeat(43)),("code_challenge_method","S256")]).send().await?.text().await?;
+            let asking=page.split("name=\"asking\" value=\"").nth(1).and_then(|s|s.split('"').next()).ok_or("asking absent")?;
+            let answer=client.post(format!("{}/oauth/mcp/consent",service.base)).header("cookie",&cookie).header("x-forwarded-for",host).form(&[("asking",asking),("decision","approve")]).send().await?;
+            assert_eq!(answer.status(),200);
+            assert_eq!(answer.text().await?.contains("http-equiv=\"refresh\""),!trusted || host=="192.0.2.1");
+        }
+    }
+    Ok(())
+}

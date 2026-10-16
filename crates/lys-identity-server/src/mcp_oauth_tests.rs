@@ -19,10 +19,14 @@ const REDIRECT: &str = "https://app.example/callback";
 const VERIFIER: &str = "a-verifier-of-at-least-forty-three-characters-long";
 
 pub(super) async fn service() -> Result<(Service, String), Box<dyn Error>> {
+    service_with_trusted(Vec::new()).await
+}
+
+pub(super) async fn service_with_trusted(trusted:Vec<std::net::IpAddr>) -> Result<(Service,String),Box<dyn Error>> {
     use lys_identity::{
         Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance,
     };
-    let (service, ()) = Service::start_with(|config| {
+    let (service, ()) = Service::start_adjusted(identity_contract::harness::GRANT_MODEL,None,None,None,move |config| {config.trusted_proxies=trusted;}, |config| {
         lys_log_store::FileLeafStore::create(&config.log_dir, &config.log_origin)?;
         let path = config.log_dir.clone();
         let key = lys_identity::signer::load_service_key(&config.event_key_file)?;

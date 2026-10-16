@@ -12,7 +12,6 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -343,29 +342,9 @@ pub(crate) fn challenged(router: Router, metadata: String) -> Router {
     ))
 }
 
-async fn resource(State(apps): State<Arc<Apps>>) -> Json<serde_json::Value> {
-    Json(json!({
-        "resource": apps.resource,
-        "authorization_servers": [apps.origin],
-        "bearer_methods_supported": ["header"],
-        "resource_name": "Lys",
-    }))
-}
-
-async fn server(State(apps): State<Arc<Apps>>) -> Json<serde_json::Value> {
-    let origin = &apps.origin;
-    Json(json!({
-        "issuer": origin,
-        "authorization_endpoint": format!("{origin}/oauth/mcp/authorize"),
-        "token_endpoint": format!("{origin}/oauth/mcp/token"),
-        "registration_endpoint": format!("{origin}/oauth/mcp/register"),
-        "response_types_supported": ["code"],
-        "grant_types_supported": ["authorization_code", "refresh_token"],
-        "code_challenge_methods_supported": ["S256"],
-        "token_endpoint_auth_methods_supported": ["none"],
-        "native_client_id": native::CLIENT,
-    }))
-}
+#[path="mcp_oauth_metadata.rs"]
+mod metadata;
+use metadata::{resource,server};
 
 #[path = "mcp_oauth_flow.rs"]
 mod flow;
