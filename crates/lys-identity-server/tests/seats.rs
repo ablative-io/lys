@@ -190,7 +190,7 @@ async fn a_seat_whose_profile_does_not_require_controls_starts_as_a_pty() -> Tes
     let runner = table.serving.as_ref().ok_or("no runner")?.sessions();
     let liveness = runner.liveness(Some(session))?;
     assert!(liveness[0].alive);
-    assert!(!liveness[0].managed);
+    assert!(!liveness[0].harness.managed);
     let (_, live) = table.service.get("/runtime/live", Some(&table.ada)).await?;
     assert_eq!(
         live["sessions"].as_array().map(Vec::len),

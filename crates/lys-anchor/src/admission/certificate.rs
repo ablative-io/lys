@@ -161,6 +161,7 @@ impl RecognisedCertificate {
     /// when the authority's issuance policy *is* the admission policy — the
     /// authority is the operator's own, and issuing a certificate is already
     /// the decision to let the holder write.
+    #[must_use]
     pub fn issued_by(issuer_public_key: [u8; 32]) -> Self {
         Self {
             issuer_public_key,
@@ -175,6 +176,7 @@ impl RecognisedCertificate {
     /// left as-is rather than reinterpreted as "no restriction": a set that
     /// silently meant *everyone* when it was accidentally emptied is how an
     /// allow-list stops being one without anybody noticing.
+    #[must_use]
     pub fn issued_by_to(issuer_public_key: [u8; 32], subject_keys: BTreeSet<[u8; 32]>) -> Self {
         Self {
             issuer_public_key,
@@ -183,12 +185,14 @@ impl RecognisedCertificate {
     }
 
     /// The authority public key this policy recognises certificates from.
+    #[must_use]
     pub fn issuer_public_key(&self) -> &[u8; 32] {
         &self.issuer_public_key
     }
 
     /// The subject keys this policy is restricted to, if it is restricted at
     /// all. `None` means any subject the authority certified.
+    #[must_use]
     pub fn subject_keys(&self) -> Option<&BTreeSet<[u8; 32]>> {
         self.subject_keys.as_ref()
     }

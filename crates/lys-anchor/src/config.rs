@@ -62,6 +62,7 @@ impl AnchorConfig {
     /// type has. When a field arrives, a caller that wants the field must reach
     /// a constructor that takes it, and this one will not quietly acquire a
     /// value on their behalf.
+    #[must_use]
     pub fn unconfigured() -> Self {
         Self {}
     }

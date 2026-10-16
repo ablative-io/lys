@@ -140,13 +140,15 @@ async fn reconcile_phantoms(evidence: Evidence, starting_only: bool) -> Result<(
                             session: session.to_owned(),
                             pid: Some(1),
                             alive: true,
-                            managed: false,
                             harness_session: None,
-                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: Some(1_000),
                             started_at: 1_000,
                             ended: false,
+                            harness: lys_runner::liveness::HarnessLiveness {
+                                managed: false,
+                                started_fresh: false,
+                            },
                         })
                         .collect(),
                 },

@@ -325,21 +325,25 @@ impl OwnerStore {
     }
 
     /// The live owners, by session.
+    #[must_use]
     pub fn owners(&self) -> &BTreeMap<String, OwnerRecord> {
         &self.projection.owners
     }
 
     /// The owner of `session`, when one is live.
+    #[must_use]
     pub fn owner(&self, session: &str) -> Option<&OwnerRecord> {
         self.projection.owners.get(session)
     }
 
     /// The work done so far.
+    #[must_use]
     pub fn counts(&self) -> StoreCounts {
         self.counts
     }
 
     /// The last journal sequence.
+    #[must_use]
     pub fn last_seq(&self) -> u64 {
         self.last_seq
     }

@@ -166,13 +166,15 @@ fn respond(
                             session,
                             pid: Some(4242),
                             alive: true,
-                            managed: false,
                             harness_session: None,
-                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: None,
                             started_at: 1,
                             ended: false,
+                            harness: lys_runner::liveness::HarnessLiveness {
+                                managed: false,
+                                started_fresh: false,
+                            },
                         }],
                     }
                 }

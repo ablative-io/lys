@@ -66,50 +66,7 @@ impl Controller {
                 }
             }
             Observation::Completed { turn, failed } => {
-                if self.transport == Transport::Claude && !self.initialized {
-                    return Err(self.claude_unproved());
-                }
-                let matches = if self.transport == Transport::Claude {
-                    self.current.is_some() && self.boundary != Boundary::Unknown
-                } else {
-                    turn.is_some()
-                        && turn == self.turn
-                        && matches!(self.boundary, Boundary::Active(_))
-                };
-                if !matches {
-                    return Ok(update);
-                }
-                if let Some(current) = self.current.take() {
-                    if current.kind == Kind::Compact {
-                        let (state, reason) = if self.compacted.is_some() && !failed {
-                            (
-                                crate::operations::OperationState::Confirmed,
-                                "harness_compacted",
-                            )
-                        } else {
-                            (crate::operations::OperationState::Refused, "not_compacted")
-                        };
-                        update.receipts.push(receipt(&current.id, state, reason));
-                    } else if !self.admitted {
-                        update.receipts.push(receipt(
-                            &current.id,
-                            crate::operations::OperationState::Uncertain,
-                            "admission_unconfirmed",
-                        ));
-                    }
-                    update
-                        .events
-                        .push(self.event("turn_end", self.turn.clone(), Some(current.id)));
-                } else {
-                    update
-                        .events
-                        .push(self.event("turn_end", self.turn.clone(), None));
-                }
-                self.boundary = Boundary::Idle;
-                self.turn = None;
-                self.compacted = None;
-                self.request_boundary(&mut update)?;
-                self.dispatch(&mut update)?;
+                return self.completed(turn.as_deref(), failed);
             }
             Observation::Refused => {
                 if let Some(current) = self.current.take() {
@@ -138,6 +95,55 @@ impl Controller {
                     .push(self.event("control_request_refused", None, None));
             }
         }
+        Ok(update)
+    }
+
+    fn completed(&mut self, turn: Option<&str>, failed: bool) -> Result<Update, RunnerError> {
+        let mut update = Update::default();
+        if self.transport == Transport::Claude && !self.initialized {
+            return Err(self.claude_unproved());
+        }
+        let matches = if self.transport == Transport::Claude {
+            self.current.is_some() && self.boundary != Boundary::Unknown
+        } else {
+            turn.is_some()
+                && turn == self.turn.as_deref()
+                && matches!(self.boundary, Boundary::Active(_))
+        };
+        if !matches {
+            return Ok(update);
+        }
+        if let Some(current) = self.current.take() {
+            if current.kind == Kind::Compact {
+                let (state, reason) = if self.compacted.is_some() && !failed {
+                    (
+                        crate::operations::OperationState::Confirmed,
+                        "harness_compacted",
+                    )
+                } else {
+                    (crate::operations::OperationState::Refused, "not_compacted")
+                };
+                update.receipts.push(receipt(&current.id, state, reason));
+            } else if !self.admitted {
+                update.receipts.push(receipt(
+                    &current.id,
+                    crate::operations::OperationState::Uncertain,
+                    "admission_unconfirmed",
+                ));
+            }
+            update
+                .events
+                .push(self.event("turn_end", self.turn.clone(), Some(current.id)));
+        } else {
+            update
+                .events
+                .push(self.event("turn_end", self.turn.clone(), None));
+        }
+        self.boundary = Boundary::Idle;
+        self.turn = None;
+        self.compacted = None;
+        self.request_boundary(&mut update)?;
+        self.dispatch(&mut update)?;
         Ok(update)
     }
 }

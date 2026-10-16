@@ -97,13 +97,15 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
                             session,
                             pid: Some(4242),
                             alive: true,
-                            managed: true,
                             harness_session: Some(conversation.to_owned()),
-                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: None,
                             started_at: 1,
                             ended: false,
+                            harness: lys_runner::liveness::HarnessLiveness {
+                                managed: true,
+                                started_fresh: false,
+                            },
                         }],
                     }
                 }

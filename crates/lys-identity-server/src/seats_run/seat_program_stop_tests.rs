@@ -28,9 +28,7 @@ async fn answer(listener: tokio::net::UnixListener, key: [u8; 32]) -> std::io::R
         let (answer, done) = match act {
             Act::Owned => (Answer::Owned { owners: Vec::new(), unreachable: Vec::new() }, false),
             Act::Liveness { .. } => (Answer::Liveness { sessions: vec![lys_runner::liveness::LivenessView {
-                session: SESSION.to_owned(), pid: Some(42), alive: true, managed: false, harness_session: None,
-                started_fresh: false, turn_active: false, last_signal_at: Some(1), started_at: 1, ended: false,
-            }] }, false),
+                session: SESSION.to_owned(), pid: Some(42), alive: true, harness_session: None, turn_active: false, last_signal_at: Some(1), started_at: 1, ended: false,harness: lys_runner::liveness::HarnessLiveness { managed: false, started_fresh: false },}] }, false),
             Act::End { session } => (Answer::Ended { session, ended: Ended { how: EndedHow::Exited, at: 3, status: Some(0), signal: None, reason: Some("stdin EOF".to_owned()), stopped: None } }, true),
             Act::Operate { .. } | Act::Input { .. } | Act::Keys { .. } => (Answer::Refused { refusal: "acp_stdin_close_required".to_owned(), words: "an ACP seat must close stdin instead of receiving a terminal exit operation".to_owned(), oldest: None }, true),
             _ => return Err(std::io::Error::other("unexpected non-stop request in the ACP stop fixture")),

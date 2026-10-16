@@ -8,6 +8,9 @@ impl Feed {
     /// The entries after `cursor`, the first when none is given, up to
     /// [`PAGE_MAX`]; refused `cursor_expired` for another feed's cursor and
     /// `cursor_ahead` for one past its end.
+    ///
+    /// # Errors
+    /// Returns cursor validation, feed read or pending writer failures.
     pub fn page(&self, cursor: Option<&str>) -> Result<FeedPage, RunnerError> {
         if let Some(writer) = &self.writer {
             writer.barrier()?;
@@ -36,6 +39,9 @@ impl Feed {
     }
 
     /// Whether anything is committed after `cursor`.
+    ///
+    /// # Errors
+    /// Returns the named refusal for a malformed, foreign or ahead cursor.
     pub fn after(&self, cursor: Option<&str>) -> Result<bool, RunnerError> {
         Ok(self.offset(cursor)? < self.index.committed)
     }

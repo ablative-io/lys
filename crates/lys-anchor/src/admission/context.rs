@@ -141,11 +141,13 @@ impl<'a> AuthenticatedPeer<'a> {
     /// Nothing about the certificate's issuer, its validity window, or whether
     /// this anchor should accept it. Those are the policy's, and this value is
     /// an input to that decision rather than a substitute for it.
+    #[must_use]
     pub fn verified_by_transport(certificate: &'a [u8]) -> Self {
         Self { certificate }
     }
 
     /// The certificate DER the peer was authenticated against.
+    #[must_use]
     pub fn certificate(&self) -> &'a [u8] {
         self.certificate
     }

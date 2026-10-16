@@ -81,13 +81,15 @@ pub fn liveness(
                 session: id.clone(),
                 pid: Some(42),
                 alive: true,
-                managed: false,
                 harness_session: Some(conversation.clone()),
-                started_fresh: false,
                 turn_active: false,
                 last_signal_at: None,
                 started_at: 1,
                 ended: false,
+                harness: lys_runner::liveness::HarnessLiveness {
+                    managed: false,
+                    started_fresh: false,
+                },
             })
             .collect(),
     }

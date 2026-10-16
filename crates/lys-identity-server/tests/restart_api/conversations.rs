@@ -48,13 +48,15 @@ fn reply(computer: &mut Computer, act: Act) -> Result<Answer, Box<dyn Error>> {
                         session: launch.session.clone(),
                         pid: Some(42),
                         alive: !ended,
-                        managed: false,
                         harness_session: Some(NATIVE.to_owned()),
-                        started_fresh: false,
                         turn_active: false,
                         last_signal_at: Some(1),
                         started_at: 1,
                         ended,
+                        harness: lys_runner::liveness::HarnessLiveness {
+                            managed: false,
+                            started_fresh: false,
+                        },
                     }
                 })
                 .collect();

@@ -321,13 +321,15 @@ mod held_tests {
             session: session.to_owned(),
             pid: Some(4242),
             alive: true,
-            managed: true,
             harness_session: None,
-            started_fresh: false,
             turn_active: false,
             last_signal_at: None,
             started_at: 1,
             ended: false,
+            harness: lys_runner::liveness::HarnessLiveness {
+                managed: true,
+                started_fresh: false,
+            },
         }
     }
 

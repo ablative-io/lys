@@ -27,14 +27,12 @@ pub struct LivenessView {
     pub pid: Option<u32>,
     /// Whether its process is held, not seen to exit, and still present.
     pub alive: bool,
-    /// Whether it runs on a managed channel rather than a pseudo-terminal.
-    pub managed: bool,
+    /// The harness channel and whether it began a fresh conversation.
+    #[serde(flatten)]
+    pub harness: HarnessLiveness,
     /// The harness's own session it is bound to: the managed conversation
     /// once the harness proved it, or the session a `SessionStart` hook bound.
     pub harness_session: Option<String>,
-    /// The runner started a fresh conversation because the selected transcript was absent.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub started_fresh: bool,
     /// Whether a turn is in progress: a managed turn reserved or active, or
     /// a terminal session whose harness began a turn and has not stopped.
     pub turn_active: bool,
@@ -45,6 +43,16 @@ pub struct LivenessView {
     pub started_at: u64,
     /// Whether its end has been recorded.
     pub ended: bool,
+}
+
+/// The harness facts reported beside a session's process liveness.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct HarnessLiveness {
+    /// Whether it runs on a managed channel rather than a pseudo-terminal.
+    pub managed: bool,
+    /// The runner started a fresh conversation because the selected transcript was absent.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub started_fresh: bool,
 }
 
 /// A session's view as the table holds it, with whether its process is held.
@@ -110,18 +118,20 @@ fn seen(id: &str, session: &Session, table: &Table) -> Result<Seen, RunnerError>
             session: id.to_owned(),
             pid: session.pid,
             alive: false,
-            managed: session.managed.is_some()
-                || session.launch.as_ref().is_some_and(|launch| {
-                    launch
-                        .environment
-                        .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
-                }),
             harness_session,
-            started_fresh,
             turn_active,
             last_signal_at: session.last_signal.max(output),
             started_at: session.started_at,
             ended: session.ended.is_some(),
+            harness: crate::liveness::HarnessLiveness {
+                managed: session.managed.is_some()
+                    || session.launch.as_ref().is_some_and(|launch| {
+                        launch
+                            .environment
+                            .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+                    }),
+                started_fresh,
+            },
         },
         held,
     })
@@ -153,6 +163,9 @@ fn present(session: &str, pid: u32) -> Result<bool, RunnerError> {
 impl Sessions {
     /// The liveness of every session the runner holds, or of the one named,
     /// refused `session_unknown` when it holds none by that name.
+    ///
+    /// # Errors
+    /// Returns `session_unknown` for an unknown session, or `liveness_unreadable` when its process cannot be inspected.
     pub fn liveness(&self, only: Option<&str>) -> Result<Vec<LivenessView>, RunnerError> {
         let table = self.lock()?;
         let held = match only {
@@ -195,6 +208,32 @@ impl Sessions {
         let mut table = self.lock()?;
         if let Some(session) = table.sessions.get_mut(id) {
             session.last_signal = Some(now_ms());
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod wire_tests {
+    use super::LivenessView;
+    use serde_json::json;
+
+    #[test]
+    fn harness_facts_keep_the_existing_flat_liveness_wire() -> Result<(), Box<dyn std::error::Error>>
+    {
+        for fresh in [false, true] {
+            let mut wire = json!({"session":"fixture", "pid":42, "alive":true, "managed":true,
+                "harness_session":"conversation", "turn_active":false, "last_signal_at":1,
+                "started_at":1, "ended":false});
+            if fresh {
+                wire["started_fresh"] = json!(true);
+            }
+            let view: LivenessView = serde_json::from_value(wire.clone())?;
+            assert!(view.harness.managed);
+            assert_eq!(view.harness.started_fresh, fresh);
+            assert_eq!(serde_json::to_value(view)?, wire);
+            wire["unrecognized"] = json!(true);
+            assert!(serde_json::from_value::<LivenessView>(wire).is_err());
         }
         Ok(())
     }

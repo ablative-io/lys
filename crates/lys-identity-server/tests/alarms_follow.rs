@@ -37,11 +37,8 @@ macro_rules! alarms_follow {
                 let socket = dir.path().join("alarm.sock");
                 let listener = tokio::net::UnixListener::bind(&socket)?;
                 let live = Arc::new(Mutex::new(LivenessView {
-                    session: "alarm-session".to_owned(), pid: Some(1), alive: true,
-                    managed: false, harness_session: None, turn_active: false,
-                    started_fresh: false,
-                    last_signal_at: Some(1_000), started_at: 1_000, ended: false,
-                }));
+                    session: "alarm-session".to_owned(), pid: Some(1), alive: true, harness_session: None, turn_active: false,
+                    last_signal_at: Some(1_000), started_at: 1_000, ended: false,harness: lys_runner::liveness::HarnessLiveness { managed: false, started_fresh: false },}));
                 let evidence = Arc::clone(&live);
                 let extra_live = Arc::new(Mutex::new(Vec::<LivenessView>::new()));
                 let extra_evidence = Arc::clone(&extra_live);

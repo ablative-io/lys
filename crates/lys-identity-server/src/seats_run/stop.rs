@@ -135,7 +135,7 @@ pub(super) async fn request_end(
                 }
                 .into());
             }
-            if live.managed {
+            if live.harness.managed {
                 let stop = Act::Operate {
                     operation: Operation {
                         operation: operation.to_owned(),
@@ -180,7 +180,11 @@ pub(super) async fn harness_session(
         Ok(Some(live)) => {
             notes.push(format!(
                 "the runner reports transport={} for session {session}",
-                if live.managed { "managed" } else { "pty" }
+                if live.harness.managed {
+                    "managed"
+                } else {
+                    "pty"
+                }
             ));
             if live.harness_session.is_none() {
                 notes.push(format!(

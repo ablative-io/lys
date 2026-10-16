@@ -115,6 +115,15 @@ impl Sessions {
             }
         }
         self.read_source(id, None);
+        self.finish_notification(id, turn, thread)
+    }
+
+    fn finish_notification(
+        &self,
+        id: &str,
+        turn: Option<String>,
+        thread: &str,
+    ) -> Result<String, RunnerError> {
         let mut table = self.lock()?;
         flushed_at(
             &mut table,

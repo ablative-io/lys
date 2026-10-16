@@ -16,13 +16,15 @@ fn projected(live: &lys_runner::liveness::LivenessView) -> Live {
         session: live.session.clone(),
         pid: live.pid,
         alive: live.alive,
-        managed: live.managed,
         harness_session: live.harness_session.clone(),
-        started_fresh: false,
         turn_active: live.turn_active,
         last_signal_at: live.last_signal_at,
         started_at: live.started_at,
         ended: live.ended,
+        harness: lys_runner::liveness::HarnessLiveness {
+            managed: live.harness.managed,
+            started_fresh: false,
+        },
     }
 }
 
@@ -57,7 +59,7 @@ fn the_seat_runner_says_online_offline_or_unknown() -> Result<(), Box<dyn Error>
         let live = runner.liveness(Some(session))?;
         assert_eq!(live.len(), 1);
         assert!(live[0].alive);
-        assert!(!live[0].managed);
+        assert!(!live[0].harness.managed);
         assert_eq!(
             view(&seat, None, &Reading::Read(Some(&projected(&live[0])))).state,
             expected

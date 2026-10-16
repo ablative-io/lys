@@ -226,14 +226,7 @@ impl Sessions {
                 (None, None) => return,
             };
             let mut bodies = Vec::new();
-            if let Some(reason) = &lost {
-                bodies.push(Body::Coverage(Coverage::of(
-                "coverage_incomplete",
-                &source,
-                Some(source.offset),
-                format!("change notices were lost ({reason}): the stream is read again from its saved cursor"),
-            )));
-            }
+            notice_loss(&source, lost, &mut bodies);
             let before = source.clone();
             let more = read_lines(lines, &mut source, &mut bodies);
             if bodies.is_empty() && source == before {
@@ -444,5 +437,16 @@ fn read_lines(lines: Lines<'_>, source: &mut SourceState, bodies: &mut Vec<Body>
         if at - beginning >= 1_048_576 {
             return true;
         }
+    }
+}
+
+fn notice_loss(source: &SourceState, lost: Option<&str>, bodies: &mut Vec<Body>) {
+    if let Some(reason) = &lost {
+        bodies.push(Body::Coverage(Coverage::of(
+        "coverage_incomplete",
+        source,
+        Some(source.offset),
+        format!("change notices were lost ({reason}): the stream is read again from its saved cursor"),
+    )));
     }
 }

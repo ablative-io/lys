@@ -189,6 +189,7 @@ impl AnchorStatus {
     ///
     /// Read out of [`root`](Self::root) rather than stored beside it — see the
     /// [module docs](self) for why one fact gets one field.
+    #[must_use]
     pub fn tree_size(&self) -> u64 {
         self.root.num_leaves()
     }

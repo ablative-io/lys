@@ -114,6 +114,7 @@ impl MaxSize {
     ///
     /// There is no default and no "sensible" value chosen here — the number is
     /// the operator's, and it is the only thing this type holds.
+    #[must_use]
     pub fn new(max_bytes: usize) -> Self {
         Self { max_bytes }
     }
@@ -122,6 +123,7 @@ impl MaxSize {
     ///
     /// Readable by the operator who set it, and never reported to a submitter:
     /// nothing on the refusal path can reach this value.
+    #[must_use]
     pub fn max_bytes(&self) -> usize {
         self.max_bytes
     }

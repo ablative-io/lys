@@ -404,13 +404,15 @@ mod tests {
             session: "op-b".to_owned(),
             pid: Some(7),
             alive,
-            managed: true,
             harness_session: Some("uuid".to_owned()),
-            started_fresh: false,
             turn_active,
             last_signal_at: Some(9),
             started_at: 1,
             ended: !alive,
+            harness: lys_runner::liveness::HarnessLiveness {
+                managed: true,
+                started_fresh: false,
+            },
         }
     }
 

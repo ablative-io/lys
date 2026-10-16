@@ -283,6 +283,7 @@ pub enum AdmitPolicy {
 
 impl AdmitPolicy {
     /// The value an operator typed, for use in a diagnostic.
+    #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
             Self::AcceptAll => "accept-all",

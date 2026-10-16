@@ -76,6 +76,9 @@ impl ProxyTracking {
     /// each call's model, and the service holds it against the window a
     /// person declared for that model; with none declared there either, the
     /// service says so by name.
+    ///
+    /// # Errors
+    /// Refuses an invalid proxy usage run or account binding by name.
     pub fn checked(&self) -> Result<(), RunnerError> {
         if !is_run_key(&self.run) {
             return Err(RunnerError::refused(
@@ -87,6 +90,7 @@ impl ProxyTracking {
     }
 
     /// The run's usage file under the proxy's `usage` directory.
+    #[must_use]
     pub fn file(&self, usage_dir: &Path) -> PathBuf {
         usage_dir.join(format!("{}.jsonl", self.run))
     }
@@ -211,52 +215,12 @@ impl ProxyReading<'_> {
             .or_else(|| self.tracking.account.clone());
         // Where the call is kept whole and how it ended: what a list of the
         // session's calls shows, whether or not the call reported a figure.
-        let kept = line
-            .record
-            .clone()
-            .zip(line.entry.clone())
-            .map(|(session, entry)| crate::tracking::RecordAt {
-                session,
-                entry,
-                status: if line.status == CallStatus::UpstreamRefused {
-                    line.http.map_or_else(
-                        || "upstream_refused (HTTP status not reported)".to_owned(),
-                        |status| format!("upstream_refused (HTTP {status})"),
-                    )
-                } else {
-                    line.status.as_str().to_owned()
-                },
-                duration_ms: observed
-                    .zip(instant(&line.started_at))
-                    .and_then(|(ended, started)| ended.checked_sub(started)),
-            });
+        let kept = kept_call(&line, observed);
         let mut bodies = Vec::new();
         // A call whose spend is not known is still one record, with no
         // figure, beside the coverage entry that says why: every call that
         // passed is on the record, and none is counted as nothing spent.
-        let unknown = if line.status == CallStatus::Lost {
-            Some((
-                "call_lost",
-                format!(
-                    "call {} was lost in flight: the proxy died before its response ended, and what it spent is not known",
-                    line.call_id
-                ),
-            ))
-        } else if line.usage.is_none() {
-            let answered = line
-                .http
-                .map(|status| format!(", answered HTTP {status},"))
-                .unwrap_or_default();
-            Some((
-                "usage_unreported",
-                format!(
-                    "call {} ended {:?}{answered} and its response reported no token figures: what it spent is not known",
-                    line.call_id, line.status
-                ),
-            ))
-        } else {
-            None
-        };
+        let unknown = unknown_spend(&line);
         let (figures, unavailable) = match (&unknown, line.usage.as_ref()) {
             (None, Some(usage)) => spend(line.api, usage),
             // No figure, each named as unreported.
@@ -410,3 +374,50 @@ impl ProxyReading<'_> {
 #[cfg(test)]
 #[path = "tracking_proxy_tests.rs"]
 mod tests;
+
+fn kept_call(line: &UsageLine, observed: Option<u64>) -> Option<crate::tracking::RecordAt> {
+    line.record
+        .clone()
+        .zip(line.entry.clone())
+        .map(|(session, entry)| crate::tracking::RecordAt {
+            session,
+            entry,
+            status: if line.status == CallStatus::UpstreamRefused {
+                line.http.map_or_else(
+                    || "upstream_refused (HTTP status not reported)".to_owned(),
+                    |status| format!("upstream_refused (HTTP {status})"),
+                )
+            } else {
+                line.status.as_str().to_owned()
+            },
+            duration_ms: observed
+                .zip(instant(&line.started_at))
+                .and_then(|(ended, started)| ended.checked_sub(started)),
+        })
+}
+
+fn unknown_spend(line: &UsageLine) -> Option<(&'static str, String)> {
+    if line.status == CallStatus::Lost {
+        Some((
+            "call_lost",
+            format!(
+                "call {} was lost in flight: the proxy died before its response ended, and what it spent is not known",
+                line.call_id
+            ),
+        ))
+    } else if line.usage.is_none() {
+        let answered = line
+            .http
+            .map(|status| format!(", answered HTTP {status},"))
+            .unwrap_or_default();
+        Some((
+            "usage_unreported",
+            format!(
+                "call {} ended {:?}{answered} and its response reported no token figures: what it spent is not known",
+                line.call_id, line.status
+            ),
+        ))
+    } else {
+        None
+    }
+}

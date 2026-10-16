@@ -334,7 +334,7 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted()
     let dir = tmp.path().join("store");
     create(&dir);
     let segment = segment_file(&dir, 0);
-    let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+    let mut writer = AppendWriter(std::process::Command::new(std::env::current_exe().unwrap())
         .arg("--exact")
         .arg("file::tests::a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted")
         .arg("--nocapture")
@@ -342,7 +342,8 @@ fn a_process_killed_inside_an_append_reopens_at_the_pin_with_nothing_adopted()
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
         .spawn()
-        .unwrap();
+        .unwrap());
+    let child = &mut writer.0;
     let stdout = child.stdout.take().ok_or("writer stdout missing")?;
     let mut lines = BufReader::new(stdout).lines();
     let ready = loop {
@@ -510,4 +511,22 @@ fn every_physical_read_is_counted_and_nothing_held_in_memory_is() {
     // A snapshot is one read, whatever it holds.
     let _snapshot = store.snapshot().unwrap();
     assert_eq!(crate::process_read_count() - before, 3);
+}
+
+/// The fixture owns its writer until the process is reaped, including error paths.
+struct AppendWriter(std::process::Child);
+impl Drop for AppendWriter {
+    fn drop(&mut self) {
+        match self.0.try_wait() {
+            Ok(Some(_)) => return,
+            Ok(None) => {}
+            Err(error) => eprintln!("append_writer_state_failed: {error}"),
+        }
+        if let Err(error) = self.0.kill() {
+            eprintln!("append_writer_stop_failed: {error}");
+        }
+        if let Err(error) = self.0.wait() {
+            eprintln!("append_writer_reap_failed: {error}");
+        }
+    }
 }

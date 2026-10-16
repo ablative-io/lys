@@ -292,7 +292,7 @@ fn seat_program_launch_reports_a_pipe_in_its_liveness() -> Result {
     let live = sessions.liveness(Some("seat-fixture"))?;
     sessions.end("seat-fixture", &AtomicBool::new(false))?;
     assert!(
-        live[0].managed,
+        live[0].harness.managed,
         "the ACP pipe was reported as a pseudo-terminal"
     );
     drop(admission);

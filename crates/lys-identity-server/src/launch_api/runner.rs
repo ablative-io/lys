@@ -99,7 +99,7 @@ pub(crate) async fn run(
             remember_native(state, &session, native)?;
             view["native_conversation"] = serde_json::json!(native);
         }
-        if live.started_fresh {
+        if live.harness.started_fresh {
             view["conversation"] = Value::Null;
             view["native_conversation"] = serde_json::json!(live.harness_session);
             view["runner"]["started_fresh"] = Value::Bool(true);

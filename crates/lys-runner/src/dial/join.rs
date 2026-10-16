@@ -29,6 +29,9 @@ pub const UNREACHABLE: &str = "runner_join_unreachable";
 /// Refuse, by name, a server address a runner on another computer cannot
 /// dial: one that is not `https://`, or one on this computer's own loopback
 /// address.
+///
+/// # Errors
+/// Returns the named connection refusal when the server cannot be reached.
 pub fn reachable(server: &str) -> Result<(), RunnerError> {
     let Some(rest) = server.strip_prefix("https://") else {
         return Err(RunnerError::refused(
@@ -71,6 +74,9 @@ impl Join<'_> {
     /// Join, answering the server's runner public key; refused by name
     /// when the address cannot be dialled, the server cannot be reached, or
     /// the server refuses the code.
+    ///
+    /// # Errors
+    /// Returns the transport refusal or the named join refusal supplied by the server.
     pub fn join(&self) -> Result<[u8; 32], RunnerError> {
         reachable(self.server)?;
         let channel = Channel::for_server(self.server, self.authority)?;

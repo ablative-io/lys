@@ -132,7 +132,7 @@ fn of_two_sessions_started_and_one_ended_one_is_alive_and_one_ended() -> TestRes
     let alive = named(&views, "first")?;
     assert!(alive.alive && !alive.ended, "{alive:?}");
     assert_eq!(alive.pid, Some(first));
-    assert!(!alive.managed);
+    assert!(!alive.harness.managed);
     assert!(!alive.turn_active);
     let ended = named(&views, "second")?;
     assert!(!ended.alive && ended.ended, "{ended:?}");

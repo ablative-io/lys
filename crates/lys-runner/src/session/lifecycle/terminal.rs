@@ -94,33 +94,9 @@ impl Sessions {
     ) {
         let waited = child.wait();
         let at = now_ms();
-        let Some(table) = self.lock_logged() else {
+        if !self.finish_terminal_output(id, generation, pump) {
             return;
-        };
-        let cleanup = table
-            .sessions
-            .get(id)
-            .filter(|session| session.generation == generation)
-            .filter(|session| {
-                session.ending
-                    || session
-                        .rotation
-                        .as_ref()
-                        .is_some_and(crate::rotation::RotationState::tripped)
-            })
-            .and_then(|session| session.guard.leader.clone());
-        drop(table);
-        if let Some(leader) = cleanup {
-            if let Some(diagnostic) = terminal_cleanup(crate::pty::end_left_group(&leader)) {
-                crate::error::said(&format!("session {id}: {diagnostic}"));
-            }
         }
-        if pump.join().is_err() {
-            crate::error::said(&format!(
-                "session {id}: the thread keeping its output ended abnormally"
-            ));
-        }
-        self.read_source(id, None);
         let Some(mut table) = self.lock_logged() else {
             return;
         };
@@ -203,19 +179,57 @@ impl Sessions {
             at,
             status,
             signal: signal.clone(),
-            reason: table
-                .sessions
-                .get(id)
-                .filter(|session| {
-                    session.launch.as_ref().is_some_and(|launch| {
-                        launch
-                            .environment
-                            .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
-                    })
-                })
-                .map(|_| format!("seat_program_exited: status {status:?}; signal {signal:?}")),
+            reason: seat_exit_reason(&table, id, status, signal.as_deref()),
             stopped,
         };
+        self.publish_terminal_exit(id, generation, output, ended, table);
+    }
+}
+
+impl Sessions {
+    fn finish_terminal_output(
+        &self,
+        id: &str,
+        generation: u64,
+        pump: std::thread::JoinHandle<()>,
+    ) -> bool {
+        let Some(table) = self.lock_logged() else {
+            return false;
+        };
+        let cleanup = table
+            .sessions
+            .get(id)
+            .filter(|session| session.generation == generation)
+            .filter(|session| {
+                session.ending
+                    || session
+                        .rotation
+                        .as_ref()
+                        .is_some_and(crate::rotation::RotationState::tripped)
+            })
+            .and_then(|session| session.guard.leader.clone());
+        drop(table);
+        if let Some(leader) = cleanup {
+            if let Some(diagnostic) = terminal_cleanup(crate::pty::end_left_group(&leader)) {
+                crate::error::said(&format!("session {id}: {diagnostic}"));
+            }
+        }
+        if pump.join().is_err() {
+            crate::error::said(&format!(
+                "session {id}: the thread keeping its output ended abnormally"
+            ));
+        }
+        self.read_source(id, None);
+        true
+    }
+    fn publish_terminal_exit(
+        &self,
+        id: &str,
+        generation: u64,
+        output: &super::super::output::OutputHandle,
+        ended: Ended,
+        mut table: std::sync::MutexGuard<'_, crate::session::Table>,
+    ) {
         let drains = table
             .sessions
             .get(id)
@@ -299,4 +313,23 @@ mod cleanup_tests {
                 && words.contains("process_group_unreadable"))
         );
     }
+}
+
+fn seat_exit_reason(
+    table: &crate::session::Table,
+    id: &str,
+    status: Option<u32>,
+    signal: Option<&str>,
+) -> Option<String> {
+    table
+        .sessions
+        .get(id)
+        .filter(|session| {
+            session.launch.as_ref().is_some_and(|launch| {
+                launch
+                    .environment
+                    .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+            })
+        })
+        .map(|_| format!("seat_program_exited: status {status:?}; signal {signal:?}"))
 }

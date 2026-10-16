@@ -13,6 +13,9 @@ use crate::commands::error::{CliError, CliResult};
 
 /// Read a file fully into memory, describing the file's role (`what`, e.g.
 /// "genesis leaf file") and its path in any error.
+///
+/// # Errors
+/// Returns the I/O failure with the file role and path.
 pub fn read_file(path: &Path, what: &str) -> CliResult<Vec<u8>> {
     std::fs::read(path).map_err(|source| CliError::Io {
         context: format!("failed to read {what} {}", path.display()),
@@ -22,6 +25,9 @@ pub fn read_file(path: &Path, what: &str) -> CliResult<Vec<u8>> {
 
 /// Write bytes to a file, describing the file's role (`what`, e.g. "receipt
 /// file") and its path in any error.
+///
+/// # Errors
+/// Returns the I/O failure with the file role and path.
 pub fn write_file(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
     std::fs::write(path, contents).map_err(|source| CliError::Io {
         context: format!("failed to write {what} {}", path.display()),
@@ -36,6 +42,9 @@ pub fn write_file(path: &Path, contents: &[u8], what: &str) -> CliResult<()> {
 /// all of its integrity flows through the embedded signed note and the root
 /// recomputation a reader performs. Pretty-printing therefore changes how it
 /// reads and not whether it verifies.
+///
+/// # Errors
+/// Returns JSON serialization failures or the path-specific write failure.
 pub fn write_artifact<T: Serialize>(
     path: &Path,
     artifact: &T,

@@ -103,6 +103,7 @@ pub struct Coverage {
 
 impl Coverage {
     /// Coverage `state` of `source` at `offset`, in `words`.
+    #[must_use]
     pub fn of(state: &str, source: &SourceState, offset: Option<u64>, words: String) -> Self {
         Self {
             state: state.to_owned(),

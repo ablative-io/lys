@@ -76,13 +76,15 @@ async fn stop_refuses_an_exit_answer_without_reap_evidence() -> Result<(), Box<d
                             session,
                             pid: Some(41),
                             alive: true,
-                            managed: false,
                             harness_session: None,
-                            started_fresh: false,
                             turn_active: false,
                             last_signal_at: None,
                             started_at: 1,
                             ended: false,
+                            harness: lys_runner::liveness::HarnessLiveness {
+                                managed: false,
+                                started_fresh: false,
+                            },
                         }],
                     }
                 }

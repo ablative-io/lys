@@ -142,16 +142,7 @@ impl Projection {
 pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), RunnerError> {
     match intent {
         Intent::Establish { record } => {
-            validate_record(record)?;
-            if projection.owners.contains_key(&record.session) {
-                return Err(refused(
-                    "seat_owner_held",
-                    format!("session {} already has a live owner", record.session),
-                ));
-            }
-            projection
-                .owners
-                .insert(record.session.clone(), record.as_ref().clone());
+            establish(projection, record)?;
         }
         Intent::Lease {
             session,
@@ -215,21 +206,7 @@ pub(super) fn apply(projection: &mut Projection, intent: &Intent) -> Result<(), 
         Intent::Custody { session, custody } => {
             validate_custody(custody)?;
             let record = held(projection, session)?;
-            if let Custody::Exited { .. } = record.custody {
-                return Err(refused(
-                    "seat_owner_exited",
-                    format!("session {session} has exited; its custody does not change"),
-                ));
-            }
-            if let (Custody::Stopping { .. }, Custody::HandingOver { .. }) =
-                (&record.custody, custody)
-            {
-                return Err(refused(
-                    "seat_owner_stop_fenced",
-                    format!("session {session} is stopping; a handover cannot adopt it"),
-                ));
-            }
-            record.custody = custody.clone();
+            change_custody(record, session, custody)?;
         }
         Intent::Cursors { session, cursors } => {
             let record = held(projection, session)?;
@@ -268,4 +245,39 @@ fn held<'a>(
             format!("session {session} has no live owner"),
         )
     })
+}
+
+fn change_custody(
+    record: &mut OwnerRecord,
+    session: &str,
+    custody: &Custody,
+) -> Result<(), RunnerError> {
+    if let Custody::Exited { .. } = record.custody {
+        return Err(refused(
+            "seat_owner_exited",
+            format!("session {session} has exited; its custody does not change"),
+        ));
+    }
+    if let (Custody::Stopping { .. }, Custody::HandingOver { .. }) = (&record.custody, custody) {
+        return Err(refused(
+            "seat_owner_stop_fenced",
+            format!("session {session} is stopping; a handover cannot adopt it"),
+        ));
+    }
+    record.custody = custody.clone();
+    Ok(())
+}
+
+fn establish(projection: &mut Projection, record: &OwnerRecord) -> Result<(), RunnerError> {
+    validate_record(record)?;
+    if projection.owners.contains_key(&record.session) {
+        return Err(refused(
+            "seat_owner_held",
+            format!("session {} already has a live owner", record.session),
+        ));
+    }
+    projection
+        .owners
+        .insert(record.session.clone(), record.clone());
+    Ok(())
 }

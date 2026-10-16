@@ -178,6 +178,7 @@ pub enum Answer {
 
 impl Answer {
     /// The answer for `error`, by its name.
+    #[must_use]
     pub fn refusal(error: &RunnerError) -> Self {
         let oldest = match error {
             RunnerError::Refused { oldest, .. } => *oldest,
