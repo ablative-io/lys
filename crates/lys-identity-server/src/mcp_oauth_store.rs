@@ -153,7 +153,17 @@ impl Store {
                 let previous = store
                     .path
                     .with_extension(format!("v{}.json", store.held.format));
-                if !previous.exists() {
+                if previous.exists() {
+                    let backup = std::fs::read(&previous)
+                        .map_err(|error| unavailable(&error.to_string()))?;
+                    let source = std::fs::read(&store.path)
+                        .map_err(|error| unavailable(&error.to_string()))?;
+                    if backup != source {
+                        return Err(unavailable(
+                            "the migration backup differs from the old install file",
+                        ));
+                    }
+                } else {
                     std::fs::copy(&store.path, &previous)
                         .map_err(|error| unavailable(&error.to_string()))?;
                     std::fs::File::open(&previous)

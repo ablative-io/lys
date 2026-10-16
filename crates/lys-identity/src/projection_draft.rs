@@ -112,18 +112,19 @@ impl Projection {
             if held.hash != hash {
                 return Err(IdentityError::DraftHashMismatch);
             }
-            let application = match event {
-                DraftEvent::Executed(e) => Some(e.application),
-                DraftEvent::RefusedOnExecution(e) => Some(e.application),
+            let closing = match event {
+                DraftEvent::Executed(e) => Some((e.application, &e.actor)),
+                DraftEvent::RefusedOnExecution(e) => Some((e.application, &e.actor)),
                 _ => None,
             };
-            let permitted = application.map_or_else(
+            let permitted = closing.map_or_else(
                 || held.is_pending(),
-                |application| {
-                    held.approved
-                        .as_ref()
-                        .is_some_and(|(a, _)| a.application == application)
-                        && held.executed.is_none()
+                |(application, actor)| {
+                    held.approved.as_ref().is_some_and(|(a, _)| {
+                        a.application == application
+                            && a.actor.binding() == actor.binding()
+                            && a.actor.provenance() == actor.provenance()
+                    }) && held.executed.is_none()
                         && held.refused_on_execution.is_none()
                 },
             );

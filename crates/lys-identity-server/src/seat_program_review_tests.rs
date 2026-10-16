@@ -67,7 +67,7 @@ async fn seat_program_account_requires_model_wire_at_set_time() -> Result<(), Bo
             "rendering_contract":"seat-program/v1","models":{"minimum":0,"maximum":0,"further_encoding":{"kind":"array"}},
             "permissions":{"modes":[],"rule_forms":[]},"mcp":{"transports":[],"working_directory":false,"handle_variables":false,"channel_policies":[]},
             "seat_program":{"executable":"/opt/seat/host","executable_sha256":"a".repeat(64),"arguments":["{seat_file}"],"seat_file":"/opt/seat/seat.json","seat_file_sha256":"b".repeat(64),"adapter":"acp/1"}}},
-        "session":{"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}});
+        "session":{"stall_after":300,"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}});
     let (status, refused) = post(&service, &path, Auth::Cookie(&cookie), &body).await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "ModelWireMissing");

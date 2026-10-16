@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! HTTP admission and immutable evidence at the draft boundary.
 
 pub(super) use std::error::Error;

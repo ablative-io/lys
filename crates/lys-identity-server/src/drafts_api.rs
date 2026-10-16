@@ -378,10 +378,7 @@ async fn approve(
             })?
             .clone();
         let event = if let Some((approved, _)) = &held.approved {
-            if approved.application != application
-                || approved.operation != operation
-                || held.hash != hash
-            {
+            if approved.application != application || held.hash != hash {
                 return Err(lys_identity::IdentityError::DraftNotPending {
                     draft: draft.to_string(),
                 }
@@ -409,8 +406,7 @@ async fn approve(
             .clone();
         Ok((answer, held))
     })?;
-    answer.execution =
-        Some(Box::pin(crate::drafts_apply::apply(&state, &headers, &held, actor)).await?);
+    answer.execution = Some(Box::pin(crate::drafts_apply::apply(&state, &headers, &held)).await?);
     drop(execution_guard);
     Ok(answer)
 }

@@ -1,3 +1,4 @@
+#![cfg(test)]
 use crate::drafts_test_support::Table;
 use lys_identity::{AuthMethod, OperationId};
 use serde_json::{Value, json};
@@ -51,6 +52,19 @@ async fn approval_applies_provisioning_once_as_the_person_and_lists_its_receipt(
         .service
         .post(&format!("/drafts/{id}/approve"), Some(&table.owner), &body)
         .await?;
+    assert_eq!(answer, retry);
+    assert_eq!(table.service.log_size().await?, size);
+    let mut another_approval = body.clone();
+    another_approval["operation"] = json!(OperationId::generate()?.to_string());
+    let (status, retry) = table
+        .service
+        .post(
+            &format!("/drafts/{id}/approve"),
+            Some(&table.owner),
+            &another_approval,
+        )
+        .await?;
+    assert_eq!(status, 200, "{retry}");
     assert_eq!(answer, retry);
     assert_eq!(table.service.log_size().await?, size);
     let mut directory = table.directory()?;

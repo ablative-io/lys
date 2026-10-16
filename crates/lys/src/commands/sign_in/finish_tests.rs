@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::{finish, validate};
 use std::error::Error;
 use std::net::TcpListener;

@@ -244,7 +244,10 @@ async fn dispatch(
     if app.is_some() {
         parts.headers.remove(header::AUTHORIZATION);
     }
-    let relay = dispatch_router(endpoint.router.clone(), Request::from_parts(parts, body));
+    let relay = dispatch_router(
+        endpoint.router.as_ref().clone(),
+        Request::from_parts(parts, body),
+    );
     let answered = match (relayed, token) {
         (Some(relayed), _) => crate::agent_signature::relayed(relayed, relay).await,
         (None, Some(principal)) => crate::agent_signature::token_scoped(principal, relay).await,

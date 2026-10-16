@@ -114,12 +114,14 @@ pub(in crate::projection) fn decode(
             let [value, index] = tuple::<2>(closing, "a draft closing event")?;
             let (event, _) = event(value)?;
             let index = read_uint(&index, "a closing position")?;
-            let application = record
+            let (approved, approved_index) = record
                 .approved
                 .as_ref()
-                .ok_or("an execution has no approval")?
-                .0
-                .application;
+                .ok_or("an execution has no approval")?;
+            let application = approved.application;
+            if index <= *approved_index {
+                return Err("an execution precedes its approval".to_owned());
+            }
             if event.decision() != Some((record.created.operation, hash))
                 || projection.operation(event.operation()) != Some(index)
             {

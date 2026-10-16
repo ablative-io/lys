@@ -1,3 +1,4 @@
+#![cfg(test)]
 use crate::launch_template::HandleName;
 use crate::model_account_start::{routed, wire};
 use crate::provisioning_store::Version;
@@ -33,7 +34,7 @@ fn seat_program_accounts_share_native_provider_and_selector_mapping() -> Result<
             json!({"number":1,"operation":"fixture","set_by":"fixture","set_at":1,
             "settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"",
             "harness":{"name":"seat","program":"/opt/seat/host","package":"seat 1","description":description},
-            "session":{"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}}}),
+            "session":{"stall_after":300,"accounts":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}}}),
         )?;
         let rotation = profile
             .settings

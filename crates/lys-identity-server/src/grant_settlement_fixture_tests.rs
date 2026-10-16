@@ -303,7 +303,7 @@ impl Table {
         let apps = crate::apps_api::opened(&config, Arc::clone(&key), &*say)?;
         let model_revision = apps.model_revision();
         let state = AppState {
-            draft_execution: Default::default(),
+            draft_execution: crate::drafts_apply::Executor::default(),
             changes: crate::changes::Changes::new()?,
             directory: Mutex::new(directory),
             oidc,

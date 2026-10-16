@@ -177,7 +177,7 @@ pub(super) async fn call(
             )
         })?;
     let response = PERSON_READING
-        .scope(actor, endpoint.router.clone().oneshot(request))
+        .scope(actor, endpoint.router.as_ref().clone().oneshot(request))
         .await;
     let response = match response {
         Ok(response) => response,

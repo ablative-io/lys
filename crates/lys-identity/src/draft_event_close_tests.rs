@@ -1,3 +1,4 @@
+#![cfg(test)]
 use crate::draft_event::{
     Approved, Created, DraftEvent, Executed, Refused, RefusedOnExecution, Target, decode, encode,
 };

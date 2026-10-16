@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::return_page::{Return, page};
 use axum::http::StatusCode;
 use std::error::Error;

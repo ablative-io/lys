@@ -8,16 +8,16 @@ use lys_identity::draft_event::{DraftEvent, Executed, RefusedOnExecution};
 use lys_identity::projection::draft::DraftRecord;
 use lys_identity::{Actor, OperationId};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, OnceLock, Weak};
 
 /// The admitted router and the signal-driven exclusion of simultaneous approvals.
 #[derive(Default)]
 pub struct Executor {
-    router: OnceLock<Router>,
+    router: OnceLock<Weak<Router>>,
     pub(crate) gate: tokio::sync::Mutex<()>,
 }
 impl Executor {
-    pub(crate) fn attach(&self, router: Router) -> Result<(), ServerError> {
+    pub(crate) fn attach(&self, router: Weak<Router>) -> Result<(), ServerError> {
         self.router
             .set(router)
             .map_err(|_| fault("the draft router was attached twice"))
@@ -74,7 +74,6 @@ pub(crate) async fn apply(
     state: &Arc<AppState>,
     headers: &HeaderMap,
     held: &DraftRecord,
-    approver: Actor,
 ) -> Result<Outcome, ServerError> {
     if let Some(outcome) = outcome(held) {
         return Ok(outcome);
@@ -84,11 +83,14 @@ pub(crate) async fn apply(
         .as_ref()
         .ok_or_else(|| fault("the draft has no approval"))?
         .0;
-    let actor = approver.with_draft(lys_identity::provenance::DraftProvenance {
-        draft: held.created.operation,
-        application: approved.application,
-        drafted_by: held.created.actor.provenance().agent(),
-    });
+    let actor = approved
+        .actor
+        .clone()
+        .with_draft(lys_identity::provenance::DraftProvenance {
+            draft: held.created.operation,
+            application: approved.application,
+            drafted_by: held.created.actor.provenance().agent(),
+        });
     let bytes = match serde_json::from_slice::<serde_json::Value>(&held.created.body) {
         Ok(serde_json::Value::Object(mut object)) => {
             if object.contains_key("operation") {
@@ -116,8 +118,9 @@ pub(crate) async fn apply(
         .draft_execution
         .router
         .get()
-        .ok_or_else(|| fault("the admitted draft router is absent"))?
-        .clone();
+        .and_then(Weak::upgrade)
+        .ok_or_else(|| fault("the admitted draft router is absent"))?;
+    let router = router.as_ref().clone();
     let response = APPROVER
         .scope(
             actor.clone(),

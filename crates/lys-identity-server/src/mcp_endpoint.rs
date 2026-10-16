@@ -65,7 +65,7 @@ const TOOLS: [(&str, &str); 4] = [
 ];
 
 struct Endpoint {
-    router: Router,
+    router: Arc<Router>,
     state: Option<Arc<crate::routes::AppState>>,
     origin: String,
     apps: Option<Arc<crate::mcp_oauth::Apps>>,
@@ -96,6 +96,10 @@ fn registered(
     let origin = reqwest::Url::parse(origin).map_err(|error| ServerError::ConfigInvalid {
         reason: format!("the MCP origin is invalid: {error}"),
     })?;
+    let router = Arc::new(router);
+    if let Some(state) = &state {
+        state.draft_execution.attach(Arc::downgrade(&router))?;
+    }
     let endpoint = Arc::new(Endpoint {
         router,
         state,

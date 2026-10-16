@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::seat_program::SeatProgram;
 use serde_json::{Value, json};
 use std::error::Error;
