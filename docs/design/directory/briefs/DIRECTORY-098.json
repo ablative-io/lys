@@ -34,13 +34,19 @@
       "files": {
         "create": [
           "crates/lys-identity-server/src/apps_sign_in_declare.rs",
-          "crates/lys-identity-server/src/apps_sign_in_declare_tests.rs"
+          "crates/lys-identity-server/src/apps_sign_in_declare_tests.rs",
+          "crates/lys-identity-server/tests/fixtures/apps-line-return-declared.json"
         ],
         "modify": [
           "crates/lys-identity-server/src/lib.rs",
           "crates/lys-identity-server/src/openapi_typed/apps.rs",
           "crates/lys-identity-server/tests/provider.rs",
-          "crates/lys-identity-server/src/routes_table.rs"
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity-server/src/apps_state.rs",
+          "crates/lys-identity-server/src/apps_fold.rs",
+          "crates/lys-identity-server/src/apps_views.rs",
+          "crates/lys-identity-server/tests/apps_lines.rs",
+          "crates/lys-identity-server/tests/apps_snapshot.rs"
         ],
         "delete": []
       },

@@ -35,8 +35,10 @@ import type { MeView } from '../../generated';
 
 /** Who made an act on the apps. */
 export interface By { kind: 'person' | 'operator' | 'service_account' | 'start'; login?: { provider: string; subject: string }; id?: string }
+/** One return address declared rather than saved in the list (DIRECTORY-098): who declared it and when. */
+export interface Declared { address: string; by: By; at: number }
 /** An approved app's sign-in settings as last set: what the provider admits at its next request. */
-export interface SignIn { redirects: string[]; profile: boolean; operation: string; by: By; at: number }
+export interface SignIn { redirects: string[]; profile: boolean; operation: string; by: By; at: number; declared?: Declared[] }
 /** An app as the service answers it. */
 export interface AppRecord {
   id: string; name: string; state: 'pending' | 'approved' | 'declined' | 'retired'; redirects: string[];
@@ -48,9 +50,17 @@ export interface AppRecord {
 
 const strings = (values: unknown): values is string[] => Array.isArray(values) && values.every((entry) => typeof entry === 'string');
 const validBy = (by: unknown): by is By => !!by && typeof by === 'object' && ['person', 'operator', 'service_account', 'start'].includes((by as By).kind);
+const validDeclared = (value: unknown): value is Declared => !!value && typeof value === 'object' && typeof (value as Declared).address === 'string' && validBy((value as Declared).by) && Number.isSafeInteger((value as Declared).at);
 const validSignIn = (value: unknown): value is SignIn | null => value === null
   || (!!value && typeof value === 'object' && strings((value as SignIn).redirects) && typeof (value as SignIn).profile === 'boolean'
-    && typeof (value as SignIn).operation === 'string' && validBy((value as SignIn).by) && Number.isSafeInteger((value as SignIn).at));
+    && typeof (value as SignIn).operation === 'string' && validBy((value as SignIn).by) && Number.isSafeInteger((value as SignIn).at)
+    && ((value as SignIn).declared === undefined || (Array.isArray((value as SignIn).declared) && (value as SignIn).declared!.every(validDeclared))));
+/** When a declaration was made, as a date and time a person reads the same everywhere. */
+const declaredWhen = (at: number): string => new Date(at * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+/** The line under a declared address: who declared it (the app itself, or the person by their login) and when. */
+function DeclaredBy({ declared }: { declared: Declared }) {
+  return <div className="note declared-by">declared by {declared.by.kind === 'service_account' ? 'the app' : who(declared.by)}, {declaredWhen(declared.at)}</div>;
+}
 
 /** The app as an answer carries it, checked whole, or thrown with words for the screen. */
 function appAnswer(value: unknown, id: string, state: AppRecord['state'], what: string): AppRecord {
@@ -201,7 +211,7 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
     </dl></details>
     {app.redirects.length ? <div><b>Return addresses its registration asked for</b><ul className="app-list">{app.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul></div> : null}
     {app.sign_in ? <div aria-label={'Sign-in settings of ' + app.id}><b>Its sign-in, as last set by <ByName by={app.sign_in.by} me={me} /></b>
-      <ul className="app-list">{app.sign_in.redirects.map((address) => <li className="mono" key={address}>{address}</li>)}</ul>
+      <ul className="app-list">{app.sign_in.redirects.map((address) => { const declared = app.sign_in?.declared?.find((entry) => entry.address === address); return <li className="mono" key={address}>{address}{declared ? <DeclaredBy declared={declared} /> : null}</li>; })}</ul>
       <p className="note">{app.sign_in.profile ? 'It is given the person’s name.' : 'It is not given the person’s name.'}</p></div> : null}
     <div><b>{app.state === 'pending' ? 'The permissions it asks for' : 'The permissions it has'}</b><SchemaTable app={app.id} schema={app.schema} label={'Schema of ' + app.id} /></div>
     {stored ? <CustodyConfirmed answer={stored} /> : null}

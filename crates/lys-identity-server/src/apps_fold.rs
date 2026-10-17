@@ -77,6 +77,11 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
             Err(Refused::Standing(standing))
         }
         Line::SignInSet(_) if standing != Standing::Approved => Err(Refused::Standing(standing)),
+        // A declaration joins the settings in force: with none to join, or an
+        // app not approved, it is refused as the standing is.
+        Line::ReturnDeclared(_) if standing != Standing::Approved || app.sign_in.is_none() => {
+            Err(Refused::Standing(standing))
+        }
         // The settings beside an approval are kept once: a second line under
         // the approval's operation is a repeat, not a change.
         Line::SignInSet(set)
@@ -184,6 +189,13 @@ pub(super) fn apply(app: &mut App, line: &Line) {
             app.approved = Some(approved.clone());
         }
         Line::SignInSet(set) => app.sign_in = Some(set.clone()),
+        Line::ReturnDeclared(declared) => {
+            if let Some(settings) = &mut app.sign_in
+                && !settings.redirects.contains(&declared.address)
+            {
+                settings.redirects.push(declared.address.clone());
+            }
+        }
         Line::Connector(connected) => app.connector = Some(connected.clone()),
         Line::Declined(declined) => app.declined = Some(declined.clone()),
         Line::Retired(retired) => app.retired = Some(retired.clone()),

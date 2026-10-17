@@ -617,6 +617,62 @@ async fn the_sign_in_settings_are_in_force_at_the_provider_s_next_request() -> T
     Ok(())
 }
 
+/// DIRECTORY-098 R1: an address the app declared with its own credential is
+/// in force at the provider's next request, as DIRECTORY-097 R2 pins for a
+/// listed entry: authorize at it answers 303 and the token exchange at it
+/// completes; before the declaration it is refused as any unlisted address.
+#[tokio::test]
+async fn an_address_the_app_declared_is_in_force_at_the_provider_s_next_request() -> TestResult {
+    const DECLARED: &str = "https://product.example.test/signin/return";
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let (status, sent, refusal) = authorize_answer(&service, &cookie, PRODUCT, DECLARED).await?;
+    assert_eq!((status, sent), (400, None), "{refusal}");
+    let declaration = json!({"operation": identity_contract::apps::op()?, "address": DECLARED});
+    let declared = ok(post(
+        &service,
+        &format!("/apps/{PRODUCT}/sign_in/returns"),
+        Auth::Bearer(&identity_contract::app_custody::credential(PRODUCT)),
+        &declaration,
+    )
+    .await?)?;
+    assert_eq!(
+        declared["sign_in"]["redirects"],
+        json!([CALLBACK, DECLARED])
+    );
+    assert_eq!(declared["sign_in"]["declared"][0]["address"], DECLARED);
+    assert_eq!(
+        declared["sign_in"]["declared"][0]["by"]["kind"],
+        "service_account"
+    );
+    let verifier = "a-verifier-of-enough-length-for-pkce-9876543210";
+    let answer = browser()?
+        .get(format!("{}/oauth/authorize", service.base))
+        .query(&[
+            ("client_id", PRODUCT),
+            ("redirect_uri", DECLARED),
+            ("response_type", "code"),
+            ("scope", "openid"),
+            ("state", "declared-state"),
+            ("code_challenge", &challenge_of(verifier)),
+            ("code_challenge_method", "S256"),
+        ])
+        .header(reqwest::header::COOKIE, &cookie)
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 303, "the declared address is admitted");
+    let back = reqwest::Url::parse(&location(&answer)?)?;
+    assert!(back.as_str().starts_with(DECLARED), "{back}");
+    let code = back
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, value)| value.into_owned())
+        .ok_or("the product is given a code at the declared address")?;
+    let (status, tokens) = exchange_at(&service, &code, verifier, DECLARED).await?;
+    assert_eq!(status, 200, "{tokens}");
+    assert!(tokens["id_token"].is_string(), "{tokens}");
+    Ok(())
+}
+
 /// DIRECTORY-079 R1, acceptance 4: a declined app's client id is refused
 /// `app_not_approved` naming the app, at authorize and at token, and the
 /// browser is sent nowhere.

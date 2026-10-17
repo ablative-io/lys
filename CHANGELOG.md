@@ -73,6 +73,29 @@ unreleased things cannot be used to tell what a published version contains.
   return address is judged by the same rule, and a wildcard is never an
   origin there.
 
+### Added — `lys-identity-server`: an app declares its own return address (DIRECTORY-098)
+
+- `POST /apps/{app}/sign_in/returns` takes `{operation, address}` and is
+  admitted to the signed-in administrator and to the app itself, acting
+  through its `lys-app` credential; a signed-in person, the registrar and
+  another app's credential are refused `NotAdmitted` ("only the
+  administrator or the app itself declares the app's return addresses").
+  The address is judged by the rule a saved line is (every DIRECTORY-097
+  `redirect_invalid` reason applies); an app not approved is refused by its
+  standing's name (`app_not_approved`, `app_retired`), and an approved app
+  with no sign-in settings to join is refused `redirect_invalid` as an app
+  that could sign nobody in. An address already listed byte for byte
+  answers 200 with the settings unchanged and writes nothing; otherwise the
+  app's log gains one `return_declared` line by the caller and the settings
+  in force gain the address, every other setting as it was. The
+  administrator's `POST /apps/{app}/sign_in` still sets the whole list and
+  may drop a declared address. The sign-in settings answer `declared`: each
+  declared address with who declared it and when, cleared by a later save
+  of the whole list; the Apps screen shows "declared by the app" or
+  "declared by <login>" with the time under such an address, and its help
+  says an app may declare its own address and that the list saved there is
+  the whole list.
+
 ### Fixed — `lys-pass` 0.3.3
 
 - Live clients take the Lys origin. Provider routes use `/oauth/`; permission

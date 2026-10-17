@@ -15,7 +15,7 @@ use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
     ClientCredentialsEnded, Connected, CustodyPrepared, Decided, Held, Line, LysRecorded, Placed,
-    Proposed, Registered, SignInSet, Standing,
+    Proposed, Registered, ReturnDeclared, SignInSet, Standing,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -235,6 +235,7 @@ fn kind(line: &Line) -> &'static str {
         Line::Registered(_) => "registered",
         Line::Approved(_) => "approved",
         Line::SignInSet(_) => "sign_in_set",
+        Line::ReturnDeclared(_) => "return_declared",
         Line::Declined(_) => "declined",
         Line::Retired(_) => "retired",
         Line::Proposed(_) => "proposed",
@@ -259,6 +260,7 @@ fn actor(line: &Line) -> Option<By> {
         Line::Registered(Registered { by, .. })
         | Line::Approved(Approved { by, .. })
         | Line::SignInSet(SignInSet { by, .. })
+        | Line::ReturnDeclared(ReturnDeclared { by, .. })
         | Line::Declined(Decided { by, .. })
         | Line::Retired(Decided { by, .. })
         | Line::Proposed(Proposed { by, .. })

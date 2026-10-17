@@ -42,10 +42,16 @@ Behavioural. POST /apps/{app}/sign_in/returns takes {"address": "<absolute addre
 **Files:**
 - create: crates/lys-identity-server/src/apps_sign_in_declare.rs
 - create: crates/lys-identity-server/src/apps_sign_in_declare_tests.rs
+- create: crates/lys-identity-server/tests/fixtures/apps-line-return-declared.json
 - modify: crates/lys-identity-server/src/lib.rs
 - modify: crates/lys-identity-server/src/openapi_typed/apps.rs
 - modify: crates/lys-identity-server/tests/provider.rs
 - modify: crates/lys-identity-server/src/routes_table.rs
+- modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_fold.rs
+- modify: crates/lys-identity-server/src/apps_views.rs
+- modify: crates/lys-identity-server/tests/apps_lines.rs
+- modify: crates/lys-identity-server/tests/apps_snapshot.rs
 
 **Checklist:**
 - C743 — POST /apps/{app}/sign_in/returns adds one return address for the administrator or the app itself acting through its own credential, judged by DIRECTORY-097's rule, written nowhere when already listed, refused NotAdmitted to anyone else.

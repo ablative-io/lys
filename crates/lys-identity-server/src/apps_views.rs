@@ -13,7 +13,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::apps_error::Strand;
-use crate::apps_state::{App, By, Connected, Proposed, SignInSet, Standing};
+use crate::apps_state::{App, By, Connected, Line, Proposed, SignInSet, Standing};
 
 /// A schema change waiting for an administrator.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -59,6 +59,50 @@ pub struct SignInView {
     pub by: By,
     /// When.
     pub at: u64,
+    /// The addresses among `redirects` that were declared (DIRECTORY-098)
+    /// rather than saved in the list, each with who declared it and when.
+    /// A later save of the whole list makes every address a saved one.
+    pub declared: Vec<DeclaredView>,
+}
+
+/// One declared return address: who declared it and when.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+pub struct DeclaredView {
+    /// The address, as listed.
+    pub address: String,
+    /// Who declared it: the app itself (a service account) or the administrator.
+    #[schema(value_type = Object)]
+    pub by: By,
+    /// When.
+    pub at: u64,
+}
+
+/// The app's sign-in settings as they stand, with the declared addresses read
+/// from its history: a declaration counts while its address is listed and no
+/// later save of the whole list has made it a saved one.
+pub(crate) fn sign_in_view(app: &App) -> Option<SignInView> {
+    let settings = app.sign_in.as_ref()?;
+    let mut declared: Vec<DeclaredView> = Vec::new();
+    for line in &app.history {
+        match line {
+            Line::SignInSet(_) => declared.clear(),
+            Line::ReturnDeclared(line)
+                if settings.redirects.contains(&line.address)
+                    && !declared.iter().any(|held| held.address == line.address) =>
+            {
+                declared.push(DeclaredView {
+                    address: line.address.clone(),
+                    by: line.by.clone(),
+                    at: line.at,
+                });
+            }
+            _ => {}
+        }
+    }
+    Some(SignInView {
+        declared,
+        ..SignInView::from(settings)
+    })
 }
 
 impl From<&SignInSet> for SignInView {
@@ -69,6 +113,7 @@ impl From<&SignInSet> for SignInView {
             operation: set.operation.clone(),
             by: set.by.clone(),
             at: set.at,
+            declared: Vec::new(),
         }
     }
 }
@@ -151,7 +196,7 @@ impl From<&App> for AppView {
             name: registered.name.clone(),
             state: app.standing(),
             redirects: registered.redirects.clone(),
-            sign_in: app.sign_in.as_ref().map(SignInView::from),
+            sign_in: sign_in_view(app),
             schema: current.map_or_else(|| registered.schema.clone(), |held| held.schema.clone()),
             version: current.map_or(0, |held| held.version),
             versions: app.versions.iter().map(|held| held.version).collect(),

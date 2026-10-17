@@ -218,6 +218,27 @@ pub(super) fn settings(api: &mut Api, app: &str) -> Vec<lys_openapi::Route> {
         route(
             (
                 POST,
+                "/apps/{app}/sign_in/returns",
+                "Declare one return address for an approved app, as the administrator or as the app itself through its lys-app credential; an address already listed writes nothing",
+            ),
+            S,
+            Some(api.schema::<crate::apps_sign_in_declare::ReturnDeclarationBody>()),
+            Some(app.to_owned().into()),
+            &[
+                ADMIN_BODY,
+                &[
+                    "credential_refused",
+                    "app_unknown",
+                    "app_not_approved",
+                    "app_retired",
+                    "redirect_invalid",
+                    "app_operation_reused",
+                ],
+            ],
+        ),
+        route(
+            (
+                POST,
                 "/apps/{app}/connector",
                 "Give an app approved before connectors its connector, answering to the administrator acting",
             ),

@@ -152,6 +152,24 @@ pub struct SignInSet {
     pub at: u64,
 }
 
+/// One return address declared for an approved app (DIRECTORY-098): by the
+/// administrator or by the app itself through its own credential, judged as
+/// a saved line is, appended to the settings in force.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReturnDeclared {
+    /// The operation id it was kept under.
+    pub operation: String,
+    /// The app.
+    pub app: String,
+    /// The address, as admitted.
+    pub address: String,
+    /// Who declared it.
+    pub by: By,
+    /// When.
+    pub at: u64,
+}
+
 /// A registration or a change declined, or an app retired.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -289,6 +307,8 @@ pub enum Line {
     Approved(Approved),
     /// An approved app's sign-in settings set.
     SignInSet(SignInSet),
+    /// One return address declared for an approved app (DIRECTORY-098).
+    ReturnDeclared(ReturnDeclared),
     /// A registration declined.
     Declined(Decided),
     /// An app retired.
@@ -324,6 +344,7 @@ impl Line {
             Self::Registered(line) => &line.operation,
             Self::Approved(line) => &line.operation,
             Self::SignInSet(line) => &line.operation,
+            Self::ReturnDeclared(line) => &line.operation,
             Self::Declined(line) | Self::Retired(line) | Self::ChangeDeclined(line) => {
                 &line.operation
             }
@@ -347,6 +368,7 @@ impl Line {
             Self::Registered(line) => Some(&line.app),
             Self::Approved(line) => Some(&line.app),
             Self::SignInSet(line) => Some(&line.app),
+            Self::ReturnDeclared(line) => Some(&line.app),
             Self::Declined(line) | Self::Retired(line) | Self::ChangeDeclined(line) => {
                 Some(&line.app)
             }

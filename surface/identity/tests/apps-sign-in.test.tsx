@@ -5,6 +5,7 @@ import { act } from 'react';
 import { expect, it } from 'vitest';
 import { click, mount, settle, text } from './harness';
 import { ME, SERVICE, ok, refused } from './fixtures';
+import { PAGES } from '../src/shell/help/pages';
 
 /** Type into the addresses field, a textarea, as a person would. */
 async function type(el: Element | null, value: string): Promise<void> {
@@ -147,4 +148,55 @@ it('shows a refused wildcard line with its reason', async () => {
   expect(details()).toBe(reason);
   expect(settings()).toContain(BACK);
   expect(settings()).not.toContain(wild);
+});
+
+// DIRECTORY-098 R2: an address the app declared with its credential, or the administrator declared for
+// it, carries the line "declared by the app, <time>" or "declared by <login>, <time>" under it, read
+// from the settings' `declared`; an address saved in the list carries none; saving the list without a
+// declared address posts the list without it; and the help page says so.
+const DECLARED = 'https://notes.example.test/signin/return';
+const AT = 1760780000;
+const WHEN = '2025-10-18 09:33 UTC';
+const declaredSignIn = (by: unknown) => ({ ...signIn, redirects: [BACK, DECLARED], declared: [{ address: DECLARED, by, at: AT }] });
+/** The settings' list items, each with its own words. */
+const items = () => [...document.querySelectorAll('[aria-label="Sign-in settings of ' + APP + '"] li')].map((entry) => entry.textContent ?? '');
+
+function declaredRoutes(by: unknown) {
+  let current: unknown = { ...approved, sign_in: declaredSignIn(by) };
+  return {
+    ...SERVICE,
+    '/apps': () => ok({ apps: [current] }),
+    ['POST /apps/' + APP + '/sign_in']: (body: unknown) => {
+      const asked = body as { redirects: string[]; profile: boolean };
+      current = { ...approved, sign_in: { redirects: asked.redirects, profile: asked.profile, operation: 'op-change', by: ada, at: 3 } };
+      return ok(current);
+    },
+  };
+}
+
+it('shows an address the app declared with who declared it and when, and a saved address with no such line', async () => {
+  await mount('#/apps', declaredRoutes({ kind: 'service_account', id: APP }));
+  expect(items()).toEqual([BACK, DECLARED + 'declared by the app, ' + WHEN]);
+  expect(document.querySelectorAll('.declared-by')).toHaveLength(1);
+});
+
+it('names the administrator who declared an address by their login', async () => {
+  await mount('#/apps', declaredRoutes(ada));
+  expect(items()[1]).toBe(DECLARED + 'declared by ada, ' + WHEN);
+});
+
+it('saving the list without the declared address posts the list without it, and the line is gone', async () => {
+  const { posted } = await mount('#/apps', declaredRoutes({ kind: 'service_account', id: APP }));
+  expect(addresses()?.value).toBe(BACK + '\n' + DECLARED);
+  await type(addresses(), BACK);
+  await click(button('Save the sign-in of Notes fixture'));
+  expect(posted).toEqual([{ path: '/apps/' + APP + '/sign_in', body: { operation: expect.stringMatching(/^op-/), redirects: [BACK], profile: true } }]);
+  expect(items()).toEqual([BACK]);
+  expect(settings()).not.toContain('declared by');
+});
+
+it('the help page says an app may declare its own return address and that the list saved there is the whole list', () => {
+  const help = PAGES.apps.regions.find((region) => region.sel === '.app-signin')?.text ?? '';
+  expect(help).toContain('An app may declare its own return address with its credential, and such an address is shown here with who declared it and when.');
+  expect(help).toContain('The list saved here is the whole list: saving it without a declared address removes it.');
 });

@@ -36,6 +36,7 @@ All tool paths omit the HTTP endpoint's `/api` prefix.
 | POST | `/apps/{app}/schema/check` | What a schema change would do, writing nothing | CheckBody |
 | POST | `/apps/{app}/schema/decline` | Decline the schema change waiting | ChangeDecision |
 | POST | `/apps/{app}/sign_in` | Set an approved app's return addresses (https anywhere or http on this machine; `https://*.` under a domain of two or more labels names every machine of that domain) and whether it is given the person's name | AppSignInBody |
+| POST | `/apps/{app}/sign_in/returns` | Declare one return address for an approved app, as the administrator or as the app itself through its lys-app credential; an address already listed writes nothing | ReturnDeclarationBody |
 | GET | `/oauth/authorize` | Begin an authorization | not declared; inspect operation |
 | GET | `/oauth/jwks` | The issuer's signing keys | not declared; inspect operation |
 | POST | `/oauth/jwks/rotate` | Rotate the key passes are signed with; the old key stays published one lifetime | RotateBody |

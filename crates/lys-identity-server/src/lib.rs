@@ -36,6 +36,7 @@ mod apps_redirect;
 mod apps_refresh;
 pub mod apps_schema_api;
 pub mod apps_sign_in;
+mod apps_sign_in_declare;
 pub mod apps_state;
 pub mod apps_store;
 mod apps_upgrade;

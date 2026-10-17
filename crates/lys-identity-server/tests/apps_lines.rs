@@ -11,7 +11,7 @@ use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
     ClientCredentialsEnded, Connected, Decided, Line, LysRecorded, Placed, Proposed, Registered,
-    SignInSet,
+    ReturnDeclared, SignInSet,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -114,6 +114,7 @@ fn shape(line: &Line) -> &'static str {
         Line::Registered(_) => "registered",
         Line::Approved(_) => "approved",
         Line::SignInSet(_) => "sign_in_set",
+        Line::ReturnDeclared(_) => "return_declared",
         Line::Declined(_) => "declined",
         Line::Retired(_) => "retired",
         Line::Proposed(_) => "proposed",
@@ -187,13 +188,14 @@ fn every_client_credential_line_shape_keeps_its_bytes_and_reads_back() -> TestRe
         assert_eq!(&read, line, "{}: today's reader", shape(line));
     }
     let connector: Line = serde_json::from_str(CONNECTOR_FIXTURE.trim_end())?;
+    let declared: Line = serde_json::from_str(RETURN_DECLARED_FIXTURE.trim_end())?;
     let shapes: std::collections::BTreeSet<_> = lines()
         .iter()
         .chain(&credentials)
-        .chain(std::iter::once(&connector))
+        .chain([&connector, &declared])
         .map(shape)
         .collect();
-    assert_eq!(shapes.len(), 15, "every shape of apps line is pinned");
+    assert_eq!(shapes.len(), 16, "every shape of apps line is pinned");
     Ok(())
 }
 
@@ -216,6 +218,29 @@ fn the_connector_line_keeps_its_bytes_and_reads_back() -> TestResult {
     let read: Line = serde_json::from_str(CONNECTOR_FIXTURE.trim_end())?;
     assert_eq!(read, line);
     assert_eq!(shape(&read), "connector");
+    Ok(())
+}
+
+/// The return-address declaration (DIRECTORY-098 R1), written once by the
+/// code that added it and never regenerated.
+const RETURN_DECLARED_FIXTURE: &str = include_str!("fixtures/apps-line-return-declared.json");
+
+#[test]
+fn the_return_declared_line_keeps_its_bytes_and_reads_back() -> TestResult {
+    let line = Line::ReturnDeclared(ReturnDeclared {
+        operation: "op-13131313131313131313131313131313".to_owned(),
+        app: "notes".to_owned(),
+        address: "https://notes.example.test/signin/return".to_owned(),
+        by: By::ServiceAccount {
+            id: "notes".to_owned(),
+        },
+        at: 19,
+    });
+    let written = serde_json::to_string(&line)?;
+    assert_eq!(RETURN_DECLARED_FIXTURE.trim_end(), written);
+    let read: Line = serde_json::from_str(RETURN_DECLARED_FIXTURE.trim_end())?;
+    assert_eq!(read, line);
+    assert_eq!(shape(&read), "return_declared");
     Ok(())
 }
 

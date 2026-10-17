@@ -73,6 +73,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::secrets_api::routes())
         .merge(crate::sessions_api::routes())
         .merge(crate::apps_api::routes())
+        .merge(crate::apps_sign_in_declare::routes())
         .merge(crate::product_agents::routes())
         .merge(crate::apps_schema_api::routes())
         .merge(crate::apps_bench::routes())
