@@ -3,8 +3,9 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, Router};
-use identity_contract::apps::{login, op};
-use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
+use identity_contract::apps::op;
+use tower::ServiceExt;
+
 use serde_json::{Value, json};
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -73,34 +74,10 @@ async fn both_seat_program_wires_bind_the_run_at_the_proxy_without_receiving_a_c
         async move { axum::serve(listener, router).await },
     ));
     let keys = tempfile::tempdir()?;
-    let service_key_file = keys.path().join("service.key");
-    lys_core::Ed25519Identity::load_or_generate(&service_key_file)?;
-    let secrets = crate::secrets_api::SecretsSettings {
-        broker: address.clone(),
-        service: "identity".into(),
-        service_key_file,
-    };
-    let configured = address.clone();
-    let (service, (config, people)) = Service::start_adjusted(
-        GRANT_MODEL,
-        None,
-        Some(secrets),
-        None,
-        move |config| {
-            config.model_proxy = Some(format!("{configured}/anthropic"));
-        },
-        |config| {
-            Ok((
-                config.clone(),
-                crate::dev_seed::seed_configured(config, [ADMINISTRATOR, "other-subject"])?,
-            ))
-        },
-    )
-    .await?;
-    let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
-    let person = people.people[0].id.to_string();
-    let agent = people.people[0].agents[0].id.to_string();
+    let (fixture, cookie, person) = prepared(keys.path(), &address).await?;
+    let agent = fixture.agent.clone();
     let path = format!("/agents/{agent}/provisioning");
+    let router = crate::provisioning_api::routes().with_state(Arc::clone(&fixture.state));
     for (from_version, wire, provider, variable) in [
         (
             0,
@@ -118,11 +95,16 @@ async fn both_seat_program_wires_bind_the_run_at_the_proxy_without_receiving_a_c
         proxy
             .anthropic
             .store(wire == "anthropic-messages", Ordering::SeqCst);
-        let (status, answer) = service
-            .post(&path, Some(&cookie), &profile(wire, &op()?, from_version))
-            .await?;
-        assert_eq!(status, 200, "{answer}");
-        let state = crate::routes_startup::fixture_state(&config).await?;
+        let request = axum::http::Request::post(&path)
+            .header("cookie", &cookie)
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(
+                profile(wire, &op()?, from_version).to_string(),
+            ))?;
+        let answer = router.clone().oneshot(request).await?;
+        let status = answer.status();
+        let body = axum::body::to_bytes(answer.into_body(), usize::MAX).await?;
+        assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
         let version = from_version + 1;
         let run = format!("{version:032x}");
         let mut launch: lys_runner::Launch = serde_json::from_value(
@@ -130,7 +112,7 @@ async fn both_seat_program_wires_bind_the_run_at_the_proxy_without_receiving_a_c
             "environment":{"LYS_RUN":run,"LYS_PROVISIONING_VERSION":version.to_string()},
             "rotation":{"accounts":["first"],"variable":"LYS_HANDLE_ACCOUNT","limit":{"signal":"plan_window"}}}),
         )?;
-        crate::model_account_start::bind(&state, &agent, &person, &mut launch).await?;
+        crate::model_account_start::bind(&fixture.state, &agent, &person, &mut launch).await?;
         assert_eq!(launch.environment["LYS_ACCOUNT_VARIABLE"], variable);
         assert_eq!(launch.environment[variable], "lys-account.first");
         if wire == "anthropic-messages" {
@@ -146,6 +128,46 @@ async fn both_seat_program_wires_bind_the_run_at_the_proxy_without_receiving_a_c
         assert_eq!(binding["body"]["accounts"], json!(["first"]));
         assert_eq!(bindings.len(), usize::try_from(version)?);
     }
+    drop(router);
+    fixture.finish().await?;
     drop(serving);
     Ok(())
+}
+
+async fn prepared(
+    keys: &std::path::Path,
+    address: &str,
+) -> Result<(crate::budgets_feed::entry_tests::Fixture, String, String), Box<dyn Error>> {
+    let service_key_file = keys.join("service.key");
+    lys_core::Ed25519Identity::load_or_generate(&service_key_file)?;
+    let secrets = crate::secrets_api::SecretsSettings {
+        broker: address.to_owned(),
+        service: "identity".into(),
+        service_key_file,
+    };
+    let mut fixture = crate::budgets_feed::entry_tests::fixture().await?;
+    let state = Arc::get_mut(&mut fixture.state).ok_or("fixture state already shared")?;
+    state.model_proxy = Some(format!("{address}/anthropic"));
+    state.secrets = Some(crate::secrets_api::SecretsBroker::open(&secrets)?);
+    state.provisioning = Some(Mutex::new(
+        crate::provisioning_store::ProvisioningStore::open(&keys.join("provisioning.json"))?,
+    ));
+    let binding = state
+        .admission
+        .administrator_login()?
+        .ok_or("administrator absent")?;
+    let actor = lys_identity::Actor::new(
+        binding,
+        lys_identity::Provenance::new(lys_identity::AuthMethod::Oidc, crate::session::now()),
+    );
+    let person = crate::routes::with_directory(state, |directory| {
+        Ok(crate::read_api::own_person(directory.projection()?, &actor)?.to_string())
+    })?;
+    let cookie = state.sessions.begin(actor)?;
+    let cookie = cookie
+        .split(';')
+        .next()
+        .ok_or("session cookie absent")?
+        .to_owned();
+    Ok((fixture, cookie, person))
 }

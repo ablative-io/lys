@@ -150,6 +150,9 @@ pub struct SessionView {
     /// A known adapter's unqualified version, when it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub qualification: Option<String>,
+    /// The reviewed and started seat digests, when this is a seat program.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seat_program: Option<serde_json::Value>,
     /// The session.
     pub session: String,
     /// Its process id, while one is known.

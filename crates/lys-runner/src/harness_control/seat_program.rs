@@ -29,7 +29,9 @@ pub(crate) fn environment(
     for (name, value) in given {
         if name != SPEC_VARIABLE
             && name != PROOF_VARIABLE
-            && (name == "LYS_AGENT_PASS" || !credential_shaped(name))
+            && (name == "LYS_AGENT_PASS"
+                || !credential_shaped(name)
+                || account_value(given, name, value))
         {
             kept.insert(
                 std::ffi::OsString::from(name),
@@ -38,6 +40,26 @@ pub(crate) fn environment(
         }
     }
     kept
+}
+
+fn account_value(
+    given: &std::collections::BTreeMap<String, String>,
+    name: &str,
+    value: &str,
+) -> bool {
+    let Some(variable) = given.get("LYS_ACCOUNT_VARIABLE") else {
+        return false;
+    };
+    let Some(selector) = given.get(variable) else {
+        return false;
+    };
+    if selector
+        .strip_prefix("lys-account.")
+        .is_none_or(str::is_empty)
+    {
+        return false;
+    }
+    name == variable || value.is_empty()
 }
 
 pub(crate) fn record(

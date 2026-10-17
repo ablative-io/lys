@@ -161,6 +161,19 @@ impl Session {
     fn view(&self, id: &str) -> Result<SessionView, RunnerError> {
         let output = self.output.lock()?;
         Ok(SessionView {
+            seat_program: self
+                .launch
+                .as_ref()
+                .and_then(|launch| {
+                    launch
+                        .environment
+                        .get(crate::harness_control::seat_program::PROOF_VARIABLE)
+                })
+                .map(|proof| serde_json::from_str(proof))
+                .transpose()
+                .map_err(|error| {
+                    RunnerError::refused("seat_program_record_invalid", error.to_string())
+                })?,
             qualification: self
                 .live
                 .as_ref()

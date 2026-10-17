@@ -51,6 +51,7 @@ pub fn status<'a>(
                 .filter(|id| wanted.is_none_or(|wanted| wanted == id.as_str()))
                 .map(|id| lys_runner::protocol::SessionView {
                     qualification: None,
+                    seat_program: None,
                     session: id.clone(),
                     pid: Some(42),
                     started_at: 1,

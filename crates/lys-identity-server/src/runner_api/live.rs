@@ -16,6 +16,7 @@ pub(super) async fn live(
     let seen = crate::runtime_api::visible_sessions(&state, &headers)?;
     let page = crate::list_page::Page::read(query, "/runtime/live")?;
     let mut unanswered = Vec::new();
+    let mut proofs = std::collections::BTreeMap::new();
     let mut machines: std::collections::BTreeMap<String, Vec<super::Driven>> =
         std::collections::BTreeMap::new();
     for tracked in seen.iter().filter(|tracked| !tracked.stopped()) {
@@ -74,21 +75,7 @@ pub(super) async fn live(
                     refusal: "runner_reply_malformed".to_owned(),
                     words: "the session snapshot omitted a requested session".to_owned(),
                 })?;
-            match answer {
-                Ok(answer) => {
-                    if let Some(ended) = ended_in(&answer) {
-                        record_end(&state, &driven, ended)?;
-                    }
-                }
-                Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => {}
-                Err(refused) => {
-                    (state.say)(&format!(
-                        "runner of machine {} did not answer for session {}: {refused}",
-                        driven.machine, driven.session
-                    ));
-                    unanswered.push(json!({"session":driven.session,"machine":driven.machine,"refusal":refused.name(),"reason":refused.to_string()}));
-                }
-            }
+            keep_answer(&state, &driven, answer, &mut unanswered, &mut proofs)?;
         }
     }
     let (sessions, totals) = if let Some(page) = &page {
@@ -113,9 +100,52 @@ pub(super) async fn live(
         });
     }
     let mut answer = json!({ "sessions": sessions, "unanswered": unanswered });
+    attach_proofs(&mut answer, &proofs);
     if let Some(totals) = totals {
         answer["total"] = json!(totals.total);
         answer["next"] = json!(totals.next);
     }
     Ok(Json(answer))
+}
+
+fn keep_answer(
+    state: &Arc<AppState>,
+    driven: &super::Driven,
+    answer: Result<lys_runner::Answer, ServerError>,
+    unanswered: &mut Vec<Value>,
+    proofs: &mut std::collections::BTreeMap<String, Value>,
+) -> Result<(), ServerError> {
+    match answer {
+        Ok(answer) => {
+            if let lys_runner::Answer::Status { status } = &answer {
+                for session in &status.sessions {
+                    if let Some(proof) = &session.seat_program {
+                        proofs.insert(session.session.clone(), proof.clone());
+                    }
+                }
+            }
+            if let Some(ended) = ended_in(&answer) {
+                record_end(state, driven, ended)?;
+            }
+        }
+        Err(ServerError::Runner { refusal, .. }) if refusal == "session_unknown" => {}
+        Err(refused) => {
+            (state.say)(&format!(
+                "runner of machine {} did not answer for session {}: {refused}",
+                driven.machine, driven.session
+            ));
+            unanswered.push(json!({"session":driven.session,"machine":driven.machine,"refusal":refused.name(),"reason":refused.to_string()}));
+        }
+    }
+    Ok(())
+}
+
+fn attach_proofs(answer: &mut Value, proofs: &std::collections::BTreeMap<String, Value>) {
+    if let Some(sessions) = answer["sessions"].as_array_mut() {
+        for session in sessions {
+            if let Some(proof) = session["session"].as_str().and_then(|id| proofs.get(id)) {
+                session["seat_program"] = proof.clone();
+            }
+        }
+    }
 }

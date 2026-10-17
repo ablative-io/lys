@@ -485,9 +485,3 @@ fn served_routes(
             crate::model_proxy_route::carry,
         )))
 }
-
-#[cfg(test)]
-#[path = "routes_fixture.rs"]
-mod fixture;
-#[cfg(test)]
-pub(crate) use fixture::state as fixture_state;

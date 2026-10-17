@@ -319,25 +319,59 @@ fn a_reviewed_seat_with_a_bound_account_starts_and_keeps_only_its_selector() -> 
         let mut fixture = Fixture::new(PROGRAM, 0o600)?;
         fixture.spec.model_wire = Some(serde_json::from_value(json!(wire))?);
         let text = serde_json::to_string(&fixture.spec)?;
-        let file = fixture.launch.config.as_mut().ok_or("config absent")?.files.first_mut().ok_or("metadata absent")?;
-        file.sha256 = lys_home::record::blocks::Hash::of(text.as_bytes()).as_str().to_owned();
+        let file = fixture
+            .launch
+            .config
+            .as_mut()
+            .ok_or("config absent")?
+            .files
+            .first_mut()
+            .ok_or("metadata absent")?;
+        file.sha256 = lys_home::record::blocks::Hash::of(text.as_bytes())
+            .as_str()
+            .to_owned();
         file.text = text;
-        fixture.launch.rotation = Some(serde_json::from_value(json!({"accounts":["first"], "variable":"LYS_HANDLE_ACCOUNT", "limit":{"signal":"plan_window"}}))?);
-        fixture.launch.environment.insert("LYS_ACCOUNT_VARIABLE".to_owned(), variable.to_owned());
-        fixture.launch.environment.insert(variable.to_owned(), "lys-account.first".to_owned());
+        fixture.launch.rotation = Some(serde_json::from_value(
+            json!({"accounts":["first"], "variable":"LYS_HANDLE_ACCOUNT", "limit":{"signal":"plan_window"}}),
+        )?);
+        fixture
+            .launch
+            .environment
+            .insert("LYS_ACCOUNT_VARIABLE".to_owned(), variable.to_owned());
+        fixture
+            .launch
+            .environment
+            .insert(variable.to_owned(), "lys-account.first".to_owned());
         for clear in ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"] {
-            fixture.launch.environment.insert(clear.to_owned(), String::new());
+            fixture
+                .launch
+                .environment
+                .insert(clear.to_owned(), String::new());
         }
-        let admission = crate::harness_control::process::seat_test_support::entry(fixture.entry.clone())?;
+        let admission =
+            crate::harness_control::process::seat_test_support::entry(fixture.entry.clone())?;
         let sessions = Sessions::open(fixture.dir.path(), 8192)?;
         sessions.start(fixture.launch)?;
         sessions.end("seat-fixture", &AtomicBool::new(false))?;
-        let words = sessions.lock()?.feed.page(None)?.entries.into_iter().find_map(|entry| match entry.body {
-            crate::tracking_store::Body::Coverage(coverage) if coverage.state == "seat_program_answered" => Some(coverage.words),
-            _ => None,
-        }).ok_or("initialize frame absent")?;
+        let words = sessions
+            .lock()?
+            .feed
+            .page(None)?
+            .entries
+            .into_iter()
+            .find_map(|entry| match entry.body {
+                crate::tracking_store::Body::Coverage(coverage)
+                    if coverage.state == "seat_program_answered" =>
+                {
+                    Some(coverage.words)
+                }
+                _ => None,
+            })
+            .ok_or("initialize frame absent")?;
         let frame: Value = serde_json::from_str(&words)?;
-        let names = frame["result"]["fixture"]["names"].as_array().ok_or("environment absent")?;
+        let names = frame["result"]["fixture"]["names"]
+            .as_array()
+            .ok_or("environment absent")?;
         assert!(names.contains(&json!(variable)));
         assert!(!names.contains(&json!("SERVICE_CREDENTIAL")));
         let status = sessions.status(Some("seat-fixture"))?;

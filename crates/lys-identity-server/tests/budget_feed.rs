@@ -290,6 +290,7 @@ fn status(page: &FeedPage, only: Option<&str>) -> Result<Answer, String> {
             protocol: lys_runner::protocol::PROTOCOL_VERSION,
             sessions: vec![lys_runner::protocol::SessionView {
                 qualification: None,
+                seat_program: None,
                 session: entry.session.clone(),
                 pid: Some(42),
                 started_at: entry.at,

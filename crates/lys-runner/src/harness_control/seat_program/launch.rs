@@ -75,7 +75,7 @@ pub(crate) fn prepare(launch: &mut Launch) -> Result<Option<Value>, RunnerError>
             "the process inputs differ from the reviewed seat_program",
         ));
     }
-    if launch.rotation.is_some()
+    if (launch.rotation.is_some() && spec.model_wire.is_none())
         || launch
             .config
             .as_ref()
@@ -83,7 +83,7 @@ pub(crate) fn prepare(launch: &mut Launch) -> Result<Option<Value>, RunnerError>
     {
         return Err(refused(
             "seat_program_controls_unavailable",
-            "seat-program/v1 owns model routing and does not provide native account rotation or context controls",
+            "seat-program/v1 requires model_wire for accounts and does not provide native context controls",
         ));
     }
     let seat_file = private(&spec.seat_file, "seat_file_not_private")?;
@@ -94,6 +94,29 @@ pub(crate) fn prepare(launch: &mut Launch) -> Result<Option<Value>, RunnerError>
         )
     })?;
     drop(private(pass_file, "seat_pass_not_private")?);
+    let version = identity(launch)?;
+    let executable =
+        crate::harness_control::process::executable(std::path::Path::new(&spec.executable))?;
+    let found_seat = digest(seat_file, &spec.seat_file)?;
+    let proof = json!({"contract":"seat-program/v1", "provisioning_version": version, "executable":spec.executable, "seat_file":spec.seat_file,
+        "reviewed_executable_sha256":spec.executable_sha256, "found_executable_sha256":executable.sha256,
+        "reviewed_seat_file_sha256":spec.seat_file_sha256, "found_seat_file_sha256":found_seat});
+    let metadata = metadata.text.clone();
+    launch
+        .environment
+        .insert(SPEC_VARIABLE.to_owned(), metadata);
+    launch.environment.insert(
+        PROOF_VARIABLE.to_owned(),
+        serde_json::to_string(&proof)
+            .map_err(|error| refused("seat_program_record_invalid", error))?,
+    );
+    launch
+        .environment
+        .insert("LYS_SESSION".to_owned(), launch.session.clone());
+    Ok(Some(proof))
+}
+
+fn identity(launch: &Launch) -> Result<u32, RunnerError> {
     for name in [
         "LYS_RUN",
         "LYS_AGENT",
@@ -126,23 +149,16 @@ pub(crate) fn prepare(launch: &mut Launch) -> Result<Option<Value>, RunnerError>
             ));
         }
     }
-    let executable =
-        crate::harness_control::process::executable(std::path::Path::new(&spec.executable))?;
-    let found_seat = digest(seat_file, &spec.seat_file)?;
-    let proof = json!({"contract":"seat-program/v1", "executable":spec.executable, "seat_file":spec.seat_file,
-        "reviewed_executable_sha256":spec.executable_sha256, "found_executable_sha256":executable.sha256,
-        "reviewed_seat_file_sha256":spec.seat_file_sha256, "found_seat_file_sha256":found_seat});
-    let metadata = metadata.text.clone();
-    launch
+    let version = launch
         .environment
-        .insert(SPEC_VARIABLE.to_owned(), metadata);
-    launch.environment.insert(
-        PROOF_VARIABLE.to_owned(),
-        serde_json::to_string(&proof)
-            .map_err(|error| refused("seat_program_record_invalid", error))?,
-    );
-    launch
-        .environment
-        .insert("LYS_SESSION".to_owned(), launch.session.clone());
-    Ok(Some(proof))
+        .get("LYS_PROVISIONING_VERSION")
+        .and_then(|value| value.parse::<u32>().ok())
+        .filter(|value| *value > 0)
+        .ok_or_else(|| {
+            refused(
+                "seat_identity_invalid",
+                "LYS_PROVISIONING_VERSION is not a profile version",
+            )
+        })?;
+    Ok(version)
 }
