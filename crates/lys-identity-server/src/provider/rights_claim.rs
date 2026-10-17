@@ -77,7 +77,7 @@ pub(super) fn pass(
     };
     let expires_at = ends_at.min(at.saturating_add(provider.pass_seconds));
     if expires_at <= at {
-        return Err(ServerError::Provider(ProviderError::SessionEnded));
+        return Err(ServerError::Provider(ProviderError::session_ended()));
     }
     let log = if bind {
         Some(crate::channel_membership::served_log(state)?)

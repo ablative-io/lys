@@ -7,11 +7,29 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::{Access, unavailable};
+use super::{Access, Kind, unavailable};
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
 
 const FORMAT: &str = "lys-provider-access/v1";
+
+/// How long a refresh entry is kept past the end of the Lys sign-in it
+/// stands on, in seconds: thirty days, so a person back after a month away
+/// is told their sign-in ended rather than that the token is unknown. A kept
+/// entry renews nothing; it costs one small entry per sign-in per app
+/// (DIRECTORY-099 R1).
+pub(super) const ENDED_REFRESH_KEPT_SECONDS: u64 = 2_592_000;
+
+/// Whether `access` is still kept at `at`: an access entry until its end, a
+/// refresh entry until [`ENDED_REFRESH_KEPT_SECONDS`] past it.
+fn kept(access: &Access, at: u64) -> bool {
+    let until = if access.kind == Some(Kind::Refresh) {
+        access.expires_at.saturating_add(ENDED_REFRESH_KEPT_SECONDS)
+    } else {
+        access.expires_at
+    };
+    until > at
+}
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -96,7 +114,7 @@ impl Tokens {
                 )));
             }
         };
-        live.retain(|_, access| access.expires_at > at);
+        live.retain(|_, access| kept(access, at));
         let mut tokens = Self {
             file,
             live,
@@ -138,6 +156,23 @@ impl Tokens {
             .ok_or(ServerError::Provider(ProviderError::TokenUnknown))
     }
 
+    /// When the sign-in a refresh entry stood on ended, for a refresh entry
+    /// kept past its end at `at`; `None` for every other key, a live one and
+    /// a revoked one included. A kept entry answers nothing else: [`Self::get`]
+    /// still answers `TokenUnknown` for it.
+    pub(super) fn ended(&self, key: &str, at: u64) -> Option<u64> {
+        self.live
+            .get(key)
+            .filter(|access| access.kind == Some(Kind::Refresh) && access.expires_at <= at)
+            .map(|access| access.expires_at)
+    }
+
+    /// [`Self::ended`], for a refresh entry issued to the app `app` alone.
+    pub(super) fn ended_for(&self, key: &str, app: &str, at: u64) -> Option<u64> {
+        self.ended(key, at)
+            .filter(|_| self.live.get(key).is_some_and(|access| access.app == app))
+    }
+
     pub(super) fn insert(
         &mut self,
         key: String,
@@ -164,7 +199,7 @@ impl Tokens {
                 return Err(unavailable("the token digest is already issued"));
             }
         }
-        self.live.retain(|_, access| access.expires_at > at);
+        self.live.retain(|_, access| kept(access, at));
         if issued.iter().any(|(key, _)| self.live.contains_key(key)) {
             return Err(unavailable("the token digest is already issued"));
         }

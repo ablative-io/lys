@@ -261,6 +261,60 @@ fn place_configuration(
     intent.done(layout, Step::ConfigurationPlaced)
 }
 
+/// The rendered identity.json among `files`, and its `session_seconds`
+/// when it names one.
+fn rendered_sign_in(files: &[RenderedFile]) -> Option<(&RenderedFile, u64)> {
+    let file = files.iter().find(|file| file.name == "identity.json")?;
+    Some((file, session_seconds(file.bytes.as_slice())?))
+}
+
+fn session_seconds(bytes: &[u8]) -> Option<u64> {
+    serde_json::from_slice::<serde_json::Value>(bytes)
+        .ok()?
+        .get("session_seconds")?
+        .as_u64()
+}
+
+/// Says the one line naming the change, before identity.json is written,
+/// when the upgrade moves an install still at the former sign-in length.
+fn say_sign_in_moved(files: &[RenderedFile], say: &mut dyn FnMut(&str)) {
+    let Some(file) = files.iter().find(|file| file.name == "identity.json") else {
+        return;
+    };
+    let Ok(previous) = std::fs::read(&file.target).map(Zeroizing::new) else {
+        return;
+    };
+    let read = |bytes: &[u8]| serde_json::from_slice::<serde_json::Value>(bytes).ok();
+    if let (Some(previous), Some(next)) = (read(previous.as_slice()), read(file.bytes.as_slice())) {
+        super::render::say_sign_in_moved(&previous, &next, say);
+    }
+}
+
+/// Reads identity.json back as placed, before anything is started, and
+/// refuses by name a `session_seconds` other than the one rendered, so the
+/// service never starts on a sign-in length the upgrade did not write
+/// (DIRECTORY-099 R4).
+fn read_back_sign_in(files: &[RenderedFile]) -> IdentityResult<()> {
+    let Some((file, written)) = rendered_sign_in(files) else {
+        return Ok(());
+    };
+    let placed = Zeroizing::new(
+        std::fs::read(&file.target).map_err(|error| io("read back", &file.target, &error))?,
+    );
+    let read = session_seconds(placed.as_slice());
+    if read == Some(written) {
+        return Ok(());
+    }
+    let read = read.map_or_else(|| "nothing".to_owned(), |seconds| seconds.to_string());
+    Err(IdentityError::new(
+        ErrorKind::ConfigInvalid,
+        "read back",
+        "identity.json",
+        format!("session_seconds was written {written} and reads back {read}"),
+    )
+    .at(&file.target))
+}
+
 fn restore_configuration(layout: &Layout, files: &[Kept]) -> IdentityResult<()> {
     let kept = layout.config_previous_dir();
     for file in files {
@@ -322,6 +376,7 @@ fn swap_in(
     keep_binaries(layout, intent)?;
     place_binaries(layout, plan.from, plan.names, intent)?;
     keep_configuration(layout, intent)?;
+    say_sign_in_moved(plan.files, say);
     place_configuration(layout, plan.files, intent)?;
     if let Some(package) = plan.package {
         place_screens(layout, package, intent)?;
@@ -353,6 +408,7 @@ pub fn forward(
         restart.stop(say).map_err(|error| error.to_string())?;
     }
     swap_in(layout, plan, intent, units, engine, say).map_err(|error| error.to_string())?;
+    read_back_sign_in(plan.files).map_err(|error| error.to_string())?;
     start_all(layout, units, say)?;
     if let Some(restart) = restart {
         restart

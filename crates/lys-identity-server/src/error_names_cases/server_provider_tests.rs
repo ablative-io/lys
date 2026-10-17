@@ -52,7 +52,9 @@ pub(super) fn server_providers(detail: &'static str) -> Vec<(ServerError, &'stat
             "RefreshUnknown",
         ),
         (
-            ServerError::Provider(ProviderError::SessionEnded),
+            ServerError::Provider(ProviderError::SessionEnded {
+                reason: detail.to_owned(),
+            }),
             "SessionEnded",
         ),
         (

@@ -273,6 +273,20 @@ impl OpenIdProvider {
     /// Refuses invalid provider settings, an unreadable signing key or an
     /// unreadable or unwritable retained access token table.
     pub fn open(settings: &ProviderSettings, issuer: String) -> Result<Self, ServerError> {
+        Self::open_at(settings, issuer, now())
+    }
+
+    /// The provider `settings` names, as [`Self::open`] opens it, its kept
+    /// tokens read at `at`, the service's own clock (DIRECTORY-099 R1).
+    ///
+    /// # Errors
+    /// Refuses invalid provider settings, an unreadable signing key or an
+    /// unreadable or unwritable retained access token table.
+    pub fn open_at(
+        settings: &ProviderSettings,
+        issuer: String,
+        at: u64,
+    ) -> Result<Self, ServerError> {
         if settings.pass_seconds == 0 {
             return Err(ServerError::ConfigInvalid {
                 reason: "provider.pass_seconds is zero: a pass always ends after its issue"
@@ -280,7 +294,7 @@ impl OpenIdProvider {
             });
         }
         let keys = keys::SigningKeys::open(&settings.key_file)?;
-        let tokens = Tokens::open(settings.key_file.with_extension("tokens.json"), now())?;
+        let tokens = Tokens::open(settings.key_file.with_extension("tokens.json"), at)?;
         // Tokens the table could not read are dropped, each a sign-in asked
         // for again, and said once: the count and the file, never a key.
         if tokens.dropped() > 0 {

@@ -248,9 +248,38 @@ fn carry_sign_in(previous: &serde_json::Value, next: &mut serde_json::Value) -> 
                 format!("{key} is not a valid sign-in setting"),
             ));
         }
+        // The former product default is not an operator's choice: the
+        // rendered length stands (DIRECTORY-099 R4).
+        if key == "session_seconds" && value.as_u64() == Some(server_config::FORMER_SESSION_SECONDS)
+        {
+            continue;
+        }
         next[key] = value.clone();
     }
     Ok(())
+}
+
+/// Say, through `say`, the one line naming the change when `next` moves an
+/// install whose `previous` identity.json was still at the former default.
+pub(super) fn say_sign_in_moved(
+    previous: &serde_json::Value,
+    next: &serde_json::Value,
+    say: &mut dyn FnMut(&str),
+) {
+    let seconds = |value: &serde_json::Value| {
+        value
+            .get("session_seconds")
+            .and_then(serde_json::Value::as_u64)
+    };
+    let (Some(was), Some(now)) = (seconds(previous), seconds(next)) else {
+        return;
+    };
+    if was == server_config::FORMER_SESSION_SECONDS && now != was {
+        say(&format!(
+            "identity.json: session_seconds {was} -> {now} (a sign-in now lasts thirty days; the \
+             former eight-hour default is not carried)"
+        ));
+    }
 }
 
 #[cfg(test)]
@@ -290,7 +319,10 @@ mod sign_in_tests {
             &next,
             &mut |line| said.push(line.to_owned()),
         );
-        assert!(said.is_empty(), "an operator's own length is carried silently");
+        assert!(
+            said.is_empty(),
+            "an operator's own length is carried silently"
+        );
         Ok(())
     }
 

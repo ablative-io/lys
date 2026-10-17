@@ -41,8 +41,17 @@ pub const PROVIDER_KEY_FILE: &str = "provider-signing.key";
 /// as the administrator.
 pub const OPERATOR_TOKEN_FILE: &str = "operator-token";
 
-/// How long a sign-in lasts, in seconds: one working day.
-pub const SESSION_SECONDS: u64 = 28_800;
+/// How long a sign-in lasts, in seconds: thirty days, the same window as
+/// the identity server's `ENDED_REFRESH_KEPT_SECONDS`. A daily sign-in on
+/// every device is the work that makes people go around Lys, and sign-out,
+/// suspension and retirement already end a session early, so a shorter
+/// length buys no safety those acts don't (DIRECTORY-099 R4).
+pub const SESSION_SECONDS: u64 = 2_592_000;
+
+/// The sign-in length every install was written with before
+/// [`SESSION_SECONDS`] became thirty days: one working day. An upgrade moves
+/// an install still at it rather than carrying it as an operator's choice.
+pub const FORMER_SESSION_SECONDS: u64 = 28_800;
 
 /// Rauthy's issuer for the deployment's public origin: the origin, `/auth/v1`
 /// and a trailing slash, exactly as its discovery document states it.

@@ -11,6 +11,45 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
+### Changed — `lys-identity-server` and `lys`: an ended sign-in is named as ended, a sign-in lasts thirty days, and every refused sign-in is written down (DIRECTORY-099)
+
+- A refresh token whose Lys sign-in ended is refused `SessionEnded` with
+  the reason "SessionEnded: the Lys sign-in this refresh token stands on
+  ended at <RFC 3339 UTC instant>; sign in again", still HTTP 400 with
+  `error` `invalid_grant`, and the token request's log line names it so.
+  Before, an ended sign-in and a token Lys never gave read the same,
+  `RefreshUnknown`. Its entry in the provider's access table is kept
+  `ENDED_REFRESH_KEPT_SECONDS`, 2,592,000 seconds (thirty days), past its
+  end, renewing nothing, and is then pruned; an access token is pruned at
+  its end as before, and a refresh token revoked by a sign-out, a reused
+  code or its holder's retirement or suspension is removed, never kept. An
+  unknown token, or another product's, is still `RefreshUnknown`. The time
+  is read on the service's own clock. Cambium and every product read
+  `SessionEnded` as "sign in again".
+- Every refused person sign-in, on `POST /api/sign-in` and on the provider
+  callback `GET /auth/v1/providers/callback`, is one WARN line in
+  identity.log: "lys-identity-server WARN
+  lys_identity_server::sign_in_refusal_line: a person's sign-in was refused
+  refusal=<name> route=<route> handle=<handle>". The handle is the email
+  tried, trimmed and lowercased, when it is a well-formed address;
+  otherwise `none` for an empty field and `not-an-email` for anything else,
+  so a password typed into the email box is never written. The password,
+  the issuer's body and any token are never written. A refused provider
+  start says the same line with route `GET /api/sign-in/providers/{id}`.
+  The callback's refusals no longer go to stderr. The issuer-level
+  `IssuerRefused` and `IssuerChallengeExpired` lines stand beside it.
+- A sign-in lasts thirty days (`session_seconds` 2592000), the same window
+  as the kept refresh entry: a daily sign-in on every device is the work
+  that makes people go around Lys, and sign-out, suspension and retirement
+  already end a session early. A new install writes 2592000. An upgrade
+  moves an install still at the former default 28800 and says
+  "identity.json: session_seconds 28800 -> 2592000 (a sign-in now lasts
+  thirty days; the former eight-hour default is not carried)" before it
+  writes; any other value is the operator's and is carried. The upgrade
+  reads identity.json back before it starts anything, and a
+  `session_seconds` other than the one it wrote stops it `config_invalid`,
+  naming both values, with the previous configuration put back.
+
 ### Added — `lys-identity-server`: a return address for every machine an app runs on (DIRECTORY-097)
 
 - An app's registration and its Sign-in settings admit an https return

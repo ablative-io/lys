@@ -19,7 +19,6 @@ use super::{Access, ID_TOKEN_SECONDS, Kind, held, random};
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
 use crate::routes::{AppState, hex};
-use crate::session::now;
 
 /// The token route's answer to the app `client`, by the grant `form` asks for.
 pub(super) fn exchange(
@@ -50,7 +49,7 @@ fn by_code(state: &AppState, form: &Exchange, client: &str) -> Result<Value, Ser
     let bind = asked(form.grant_binding.as_deref())?;
     let admitted = admitted_client(state, client, &form.redirect_uri)?;
     let client_id = admitted.app;
-    let at = now();
+    let at = state.sessions.now()?;
     // The first act on the provider's state: the code verified and marked used.
     let taken = timing.measure(Act::TakeGrant, || {
         provider.take_grant(
@@ -147,13 +146,19 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
     let mut timing = Timing::new("person", client);
     let provider = provider(state)?;
     let bind = asked(form.grant_binding.as_deref())?;
-    let at = now();
+    let at = state.sessions.now()?;
     let lookup = digest(&form.refresh_token);
     let unknown = || ServerError::Provider(ProviderError::RefreshUnknown);
     let (session_id, subject, profile, ends_at) = timing.measure(Act::TakeGrant, || {
         let tokens = held(&provider.tokens)?;
         let kept = tokens.get(&lookup, at).map_err(|error| match error {
-            ServerError::Provider(ProviderError::TokenUnknown) => unknown(),
+            // A refresh token kept past its sign-in's end is named as ended,
+            // with the instant; one Lys never gave this product is unknown.
+            ServerError::Provider(ProviderError::TokenUnknown) => tokens
+                .ended_for(&lookup, client, at)
+                .map_or_else(unknown, |ended_at| {
+                    ServerError::Provider(ProviderError::session_ended_at(ended_at))
+                }),
             other => other,
         })?;
         if kept.kind != Some(Kind::Refresh) || kept.app != client {
@@ -176,7 +181,7 @@ fn by_refresh(state: &AppState, form: &Exchange, client: &str) -> Result<Value, 
         crate::grants::with_grants(state, |judged| {
             super::rights_claim::holder_of(judged.directory, IdentityId::Person(person)).map(drop)
         })?;
-        return Err(ServerError::Provider(ProviderError::SessionEnded));
+        return Err(ServerError::Provider(ProviderError::session_ended()));
     }
     let issued: Pass = timing.measure(Act::Pass, || {
         pass(

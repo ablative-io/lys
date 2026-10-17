@@ -157,7 +157,7 @@ fn oauth_code(error: &ServerError) -> &'static str {
             | ProviderError::VerifierWrong
             | ProviderError::RedirectUnregistered
             | ProviderError::RefreshUnknown
-            | ProviderError::SessionEnded
+            | ProviderError::SessionEnded { .. }
             | ProviderError::HolderRetired { .. },
         ) => "invalid_grant",
         ServerError::Provider(

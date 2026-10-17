@@ -44,6 +44,7 @@ use super::{
 use crate::error::ServerError;
 use crate::oidc::Oidc;
 use crate::routes::AppState;
+use crate::sign_in_refusal_line as refusal_line;
 
 /// Where a person lands once a provider sign-in has finished, on Lys's origin.
 const SIGNED_IN: &str = "/#/me";
@@ -301,17 +302,33 @@ impl IssuerSignIn {
 /// Send the browser to Lys's sign-in screen naming the refusal, keeping
 /// `continuation`, encoded, so signing in there continues where it was going.
 fn to_sign_in(error: &ServerError, continuation: Option<&Continuation>) -> Response {
-    refused_to_sign_in(error, continuation, None)
+    refusal_line::refused(refusal_line::PROVIDER_START_ROUTE, "", error);
+    sent_to_sign_in(error, continuation, None)
 }
 
+/// [`to_sign_in`] for a refused provider callback, naming `email`, the
+/// address the issuer would not admit, when it gave one.
 fn refused_to_sign_in(
     error: &ServerError,
     continuation: Option<&Continuation>,
     email: Option<&str>,
 ) -> Response {
-    // The browser is told only the refusal's name; the reason is written to
-    // the service's log, so whoever reads it can see why.
-    eprintln!("lys-identity-server provider sign-in refused: {error}");
+    // The browser is told only the refusal's name; the refusal, the route
+    // and the address tried are said through the WARN sink into the
+    // service's log, so whoever reads it can see who (DIRECTORY-099 R2).
+    refusal_line::refused(
+        refusal_line::CALLBACK_ROUTE,
+        email.unwrap_or_default(),
+        error,
+    );
+    sent_to_sign_in(error, continuation, email)
+}
+
+fn sent_to_sign_in(
+    error: &ServerError,
+    continuation: Option<&Continuation>,
+    email: Option<&str>,
+) -> Response {
     let mut location = format!("{SIGN_IN_SCREEN}?refused={}", error.name());
     if let Some(email) = email {
         location.push_str("&email=");

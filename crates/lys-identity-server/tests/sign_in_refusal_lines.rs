@@ -189,8 +189,8 @@ async fn a_sign_in_that_succeeds_says_no_refusal_line() -> TestResult {
 }
 
 #[tokio::test]
-async fn a_provider_callback_the_issuer_will_not_admit_says_one_line_naming_its_email()
--> TestResult {
+async fn a_provider_callback_the_issuer_will_not_admit_says_one_line_naming_its_email() -> TestResult
+{
     let (service, said) = started().await?;
     service.issuer.refuse_provider_callback(json!({
         "error": "NotFound",
@@ -224,7 +224,7 @@ async fn a_provider_callback_the_issuer_will_not_admit_says_one_line_naming_its_
 }
 
 /// The provider routes write their refusals through the WARN sink alone:
-/// nothing in sign_in_upstream.rs writes to the process's stderr.
+/// nothing in `sign_in_upstream.rs` writes to the process's stderr.
 #[test]
 fn the_provider_routes_write_nothing_to_stderr() {
     let source = include_str!("../src/sign_in_upstream.rs");

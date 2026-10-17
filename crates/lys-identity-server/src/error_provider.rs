@@ -53,9 +53,13 @@ pub enum ProviderError {
     #[error("RefreshUnknown: that refresh token is not one Lys gave this product, or it has ended")]
     RefreshUnknown,
     /// The Lys sign-in a refresh token stands on has ended, so no new pass is
-    /// issued from it (ACCESS-002 R2).
-    #[error("SessionEnded: the Lys sign-in this refresh token stands on has ended")]
-    SessionEnded,
+    /// issued from it (ACCESS-002 R2). A sign-in that ran out names the
+    /// instant it ended (DIRECTORY-099 R1).
+    #[error("SessionEnded: {reason}")]
+    SessionEnded {
+        /// What ended, and when, for a sign-in that ran out.
+        reason: String,
+    },
     /// The holder a pass would be issued to is retired or suspended, and is
     /// given no pass (ACCESS-002 R2).
     #[error("HolderRetired: {holder} is {state} and is given no pass")]
@@ -90,7 +94,7 @@ impl ProviderError {
             Self::VerifierWrong => "VerifierWrong",
             Self::TokenUnknown => "TokenUnknown",
             Self::RefreshUnknown => "RefreshUnknown",
-            Self::SessionEnded => "SessionEnded",
+            Self::SessionEnded { .. } => "SessionEnded",
             Self::HolderRetired { .. } => "HolderRetired",
             Self::PassRefused { .. } => "PassRefused",
         }
@@ -112,8 +116,36 @@ impl ProviderError {
             | Self::CodeExpired
             | Self::VerifierWrong
             | Self::RefreshUnknown
-            | Self::SessionEnded
+            | Self::SessionEnded { .. }
             | Self::HolderRetired { .. } => StatusCode::BAD_REQUEST,
+        }
+    }
+
+    /// The refusal of a refresh token whose Lys sign-in was ended early: by
+    /// a sign-out, or by its holder's retirement or suspension.
+    #[must_use]
+    pub fn session_ended() -> Self {
+        Self::SessionEnded {
+            reason: "the Lys sign-in this refresh token stands on has ended".to_owned(),
+        }
+    }
+
+    /// The refusal of a refresh token kept past the end of the Lys sign-in
+    /// it stands on, which ran out at `ended_at`, in seconds since the Unix
+    /// epoch, named as an RFC 3339 UTC instant.
+    #[must_use]
+    pub fn session_ended_at(ended_at: u64) -> Self {
+        let instant = i64::try_from(ended_at)
+            .ok()
+            .and_then(|seconds| jiff::Timestamp::from_second(seconds).ok())
+            .map_or_else(
+                || format!("{ended_at} seconds after 1970"),
+                |instant| instant.to_string(),
+            );
+        Self::SessionEnded {
+            reason: format!(
+                "the Lys sign-in this refresh token stands on ended at {instant}; sign in again"
+            ),
         }
     }
 }

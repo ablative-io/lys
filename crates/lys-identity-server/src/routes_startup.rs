@@ -219,6 +219,10 @@ async fn make_state(
         .spicedb
         .clone()
         .map(crate::spicedb::SpiceDbEngine::new);
+    // The provider reads its kept tokens on the sessions' clock, the
+    // service's own (DIRECTORY-099 R1).
+    let sessions = sessions(config, clock)?;
+    let provider = provider(config, sessions.now()?)?;
     Ok(Arc::new(AppState {
         draft_execution: crate::drafts_apply::Executor::default(),
         changes: crate::changes::Changes::new()?,
@@ -229,14 +233,14 @@ async fn make_state(
         directory: Mutex::new(primary.directory),
         oidc: Oidc::discover(config).await?,
         sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
-        provider: provider(config)?,
+        provider,
         setup: config.setup.clone(),
         password_policy: config.password_policy.clone(),
         model_proxy: config.model_proxy.clone(),
         dialled_model_proxy: crate::model_proxy_route::dialled(config)?,
         proxy_dir: config.proxy_dir.clone(),
         setup_lock: tokio::sync::Mutex::new(()),
-        sessions: sessions(config, clock)?,
+        sessions,
         admission: Admission::new(
             crate::setup::administrator(config)?,
             config.link_audit_binding()?,
@@ -309,12 +313,19 @@ fn identity_upstream(config: &Config) -> String {
     )
 }
 
-fn provider(config: &Config) -> Result<Option<crate::provider::OpenIdProvider>, ServerError> {
+fn provider(
+    config: &Config,
+    at: u64,
+) -> Result<Option<crate::provider::OpenIdProvider>, ServerError> {
     config
         .provider
         .as_ref()
         .map(|settings| {
-            crate::provider::OpenIdProvider::open(settings, crate::sign_in::lys_origin(config)?)
+            crate::provider::OpenIdProvider::open_at(
+                settings,
+                crate::sign_in::lys_origin(config)?,
+                at,
+            )
         })
         .transpose()
 }

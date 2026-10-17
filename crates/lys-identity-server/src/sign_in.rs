@@ -626,17 +626,19 @@ async fn sign_in(
     let Json(body) = body.map_err(|refused| ServerError::RequestMalformed {
         reason: refused.body_text(),
     })?;
-    let email = body.email.trim();
-    if email.is_empty() || body.password.is_empty() {
-        return Err(ServerError::SignInRefused);
-    }
-    let attempt = Attempt {
-        email,
-        password: &body.password,
-        address: state.sign_in.address(&extensions, &headers)?,
+    let answer = async {
+        if body.email.trim().is_empty() || body.password.is_empty() {
+            return Err(ServerError::SignInRefused);
+        }
+        let attempt = Attempt {
+            email: body.email.trim(),
+            password: &body.password,
+            address: state.sign_in.address(&extensions, &headers)?,
+        };
+        let actor = state.sign_in.password(&state.oidc, &attempt).await?;
+        begin_session(&state, &actor).await
     };
-    let actor = state.sign_in.password(&state.oidc, &attempt).await?;
-    begin_session(&state, &actor).await
+    crate::sign_in_refusal_line::signing_in(&body.email, answer.await)
 }
 
 #[cfg(test)]

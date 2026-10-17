@@ -77,7 +77,7 @@ cat >"$STATE/config.json" <<JSON
   "redirect_url": "http://$HOST:$APP_PORT/callback",
   "administrator": { "issuer": "$ISSUER", "subject": "ada" },
   "link_audit_source": { "issuer": "$ISSUER", "subject": "link-audit" },
-  "session_seconds": 28800,
+  "session_seconds": 2592000,
   "secure_cookie": false,
   "grant_log_dir": "$STATE/grant-log",
   "grant_log_origin": "dev.lys/grants",

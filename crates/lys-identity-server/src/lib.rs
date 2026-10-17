@@ -267,6 +267,7 @@ pub mod setup;
 pub mod sign_in;
 mod sign_in_callback;
 pub mod sign_in_providers;
+mod sign_in_refusal_line;
 mod signed_first;
 pub mod skills_api;
 pub mod spicedb;
