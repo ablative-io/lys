@@ -181,14 +181,14 @@ fn fixture_state(
     } = authority;
     let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
     let say: crate::Say = Arc::new(|_| {});
-    let apps = crate::apps_api::opened(&config, Arc::clone(&key), &*say)?;
+    let apps = crate::apps_api::opened(config, Arc::clone(&key), &*say)?;
     let model_revision = apps.model_revision();
     Ok(AppState {
         draft_execution: crate::drafts_apply::Executor::default(),
         changes: crate::changes::Changes::new()?,
         directory: Mutex::new(directory),
         oidc,
-        sign_in: crate::sign_in::IssuerSignIn::configured(&config)?,
+        sign_in: crate::sign_in::IssuerSignIn::configured(config)?,
         provider: None,
         setup: None,
         setup_lock: tokio::sync::Mutex::new(()),

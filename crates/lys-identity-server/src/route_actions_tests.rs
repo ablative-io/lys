@@ -71,23 +71,7 @@ async fn fixture_with(
         None,
         None,
         None,
-        |config| {
-            config.certificates_dir = None;
-            config.network_file = None;
-            if apps.is_empty() {
-                config.roles_file = None;
-            }
-            config.provisioning_file = None;
-            config.homes_dir = None;
-            config.runtime_dir = Some(config.log_dir.with_file_name("runtime"));
-            config.service_accounts_dir = None;
-            config.teams_dir = None;
-            config.stops_dir = None;
-            config.budgets_dir = None;
-            config.policies_dir = None;
-            config.goals_dir = None;
-            config.reviews_dir = None;
-        },
+        |config| minimal_route_config(config, apps),
         |config| {
             prepare_stores(
                 &config.log_dir,
@@ -513,4 +497,25 @@ fn reported_runtime(
         return Err(format!("fixture runtime snapshot failed: {reason}").into());
     }
     Ok(())
+}
+
+fn minimal_route_config(
+    config: &mut identity_contract::lys_identity_server::Config,
+    apps: &[&str],
+) {
+    config.certificates_dir = None;
+    config.network_file = None;
+    if apps.is_empty() {
+        config.roles_file = None;
+    }
+    config.provisioning_file = None;
+    config.homes_dir = None;
+    config.runtime_dir = Some(config.log_dir.with_file_name("runtime"));
+    config.service_accounts_dir = None;
+    config.teams_dir = None;
+    config.stops_dir = None;
+    config.budgets_dir = None;
+    config.policies_dir = None;
+    config.goals_dir = None;
+    config.reviews_dir = None;
 }

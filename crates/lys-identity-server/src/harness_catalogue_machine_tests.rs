@@ -93,60 +93,8 @@ async fn profile_on_machine(program: &str) -> Result<(), Box<dyn std::error::Err
             .as_str()
             .is_some_and(|package| package.contains("2.1.300"))
     }));
-    let description: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../docs/harness/catalogue/claude-code.json"
-    ))?;
     let agent = seeded.people[0].agents[0].id.to_string();
-    let mut body = json!({"operation":lys_identity::OperationId::generate()?.to_string(),"from_version":0,"model_access":["default"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"", "runs_on":machine,
-        "harness":{"name":"Claude Code", "program":"missing", "package":"claude 2.1.300", "description":description["description"]}});
-    let route = format!("/agents/{agent}/provisioning");
-    assert_invalid_programs(&service, &route, &cookie, &mut body).await?;
-    body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
-    body["harness"]["program"] = json!("missing");
-    let (status, refusal) = service.post(&route, Some(&cookie), &body).await?;
-    assert_eq!(status, 409);
-    assert_eq!(refusal["refusal"], "harness_program_unknown");
-    assert!(
-        refusal["reason"]
-            .as_str()
-            .is_some_and(|words| words.contains("claude version 2.1.300")
-                && words.contains("codex version 0.161.0-alpha.3"))
-    );
-    body["harness"]["program"] = json!("claude");
-    body["model_access"] = json!([description["models"][0]["id"]]);
-    unreadable.send(true)?;
-    let (status, refused) = service.post(&route, Some(&cookie), &body).await?;
-    assert_eq!(status, 409);
-    assert_eq!(refused["refusal"], "harness_programs_unreadable");
-    assert!(
-        refused["reason"]
-            .as_str()
-            .is_some_and(|words| words.contains("not UTF-8"))
-    );
-    unreadable.send(false)?;
-    body["harness"]["program"] = json!(program);
-    let (status, profile) = service.post(&route, Some(&cookie), &body).await?;
-    assert_eq!(status, 200, "profile save for {program}: {profile}");
-    assert_eq!(
-        profile["profile"]["harness"]["program"],
-        body["harness"]["program"]
-    );
-    unreadable.send(true)?;
-    for (index, program) in [
-        "/opt/forks/claude-fork",
-        "/missing/bin/claude-fork",
-        "/opt/forks/Claude fork",
-    ]
-    .iter()
-    .enumerate()
-    {
-        body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
-        body["from_version"] = json!(index + 1);
-        body["harness"]["program"] = json!(program);
-        let (status, profile) = service.post(&route, Some(&cookie), &body).await?;
-        assert_eq!(status, 200, "absolute profile save: {profile}");
-        assert_eq!(profile["profile"]["harness"]["program"], *program);
-    }
+    assert_profiles(&service, &machine, &cookie, &agent, program, &unreadable).await?;
     stop.send(()).map_err(|()| "runner ended")?;
     worker.await??;
     Ok(())
@@ -271,4 +219,68 @@ async fn serve_programs(
             .write_all(format!("{}\n", lys_runner::protocol::reply_line(answer)).as_bytes())
             .await?;
     }
+}
+
+async fn assert_profiles(
+    service: &Service,
+    machine: &str,
+    cookie: &str,
+    agent: &str,
+    program: &str,
+    unreadable: &tokio::sync::watch::Sender<bool>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let description: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../docs/harness/catalogue/claude-code.json"
+    ))?;
+    let mut body = json!({"operation":lys_identity::OperationId::generate()?.to_string(),"from_version":0,"model_access":["default"],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":"", "runs_on":machine,
+        "harness":{"name":"Claude Code", "program":"missing", "package":"claude 2.1.300", "description":description["description"]}});
+    let route = format!("/agents/{agent}/provisioning");
+    assert_invalid_programs(service, &route, cookie, &mut body).await?;
+    body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+    body["harness"]["program"] = json!("missing");
+    let (status, refusal) = service.post(&route, Some(cookie), &body).await?;
+    assert_eq!(status, 409);
+    assert_eq!(refusal["refusal"], "harness_program_unknown");
+    assert!(
+        refusal["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("claude version 2.1.300")
+                && words.contains("codex version 0.161.0-alpha.3"))
+    );
+    body["harness"]["program"] = json!("claude");
+    body["model_access"] = json!([description["models"][0]["id"]]);
+    unreadable.send(true)?;
+    let (status, refused) = service.post(&route, Some(cookie), &body).await?;
+    assert_eq!(status, 409);
+    assert_eq!(refused["refusal"], "harness_programs_unreadable");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("not UTF-8"))
+    );
+    unreadable.send(false)?;
+    body["harness"]["program"] = json!(program);
+    let (status, profile) = service.post(&route, Some(cookie), &body).await?;
+    assert_eq!(status, 200, "profile save for {program}: {profile}");
+    assert_eq!(
+        profile["profile"]["harness"]["program"],
+        body["harness"]["program"]
+    );
+    unreadable.send(true)?;
+    for (index, program) in [
+        "/opt/forks/claude-fork",
+        "/missing/bin/claude-fork",
+        "/opt/forks/Claude fork",
+    ]
+    .iter()
+    .enumerate()
+    {
+        body["operation"] = json!(lys_identity::OperationId::generate()?.to_string());
+        body["from_version"] = json!(index + 1);
+        body["harness"]["program"] = json!(program);
+        let (status, profile) = service.post(&route, Some(cookie), &body).await?;
+        assert_eq!(status, 200, "absolute profile save: {profile}");
+        assert_eq!(profile["profile"]["harness"]["program"], *program);
+    }
+    Ok(())
 }

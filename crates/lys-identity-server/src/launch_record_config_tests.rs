@@ -83,19 +83,7 @@ fn a_launch_record_requires_a_proxy_then_writes_the_pass_into_the_seat_config()
     if !matches!(&act, Act::Start { launch, lys_mcp:Some(_), .. } if launch.config.is_some()) {
         return Err("the record start carries no native config or run pass".into());
     }
-    let key = Arc::new(Ed25519Identity::load_or_generate(
-        &dir.path().join("runner.key"),
-    )?);
-    let socket = dir.path().join("runner.sock");
-    let state = dir.path().join("runner-state");
-    let runner = Runner::open(&Options {
-        socket: socket.clone(),
-        state: state.clone(),
-        server_key: key.public_key_bytes(),
-        scrollback: 4096,
-    })?;
-    let serving = runner.spawn();
-    let client = Client::new(socket, key);
+    let (serving, client, state) = running_runner(dir.path())?;
     let tested = (|| -> Result<(), Box<dyn Error>> {
         if !matches!(client.ask(&act)?, Answer::Started { .. }) {
             return Err("the runner refused the record's native start".into());
@@ -378,4 +366,21 @@ fn assert_proxy_runs(
         return Err("two launches were given the same run key".into());
     }
     Ok(())
+}
+
+fn running_runner(
+    dir: &std::path::Path,
+) -> Result<(lys_runner::Serving, Client, std::path::PathBuf), Box<dyn Error>> {
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.join("runner.key"))?);
+    let socket = dir.join("runner.sock");
+    let state = dir.join("runner-state");
+    let runner = Runner::open(&Options {
+        socket: socket.clone(),
+        state: state.clone(),
+        server_key: key.public_key_bytes(),
+        scrollback: 4096,
+    })?;
+    let serving = runner.spawn();
+    let client = Client::new(socket, key);
+    Ok((serving, client, state))
 }

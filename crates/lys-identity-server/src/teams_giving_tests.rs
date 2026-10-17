@@ -280,17 +280,11 @@ fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
     use crate::grants::{Decision, Judged, decide};
     use crate::spicedb::Relationships;
     use lys_identity::grants::{
-        Action, ExerciseRequest, Grants, MemoryRelationships, Model, Relation, Resource, Route,
+        Action, ExerciseRequest, Grants, MemoryRelationships, Resource, Route,
     };
     let (mut directory, binding, person, agent) = member_directory()?;
     let projection = directory.projection()?;
-    let model = Model::new(
-        1,
-        [
-            (Relation::new("writer")?, [Action::new("write")?].into()),
-            (Relation::new("operator")?, [Action::new("operate")?].into()),
-        ],
-    )?;
+    let model = member_model()?;
     let grant_leaves = MemoryStore::empty();
     let mut grants = Grants::open(
         Box::new(move || MemoryStore::open(Arc::clone(&grant_leaves), "grants")),
@@ -389,3 +383,14 @@ fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
 }
 
 include!("teams_giving_fixture_tests.rs");
+
+fn member_model() -> TestResult<lys_identity::grants::Model> {
+    use lys_identity::grants::{Action, Relation};
+    Ok(lys_identity::grants::Model::new(
+        1,
+        [
+            (Relation::new("writer")?, [Action::new("write")?].into()),
+            (Relation::new("operator")?, [Action::new("operate")?].into()),
+        ],
+    )?)
+}

@@ -40,19 +40,7 @@ impl Table {
             None,
             None,
             None,
-            |config| {
-                config.requests_dir = None;
-                config.roles_file = None;
-                config.network_file = None;
-                config.runtime_dir = None;
-                config.service_accounts_dir = None;
-                config.teams_dir = None;
-                config.stops_dir = None;
-                config.budgets_dir = None;
-                config.policies_dir = None;
-                config.goals_dir = None;
-                config.reviews_dir = None;
-            },
+            minimal_draft_config,
             |config| {
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let actor = Actor::new(
@@ -230,4 +218,18 @@ fn cookies(sessions_file: std::path::PathBuf, issuer: &str) -> Result<(String, S
         Provenance::new(AuthMethod::Oidc, crate::session::now()),
     ))?;
     Ok((owner, other_cookie))
+}
+
+fn minimal_draft_config(config: &mut identity_contract::lys_identity_server::Config) {
+    config.requests_dir = None;
+    config.roles_file = None;
+    config.network_file = None;
+    config.runtime_dir = None;
+    config.service_accounts_dir = None;
+    config.teams_dir = None;
+    config.stops_dir = None;
+    config.budgets_dir = None;
+    config.policies_dir = None;
+    config.goals_dir = None;
+    config.reviews_dir = None;
 }
