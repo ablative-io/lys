@@ -79,26 +79,7 @@ pub async fn keep_page(
             }
             Body::Refusal(record) => refusals.push(record.clone()),
             Body::Operation(outcome) => {
-                let crossing = with_budgets(state, |store| {
-                    Ok(store.held().crossings.holds(&outcome.operation))
-                })?;
-                if crossing {
-                    let observed = i64::try_from(outcome.at)
-                        .map_err(|error| refused(format!("runner outcome instant: {error}")))?;
-                    with_budgets_mut(state, |store| {
-                        let acted = crate::budgets_crossing::Acted::from_runner(outcome, observed);
-                        if store
-                            .held()
-                            .crossings
-                            .acted
-                            .get(&outcome.operation)
-                            .is_none_or(|prior| later_control_outcome(prior, &acted))
-                        {
-                            store.acted(acted)?;
-                        }
-                        Ok(())
-                    })?;
-                }
+                crossing::keep(state, outcome)?;
                 if let Some(goals) = &state.goals {
                     let holders = if crate::goals_store::actual_compaction(outcome) {
                         let agent = crate::runtime_api::with_runtime(state, |store| {
@@ -339,6 +320,9 @@ pub fn context_figure(
 
 /// Convert spend and cumulative time once; snapshots never charge their token totals.
 /// Refuses invalid usage identities, instants, totals or declared context windows.
+///
+/// # Errors
+/// Refuses an entry whose version, fields or values do not match the runner feed contract.
 pub fn convert(
     machine: &str,
     agent: &str,
@@ -502,3 +486,6 @@ mod entry_test_definitions;
 pub(crate) mod entry_tests {
     budgets_feed_entries!();
 }
+
+#[path = "budgets_feed_crossing.rs"]
+mod crossing;

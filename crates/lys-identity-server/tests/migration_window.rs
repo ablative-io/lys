@@ -132,10 +132,29 @@ fn seed(config: &Config) -> ResultOf<Seed> {
         vec![serde_json::to_value(created)?, serde_json::to_value(added)?],
         &json!({"format":"lys-teams-state/v1", "held":old_teams}),
     )?;
+    let budgets_dir = seed_budgets(config, &key, &person, seeded.people[0].id.to_string())?;
+    let intent = config
+        .operator_upgrade_file
+        .clone()
+        .ok_or("intent path missing")?;
+    std::fs::write(&intent, b"reversible upgrade")?;
+    Ok(Seed {
+        team,
+        member,
+        person,
+        intent,
+        old_teams: files(&teams_dir)?,
+        old_budgets: files(&budgets_dir)?,
+        teams: teams_dir,
+        budgets: budgets_dir,
+    })
+}
+
+fn seed_budgets(config: &Config, key: &Ed25519Identity, person: &str, by: String) -> ResultOf<PathBuf> {
     let earlier = Budget {
         holder: Holder {
             kind: HolderKind::Person,
-            id: person.clone(),
+            id: person.to_owned(),
         },
         measure: Measure::Tokens,
         limit: 100,
@@ -145,7 +164,7 @@ fn seed(config: &Config) -> ResultOf<Seed> {
         }),
         act: Act::Stop,
         version: 1,
-        by: seeded.people[0].id.to_string(),
+        by,
         at: 1,
     };
     let changed = Budget {
@@ -154,7 +173,7 @@ fn seed(config: &Config) -> ResultOf<Seed> {
             zone: "UTC".to_owned(),
         }),
         version: 2,
-        by: person.clone(),
+        by: person.to_owned(),
         ..earlier.clone()
     };
     let mut budgets = Held::default();
@@ -174,28 +193,14 @@ fn seed(config: &Config) -> ResultOf<Seed> {
         &budgets_dir,
         "lys/identity/budgets",
         "lys/identity/budgets-state/v1",
-        &key,
+        key,
         vec![
             serde_json::to_value(Leaf::Set(earlier))?,
             serde_json::to_value(Leaf::Set(changed))?,
         ],
         &json!({"format":"lys-budgets-state/v1", "held":old_budgets}),
     )?;
-    let intent = config
-        .operator_upgrade_file
-        .clone()
-        .ok_or("intent path missing")?;
-    std::fs::write(&intent, b"reversible upgrade")?;
-    Ok(Seed {
-        team,
-        member,
-        person,
-        intent,
-        old_teams: files(&teams_dir)?,
-        old_budgets: files(&budgets_dir)?,
-        teams: teams_dir,
-        budgets: budgets_dir,
-    })
+    Ok(budgets_dir)
 }
 
 impl Fixture {

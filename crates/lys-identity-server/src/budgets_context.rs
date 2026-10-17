@@ -142,25 +142,7 @@ impl Agent {
             return Ok(());
         }
         let previous = previous.cloned();
-        let mut reading = Reading {
-            session: session.clone(),
-            at_ms: usage.at_ms,
-            latest_at_ms: previous
-                .as_ref()
-                .map_or(usage.at_ms, |held| held.latest_at_ms.max(usage.at_ms)),
-            figure: usage.context_percent,
-            source: usage.context_source.clone(),
-            model: usage.call.as_ref().and_then(|call| call.model.clone()),
-            unavailable: usage
-                .unavailable
-                .iter()
-                .find(|gap| gap.figure == "context_percent")
-                .map(|gap| gap.reason.clone()),
-            empty_calls: previous
-                .as_ref()
-                .map_or_else(BTreeMap::new, |held| held.empty_calls.clone()),
-            reported_none: previous.as_ref().map_or(0, |held| held.reported_none),
-        };
+        let mut reading = Reading::from_usage(usage, session, previous.as_ref());
         if usage.context_percent.is_some() {
             reading.empty_calls.retain(|at, _| *at > usage.at_ms);
             reading.reported_none =
@@ -498,3 +480,6 @@ pub(crate) fn finish(
     }
     crate::budgets_api::with_budgets(state, |store| store.end_context(agent, session))
 }
+
+#[path = "budgets_context_reading.rs"]
+mod reading;

@@ -296,23 +296,7 @@ pub(crate) async fn start_as(
         },
         &handles,
     )?;
-    let native_conversation = if crate::launch_template::requires_controls(&version) {
-        None
-    } else {
-        match version
-            .settings
-            .harness
-            .as_ref()
-            .and_then(crate::launch_template::runner_harness)
-        {
-            Some(lys_runner::tracking::Harness::ClaudeCode) => Some(match &conversation {
-                Some(conversation) => conversation.clone(),
-                None => lys_runner::pty_conversation::conversation_uuid(&session)?,
-            }),
-            Some(lys_runner::tracking::Harness::Codex) => conversation.clone(),
-            None => None,
-        }
-    };
+    let native_conversation = native_for_start(&version, conversation.as_deref(), &session)?;
     let view = serde_json::to_value(StartCommandView {
         agent: agent.clone(),
         machine: machine.to_owned(),
@@ -477,3 +461,27 @@ fn admit_start(
 #[cfg(test)]
 #[path = "launch_api/admission_tests.rs"]
 mod tests;
+
+fn native_for_start(
+    version: &crate::provisioning_store::Version,
+    conversation: Option<&str>,
+    session: &str,
+) -> Result<Option<String>, ServerError> {
+    Ok(if crate::launch_template::requires_controls(version) {
+        None
+    } else {
+        match version
+            .settings
+            .harness
+            .as_ref()
+            .and_then(crate::launch_template::runner_harness)
+        {
+            Some(lys_runner::tracking::Harness::ClaudeCode) => Some(match conversation {
+                Some(conversation) => conversation.to_owned(),
+                None => lys_runner::pty_conversation::conversation_uuid(session)?,
+            }),
+            Some(lys_runner::tracking::Harness::Codex) => conversation.map(str::to_owned),
+            None => None,
+        }
+    })
+}

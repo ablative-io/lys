@@ -156,30 +156,7 @@ pub(crate) async fn read(
             let record = RunnerRecord::Socket {
                 path: owner.endpoint.socket.to_string_lossy().into_owned(),
             };
-            reads.spawn(async move {
-                let act = if live {
-                    Act::Liveness {
-                        session: Some(id.clone()),
-                    }
-                } else {
-                    Act::Status {
-                        session: Some(id.clone()),
-                    }
-                };
-                let answer = ask_exactly(&state, &machine, record, act, false)
-                    .await
-                    .and_then(|answer| {
-                        split(answer)?
-                            .remove(&id)
-                            .ok_or_else(|| ServerError::Runner {
-                                refusal: "runner_reply_malformed".to_owned(),
-                                words: format!(
-                                    "the owner snapshot did not name requested session {id}"
-                                ),
-                            })
-                    });
-                (id, answer)
-            });
+            reads.spawn(owner_observation(state, machine, record, id, live));
         } else {
             record_unknown(state, machine, &id)?;
             sessions.insert(id, Err(unknown()));
@@ -193,4 +170,33 @@ pub(crate) async fn read(
         sessions.insert(id, answer);
     }
     Ok(Observations { sessions })
+}
+
+async fn owner_observation(
+    state: Arc<AppState>,
+    machine: String,
+    record: RunnerRecord,
+    id: String,
+    live: bool,
+) -> (String, Result<Answer, ServerError>) {
+    let act = if live {
+        Act::Liveness {
+            session: Some(id.clone()),
+        }
+    } else {
+        Act::Status {
+            session: Some(id.clone()),
+        }
+    };
+    let answer = ask_exactly(&state, &machine, record, act, false)
+        .await
+        .and_then(|answer| {
+            split(answer)?
+                .remove(&id)
+                .ok_or_else(|| ServerError::Runner {
+                    refusal: "runner_reply_malformed".to_owned(),
+                    words: format!("the owner snapshot did not name requested session {id}"),
+                })
+        });
+    (id, answer)
 }

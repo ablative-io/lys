@@ -31,85 +31,87 @@ pub async fn table(keep_explicit: bool) -> Result<(Service, [String; 2]), Box<dy
             config.goals_dir = None;
             config.reviews_dir = None;
         },
-        move |config| {
-            let actor = Actor::new(
-                LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                Provenance::new(AuthMethod::Oidc, 1),
-            );
-            let mut directory = open_directory(config)?;
-            let (person, _) = directory.setup_person(
-                actor.clone(),
-                OperationId::generate()?,
-                Profile::new("Owner")?,
-                1,
-            )?;
-            let (missing, _) = directory.register_agent(
-                actor.clone(),
-                OperationId::generate()?,
-                person,
-                Profile::new("Missing")?,
-                2,
-            )?;
-            let (other, _) = directory.register_person(
-                actor.clone(),
-                OperationId::generate()?,
-                Profile::new("Other")?,
-                3,
-            )?;
-            directory.bind_login(
-                actor.clone(),
-                OperationId::generate()?,
-                other,
-                LoginBinding::new(&config.issuer, BEA)?,
-                4,
-            )?;
-            directory.transition(
-                actor.clone(),
-                OperationId::generate()?,
-                IdentityId::Person(other),
-                Transition::Activate,
-                "",
-                5,
-            )?;
-            let (explicit, _) = directory.register_agent(
-                actor,
-                OperationId::generate()?,
-                other,
-                Profile::new("Explicit")?,
-                3,
-            )?;
-            let mut policies = PolicyStore::open(
-                config.policies_dir.as_deref().ok_or("policies missing")?,
-                Arc::new(Ed25519Identity::load(&config.event_key_file)?),
-            )?;
-            for version in 0..if keep_explicit { 2 } else { 0 } {
-                policies.set(
-                    Policy {
-                        version: version + 1,
-                        agent: explicit.to_string(),
-                        rules: Vec::new(),
-                    },
-                    version,
-                )?;
-            }
-            let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-            drop(
-                lys_identity_server::configuration_store::ConfigurationStore::open(
-                    &config.log_dir.with_file_name("organisation"),
-                    Arc::clone(&key),
-                )?,
-            );
-            drop(lys_identity_server::runner_acts::ActStore::open(
-                &config.log_dir.with_file_name("runner-acts"),
-                Arc::clone(&key),
-            )?);
-            drop(lys_identity::start::LaunchRecords::open(
-                &config.log_dir.with_file_name("launch-records"),
-                Ed25519Identity::load(&config.event_key_file)?,
-            )?);
-            drop(lys_identity_server::apps_api::opened(config, key, &|_| {})?);
-            Ok([missing.to_string(), explicit.to_string()])
-        },
+        move |config| seed(config, keep_explicit),
     )
     .await
+}
+
+fn seed(config: &lys_identity_server::config::Config, keep_explicit: bool) -> Result<[String; 2], Box<dyn Error>> {
+    let actor = Actor::new(
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let mut directory = open_directory(config)?;
+    let (person, _) = directory.setup_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Owner")?,
+        1,
+    )?;
+    let (missing, _) = directory.register_agent(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        Profile::new("Missing")?,
+        2,
+    )?;
+    let (other, _) = directory.register_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Other")?,
+        3,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        other,
+        LoginBinding::new(&config.issuer, BEA)?,
+        4,
+    )?;
+    directory.transition(
+        actor.clone(),
+        OperationId::generate()?,
+        IdentityId::Person(other),
+        Transition::Activate,
+        "",
+        5,
+    )?;
+    let (explicit, _) = directory.register_agent(
+        actor,
+        OperationId::generate()?,
+        other,
+        Profile::new("Explicit")?,
+        3,
+    )?;
+    let mut policies = PolicyStore::open(
+        config.policies_dir.as_deref().ok_or("policies missing")?,
+        Arc::new(Ed25519Identity::load(&config.event_key_file)?),
+    )?;
+    for version in 0..if keep_explicit { 2 } else { 0 } {
+        policies.set(
+            Policy {
+                version: version + 1,
+                agent: explicit.to_string(),
+                rules: Vec::new(),
+            },
+            version,
+        )?;
+    }
+    let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+    drop(
+        lys_identity_server::configuration_store::ConfigurationStore::open(
+            &config.log_dir.with_file_name("organisation"),
+            Arc::clone(&key),
+        )?,
+    );
+    drop(lys_identity_server::runner_acts::ActStore::open(
+        &config.log_dir.with_file_name("runner-acts"),
+        Arc::clone(&key),
+    )?);
+    drop(lys_identity::start::LaunchRecords::open(
+        &config.log_dir.with_file_name("launch-records"),
+        Ed25519Identity::load(&config.event_key_file)?,
+    )?);
+    drop(lys_identity_server::apps_api::opened(config, key, &|_| {})?);
+    Ok([missing.to_string(), explicit.to_string()])
 }

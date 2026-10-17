@@ -155,7 +155,7 @@ pub struct DraftView {
     pub created_at: u64,
     /// The SHA-256 of its creation, in hex, which an approval or refusal names.
     pub creation_hash: String,
-    /// The draft decision and its executed or refused_on_execution outcome.
+    /// The draft decision and its `executed` or `refused_on_execution` outcome.
     pub state: &'static str,
     /// The decision, absent while it waits.
     #[serde(skip_serializing_if = "Option::is_none")]

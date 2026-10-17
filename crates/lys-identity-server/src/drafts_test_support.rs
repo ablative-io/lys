@@ -120,7 +120,16 @@ impl Table {
                     LoginBinding::new(&config.issuer, "other-subject")?,
                     Provenance::new(AuthMethod::Oidc, crate::session::now()),
                 ))?;
-                certify(config, &key, &agent.to_string(), &person.to_string())?;
+                certify(
+                    &config.event_key_file,
+                    config
+                        .certificates_dir
+                        .as_deref()
+                        .ok_or("certificate log missing")?,
+                    &key,
+                    &agent.to_string(),
+                    &person.to_string(),
+                )?;
                 Ok((
                     agent.to_string(),
                     person.to_string(),
@@ -193,32 +202,28 @@ impl Table {
 }
 
 fn certify(
-    config: &crate::Config,
+    event_key_file: &std::path::Path,
+    certificates_dir: &std::path::Path,
     key: &Arc<Ed25519Identity>,
     agent: &str,
     person: &str,
 ) -> Result {
-    let certificate = CertificateAuthority::new(Ed25519Identity::load(&config.event_key_file)?)
+    let certificate = CertificateAuthority::new(Ed25519Identity::load(event_key_file)?)
         .issue_certificate_for_request(
             &create_certificate_request(key, agent)?,
             agent,
             Duration::from_secs(3600),
             vec![],
         )?;
-    crate::certificates_store::CertificateStore::open(
-        config
-            .certificates_dir
-            .as_deref()
-            .ok_or("certificate log missing")?,
-        Arc::clone(key),
-    )?
-    .issue(crate::certificates_store::Issued {
-        serial: operation()?,
-        agent: agent.to_owned(),
-        person: person.to_owned(),
-        claims: json!({}),
-        der: base64::engine::general_purpose::STANDARD.encode(certificate.der_bytes),
-        issued_at: crate::session::now(),
-    })?;
+    crate::certificates_store::CertificateStore::open(certificates_dir, Arc::clone(key))?.issue(
+        crate::certificates_store::Issued {
+            serial: operation()?,
+            agent: agent.to_owned(),
+            person: person.to_owned(),
+            claims: json!({}),
+            der: base64::engine::general_purpose::STANDARD.encode(certificate.der_bytes),
+            issued_at: crate::session::now(),
+        },
+    )?;
     Ok(())
 }

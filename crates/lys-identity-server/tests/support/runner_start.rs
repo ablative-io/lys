@@ -46,6 +46,9 @@ async fn broker(request: Request) -> Response {
 }
 
 /// A fresh operation for a fixture request.
+///
+/// # Errors
+/// Propagates failed fixture setup, transport errors or a service refusal.
 pub fn operation() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
 }
@@ -73,6 +76,9 @@ pub struct Table {
 /// its own executable, here the test binary, which refuses the owner's
 /// arguments ("Unrecognized option: 'dir'", exit 101); a test that starts a
 /// seat asserts it was built ([`owner_program`] in the test itself).
+///
+/// # Errors
+/// Propagates failed fixture setup, transport errors or a service refusal.
 pub fn owner_program() -> Result<Option<std::path::PathBuf>, Box<dyn Error>> {
     let exe = std::env::current_exe()?;
     let target = exe
@@ -85,6 +91,9 @@ pub fn owner_program() -> Result<Option<std::path::PathBuf>, Box<dyn Error>> {
 
 impl Table {
     /// Start with a reviewed profile for the declared fixture program.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn set() -> Result<Self, Box<dyn Error>> {
         let table = Self::unprofiled().await?;
         table.profile().await?;
@@ -92,11 +101,17 @@ impl Table {
     }
 
     /// Start once, leaving the scenario to record and review its own profile.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn unprofiled() -> Result<Self, Box<dyn Error>> {
         Self::unprofiled_with(false, None).await
     }
 
     /// Command scenarios seed a second sign-in subject only when they use one.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn unprofiled_with(
         commands_only: bool,
         other_subject: Option<&str>,
@@ -105,6 +120,9 @@ impl Table {
     }
 
     /// Start with a reviewed profile, judging grants by `model`.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn set_judging(model: &'static str) -> Result<Self, Box<dyn Error>> {
         let table = Self::unprofiled_judging(model, false, None).await?;
         table.profile().await?;
@@ -112,6 +130,9 @@ impl Table {
     }
 
     /// As [`Table::unprofiled_with`], judging grants by `model`.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn unprofiled_judging(
         model: &'static str,
         commands_only: bool,
@@ -210,6 +231,9 @@ impl Table {
     }
 
     /// Send a setup request and propagate any refusal.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn ok(&self, path: &str, body: &Value) -> Result<Value, Box<dyn Error>> {
         let (status, answer) = self.service.post(path, Some(&self.ada), body).await?;
         if status != 200 {
@@ -236,6 +260,9 @@ impl Table {
     }
 
     /// Record and review the default profile once.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn profile(&self) -> TestResult {
         let path = format!("/agents/{}/provisioning", self.agent());
         let harness = self.harness();
@@ -260,6 +287,9 @@ impl Table {
     /// named `name` on the first ask, answered as it is after. An install's
     /// own runner is named by one live machine only (AGENTS-002 D3, a second
     /// refused `runner_lys_taken`), so every start of a table shares it.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn lys_machine(&self, name: &str) -> Result<String, Box<dyn Error>> {
         if let Some(machine) = self.lys_machine.get() {
             return Ok(machine.clone());
@@ -273,7 +303,9 @@ impl Table {
             .service
             .post("/network/machines", Some(&self.ada), &body)
             .await?;
-        assert_eq!(status, 200, "{named}");
+        if status != 200 {
+            return Err(format!("fixture_machine_refused: HTTP {status}: {named}").into());
+        }
         self.ok(
             &format!("/network/machines/{machine}/runner"),
             &json!({"runner": {"kind": "lys"}}),
@@ -286,6 +318,9 @@ impl Table {
     }
 
     /// Name the requested machine, recording its runner when one is given.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn machine(
         &self,
         body: &Value,
@@ -306,12 +341,18 @@ impl Table {
     }
 
     /// Send the exact start request for the given agent.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub async fn start(&self, agent: &str, body: &Value) -> Result<(u16, Value), Box<dyn Error>> {
         let path = format!("/agents/{agent}/start-command");
         self.service.post(&path, Some(&self.ada), body).await
     }
 
     /// Stop the runner and propagate any shutdown error.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
     pub fn close(mut self) -> TestResult {
         if let Some(serving) = self.serving.take() {
             serving.stop()?;

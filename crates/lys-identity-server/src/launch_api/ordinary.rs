@@ -243,30 +243,7 @@ pub(crate) async fn chosen(
     if let Some(view) = super::admitted(state, &operation, agent)? {
         return replay(&view, machine, requested.as_deref());
     }
-    let harness = with_provisioning(state, |store| {
-        let Some(version) = store.latest_reviewed(agent) else {
-            let latest = store
-                .profile(agent)
-                .and_then(|profile| profile.versions.last())
-                .ok_or(ServerError::LaunchRecordMissing)?;
-            return Err(ServerError::ProfileNotReviewed {
-                version: latest.number,
-            });
-        };
-        if crate::launch_template::requires_controls(version) {
-            return Ok(None);
-        }
-        // A conversation named in the agent's settings is the one it continues, every time: the program resumes
-        // it in place under the same id, and the start already carries it as the program's own resume.
-        if version.settings.resume.is_some() {
-            return Ok(None);
-        }
-        Ok(version
-            .settings
-            .harness
-            .as_ref()
-            .and_then(crate::launch_template::runner_harness))
-    })?;
+    let harness = reviewed_harness(state, agent)?;
     let Some(harness) = harness else {
         return Ok(Chosen {
             profile: None,
@@ -342,3 +319,33 @@ pub(crate) async fn chosen(
 
 #[cfg(test)]
 mod tests;
+
+fn reviewed_harness(
+    state: &Arc<AppState>,
+    agent: &str,
+) -> Result<Option<lys_runner::tracking::Harness>, ServerError> {
+    with_provisioning(state, |store| {
+        let Some(version) = store.latest_reviewed(agent) else {
+            let latest = store
+                .profile(agent)
+                .and_then(|profile| profile.versions.last())
+                .ok_or(ServerError::LaunchRecordMissing)?;
+            return Err(ServerError::ProfileNotReviewed {
+                version: latest.number,
+            });
+        };
+        if crate::launch_template::requires_controls(version) {
+            return Ok(None);
+        }
+        // A conversation named in the agent's settings is the one it continues, every time: the program resumes
+        // it in place under the same id, and the start already carries it as the program's own resume.
+        if version.settings.resume.is_some() {
+            return Ok(None);
+        }
+        Ok(version
+            .settings
+            .harness
+            .as_ref()
+            .and_then(crate::launch_template::runner_harness))
+    })
+}

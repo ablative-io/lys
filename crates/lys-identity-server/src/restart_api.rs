@@ -114,32 +114,7 @@ async fn restart(
             .and_then(Value::as_str)
             .map(str::to_owned))
     })?;
-    with_directory(&state, |directory| {
-        let record = directory
-            .projection()?
-            .record(IdentityId::Agent(agent))
-            .ok_or(ServerError::AgentNotVisible)?;
-        crate::start_checks::active(record.state())
-    })?;
-    let profile = with_provisioning(&state, |store| {
-        store
-            .profile(&driven.agent)
-            .and_then(|profile| {
-                profile
-                    .versions
-                    .iter()
-                    .rev()
-                    .find(|version| version.reviewed.is_some())
-                    .cloned()
-            })
-            .ok_or_else(|| ServerError::Runner {
-                refusal: "profile_version_unreviewed".to_owned(),
-                words: format!(
-                    "agent {} has no reviewed profile version; session {session} keeps running",
-                    driven.agent
-                ),
-            })
-    })?;
+    let profile = restart_version(&state, agent, &session)?;
     let chosen = crate::launch_api::ordinary::chosen(
         &state,
         &driven.agent,
@@ -177,4 +152,36 @@ async fn restart(
         },
     )
     .await
+}
+
+fn restart_version(
+    state: &AppState,
+    agent: AgentId,
+    session: &str,
+) -> Result<crate::provisioning_store::Version, ServerError> {
+    with_directory(state, |directory| {
+        let record = directory
+            .projection()?
+            .record(IdentityId::Agent(agent))
+            .ok_or(ServerError::AgentNotVisible)?;
+        crate::start_checks::active(record.state())
+    })?;
+    with_provisioning(state, |store| {
+        store
+            .profile(&agent.to_string())
+            .and_then(|profile| {
+                profile
+                    .versions
+                    .iter()
+                    .rev()
+                    .find(|version| version.reviewed.is_some())
+                    .cloned()
+            })
+            .ok_or_else(|| ServerError::Runner {
+                refusal: "profile_version_unreviewed".to_owned(),
+                words: format!(
+                    "agent {agent} has no reviewed profile version; session {session} keeps running"
+                ),
+            })
+    })
 }

@@ -239,31 +239,14 @@ async fn begin(
         selected.expected
     };
     let observed = harness_session(state, &held.added.machine, &session, &mut notes).await;
-    if let (Some(expected), Some(observed)) = (&expected, &observed)
-        && expected != observed
-    {
-        let launched = driven(state, &session)?;
-        let (answer, _) = act(
-            state,
-            (&launched, caller, "seat_start_refused"),
-            None,
-            Act::End {
-                session: session.clone(),
-            },
-        )
-        .await?;
-        if !matches!(answer, Answer::Ended { .. }) {
-            return Err(ServerError::Runner {
-                refusal: "runner_reply_malformed".to_owned(),
-                words: format!("ending a mismatched seat start answered {}", kind(&answer)),
-            });
-        }
-        return Err(lys_runner::RunnerError::refused(
-            "pty_conversation_mismatch",
-            "the runner reported another native conversation and the new process was ended; choose Start again",
-        )
-        .into());
-    }
+    verify_conversation(
+        state,
+        &session,
+        caller,
+        expected.as_deref(),
+        observed.as_deref(),
+    )
+    .await?;
     let harness_session = expected.or(observed);
     let kept = with_seats(state, |store| {
         store.keep(Line::Started(Started {
@@ -468,3 +451,38 @@ async fn ready_start(
 
 #[cfg(test)]
 mod seat_program_stop_tests;
+
+async fn verify_conversation(
+    state: &Arc<AppState>,
+    session: &str,
+    caller: &str,
+    expected: Option<&str>,
+    observed: Option<&str>,
+) -> Result<(), ServerError> {
+    if let (Some(expected), Some(observed)) = (expected, observed)
+        && expected != observed
+    {
+        let launched = driven(state, session)?;
+        let (answer, _) = act(
+            state,
+            (&launched, caller, "seat_start_refused"),
+            None,
+            Act::End {
+                session: session.to_owned(),
+            },
+        )
+        .await?;
+        if !matches!(answer, Answer::Ended { .. }) {
+            return Err(ServerError::Runner {
+                refusal: "runner_reply_malformed".to_owned(),
+                words: format!("ending a mismatched seat start answered {}", kind(&answer)),
+            });
+        }
+        return Err(lys_runner::RunnerError::refused(
+            "pty_conversation_mismatch",
+            "the runner reported another native conversation and the new process was ended; choose Start again",
+        )
+        .into());
+    }
+    Ok(())
+}

@@ -426,6 +426,11 @@ async fn the_routes_set_read_change_and_stop_and_refuse_by_name() -> TestResult 
     assert_eq!(status, 409, "{refused}");
     assert_eq!(refused["refusal"], "schedule_stopped");
 
+    assert_route_refusals(&table, at).await?;
+    Ok(())
+}
+
+async fn assert_route_refusals(table: &Table, at: u64) -> TestResult {
     // Refusals by name.
     let (status, refused) = table
         .service

@@ -35,111 +35,8 @@ async fn native_spend_and_unavailable_current_context_survive_replay_and_restart
             email: "operator@example.test".to_owned(),
         })
         .await?;
-    // With no limit set, the agent's usage still answers what it used and
-    // its account's windows; nothing is held against a limit.
-    let (status, usage) = service
-        .get(&format!("/agents/{agent}/usage"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 200, "{usage}");
-    assert_eq!(usage["used"], json!([]));
-    assert_eq!(
-        usage["figures"]
-            .as_array()
-            .ok_or("no figures")?
-            .iter()
-            .map(|row| json!([row["unit"], row["period"], row["figure"]]))
-            .collect::<Vec<_>>(),
-        vec![
-            json!(["context_percent", null, null]),
-            json!(["tokens", "day", 100]),
-            json!(["tokens", "week", 100]),
-            json!(["dollars", "day", 500]),
-            json!(["dollars", "week", 500]),
-            json!(["running_ms", "day", 150]),
-            json!(["running_ms", "week", 150]),
-            json!(["plan_percent", "five_hour", null]),
-            json!(["tokens", "five_hour", 100]),
-        ]
-    );
-    let accounts = usage["accounts"].as_array().ok_or("no accounts")?;
-    assert_eq!(accounts.len(), 1, "{usage}");
-    assert_eq!(accounts[0]["account"], "shared-account");
-    assert_eq!(accounts[0]["windows"][0]["duration_minutes"], 10_080);
-    assert_eq!(accounts[0]["windows"][0]["used_percent"], 49);
-    // Each call the proxy reported is listed newest first from the kept uses.
-    let (status, calls) = service
-        .get(&format!("/agents/{agent}/calls"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 200, "{calls}");
-    assert_eq!(
-        calls["calls"]
-            .as_array()
-            .ok_or("no calls")?
-            .iter()
-            .map(|row| json!([
-                row["call_id"],
-                row["model"],
-                row["input_tokens"],
-                row["account"],
-                row["status"],
-                row["duration_ms"]
-            ]))
-            .collect::<Vec<_>>(),
-        vec![
-            json!([
-                "1-Spend",
-                "model-one",
-                70,
-                "shared-account",
-                "complete",
-                1200
-            ]),
-            json!([
-                "0-Spend",
-                "model-one",
-                30,
-                "shared-account",
-                "partial",
-                null
-            ]),
-        ]
-    );
-    assert_eq!(calls["next"], json!(null));
-    let (status, refused) = service
-        .get(
-            &format!("/agents/{agent}/calls?after=nonsense"),
-            Some(&cookie),
-        )
-        .await?;
-    assert_eq!(status, 400, "{refused}");
-    // A call kept on this computer is read whole: its record and both bodies.
-    let (status, whole) = service
-        .get(&format!("/agents/{agent}/calls/1-Spend"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 200, "{whole}");
-    assert_eq!(whole["call"]["call_id"], "1-Spend");
-    assert_eq!(whole["request"], json!({"model": "model-one"}));
-    assert_eq!(whole["response"], json!({"type": "message"}));
-    assert_eq!(whole["request_unreadable"], json!(null));
-    assert_eq!(whole["response_unreadable"], json!(null));
-    // One this computer's proxy does not hold names the computer that made it.
-    let (status, elsewhere) = service
-        .get(&format!("/agents/{agent}/calls/0-Spend"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 409, "{elsewhere}");
-    let words = elsewhere.to_string();
-    assert!(
-        words.contains("CallKeptElsewhere") && words.contains(&machine),
-        "{words}"
-    );
-    let (status, unknown) = service
-        .get(
-            &format!("/agents/{agent}/calls/no-such-call"),
-            Some(&cookie),
-        )
-        .await?;
-    assert_eq!(status, 404, "{unknown}");
-    assert!(unknown.to_string().contains("CallUnknown"), "{unknown}");
+    assert_usage(&service, &agent, &cookie).await?;
+    assert_calls(&service, &agent, &machine, &cookie).await?;
     let path = format!("/budgets/agent/{agent}");
     let limits = json!([
         {"unit": "tokens", "amount": 200, "period": "day", "act": "tell"},
@@ -202,5 +99,118 @@ async fn native_spend_and_unavailable_current_context_survive_replay_and_restart
     reopened.fold(&tail)?;
     assert_eq!(reopened.refusals.records, held.refusals.records);
     assert_eq!(reopened.refusals.cursors, held.refusals.cursors);
+    Ok(())
+}
+
+async fn assert_usage(service: &Service, agent: &str, cookie: &str) -> TestResult {
+    // With no limit set, the agent's usage still answers what it used and
+    // its account's windows; nothing is held against a limit.
+    let (status, usage) = service
+        .get(&format!("/agents/{agent}/usage"), Some(cookie))
+        .await?;
+    assert_eq!(status, 200, "{usage}");
+    assert_eq!(usage["used"], json!([]));
+    assert_eq!(
+        usage["figures"]
+            .as_array()
+            .ok_or("no figures")?
+            .iter()
+            .map(|row| json!([row["unit"], row["period"], row["figure"]]))
+            .collect::<Vec<_>>(),
+        vec![
+            json!(["context_percent", null, null]),
+            json!(["tokens", "day", 100]),
+            json!(["tokens", "week", 100]),
+            json!(["dollars", "day", 500]),
+            json!(["dollars", "week", 500]),
+            json!(["running_ms", "day", 150]),
+            json!(["running_ms", "week", 150]),
+            json!(["plan_percent", "five_hour", null]),
+            json!(["tokens", "five_hour", 100]),
+        ]
+    );
+    let accounts = usage["accounts"].as_array().ok_or("no accounts")?;
+    assert_eq!(accounts.len(), 1, "{usage}");
+    assert_eq!(accounts[0]["account"], "shared-account");
+    assert_eq!(accounts[0]["windows"][0]["duration_minutes"], 10_080);
+    assert_eq!(accounts[0]["windows"][0]["used_percent"], 49);
+    Ok(())
+}
+
+async fn assert_calls(service: &Service, agent: &str, machine: &str, cookie: &str) -> TestResult {
+    // Each call the proxy reported is listed newest first from the kept uses.
+    let (status, calls) = service
+        .get(&format!("/agents/{agent}/calls"), Some(cookie))
+        .await?;
+    assert_eq!(status, 200, "{calls}");
+    assert_eq!(
+        calls["calls"]
+            .as_array()
+            .ok_or("no calls")?
+            .iter()
+            .map(|row| json!([
+                row["call_id"],
+                row["model"],
+                row["input_tokens"],
+                row["account"],
+                row["status"],
+                row["duration_ms"]
+            ]))
+            .collect::<Vec<_>>(),
+        vec![
+            json!([
+                "1-Spend",
+                "model-one",
+                70,
+                "shared-account",
+                "complete",
+                1200
+            ]),
+            json!([
+                "0-Spend",
+                "model-one",
+                30,
+                "shared-account",
+                "partial",
+                null
+            ]),
+        ]
+    );
+    assert_eq!(calls["next"], json!(null));
+    let (status, refused) = service
+        .get(
+            &format!("/agents/{agent}/calls?after=nonsense"),
+            Some(cookie),
+        )
+        .await?;
+    assert_eq!(status, 400, "{refused}");
+    // A call kept on this computer is read whole: its record and both bodies.
+    let (status, whole) = service
+        .get(&format!("/agents/{agent}/calls/1-Spend"), Some(cookie))
+        .await?;
+    assert_eq!(status, 200, "{whole}");
+    assert_eq!(whole["call"]["call_id"], "1-Spend");
+    assert_eq!(whole["request"], json!({"model": "model-one"}));
+    assert_eq!(whole["response"], json!({"type": "message"}));
+    assert_eq!(whole["request_unreadable"], json!(null));
+    assert_eq!(whole["response_unreadable"], json!(null));
+    // One this computer's proxy does not hold names the computer that made it.
+    let (status, elsewhere) = service
+        .get(&format!("/agents/{agent}/calls/0-Spend"), Some(cookie))
+        .await?;
+    assert_eq!(status, 409, "{elsewhere}");
+    let words = elsewhere.to_string();
+    assert!(
+        words.contains("CallKeptElsewhere") && words.contains(machine),
+        "{words}"
+    );
+    let (status, unknown) = service
+        .get(
+            &format!("/agents/{agent}/calls/no-such-call"),
+            Some(cookie),
+        )
+        .await?;
+    assert_eq!(status, 404, "{unknown}");
+    assert!(unknown.to_string().contains("CallUnknown"), "{unknown}");
     Ok(())
 }

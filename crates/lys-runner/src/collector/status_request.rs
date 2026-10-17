@@ -1,4 +1,6 @@
 //! The snapshot transaction releases the table before durability and process completion.
+#[cfg(test)]
+use super::BEFORE_END;
 use super::{
     Body, PendingStatus, Reading, RunnerError, Sessions, Value, accounts, flush_status, now_ms,
     plan_status, proxied_status, text,

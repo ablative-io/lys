@@ -409,25 +409,7 @@ pub(super) fn prepare_record(
     }
     if harness == Some(lys_runner::tracking::Harness::Codex) && proxy.is_some() {
         let proxy = proxy.ok_or_else(|| record_unproved("the Codex start names no model proxy"))?;
-        let run = launch
-            .environment
-            .get("LYS_RUN")
-            .filter(|run| lys_home::proxy::usage::is_run_key(run))
-            .ok_or_else(|| {
-                record_unproved("the rendered Codex model proxy has no valid run key")
-            })?;
-        if launch.arguments.len() != record.arguments.len() {
-            return Err(record_unproved(
-                "the signed argument count differs from its reviewed profile",
-            ));
-        }
-        for (given, wanted) in record.arguments.iter().zip(&launch.arguments) {
-            if given != wanted && !super::proxy_argument(given, wanted, proxy, run)? {
-                return Err(record_unproved(
-                    "a signed Codex argument differs beyond its per-run proxy key",
-                ));
-            }
-        }
+        proxy_check::arguments(record, &launch, proxy)?;
     } else {
         // The existing builder remains the exact signed-command check for static arguments.
         let checked = crate::launch_record_config::build(
@@ -450,3 +432,6 @@ pub(super) fn prepare_record(
 #[cfg(test)]
 #[path = "starting_tests.rs"]
 mod tests;
+
+#[path = "starting_proxy.rs"]
+mod proxy_check;

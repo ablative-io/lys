@@ -9,9 +9,11 @@ fn live(session: &str) -> Live {
         session: session.to_owned(),
         pid: Some(7),
         alive: true,
-        managed: true,
+        harness: lys_runner::liveness::HarnessLiveness {
+            managed: true,
+            started_fresh: false,
+        },
         harness_session: None,
-        started_fresh: false,
         turn_active: false,
         last_signal_at: None,
         started_at: 1,
