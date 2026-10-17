@@ -3,6 +3,9 @@ use super::return_page::{Return, page};
 use axum::http::StatusCode;
 use std::error::Error;
 
+#[path = "mcp_oauth_return_door_tests.rs"]
+mod door;
+
 #[tokio::test]
 async fn finishing_page_carries_one_address_and_no_script_or_redirect() -> Result<(), Box<dyn Error>>
 {
@@ -71,59 +74,26 @@ async fn finishing_page_carries_one_address_and_no_script_or_redirect() -> Resul
 #[tokio::test]
 async fn registered_and_native_clients_return_only_to_the_same_host_and_decide_once()
 -> Result<(), Box<dyn Error>> {
-    let (service, cookie) = super::tests::service().await?;
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .build()?;
-    let elsewhere = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .local_address("127.0.0.2".parse::<std::net::IpAddr>()?)
-        .build()?;
-    let app:serde_json::Value=client.post(format!("{}/oauth/mcp/register",service.base)).json(&serde_json::json!({"client_name":"Claude Code","redirect_uris":["http://127.0.0.1:23456/lys/sign-in"]})).send().await?.json().await?;
-    for id in [app["client_id"].as_str().ok_or("client absent")?, "lys-cli"] {
+    let door = door::Door::new().await?;
+    let client = std::net::SocketAddr::from(([192, 0, 2, 1], 12345));
+    let app = door.register(client).await?;
+    for id in [app.as_str(), "lys-cli"] {
         for same in [true, false] {
-            let response = client
-                .get(format!("{}/oauth/mcp/authorize", service.base))
-                .header("cookie", &cookie)
-                .query(&[
-                    ("response_type", "code"),
-                    ("client_id", id),
-                    ("redirect_uri", "http://127.0.0.1:23456/lys/sign-in"),
-                    ("code_challenge", &"a".repeat(43)),
-                    ("code_challenge_method", "S256"),
-                    ("state", "kept"),
-                ])
-                .send()
-                .await?;
-            let body = response.text().await?;
-            let asking = body
-                .split("name=\"asking\" value=\"")
-                .nth(1)
-                .and_then(|s| s.split('"').next())
-                .ok_or("asking absent")?;
-            let browser = if same { &client } else { &elsewhere };
-            let answer = browser
-                .post(format!("{}/oauth/mcp/consent", service.base))
-                .header("cookie", &cookie)
-                .form(&[("asking", asking), ("decision", "approve")])
-                .send()
-                .await?;
-            assert_eq!(answer.status(), 200);
-            assert!(!answer.headers().contains_key("location"));
-            let body = answer.text().await?;
+            let asking = door.authorize(client, id).await?;
+            let browser = std::net::SocketAddr::from((
+                if same { [192, 0, 2, 1] } else { [192, 0, 2, 2] },
+                23456,
+            ));
+            let (status, headers, body) = door.decide(browser, &asking).await?;
+            assert_eq!(status, 200);
+            assert!(!headers.contains_key("location"));
             assert_eq!(body.contains("http-equiv=\"refresh\""), same);
-            let again = browser
-                .post(format!("{}/oauth/mcp/consent", service.base))
-                .header("cookie", &cookie)
-                .form(&[("asking", asking), ("decision", "approve")])
-                .send()
-                .await?;
-            assert_eq!(again.status(), 400);
-            assert!(again.text().await?.contains("CodeUnknown"));
+            let (status, _, body) = door.decide(browser, &asking).await?;
+            assert_eq!(status, 400);
+            assert!(body.contains("CodeUnknown"));
         }
     }
+    door.finish()?;
     Ok(())
 }
 
