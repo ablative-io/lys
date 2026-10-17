@@ -254,6 +254,17 @@ fn seat_program_launch_records_both_started_digests() -> Result {
     let sessions = Sessions::open(fixture.dir.path(), 8192)?;
     sessions.start(fixture.launch)?;
     sessions.end("seat-fixture", &AtomicBool::new(false))?;
+    let status = serde_json::to_value(sessions.status(Some("seat-fixture"))?)?;
+    let evidence = &status["sessions"][0]["seat_program"];
+    assert_eq!(evidence["provisioning_version"], 1);
+    assert_eq!(
+        evidence["reviewed_executable_sha256"],
+        fixture.spec.executable_sha256
+    );
+    assert_eq!(
+        evidence["found_seat_file_sha256"],
+        fixture.spec.seat_file_sha256
+    );
     let proof = sessions
         .lock()?
         .feed
