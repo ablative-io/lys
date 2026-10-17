@@ -1339,6 +1339,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `plugin/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 | `plugins/lys/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 | `crates/lys-identity-server/src/apps_sign_in_declare.rs` | R1: one return address declared for an app by the administrator or by the app itself through its own credential, judged by the same rule as a saved line, written nowhere when already listed | DIRECTORY-098 |
+| `crates/lys-identity-server/src/sign_in_refusal_line.rs` | R2: the one WARN line for a refused person sign-in, with the route, the refusal's name and the handle tried when it is a well-formed email, never the password | DIRECTORY-099 |
 
 ## Inventory
 
@@ -1372,7 +1373,6 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 - `docs/design/identity/mockup/index.v5.html` — the accepted mock-up, 1680 lines, sha256 e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f; the shell's definition; kept as the prior, never changed
 - `scripts/design/render-brief.py` — the brief renderer copied from the design-system method at 3c3bac7; joins every list field of a brief onto one line with ', ', blocked_by and depends_on included
 - `scripts/design/SOURCE.md` — states that the design scripts, render-brief.py among them, are copies of the design-system method at 3c3bac7
-- `crates/lys-identity-server/src/sign_in_refusal_line.rs` — R2: the one WARN line for a refused person sign-in, with the route, the refusal's name and the handle tried when it is a well-formed email, never the password
 
 ## Constraints
 
