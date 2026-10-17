@@ -15,13 +15,16 @@ pub(super) fn client() -> Result<reqwest::Client, Box<dyn Error>> {
         .build()?)
 }
 
-fn located(response: &reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
-    let location = response
-        .headers()
-        .get("location")
-        .ok_or("no location")?
-        .to_str()?;
-    Ok(reqwest::Url::parse(location)?)
+async fn located(response: reqwest::Response) -> Result<reqwest::Url, Box<dyn Error>> {
+    assert!(!response.headers().contains_key("location"));
+    let page = response.text().await?;
+    let address = page
+        .split("readonly value=\"")
+        .nth(1)
+        .and_then(|text| text.split('"').next())
+        .ok_or("no finishing address")?
+        .replace("&amp;", "&");
+    Ok(reqwest::Url::parse(&address)?)
 }
 
 fn pair(url: &reqwest::Url, name: &str) -> Option<String> {
@@ -82,10 +85,10 @@ pub(super) async fn connected_mode(
         .await?;
     assert_eq!(
         answered.status(),
-        StatusCode::SEE_OTHER,
+        StatusCode::OK,
         "OAuth consent for mode {mode:?} was refused"
     );
-    let back = located(&answered)?;
+    let back = located(answered).await?;
     assert_eq!(pair(&back, "state").as_deref(), Some("kept"));
     let code = pair(&back, "code").ok_or("no code")?;
     let tokens: Value = client

@@ -51,14 +51,16 @@ async fn connection(service: &Service, cookie: &str, client: &Client) -> Result<
         ])
         .send()
         .await?;
-    assert_eq!(response.status(), 303);
-    let back = reqwest::Url::parse(
-        response
-            .headers()
-            .get("location")
-            .ok_or("no consent redirect")?
-            .to_str()?,
-    )?;
+    assert_eq!(response.status(), 200);
+    assert!(!response.headers().contains_key("location"));
+    let page = response.text().await?;
+    let address = page
+        .split("readonly value=\"")
+        .nth(1)
+        .and_then(|text| text.split('"').next())
+        .ok_or("no finishing address")?
+        .replace("&amp;", "&");
+    let back = reqwest::Url::parse(&address)?;
     let code = back
         .query_pairs()
         .find(|(key, _)| key == "code")
