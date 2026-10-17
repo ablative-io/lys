@@ -28,7 +28,7 @@ fn draft(table: &Table, person: PersonId, product: bool) -> Result<(String, Valu
         }
         .to_owned(),
         id: table.own.clone(),
-        action: "read".to_owned(),
+        action: if product { "read" } else { "agent.wake" }.to_owned(),
     };
     let (id, body) = if product {
         let holder = IdentityId::Agent(table.own.parse()?);
@@ -117,11 +117,18 @@ async fn decide_both(
 async fn personapp_decide_admits_its_persons_operator_draft() -> Result {
     let table = Table::app_fixture().await?;
     let pass = table.pass("fixture_product", false, true)?;
-    for (status, answer) in decide_both(&table, &pass, table.person, false).await? {
+    for (approve, (status, answer)) in [false, true]
+        .into_iter()
+        .zip(decide_both(&table, &pass, table.person, false).await?)
+    {
         assert_eq!(
             status, 200,
             "the own person's draft decision was refused: {answer}"
         );
+        if approve {
+            assert_eq!(answer["execution"]["state"], "refused_on_execution");
+            assert_eq!(answer["execution"]["refusal"], "RequestMalformed");
+        }
     }
     Ok(())
 }

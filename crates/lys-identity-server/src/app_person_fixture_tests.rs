@@ -156,6 +156,30 @@ impl Table {
         Ok(())
     }
 
+    fn admitted(&self) -> TestResult<axum::Router> {
+        let mut dispatch = self.dispatch.lock().map_err(|error| error.to_string())?;
+        if let Some(router) = dispatch.as_ref() {
+            return Ok(router.as_ref().clone());
+        }
+        let router = crate::signed_first::guarded(
+            crate::routes_table::router(Arc::clone(&self.state))
+                .merge(crate::certificates_api::routes().with_state(Arc::clone(&self.state))),
+            Arc::clone(&self.state),
+        );
+        let router = Arc::new(
+            crate::session_admission::guarded(router, Arc::clone(&self.state)).layer(
+                axum::middleware::from_fn_with_state(
+                    Arc::clone(&self.state),
+                    crate::operator::guard,
+                ),
+            ),
+        );
+        self.state.draft_execution.attach(Arc::downgrade(&router))?;
+        let answer = router.as_ref().clone();
+        *dispatch = Some(router);
+        Ok(answer)
+    }
+
     pub(super) async fn send(
         &self,
         method: &str,
@@ -164,11 +188,7 @@ impl Table {
         body: &Value,
         extra: &[(&str, &str)],
     ) -> TestResult<(u16, Value)> {
-        let router = crate::signed_first::guarded(
-            crate::routes_table::router(Arc::clone(&self.state))
-                .merge(crate::certificates_api::routes().with_state(Arc::clone(&self.state))),
-            Arc::clone(&self.state),
-        );
+        let router = self.admitted()?;
         let mut request = Request::builder()
             .method(method)
             .uri(path)
@@ -177,11 +197,7 @@ impl Table {
         for (name, value) in extra {
             request = request.header(*name, *value);
         }
-        let response = crate::session_admission::guarded(router, Arc::clone(&self.state))
-            .layer(axum::middleware::from_fn_with_state(
-                Arc::clone(&self.state),
-                crate::operator::guard,
-            ))
+        let response = router
             .oneshot(request.body(Body::from(serde_json::to_vec(body)?))?)
             .await?;
         let status = response.status().as_u16();

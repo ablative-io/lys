@@ -5,7 +5,7 @@ use lys_identity::PersonId;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::error::Error;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -13,6 +13,7 @@ type TestResult = Result<(), Box<dyn Error>>;
 struct Table {
     dir: tempfile::TempDir,
     state: Arc<crate::routes::AppState>,
+    dispatch: Mutex<Option<Arc<axum::Router>>>,
     session: String,
     person: PersonId,
     own: String,
@@ -37,6 +38,7 @@ impl Table {
         Ok(Self {
             dir,
             state: Arc::new(state),
+            dispatch: Mutex::new(None),
             session,
             person,
             own: own.to_string(),
