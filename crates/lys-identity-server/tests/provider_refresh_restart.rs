@@ -193,9 +193,9 @@ async fn issued_refresh(service: &Service) -> Result<String, Box<dyn Error>> {
 }
 
 /// DIRECTORY-099 R1: a refresh token whose Lys sign-in ended, read on the
-/// service's own clock, is refused SessionEnded naming the instant it ended,
+/// service's own clock, is refused `SessionEnded` naming the instant it ended,
 /// across a restart, and said so once in the service's log; a token Lys never
-/// issued is still RefreshUnknown.
+/// issued is still `RefreshUnknown`.
 #[tokio::test]
 async fn a_refresh_whose_sign_in_ended_is_refused_session_ended_naming_its_end() -> TestResult {
     let started = i64::try_from(lys_identity_server::session::now())?;

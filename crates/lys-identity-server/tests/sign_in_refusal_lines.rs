@@ -20,7 +20,7 @@ const EMAIL: &str = "grace@example.test";
 const PASSWORD: &str = "Compiler-Pioneer-1952";
 const WRONG: &str = "Not-The-Password-1";
 const REFUSED: &str = "a person's sign-in was refused";
-/// SignInRefused's words, as the browser is answered them.
+/// `SignInRefused`'s words, as the browser is answered them.
 const REFUSED_WORDS: &str = "SignInRefused: the email or password is not right";
 /// What an issuer's callback body carries that must never reach the log.
 const BODY_SENTINELS: [&str; 2] = [
@@ -250,7 +250,7 @@ async fn a_provider_callback_the_issuer_will_not_admit_says_one_line_naming_its_
 }
 
 /// A callback the issuer refuses with a body Lys does not recognise as an
-/// admission refusal is SignInFailed, and its line carries the words
+/// admission refusal is `SignInFailed`, and its line carries the words
 /// `callback_summary` reduced the body to, and nothing else of it.
 #[tokio::test]
 async fn a_callback_refused_sign_in_failed_says_its_reduced_words_as_the_reason() -> TestResult {

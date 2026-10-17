@@ -60,7 +60,7 @@ fn an_ended_refresh_entry_is_kept_thirty_days_answering_its_end_and_no_token()
         reopened.get(&ended, T + 1),
         Err(ServerError::Provider(ProviderError::TokenUnknown))
     ));
-    assert_eq!(stored_keys(&file)?, [ended.clone()]);
+    assert_eq!(stored_keys(&file)?, std::slice::from_ref(&ended));
     drop(reopened);
     let past = T + ENDED_REFRESH_KEPT_SECONDS + 1;
     let mut later = Tokens::open(file.clone(), past)?;
