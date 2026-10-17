@@ -361,24 +361,7 @@ fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
     super::giving::decide_member(&mut judged, &member, 5, Decision::Explain)?;
     assert_eq!(judged.grants.revision(), revision);
     super::giving::decide_member(&mut judged, &member, 5, Decision::Exercise)?;
-    assert_eq!(
-        judged
-            .grants
-            .book()
-            .record(member_grant)
-            .ok_or("member grant missing")?
-            .uses(),
-        1
-    );
-    assert_eq!(
-        judged
-            .grants
-            .book()
-            .record(team_grant)
-            .ok_or("team grant missing")?
-            .uses(),
-        1
-    );
+    assert_grant_uses(judged.grants, member_grant, team_grant)?;
     Ok(())
 }
 
@@ -393,4 +376,31 @@ fn member_model() -> TestResult<lys_identity::grants::Model> {
             (Relation::new("operator")?, [Action::new("operate")?].into()),
         ],
     )?)
+}
+
+fn assert_grant_uses(
+    grants: &lys_identity::grants::Grants<
+        crate::apps_bench_scratch::memory::MemoryStore,
+        crate::spicedb::Relationships,
+    >,
+    member_grant: lys_identity::grants::GrantId,
+    team_grant: lys_identity::grants::GrantId,
+) -> TestResult {
+    assert_eq!(
+        grants
+            .book()
+            .record(member_grant)
+            .ok_or("member grant missing")?
+            .uses(),
+        1
+    );
+    assert_eq!(
+        grants
+            .book()
+            .record(team_grant)
+            .ok_or("team grant missing")?
+            .uses(),
+        1
+    );
+    Ok(())
 }
