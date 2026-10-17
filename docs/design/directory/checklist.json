@@ -2263,6 +2263,11 @@
           "id": "C748",
           "text": "The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.",
           "done": false
+        },
+        {
+          "id": "C749",
+          "text": "A sign-in lasts thirty days: a new install writes session_seconds 2592000, an upgrade moves an install still at the former 28800 and says so, carries any other value, and reads the file back before the start.",
+          "done": false
         }
       ]
     }

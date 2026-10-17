@@ -606,3 +606,4 @@
 - [ ] **C746** — A refresh token whose Lys sign-in ended is refused SessionEnded with the instant it ended, kept thirty days past its end and renewing nothing, read on the service's clock; an unknown token is still RefreshUnknown.
 - [ ] **C747** — Every refused person sign-in on POST /api/sign-in and on the provider callback says one WARN line with the route, the refusal and the handle tried when it is a well-formed email, and never the password.
 - [ ] **C748** — The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.
+- [ ] **C749** — A sign-in lasts thirty days: a new install writes session_seconds 2592000, an upgrade moves an install still at the former 28800 and says so, carries any other value, and reads the file back before the start.

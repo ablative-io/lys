@@ -2,10 +2,10 @@
 type: brief
 id: DIRECTORY-099
 cluster: directory
-title: A refresh token whose sign-in ended is refused by that name, and every refused person sign-in is written to the log with its route, its reason and the handle tried
+title: A refresh token whose sign-in ended is refused by that name, a sign-in lasts thirty days, and every refused person sign-in is written to the log with its route, its reason and the handle tried
 ---
 
-# DIRECTORY-099: A refresh token whose sign-in ended is refused by that name, and every refused person sign-in is written to the log with its route, its reason and the handle tried
+# DIRECTORY-099: A refresh token whose sign-in ended is refused by that name, a sign-in lasts thirty days, and every refused person sign-in is written to the log with its route, its reason and the handle tried
 
 > **Cluster:** directory
 > **Design anchor:**
@@ -14,16 +14,17 @@ title: A refresh token whose sign-in ended is refused by that name, and every re
 > - C746 — A refresh token whose Lys sign-in ended is refused SessionEnded with the instant it ended, kept thirty days past its end and renewing nothing, read on the service's clock; an unknown token is still RefreshUnknown.
 > - C747 — Every refused person sign-in on POST /api/sign-in and on the provider callback says one WARN line with the route, the refusal and the handle tried when it is a well-formed email, and never the password.
 > - C748 — The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.
+> - C749 — A sign-in lasts thirty days: a new install writes session_seconds 2592000, an upgrade moves an install still at the former 28800 and says so, carries any other value, and reads the file back before the start.
 > **Stories:**
 > - S423 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing.
 
 ## Purpose
 
-On 17 and 18 October 2026 Cambium lost its sign-in four times, and each time identity.log said only "lys-identity-server token request refused: client_id cambium error invalid_grant refusal RefreshUnknown reason RefreshUnknown: that refresh token is not one Lys gave this product, or it has ended" (lines 3642, 5297 and 5453 of the install's identity.log; line 3640 is the same line for haematite). That reads as a token lost in a restart, but it was not. Refresh tokens are already kept across a restart (provider.rs:283 opens <key file>.tokens.json; tests/provider_refresh_restart.rs pins a refresh that renews after Service::restart). What happened is that the refresh token lives only as long as the Lys sign-in it stands on (provider/issue.rs:77 and :119, ends_at = the sign-in's end), and this install's sign-in lasts session_seconds 28800, eight hours. The saved Cambium refresh entry in state/provider-signing.tokens.json ended at 1792215810 (17 October 16:43:30 Melbourne). After that, ProviderTokens::get filters it out (provider_tokens.rs:133-138), every open and insert prunes it (:99, :167), and by_refresh turns the TokenUnknown into RefreshUnknown (provider/issue.rs:155). So an ended sign-in and a token Lys never gave get the same words, and SessionEnded, which already exists for a sign-out (error_provider.rs:57), is never said for a sign-in that ran out. Waffles' R1 asked for refresh tokens kept with the session store and revoked by the same acts that end sessions; at 7e3a88a7 that already holds, and the one timer is the sign-in's own eight hours. How long a sign-in lasts is this install's session_seconds setting, not code, and is Waffles' call outside this brief. The second gap: a person's refused sign-in leaves no line at all. The issuer's 401 becomes SignInRefused with no log (sign_in.rs:344-346), an empty email or password returns early with none (:630), and a refused admission after the issuer said yes (session_admission::begin) logs nothing. The provider callback writes its refusal by eprintln outside the WARN sink (sign_in_upstream.rs:313) and never names the address. On 17 October nobody could say whether Callie had tried to sign in to Cambium: the log had nothing to read.
+On 17 and 18 October 2026 Cambium lost its sign-in four times, and each time identity.log said only "lys-identity-server token request refused: client_id cambium error invalid_grant refusal RefreshUnknown reason RefreshUnknown: that refresh token is not one Lys gave this product, or it has ended" (lines 3642, 5297 and 5453 of the install's identity.log; line 3640 is the same line for haematite). That reads as a token lost in a restart, but it was not. Refresh tokens are already kept across a restart (provider.rs:283 opens <key file>.tokens.json; tests/provider_refresh_restart.rs pins a refresh that renews after Service::restart). What happened is that the refresh token lives only as long as the Lys sign-in it stands on (provider/issue.rs:77 and :119, ends_at = the sign-in's end), and this install's sign-in lasts session_seconds 28800, eight hours. The saved Cambium refresh entry in state/provider-signing.tokens.json ended at 1792215810 (17 October 16:43:30 Melbourne). After that, ProviderTokens::get filters it out (provider_tokens.rs:133-138), every open and insert prunes it (:99, :167), and by_refresh turns the TokenUnknown into RefreshUnknown (provider/issue.rs:155). So an ended sign-in and a token Lys never gave get the same words, and SessionEnded, which already exists for a sign-out (error_provider.rs:57), is never said for a sign-in that ran out. Waffles' R1 asked for refresh tokens kept with the session store and revoked by the same acts that end sessions; at 7e3a88a7 that already holds, and the one timer is the sign-in's own eight hours. How long a sign-in lasts was Waffles' call, 18 October 09:01: thirty days, 2,592,000 seconds, the same window as the kept entry. Eight hours means every person on every device signs in again every working day, which is the work that makes people go around Lys. Sign-out, suspension and retirement already end a session early, so the shorter length buys no safety those acts don't. It is the product's number: a new install writes it from SESSION_SECONDS (crates/lys/src/identity/install/server_config.rs:45, 28_800, "one working day", rendered at server_config/rendering.rs:102), and an upgrade carries the old install's value (upgrade/render.rs:234-250, carry_sign_in), so this install would stay at eight hours without R4. The second gap: a person's refused sign-in leaves no line at all. The issuer's 401 becomes SignInRefused with no log (sign_in.rs:344-346), an empty email or password returns early with none (:630), and a refused admission after the issuer said yes (session_admission::begin) logs nothing. The provider callback writes its refusal by eprintln outside the WARN sink (sign_in_upstream.rs:313) and never names the address. On 17 October nobody could say whether Callie had tried to sign in to Cambium: the log had nothing to read.
 
 ## Task
 
-Keep an ended refresh token's record past its end and refuse it SessionEnded, naming the instant it ended, read on the service's own clock (R1); write one WARN line through the identity server's WARN sink for every refused person sign-in on POST /api/sign-in and on the provider callback, with the route, the refusal's name and the handle tried when it is a well-formed email, and never the password (R2); record both in the CHANGELOG (R3). Out of scope: how long a sign-in lasts (the install's session_seconds), Cambium's handling of the refusal, agent and machine passes, and the access-token refusals on userinfo.
+Keep an ended refresh token's record past its end and refuse it SessionEnded, naming the instant it ended, read on the service's own clock (R1); write one WARN line through the identity server's WARN sink for every refused person sign-in on POST /api/sign-in and on the provider callback, with the route, the refusal's name and the handle tried when it is a well-formed email, and never the password (R2); record both in the CHANGELOG (R3); make a sign-in last thirty days for a new install and move an install still at the former eight-hour default on upgrade, naming the change and reading it back before the start (R4). Out of scope: Cambium's handling of the refusal, agent and machine passes, and the access-token refusals on userinfo.
 
 ## Requirements
 
@@ -75,7 +76,7 @@ Behavioural. A new module, sign_in_refusal_line.rs, holds one function that writ
 
 ### R3: The two changes are recorded
 
-Documentary. The CHANGELOG's Unreleased section names the SessionEnded refusal for an ended refresh token with its thirty-day keeping, says that Cambium and every product read it as "sign in again", and gives the refused-sign-in line with its three fields and the handle rule.
+Documentary. The CHANGELOG's Unreleased section names the SessionEnded refusal for an ended refresh token with its thirty-day keeping, says that Cambium and every product read it as "sign in again", and gives the refused-sign-in line with its three fields and the handle rule. It also names the sign-in length of thirty days, why, and that an upgrade moves an install still at 28800 and carries any other value.
 
 **Acceptance:**
 - The CHANGELOG entry names SessionEnded, ENDED_REFRESH_KEPT_SECONDS, the line's three fields, both routes and the handle rule
@@ -90,15 +91,40 @@ Documentary. The CHANGELOG's Unreleased section names the SessionEnded refusal f
 **Stories:**
 - S423 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing.
 
+### R4: A sign-in lasts thirty days, for a new install and for an install moved on upgrade
+
+Behavioural. SESSION_SECONDS in crates/lys/src/identity/install/server_config.rs becomes 2_592_000. Its doc comment gives the reason: thirty days, the same window as ENDED_REFRESH_KEPT_SECONDS, because a daily sign-in on every device is the work that makes people go around Lys, and sign-out, suspension and retirement already end a session early. A new install's identity.json is written with session_seconds 2592000. carry_sign_in (upgrade/render.rs) keeps an operator's own session_seconds as today, except the former product default: a previous value of exactly 28800, named FORMER_SESSION_SECONDS beside SESSION_SECONDS, is not carried, and the rendered 2592000 stands. The upgrade then says one line naming the change before it writes: "identity.json: session_seconds 28800 -> 2592000 (a sign-in now lasts thirty days; the former eight-hour default is not carried)". The previous identity.json is kept in config.previous/ by keep_configuration as today. After place_configuration writes identity.json and before start_all, the upgrade reads the file back and checks that session_seconds is the value it rendered. A mismatch stops the upgrade with ConfigInvalid naming the file, the value written and the value read, and puts the previous configuration back as a failed placement does today. surface/identity/dev/start.sh writes 2592000. The identity server keeps refusing zero and reads the value as before; a session's cookie Max-Age follows it as today.
+
+**Acceptance:**
+- Red first in crates/lys/src/identity/install/server_config.rs's tests at 7e3a88a7: a fresh render has session_seconds 2592000
+- Red first in upgrade/render.rs's sign_in_tests: a previous 28800 becomes 2592000 and the change line is said exactly once; a previous 43200 is carried as 43200 with no line (the existing pin, kept); a previous 0 or a string is still refused ConfigInvalid
+- Red first in upgrade/render_tests.rs (or swap's tests beside it): an upgrade whose written identity.json reads back with a different session_seconds stops before start_all with ConfigInvalid naming both values, and config.previous/identity.json is the file put back
+- server_config.rs (212 lines of code at 7e3a88a7), upgrade/render.rs (206) and upgrade/swap.rs (389) stay under the gate's 500, by scripts/check_file_length.py
+
+**Files:**
+- modify: crates/lys/src/identity/install/server_config.rs
+- modify: crates/lys/src/identity/upgrade/render.rs
+- modify: crates/lys/src/identity/upgrade/render_tests.rs
+- modify: crates/lys/src/identity/upgrade/swap.rs
+- modify: surface/identity/dev/start.sh
+- modify: CHANGELOG.md
+
+**Checklist:**
+- C749 — A sign-in lasts thirty days: a new install writes session_seconds 2592000, an upgrade moves an install still at the former 28800 and says so, carries any other value, and reads the file back before the start.
+
+**Stories:**
+- S423 (Administrator, Suspends, reinstates and retires identities, and reads why a check refused) — As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing.
+
 ## Boundaries
 
-- SHALL NOT change session_seconds, a sign-in's length, or tie a refresh token to anything but the sign-in it was issued in.
+- SHALL NOT tie a refresh token to anything but the sign-in it was issued in, and SHALL NOT change an operator's own session_seconds: only the former product default 28800 is moved on upgrade.
 - SHALL NOT let a kept ended refresh entry renew anything: it answers SessionEnded and nothing else.
 - SHALL NOT write a password, an issuer body, a token, a token digest, or a handle that accounts::check_email does not admit.
 - SHALL NOT remove or reword the existing IssuerRefused and IssuerChallengeExpired WARN lines.
 - SHALL NOT keep a refresh entry that was revoked: sign-out, a reused code and a retired or suspended holder remove it as today.
+- SHALL NOT start the upgraded service on an identity.json whose session_seconds reads back different from the value rendered.
 
 ## Verification
 
 - Every test red first at 7e3a88a7; cargo nextest run only; clippy -D warnings, cargo fmt --all; the design gate (validate.py and check-coverage.py on docs/design/directory) parsed for FAIL lines.
-- Done means: the four token-table pins and the restart pin of R1 green, the six route pins of R2 green, sign_in_page.rs unchanged and green, the CHANGELOG written, and Cambium's lead told that an ended sign-in now says SessionEnded.
+- Done means: the four token-table pins and the restart pin of R1 green, the six route pins of R2 green, sign_in_page.rs unchanged and green, R4's render, carry and read-back pins green, the CHANGELOG written, this install's identity.json reading 2592000 after the release install with its 28800 copy in config.previous/, and Cambium's lead told that an ended sign-in now says SessionEnded.
