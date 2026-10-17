@@ -20,6 +20,13 @@ const EMAIL: &str = "grace@example.test";
 const PASSWORD: &str = "Compiler-Pioneer-1952";
 const WRONG: &str = "Not-The-Password-1";
 const REFUSED: &str = "a person's sign-in was refused";
+/// SignInRefused's words, as the browser is answered them.
+const REFUSED_WORDS: &str = "SignInRefused: the email or password is not right";
+/// What an issuer's callback body carries that must never reach the log.
+const BODY_SENTINELS: [&str; 2] = [
+    "callback-private-message-sentinel",
+    "callback-private-token-sentinel",
+];
 
 /// Every line the service said, its own and its WARN events, kept in order.
 #[derive(Clone, Default)]
@@ -51,13 +58,20 @@ impl Said {
             .collect())
     }
 
-    /// No line said holds either password the tests type.
+    /// No line said holds either password the tests type, or anything
+    /// of an issuer's body outside the words already deemed safe.
     fn holds_no_password(&self) -> TestResult {
         for line in self.lines()? {
             assert!(
                 !line.contains(PASSWORD) && !line.contains(WRONG),
                 "a password reached the log: {line}"
             );
+            for sentinel in BODY_SENTINELS {
+                assert!(
+                    !line.contains(sentinel),
+                    "an issuer body reached the log: {line}"
+                );
+            }
         }
         Ok(())
     }
@@ -127,6 +141,10 @@ async fn a_wrong_password_for_a_held_account_says_one_line_naming_its_email() ->
         &said,
         "refusal=SignInRefused route=POST /api/sign-in handle=grace@example.test",
     )?;
+    one_line_holding(
+        &said,
+        &format!("handle=grace@example.test reason={REFUSED_WORDS}"),
+    )?;
     said.holds_no_password()
 }
 
@@ -161,6 +179,10 @@ async fn an_empty_field_says_one_line_each() -> TestResult {
         lines[1].contains("refusal=SignInRefused route=POST /api/sign-in handle=none"),
         "{lines:#?}"
     );
+    assert!(
+        lines[1].ends_with(&format!(" handle=none reason={REFUSED_WORDS}")),
+        "{lines:#?}"
+    );
     said.holds_no_password()
 }
 
@@ -173,6 +195,10 @@ async fn a_password_typed_into_the_email_box_is_never_written() -> TestResult {
     one_line_holding(
         &said,
         "refusal=SignInRefused route=POST /api/sign-in handle=not-an-email",
+    )?;
+    one_line_holding(
+        &said,
+        &format!("handle=not-an-email reason={REFUSED_WORDS}"),
     )?;
     said.holds_no_password()
 }
@@ -220,6 +246,44 @@ async fn a_provider_callback_the_issuer_will_not_admit_says_one_line_naming_its_
             "an issuer body reached the log: {line}"
         );
     }
+    said.holds_no_password()
+}
+
+/// A callback the issuer refuses with a body Lys does not recognise as an
+/// admission refusal is SignInFailed, and its line carries the words
+/// `callback_summary` reduced the body to, and nothing else of it.
+#[tokio::test]
+async fn a_callback_refused_sign_in_failed_says_its_reduced_words_as_the_reason() -> TestResult {
+    let (service, said) = started().await?;
+    let body = json!({
+        "error": "Forbidden",
+        "message": BODY_SENTINELS[0],
+        "access_token": BODY_SENTINELS[1],
+    });
+    let bytes = serde_json::to_vec(&body)?.len();
+    service.issuer.refuse_provider_callback(body)?;
+    let (back, binding) = service
+        .issuer_answer(Login {
+            subject: "callie-subject".to_owned(),
+            email: "callie@example.test".to_owned(),
+        })
+        .await?;
+    let (status, to, _) = service.get_page(&back, &binding).await?;
+    assert_eq!(status, 303);
+    assert_eq!(to.as_deref(), Some("/#/sign-in?refused=SignInFailed"));
+    let reason = format!(
+        "SignInFailed: the provider callback answered 403; body error=Forbidden; \
+         message=unrecognized message redacted ({bytes} bytes)"
+    );
+    one_line_holding(
+        &said,
+        &format!(
+            "refusal=SignInFailed route=GET /auth/v1/providers/callback handle=none \
+             reason={reason}"
+        ),
+    )?;
+    let lines = said.refusals()?;
+    assert!(lines[0].ends_with(&reason), "{lines:#?}");
     said.holds_no_password()
 }
 

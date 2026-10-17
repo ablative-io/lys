@@ -80,4 +80,15 @@ mod tests {
             assert_eq!(super::handle(tried), named, "{tried:?}");
         }
     }
+
+    #[test]
+    fn the_reason_is_the_refusals_words_on_one_line() {
+        let refusal = crate::error::ServerError::SignInFailed {
+            reason: "the issuer\nanswered\r\u{7}twice".to_owned(),
+        };
+        assert_eq!(
+            super::words(&refusal),
+            "SignInFailed: the issuer answered  twice"
+        );
+    }
 }
