@@ -112,6 +112,8 @@
 
 **S266.** As an administrator, I want to issue, list and revoke the credential a product signs people in with, with nobody ever seeing the app's secret, so that I can arm a product and disarm it in one place.
 
+**S423.** As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.

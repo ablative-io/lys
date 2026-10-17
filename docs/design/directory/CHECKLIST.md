@@ -600,3 +600,9 @@
 - [ ] **C743** — POST /apps/{app}/sign_in/returns adds one return address for the administrator or the app itself acting through its own credential, judged by DIRECTORY-097's rule, written nowhere when already listed, refused NotAdmitted to anyone else.
 - [ ] **C744** — The Sign-in settings show a declared address with who declared it and when, and the administrator's save of the whole list still removes it.
 - [ ] **C745** — The CHANGELOG and the apps skill's route notes record the route, its callers and its refusals.
+
+## An ended sign-in is named, and a refused sign-in is written down (DIRECTORY-099)
+
+- [ ] **C746** — A refresh token whose Lys sign-in ended is refused SessionEnded with the instant it ended, kept thirty days past its end and renewing nothing, read on the service's clock; an unknown token is still RefreshUnknown.
+- [ ] **C747** — Every refused person sign-in on POST /api/sign-in and on the provider callback says one WARN line with the route, the refusal and the handle tried when it is a well-formed email, and never the password.
+- [ ] **C748** — The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.

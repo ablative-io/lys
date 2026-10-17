@@ -2245,6 +2245,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An ended sign-in is named, and a refused sign-in is written down (DIRECTORY-099)",
+      "items": [
+        {
+          "id": "C746",
+          "text": "A refresh token whose Lys sign-in ended is refused SessionEnded with the instant it ended, kept thirty days past its end and renewing nothing, read on the service's clock; an unknown token is still RefreshUnknown.",
+          "done": false
+        },
+        {
+          "id": "C747",
+          "text": "Every refused person sign-in on POST /api/sign-in and on the provider callback says one WARN line with the route, the refusal and the handle tried when it is a well-formed email, and never the password.",
+          "done": false
+        },
+        {
+          "id": "C748",
+          "text": "The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.",
+          "done": false
+        }
+      ]
     }
   ]
 }
