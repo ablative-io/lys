@@ -17,6 +17,22 @@ pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId
     resolve(directory, actor, false)
 }
 
+/// Personal mutations admit the caller before reading their requested target.
+/// Missing personal authority must not expose a directory lookup refusal.
+pub(crate) fn admitted_person(
+    directory: &Projection,
+    actor: &Actor,
+) -> Result<lys_identity::PersonId, ServerError> {
+    let refused = || ServerError::NotAdmitted {
+        reason: "only an active person may do this",
+    };
+    let person = directory.person_for(actor.binding()).ok_or_else(refused)?;
+    if active_caller(directory, actor)? != IdentityId::Person(person) {
+        return Err(refused());
+    }
+    Ok(person)
+}
+
 /// Authentication and bounded own-account reads do not grant acting authority.
 /// The lifecycle contract section 2 permits first sign-in before activation.
 pub(crate) fn authenticating_caller(

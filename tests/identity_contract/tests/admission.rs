@@ -273,3 +273,33 @@ async fn the_administrators_subject_at_another_issuer_is_refused() -> TestResult
     assert_eq!(service.log_size().await?, 0, "nothing was logged");
     Ok(())
 }
+
+#[tokio::test]
+async fn agent_registration_admits_the_caller_before_validating_the_operation_or_target()
+-> TestResult {
+    let service = Service::start().await?;
+    let stranger = service.sign_in(login("unbound-stranger")).await?;
+    for body in [
+        json!({"operation":"invalid", "display_name":"Stranger's agent"}),
+        person(30, "Stranger's agent"),
+        json!({"operation":op(31).to_string(), "display_name":""}),
+        json!({"operation":op(32).to_string(), "display_name":"Stranger's agent", "answers_to":"invalid"}),
+    ] {
+        let (status, answer) = service.post("/agents", Some(&stranger), &body).await?;
+        assert_eq!(status, 403, "{answer}");
+        assert_eq!(answer["refusal"], "NotAdmitted", "{answer}");
+        assert!(
+            !answer["reason"]
+                .as_str()
+                .ok_or("no refusal reason")?
+                .contains("NoPerson"),
+            "{answer}"
+        );
+    }
+    assert_eq!(
+        service.log_size().await?,
+        0,
+        "a refused call writes nothing"
+    );
+    Ok(())
+}

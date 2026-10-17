@@ -86,24 +86,29 @@ pub(crate) async fn register_agent(
             Some(actor) => actor,
             None => signed_in(&state, &headers)?,
         };
-        let administrator = !app_pass && crate::routes::is_administrator(&state, &actor)?;
-        let (op, profile) = (
-            operation(&body.operation)?,
-            Profile::new(&body.display_name)?,
-        );
         return with_directory(&state, |directory| {
             let projection = directory.projection()?;
-            let own = match crate::caller_admission::active_caller(projection, &actor)? {
-                IdentityId::Person(person) => person,
-                IdentityId::Agent(_)
-                | IdentityId::ServiceAccount(_)
-                | IdentityId::Connector(_)
-                | IdentityId::Machine(_) => {
-                    return Err(ServerError::NotAdmitted {
-                        reason: "an agent registration requires a person or an admitted service account",
-                    });
+            let administrator =
+                !app_pass && state.admission.is_administrator(projection, &actor)?;
+            let own = if administrator {
+                match crate::caller_admission::active_caller(projection, &actor)? {
+                    IdentityId::Person(person) => person,
+                    IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => {
+                        return Err(ServerError::NotAdmitted {
+                            reason: "an agent registration requires a person or an admitted service account",
+                        });
+                    }
                 }
+            } else {
+                crate::caller_admission::admitted_person(projection, &actor)?
             };
+            let (op, profile) = (
+                operation(&body.operation)?,
+                Profile::new(&body.display_name)?,
+            );
             let target = registration_target(own, body.answers_to.as_deref(), administrator)?;
             crate::agent_policy_api::with_policies(&state, |policies| {
                 let answer =

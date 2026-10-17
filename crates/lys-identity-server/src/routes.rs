@@ -368,7 +368,7 @@ pub(crate) fn responsible_or_administrator(
         if state.admission.is_administrator(directory, &actor)? {
             return Ok(());
         }
-        let person = crate::read_api::own_person(directory, &actor)?;
+        let person = crate::caller_admission::admitted_person(directory, &actor)?;
         let agent = AgentId::from_str(agent)?;
         if directory
             .record(IdentityId::Agent(agent))
