@@ -24,12 +24,12 @@
     {
       "id": "R1",
       "title": "An app declares one return address with its own credential",
-      "spec": "Behavioural. POST /apps/{app}/sign_in/returns takes {\"address\": \"<absolute address>\"} under an operation id as every app act does. It is admitted to the signed-in administrator and to the app itself: a caller whose apps_binding::acting is Acting::App with app equal to {app}. A person, the registrar, and another app's credential are refused NotAdmitted with the reason \"only the administrator or the app itself declares the app's return addresses\"; a pending, declined or retired app's credential is refused as apps_binding::app_acting refuses it today. The address is judged by apps_redirect::admitted, so every DIRECTORY-097 refusal and reason applies (redirect_invalid, http off this machine, a fragment, a malformed wildcard). An address already listed byte for byte answers 200 with the settings unchanged and writes nothing. Otherwise the app's log gains one line, the declaration, by the caller (By::ServiceAccount naming the app for the app's own act, the administrator's login for theirs), and the sign-in settings read back with the address appended and every other setting (the person's name, the other addresses) as it was. The administrator's POST /apps/{app}/sign_in keeps setting the whole list and may drop a declared address. The handler lives in its own module, apps_sign_in_declare.rs, so apps_sign_in.rs and apps_api.rs stay under 500 lines.",
+      "spec": "Behavioural. POST /apps/{app}/sign_in/returns takes {\"address\": \"<absolute address>\"} under an operation id as every app act does. It is admitted to the signed-in administrator and to the app itself: a caller whose apps_binding::acting is Acting::App with app equal to {app}. A person, the registrar, and another app's credential are refused NotAdmitted with the reason \"only the administrator or the app itself declares the app's return addresses\"; a pending, declined or retired app's credential is refused as apps_binding::app_acting refuses it today. The address is judged by apps_redirect::admitted, so every DIRECTORY-097 refusal and reason applies (redirect_invalid, http off this machine, a fragment, a malformed wildcard). An address already listed byte for byte answers 200 with the settings unchanged and writes nothing. Otherwise the app's log gains one line, the declaration, by the caller (By::ServiceAccount naming the app for the app's own act, the administrator's login for theirs), and the sign-in settings read back with the address appended and every other setting (the person's name, the other addresses) as it was. The administrator's POST /apps/{app}/sign_in keeps setting the whole list and may drop a declared address. The handler and its route registration live in their own module, apps_sign_in_declare.rs (`routes()`), merged in routes_table.rs beside apps_api::routes(), so apps_api.rs gains no line.",
       "acceptance": [
         "Red first in apps_sign_in_declare_tests.rs: the app's own lys-app credential declares https://console.example/signin/return and the settings read back with it appended, the log's last line by the app's service account; the same declaration again answers 200 and the log's length is unchanged; another approved app's credential, a signed-in person and the registrar's credential each answer NotAdmitted with the reason; http://console.example/signin/return answers redirect_invalid with DIRECTORY-097's reason; a retired app's credential answers app_retired",
         "Red first in tests/provider.rs: after the app declares an address, /oauth/authorize with that redirect_uri answers 303 to the issuer and the token exchange completes, as DIRECTORY-097 R2 pins for a listed entry",
         "The route is in openapi_typed/apps.rs with its request and response schemas and the three refusal names, and GET /openapi.json carries it",
-        "apps_sign_in.rs, apps_api.rs and the new module each stay under 500 lines"
+        "apps_api.rs measures 424 lines of code by scripts/check_file_length.py at c95be049 (limit 500) and gains no line in this brief; apps_sign_in.rs (75) and the new module each stay under the gate's 500"
       ],
       "files": {
         "create": [
@@ -37,10 +37,10 @@
           "crates/lys-identity-server/src/apps_sign_in_declare_tests.rs"
         ],
         "modify": [
-          "crates/lys-identity-server/src/apps_api.rs",
           "crates/lys-identity-server/src/lib.rs",
           "crates/lys-identity-server/src/openapi_typed/apps.rs",
-          "crates/lys-identity-server/tests/provider.rs"
+          "crates/lys-identity-server/tests/provider.rs",
+          "crates/lys-identity-server/src/routes_table.rs"
         ],
         "delete": []
       },
