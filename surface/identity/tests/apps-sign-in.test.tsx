@@ -121,3 +121,30 @@ it('shows a non-administrator’s refusal in Lys’s words and tries nothing aga
   expect(settings()).not.toContain(MOVED);
   expect(button('Save the sign-in of Notes fixture')).not.toBeNull();
 });
+
+// DIRECTORY-097 R3: both forms say, in one sentence, that an https address may name every machine of a
+// domain with `*.` as its first label and that http addresses are admitted only on this machine; and a
+// refused wildcard line is shown with the line and Lys's reason.
+const WILD_HELP = 'An https address may name every machine of a domain with *. as its first label, such as https://*.example.com/signin/return; http addresses are admitted only on this machine.';
+
+it('explains the wildcard form and the device-local http rule on the sign-in settings and on the registration form', async () => {
+  await mount('#/apps', routes());
+  const hints = [...document.querySelectorAll('.hint')].map((entry) => entry.textContent ?? '');
+  const signIn = document.querySelector('[aria-label="Change the sign-in of ' + APP + '"]')?.textContent ?? '';
+  expect(signIn).toContain(WILD_HELP);
+  const register = document.querySelector('[aria-label="Register an app"]')?.textContent ?? '';
+  expect(register).toContain(WILD_HELP);
+  expect(hints.filter((words) => words.includes(WILD_HELP))).toHaveLength(2);
+});
+
+it('shows a refused wildcard line with its reason', async () => {
+  const wild = 'http://*.example.com/signin/return';
+  const reason = 'redirect_invalid: `' + wild + '` is neither https nor http to this machine';
+  await mount('#/apps', routes(() => refused(400, 'redirect_invalid', reason)));
+  await type(addresses(), BACK + '\n' + wild);
+  await click(button('Save the sign-in of Notes fixture'));
+  expect(alert()).toBe('Lys refused: `' + wild + '` is neither https nor http to this machine');
+  expect(details()).toBe(reason);
+  expect(settings()).toContain(BACK);
+  expect(settings()).not.toContain(wild);
+});

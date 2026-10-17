@@ -32,6 +32,7 @@ mod apps_connector_give;
 mod apps_credentials;
 pub mod apps_error;
 mod apps_read;
+mod apps_redirect;
 mod apps_refresh;
 pub mod apps_schema_api;
 pub mod apps_sign_in;

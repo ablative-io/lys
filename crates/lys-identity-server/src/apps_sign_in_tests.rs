@@ -163,3 +163,24 @@ fn an_address_list_is_judged_as_a_registrations_and_an_empty_one_by_name() -> Ou
     }
     Ok(())
 }
+
+/// DIRECTORY-097 R1: the settings admit a wildcard entry exactly as a
+/// registration does, kept as given, and refuse an http wildcard by reason.
+#[test]
+fn a_wildcard_entry_is_admitted_in_the_settings_and_an_http_wildcard_refused_by_reason() -> Outcome
+{
+    const WILD: &str = "https://*.tail39833a.ts.net/signin/return";
+    let kept = redirects(APP, &[FIRST.to_owned(), WILD.to_owned()])?;
+    assert_eq!(kept, vec![FIRST.to_owned(), WILD.to_owned()]);
+    match redirects(
+        APP,
+        &["http://*.tail39833a.ts.net/signin/return".to_owned()],
+    ) {
+        Err(AppError::RedirectInvalid { address, reason }) => {
+            assert_eq!(address, "http://*.tail39833a.ts.net/signin/return");
+            assert_eq!(reason, "is neither https nor http to this machine");
+        }
+        other => return Err(format!("{other:?}").into()),
+    }
+    Ok(())
+}

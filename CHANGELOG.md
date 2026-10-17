@@ -11,6 +11,29 @@ unreleased things cannot be used to tell what a published version contains.
 
 ## [Unreleased]
 
+### Added — `lys-identity-server`: a return address for every machine an app runs on (DIRECTORY-097)
+
+- An app's registration and its Sign-in settings admit an https return
+  address whose host is `*.` under a domain of two or more labels, such as
+  `https://*.tail39833a.ts.net/signin/return`. At `/oauth/authorize` and at
+  the token exchange a sign-in's redirect matches such an entry when it is
+  the entry's own text with exactly one host label (a-z, 0-9, hyphen) in
+  the wildcard's place, the label and the suffix compared without regard
+  to ASCII case and everything else byte for byte: the scheme, the port if
+  the entry writes one (`:443` is not implied), the path and the query as
+  written, nothing normalised; it is returned to as presented, never
+  rewritten. Refused `redirect_invalid`, each by its own reason: a bare
+  `*`, a second wildcard label, a wildcard inside a label, a suffix of
+  fewer than two labels or with an empty label, a wildcard beside a user or
+  outside the host, and a wildcard under a domain written outside ASCII; an
+  http wildcard is refused by the http rule as it stood. A two-label public
+  suffix (`*.co.uk`) is admitted by the two-label rule; refusing public
+  suffixes by name is a brief of its own. The device-local http rule is
+  unchanged, the Apps screen's two address forms say so, and the
+  `/apps/{app}/sign_in` route's summary names the form. An app-connect
+  return address is judged by the same rule, and a wildcard is never an
+  origin there.
+
 ### Fixed — `lys-pass` 0.3.3
 
 - Live clients take the Lys origin. Provider routes use `/oauth/`; permission

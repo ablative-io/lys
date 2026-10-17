@@ -1108,3 +1108,74 @@ async fn the_administrator_rotates_the_key_and_a_pass_from_before_still_verifies
     assert_eq!(refused["refusal"], "RequestMalformed");
     Ok(())
 }
+
+/// DIRECTORY-097 R2: a wildcard entry in the sign-in settings admits a
+/// sign-in at exactly one label under its suffix, at authorize and at the
+/// token exchange; the code is issued to the address as presented, never
+/// rewritten; a two-label host is refused `redirect_invalid` at authorize,
+/// and the code presented at another host at the exchange is refused as it
+/// is today and still exchanges at its own address.
+#[tokio::test]
+async fn a_wildcard_entry_admits_one_label_under_its_suffix_at_authorize_and_at_token() -> TestResult
+{
+    const WILD: &str = "https://*.tail39833a.example.test/signin/return";
+    const ONE: &str = "https://toms-macbook-pro.tail39833a.example.test/signin/return";
+    const TWO: &str = "https://a.b.tail39833a.example.test/signin/return";
+    const OTHER: &str = "https://other.tail39833a.example.test/signin/return";
+    let (service, cookie, _) = table(CODE_SECONDS).await?;
+    let mut body = registration(SECOND, &workspace_schema(SECOND))?;
+    body["redirects"] = json!([BACK]);
+    ok(post(&service, "/apps", Auth::Cookie(&cookie), &body).await?)?;
+    let approval = approve_with(&service, &cookie, SECOND, json!([BACK, WILD]), false).await?;
+    assert_eq!(approval["app"]["sign_in"]["redirects"], json!([BACK, WILD]));
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, ONE).await?;
+    assert_eq!(status, 303, "{refusal}");
+    let back = reqwest::Url::parse(&location.ok_or("a code is sent back")?)?;
+    assert!(back.as_str().starts_with(ONE), "never rewritten: {back}");
+    let code = back
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, value)| value.into_owned())
+        .ok_or("the app is given a code")?;
+    let (status, location, refusal) = authorize_answer(&service, &cookie, SECOND, TWO).await?;
+    assert_eq!((status, location), (400, None), "{refusal}");
+    assert_eq!(refusal["refusal"], "redirect_invalid");
+    let exchange = |redirect: &'static str| {
+        let base = service.base.clone();
+        let code = code.clone();
+        async move {
+            let answer = reqwest::Client::new()
+                .post(format!("{base}/oauth/token"))
+                .header(
+                    reqwest::header::AUTHORIZATION,
+                    format!(
+                        "Basic {}",
+                        STANDARD.encode(format!("{SECOND}:{}", secret()))
+                    ),
+                )
+                .form(&[
+                    ("grant_type", "authorization_code"),
+                    ("code", code.as_str()),
+                    ("redirect_uri", redirect),
+                    ("code_verifier", "v"),
+                ])
+                .send()
+                .await?;
+            let status = answer.status().as_u16();
+            let body: Value = serde_json::from_str(&answer.text().await?)?;
+            Ok::<(u16, Value), Box<dyn Error>>((status, body))
+        }
+    };
+    let (status, refused) = exchange(TWO).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "redirect_invalid");
+    // Another machine of the domain is listed too, and the code is not its:
+    // refused as any other host's code is today, the code kept for its own.
+    let (status, refused) = exchange(OTHER).await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "RedirectUnregistered");
+    let (status, issued) = exchange(ONE).await?;
+    assert_eq!(status, 200, "{issued}");
+    assert!(issued["access_token"].is_string(), "{issued}");
+    Ok(())
+}

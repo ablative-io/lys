@@ -399,8 +399,9 @@ fn approved_client<'a>(
 }
 
 /// Refuse `redirect` unless the app's sign-in settings, as an administrator
-/// last set them, list it exactly. The registration's addresses are what the
-/// screen offered to approve, never what is read here.
+/// last set them, list it: exactly, or by one host label under a wildcard
+/// entry (`apps_redirect::matches`). The registration's addresses are what
+/// the screen offered to approve, never what is read here.
 fn listed(app: &App, redirect: &str) -> Result<(), AppError> {
     let Some(settings) = app.sign_in.as_ref() else {
         return Err(AppError::RedirectInvalid {
@@ -408,7 +409,11 @@ fn listed(app: &App, redirect: &str) -> Result<(), AppError> {
             reason: "is not admitted: the app has no sign-in settings, so no address is listed",
         });
     };
-    if settings.redirects.iter().any(|listed| listed == redirect) {
+    if settings
+        .redirects
+        .iter()
+        .any(|listed| crate::apps_redirect::matches(listed, redirect))
+    {
         return Ok(());
     }
     Err(AppError::RedirectInvalid {

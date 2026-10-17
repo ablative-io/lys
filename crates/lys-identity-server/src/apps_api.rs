@@ -331,25 +331,12 @@ fn words(name: &str, text: &str) -> Result<String, ServerError> {
 }
 
 /// Refuse a redirect address a sign-in client does not take: an absolute
-/// `https` address, or `http` to this machine, with no fragment. The one
-/// rule for a registration's addresses and for the sign-in settings' alike.
+/// `https` address, or `http` to this machine, with no fragment; an `https`
+/// address may name every machine of a domain with `*.` as its first host
+/// label (`apps_redirect`). The one rule for a registration's addresses and
+/// for the sign-in settings' alike.
 pub(crate) fn redirect(address: &str) -> Result<String, AppError> {
-    let refused = |reason| AppError::RedirectInvalid {
-        address: address.to_owned(),
-        reason,
-    };
-    let url =
-        reqwest::Url::parse(address).map_err(|_unparsed| refused("is not an absolute address"))?;
-    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
-    match url.scheme() {
-        "https" => {}
-        "http" if local => {}
-        _ => return Err(refused("is neither https nor http to this machine")),
-    }
-    if url.fragment().is_some() {
-        return Err(refused("carries a fragment"));
-    }
-    Ok(address.to_owned())
+    crate::apps_redirect::admitted(address)
 }
 
 /// Refuse a service account the service accounts do not hold, or hold retired.

@@ -170,7 +170,7 @@ export function Apps() {
 /** The sign-in settings' two fields: the return addresses, one to a line, and whether the app is given the person's name. */
 function SignInFields({ redirects, setRedirects, profile, setProfile, app, name }: { redirects: string; setRedirects: (text: string) => void; profile: boolean; setProfile: (on: boolean) => void; app: string; name: string }) {
   return <>
-    <label className="field app-addresses-field">Return addresses the sign-in may send a person back to, one to a line<textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} aria-label={'Return addresses of ' + app} /></label>
+    <label className="field app-addresses-field">Return addresses the sign-in may send a person back to, one to a line <span className="hint">An https address may name every machine of a domain with *. as its first label, such as https://*.example.com/signin/return; http addresses are admitted only on this machine.</span><textarea value={redirects} onChange={(event) => setRedirects(event.target.value)} aria-label={'Return addresses of ' + app} /></label>
     <label className="tick" title={app}><input type="checkbox" checked={profile} onChange={(event) => setProfile(event.target.checked)} /> Give {name} the person’s name</label>
   </>;
 }
@@ -270,7 +270,7 @@ function Register({ changed }: { changed: (message: string) => void }) {
       <label className="field">App id <span className="hint">3 to 40 lowercase letters, digits or underscores; it starts every permission name the app uses, such as notes.document</span><input value={id} onChange={(event) => setId(event.target.value.trim())} autoComplete="off" spellCheck={false} required aria-invalid={id !== '' && idWhy !== ''} /></label>
       <label className="field">Name <span className="hint">as people will see it</span><input value={name} onChange={(event) => setName(event.target.value)} required /></label>
     </div>
-    <fieldset className="field"><legend>Return addresses it asks for <span className="hint">where the app’s sign-in sends a person back to</span></legend>
+    <fieldset className="field"><legend>Return addresses it asks for <span className="hint">where the app’s sign-in sends a person back to</span> <span className="hint">An https address may name every machine of a domain with *. as its first label, such as https://*.example.com/signin/return; http addresses are admitted only on this machine.</span></legend>
       {redirects.map((address, at) => <div className="app-address-row" key={at}>
         <input value={address} type="url" inputMode="url" aria-label={'Return address ' + (at + 1)} placeholder="https://app.example.com/callback" onChange={(event) => setRedirects(redirects.map((held, index) => (index === at ? event.target.value : held)))} />
         {redirects.length > 1 ? <Act symbol="remove" name={'Remove return address ' + (at + 1)} onClick={() => setRedirects(redirects.filter((_, index) => index !== at))} /> : null}

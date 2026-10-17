@@ -3081,6 +3081,11 @@
       "brief": "DIRECTORY-048"
     },
     {
+      "path": "crates/lys-identity-server/src/apps_redirect.rs",
+      "note": "R1, R2: a return address as a registration and the Sign-in settings admit it, a wildcard label under a domain included, and a presented redirect judged against a listed entry by one label, never rewritten",
+      "brief": "DIRECTORY-097"
+    },
+    {
       "path": "crates/lys-identity-server/src/apps_state.rs",
       "note": "R1: An app is a record, registered through the API and approved on a Lys screen",
       "brief": "DIRECTORY-048"

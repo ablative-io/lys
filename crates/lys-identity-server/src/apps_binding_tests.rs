@@ -168,3 +168,188 @@ fn a_retired_apps_client_cannot_complete_a_sign_in() -> Outcome {
     assert!(matches!(refused, AppError::AppRetired { .. }), "{refused}");
     Ok(())
 }
+
+const WILD: &str = "https://*.tail39833a.ts.net/signin/return";
+const ONE: &str = "https://toms-macbook-pro.tail39833a.ts.net/signin/return";
+
+/// The reason a return address is refused, or `admitted`.
+fn judged(address: &str) -> String {
+    match crate::apps_api::redirect(address) {
+        Ok(_) => "admitted".to_owned(),
+        Err(AppError::RedirectInvalid { reason, .. }) => reason.to_owned(),
+        Err(other) => other.to_string(),
+    }
+}
+
+/// DIRECTORY-097 R1: an https address whose host is one wildcard label under
+/// a domain of two or more labels is admitted as a registration's and the
+/// settings' addresses are; an http wildcard, a bare wildcard, a one-label
+/// suffix, a second wildcard label and a wildcard inside a label are each
+/// refused `redirect_invalid` with its own reason.
+#[test]
+fn a_wildcard_label_under_a_domain_is_admitted_with_https_and_its_kin_refused_by_reason() -> Outcome
+{
+    assert_eq!(crate::apps_api::redirect(WILD)?, WILD);
+    assert_eq!(
+        crate::apps_api::redirect("https://*.example.com:8443/x?y=1")?,
+        "https://*.example.com:8443/x?y=1"
+    );
+    assert_eq!(
+        judged("http://*.example.com/x"),
+        "is neither https nor http to this machine"
+    );
+    assert_eq!(
+        judged("http://*/x"),
+        "is neither https nor http to this machine"
+    );
+    assert_eq!(
+        judged("https://*/x"),
+        "is a bare wildcard; a wildcard is one label under a domain of two or more labels"
+    );
+    assert_eq!(
+        judged("https://*.net/x"),
+        "names a wildcard under a one-label suffix; the domain under the wildcard needs two or more labels"
+    );
+    assert_eq!(
+        judged("https://*.*.example.com/x"),
+        "has more than one wildcard label; only the first label of the host may be a wildcard"
+    );
+    assert_eq!(
+        judged("https://a*.example.com/x"),
+        "has a wildcard inside a label; the wildcard is the whole first label"
+    );
+    assert_eq!(
+        judged("https:/a*.example.com/x"),
+        "has a wildcard inside a label; the wildcard is the whole first label"
+    );
+    assert_eq!(
+        judged("https://u@*.example.com/x"),
+        "names a user beside a wildcard; a wildcard address names machines and no user"
+    );
+    assert_eq!(
+        judged("https://*.evil.example@good.example/cb"),
+        "has a wildcard outside the host; the wildcard is the whole first label of the host"
+    );
+    assert_eq!(
+        judged("https://*.example.com/a*b"),
+        "has a wildcard outside the host; the wildcard is the whole first label of the host"
+    );
+    assert_eq!(
+        judged("https://*.example.com./x"),
+        "has an empty label in the domain under the wildcard"
+    );
+    assert_eq!(
+        judged("https://*.bücher.example/x"),
+        "names a domain outside ASCII under the wildcard; the domain is written as a browser sends it, in ASCII"
+    );
+    assert_eq!(judged("https://*.example.com/x#top"), "carries a fragment");
+    // R1's rule is two or more labels: a two-label public suffix is admitted
+    // by it; refusing public suffixes by name is a brief of its own.
+    assert_eq!(
+        crate::apps_api::redirect("https://*.co.uk/x")?,
+        "https://*.co.uk/x"
+    );
+    Ok(())
+}
+
+/// An approved app whose sign-in settings list `redirects`.
+fn approved_listing(redirects: &[&str]) -> Result<Held, Box<dyn Error>> {
+    let mut held = registered()?;
+    held.hold(Line::Approved(Approved {
+        operation: "approve".to_owned(),
+        app: APP.to_owned(),
+        client: Client {
+            client_id: APP.to_owned(),
+            secret_sha256: sha256_hex(SECRET),
+        },
+        binding: None,
+        by: By::Start,
+        at: 2,
+    }))?;
+    held.hold(Line::SignInSet(SignInSet {
+        operation: "approve".to_owned(),
+        app: APP.to_owned(),
+        redirects: redirects
+            .iter()
+            .map(|address| (*address).to_owned())
+            .collect(),
+        profile: false,
+        by: By::Start,
+        at: 2,
+    }))?;
+    Ok(held)
+}
+
+/// DIRECTORY-097 R2: with a wildcard entry listed, a sign-in's redirect is
+/// admitted when its host is exactly one label under the entry's suffix,
+/// compared without regard to ASCII case, with the entry's scheme, port,
+/// path and query; a second label, no label, another port, another path,
+/// another query, http, a label with a character outside a-z, 0-9 and
+/// hyphen, and a longer suffix are each refused by the existing reason.
+/// An exact entry beside it still admits byte for byte.
+#[test]
+fn a_wildcard_entry_admits_one_label_under_its_suffix_and_nothing_else() -> Outcome {
+    let held = approved_listing(&[BACK, WILD])?;
+    assert_eq!(sign_in_redirect(&held, APP, ONE)?.registered.app, APP);
+    assert_eq!(
+        sign_in_redirect(
+            &held,
+            APP,
+            "https://TOMS-MacBook-Pro.tail39833a.ts.net/signin/return"
+        )?
+        .registered
+        .app,
+        APP
+    );
+    assert_eq!(sign_in_redirect(&held, APP, BACK)?.registered.app, APP);
+    for presented in [
+        "https://a.b.tail39833a.ts.net/signin/return",
+        "https://tail39833a.ts.net/signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net:8443/signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/return/",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/return?x=1",
+        "http://toms-macbook-pro.tail39833a.ts.net/signin/return",
+        "https://toms_mac.tail39833a.ts.net/signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net.example.com/signin/return",
+        "https://*.tail39833a.ts.net/signin/return",
+        "https://evil@toms-macbook-pro.tail39833a.ts.net/signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net./signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net:443/signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/return#x",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/%0Areturn",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/../signin/return",
+        "https://toms-macbook-pro.tail39833a.ts.net/signin/./return",
+        "https://toms-macbook-pro.tail39833a.ts.net\\signin\\return",
+        "HTTPS://toms-macbook-pro.tail39833a.ts.net/signin/return",
+    ] {
+        match sign_in_redirect(&held, APP, presented) {
+            Err(AppError::RedirectInvalid { address, reason }) => {
+                assert_eq!(address, presented);
+                assert_eq!(reason, "is not an address the app's sign-in settings list");
+            }
+            other => return Err(format!("{presented} judged {other:?}").into()),
+        }
+    }
+    Ok(())
+}
+
+/// DIRECTORY-097 R2: the entry's suffix is compared without regard to ASCII
+/// case, as the label is; the rest of the entry is its own text.
+#[test]
+fn a_wildcard_entry_written_in_any_ascii_case_admits_the_label_under_its_suffix() -> Outcome {
+    let held = approved_listing(&["https://*.TAIL39833A.ts.net/signin/return"])?;
+    assert_eq!(sign_in_redirect(&held, APP, ONE)?.registered.app, APP);
+    assert_eq!(
+        sign_in_redirect(&held, APP, "https://TOMS.tail39833a.TS.NET/signin/return")?
+            .registered
+            .app,
+        APP
+    );
+    match sign_in_redirect(&held, APP, "https://toms.tail39833a.ts.net/SIGNIN/return") {
+        Err(AppError::RedirectInvalid { reason, .. }) => {
+            assert_eq!(reason, "is not an address the app's sign-in settings list");
+        }
+        other => return Err(format!("a path in another case judged {other:?}").into()),
+    }
+    Ok(())
+}
