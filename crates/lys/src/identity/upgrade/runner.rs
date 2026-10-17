@@ -226,42 +226,7 @@ impl Restart {
             ));
         }
         let configured_proxy = proxy::configured(layout)?;
-        let before = std::fs::metadata(&self.unit.log)
-            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?
-            .len();
-        let out = OpenOptions::new()
-            .append(true)
-            .open(&self.unit.log)
-            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?;
-        let err = out
-            .try_clone()
-            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?;
-        let lock = exit_wait::hold(&self.unit.pid)?;
-        // The runner starts with the login's environment, as every service
-        // does, never the shell that ran the upgrade.
-        let environment = login::login()?;
-        let mut command = Command::new(layout.binary("lys"));
-        command
-            .env_clear()
-            .envs(environment.variables())
-            .args(&self.unit.args)
-            .stdin(lock)
-            .stdout(out)
-            .stderr(err);
-        if configured_proxy {
-            command
-                .arg("--proxy-state")
-                .arg(layout.data_dir().join("proxy").join("state"));
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::process::CommandExt;
-            command.process_group(0);
-        }
-        let child = command
-            .spawn()
-            .map_err(|error| refuse("runner_start_refused", error, &layout.binary("lys")))?;
-        drop(command);
+        let (child, before) = self.spawn_runner(layout, configured_proxy)?;
         self.pid = child.id();
         self.child = Some(child);
         self.recorded = false;
@@ -330,6 +295,50 @@ impl Restart {
         super::launch(layout, &self.proxy, true)?;
         say(&format!("model proxy {word} on {}", self.proxy_url));
         self.resume_saved(say)
+    }
+
+    fn spawn_runner(
+        &self,
+        layout: &Layout,
+        configured_proxy: bool,
+    ) -> IdentityResult<(std::process::Child, u64)> {
+        let before = std::fs::metadata(&self.unit.log)
+            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?
+            .len();
+        let out = OpenOptions::new()
+            .append(true)
+            .open(&self.unit.log)
+            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?;
+        let err = out
+            .try_clone()
+            .map_err(|error| refuse("runner_log_unreadable", error, &self.unit.log))?;
+        let lock = exit_wait::hold(&self.unit.pid)?;
+        // The runner starts with the login's environment, as every service
+        // does, never the shell that ran the upgrade.
+        let environment = login::login()?;
+        let mut command = Command::new(layout.binary("lys"));
+        command
+            .env_clear()
+            .envs(environment.variables())
+            .args(&self.unit.args)
+            .stdin(lock)
+            .stdout(out)
+            .stderr(err);
+        if configured_proxy {
+            command
+                .arg("--proxy-state")
+                .arg(layout.data_dir().join("proxy").join("state"));
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        let child = command
+            .spawn()
+            .map_err(|error| refuse("runner_start_refused", error, &layout.binary("lys")))?;
+        drop(command);
+        Ok((child, before))
     }
 
     fn named_output(&self, from: u64) -> IdentityResult<String> {

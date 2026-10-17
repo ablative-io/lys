@@ -90,6 +90,9 @@ pub struct Unit {
 }
 
 /// The broker and the service as the install runs them, in start order.
+///
+/// # Errors
+/// Returns named install-state, service-control or upgrade-phase failures.
 pub fn units(layout: &Layout) -> IdentityResult<Vec<Unit>> {
     Ok(units_at(layout, Ports::load(layout)?))
 }
@@ -136,11 +139,17 @@ pub fn units_at(layout: &Layout, ports: Ports) -> Vec<Unit> {
 pub trait Engine {
     /// Brings the compose services to the definition now in place,
     /// making every service again from it, and waits for them ready.
+    ///
+    /// # Errors
+    /// Returns named install-state, service-control or upgrade-phase failures.
     fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
     /// Once the new build is running: writes what `deployment.toml` declares
     /// to the sign-in service, as an install does, so an upgrade never leaves
     /// the sign-in service on the policy of an earlier build. On 15 Oct 2026
     /// a lowered password length stayed at the old fifteen through an upgrade.
+    ///
+    /// # Errors
+    /// Returns named install-state, service-control or upgrade-phase failures.
     fn settle(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()>;
 }
 
@@ -213,6 +222,9 @@ fn io(action: &'static str, path: &Path, error: &std::io::Error) -> IdentityErro
 /// Its log is read forward from the offset it opened at, kept beside its
 /// pid file; one started before offsets were kept is read from the start,
 /// once. `true` when it was started.
+///
+/// # Errors
+/// Returns named install-state, service-control or upgrade-phase failures.
 pub fn launch(layout: &Layout, unit: &Unit, replace: bool) -> IdentityResult<bool> {
     let before = std::fs::metadata(&unit.log).map_or(0, |meta| meta.len());
     let program = layout.binary(unit.binary);
@@ -241,6 +253,9 @@ pub fn launch(layout: &Layout, unit: &Unit, replace: bool) -> IdentityResult<boo
 /// Runs `program --version`, reads `name VERSION (COMMIT)` and answers what
 /// the parentheses hold: a commit, perhaps with `; dirty`, or the words of a
 /// build with no commit.
+///
+/// # Errors
+/// Returns named install-state, service-control or upgrade-phase failures.
 pub fn version(program: &Path, name: &str) -> IdentityResult<String> {
     let unreadable = |detail: String| {
         refuse(ErrorKind::VersionUnreadable, "read version", name, detail).at(program)
@@ -304,6 +319,9 @@ fn incoming(from: &Path, names: &[&'static str]) -> IdentityResult<BTreeMap<Stri
 /// Upgrades the install under `layout` to the binaries in `from` (and the
 /// screens in `package`), and returns the build now running. `say` hears
 /// every line the upgrade prints.
+///
+/// # Errors
+/// Returns named install-state, service-control or upgrade-phase failures.
 pub fn upgrade(
     layout: &Layout,
     from: &Path,
@@ -354,23 +372,7 @@ pub fn upgrade(
     let files = parts
         .render
         .render(layout, &to, screens_existed || package.is_some())?;
-    let mut intent = Intent {
-        from: installed,
-        to,
-        screens: package.is_some(),
-        screens_existed,
-        files: files
-            .iter()
-            .map(|file| intent::Kept {
-                name: file.name.to_string(),
-                target: file.target.clone(),
-                existed: file.target.is_file(),
-                private: file.private,
-            })
-            .collect(),
-        compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
-        steps: Vec::new(),
-    };
+    let mut intent = planned_intent(installed, to, package.is_some(), screens_existed, &files);
     if let Some(restart) = &restart {
         restart.retain()?;
     }
@@ -396,20 +398,7 @@ pub fn upgrade(
         say,
     );
     let Err(failure) = result else {
-        let record = record_build(layout, &names, say)?;
-        Intent::clear(layout)?;
-        // After the record is written and the fence cleared: a refusal here never leaves an unfinished upgrade.
-        parts.engine.settle(layout, say).map_err(|error| {
-            refuse(
-                ErrorKind::UpgradeFailed,
-                "settle",
-                "password_policy",
-                format!(
-                    "the new build is running, but the sign-in service did not take Lys's password policy: {error}"
-                ),
-            )
-        })?;
-        return Ok(record);
+        return finish_upgrade(layout, &names, parts.engine, say);
     };
     say(&format!("upgrade failed: {failure}"));
     say("putting the previous build back");
@@ -448,3 +437,51 @@ mod scratch;
 #[cfg(test)]
 #[path = "upgrade_tests.rs"]
 mod tests;
+
+fn planned_intent(
+    installed: BTreeMap<String, String>,
+    to: BTreeMap<String, String>,
+    screens: bool,
+    screens_existed: bool,
+    files: &[render::RenderedFile],
+) -> Intent {
+    Intent {
+        from: installed,
+        to,
+        screens,
+        screens_existed,
+        files: files
+            .iter()
+            .map(|file| intent::Kept {
+                name: file.name.to_string(),
+                target: file.target.clone(),
+                existed: file.target.is_file(),
+                private: file.private,
+            })
+            .collect(),
+        compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
+        steps: Vec::new(),
+    }
+}
+
+fn finish_upgrade(
+    layout: &Layout,
+    names: &[&str],
+    engine: &mut dyn Engine,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<BuildRecord> {
+    let record = record_build(layout, names, say)?;
+    Intent::clear(layout)?;
+    // After the record is written and the fence cleared: a refusal here never leaves an unfinished upgrade.
+    engine.settle(layout, say).map_err(|error| {
+        refuse(
+            ErrorKind::UpgradeFailed,
+            "settle",
+            "password_policy",
+            format!(
+                "the new build is running, but the sign-in service did not take Lys's password policy: {error}"
+            ),
+        )
+    })?;
+    Ok(record)
+}

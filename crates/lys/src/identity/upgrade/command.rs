@@ -28,6 +28,9 @@ pub struct Options {
 }
 
 /// Runs `lys identity upgrade` after checking the live issuer authority.
+///
+/// # Errors
+/// Returns named upgrade configuration, preparation or execution failures.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     let client_program = options.from.join("lys");
     let clients = install::layout::prepare_clients(
@@ -97,33 +100,8 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
     if json {
         emitter.field("build", "build", value);
     }
-    let placed = install::server_config::carried(&layout)?;
-    let membership = placed
-        .as_ref()
-        .and_then(|carried| carried.membership.as_ref());
-    emitter.note(&install::server_config::membership_readback(membership));
-    let rights_bytes = placed
-        .as_ref()
-        .and_then(|carried| carried.rights_bytes.as_ref());
-    emitter.note(&install::server_config::provider_readback(
-        rights_bytes,
-        &layout.logs_dir().join("identity.log"),
-    )?);
-    if session_outcomes
-        .iter()
-        .any(|line| line.contains(": failed:"))
-    {
-        return Err(refuse(
-            ErrorKind::UpgradeFailed,
-            "resume sessions",
-            "installed build",
-            format!(
-                "the build is installed; {}; retained launches remain in {}",
-                session_outcomes.join("; "),
-                layout.run_dir().join("upgrade-sessions.json").display()
-            ),
-        ));
-    }
+    report_service(&layout, &mut emitter)?;
+    require_resumed(&layout, &session_outcomes)?;
     let address =
         install::ports::PersonAddress::load(&layout, install::ports::Ports::load(&layout)?)?;
     address.say_fallback(&mut emitter);
@@ -160,4 +138,39 @@ impl Render for ClientRender<'_> {
         files.push(self.clients.manifest(layout)?);
         Ok(files)
     }
+}
+
+fn report_service(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> {
+    let placed = install::server_config::carried(layout)?;
+    let membership = placed
+        .as_ref()
+        .and_then(|carried| carried.membership.as_ref());
+    emitter.note(&install::server_config::membership_readback(membership));
+    let rights_bytes = placed
+        .as_ref()
+        .and_then(|carried| carried.rights_bytes.as_ref());
+    emitter.note(&install::server_config::provider_readback(
+        rights_bytes,
+        &layout.logs_dir().join("identity.log"),
+    )?);
+    Ok(())
+}
+
+fn require_resumed(layout: &Layout, session_outcomes: &[String]) -> IdentityResult<()> {
+    if session_outcomes
+        .iter()
+        .any(|line| line.contains(": failed:"))
+    {
+        return Err(refuse(
+            ErrorKind::UpgradeFailed,
+            "resume sessions",
+            "installed build",
+            format!(
+                "the build is installed; {}; retained launches remain in {}",
+                session_outcomes.join("; "),
+                layout.run_dir().join("upgrade-sessions.json").display()
+            ),
+        ));
+    }
+    Ok(())
 }

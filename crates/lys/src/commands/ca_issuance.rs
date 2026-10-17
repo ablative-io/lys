@@ -254,6 +254,19 @@ pub fn issue_with_clock(
     }
     let entered = opened.enter(&issued.der_bytes, staged)?;
 
+    let mut emit = issuance_report(&issued, subject, claims, outputs, json);
+    entered.report(&mut emit);
+    emit.finish();
+    Ok(())
+}
+
+fn issuance_report(
+    issued: &Issuance,
+    subject: &str,
+    claims: Option<&Path>,
+    outputs: &IssueOutputs<'_>,
+    json: bool,
+) -> Emitter {
     let mut emit = Emitter::new(json);
     emit.field("issued certificate for subject", "subject", subject);
     emit.field(
@@ -301,7 +314,5 @@ pub fn issue_with_clock(
             path.display().to_string(),
         );
     }
-    entered.report(&mut emit);
-    emit.finish();
-    Ok(())
+    emit
 }

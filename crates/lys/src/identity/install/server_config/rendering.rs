@@ -7,6 +7,7 @@ use super::{
 };
 
 /// Render the service configuration while retaining the carried installation settings.
+#[must_use]
 pub fn render(
     layout: &Layout,
     config: &DeploymentConfig,
@@ -14,11 +15,56 @@ pub fn render(
     surface: bool,
 ) -> Value {
     let issuer = issuer(config);
+    let mut rendered = base_configuration(layout, config, carried);
+    rendered["model_proxy"] = Value::String(carried.ports.proxy_url());
+    // Where that proxy keeps its records, so the service can show a person an agent's calls.
+    rendered["proxy_dir"] = Value::String(layout.data_dir().join("proxy").display().to_string());
+    // When the issuer an earlier configuration named is not this one, the
+    // sign-in service moved: the service is handed the earlier issuer and
+    // records the move in the directory once, and the administrator's login
+    // moves with every other. A move handed over before is handed over
+    // again, which the directory finds already recorded.
+    let moved_from = carried
+        .issuer
+        .clone()
+        .filter(|earlier| *earlier != issuer)
+        .or_else(|| carried.issuer_moved_from.clone())
+        .filter(|earlier| *earlier != issuer);
+    if let Some(administrator) = &carried.administrator {
+        let mut administrator = administrator.clone();
+        if moved_from.is_some() && administrator["issuer"].as_str() == moved_from.as_deref() {
+            administrator["issuer"] = Value::String(issuer);
+        }
+        rendered["administrator"] = administrator;
+    }
+    if let Some(from) = moved_from {
+        rendered["issuer_moved_from"] = Value::String(from);
+    }
+    if let Some(bridge) = &carried.message_service {
+        rendered[MESSAGE_SERVICE] = bridge.clone();
+    }
+    if let Some(proxies) = &carried.trusted_proxies {
+        rendered["trusted_proxies"] = proxies.clone();
+    }
+    if let Some(membership) = &carried.membership {
+        rendered["membership"] = membership.clone();
+    }
+    if let Some(cap) = &carried.rights_bytes {
+        rendered["provider"]["rights_bytes"] = cap.clone();
+    }
+    if surface {
+        rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
+    }
+    rendered
+}
+
+fn base_configuration(layout: &Layout, config: &DeploymentConfig, carried: &Carried) -> Value {
+    let issuer = issuer(config);
     let state = config.state_dir();
     let data = layout.data_dir();
     let policy = &config.password_policy;
     let dir = |name: &str| Value::String(data.join(name).display().to_string());
-    let mut rendered = Value::Object([
+    Value::Object([
         ("listen", json!(format!("127.0.0.1:{}", carried.ports.service))),
         ("log_dir", json!(dir("directory-log"))),
         ("log_origin", json!(LOG_ORIGIN)),
@@ -94,45 +140,5 @@ pub fn render(
         ("schedules_dir", json!(dir("schedules"))),
         ("reviews_dir", json!(dir("reviews"))),
         ("runner_socket", json!(layout.runner_socket().display().to_string())),
-    ].into_iter().map(|(key, value)| (key.to_owned(), value)).collect());
-    rendered["model_proxy"] = Value::String(carried.ports.proxy_url());
-    // Where that proxy keeps its records, so the service can show a person an agent's calls.
-    rendered["proxy_dir"] = Value::String(layout.data_dir().join("proxy").display().to_string());
-    // When the issuer an earlier configuration named is not this one, the
-    // sign-in service moved: the service is handed the earlier issuer and
-    // records the move in the directory once, and the administrator's login
-    // moves with every other. A move handed over before is handed over
-    // again, which the directory finds already recorded.
-    let moved_from = carried
-        .issuer
-        .clone()
-        .filter(|earlier| *earlier != issuer)
-        .or_else(|| carried.issuer_moved_from.clone())
-        .filter(|earlier| *earlier != issuer);
-    if let Some(administrator) = &carried.administrator {
-        let mut administrator = administrator.clone();
-        if moved_from.is_some() && administrator["issuer"].as_str() == moved_from.as_deref() {
-            administrator["issuer"] = Value::String(issuer);
-        }
-        rendered["administrator"] = administrator;
-    }
-    if let Some(from) = moved_from {
-        rendered["issuer_moved_from"] = Value::String(from);
-    }
-    if let Some(bridge) = &carried.message_service {
-        rendered[MESSAGE_SERVICE] = bridge.clone();
-    }
-    if let Some(proxies) = &carried.trusted_proxies {
-        rendered["trusted_proxies"] = proxies.clone();
-    }
-    if let Some(membership) = &carried.membership {
-        rendered["membership"] = membership.clone();
-    }
-    if let Some(cap) = &carried.rights_bytes {
-        rendered["provider"]["rights_bytes"] = cap.clone();
-    }
-    if surface {
-        rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
-    }
-    rendered
+    ].into_iter().map(|(key, value)| (key.to_owned(), value)).collect())
 }

@@ -33,7 +33,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use base64::Engine;
 use lys_core::Ed25519Identity;
 
 use super::config::DeploymentConfig;
@@ -88,6 +87,7 @@ fn write_absent(path: &Path, text: &str) -> IdentityResult<bool> {
 /// The shipped permission model, when the model file at `path` is absent
 /// or holds an earlier version of it; none when any other file is there:
 /// the running service applies a later version over the one it holds.
+#[must_use]
 pub fn model_replacement(path: &Path) -> Option<String> {
     let held = std::fs::read_to_string(path)
         .ok()
@@ -230,6 +230,9 @@ pub(super) fn start_runner(
 /// part-way is ended first, then the compose services, the broker and the
 /// service, the runner and the model proxy, each waited on until ready.
 /// The inverse of `lys identity stop`.
+///
+/// # Errors
+/// Returns named configuration, key, placement or service-start failures.
 pub fn start_installed(
     layout: &Layout,
     ports: ports::Ports,
@@ -265,6 +268,9 @@ pub fn start_installed(
 /// providers' key, the provider signing key and the service key. Install
 /// and upgrade both run it, so an install made by an earlier build gains
 /// what this build's service needs before it starts.
+///
+/// # Errors
+/// Returns named configuration, key, placement or service-start failures.
 pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     write_model(&layout.grant_model())?;
     server_keys(layout, config)
@@ -273,6 +279,9 @@ pub fn server_state(layout: &Layout, config: &DeploymentConfig) -> IdentityResul
 /// As [`server_state`] but the grant model, which an upgrade places as one
 /// of the files it replaces, so that a put-back by any installer returns
 /// the model the previous build read.
+///
+/// # Errors
+/// Returns named configuration, key, placement or service-start failures.
 pub fn server_keys(layout: &Layout, config: &DeploymentConfig) -> IdentityResult<()> {
     provider_key(config)?;
     service_key(layout)?;
@@ -283,208 +292,14 @@ pub fn server_keys(layout: &Layout, config: &DeploymentConfig) -> IdentityResult
 
 /// Runs `lys identity install`. A failure is said in Lys's words, because
 /// the person installing reads it.
+///
+/// # Errors
+/// Returns named configuration, key, placement or service-start failures.
 pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
-    install(options, json).map_err(IdentityError::said_in_lys_words)
+    command::install(options, json).map_err(IdentityError::said_in_lys_words)
 }
 
-fn install(options: &Options, json: bool) -> IdentityResult<()> {
-    let sibling = |name: &str| match &options.from {
-        Some(from) => Ok(from.join(name)),
-        None => services::sibling(name),
-    };
-    let client_program = sibling("lys")?;
-    let client_folder = client_program.parent().ok_or_else(|| {
-        IdentityError::new(
-            ErrorKind::BinaryMissing,
-            "prepare clients",
-            "lys",
-            "the built client has no containing folder",
-        )
-    })?;
-    let clients = layout::prepare_clients(
-        options.clients.as_deref(),
-        client_folder,
-        &upgrade::version(&client_program, "lys")?,
-    )?;
-    let layout = match &options.root {
-        Some(root) => Layout::at(root.clone()),
-        None => Layout::discover()?,
-    };
-    let mut emitter = Emitter::new(json);
-    let ports = ports::Ports::load(&layout)?.chosen(
-        options.service_port,
-        options.broker_port,
-        options.proxy_port,
-    )?;
-    let units = upgrade::units_at(&layout, ports);
-    swap::recover(&layout, &units, &mut Compose, &mut |line| {
-        emitter.note(line);
-    })?;
-    adopt::check_placed_build(&layout, &BINARIES, &sibling)?;
-    services::require_docker(Path::new("docker"))?;
-    private_files::ensure_dir(&layout.root)?;
-    for dir in [
-        layout.deploy_dir(),
-        layout.logs_dir(),
-        layout.run_dir(),
-        layout.data_dir(),
-    ] {
-        private_files::ensure_dir(&dir)?;
-    }
-    emitter.field("root", "root", layout.root.display().to_string());
-    write_plain(
-        &layout.deploy_dir().join("compose.yaml"),
-        layout::COMPOSE_YAML,
-    )?;
-    write_plain(
-        &layout.deploy_dir().join("postgres-init.sql"),
-        layout::POSTGRES_INIT_SQL,
-    )?;
-    let config_path = layout.deployment_config();
-    let deployment = if ports.service == layout::SERVICE_PORT {
-        layout::render_deployment(options.admin_email.as_deref())
-    } else {
-        layout::render_deployment_at(options.admin_email.as_deref(), ports.service)
-    };
-    if write_absent(&config_path, &deployment)? {
-        emitter.note("deployment.toml written");
-    }
-    let config = DeploymentConfig::load_install(&config_path)?;
-    let materialised = prepare::materialise_all(&config)?;
-    emitter.note(&format!(
-        "{} private files ready (only you can read them)",
-        materialised.len()
-    ));
-    services::compose_up(&layout, &config)?;
-    emitter.note("database, sign-in and permission services up");
-    services::wait_ready(&layout, &config, &mut |line| {
-        println!("{}", in_lys_words(line));
-    })?;
-    emitter.note("database, sign-in and permission services ready");
-    configure::reconcile(&config)?;
-    emitter.note("sign-in clients registered");
-    configure::apply_password_policy(&config)?;
-    emitter.note("Lys's password policy set");
-    let key = Arc::new(service_key(&layout)?);
-    let public = base64::engine::general_purpose::STANDARD.encode(key.public_key_bytes());
-    emitter.note(&format!("service key public {public}"));
-    if services::broker_init(&layout)? {
-        emitter.note("secrets broker made");
-    }
-    broker_trust::trust(&layout, server_config::SERVICE_NAME)?;
-    emitter.note("secrets broker trusts the identity service");
-    if let Some(package) = &options.surface {
-        let manifest = surface::place(package, &layout.surface_dir())?;
-        emitter.note(&format!("screens placed from commit {}", manifest.commit));
-    }
-    let surface_present = layout.surface_dir().join("index.html").is_file();
-    server_state(&layout, &config)?;
-    let service_key_file = directory_key::provide(&config)?;
-    private_files::write(
-        &layout.data_dir().join("estate-approval.json"),
-        layout::ESTATE_PLAN.as_bytes(),
-    )?;
-    let mut carried = server_config::carried(&layout)?.unwrap_or_default();
-    carried.ports = ports;
-    let profile = options.profile.or(carried.profile).unwrap_or_default();
-    carried.profile = Some(profile);
-    emitter.note(&format!("profile: {}", profile.word()));
-    operator_token(&config, profile, &mut |line| emitter.note(line))?;
-    if let Some(path) = &options.message_service {
-        carried.message_service = Some(server_config::messages_from(path)?);
-        emitter.note("message service connection kept");
-    }
-    let rendered = server_config::render(&layout, &config, &carried, surface_present);
-    let encoded = serde_json::to_vec_pretty(&rendered).map_err(|error| {
-        IdentityError::new(
-            ErrorKind::RenderFailed,
-            "render",
-            "identity.json",
-            error.to_string(),
-        )
-    })?;
-    let configuration = private_files::write(&layout.service_config(), &encoded)?;
-    emitter.note(&server_config::membership_readback(
-        rendered.get("membership"),
-    ));
-    emitter.note(&server_config::provider_readback(
-        rendered["provider"].get("rights_bytes"),
-        &layout.logs_dir().join("identity.log"),
-    )?);
-    let changed = configuration != Outcome::Unchanged || service_key_file != Outcome::Unchanged;
-    let code = if setup_code::has_administrator(&layout)? {
-        None
-    } else {
-        Some(setup_code::issue_pending(
-            &layout,
-            setup_code::Purpose::FirstRun,
-            &super::presence::SystemPresence,
-        )?)
-    };
-    clients.place(&layout)?;
-    let manifest = clients.manifest(&layout)?;
-    if manifest.target.exists() {
-        let bytes = std::fs::read(&manifest.target).map_err(|error| {
-            IdentityError::new(
-                ErrorKind::PrivateFileIo,
-                "back up",
-                "clients",
-                error.to_string(),
-            )
-            .at(&manifest.target)
-        })?;
-        private_files::write(&layout.root.join("clients.json.previous"), &bytes)?;
-    }
-    swap::place_file(&manifest.target, &manifest.bytes, false)?;
-    emitter.note(&format!(
-        "clients recorded: {} platforms",
-        clients.releases.len()
-    ));
-    swap::announce_restart(&units, changed || options.surface.is_some())?;
-    let build = adopt::settle(
-        &layout,
-        &units,
-        &sibling,
-        changed,
-        options.surface.is_some(),
-        &mut |line| {
-            emitter.note(line);
-        },
-    )?;
-    let build = serde_json::to_value(&build).map_err(|error| {
-        IdentityError::new(
-            ErrorKind::RenderFailed,
-            "render",
-            "build.json",
-            error.to_string(),
-        )
-    })?;
-    if emitter.is_json() {
-        emitter.field("build", "build", build);
-    }
-    place_runner(&layout, &sibling, &mut |line| {
-        emitter.note(line);
-    })?;
-    start_runner(&layout, &key, &layout.binary("lys"), &mut |line| {
-        emitter.note(line);
-    })?;
-    proxy::start(&layout, ports, &layout.binary("lys"), &mut |line| {
-        emitter.note(line);
-    })?;
-    let address = ports::PersonAddress::load(&layout, ports)?;
-    // The setup code's handover says the same when a code is handed over.
-    if code.is_none() {
-        address.say_fallback(&mut emitter);
-    }
-    emitter.field("open", "url", address.origin.clone());
-    emitter.field("sign-in for products", "issuer", address.origin);
-    setup_code::hand_over_first_run(&layout, code, &mut emitter)?;
-    if !surface_present {
-        emitter.note("no screens placed: pass --surface with a compiled screens package");
-    }
-    emitter.finish();
-    Ok(())
-}
+mod command;
 
 #[cfg(test)]
 #[path = "install_tests.rs"]

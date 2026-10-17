@@ -73,10 +73,26 @@ fn s(value: &Value, key: &str) -> String {
 fn every_subcommand_honours_the_global_json_flag() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path();
-    let p = |name: &str| dir.join(name).to_string_lossy().to_string();
+    let keys = key_commands(dir);
+    log_commands(dir, &keys.signer);
+    let payload = attestation_commands(dir, &keys.signer, &keys.signer_pub);
+    let (issued, issuance_log) = issuance_commands(dir, &keys.signer, &keys.signer_pub);
+    request_commands(dir, &keys.signer, &keys.signer_pub, &issuance_log, &issued);
+    seal_commands(dir, &keys, &payload);
+}
 
-    // ── key ──────────────────────────────────────────────────────────
-    let signer = p("signer.key");
+struct Keys {
+    signer: String,
+    signer_pub: String,
+    recipient: String,
+    recipient_pub: String,
+    recipient_x25519: String,
+}
+fn p(dir: &Path, name: &str) -> String {
+    dir.join(name).to_string_lossy().to_string()
+}
+fn key_commands(dir: &Path) -> Keys {
+    let signer = p(dir, "signer.key");
     let generated = json_ok(&["--json", "key", "generate", "--out", &signer]);
     assert_eq!(generated["generated"], Value::Bool(true));
     let signer_pub = s(&generated, "public_key_ed25519");
@@ -85,7 +101,7 @@ fn every_subcommand_honours_the_global_json_flag() {
     let reloaded = json_ok(&["--json", "key", "generate", "--out", &signer]);
     assert_eq!(reloaded["generated"], Value::Bool(false));
 
-    let recipient = p("recipient.key");
+    let recipient = p(dir, "recipient.key");
     let recipient_json = json_ok(&["--json", "key", "generate", "--out", &recipient]);
     let recipient_x25519 = {
         let inspected = json_ok(&["--json", "key", "inspect", "--key", &recipient]);
@@ -109,8 +125,17 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert!(s(&inspected, "allowed_signers").contains("namespaces=\"git\""));
     assert!(s(&inspected, "verifier_key").starts_with("example.com/json+"));
 
-    // ── log ──────────────────────────────────────────────────────────
-    let log = p("log");
+    Keys {
+        signer,
+        signer_pub,
+        recipient,
+        recipient_pub,
+        recipient_x25519,
+    }
+}
+
+fn log_commands(dir: &Path, signer: &str) {
+    let log = p(dir, "log");
     json_ok(&[
         "--json",
         "log",
@@ -146,7 +171,7 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(status["tree_size"], 2);
     assert_eq!(status["origin"], "example.com/json");
 
-    let checkpoint = p("checkpoint");
+    let checkpoint = p(dir, "checkpoint");
     let checkpointed = json_ok(&[
         "--json",
         "log",
@@ -154,13 +179,13 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--dir",
         &log,
         "--key",
-        &signer,
+        signer,
         "--out",
         &checkpoint,
     ]);
     let verifier_key = s(&checkpointed, "verifier_key");
 
-    let inclusion = p("inclusion.json");
+    let inclusion = p(dir, "inclusion.json");
     json_ok(&[
         "--json",
         "log",
@@ -169,7 +194,7 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--dir",
         &log,
         "--key",
-        &signer,
+        signer,
         "--leaf-index",
         "0",
         "--out",
@@ -189,7 +214,7 @@ fn every_subcommand_honours_the_global_json_flag() {
     ]);
     assert_eq!(verified["verified"], Value::Bool(true));
 
-    let consistency = p("consistency.json");
+    let consistency = p(dir, "consistency.json");
     json_ok(&[
         "--json",
         "log",
@@ -198,7 +223,7 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--dir",
         &log,
         "--key",
-        &signer,
+        signer,
         "--old-size",
         "1",
         "--out",
@@ -215,17 +240,18 @@ fn every_subcommand_honours_the_global_json_flag() {
         &verifier_key,
     ]);
     assert_eq!(consistent["verified"], Value::Bool(true));
+}
 
-    // ── attest / verify / inspect ────────────────────────────────────
+fn attestation_commands(dir: &Path, signer: &str, signer_pub: &str) -> String {
     let payload = dir.join("payload.bin");
     write(&payload, b"payload bytes");
     let payload_path = payload.to_string_lossy().to_string();
-    let cose = p("payload.cose");
+    let cose = p(dir, "payload.cose");
     json_ok(&[
         "--json",
         "attest",
         "--key",
-        &signer,
+        signer,
         "--payload",
         &payload_path,
         "--out",
@@ -249,11 +275,14 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(inspected_attestation["verified"], Value::Bool(false));
     assert!(s(&inspected_attestation, "warning").contains("UNVERIFIED"));
 
-    // ── ca ───────────────────────────────────────────────────────────
+    payload_path
+}
+
+fn issuance_commands(dir: &Path, signer: &str, signer_pub: &str) -> (Value, String) {
     let claims = dir.join("claims.json");
     write(&claims, b"{\"capabilities\":[\"repo:read\"]}");
-    let cert = p("agent.pem");
-    let issuance_log = p("issuance-log");
+    let cert = p(dir, "agent.pem");
+    let issuance_log = p(dir, "issuance-log");
     json_ok(&[
         "--json",
         "log",
@@ -268,7 +297,7 @@ fn every_subcommand_honours_the_global_json_flag() {
         "ca",
         "issue",
         "--key",
-        &signer,
+        signer,
         "--subject",
         "agent-json",
         "--claims",
@@ -280,7 +309,7 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--log",
         &issuance_log,
         "--leaf-out",
-        &p("agent.leaf"),
+        &p(dir, "agent.leaf"),
     ]);
     assert_eq!(issued["subject"], "agent-json");
     let ca_verified = json_ok(&[
@@ -290,7 +319,7 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--cert",
         &cert,
         "--issuer-public-key",
-        &signer_pub,
+        signer_pub,
     ]);
     assert_eq!(ca_verified["verified"], Value::Bool(true));
     assert!(s(&ca_verified, "capability_claims").contains("repo:read"));
@@ -299,13 +328,22 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(inspected_cert["verified"], Value::Bool(false));
     assert!(s(&inspected_cert, "capability_claims_warning").contains("UNVERIFIED"));
 
-    // ── ca request / issue --request ──────────────────────────────────
-    let holder = p("holder.key");
+    (issued, issuance_log)
+}
+
+fn request_commands(
+    dir: &Path,
+    signer: &str,
+    signer_pub: &str,
+    issuance_log: &str,
+    issued: &Value,
+) {
+    let holder = p(dir, "holder.key");
     let holder_pub = s(
         &json_ok(&["--json", "key", "generate", "--out", &holder]),
         "public_key_ed25519",
     );
-    let request = p("holder.csr.pem");
+    let request = p(dir, "holder.csr.pem");
     let requested = json_ok(&[
         "--json",
         "ca",
@@ -320,13 +358,13 @@ fn every_subcommand_honours_the_global_json_flag() {
     assert_eq!(requested["subject"], "agent-holder");
     assert_eq!(s(&requested, "subject_public_key"), holder_pub);
 
-    let presented_cert = p("holder.pem");
+    let presented_cert = p(dir, "holder.pem");
     let presented = json_ok(&[
         "--json",
         "ca",
         "issue",
         "--key",
-        &signer,
+        signer,
         "--subject",
         "agent-holder",
         "--request",
@@ -336,17 +374,17 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--out",
         &presented_cert,
         "--log",
-        &issuance_log,
+        issuance_log,
         "--leaf-out",
-        &p("holder.leaf"),
+        &p(dir, "holder.leaf"),
     ]);
     // The certificate binds the holder's own key rather than one the issuer
     // minted, and says so — a consumer must be able to tell the two paths
     // apart, because only one of them is evidence about the holder.
     assert_eq!(s(&presented, "subject_public_key"), holder_pub);
     assert!(s(&presented, "subject_key_origin").contains("proof of possession verified"));
-    assert!(s(&issued, "subject_key_origin").contains("never proved possession"));
-    assert_ne!(s(&issued, "subject_public_key"), holder_pub);
+    assert!(s(issued, "subject_key_origin").contains("never proved possession"));
+    assert_ne!(s(issued, "subject_public_key"), holder_pub);
 
     json_ok(&[
         "--json",
@@ -355,21 +393,22 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--cert",
         &presented_cert,
         "--issuer-public-key",
-        &signer_pub,
+        signer_pub,
     ]);
+}
 
-    // ── seal / open ──────────────────────────────────────────────────
-    let envelope = p("secret.sealed.json");
-    let seal_att = p("secret.sealed.cose");
+fn seal_commands(dir: &Path, keys: &Keys, payload_path: &str) {
+    let envelope = p(dir, "secret.sealed.json");
+    let seal_att = p(dir, "secret.sealed.cose");
     json_ok(&[
         "--json",
         "seal",
         "--key",
-        &signer,
+        &keys.signer,
         "--recipient-public-key",
-        &recipient_x25519,
+        &keys.recipient_x25519,
         "--payload",
-        &payload_path,
+        payload_path,
         "--out",
         &envelope,
         "--attestation-out",
@@ -379,21 +418,21 @@ fn every_subcommand_honours_the_global_json_flag() {
         "--json",
         "open",
         "--key",
-        &recipient,
+        &keys.recipient,
         "--sender-public-key",
-        &signer_pub,
+        &keys.signer_pub,
         "--envelope",
         &envelope,
         "--attestation",
         &seal_att,
         "--out",
-        &p("recovered.bin"),
+        &p(dir, "recovered.bin"),
     ]);
     assert_eq!(opened["opened"], Value::Bool(true));
     assert_eq!(opened["payload_bytes"], 13);
-    assert_eq!(opened["sender_public_key"], signer_pub);
+    assert_eq!(opened["sender_public_key"], keys.signer_pub);
     assert_eq!(
-        recipient_pub.len(),
+        keys.recipient_pub.len(),
         64,
         "key generate must report public_key_ed25519 as 64 hex characters"
     );

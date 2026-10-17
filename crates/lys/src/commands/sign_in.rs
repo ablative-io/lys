@@ -21,6 +21,8 @@ use lys_runner::dial::HttpClient;
 #[path = "sign_in/callback.rs"]
 mod callback;
 use callback::callback;
+#[path = "sign_in/authorization.rs"]
+mod authorization;
 #[path = "sign_in/finish.rs"]
 mod finish;
 #[path = "sign_in/browser.rs"]
@@ -316,25 +318,7 @@ pub fn sign_in_at(
             &error,
         )
     })?;
-    let endpoint = |name: &str| {
-        let endpoint = metadata[name].as_str().ok_or_else(|| {
-            refused(
-                "sign_in_unavailable",
-                format!("the authorization description names no {name}"),
-            )
-        })?;
-        if !endpoint.starts_with(&format!("{origin}/")) {
-            let advertised = metadata["issuer"].as_str().ok_or_else(|| refused("sign_in_unavailable", "the authorization endpoint has another origin but the service names no issuer to use"))?;
-            let recommended = base(&format!("{}/api", advertised.trim_end_matches('/')))?;
-            return Err(refused(
-                "sign_in_origin_mismatch",
-                format!(
-                    "this Lys serves authorization from another origin; run `lys sign-in --server {recommended}`"
-                ),
-            ));
-        }
-        Ok(endpoint)
-    };
+    let endpoint = |name: &str| authorization::endpoint(&metadata, origin, name);
     let token_endpoint = endpoint("token_endpoint")?;
     let existing = private_files::read(&pass_file(root))?;
     if existing.is_some() {

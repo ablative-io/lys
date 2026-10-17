@@ -168,47 +168,7 @@ async fn receive(mut stream: tokio::net::TcpStream, expected: &str) -> CliResult
             })?;
         return Ok(Received::Unrelated);
     }
-    let outcome = (|| -> CliResult<Zeroizing<String>> {
-        let mut values = std::collections::BTreeMap::new();
-        for pair in target.trim_start_matches("/lys/sign-in?").split('&') {
-            let (key, value) = pair.split_once('=').ok_or_else(|| {
-                refused(
-                    "sign_in_callback_invalid",
-                    "the callback fields are incomplete",
-                )
-            })?;
-            if values.insert(decoded(key)?, decoded(value)?).is_some() {
-                return Err(refused(
-                    "sign_in_callback_invalid",
-                    "a callback field is repeated",
-                ));
-            }
-        }
-        if values.get("state").map(String::as_str) != Some(expected) {
-            return Err(refused(
-                "sign_in_state_wrong",
-                "the callback does not answer this sign-in",
-            ));
-        }
-        if values.contains_key("error") {
-            let reason = values
-                .get("error_description")
-                .map_or("the person did not approve this terminal", String::as_str);
-            return Err(refused("sign_in_refused", reason));
-        }
-        let code = Zeroizing::new(
-            values
-                .remove("code")
-                .filter(|code| !code.is_empty())
-                .ok_or_else(|| {
-                    refused(
-                        "sign_in_callback_invalid",
-                        "the callback supplied no authorization answer",
-                    )
-                })?,
-        );
-        Ok(code)
-    })();
+    let outcome = callback_code(target, expected);
     let code = match outcome {
         Ok(code) => code,
         Err(error) => {
@@ -261,3 +221,45 @@ async fn receive(mut stream: tokio::net::TcpStream, expected: &str) -> CliResult
 #[cfg(test)]
 #[path = "callback_tests.rs"]
 mod tests;
+
+fn callback_code(target: &str, expected: &str) -> CliResult<Zeroizing<String>> {
+    let mut values = std::collections::BTreeMap::new();
+    for pair in target.trim_start_matches("/lys/sign-in?").split('&') {
+        let (key, value) = pair.split_once('=').ok_or_else(|| {
+            refused(
+                "sign_in_callback_invalid",
+                "the callback fields are incomplete",
+            )
+        })?;
+        if values.insert(decoded(key)?, decoded(value)?).is_some() {
+            return Err(refused(
+                "sign_in_callback_invalid",
+                "a callback field is repeated",
+            ));
+        }
+    }
+    if values.get("state").map(String::as_str) != Some(expected) {
+        return Err(refused(
+            "sign_in_state_wrong",
+            "the callback does not answer this sign-in",
+        ));
+    }
+    if values.contains_key("error") {
+        let reason = values
+            .get("error_description")
+            .map_or("the person did not approve this terminal", String::as_str);
+        return Err(refused("sign_in_refused", reason));
+    }
+    let code = Zeroizing::new(
+        values
+            .remove("code")
+            .filter(|code| !code.is_empty())
+            .ok_or_else(|| {
+                refused(
+                    "sign_in_callback_invalid",
+                    "the callback supplied no authorization answer",
+                )
+            })?,
+    );
+    Ok(code)
+}

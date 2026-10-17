@@ -13,7 +13,7 @@ fn validate(address: &str) -> CliResult<(&str, &str)> {
     let url = url::Url::parse(address).map_err(|error| {
         refused(
             "sign_in_finish_invalid",
-            &format!("the finishing address cannot be parsed: {error}"),
+            format!("the finishing address cannot be parsed: {error}"),
         )
     })?;
     let (authority, target) = address

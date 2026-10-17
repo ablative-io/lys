@@ -37,10 +37,12 @@ fn finish_uses_the_callback_receiver_for_success_and_wrong_state() -> Result<(),
                 .map_err(|e| e.to_string())
         });
         let answer = finish(&address);
-        let received = receiver.join().map_err(|_| "receiver panicked")?;
+        let callback_answer = receiver
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic));
         if state == "expected" {
             answer?;
-            assert_eq!(received?, "fixture");
+            assert_eq!(callback_answer?, "fixture");
         } else {
             assert!(
                 answer
@@ -49,7 +51,7 @@ fn finish_uses_the_callback_receiver_for_success_and_wrong_state() -> Result<(),
                     .to_string()
                     .contains("sign_in_state_wrong")
             );
-            assert!(received.is_err());
+            assert!(callback_answer.is_err());
         }
     }
     Ok(())

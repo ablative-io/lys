@@ -67,11 +67,13 @@ impl Environment {
     /// The login's own `ANTHROPIC_BASE_URL`, as the same login shell answered
     /// it; never given to a service, only recorded as the model proxy's
     /// upstream.
+    #[must_use]
     pub fn anthropic_base(&self) -> Option<&str> {
         self.anthropic_base.as_deref()
     }
 
     /// What the install record says about this environment.
+    #[must_use]
     pub fn record(&self) -> EnvironmentRecord {
         EnvironmentRecord {
             kept: self.kept.keys().cloned().collect(),
@@ -99,6 +101,9 @@ static LOGIN: OnceLock<Environment> = OnceLock::new();
 ///
 /// A test build reads the test login of `login_fixture.rs` instead, never the
 /// variables of whoever runs the tests nor their shell.
+///
+/// # Errors
+/// Returns named login-process, credential-read or credential-recording failures.
 pub fn login() -> IdentityResult<&'static Environment> {
     if let Some(environment) = LOGIN.get() {
         return Ok(environment);
@@ -112,6 +117,9 @@ pub fn login() -> IdentityResult<&'static Environment> {
 
 /// [`login`] from `process` as the starting process's variables, read now,
 /// so a test can hand it variables it must drop.
+///
+/// # Errors
+/// Returns named login-process, credential-read or credential-recording failures.
 pub fn login_from(
     process: impl IntoIterator<Item = (OsString, OsString)>,
 ) -> IdentityResult<Environment> {
@@ -139,26 +147,7 @@ pub fn login_from(
                 "SHELL is not set; start the install from a login",
             )
         })?;
-    let output = Command::new(shell)
-        .env_clear()
-        .envs(&kept)
-        .args([
-            "-l",
-            "-i",
-            "-c",
-            &format!(
-                r#"printf '\n%s%s%s%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}' '{BASE_MARKER}' "${{ANTHROPIC_BASE_URL-}}" '{BASE_END}'"#
-            ),
-        ])
-        .stdin(Stdio::null())
-        .output()
-        .map_err(|error| {
-            refuse(
-                "read login",
-                "environment",
-                format!("login shell {shell} could not run: {error}"),
-            )
-        })?;
+    let output = shell_output(&kept, shell)?;
     if !output.status.success() {
         return Err(refuse(
             "read login",
@@ -229,3 +218,29 @@ pub mod fixture;
 #[cfg(test)]
 #[path = "login_tests.rs"]
 mod tests;
+
+fn shell_output(
+    kept: &BTreeMap<String, String>,
+    shell: &str,
+) -> IdentityResult<std::process::Output> {
+    Command::new(shell)
+        .env_clear()
+        .envs(kept)
+        .args([
+            "-l",
+            "-i",
+            "-c",
+            &format!(
+                r#"printf '\n%s%s%s%s%s%s' '{PATH_MARKER}' "$PATH" '{PATH_END}' '{BASE_MARKER}' "${{ANTHROPIC_BASE_URL-}}" '{BASE_END}'"#
+            ),
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| {
+            refuse(
+                "read login",
+                "environment",
+                format!("login shell {shell} could not run: {error}"),
+            )
+        })
+}
