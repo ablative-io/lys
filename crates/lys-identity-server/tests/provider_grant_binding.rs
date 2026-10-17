@@ -257,37 +257,7 @@ async fn a_binding_maps_each_right_to_its_ancestry_and_one_revoke_denies_one() -
     );
     assert!(rebound.revision() > binding.revision());
 
-    // Substitutions, one at a time, each refused by name.
-    let keys = published(&service).await?;
-    let other_token = renewed["access_token"].as_str().ok_or("a pass")?;
-    let other_pass = VerifiedPass::verify(other_token, &keys, &service.base, NOTES, now()?)?;
-    let moved = VerifiedBinding::verify(
-        answer["grant_binding"].as_str().ok_or("a binding")?,
-        other_token,
-        &other_pass,
-        &keys,
-        &log,
-    );
-    assert_eq!(
-        moved.map(drop).map_err(|error| error.name().to_owned()),
-        Err(BINDING_MISMATCH.to_owned())
-    );
-    let foreign = GrantLog {
-        identity: "elsewhere".to_owned(),
-        epoch: 0,
-    };
-    let token = answer["access_token"].as_str().ok_or("a pass")?;
-    let elsewhere = VerifiedBinding::verify(
-        answer["grant_binding"].as_str().ok_or("a binding")?,
-        token,
-        &pass,
-        &keys,
-        &foreign,
-    );
-    assert_eq!(
-        elsewhere.map(drop).map_err(|error| error.name().to_owned()),
-        Err(BINDING_LOG_MISMATCH.to_owned())
-    );
+    assert_binding_substitutions(&service, &answer, &renewed, &log, &pass).await?;
     Ok(())
 }
 
@@ -501,5 +471,46 @@ async fn a_registry_pass_is_bound_only_to_grants_lys_judges_live() -> TestResult
     )
     .await?;
     assert_eq!(revoked.1["refusal"], "Revoked", "{revoked:?}");
+    Ok(())
+}
+
+async fn assert_binding_substitutions(
+    service: &Service,
+    answer: &Value,
+    renewed: &Value,
+    log: &GrantLog,
+    pass: &VerifiedPass,
+) -> TestResult {
+    // Substitutions, one at a time, each refused by name.
+    let keys = published(service).await?;
+    let other_token = renewed["access_token"].as_str().ok_or("a pass")?;
+    let other_pass = VerifiedPass::verify(other_token, &keys, &service.base, NOTES, now()?)?;
+    let moved = VerifiedBinding::verify(
+        answer["grant_binding"].as_str().ok_or("a binding")?,
+        other_token,
+        &other_pass,
+        &keys,
+        log,
+    );
+    assert_eq!(
+        moved.map(drop).map_err(|error| error.name().to_owned()),
+        Err(BINDING_MISMATCH.to_owned())
+    );
+    let foreign = GrantLog {
+        identity: "elsewhere".to_owned(),
+        epoch: 0,
+    };
+    let token = answer["access_token"].as_str().ok_or("a pass")?;
+    let elsewhere = VerifiedBinding::verify(
+        answer["grant_binding"].as_str().ok_or("a binding")?,
+        token,
+        pass,
+        &keys,
+        &foreign,
+    );
+    assert_eq!(
+        elsewhere.map(drop).map_err(|error| error.name().to_owned()),
+        Err(BINDING_LOG_MISMATCH.to_owned())
+    );
     Ok(())
 }

@@ -244,117 +244,9 @@ async fn allowance_is_admin_only_retained_once_and_removal_refuses_the_next_star
     let path = format!("/network/machines/{}/agents", table.machine.id);
     let grant = json!({"operation": operation()?, "agent": table.agent(), "allow": true});
     let inode = std::fs::metadata(&table.path)?.ino();
-    for caller in [None, Some(table.bea.as_str())] {
-        let answer = table.service.post(&path, caller, &grant).await?;
-        let (status, name) = if caller.is_some() {
-            (403, "agent_not_yours")
-        } else {
-            (401, "NotSignedIn")
-        };
-        refused(&answer, status, name);
-        unchanged(&table.path, &table.before, inode)?;
-    }
+    assert_allowance_refusals(&table, &path, &grant, inode).await?;
 
-    for (machine, agent, status, name) in [
-        (
-            table.machine.id.clone(),
-            AgentId::generate()?.to_string(),
-            404,
-            "AgentNotVisible",
-        ),
-        (
-            table.machine.id.clone(),
-            table.seeded.people[0].id.to_string(),
-            400,
-            "IdentifierMalformed",
-        ),
-        (operation()?, table.agent(), 404, "MachineUnknown"),
-    ] {
-        let answer = table
-            .service
-            .post(
-                &format!("/network/machines/{machine}/agents"),
-                Some(&table.ada),
-                &json!({"operation": operation()?, "agent": agent, "allow": true}),
-            )
-            .await?;
-        refused(&answer, status, name);
-        unchanged(&table.path, &table.before, inode)?;
-    }
-
-    let first = table.sent(&path, &grant).await?;
-    assert_eq!(first["recorded"]["operation"], grant["operation"]);
-    assert_eq!(first["recorded"]["machine"], table.machine.id);
-    assert_eq!(first["recorded"]["agent"], table.agent());
-    assert_eq!(first["recorded"]["allow"], true);
-    assert_eq!(
-        first["recorded"]["by"],
-        table.seeded.people[0].id.to_string()
-    );
-    assert!(first["recorded"]["at"].is_u64(), "{first}");
-    assert_eq!(first["recorded"]["original_may_run"], json!([]));
-    assert_eq!(
-        first["machine"]["may_run"].as_array().map(Vec::len),
-        Some(1)
-    );
-    assert_eq!(first["machine"]["may_run"][0]["id"], table.agent());
-    assert_eq!(
-        first["machine"]["may_reach"],
-        json!(table.machine.may_reach)
-    );
-
-    let written = std::fs::read(&table.path)?;
-    let inode = std::fs::metadata(&table.path)?.ino();
-    let snapshot = kept_bytes(&table.path)?;
-    let held: Value = serde_json::from_slice(&snapshot)?;
-    assert_eq!(
-        held["agent_changes"].as_object().map(serde_json::Map::len),
-        Some(1)
-    );
-    let grant_id = grant["operation"].as_str().ok_or("no granting operation")?;
-    assert_eq!(held["agent_changes"][grant_id], first["recorded"]);
-    for field in ["runners", "team_changes"] {
-        assert_eq!(member(&snapshot, field)?, member(&table.before, field)?);
-    }
-    assert_eq!(
-        machine_bytes(&snapshot, &table.other)?,
-        machine_bytes(&table.before, &table.other)?
-    );
-    let mut expected = table.machine.clone();
-    expected.may_run.push(table.agent());
-    let expected = format!(
-        "    {}",
-        serde_json::to_string_pretty(&expected)?.replace('\n', "\n    ")
-    );
-    assert_eq!(machine_bytes(&snapshot, &table.machine.id)?, expected);
-
-    assert_eq!(table.sent(&path, &grant).await?, first);
-    unchanged(&table.path, &written, inode)?;
-    for (agent, allow) in [
-        (table.agent(), false),
-        (table.seeded.people[1].agents[0].id.to_string(), true),
-    ] {
-        let answer = table
-            .service
-            .post(
-                &path,
-                Some(&table.ada),
-                &json!({"operation": grant["operation"], "agent": agent, "allow": allow}),
-            )
-            .await?;
-        refused(&answer, 409, "MachineAgentsReused");
-        unchanged(&table.path, &written, inode)?;
-    }
-    let answer = table
-        .service
-        .post(
-            &format!("/network/machines/{}/agents", table.other),
-            Some(&table.ada),
-            &grant,
-        )
-        .await?;
-    refused(&answer, 409, "MachineAgentsReused");
-    unchanged(&table.path, &written, inode)?;
+    let first = assert_recorded_allowance(&table, &path, &grant).await?;
     table.creation_replays(true).await?;
     table.profile().await?;
     let admitted = table
@@ -523,4 +415,134 @@ async fn without_a_network_file_the_agents_route_says_so() -> TestResult {
         "NetworkUnavailable",
     );
     Ok(())
+}
+
+async fn assert_allowance_refusals(
+    table: &Table,
+    path: &str,
+    grant: &Value,
+    inode: u64,
+) -> TestResult {
+    for caller in [None, Some(table.bea.as_str())] {
+        let answer = table.service.post(path, caller, grant).await?;
+        let (status, name) = if caller.is_some() {
+            (403, "agent_not_yours")
+        } else {
+            (401, "NotSignedIn")
+        };
+        refused(&answer, status, name);
+        unchanged(&table.path, &table.before, inode)?;
+    }
+
+    let cases = [
+        (
+            table.machine.id.clone(),
+            AgentId::generate()?.to_string(),
+            404,
+            "AgentNotVisible",
+        ),
+        (
+            table.machine.id.clone(),
+            table.seeded.people[0].id.to_string(),
+            400,
+            "IdentifierMalformed",
+        ),
+        (operation()?, table.agent(), 404, "MachineUnknown"),
+    ];
+    for (machine, agent, status, name) in cases {
+        let operation = operation()?;
+        let answer = table
+            .service
+            .post(
+                &format!("/network/machines/{machine}/agents"),
+                Some(&table.ada),
+                &json!({"operation": operation, "agent": agent, "allow": true}),
+            )
+            .await?;
+        refused(&answer, status, name);
+        unchanged(&table.path, &table.before, inode)?;
+    }
+
+    Ok(())
+}
+
+async fn assert_recorded_allowance(
+    table: &Table,
+    path: &str,
+    grant: &Value,
+) -> Result<Value, Box<dyn Error>> {
+    let first = table.sent(path, grant).await?;
+    assert_eq!(first["recorded"]["operation"], grant["operation"]);
+    assert_eq!(first["recorded"]["machine"], table.machine.id);
+    assert_eq!(first["recorded"]["agent"], table.agent());
+    assert_eq!(first["recorded"]["allow"], true);
+    assert_eq!(
+        first["recorded"]["by"],
+        table.seeded.people[0].id.to_string()
+    );
+    assert!(first["recorded"]["at"].is_u64(), "{first}");
+    assert_eq!(first["recorded"]["original_may_run"], json!([]));
+    assert_eq!(
+        first["machine"]["may_run"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(first["machine"]["may_run"][0]["id"], table.agent());
+    assert_eq!(
+        first["machine"]["may_reach"],
+        json!(table.machine.may_reach)
+    );
+
+    let written = std::fs::read(&table.path)?;
+    let inode = std::fs::metadata(&table.path)?.ino();
+    let snapshot = kept_bytes(&table.path)?;
+    let held: Value = serde_json::from_slice(&snapshot)?;
+    assert_eq!(
+        held["agent_changes"].as_object().map(serde_json::Map::len),
+        Some(1)
+    );
+    let grant_id = grant["operation"].as_str().ok_or("no granting operation")?;
+    assert_eq!(held["agent_changes"][grant_id], first["recorded"]);
+    for field in ["runners", "team_changes"] {
+        assert_eq!(member(&snapshot, field)?, member(&table.before, field)?);
+    }
+    assert_eq!(
+        machine_bytes(&snapshot, &table.other)?,
+        machine_bytes(&table.before, &table.other)?
+    );
+    let mut expected = table.machine.clone();
+    expected.may_run.push(table.agent());
+    let expected = format!(
+        "    {}",
+        serde_json::to_string_pretty(&expected)?.replace('\n', "\n    ")
+    );
+    assert_eq!(machine_bytes(&snapshot, &table.machine.id)?, expected);
+
+    assert_eq!(table.sent(path, grant).await?, first);
+    unchanged(&table.path, &written, inode)?;
+    for (agent, allow) in [
+        (table.agent(), false),
+        (table.seeded.people[1].agents[0].id.to_string(), true),
+    ] {
+        let answer = table
+            .service
+            .post(
+                path,
+                Some(&table.ada),
+                &json!({"operation": grant["operation"], "agent": agent, "allow": allow}),
+            )
+            .await?;
+        refused(&answer, 409, "MachineAgentsReused");
+        unchanged(&table.path, &written, inode)?;
+    }
+    let answer = table
+        .service
+        .post(
+            &format!("/network/machines/{}/agents", table.other),
+            Some(&table.ada),
+            grant,
+        )
+        .await?;
+    refused(&answer, 409, "MachineAgentsReused");
+    unchanged(&table.path, &written, inode)?;
+    Ok(first)
 }

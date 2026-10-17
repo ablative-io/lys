@@ -279,6 +279,25 @@ fn terminal_cleanup(left: Result<crate::pty::Left, crate::error::RunnerError>) -
     }
 }
 
+fn seat_exit_reason(
+    table: &crate::session::Table,
+    id: &str,
+    status: Option<u32>,
+    signal: Option<&str>,
+) -> Option<String> {
+    table
+        .sessions
+        .get(id)
+        .filter(|session| {
+            session.launch.as_ref().is_some_and(|launch| {
+                launch
+                    .environment
+                    .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
+            })
+        })
+        .map(|_| format!("seat_program_exited: status {status:?}; signal {signal:?}"))
+}
+
 #[cfg(test)]
 mod cleanup_tests {
     use super::terminal_cleanup;
@@ -313,23 +332,4 @@ mod cleanup_tests {
                 && words.contains("process_group_unreadable"))
         );
     }
-}
-
-fn seat_exit_reason(
-    table: &crate::session::Table,
-    id: &str,
-    status: Option<u32>,
-    signal: Option<&str>,
-) -> Option<String> {
-    table
-        .sessions
-        .get(id)
-        .filter(|session| {
-            session.launch.as_ref().is_some_and(|launch| {
-                launch
-                    .environment
-                    .contains_key(crate::harness_control::seat_program::SPEC_VARIABLE)
-            })
-        })
-        .map(|_| format!("seat_program_exited: status {status:?}; signal {signal:?}"))
 }

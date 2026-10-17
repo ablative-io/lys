@@ -36,7 +36,10 @@ pub async fn table(keep_explicit: bool) -> Result<(Service, [String; 2]), Box<dy
     .await
 }
 
-fn seed(config: &lys_identity_server::config::Config, keep_explicit: bool) -> Result<[String; 2], Box<dyn Error>> {
+fn seed(
+    config: &lys_identity_server::config::Config,
+    keep_explicit: bool,
+) -> Result<[String; 2], Box<dyn Error>> {
     let actor = Actor::new(
         LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
         Provenance::new(AuthMethod::Oidc, 1),

@@ -73,14 +73,7 @@ async fn signed_prepare_is_private_repeatable_bound_to_body_and_its_route_presen
         .map_err(|e| format!("{} {}", e.0, e.1))?
         .0;
     assert_eq!(answer, again);
-    {
-        let broker = shared.broker.lock().expect("test state lock poisoned");
-        assert_eq!(broker.store().entries().count(), 2);
-        for entry in broker.store().entries() {
-            assert_eq!(entry.owner, "person-fixture");
-            assert_eq!(entry.sequence, 1);
-        }
-    }
+    assert_initial_values(&shared);
     let mut forged = signed(&key, &body)?;
     *forged.body_mut() = Body::from("{}");
     assert!(
@@ -274,4 +267,13 @@ fn credential_target(digest: String) -> axum::Router {
             }
         }),
     )
+}
+
+fn assert_initial_values(shared: &Arc<Shared>) {
+    let broker = shared.broker.lock().expect("test state lock poisoned");
+    assert_eq!(broker.store().entries().count(), 2);
+    for entry in broker.store().entries() {
+        assert_eq!(entry.owner, "person-fixture");
+        assert_eq!(entry.sequence, 1);
+    }
 }

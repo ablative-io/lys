@@ -109,6 +109,7 @@ pub enum Line {
 
 impl Line {
     /// The operation id the line was kept under.
+    #[must_use]
     pub fn operation(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
@@ -122,6 +123,7 @@ impl Line {
     }
 
     /// The team the line is about.
+    #[must_use]
     pub fn team(&self) -> &str {
         match self {
             Self::Created(created) => &created.id,
@@ -163,6 +165,7 @@ impl Line {
     }
 
     /// Whether `other` is the same act as this line, whenever each was received.
+    #[must_use]
     pub fn same_act(&self, other: &Self) -> bool {
         *self == other.at(self.received())
     }
@@ -222,11 +225,13 @@ pub enum Refused {
 
 impl Held {
     /// The team named `id`.
+    #[must_use]
     pub fn team(&self, id: &str) -> Option<&Team> {
         self.teams.iter().find(|team| team.created.id == id)
     }
 
     /// The line kept under `operation`, whichever kind it is.
+    #[must_use]
     pub fn operation(&self, operation: &str) -> Option<Line> {
         self.teams
             .iter()
@@ -249,6 +254,10 @@ impl Held {
     }
 
     /// Whether `line` may be kept on the teams as they stand, by reason.
+    ///
+    /// # Errors
+    ///
+    /// Returns the retained team's refusal for a line it does not permit.
     pub fn allows(&self, line: &Line) -> Result<(), Refused> {
         match line {
             Line::Checked(_) if self.checked.is_some() => return Err(Refused::Checked),
@@ -279,6 +288,10 @@ impl Held {
 
     /// Fold one line. A line the lines before it do not allow is refused by
     /// reason, since every kept line was checked against what came before.
+    ///
+    /// # Errors
+    ///
+    /// Refuses reused operations and lines the retained team does not permit.
     pub fn hold(&mut self, line: Line) -> Result<(), String> {
         if self.operation(line.operation()).is_some() {
             return Err(format!(
@@ -331,6 +344,10 @@ impl Held {
     }
 
     /// Fold every leaf of `tail`, in order.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed leaves or a line the preceding retained state does not permit.
     pub fn fold(&mut self, tail: &lys_log_store::Tail) -> Result<(), String> {
         for (index, bytes) in (tail.from..).zip(&tail.leaves) {
             let line = serde_json::from_slice(bytes)
@@ -342,6 +359,10 @@ impl Held {
     }
 
     /// The state a snapshot seals.
+    ///
+    /// # Errors
+    ///
+    /// Returns the serialization failure when the retained state cannot be encoded.
     pub fn encode(&self) -> Result<Vec<u8>, String> {
         serde_json::to_vec(&Sealed {
             format: FORMAT.to_owned(),
@@ -352,6 +373,10 @@ impl Held {
 
     /// The state a snapshot sealed, refused by reason unless it reads whole
     /// in this format.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed bytes or a snapshot from another state format.
     pub fn decode(bytes: &[u8]) -> Result<Self, String> {
         let sealed: Sealed =
             serde_json::from_slice(bytes).map_err(|error| format!("teams state: {error}"))?;

@@ -61,6 +61,10 @@ fn variables_unavailable(reason: String) -> ServerError {
 impl Stores {
     /// Every store kept under `dir`, signed by `key`; opening the same
     /// folder again is a restart.
+    ///
+    /// # Errors
+    ///
+    /// Propagates fixture store opening, retained state decoding and verification failures.
     pub fn open(dir: &Path, key: &Arc<Ed25519Identity>) -> Result<Self, Box<dyn Error>> {
         Ok(Self {
             provisioning: Mutex::new(ProvisioningStore::open(&dir.join("provisioning.json"))?),
@@ -105,6 +109,10 @@ impl Stores {
 
     /// The owner revisions the fixture's destinations stand at, in order:
     /// template, slot, variables, limits, schedule, profile.
+    ///
+    /// # Errors
+    ///
+    /// Propagates a destination owner refusal while reading its revision.
     pub fn revisions(&self) -> Result<[u64; 6], Box<dyn Error>> {
         let owners = self.owners();
         let mut held = [0; 6];
@@ -116,6 +124,7 @@ impl Stores {
 }
 
 /// The seat as Lys holds it.
+#[must_use]
 pub fn facts() -> SeatFacts {
     SeatFacts {
         seat: SEAT.to_owned(),
@@ -125,6 +134,7 @@ pub fn facts() -> SeatFacts {
 }
 
 /// The confirming person, admitted as the one responsible.
+#[must_use]
 pub fn confirmation() -> Confirmation {
     Confirmation {
         person: PERSON.to_owned(),
@@ -135,6 +145,7 @@ pub fn confirmation() -> Confirmation {
 }
 
 /// `plan` reserved under `operation`.
+#[must_use]
 pub fn reserved(operation: &str, plan: &Plan) -> Reserved {
     Reserved {
         operation: operation.to_owned(),
@@ -147,6 +158,7 @@ pub fn reserved(operation: &str, plan: &Plan) -> Reserved {
 }
 
 /// Seconds since the Unix epoch.
+#[must_use]
 pub fn now() -> u64 {
     lys_identity_server::session::now()
 }
@@ -174,6 +186,7 @@ fn destination(kind: &str, record: &str, change: Value, from: &str) -> Destinati
 }
 
 /// The schedule the fixture imports, due an hour after `now`.
+#[must_use]
 pub fn schedule(now: u64) -> Value {
     json!({
         "id": "schedule-standup",
@@ -188,6 +201,7 @@ pub fn schedule(now: u64) -> Value {
 
 /// One fixture destination of each kind the owners keep, plus a rule
 /// transfer, read from two sources at `revision`.
+#[must_use]
 pub fn fragment(revision: &str, now: u64) -> Fragment {
     let settings = json!({
         "model_access": ["claude-fable-5-1"], "tools": [], "skills": [],
@@ -331,6 +345,7 @@ impl Signal for Exit {
 
 /// Every exit an apply of `plan` under `operation` can be ended at: a rule
 /// transfer is kept in the receipt only, so it has no write to end after.
+#[must_use]
 pub fn exits(operation: &str, plan: &Plan) -> Vec<Exit> {
     let mut exits = Vec::new();
     for (index, destination) in plan.destinations.iter().enumerate() {

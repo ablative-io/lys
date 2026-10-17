@@ -95,35 +95,7 @@ fn a_personal_secret_is_closed_to_every_other_person_and_their_agents() -> TestR
         broker.set_scope(&owner, &format!("{person}-notes"), personal)?;
     }
     let grants = broker.permissions();
-    for identity in [
-        "person:tom",
-        "person:dana",
-        "agent:tom-bot",
-        "agent:dana-bot",
-    ] {
-        for secret in ["tom-token", "dana-token"] {
-            grants
-                .grant(relation(identity, secret, "person:tom"))
-                .expect("local grants lock must be healthy");
-        }
-        for record in ["tom-notes", "dana-notes"] {
-            grants
-                .grant_as(Relation::Read, relation(identity, record, "person:tom"))
-                .expect("local grants lock must be healthy");
-        }
-    }
-    for person in ["tom", "dana"] {
-        grants
-            .grant_as(
-                Relation::Member,
-                relation(
-                    &format!("agent:{person}-bot"),
-                    &format!("person/person:{person}"),
-                    &format!("person:{person}"),
-                ),
-            )
-            .expect("local grants lock must be healthy");
-    }
+    grant_personal_relations(grants);
 
     for (person, other) in people {
         let token = format!("{person}-token");
@@ -263,4 +235,36 @@ fn a_handles_revocation_is_told_only_to_those_who_may_discover_its_secret() -> T
             .stopped_here
     );
     Ok(())
+}
+
+fn grant_personal_relations(grants: &LocalGrants) {
+    for identity in [
+        "person:tom",
+        "person:dana",
+        "agent:tom-bot",
+        "agent:dana-bot",
+    ] {
+        for secret in ["tom-token", "dana-token"] {
+            grants
+                .grant(relation(identity, secret, "person:tom"))
+                .expect("local grants lock must be healthy");
+        }
+        for record in ["tom-notes", "dana-notes"] {
+            grants
+                .grant_as(Relation::Read, relation(identity, record, "person:tom"))
+                .expect("local grants lock must be healthy");
+        }
+    }
+    for person in ["tom", "dana"] {
+        grants
+            .grant_as(
+                Relation::Member,
+                relation(
+                    &format!("agent:{person}-bot"),
+                    &format!("person/person:{person}"),
+                    &format!("person:{person}"),
+                ),
+            )
+            .expect("local grants lock must be healthy");
+    }
 }

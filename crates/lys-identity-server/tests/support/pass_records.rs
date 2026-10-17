@@ -169,47 +169,7 @@ impl Fixture {
                 config.reviews_dir = None;
             },
             |config| {
-                let mut directory = open_directory(config)?;
-                let actor = Actor::new(
-                    config.administrator_binding()?,
-                    Provenance::new(AuthMethod::Oidc, 1),
-                );
-                let (person, _) = directory.register_person(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    Profile::new("Fixture person")?,
-                    1,
-                )?;
-                directory.bind_login(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    person,
-                    config.administrator_binding()?,
-                    1,
-                )?;
-                directory.transition(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    IdentityId::Person(person),
-                    Transition::Activate,
-                    "",
-                    1,
-                )?;
-                let (agent, _) = directory.register_agent(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    person,
-                    Profile::new("Fixture agent")?,
-                    1,
-                )?;
-                directory.transition(
-                    actor,
-                    OperationId::generate()?,
-                    IdentityId::Agent(agent),
-                    Transition::Activate,
-                    "",
-                    1,
-                )?;
+                let (person, agent) = active_pair(config)?;
                 let machine = operation()?;
                 let owner = OwnersFixture {
                     agent: agent.to_string(),
@@ -266,23 +226,7 @@ impl Fixture {
                 let launch = given.record.id;
                 let mut passes = Passes::open(config.log_dir.with_file_name("agent-passes.json"))?;
                 let pass = passes.issue(agent, &launch, &session)?;
-                let signed_in = Sessions::open(
-                    config
-                        .sessions_file
-                        .clone()
-                        .ok_or("fixture needs persisted sessions")?,
-                    config.session_seconds,
-                    config.secure_cookie,
-                )?;
-                let cookie = signed_in.begin(Actor::new(
-                    config.administrator_binding()?,
-                    Provenance::new(AuthMethod::Oidc, now()),
-                ))?;
-                let cookie = cookie
-                    .split(';')
-                    .next()
-                    .ok_or("fixture session cookie is absent")?
-                    .to_owned();
+                let cookie = signed_in_cookie(config)?;
                 Ok((agent, machine, session, launch, pass, cookie))
             },
         )
@@ -318,4 +262,74 @@ pub fn restore(file: &Path, earlier: &[u8]) -> TestResult {
     std::fs::remove_dir(file)?;
     std::fs::write(file, earlier)?;
     Ok(())
+}
+
+fn active_pair(
+    config: &lys_identity_server::config::Config,
+) -> Result<(lys_identity::PersonId, AgentId), Box<dyn Error>> {
+    let mut directory = open_directory(config)?;
+    let actor = Actor::new(
+        config.administrator_binding()?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let (person, _) = directory.register_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Fixture person")?,
+        1,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        config.administrator_binding()?,
+        1,
+    )?;
+    directory.transition(
+        actor.clone(),
+        OperationId::generate()?,
+        IdentityId::Person(person),
+        Transition::Activate,
+        "",
+        1,
+    )?;
+    let (agent, _) = directory.register_agent(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        Profile::new("Fixture agent")?,
+        1,
+    )?;
+    directory.transition(
+        actor,
+        OperationId::generate()?,
+        IdentityId::Agent(agent),
+        Transition::Activate,
+        "",
+        1,
+    )?;
+    Ok((person, agent))
+}
+
+fn signed_in_cookie(
+    config: &lys_identity_server::config::Config,
+) -> Result<String, Box<dyn Error>> {
+    let signed_in = Sessions::open(
+        config
+            .sessions_file
+            .clone()
+            .ok_or("fixture needs persisted sessions")?,
+        config.session_seconds,
+        config.secure_cookie,
+    )?;
+    let cookie = signed_in.begin(Actor::new(
+        config.administrator_binding()?,
+        Provenance::new(AuthMethod::Oidc, now()),
+    ))?;
+    let cookie = cookie
+        .split(';')
+        .next()
+        .ok_or("fixture session cookie is absent")?
+        .to_owned();
+    Ok(cookie)
 }

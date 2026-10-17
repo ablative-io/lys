@@ -120,56 +120,19 @@ fn exercise(
     sessions: &Arc<Sessions>,
     operation: Option<OperationRequest>,
 ) -> Result<(), Box<dyn Error>> {
-    let (mut pipe, mut reader) = UnixStream::pair()?;
-    pipe.set_nonblocking(true)?;
-    let buffer = [0_u8; 8192];
-    let mut filled = 0;
-    loop {
-        match pipe.write(&buffer) {
-            Ok(0) => return Err("input pipe closed before becoming full".into()),
-            Ok(written) => filled += written,
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
-            Err(error) => return Err(error.into()),
-        }
-    }
-    assert!(filled > 0);
+    let (pipe, mut reader, filled) = full_pipe()?;
     let (blocked, pipe_full) = mpsc::sync_channel(1);
     let (release, resume) = mpsc::sync_channel(1);
-    let terminal_input = {
-        let mut table = sessions.lock()?;
-        let live = table
-            .sessions
-            .get_mut("blocked")
-            .ok_or("blocked session missing")?
-            .live("blocked")?;
-        // Dropping the terminal input sends EOF; keep it alive through delivery.
-        let terminal_input = std::mem::replace(
-            &mut live.writer,
-            crate::input::Input::new(Box::new(GatedPipe {
-                pipe,
-                blocked,
-                resume,
-                entered: false,
-            })),
-        );
-        if operation.is_some() {
-            let tracking = crate::tracking::Tracking {
-                harness: crate::tracking::Harness::ClaudeCode,
-                adapter: crate::tracking::CLAUDE_ADAPTER.to_owned(),
-                version: "2.1.281".to_owned(),
-                config_home: "/".to_owned(),
-                context_window: 200_000,
-                profile_version: 1,
-                account: None,
-                requires_pre_tool: false,
-            };
-            tracking.checked()?;
-            let session = table.sessions.get_mut("blocked").ok_or("session missing")?;
-            session.guard.tracking = Some(tracking);
-            session.guard.idle = false;
-        }
-        terminal_input
-    };
+    let terminal_input = install_gated_input(
+        sessions,
+        operation.is_some(),
+        GatedPipe {
+            pipe,
+            blocked,
+            resume,
+            entered: false,
+        },
+    )?;
     let compact = matches!(operation, Some(OperationRequest::Compact { .. }));
     let writer = if let Some(request) = operation {
         let mut table = sessions.lock()?;
@@ -341,4 +304,54 @@ fn input_failure_is_named_and_answers_the_waiter() {
         }
         other => panic!("expected a named write failure, got {other:?}"),
     }
+}
+
+fn install_gated_input(
+    sessions: &Arc<Sessions>,
+    tracked: bool,
+    pipe: GatedPipe,
+) -> Result<crate::input::Input, Box<dyn Error>> {
+    let mut table = sessions.lock()?;
+    let live = table
+        .sessions
+        .get_mut("blocked")
+        .ok_or("blocked session missing")?
+        .live("blocked")?;
+    // Dropping the terminal input sends EOF; keep it alive through delivery.
+    let terminal_input =
+        std::mem::replace(&mut live.writer, crate::input::Input::new(Box::new(pipe)));
+    if tracked {
+        let tracking = crate::tracking::Tracking {
+            harness: crate::tracking::Harness::ClaudeCode,
+            adapter: crate::tracking::CLAUDE_ADAPTER.to_owned(),
+            version: "2.1.281".to_owned(),
+            config_home: "/".to_owned(),
+            context_window: 200_000,
+            profile_version: 1,
+            account: None,
+            requires_pre_tool: false,
+        };
+        tracking.checked()?;
+        let session = table.sessions.get_mut("blocked").ok_or("session missing")?;
+        session.guard.tracking = Some(tracking);
+        session.guard.idle = false;
+    }
+    Ok(terminal_input)
+}
+
+fn full_pipe() -> Result<(UnixStream, UnixStream, usize), Box<dyn Error>> {
+    let (mut pipe, reader) = UnixStream::pair()?;
+    pipe.set_nonblocking(true)?;
+    let buffer = [0_u8; 8192];
+    let mut filled = 0;
+    loop {
+        match pipe.write(&buffer) {
+            Ok(0) => return Err("input pipe closed before becoming full".into()),
+            Ok(written) => filled += written,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    assert!(filled > 0);
+    Ok((pipe, reader, filled))
 }

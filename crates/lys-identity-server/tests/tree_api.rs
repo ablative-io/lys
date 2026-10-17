@@ -307,59 +307,9 @@ async fn an_agent_lead_reads_descendants_and_other_members_without_gaining_mutat
 #[tokio::test]
 async fn summaries_use_reviewed_versions_reported_sessions_and_every_applicable_budget()
 -> TestResult {
-    use lys_core::Ed25519Identity;
-    use lys_identity_server::budgets_state::{
-        Act, Budget, Holder, HolderKind, Length, Measure, Period, Usage,
-    };
-    use lys_identity_server::budgets_store::BudgetStore;
-    use lys_identity_server::provisioning_store::{ProvisioningStore, Review, Version};
-    use lys_identity_server::runtime_state::{Report, Reported};
-    use lys_identity_server::runtime_store::RuntimeStore;
-    use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
     let team = operation()?;
-    let (mut service, (seeded, reviewed)) = Service::start_with(|config| {
-        let seeded = seed_configured(config,[ADMINISTRATOR,"another-subject"])?;
-        let agent = seeded.people[0].agents[0].id.to_string();
-        let other = seeded.people[1].agents[0].id.to_string();
-        let person = seeded.people[0].id.to_string();
-        let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-        let mut profiles = ProvisioningStore::open(config.provisioning_file.as_deref().ok_or("no profiles file")?)?;
-        let description = json!({"models":{"minimum":0,"maximum":null,"further_encoding":{"kind":"array"}},
-            "permissions":{"modes":[],"rule_forms":[]}, "mcp":{"transports":[],"working_directory":false,"handle_variables":false,"channel_policies":[]},
-            "rendering_contract":"recorded/template-v1"});
-        let first: Version = serde_json::from_value(json!({"number":1,"operation":operation()?,"set_by":person,"set_at":1,
-            "settings":{"model_access":["primary-model"],"tools":[],"skills":[],"mcp_servers":[{"name":"kept-server","url":"https://server.invalid/mcp"}],
-                "instructions":"private instructions","note":"","harness":{"name":"declared build","description":description,"program":"/opt/seat/bin/program","package":"pinned-build"}}}))?;
-        let reviewed = first.operation.clone();
-        assert_eq!(profiles.set(&agent,0,first.clone())?,1);
-        profiles.review(&agent,1,Review {operation:operation()?,by:person.clone(),at:2})?;
-        let second = Version {number:2, operation:operation()?, settings:lys_identity_server::provisioning_store::Settings {model_access:vec!["unreviewed-model".to_owned()], ..first.settings}, ..first};
-        assert_eq!(profiles.set(&agent,1,second)?,2);
-        let empty: Version = serde_json::from_value(json!({"number":1,"operation":operation()?,"set_by":person,"set_at":1,
-            "settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":""}}))?;
-        assert_eq!(profiles.set(&other,0,empty)?,1);
-        profiles.review(&other,1,Review {operation:operation()?,by:person.clone(),at:2})?;
-        let mut runtime = RuntimeStore::open(config.runtime_dir.as_deref().ok_or("no runtime directory")?,Arc::clone(&key))?;
-        for (id, session) in [(&agent,"running-session"),(&other,"unconfirmed-session")] {
-            runtime.report(Report {operation:operation()?,session:session.to_owned(),agent:Some(id.clone()),machine:"recorded-machine".to_owned(),state:Reported::Starting,
-                what:String::new(),confirmation:String::new(),reported_by:person.clone(),at:1,launch:None})?;
-        }
-        runtime.report(Report {operation:operation()?,session:"running-session".to_owned(),agent:Some(agent.clone()),machine:"recorded-machine".to_owned(),state:Reported::Running,
-            what:String::new(),confirmation:String::new(),reported_by:person.clone(),at:2,launch:None})?;
-        let mut budgets = BudgetStore::open(config.budgets_dir.as_deref().ok_or("no budgets directory")?,key)?;
-        for (kind,id,measure,limit) in [(HolderKind::Agent,agent.clone(),Measure::Tokens,1000), (HolderKind::Person,person.clone(),Measure::RunningMs,9000),
-            (HolderKind::Agent,agent.clone(),Measure::ContextPercent,80), (HolderKind::Agent,other,Measure::Tokens,300),
-            (HolderKind::Team,team.clone(),Measure::Tokens,2000)] {
-            budgets.set_confirmed(Budget {holder:Holder {kind,id},measure,limit,period:if measure == Measure::ContextPercent {None} else {Some(Period {length:Length::Week,zone:"UTC".to_owned()})},
-                act:Act::Tell,version:1,by:person.clone(),at:1},0)?;
-        }
-        let at_ms = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
-        assert!(budgets.charge(Usage {event:operation()?,agent:agent.clone(),at_ms,tokens:42,running_ms:77,session:Some("running-session".to_owned()),context_percent:Some(55),crossed:Vec::new(),..Usage::default()})?);
-        assert!(budgets.charge(Usage {event:operation()?,agent,at_ms,tokens:0,running_ms:0,session:Some("running-session".to_owned()),context_percent:Some(35),crossed:Vec::new(),..Usage::default()})?);
-        Ok((seeded,reviewed))
-    }).await?;
+    let (mut service, (seeded, reviewed)) =
+        Service::start_with(|config| seed_summaries(config, &team)).await?;
     let cookie = service.sign_in(login(ADMINISTRATOR)).await?;
     let agent = seeded.people[0].agents[0].id.to_string();
     let other = seeded.people[1].agents[0].id.to_string();
@@ -455,5 +405,197 @@ async fn summaries_use_reviewed_versions_reported_sessions_and_every_applicable_
     );
     service.restart().await?;
     assert_eq!(service.get("/tree", Some(&cookie)).await?.1, answer);
+    Ok(())
+}
+
+fn seed_summaries(
+    config: &lys_identity_server::config::Config,
+    team: &str,
+) -> Result<(lys_identity_server::dev_seed::Seeded, String), Box<dyn std::error::Error>> {
+    use lys_core::Ed25519Identity;
+    use lys_identity_server::runtime_state::{Report, Reported};
+    use lys_identity_server::runtime_store::RuntimeStore;
+    use std::sync::Arc;
+
+    let seeded = seed_configured(config, [ADMINISTRATOR, "another-subject"])?;
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let other = seeded.people[1].agents[0].id.to_string();
+    let person = seeded.people[0].id.to_string();
+    let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+    let reviewed = summary_profiles(
+        config
+            .provisioning_file
+            .as_deref()
+            .ok_or("no profiles file")?,
+        &agent,
+        &other,
+        &person,
+    )?;
+    let mut runtime = RuntimeStore::open(
+        config
+            .runtime_dir
+            .as_deref()
+            .ok_or("no runtime directory")?,
+        Arc::clone(&key),
+    )?;
+    for (id, session) in [(&agent, "running-session"), (&other, "unconfirmed-session")] {
+        runtime.report(Report {
+            operation: operation()?,
+            session: session.to_owned(),
+            agent: Some(id.clone()),
+            machine: "recorded-machine".to_owned(),
+            state: Reported::Starting,
+            what: String::new(),
+            confirmation: String::new(),
+            reported_by: person.clone(),
+            at: 1,
+            launch: None,
+        })?;
+    }
+    runtime.report(Report {
+        operation: operation()?,
+        session: "running-session".to_owned(),
+        agent: Some(agent.clone()),
+        machine: "recorded-machine".to_owned(),
+        state: Reported::Running,
+        what: String::new(),
+        confirmation: String::new(),
+        reported_by: person.clone(),
+        at: 2,
+        launch: None,
+    })?;
+    seed_summary_budgets(config, key, (agent, other, person), team)?;
+    Ok((seeded, reviewed))
+}
+
+fn summary_profiles(
+    path: &std::path::Path,
+    agent: &str,
+    other: &str,
+    person: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    use lys_identity_server::provisioning_store::{ProvisioningStore, Review, Version};
+    let mut profiles = ProvisioningStore::open(path)?;
+    let description = json!({"models":{"minimum":0,"maximum":null,"further_encoding":{"kind":"array"}},
+        "permissions":{"modes":[],"rule_forms":[]}, "mcp":{"transports":[],"working_directory":false,"handle_variables":false,"channel_policies":[]},
+        "rendering_contract":"recorded/template-v1"});
+    let first: Version = serde_json::from_value(
+        json!({"number":1,"operation":operation()?,"set_by":person,"set_at":1,
+        "settings":{"model_access":["primary-model"],"tools":[],"skills":[],"mcp_servers":[{"name":"kept-server","url":"https://server.invalid/mcp"}],
+            "instructions":"private instructions","note":"","harness":{"name":"declared build","description":description,"program":"/opt/seat/bin/program","package":"pinned-build"}}}),
+    )?;
+    let reviewed = first.operation.clone();
+    assert_eq!(profiles.set(agent, 0, first.clone())?, 1);
+    profiles.review(
+        agent,
+        1,
+        Review {
+            operation: operation()?,
+            by: person.to_owned(),
+            at: 2,
+        },
+    )?;
+    let second = Version {
+        number: 2,
+        operation: operation()?,
+        settings: lys_identity_server::provisioning_store::Settings {
+            model_access: vec!["unreviewed-model".to_owned()],
+            ..first.settings
+        },
+        ..first
+    };
+    assert_eq!(profiles.set(agent, 1, second)?, 2);
+    let empty: Version = serde_json::from_value(
+        json!({"number":1,"operation":operation()?,"set_by":person,"set_at":1,
+        "settings":{"model_access":[],"tools":[],"skills":[],"mcp_servers":[],"instructions":"","note":""}}),
+    )?;
+    assert_eq!(profiles.set(other, 0, empty)?, 1);
+    profiles.review(
+        other,
+        1,
+        Review {
+            operation: operation()?,
+            by: person.to_owned(),
+            at: 2,
+        },
+    )?;
+    Ok(reviewed)
+}
+
+fn seed_summary_budgets(
+    config: &lys_identity_server::config::Config,
+    key: std::sync::Arc<lys_core::Ed25519Identity>,
+    identities: (String, String, String),
+    team: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use lys_identity_server::budgets_state::{
+        Act, Budget, Holder, HolderKind, Length, Measure, Period, Usage,
+    };
+    use lys_identity_server::budgets_store::BudgetStore;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let (agent, other, person) = identities;
+    let mut budgets = BudgetStore::open(
+        config
+            .budgets_dir
+            .as_deref()
+            .ok_or("no budgets directory")?,
+        key,
+    )?;
+    for (kind, id, measure, limit) in [
+        (HolderKind::Agent, agent.clone(), Measure::Tokens, 1000),
+        (HolderKind::Person, person.clone(), Measure::RunningMs, 9000),
+        (
+            HolderKind::Agent,
+            agent.clone(),
+            Measure::ContextPercent,
+            80,
+        ),
+        (HolderKind::Agent, other, Measure::Tokens, 300),
+        (HolderKind::Team, team.to_owned(), Measure::Tokens, 2000),
+    ] {
+        budgets.set_confirmed(
+            Budget {
+                holder: Holder { kind, id },
+                measure,
+                limit,
+                period: if measure == Measure::ContextPercent {
+                    None
+                } else {
+                    Some(Period {
+                        length: Length::Week,
+                        zone: "UTC".to_owned(),
+                    })
+                },
+                act: Act::Tell,
+                version: 1,
+                by: person.clone(),
+                at: 1,
+            },
+            0,
+        )?;
+    }
+    let at_ms = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
+    assert!(budgets.charge(Usage {
+        event: operation()?,
+        agent: agent.clone(),
+        at_ms,
+        tokens: 42,
+        running_ms: 77,
+        session: Some("running-session".to_owned()),
+        context_percent: Some(55),
+        crossed: Vec::new(),
+        ..Usage::default()
+    })?);
+    assert!(budgets.charge(Usage {
+        event: operation()?,
+        agent,
+        at_ms,
+        tokens: 0,
+        running_ms: 0,
+        session: Some("running-session".to_owned()),
+        context_percent: Some(35),
+        crossed: Vec::new(),
+        ..Usage::default()
+    })?);
     Ok(())
 }

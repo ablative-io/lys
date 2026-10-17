@@ -80,37 +80,10 @@ fn fixture(
         by,
         at: 2,
     }))?;
-    let role = format!("op-{:032x}", 104);
-    let mut roles = RolesStore::open(config.roles_file.as_deref().ok_or("roles disabled")?)?;
-    roles.make(
-        "Runner".to_owned(),
-        Version {
-            number: 1,
-            operation: role.clone(),
-            words: Words {
-                responsibilities: String::new(),
-                goals: String::new(),
-                practice: String::new(),
-                profile: String::new(),
-                grant_templates: Vec::new(),
-                note: String::new(),
-            },
-            made_by: owner.clone(),
-            made_at: 1,
-        },
-    )?;
-    roles.assign(
-        &role,
-        Holding {
-            operation: format!("op-{:032x}", 105),
-            holder: agent.clone(),
-            version: 1,
-            assigned_by: owner.clone(),
-            assigned_at: 1,
-            ends_at: None,
-            moves: Vec::new(),
-            ended: None,
-        },
+    let role = assigned_role(
+        config.roles_file.as_deref().ok_or("roles disabled")?,
+        &owner,
+        &agent,
     )?;
     let mut network =
         NetworkStore::open(config.network_file.as_deref().ok_or("network disabled")?)?;
@@ -200,4 +173,44 @@ async fn personal_network_filters_before_paging_and_counts() -> Outcome {
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "NoPerson");
     Ok(())
+}
+
+fn assigned_role(
+    file: &std::path::Path,
+    owner: &str,
+    agent: &str,
+) -> Result<String, Box<dyn Error>> {
+    let role = format!("op-{:032x}", 104);
+    let mut roles = RolesStore::open(file)?;
+    roles.make(
+        "Runner".to_owned(),
+        Version {
+            number: 1,
+            operation: role.clone(),
+            words: Words {
+                responsibilities: String::new(),
+                goals: String::new(),
+                practice: String::new(),
+                profile: String::new(),
+                grant_templates: Vec::new(),
+                note: String::new(),
+            },
+            made_by: owner.to_owned(),
+            made_at: 1,
+        },
+    )?;
+    roles.assign(
+        &role,
+        Holding {
+            operation: format!("op-{:032x}", 105),
+            holder: agent.to_owned(),
+            version: 1,
+            assigned_by: owner.to_owned(),
+            assigned_at: 1,
+            ends_at: None,
+            moves: Vec::new(),
+            ended: None,
+        },
+    )?;
+    Ok(role)
 }

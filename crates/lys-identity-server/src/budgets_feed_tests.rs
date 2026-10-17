@@ -230,59 +230,7 @@ fn budgets_context_keeps_ties_and_replacement_because_gaps_preserve_the_last_rea
     };
     let agents = std::collections::BTreeSet::from(["agent".to_owned()]);
     let mut held = Held::default();
-    for (event, session, at, figure, source, expected, declared, read_at) in [
-        (
-            "first",
-            "one",
-            1,
-            Some(60),
-            Some("profile"),
-            Some(60),
-            Some("profile"),
-            1,
-        ),
-        (
-            "tie",
-            "two",
-            2,
-            Some(60),
-            Some("model"),
-            Some(60),
-            Some("profile"),
-            1,
-        ),
-        (
-            "lower",
-            "one",
-            3,
-            Some(40),
-            Some("profile"),
-            Some(60),
-            Some("model"),
-            2,
-        ),
-        ("gap", "two", 4, None, None, Some(60), Some("model"), 2),
-        (
-            "restore",
-            "two",
-            5,
-            Some(20),
-            Some("model"),
-            Some(40),
-            Some("profile"),
-            3,
-        ),
-        (
-            "older",
-            "two",
-            1,
-            Some(90),
-            Some("model"),
-            Some(40),
-            Some("profile"),
-            3,
-        ),
-    ] {
+    for (event, session, at, figure, source, expected, declared, read_at) in context_readings() {
         let usage: Usage = serde_json::from_value(serde_json::json!({
             "event":event, "agent":"agent", "at_ms":at, "tokens":0, "running_ms":0,
             "session":session, "context_percent":figure, "context_source":source
@@ -491,4 +439,70 @@ fn partial_calls_keep_their_independent_components_and_gaps_through_a_budget_sna
         assert_eq!(part.missing_calls, missing);
     }
     Ok(())
+}
+
+type ContextCase = (
+    &'static str,
+    &'static str,
+    i64,
+    Option<u64>,
+    Option<&'static str>,
+    Option<u64>,
+    Option<&'static str>,
+    i64,
+);
+fn context_readings() -> Vec<ContextCase> {
+    vec![
+        (
+            "first",
+            "one",
+            1,
+            Some(60),
+            Some("profile"),
+            Some(60),
+            Some("profile"),
+            1,
+        ),
+        (
+            "tie",
+            "two",
+            2,
+            Some(60),
+            Some("model"),
+            Some(60),
+            Some("profile"),
+            1,
+        ),
+        (
+            "lower",
+            "one",
+            3,
+            Some(40),
+            Some("profile"),
+            Some(60),
+            Some("model"),
+            2,
+        ),
+        ("gap", "two", 4, None, None, Some(60), Some("model"), 2),
+        (
+            "restore",
+            "two",
+            5,
+            Some(20),
+            Some("model"),
+            Some(40),
+            Some("profile"),
+            3,
+        ),
+        (
+            "older",
+            "two",
+            1,
+            Some(90),
+            Some("model"),
+            Some(40),
+            Some("profile"),
+            3,
+        ),
+    ]
 }

@@ -408,51 +408,8 @@ exit "$FIXTURE_RESULT"
 fn exercise_hook(macos: bool) -> Result<(), Box<dyn Error>> {
     let directory = hook_fixture()?;
     let root = directory.path();
-    let script = if macos {
-        MAC_POSTINSTALL
-            .replace(
-                "PATH=/usr/bin:/bin:/usr/sbin:/sbin",
-                "PATH=\"$FIXTURE_BIN:/usr/bin:/bin:/usr/sbin:/sbin\"",
-            )
-            .replace(
-                "pending='/Library/Application Support/Lys/runner-pending.json'",
-                "pending=\"$FIXTURE_PENDING\"",
-            )
-            .replace("/usr/bin/stat", "stat")
-            .replace("/usr/bin/id", "id")
-            .replace("/usr/bin/mktemp", "mktemp")
-            .replace("/usr/sbin/chown", "chown")
-            .replace("/bin/chmod", "chmod")
-            .replace("/usr/bin/install", "install")
-            .replace("/bin/launchctl", "launchctl")
-    } else {
-        LINUX_INSTALL
-            .replace(
-                "PATH=/usr/sbin:/usr/bin:/sbin:/bin",
-                "PATH=\"$FIXTURE_BIN:/usr/sbin:/usr/bin:/sbin:/bin\"",
-            )
-            .replace(
-                "pending=/usr/lib/lys/runner-pending.json",
-                "pending=\"$FIXTURE_PENDING\"",
-            )
-            .replace("/run/user/$uid", "$FIXTURE_RUNTIME")
-    };
-    let cases = if macos {
-        vec![
-            ("", "", "alice", 0, true, "yes"),
-            ("", "", "alice", 9, true, "no"),
-            ("", "", "alice", 9, true, "yes"),
-        ]
-    } else {
-        vec![
-            ("alice", "1002", "alice", 0, true, "yes"),
-            ("", "1002", "graphical", 0, true, "yes"),
-            ("", "", "alice", 0, true, "yes"),
-            ("alice", "", "alice", 9, true, "no"),
-            ("alice", "", "alice", 9, false, "yes"),
-            ("", "", "", 0, false, "no"),
-        ]
-    };
+    let script = hook_script(macos);
+    let cases = hook_cases(macos);
     for (index, (sudo, graphical, expected, result, runtime, consume)) in
         cases.into_iter().enumerate()
     {
@@ -632,4 +589,63 @@ fn pkgbuild_produces_a_flat_package_without_running_install_hooks() -> Result<()
     assert!(bytes.starts_with(b"xar!"));
     directory.close()?;
     Ok(())
+}
+
+fn hook_script(macos: bool) -> String {
+    if macos {
+        MAC_POSTINSTALL
+            .replace(
+                "PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+                "PATH=\"$FIXTURE_BIN:/usr/bin:/bin:/usr/sbin:/sbin\"",
+            )
+            .replace(
+                "pending='/Library/Application Support/Lys/runner-pending.json'",
+                "pending=\"$FIXTURE_PENDING\"",
+            )
+            .replace("/usr/bin/stat", "stat")
+            .replace("/usr/bin/id", "id")
+            .replace("/usr/bin/mktemp", "mktemp")
+            .replace("/usr/sbin/chown", "chown")
+            .replace("/bin/chmod", "chmod")
+            .replace("/usr/bin/install", "install")
+            .replace("/bin/launchctl", "launchctl")
+    } else {
+        LINUX_INSTALL
+            .replace(
+                "PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+                "PATH=\"$FIXTURE_BIN:/usr/sbin:/usr/bin:/sbin:/bin\"",
+            )
+            .replace(
+                "pending=/usr/lib/lys/runner-pending.json",
+                "pending=\"$FIXTURE_PENDING\"",
+            )
+            .replace("/run/user/$uid", "$FIXTURE_RUNTIME")
+    }
+}
+
+type HookCase = (
+    &'static str,
+    &'static str,
+    &'static str,
+    i32,
+    bool,
+    &'static str,
+);
+fn hook_cases(macos: bool) -> Vec<HookCase> {
+    if macos {
+        vec![
+            ("", "", "alice", 0, true, "yes"),
+            ("", "", "alice", 9, true, "no"),
+            ("", "", "alice", 9, true, "yes"),
+        ]
+    } else {
+        vec![
+            ("alice", "1002", "alice", 0, true, "yes"),
+            ("", "1002", "graphical", 0, true, "yes"),
+            ("", "", "alice", 0, true, "yes"),
+            ("alice", "", "alice", 9, true, "no"),
+            ("alice", "", "alice", 9, false, "yes"),
+            ("", "", "", 0, false, "no"),
+        ]
+    }
 }

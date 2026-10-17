@@ -63,60 +63,7 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
     let key = table.server_key.public_key_bytes();
     let held_session = session.clone();
     let responder = std::thread::spawn(move || -> Result<(), String> {
-        let mut observed = 0;
-        while observed < 1 {
-            let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
-            let greeting = Greeting::fresh("00");
-            let mut writer = &stream;
-            writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
-            let mut line = String::new();
-            BufReader::new(&stream)
-                .read_line(&mut line)
-                .map_err(|error| error.to_string())?;
-            let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
-            let answer = match act {
-                Act::Feed { .. } => Answer::Refused {
-                    refusal: "feed_not_kept".to_owned(),
-                    words: "this fixture keeps no feed".to_owned(),
-                    oldest: None,
-                },
-                Act::Liveness { session: None } => Answer::Liveness {
-                    sessions: Vec::new(),
-                },
-                Act::GrantChannel => Answer::GrantChannel,
-                Act::Owned => Answer::Owned {
-                    owners: Vec::new(),
-                    unreachable: Vec::new(),
-                },
-                Act::Liveness {
-                    session: Some(session),
-                } if session == held_session => {
-                    observed += 1;
-                    Answer::Liveness {
-                        sessions: vec![lys_runner::liveness::LivenessView {
-                            session,
-                            pid: Some(4242),
-                            alive: true,
-                            harness_session: Some(conversation.to_owned()),
-                            turn_active: false,
-                            last_signal_at: None,
-                            started_at: 1,
-                            ended: false,
-                            harness: lys_runner::liveness::HarnessLiveness {
-                                managed: true,
-                                started_fresh: false,
-                            },
-                        }],
-                    }
-                }
-                other => return Err(format!("unexpected runner request {other:?}")),
-            };
-            writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
-        }
-        if observed != 1 {
-            return Err(format!("liveness observed {observed} times"));
-        }
-        Ok(())
+        serve_held(&listener, key, &held_session, conversation)
     });
     let started = table
         .service
@@ -144,4 +91,66 @@ async fn start_held_conversation_from_runner_liveness_is_recorded() -> Result<()
     assert_eq!(status, 200, "{recorded}");
     assert_eq!(recorded, answer["start_record"]);
     table.close()
+}
+
+fn serve_held(
+    listener: &UnixListener,
+    key: [u8; 32],
+    held_session: &str,
+    conversation: &str,
+) -> Result<(), String> {
+    let mut observed = 0;
+    while observed < 1 {
+        let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        let greeting = Greeting::fresh("00");
+        let mut writer = &stream;
+        writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
+        let mut line = String::new();
+        BufReader::new(&stream)
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
+        let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
+        let answer = match act {
+            Act::Feed { .. } => Answer::Refused {
+                refusal: "feed_not_kept".to_owned(),
+                words: "this fixture keeps no feed".to_owned(),
+                oldest: None,
+            },
+            Act::Liveness { session: None } => Answer::Liveness {
+                sessions: Vec::new(),
+            },
+            Act::GrantChannel => Answer::GrantChannel,
+            Act::Owned => Answer::Owned {
+                owners: Vec::new(),
+                unreachable: Vec::new(),
+            },
+            Act::Liveness {
+                session: Some(session),
+            } if session == held_session => {
+                observed += 1;
+                Answer::Liveness {
+                    sessions: vec![lys_runner::liveness::LivenessView {
+                        session,
+                        pid: Some(4242),
+                        alive: true,
+                        harness_session: Some(conversation.to_owned()),
+                        turn_active: false,
+                        last_signal_at: None,
+                        started_at: 1,
+                        ended: false,
+                        harness: lys_runner::liveness::HarnessLiveness {
+                            managed: true,
+                            started_fresh: false,
+                        },
+                    }],
+                }
+            }
+            other => return Err(format!("unexpected runner request {other:?}")),
+        };
+        writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
+    }
+    if observed != 1 {
+        return Err(format!("liveness observed {observed} times"));
+    }
+    Ok(())
 }

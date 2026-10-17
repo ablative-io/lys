@@ -307,33 +307,7 @@ async fn seat_import_monitor_maps_records() -> TestResult {
 
 #[tokio::test]
 async fn seat_import_monitor_refuses_incomplete() -> TestResult {
-    let cases: [(&str, Value, &str); 5] = [
-        (
-            "/api/budgets",
-            json!({"budgets": [], "invalid": [{"key": "sess-x", "reason": "two transports"}]}),
-            SOURCE_INCOMPLETE,
-        ),
-        (
-            "/api/budgets",
-            json!({"budgets": [{"id": "sess-w", "name": "waffles", "budget_error": "inform level 90 is above compact_at 85"}], "invalid": []}),
-            SOURCE_INCOMPLETE,
-        ),
-        (
-            "/api/rules",
-            json!({"rules": [], "skipped_lines": 2, "skips": []}),
-            SOURCE_INCOMPLETE,
-        ),
-        (
-            "/api/scheduled-messages",
-            json!({"schedules": [], "error": null, "health": {"skips": [], "held": ["night"]}}),
-            SOURCE_INCOMPLETE,
-        ),
-        (
-            "/api/prompt-settings",
-            json!({"defaults": {}}),
-            SOURCE_INCOMPLETE,
-        ),
-    ];
+    let cases = incomplete_monitor_answers();
     for (path, body, name) in cases {
         let mut answers = recorded();
         answers.answers.insert(path, (StatusCode::OK, body));
@@ -546,4 +520,34 @@ async fn seat_import_monitor_revision_projection() -> TestResult {
         "the wording is identical while the native revision moved"
     );
     Ok(())
+}
+
+fn incomplete_monitor_answers() -> Vec<(&'static str, Value, &'static str)> {
+    vec![
+        (
+            "/api/budgets",
+            json!({"budgets": [], "invalid": [{"key": "sess-x", "reason": "two transports"}]}),
+            SOURCE_INCOMPLETE,
+        ),
+        (
+            "/api/budgets",
+            json!({"budgets": [{"id": "sess-w", "name": "waffles", "budget_error": "inform level 90 is above compact_at 85"}], "invalid": []}),
+            SOURCE_INCOMPLETE,
+        ),
+        (
+            "/api/rules",
+            json!({"rules": [], "skipped_lines": 2, "skips": []}),
+            SOURCE_INCOMPLETE,
+        ),
+        (
+            "/api/scheduled-messages",
+            json!({"schedules": [], "error": null, "health": {"skips": [], "held": ["night"]}}),
+            SOURCE_INCOMPLETE,
+        ),
+        (
+            "/api/prompt-settings",
+            json!({"defaults": {}}),
+            SOURCE_INCOMPLETE,
+        ),
+    ]
 }

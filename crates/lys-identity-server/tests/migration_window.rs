@@ -150,7 +150,12 @@ fn seed(config: &Config) -> ResultOf<Seed> {
     })
 }
 
-fn seed_budgets(config: &Config, key: &Ed25519Identity, person: &str, by: String) -> ResultOf<PathBuf> {
+fn seed_budgets(
+    config: &Config,
+    key: &Ed25519Identity,
+    person: &str,
+    by: String,
+) -> ResultOf<PathBuf> {
     let earlier = Budget {
         holder: Holder {
             kind: HolderKind::Person,

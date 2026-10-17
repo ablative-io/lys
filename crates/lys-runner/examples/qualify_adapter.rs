@@ -235,39 +235,16 @@ async fn protocol(
 ) -> Result<()> {
     let mut controller =
         Controller::new(binding.clone(), transport).map_err(|error| error.to_string())?;
-    let bootstrap = controller.bootstrap();
-    let frame = &bootstrap
-        .dispatches
-        .first()
-        .ok_or("qualification_initialize_missing")?
-        .frame;
-    let correlation = frame
-        .get("request_id")
-        .or_else(|| frame.get("id"))
-        .and_then(Value::as_str)
-        .ok_or("qualification_initialize_uncorrelated")?
-        .to_owned();
     let mut proof = None;
-    owned.write(&bootstrap)?;
-    loop {
-        let update = ingest(
-            owned,
-            &mut controller,
-            &binding,
-            cancel,
-            transport,
-            &mut proof,
-            None,
-        )
-        .await?;
-        if update
-            .events
-            .iter()
-            .any(|event| event.event == "control_bound")
-        {
-            break;
-        }
-    }
+    let correlation = bind_protocol(
+        owned,
+        &mut controller,
+        &binding,
+        cancel,
+        transport,
+        &mut proof,
+    )
+    .await?;
     evidence.record("bound", json!({"correlation":correlation}))?;
     let pending = Pending::new(
         "qualification-reminder".to_owned(),
@@ -348,6 +325,40 @@ async fn protocol(
     }
 
     evidence.record("compaction", json!({"evidence":if transport == Transport::Claude {"compact_boundary"} else {"ContextCompaction"},"turn_completed":true}))
+}
+
+async fn bind_protocol(
+    owned: &mut Owned,
+    controller: &mut Controller,
+    binding: &Binding,
+    cancel: &mut Cancellation,
+    transport: Transport,
+    proof: &mut Option<String>,
+) -> Result<String> {
+    let bootstrap = controller.bootstrap();
+    let frame = &bootstrap
+        .dispatches
+        .first()
+        .ok_or("qualification_initialize_missing")?
+        .frame;
+    let correlation = frame
+        .get("request_id")
+        .or_else(|| frame.get("id"))
+        .and_then(Value::as_str)
+        .ok_or("qualification_initialize_uncorrelated")?
+        .to_owned();
+    owned.write(&bootstrap)?;
+    loop {
+        let update = ingest(owned, controller, binding, cancel, transport, proof, None).await?;
+        if update
+            .events
+            .iter()
+            .any(|event| event.event == "control_bound")
+        {
+            break;
+        }
+    }
+    Ok(correlation)
 }
 
 async fn probe_exit(

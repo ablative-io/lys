@@ -59,7 +59,7 @@ async fn optional_native_ids_validate_and_a_named_conversation_is_resumed_by_its
             .liveness(Some(session))?;
         assert_eq!(live.len(), 1);
         assert_eq!(live[0].harness_session.as_deref(), Some(native));
-        assert!(live[0].alive && !live[0].managed && !live[0].ended);
+        assert!(live[0].alive && !live[0].harness.managed && !live[0].ended);
         let (status, repeated) = table.service.post(path, Some(&table.ada), &request).await?;
         assert_eq!(status, 200, "{repeated}");
         assert_eq!(repeated["session"], reply["session"]);

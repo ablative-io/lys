@@ -141,58 +141,7 @@ macro_rules! refusals_follow_retry {
                         })
                     },
                 ));
-                let mut context = Context::from_waker(Waker::noop());
-                assert!(
-                    follow.as_mut().poll(&mut context).is_pending(),
-                    "a refused follow ended instead of scheduling a retry"
-                );
-                assert_eq!(calls.load(Ordering::SeqCst), 1);
-                assert_eq!(*held(&delays), [Duration::from_secs(1)]);
-                assert!(
-                    !table
-                        .state
-                        .runners
-                        .links()
-                        .begin($crate::runner_links::Link::Feed, "machine"),
-                    "the retry retained the follow link"
-                );
-                clock.store(999, Ordering::SeqCst);
-                assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(
-                    calls.load(Ordering::SeqCst),
-                    1,
-                    "no retry before the deadline"
-                );
-                clock.store(1000, Ordering::SeqCst);
-                assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(
-                    calls.load(Ordering::SeqCst),
-                    2,
-                    "the refused follow restarted at one second"
-                );
-                assert_eq!(
-                    *held(&delays),
-                    [Duration::from_secs(1), Duration::from_secs(2)]
-                );
-                clock.store(2999, Ordering::SeqCst);
-                assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(calls.load(Ordering::SeqCst), 2);
-                clock.store(3000, Ordering::SeqCst);
-                assert!(follow.as_mut().poll(&mut context).is_pending());
-                assert_eq!(
-                    calls.load(Ordering::SeqCst),
-                    4,
-                    "a successful page was followed immediately"
-                );
-                assert_eq!(
-                    *held(&delays),
-                    [
-                        Duration::from_secs(1),
-                        Duration::from_secs(2),
-                        Duration::from_secs(1)
-                    ],
-                    "success reset the backoff"
-                );
+                poll_recovery(&mut follow, &clock, &calls, &delays, &table)?;
                 $crate::budgets_api::with_budgets(&table.state, |store| {
                     assert_eq!(
                         store
@@ -266,6 +215,67 @@ macro_rules! refusals_follow_retry {
             assert_eq!(*held(&delays), [1, 2, 4, 8, 16, 32, 60, 60]);
             drop(follow);
             table.finish().await
+        }
+        fn poll_recovery<F: Future>(
+            follow: &mut std::pin::Pin<Box<F>>,
+            clock: &AtomicU64,
+            calls: &AtomicUsize,
+            delays: &Mutex<Vec<Duration>>,
+            table: &$crate::budgets_feed::entry_tests::Fixture,
+        ) -> TestResult {
+            let mut context = Context::from_waker(Waker::noop());
+            assert!(
+                follow.as_mut().poll(&mut context).is_pending(),
+                "a refused follow ended instead of scheduling a retry"
+            );
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_eq!(*held(delays), [Duration::from_secs(1)]);
+            assert!(
+                !table
+                    .state
+                    .runners
+                    .links()
+                    .begin($crate::runner_links::Link::Feed, "machine"),
+                "the retry retained the follow link"
+            );
+            clock.store(999, Ordering::SeqCst);
+            assert!(follow.as_mut().poll(&mut context).is_pending());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "no retry before the deadline"
+            );
+            clock.store(1000, Ordering::SeqCst);
+            assert!(follow.as_mut().poll(&mut context).is_pending());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                2,
+                "the refused follow restarted at one second"
+            );
+            assert_eq!(
+                *held(delays),
+                [Duration::from_secs(1), Duration::from_secs(2)]
+            );
+            clock.store(2999, Ordering::SeqCst);
+            assert!(follow.as_mut().poll(&mut context).is_pending());
+            assert_eq!(calls.load(Ordering::SeqCst), 2);
+            clock.store(3000, Ordering::SeqCst);
+            assert!(follow.as_mut().poll(&mut context).is_pending());
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                4,
+                "a successful page was followed immediately"
+            );
+            assert_eq!(
+                *held(delays),
+                [
+                    Duration::from_secs(1),
+                    Duration::from_secs(2),
+                    Duration::from_secs(1)
+                ],
+                "success reset the backoff"
+            );
+            Ok(())
         }
     };
 }

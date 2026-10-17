@@ -438,23 +438,17 @@ async fn assert_route_refusals(table: &Table, at: u64) -> TestResult {
         .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "schedule_unknown");
+    let malformed = Table::body(&table.beas_agent, 1)?;
     let (status, refused) = table
         .service
-        .post(
-            "/schedules",
-            Some(&table.ada),
-            &Table::body(&table.beas_agent, 1)?,
-        )
+        .post("/schedules", Some(&table.ada), &malformed)
         .await?;
     assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "schedule_malformed");
+    let invisible = Table::body(&table.adas_agent, at)?;
     let (status, refused) = table
         .service
-        .post(
-            "/schedules",
-            Some(&table.bea),
-            &Table::body(&table.adas_agent, at)?,
-        )
+        .post("/schedules", Some(&table.bea), &invisible)
         .await?;
     assert_eq!(status, 404, "{refused}");
     assert_eq!(refused["refusal"], "AgentNotVisible");
@@ -471,13 +465,10 @@ async fn assert_route_refusals(table: &Table, at: u64) -> TestResult {
     assert_eq!(refused["refusal"], "NotSignedIn");
 
     // Bea does not see a schedule on Ada's agent.
+    let visible = Table::body(&table.adas_agent, at)?;
     let (status, adas) = table
         .service
-        .post(
-            "/schedules",
-            Some(&table.ada),
-            &Table::body(&table.adas_agent, at)?,
-        )
+        .post("/schedules", Some(&table.ada), &visible)
         .await?;
     assert_eq!(status, 200, "{adas}");
     let adas_id = adas["schedule"]["id"]

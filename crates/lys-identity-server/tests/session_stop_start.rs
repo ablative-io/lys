@@ -60,94 +60,7 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
     let lifetime = Lifetime::new(&socket);
     let ended = lifetime.signal();
     let responding = std::thread::spawn(move || -> Result<(usize, usize), String> {
-        let result = (|| -> Result<(usize, usize), Box<dyn Error>> {
-            let (mut starts, mut ends) = (0, 0);
-            let mut native: std::collections::BTreeMap<String, String> =
-                std::collections::BTreeMap::new();
-            let mut channels = Vec::new();
-            loop {
-                let (stream, _) = listener.accept()?;
-                if ended.load(Ordering::Acquire) {
-                    break;
-                }
-                let greeting = Greeting::fresh(&"a".repeat(32));
-                let mut writer = &stream;
-                writeln!(writer, "{}", greeting.line())?;
-                let mut line = zeroize::Zeroizing::new(String::new());
-                BufReader::new(&stream).read_line(&mut line)?;
-                let requested = verify_request(&line, &key, &greeting)?;
-                let requested = match requested {
-                    Act::AsCaller { done, .. } => *done,
-                    other => other,
-                };
-                let answer = match requested {
-                    Act::Status { session } => {
-                        runner_lifetime::status(native.keys(), session.as_deref())
-                    }
-                    Act::End { session } => {
-                        ends += 1;
-                        Answer::Ended {
-                            session,
-                            ended: Ended {
-                                how: EndedHow::Exited,
-                                at: 2,
-                                status: Some(0),
-                                signal: None,
-                                reason: None,
-                                stopped: None,
-                            },
-                        }
-                    }
-                    Act::Start { launch, .. } => {
-                        native.insert(
-                            launch.session.clone(),
-                            launch
-                                .arguments
-                                .windows(2)
-                                .find(|pair| pair[0] == "--session-id" || pair[0] == "--resume")
-                                .map(|pair| pair[1].clone())
-                                .ok_or("start has no native id")?,
-                        );
-                        starts += 1;
-                        Answer::Started {
-                            qualification: None,
-                            session: launch.session,
-                            pid: 42,
-                            started_at: 3,
-                        }
-                    }
-                    Act::Liveness { session } => {
-                        runner_lifetime::liveness(&native, session.as_deref())
-                    }
-                    Act::Owned => Answer::Owned {
-                        owners: Vec::new(),
-                        unreachable: Vec::new(),
-                    },
-                    Act::ControlStatus { session } => Answer::ControlStatus {
-                        session,
-                        control: None,
-                    },
-                    Act::GrantChannel => {
-                        writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
-                        channels.push(stream);
-                        continue;
-                    }
-                    Act::Feed { .. } => Answer::Refused {
-                        refusal: "feed_not_kept".to_owned(),
-                        words: "this fixture keeps no feed".to_owned(),
-                        oldest: None,
-                    },
-                    other => return Err(format!("unexpected runner act: {other:?}").into()),
-                };
-                writeln!(writer, "{}", reply_line(answer))?;
-            }
-            Ok((starts, ends))
-        })();
-        let result = result.map_err(|error| error.to_string());
-        if let Err(error) = &result {
-            eprintln!("stop/start stand-in failed: {error}");
-        }
-        result
+        serve_runner(&listener, key, &ended)
     });
     let machine = table
         .machine(
@@ -204,4 +117,97 @@ async fn a_person_stops_then_starts_without_reinstating_the_identity() -> Result
         (1, 1)
     );
     table.close()
+}
+
+fn serve_runner(
+    listener: &UnixListener,
+    key: [u8; 32],
+    ended: &std::sync::atomic::AtomicBool,
+) -> Result<(usize, usize), String> {
+    let result = (|| -> Result<(usize, usize), Box<dyn Error>> {
+        let (mut starts, mut ends) = (0, 0);
+        let mut native: std::collections::BTreeMap<String, String> =
+            std::collections::BTreeMap::new();
+        let mut channels = Vec::new();
+        loop {
+            let (stream, _) = listener.accept()?;
+            if ended.load(Ordering::Acquire) {
+                break;
+            }
+            let greeting = Greeting::fresh(&"a".repeat(32));
+            let mut writer = &stream;
+            writeln!(writer, "{}", greeting.line())?;
+            let mut line = zeroize::Zeroizing::new(String::new());
+            BufReader::new(&stream).read_line(&mut line)?;
+            let requested = verify_request(&line, &key, &greeting)?;
+            let requested = match requested {
+                Act::AsCaller { done, .. } => *done,
+                other => other,
+            };
+            let answer = match requested {
+                Act::Status { session } => {
+                    runner_lifetime::status(native.keys(), session.as_deref())
+                }
+                Act::End { session } => {
+                    ends += 1;
+                    Answer::Ended {
+                        session,
+                        ended: Ended {
+                            how: EndedHow::Exited,
+                            at: 2,
+                            status: Some(0),
+                            signal: None,
+                            reason: None,
+                            stopped: None,
+                        },
+                    }
+                }
+                Act::Start { launch, .. } => {
+                    native.insert(
+                        launch.session.clone(),
+                        launch
+                            .arguments
+                            .windows(2)
+                            .find(|pair| pair[0] == "--session-id" || pair[0] == "--resume")
+                            .map(|pair| pair[1].clone())
+                            .ok_or("start has no native id")?,
+                    );
+                    starts += 1;
+                    Answer::Started {
+                        qualification: None,
+                        session: launch.session,
+                        pid: 42,
+                        started_at: 3,
+                    }
+                }
+                Act::Liveness { session } => runner_lifetime::liveness(&native, session.as_deref()),
+                Act::Owned => Answer::Owned {
+                    owners: Vec::new(),
+                    unreachable: Vec::new(),
+                },
+                Act::ControlStatus { session } => Answer::ControlStatus {
+                    session,
+                    control: None,
+                },
+                Act::GrantChannel => {
+                    writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
+                    channels.push(stream);
+                    continue;
+                }
+                Act::Feed { .. } => Answer::Refused {
+                    refusal: "feed_not_kept".to_owned(),
+                    words: "this fixture keeps no feed".to_owned(),
+                    oldest: None,
+                },
+                other => return Err(format!("unexpected runner act: {other:?}").into()),
+            };
+            writeln!(writer, "{}", reply_line(answer))?;
+        }
+        Ok((starts, ends))
+    })();
+    let result = result.map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        eprintln!("stop/start stand-in failed: {error}");
+    }
+    result
 }

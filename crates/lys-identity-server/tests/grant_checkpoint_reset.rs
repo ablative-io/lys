@@ -41,19 +41,7 @@ async fn a_refused_checkpoint_holds_the_grants_until_the_administrator_resets_th
     assert_eq!(before["verdict"]["outcome"], "allowed", "{before}");
     let counted = world.counts().await?;
 
-    let snapshot = world
-        .service
-        .dir
-        .path()
-        .join("grant-log")
-        .join("snapshot.bin");
-    let mut bytes = std::fs::read(&snapshot)?;
-    let last = bytes
-        .len()
-        .checked_sub(1)
-        .ok_or("the checkpoint is empty")?;
-    bytes[last] ^= 0xff;
-    std::fs::write(&snapshot, bytes)?;
+    damage_checkpoint(&world)?;
     world.service.restart().await?;
 
     let mut name = String::new();
@@ -132,5 +120,22 @@ async fn a_refused_checkpoint_holds_the_grants_until_the_administrator_resets_th
         409,
         "ResetRefused",
     )?;
+    Ok(())
+}
+
+fn damage_checkpoint(world: &World) -> TestResult {
+    let snapshot = world
+        .service
+        .dir
+        .path()
+        .join("grant-log")
+        .join("snapshot.bin");
+    let mut bytes = std::fs::read(&snapshot)?;
+    let last = bytes
+        .len()
+        .checked_sub(1)
+        .ok_or("the checkpoint is empty")?;
+    bytes[last] ^= 0xff;
+    std::fs::write(&snapshot, bytes)?;
     Ok(())
 }

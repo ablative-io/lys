@@ -141,7 +141,7 @@ async fn seat_pty_starts_from_a_reviewed_profile_and_records_its_transport() -> 
     let session = started(&table, false).await?;
     let live = sessions(&table)?.liveness(Some(&session))?;
     assert!(live[0].alive);
-    assert!(!live[0].managed);
+    assert!(!live[0].harness.managed);
     let (status, seat) = table
         .service
         .get("/seats/waffles", Some(&table.ada))

@@ -286,135 +286,8 @@ fn no_credential_byte_reaches_a_plan() -> TestResult {
 
 #[test]
 fn every_import_refusal_keeps_its_name_through_the_server_error() {
-    let text = || "x".to_owned();
-    let cases = [
-        (
-            SeatImportError::Unavailable { reason: text() },
-            "seat_imports_unavailable",
-        ),
-        (
-            SeatImportError::PlanRefused {
-                seat: text(),
-                refusals: Vec::new(),
-            },
-            "import_plan_refused",
-        ),
-        (
-            SeatImportError::PlanUnknown {
-                seat: text(),
-                plan_id: text(),
-            },
-            "import_plan_unknown",
-        ),
-        (
-            SeatImportError::PlanStale {
-                seat: text(),
-                plan_id: text(),
-                held: text(),
-                given: text(),
-            },
-            "import_plan_stale",
-        ),
-        (
-            SeatImportError::SourceChanged {
-                locator: text(),
-                shown: text(),
-                now: text(),
-            },
-            "import_source_changed",
-        ),
-        (
-            SeatImportError::DestinationMoved {
-                record: text(),
-                expected: 1,
-                held: 2,
-            },
-            "import_destination_moved",
-        ),
-        (
-            SeatImportError::SeatMismatch {
-                seat: text(),
-                named: text(),
-            },
-            "import_seat_mismatch",
-        ),
-        (
-            SeatImportError::BulkRefused { name: text() },
-            "import_bulk_refused",
-        ),
-        (
-            SeatImportError::ConfirmerNotPerson { caller: text() },
-            "import_confirmer_not_person",
-        ),
-        (
-            SeatImportError::NoResponsible {
-                seat: text(),
-                agent: text(),
-            },
-            "import_no_responsible",
-        ),
-        (
-            SeatImportError::SeatRunning {
-                seat: text(),
-                agent: text(),
-            },
-            "import_seat_running",
-        ),
-        (
-            SeatImportError::OperationReused { operation: text() },
-            "import_operation_reused",
-        ),
-        (
-            SeatImportError::InProgress {
-                seat: text(),
-                operation: text(),
-            },
-            "import_in_progress",
-        ),
-        (
-            SeatImportError::Stopped {
-                operation: text(),
-                record: text(),
-                reason: text(),
-            },
-            "import_stopped",
-        ),
-        (
-            SeatImportError::Incomplete {
-                seat: text(),
-                operation: text(),
-                state: text(),
-            },
-            "import_incomplete",
-        ),
-        (
-            SeatImportError::DestinationUnconfigured { kind: text() },
-            "import_destination_unconfigured",
-        ),
-        (
-            SeatImportError::DestinationUnsupported {
-                record: text(),
-                kind: text(),
-            },
-            "import_destination_unsupported",
-        ),
-        (
-            SeatImportError::DestinationMalformed {
-                record: text(),
-                reason: text(),
-            },
-            "import_destination_malformed",
-        ),
-        (
-            SeatImportError::ScheduleActive { record: text() },
-            "import_schedule_active",
-        ),
-        (SeatImportError::UpgradePending, "import_upgrade_pending"),
-        (
-            SeatImportError::UpgradeIntentUnreadable { reason: text() },
-            "import_upgrade_intent_unreadable",
-        ),
-    ];
+    let mut cases = import_source_refusals();
+    cases.extend(import_operation_refusals());
     for (error, expected) in cases {
         let error = ServerError::from(error);
         assert_eq!(error.name(), expected, "{error}");
@@ -524,4 +397,142 @@ async fn seat_import_confirmation_is_per_seat() -> TestResult {
     assert_eq!(held["selected"], Value::Null);
     assert_eq!(held["imports"], json!([]));
     table.close()
+}
+
+fn import_source_refusals() -> Vec<(SeatImportError, &'static str)> {
+    let text = || "x".to_owned();
+    vec![
+        (
+            SeatImportError::Unavailable { reason: text() },
+            "seat_imports_unavailable",
+        ),
+        (
+            SeatImportError::PlanRefused {
+                seat: text(),
+                refusals: Vec::new(),
+            },
+            "import_plan_refused",
+        ),
+        (
+            SeatImportError::PlanUnknown {
+                seat: text(),
+                plan_id: text(),
+            },
+            "import_plan_unknown",
+        ),
+        (
+            SeatImportError::PlanStale {
+                seat: text(),
+                plan_id: text(),
+                held: text(),
+                given: text(),
+            },
+            "import_plan_stale",
+        ),
+        (
+            SeatImportError::SourceChanged {
+                locator: text(),
+                shown: text(),
+                now: text(),
+            },
+            "import_source_changed",
+        ),
+        (
+            SeatImportError::DestinationMoved {
+                record: text(),
+                expected: 1,
+                held: 2,
+            },
+            "import_destination_moved",
+        ),
+    ]
+}
+
+fn import_operation_refusals() -> Vec<(SeatImportError, &'static str)> {
+    let text = || "x".to_owned();
+    vec![
+        (
+            SeatImportError::SeatMismatch {
+                seat: text(),
+                named: text(),
+            },
+            "import_seat_mismatch",
+        ),
+        (
+            SeatImportError::BulkRefused { name: text() },
+            "import_bulk_refused",
+        ),
+        (
+            SeatImportError::ConfirmerNotPerson { caller: text() },
+            "import_confirmer_not_person",
+        ),
+        (
+            SeatImportError::NoResponsible {
+                seat: text(),
+                agent: text(),
+            },
+            "import_no_responsible",
+        ),
+        (
+            SeatImportError::SeatRunning {
+                seat: text(),
+                agent: text(),
+            },
+            "import_seat_running",
+        ),
+        (
+            SeatImportError::OperationReused { operation: text() },
+            "import_operation_reused",
+        ),
+        (
+            SeatImportError::InProgress {
+                seat: text(),
+                operation: text(),
+            },
+            "import_in_progress",
+        ),
+        (
+            SeatImportError::Stopped {
+                operation: text(),
+                record: text(),
+                reason: text(),
+            },
+            "import_stopped",
+        ),
+        (
+            SeatImportError::Incomplete {
+                seat: text(),
+                operation: text(),
+                state: text(),
+            },
+            "import_incomplete",
+        ),
+        (
+            SeatImportError::DestinationUnconfigured { kind: text() },
+            "import_destination_unconfigured",
+        ),
+        (
+            SeatImportError::DestinationUnsupported {
+                record: text(),
+                kind: text(),
+            },
+            "import_destination_unsupported",
+        ),
+        (
+            SeatImportError::DestinationMalformed {
+                record: text(),
+                reason: text(),
+            },
+            "import_destination_malformed",
+        ),
+        (
+            SeatImportError::ScheduleActive { record: text() },
+            "import_schedule_active",
+        ),
+        (SeatImportError::UpgradePending, "import_upgrade_pending"),
+        (
+            SeatImportError::UpgradeIntentUnreadable { reason: text() },
+            "import_upgrade_intent_unreadable",
+        ),
+    ]
 }

@@ -171,6 +171,53 @@ async fn walk(table: &Table) -> Outcome {
         )
         .await?;
     assert_eq!(started["runner"]["state"], "running", "{started}");
+    assert_codex_template(table, agent, &started)?;
+    let session = started["session"].as_str().ok_or("no session")?;
+    let client = Client::new(table.dir.path().join("runner.sock"), Arc::clone(&table.key));
+    assert!(matches!(
+        client.ask(&Act::Wait {
+            session: session.to_owned(),
+            cursor: Some(0),
+            pattern: "profile-read".to_owned(),
+            regex: false
+        })?,
+        Answer::Matched { .. }
+    ));
+    table.post(&format!("/agents/{agent}/policy"), &json!({"version": 1, "rules": [{
+        "id": "owner-deny", "tool": "Read", "kind": "tool", "target": null, "authority": "hard"
+    }]})).await?;
+    let (status, refused) = post(
+        &table.service,
+        &format!("/agents/{agent}/start-command"),
+        Auth::Cookie(&table.cookie),
+        &json!({"machine": machine, "operation": op()?}),
+    )
+    .await?;
+    assert_eq!(status, 400, "{refused}");
+    assert_eq!(refused["refusal"], "PolicyUnrepresentable", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("owner-deny")),
+        "{refused}"
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn codex_form_defaults_start_a_real_runner_with_workspace_network_off() -> Outcome {
+    let table = Table::open().await?;
+    let result = walk(&table).await;
+    match (result, table.close().await) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
+        (Err(walk), Err(close)) => {
+            Err(format!("start failed: {walk}; cleanup failed: {close}").into())
+        }
+    }
+}
+
+fn assert_codex_template(table: &Table, agent: &str, started: &Value) -> Outcome {
     let store = ProvisioningStore::open(&table.service.dir.path().join("provisioning.json"))?;
     let version = store
         .profile(agent)
@@ -215,47 +262,5 @@ async fn walk(table: &Table) -> Outcome {
             .iter()
             .any(|arg| arg.starts_with("mcp_servers"))
     );
-    let session = started["session"].as_str().ok_or("no session")?;
-    let client = Client::new(table.dir.path().join("runner.sock"), Arc::clone(&table.key));
-    assert!(matches!(
-        client.ask(&Act::Wait {
-            session: session.to_owned(),
-            cursor: Some(0),
-            pattern: "profile-read".to_owned(),
-            regex: false
-        })?,
-        Answer::Matched { .. }
-    ));
-    table.post(&format!("/agents/{agent}/policy"), &json!({"version": 1, "rules": [{
-        "id": "owner-deny", "tool": "Read", "kind": "tool", "target": null, "authority": "hard"
-    }]})).await?;
-    let (status, refused) = post(
-        &table.service,
-        &format!("/agents/{agent}/start-command"),
-        Auth::Cookie(&table.cookie),
-        &json!({"machine": machine, "operation": op()?}),
-    )
-    .await?;
-    assert_eq!(status, 400, "{refused}");
-    assert_eq!(refused["refusal"], "PolicyUnrepresentable", "{refused}");
-    assert!(
-        refused["reason"]
-            .as_str()
-            .is_some_and(|reason| reason.contains("owner-deny")),
-        "{refused}"
-    );
     Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread")]
-async fn codex_form_defaults_start_a_real_runner_with_workspace_network_off() -> Outcome {
-    let table = Table::open().await?;
-    let result = walk(&table).await;
-    match (result, table.close().await) {
-        (Ok(()), Ok(())) => Ok(()),
-        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
-        (Err(walk), Err(close)) => {
-            Err(format!("start failed: {walk}; cleanup failed: {close}").into())
-        }
-    }
 }

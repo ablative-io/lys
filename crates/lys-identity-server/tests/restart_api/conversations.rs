@@ -37,34 +37,7 @@ fn reply(computer: &mut Computer, act: Act) -> Result<Answer, Box<dyn Error>> {
             computer.launches.push(*launch);
             answer
         }
-        Act::Liveness { session } => {
-            let sessions = computer
-                .launches
-                .iter()
-                .filter(|launch| session.as_ref().is_none_or(|id| id == &launch.session))
-                .map(|launch| {
-                    let ended = computer.ended.contains(&launch.session);
-                    LivenessView {
-                        session: launch.session.clone(),
-                        pid: Some(42),
-                        alive: !ended,
-                        harness_session: Some(NATIVE.to_owned()),
-                        turn_active: false,
-                        last_signal_at: Some(1),
-                        started_at: 1,
-                        ended,
-                        harness: lys_runner::liveness::HarnessLiveness {
-                            managed: false,
-                            started_fresh: false,
-                        },
-                    }
-                })
-                .collect();
-            if session.is_some() && computer.ended.is_empty() {
-                computer.selected_before_end = true;
-            }
-            Answer::Liveness { sessions }
-        }
+        Act::Liveness { session } => live_reply(computer, session.as_deref()),
         Act::ControlStatus { session } => Answer::ControlStatus {
             session,
             control: None,
@@ -276,4 +249,33 @@ async fn restart_resumes_the_claude_code_session_id() -> TestResult {
 #[tokio::test(flavor = "multi_thread")]
 async fn restart_resumes_the_live_codex_thread() -> TestResult {
     resumes("codex", "resume").await
+}
+
+fn live_reply(computer: &mut Computer, session: Option<&str>) -> Answer {
+    let sessions = computer
+        .launches
+        .iter()
+        .filter(|launch| session.is_none_or(|id| id == launch.session.as_str()))
+        .map(|launch| {
+            let ended = computer.ended.contains(&launch.session);
+            LivenessView {
+                session: launch.session.clone(),
+                pid: Some(42),
+                alive: !ended,
+                harness_session: Some(NATIVE.to_owned()),
+                turn_active: false,
+                last_signal_at: Some(1),
+                started_at: 1,
+                ended,
+                harness: lys_runner::liveness::HarnessLiveness {
+                    managed: false,
+                    started_fresh: false,
+                },
+            }
+        })
+        .collect();
+    if session.is_some() && computer.ended.is_empty() {
+        computer.selected_before_end = true;
+    }
+    Answer::Liveness { sessions }
 }

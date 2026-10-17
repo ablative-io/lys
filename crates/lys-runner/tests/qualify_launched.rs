@@ -12,7 +12,7 @@ use crate::operations::OperationState;
 use crate::protocol::Launch;
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 struct Owned {
     spawned: Spawned,
@@ -233,23 +233,7 @@ fn qualify(
     } else {
         String::new()
     };
-    let launch = Launch {
-        session: "qualification".to_owned(),
-        program: binary
-            .into_string()
-            .map_err(|path| format!("qualification_binary_path_not_text: {}", path.display()))?,
-        arguments: Vec::new(),
-        directory: working
-            .to_str()
-            .ok_or("qualification_working_path_not_text")?
-            .to_owned(),
-        environment: BTreeMap::from([("HOME".to_owned(), home)]),
-        config: None,
-        columns: 80,
-        rows: 24,
-        rotation: None,
-        policy: None,
-    };
+    let launch = qualification_launch(binary, &working, home)?;
     let mut owned = Owned {
         spawned: spawn(&launch, transport, &conversation, 1, false)?,
         stopped: false,
@@ -346,4 +330,28 @@ fn qualify_launched_codex() -> TestResult {
         "codex-app-server/1",
         "0.161.0-alpha.3",
     )
+}
+
+fn qualification_launch(
+    binary: std::ffi::OsString,
+    working: &std::path::Path,
+    home: String,
+) -> TestResult<Launch> {
+    Ok(Launch {
+        session: "qualification".to_owned(),
+        program: binary
+            .into_string()
+            .map_err(|path| format!("qualification_binary_path_not_text: {}", path.display()))?,
+        arguments: Vec::new(),
+        directory: working
+            .to_str()
+            .ok_or("qualification_working_path_not_text")?
+            .to_owned(),
+        environment: BTreeMap::from([("HOME".to_owned(), home)]),
+        config: None,
+        columns: 80,
+        rows: 24,
+        rotation: None,
+        policy: None,
+    })
 }

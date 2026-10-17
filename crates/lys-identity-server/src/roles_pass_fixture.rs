@@ -128,51 +128,7 @@ impl Table {
                     LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
                     4,
                 )?;
-                let role = OperationId::from_bytes([8; 16]).to_string();
-                let assignment = OperationId::from_bytes([9; 16]).to_string();
-                let words = Words {
-                    responsibilities: "Record decisions".to_owned(),
-                    goals: "Accurate records".to_owned(),
-                    practice: "Check the record".to_owned(),
-                    profile: String::new(),
-                    grant_templates: Vec::new(),
-                    note: "Initial version".to_owned(),
-                };
-                let held = if holding {
-                    vec![Holding {
-                        operation: assignment.clone(),
-                        holder: agent.to_string(),
-                        version: 1,
-                        assigned_by: person.to_string(),
-                        assigned_at: 2,
-                        ends_at: None,
-                        moves: Vec::new(),
-                        ended: None,
-                    }]
-                } else {
-                    Vec::new()
-                };
-                let kept = Role {
-                    id: role.clone(),
-                    name: "Recorder".to_owned(),
-                    versions: vec![
-                        Version {
-                            number: 1,
-                            operation: role.clone(),
-                            words: words.clone(),
-                            made_by: person.to_string(),
-                            made_at: 1,
-                        },
-                        Version {
-                            number: 2,
-                            operation: OperationId::from_bytes([10; 16]).to_string(),
-                            words,
-                            made_by: person.to_string(),
-                            made_at: 3,
-                        },
-                    ],
-                    holdings: held,
-                };
+                let (role, assignment, kept) = role_fixture(agent, person, holding);
                 std::fs::write(
                     config.roles_file.as_deref().ok_or("roles disabled")?,
                     serde_json::to_vec(&json!({"roles":[kept]}))?,
@@ -281,4 +237,57 @@ impl Table {
         assert_eq!(status, 200, "{body}");
         Ok(body)
     }
+}
+
+fn role_fixture(
+    agent: lys_identity::AgentId,
+    person: lys_identity::PersonId,
+    holding: bool,
+) -> (String, String, Role) {
+    let role = OperationId::from_bytes([8; 16]).to_string();
+    let assignment = OperationId::from_bytes([9; 16]).to_string();
+    let words = Words {
+        responsibilities: "Record decisions".to_owned(),
+        goals: "Accurate records".to_owned(),
+        practice: "Check the record".to_owned(),
+        profile: String::new(),
+        grant_templates: Vec::new(),
+        note: "Initial version".to_owned(),
+    };
+    let held = if holding {
+        vec![Holding {
+            operation: assignment.clone(),
+            holder: agent.to_string(),
+            version: 1,
+            assigned_by: person.to_string(),
+            assigned_at: 2,
+            ends_at: None,
+            moves: Vec::new(),
+            ended: None,
+        }]
+    } else {
+        Vec::new()
+    };
+    let kept = Role {
+        id: role.clone(),
+        name: "Recorder".to_owned(),
+        versions: vec![
+            Version {
+                number: 1,
+                operation: role.clone(),
+                words: words.clone(),
+                made_by: person.to_string(),
+                made_at: 1,
+            },
+            Version {
+                number: 2,
+                operation: OperationId::from_bytes([10; 16]).to_string(),
+                words,
+                made_by: person.to_string(),
+                made_at: 3,
+            },
+        ],
+        holdings: held,
+    };
+    (role, assignment, kept)
 }

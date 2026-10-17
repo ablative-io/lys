@@ -75,16 +75,10 @@ fn the_start_command_carries_the_declared_program_and_models() -> Result<(), Box
 
 #[test]
 fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<(), Box<dyn Error>> {
-    use lys_home::harness::skills::SkillFile;
-    use lys_home::record::blocks::Hash;
     use lys_identity_server::launch_api::kept_launch;
     use lys_identity_server::launch_template::HandleName;
     use lys_identity_server::provisioning_store::ProvisioningStore;
-    let skill = SkillFile {
-        name: "checked".to_owned(),
-        text: "Read the whole change.\n".to_owned(),
-        sha256: Hash::of(b"Read the whole change.\n").as_str().to_owned(),
-    };
+    let skill = reviewed_skill();
     let version: Version = serde_json::from_value(json!({
         "number": 1, "operation": "profile-one", "set_by": "operator", "set_at": 1,
         "reviewed": {"operation": "review-one", "by": "reviewer", "at": 2},
@@ -156,37 +150,7 @@ fn the_signed_launch_carries_the_full_profile_and_replays_exactly() -> Result<()
         first.directory, "/srv/agents/agent",
         "the kept start runs in the folder its start named"
     );
-    let config = first.config.as_ref().ok_or("no config")?;
-    let file = |name: &str| {
-        config
-            .files
-            .iter()
-            .find(|file| file.path == name)
-            .ok_or("no native file")
-    };
-    let settings: serde_json::Value = serde_json::from_str(&file("settings.json")?.text)?;
-    assert_eq!(settings["permissions"]["allow"], json!(["Read", "Edit"]));
-    assert_eq!(settings["permissions"]["deny"], json!(["Bash(rm *)"]));
-    assert_eq!(settings["permissions"]["defaultMode"], "plan");
-    assert_eq!(
-        settings["enabledPlugins"],
-        json!({"argus@ablative": true, "frontend-design@claude-plugins-official": true}),
-        "the reviewed plugins, and only those, are turned on"
-    );
-    let mcp: serde_json::Value = serde_json::from_str(&file("mcp.json")?.text)?;
-    assert_eq!(
-        mcp["mcpServers"]["declared-server"]["env"]["TOKEN"],
-        "h-kept"
-    );
-    assert_eq!(
-        mcp["mcpServers"]["declared-server"]["env"]["LITERAL"],
-        "true"
-    );
-    assert_eq!(
-        file("instructions.txt")?.text,
-        version.settings.instructions
-    );
-    assert_eq!(file("skills/checked/SKILL.md")?.text, skill.text);
+    assert_native_config(&first, &version, &skill)?;
     let mut newer = version;
     newer.operation = "profile-two".to_owned();
     newer.settings.instructions = "Different instructions.".to_owned();
@@ -276,4 +240,52 @@ fn instructions_mode_renders_only_the_reviewed_claude_prompt_flag() -> Result<()
         }
     }
     Ok(())
+}
+
+fn assert_native_config(
+    first: &lys_runner::Launch,
+    version: &Version,
+    skill: &lys_home::harness::skills::SkillFile,
+) -> Result<(), Box<dyn Error>> {
+    let config = first.config.as_ref().ok_or("no config")?;
+    let file = |name: &str| {
+        config
+            .files
+            .iter()
+            .find(|file| file.path == name)
+            .ok_or("no native file")
+    };
+    let settings: serde_json::Value = serde_json::from_str(&file("settings.json")?.text)?;
+    assert_eq!(settings["permissions"]["allow"], json!(["Read", "Edit"]));
+    assert_eq!(settings["permissions"]["deny"], json!(["Bash(rm *)"]));
+    assert_eq!(settings["permissions"]["defaultMode"], "plan");
+    assert_eq!(
+        settings["enabledPlugins"],
+        json!({"argus@ablative": true, "frontend-design@claude-plugins-official": true}),
+        "the reviewed plugins, and only those, are turned on"
+    );
+    let mcp: serde_json::Value = serde_json::from_str(&file("mcp.json")?.text)?;
+    assert_eq!(
+        mcp["mcpServers"]["declared-server"]["env"]["TOKEN"],
+        "h-kept"
+    );
+    assert_eq!(
+        mcp["mcpServers"]["declared-server"]["env"]["LITERAL"],
+        "true"
+    );
+    assert_eq!(
+        file("instructions.txt")?.text,
+        version.settings.instructions
+    );
+    assert_eq!(file("skills/checked/SKILL.md")?.text, skill.text);
+    Ok(())
+}
+
+fn reviewed_skill() -> lys_home::harness::skills::SkillFile {
+    use lys_home::record::blocks::Hash;
+    lys_home::harness::skills::SkillFile {
+        name: "checked".to_owned(),
+        text: "Read the whole change.\n".to_owned(),
+        sha256: Hash::of(b"Read the whole change.\n").as_str().to_owned(),
+    }
 }

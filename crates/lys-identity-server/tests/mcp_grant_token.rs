@@ -34,25 +34,7 @@ impl Fixture {
             None,
             None,
             None,
-            |config| {
-                config.certificates_dir = None;
-                config.homes_dir = None;
-                config.sessions_file = None;
-                if !teams {
-                    config.teams_dir = None;
-                }
-                config.requests_dir = None;
-                config.roles_file = None;
-                config.provisioning_file = None;
-                config.network_file = None;
-                config.runtime_dir = None;
-                config.service_accounts_dir = None;
-                config.stops_dir = None;
-                config.budgets_dir = None;
-                config.policies_dir = None;
-                config.goals_dir = None;
-                config.reviews_dir = None;
-            },
+            |config| minimal_config(config, teams),
             |config| {
                 use lys_identity::{
                     Actor, AuthMethod, Directory, IdentityId, LoginBinding, Profile, Provenance,
@@ -382,4 +364,24 @@ async fn refusal_names_root_when_chain_holds_no_requested_grant() -> TestResult 
         ])
     );
     Ok(())
+}
+
+fn minimal_config(config: &mut lys_identity_server::config::Config, teams: bool) {
+    config.certificates_dir = None;
+    config.homes_dir = None;
+    config.sessions_file = None;
+    if !teams {
+        config.teams_dir = None;
+    }
+    config.requests_dir = None;
+    config.roles_file = None;
+    config.provisioning_file = None;
+    config.network_file = None;
+    config.runtime_dir = None;
+    config.service_accounts_dir = None;
+    config.stops_dir = None;
+    config.budgets_dir = None;
+    config.policies_dir = None;
+    config.goals_dir = None;
+    config.reviews_dir = None;
 }

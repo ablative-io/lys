@@ -61,67 +61,8 @@ fn decided(operation: &str, by: By) -> Decided {
 
 /// One line of every shape the apps log writes, in a fixed order.
 fn lines() -> Vec<Line> {
-    vec![
-        Line::Lys(LysRecorded {
-            operation: "op-01010101010101010101010101010101".to_owned(),
-            version: 3,
-            schema: schema(),
-            at: 1,
-        }),
-        Line::Registrar(Registrar {
-            operation: "op-02020202020202020202020202020202".to_owned(),
-            service_account: "op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned(),
-            secret_sha256: "ab".repeat(32),
-            by: operator(),
-            at: 2,
-        }),
-        Line::Registered(Registered {
-            operation: "op-03030303030303030303030303030303".to_owned(),
-            app: "notes".to_owned(),
-            name: "Notes".to_owned(),
-            redirects: vec!["https://notes.example.test/back".to_owned()],
-            schema: schema(),
-            service_account: Some("op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned()),
-            by: account(),
-            at: 3,
-        }),
-        Line::Registered(Registered {
-            operation: "op-04040404040404040404040404040404".to_owned(),
-            app: "diary".to_owned(),
-            name: "Diary".to_owned(),
-            redirects: Vec::new(),
-            schema: schema(),
-            service_account: None,
-            by: person(),
-            at: 4,
-        }),
-        Line::Approved(Approved {
-            operation: "op-05050505050505050505050505050505".to_owned(),
-            app: "notes".to_owned(),
-            client: Client {
-                client_id: "notes".to_owned(),
-                secret_sha256: "cd".repeat(32),
-            },
-            binding: Some(Binding {
-                service_account: "op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned(),
-                app: "notes".to_owned(),
-                bound_by: person(),
-                at: 5,
-            }),
-            by: person(),
-            at: 5,
-        }),
-        Line::Approved(Approved {
-            operation: "op-06060606060606060606060606060606".to_owned(),
-            app: "diary".to_owned(),
-            client: Client {
-                client_id: "diary".to_owned(),
-                secret_sha256: "ef".repeat(32),
-            },
-            binding: None,
-            by: operator(),
-            at: 6,
-        }),
+    let mut lines = registration_lines();
+    lines.extend([
         Line::SignInSet(SignInSet {
             operation: "op-07070707070707070707070707070707".to_owned(),
             app: "notes".to_owned(),
@@ -162,7 +103,8 @@ fn lines() -> Vec<Line> {
         }),
         Line::Declined(decided("op-0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c", operator())),
         Line::Retired(decided("op-0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d", person())),
-    ]
+    ]);
+    lines
 }
 
 /// Which shape `line` is; every shape is named, so a new one cannot be left unpinned.
@@ -298,4 +240,69 @@ fn every_apps_line_shape_keeps_its_bytes_and_reads_back() -> TestResult {
     let shapes: std::collections::BTreeSet<_> = lines.iter().map(shape).collect();
     assert_eq!(shapes.len(), 11, "every shape of apps line is pinned");
     Ok(())
+}
+
+fn registration_lines() -> Vec<Line> {
+    vec![
+        Line::Lys(LysRecorded {
+            operation: "op-01010101010101010101010101010101".to_owned(),
+            version: 3,
+            schema: schema(),
+            at: 1,
+        }),
+        Line::Registrar(Registrar {
+            operation: "op-02020202020202020202020202020202".to_owned(),
+            service_account: "op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned(),
+            secret_sha256: "ab".repeat(32),
+            by: operator(),
+            at: 2,
+        }),
+        Line::Registered(Registered {
+            operation: "op-03030303030303030303030303030303".to_owned(),
+            app: "notes".to_owned(),
+            name: "Notes".to_owned(),
+            redirects: vec!["https://notes.example.test/back".to_owned()],
+            schema: schema(),
+            service_account: Some("op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned()),
+            by: account(),
+            at: 3,
+        }),
+        Line::Registered(Registered {
+            operation: "op-04040404040404040404040404040404".to_owned(),
+            app: "diary".to_owned(),
+            name: "Diary".to_owned(),
+            redirects: Vec::new(),
+            schema: schema(),
+            service_account: None,
+            by: person(),
+            at: 4,
+        }),
+        Line::Approved(Approved {
+            operation: "op-05050505050505050505050505050505".to_owned(),
+            app: "notes".to_owned(),
+            client: Client {
+                client_id: "notes".to_owned(),
+                secret_sha256: "cd".repeat(32),
+            },
+            binding: Some(Binding {
+                service_account: "op-5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a".to_owned(),
+                app: "notes".to_owned(),
+                bound_by: person(),
+                at: 5,
+            }),
+            by: person(),
+            at: 5,
+        }),
+        Line::Approved(Approved {
+            operation: "op-06060606060606060606060606060606".to_owned(),
+            app: "diary".to_owned(),
+            client: Client {
+                client_id: "diary".to_owned(),
+                secret_sha256: "ef".repeat(32),
+            },
+            binding: None,
+            by: operator(),
+            at: 6,
+        }),
+    ]
 }

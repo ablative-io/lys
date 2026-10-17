@@ -73,35 +73,7 @@ async fn signed_write(person_active: bool) -> TestResult {
             "active agent fixture",
             5,
         )?;
-        let key = Arc::new(Ed25519Identity::load_or_generate(
-            &config.log_dir.with_file_name("signed-agent.key"),
-        )?);
-        let service_key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-        let request = create_certificate_request(&key, &agent.to_string())?;
-        let certificate = CertificateAuthority::new(Ed25519Identity::load(&config.event_key_file)?)
-            .issue_certificate_for_request(
-                &request,
-                &agent.to_string(),
-                Duration::from_secs(600),
-                vec![],
-            )?;
-        // The fixture holds a genuine certificate directly; it never grants a Registered
-        // person an HTTP issuance exception or rewrites an Active record to Registered.
-        CertificateStore::open(
-            config
-                .certificates_dir
-                .as_ref()
-                .ok_or("certificate store")?,
-            service_key,
-        )?
-        .issue(Issued {
-            serial: OperationId::generate()?.to_string(),
-            agent: agent.to_string(),
-            person: person.to_string(),
-            claims: json!({}),
-            der: STANDARD.encode(certificate.der_bytes),
-            issued_at: 6,
-        })?;
+        let key = certified_agent(config, person, agent)?;
         Ok((person, agent, key))
     })
     .await?;
@@ -146,4 +118,41 @@ async fn signed_agent_of_registered_person_cannot_write() -> TestResult {
 #[tokio::test]
 async fn signed_agent_of_active_person_can_write() -> TestResult {
     signed_write(true).await
+}
+
+fn certified_agent(
+    config: &lys_identity_server::config::Config,
+    person: lys_identity::PersonId,
+    agent: lys_identity::AgentId,
+) -> Result<Arc<Ed25519Identity>, Box<dyn std::error::Error>> {
+    let key = Arc::new(Ed25519Identity::load_or_generate(
+        &config.log_dir.with_file_name("signed-agent.key"),
+    )?);
+    let service_key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+    let request = create_certificate_request(&key, &agent.to_string())?;
+    let certificate = CertificateAuthority::new(Ed25519Identity::load(&config.event_key_file)?)
+        .issue_certificate_for_request(
+            &request,
+            &agent.to_string(),
+            Duration::from_secs(600),
+            vec![],
+        )?;
+    // The fixture holds a genuine certificate directly; it never grants a Registered
+    // person an HTTP issuance exception or rewrites an Active record to Registered.
+    CertificateStore::open(
+        config
+            .certificates_dir
+            .as_ref()
+            .ok_or("certificate store")?,
+        service_key,
+    )?
+    .issue(Issued {
+        serial: OperationId::generate()?.to_string(),
+        agent: agent.to_string(),
+        person: person.to_string(),
+        claims: json!({}),
+        der: STANDARD.encode(certificate.der_bytes),
+        issued_at: 6,
+    })?;
+    Ok(key)
 }

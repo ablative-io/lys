@@ -104,32 +104,7 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
         .await?;
     refused(&unnamed, 409, "runner_absent");
 
-    // The computer's own folder dialog is asked the same way and refused by the same names before any
-    // runner is reached; with a runner named it would open a dialog on this computer's screen, so the
-    // dialog itself is never opened here.
-    let dialog = format!("/network/machines/{machine}/choose-folder");
-    let dialog_unnamed = service
-        .post(&dialog, Some(&ada), &json!({ "start": named }))
-        .await?;
-    refused(&dialog_unnamed, 409, "runner_absent");
-    let dialog_by_bea = service.post(&dialog, Some(&bea), &json!({})).await?;
-    refused(&dialog_by_bea, 403, "not_your_computer");
-    let dialog_relative = service
-        .post(&dialog, Some(&ada), &json!({ "start": "held/receipts" }))
-        .await?;
-    refused(&dialog_relative, 400, "RequestMalformed");
-    let dialog_unknown_field = service
-        .post(&dialog, Some(&ada), &json!({ "under": named }))
-        .await?;
-    refused(&dialog_unknown_field, 400, "RequestMalformed");
-    let dialog_unknown = service
-        .post(
-            &format!("/network/machines/{}/choose-folder", operation()?),
-            Some(&ada),
-            &json!({}),
-        )
-        .await?;
-    refused(&dialog_unknown, 404, "MachineUnknown");
+    assert_dialog_refusals(&service, &machine, named, &ada, &bea).await?;
 
     let runner = service
         .post(
@@ -165,13 +140,61 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
         .await?;
     refused(&by_bea, 403, "not_your_computer");
 
+    assert_owned_folders(&service, named, &bea).await?;
+
+    assert_folder_refusals(&service, &folders, named, &ada).await?;
+
+    serving.stop()?;
+    broker.abort();
+    Ok(())
+}
+
+async fn assert_dialog_refusals(
+    service: &Service,
+    machine: &str,
+    named: &str,
+    ada: &str,
+    bea: &str,
+) -> TestResult {
+    // The computer's own folder dialog is asked the same way and refused by the same names before any
+    // runner is reached; with a runner named it would open a dialog on this computer's screen, so the
+    // dialog itself is never opened here.
+    let dialog = format!("/network/machines/{machine}/choose-folder");
+    let dialog_unnamed = service
+        .post(&dialog, Some(ada), &json!({ "start": named }))
+        .await?;
+    refused(&dialog_unnamed, 409, "runner_absent");
+    let dialog_by_bea = service.post(&dialog, Some(bea), &json!({})).await?;
+    refused(&dialog_by_bea, 403, "not_your_computer");
+    let dialog_relative = service
+        .post(&dialog, Some(ada), &json!({ "start": "held/receipts" }))
+        .await?;
+    refused(&dialog_relative, 400, "RequestMalformed");
+    let dialog_unknown_field = service
+        .post(&dialog, Some(ada), &json!({ "under": named }))
+        .await?;
+    refused(&dialog_unknown_field, 400, "RequestMalformed");
+    let unknown = operation()?;
+    let dialog_unknown = service
+        .post(
+            &format!("/network/machines/{unknown}/choose-folder"),
+            Some(ada),
+            &json!({}),
+        )
+        .await?;
+    refused(&dialog_unknown, 404, "MachineUnknown");
+
+    Ok(())
+}
+
+async fn assert_owned_folders(service: &Service, named: &str, bea: &str) -> TestResult {
     // A computer bea named herself is hers to ask about, before any runner is named on it: the
     // admission passes and the refusal is the runner's absence, not hers.
     let own = operation()?;
     let named_by_bea = service
         .post(
             "/network/machines",
-            Some(&bea),
+            Some(bea),
             &json!({ "operation": own, "name": "Bea's laptop", "kind": "laptop", "runtime": "lys-runner",
                 "slots": 1, "may_run": [], "may_reach": [] }),
         )
@@ -180,7 +203,7 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
     let own_folders = service
         .post(
             &format!("/network/machines/{own}/folders"),
-            Some(&bea),
+            Some(bea),
             &json!({ "under": named }),
         )
         .await?;
@@ -188,21 +211,31 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
     let own_dialog = service
         .post(
             &format!("/network/machines/{own}/choose-folder"),
-            Some(&bea),
+            Some(bea),
             &json!({}),
         )
         .await?;
     refused(&own_dialog, 409, "runner_absent");
 
+    Ok(())
+}
+
+async fn assert_folder_refusals(
+    service: &Service,
+    folders: &str,
+    named: &str,
+    ada: &str,
+) -> TestResult {
     let relative = service
-        .post(&folders, Some(&ada), &json!({ "under": "held/receipts" }))
+        .post(folders, Some(ada), &json!({ "under": "held/receipts" }))
         .await?;
     refused(&relative, 400, "RequestMalformed");
 
+    let unknown_id = operation()?;
     let unknown = service
         .post(
-            &format!("/network/machines/{}/folders", operation()?),
-            Some(&ada),
+            &format!("/network/machines/{unknown_id}/folders"),
+            Some(ada),
             &json!({ "under": named }),
         )
         .await?;
@@ -210,14 +243,12 @@ async fn a_machines_runner_names_the_folders_inside_one_folder() -> TestResult {
 
     let missing = service
         .post(
-            &folders,
-            Some(&ada),
+            folders,
+            Some(ada),
             &json!({ "under": format!("{named}/nothing-here") }),
         )
         .await?;
     refused(&missing, 409, "folder_unreadable");
 
-    serving.stop()?;
-    broker.abort();
     Ok(())
 }

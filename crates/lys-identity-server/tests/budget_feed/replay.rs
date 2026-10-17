@@ -205,10 +205,7 @@ async fn assert_calls(service: &Service, agent: &str, machine: &str, cookie: &st
         "{words}"
     );
     let (status, unknown) = service
-        .get(
-            &format!("/agents/{agent}/calls/no-such-call"),
-            Some(cookie),
-        )
+        .get(&format!("/agents/{agent}/calls/no-such-call"), Some(cookie))
         .await?;
     assert_eq!(status, 404, "{unknown}");
     assert!(unknown.to_string().contains("CallUnknown"), "{unknown}");

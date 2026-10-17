@@ -166,34 +166,7 @@ fn seat_import_sources_maps_declared_files() -> TestResult {
     // carry is a named exclusion the person sees; every other member is
     // asserted in the destination's settings below.
     assert!(fragment.refusals.is_empty(), "{:?}", fragment.refusals);
-    for (member, reason) in [
-        ("modelSettings.fixture-model-1.effortLevel", "no Lys owner"),
-        ("alwaysThinkingEnabled", "harness_ui_state"),
-        ("env.TERM", "machine_owned"),
-        ("env.COLORTERM", "machine_owned"),
-        ("env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION", "machine_owned"),
-        ("env.MONITOR_URL", "replaced_by_lys"),
-        ("env.MONITOR_GATE_STATE_DIR", "replaced_by_lys"),
-        ("statusLine", "replaced_by_lys"),
-        ("hooks.Stop", "replaced_by_lys"),
-        (
-            "enabledPlugins.fixture-plugin@fixture-market",
-            "no Lys owner: plugin",
-        ),
-        (
-            "extraKnownMarketplaces.fixture-market",
-            "no Lys owner: plugin",
-        ),
-        ("enableAllProjectMcpServers", "no Lys owner: plugin"),
-        ("disableAgentView", "harness_ui_state"),
-        ("tui", "harness_ui_state"),
-        ("skipDangerousModePermissionPrompt", "harness_ui_state"),
-        ("skipWorkflowUsageWarning", "harness_ui_state"),
-        ("autoCompactEnabled", "harness_ui_state"),
-        ("teammateMode", "harness_ui_state"),
-        ("agentPushNotifEnabled", "harness_ui_state"),
-        ("voiceEnabled", "harness_ui_state"),
-    ] {
+    for (member, reason) in excluded_settings() {
         let member = format!("claude.settings#{member}");
         assert!(
             excluded(&fragment, &member, reason),
@@ -420,3 +393,34 @@ fn seat_import_keys_refuses_inline() -> TestResult {
 mod boundaries;
 #[path = "seat_import_sources/live_shapes.rs"]
 mod live_shapes;
+
+fn excluded_settings() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("modelSettings.fixture-model-1.effortLevel", "no Lys owner"),
+        ("alwaysThinkingEnabled", "harness_ui_state"),
+        ("env.TERM", "machine_owned"),
+        ("env.COLORTERM", "machine_owned"),
+        ("env.CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION", "machine_owned"),
+        ("env.MONITOR_URL", "replaced_by_lys"),
+        ("env.MONITOR_GATE_STATE_DIR", "replaced_by_lys"),
+        ("statusLine", "replaced_by_lys"),
+        ("hooks.Stop", "replaced_by_lys"),
+        (
+            "enabledPlugins.fixture-plugin@fixture-market",
+            "no Lys owner: plugin",
+        ),
+        (
+            "extraKnownMarketplaces.fixture-market",
+            "no Lys owner: plugin",
+        ),
+        ("enableAllProjectMcpServers", "no Lys owner: plugin"),
+        ("disableAgentView", "harness_ui_state"),
+        ("tui", "harness_ui_state"),
+        ("skipDangerousModePermissionPrompt", "harness_ui_state"),
+        ("skipWorkflowUsageWarning", "harness_ui_state"),
+        ("autoCompactEnabled", "harness_ui_state"),
+        ("teammateMode", "harness_ui_state"),
+        ("agentPushNotifEnabled", "harness_ui_state"),
+        ("voiceEnabled", "harness_ui_state"),
+    ]
+}

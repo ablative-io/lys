@@ -103,93 +103,7 @@ impl Table {
                 config.policies_dir = None;
                 config.reviews_dir = None;
             },
-            move |config| {
-                let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-                let actor = Actor::new(
-                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                    Provenance::new(AuthMethod::Oidc, 1),
-                );
-                let mut directory = open_directory(config)?;
-                let (person, _) = directory.setup_person(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    Profile::new("Owner")?,
-                    1,
-                )?;
-                directory.bind_login(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    person,
-                    LoginBinding::new(&config.issuer, BEA)?,
-                    1,
-                )?;
-                let (agent, _) = directory.register_agent(
-                    actor.clone(),
-                    OperationId::generate()?,
-                    person,
-                    Profile::new("Agent")?,
-                    2,
-                )?;
-                directory.transition(
-                    actor,
-                    OperationId::generate()?,
-                    IdentityId::Agent(agent),
-                    Transition::Activate,
-                    "",
-                    3,
-                )?;
-                drop(lys_identity_server::runtime_store::RuntimeStore::open(
-                    config
-                        .runtime_dir
-                        .as_deref()
-                        .ok_or("runtime directory missing")?,
-                    Arc::clone(&key),
-                )?);
-                drop(lys_identity_server::goals_store::GoalStore::open(
-                    config
-                        .goals_dir
-                        .as_deref()
-                        .ok_or("goals directory missing")?,
-                    Arc::clone(&key),
-                )?);
-                let mut certificates = CertificateStore::open(
-                    config
-                        .certificates_dir
-                        .as_deref()
-                        .ok_or("certificate directory missing")?,
-                    Arc::clone(&key),
-                )?;
-                if let Some(der) = der {
-                    certificates.issue(Issued {
-                        serial: entered_serial,
-                        agent: agent.to_string(),
-                        person: person.to_string(),
-                        claims: json!({}),
-                        der: STANDARD.encode(der),
-                        issued_at: 0,
-                    })?;
-                }
-                drop(
-                    lys_identity_server::configuration_store::ConfigurationStore::open(
-                        &config.log_dir.with_file_name("organisation"),
-                        Arc::clone(&key),
-                    )?,
-                );
-                drop(lys_identity_server::runner_acts::ActStore::open(
-                    &config.log_dir.with_file_name("runner-acts"),
-                    Arc::clone(&key),
-                )?);
-                drop(lys_identity::start::LaunchRecords::open(
-                    &config.log_dir.with_file_name("launch-records"),
-                    Ed25519Identity::load(&config.event_key_file)?,
-                )?);
-                drop(lys_identity_server::apps_api::opened(
-                    config,
-                    Arc::clone(&key),
-                    &|_| {},
-                )?);
-                Ok((agent.to_string(), key))
-            },
+            move |config| seed_certificate(config, der, &entered_serial),
         )
         .await?;
         let ada = service.sign_in(login(ADMINISTRATOR)).await?;
@@ -446,4 +360,96 @@ async fn a_recorded_certificate_that_cannot_be_decoded_is_named_and_admits_nothi
         answer.1
     );
     Ok(())
+}
+
+fn seed_certificate(
+    config: &lys_identity_server::config::Config,
+    der: Option<&'static [u8]>,
+    entered_serial: &str,
+) -> Result<(String, Arc<Ed25519Identity>), Box<dyn Error>> {
+    let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+    let actor = Actor::new(
+        LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let mut directory = open_directory(config)?;
+    let (person, _) = directory.setup_person(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Owner")?,
+        1,
+    )?;
+    directory.bind_login(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        LoginBinding::new(&config.issuer, BEA)?,
+        1,
+    )?;
+    let (agent, _) = directory.register_agent(
+        actor.clone(),
+        OperationId::generate()?,
+        person,
+        Profile::new("Agent")?,
+        2,
+    )?;
+    directory.transition(
+        actor,
+        OperationId::generate()?,
+        IdentityId::Agent(agent),
+        Transition::Activate,
+        "",
+        3,
+    )?;
+    drop(lys_identity_server::runtime_store::RuntimeStore::open(
+        config
+            .runtime_dir
+            .as_deref()
+            .ok_or("runtime directory missing")?,
+        Arc::clone(&key),
+    )?);
+    drop(lys_identity_server::goals_store::GoalStore::open(
+        config
+            .goals_dir
+            .as_deref()
+            .ok_or("goals directory missing")?,
+        Arc::clone(&key),
+    )?);
+    let mut certificates = CertificateStore::open(
+        config
+            .certificates_dir
+            .as_deref()
+            .ok_or("certificate directory missing")?,
+        Arc::clone(&key),
+    )?;
+    if let Some(der) = der {
+        certificates.issue(Issued {
+            serial: entered_serial.to_owned(),
+            agent: agent.to_string(),
+            person: person.to_string(),
+            claims: json!({}),
+            der: STANDARD.encode(der),
+            issued_at: 0,
+        })?;
+    }
+    drop(
+        lys_identity_server::configuration_store::ConfigurationStore::open(
+            &config.log_dir.with_file_name("organisation"),
+            Arc::clone(&key),
+        )?,
+    );
+    drop(lys_identity_server::runner_acts::ActStore::open(
+        &config.log_dir.with_file_name("runner-acts"),
+        Arc::clone(&key),
+    )?);
+    drop(lys_identity::start::LaunchRecords::open(
+        &config.log_dir.with_file_name("launch-records"),
+        Ed25519Identity::load(&config.event_key_file)?,
+    )?);
+    drop(lys_identity_server::apps_api::opened(
+        config,
+        Arc::clone(&key),
+        &|_| {},
+    )?);
+    Ok((agent.to_string(), key))
 }

@@ -12,30 +12,7 @@ fn two_next_bridges_are_open_before_either_request_is_answered() -> Result<(), B
     let dir = tempfile::tempdir()?;
     let socket = dir.path().join("runner.sock");
     let local = UnixListener::bind(&socket)?;
-    let native = std::thread::spawn(move || -> Result<(), String> {
-        let mut workers = Vec::new();
-        for _ in 0..2 {
-            let (mut stream, _) = local.accept().map_err(|error| error.to_string())?;
-            workers.push(std::thread::spawn(move || -> Result<(), String> {
-                let greeting = crate::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
-                writeln!(stream, "{}", greeting.line()).map_err(|error| error.to_string())?;
-                let mut rest = Vec::new();
-                stream
-                    .read_to_end(&mut rest)
-                    .map_err(|error| error.to_string())?;
-                if !rest.is_empty() {
-                    return Err("an unaccepted poll sent a native request".to_owned());
-                }
-                Ok(())
-            }));
-        }
-        for worker in workers {
-            worker
-                .join()
-                .map_err(|panic| format!("native fixture panicked: {panic:?}"))??;
-        }
-        Ok(())
-    });
+    let native = std::thread::spawn(move || -> Result<(), String> { serve_native(&local) });
     let tcp = TcpListener::bind("127.0.0.1:0")?;
     let server = format!("http://{}", tcp.local_addr()?);
     let (entered, arrivals) = mpsc::channel();
@@ -192,5 +169,30 @@ fn a_lost_reply_connection_is_not_a_refusal_and_is_not_replayed() -> Result<(), 
     remote
         .join()
         .map_err(|panic| format!("reply fixture panicked: {panic:?}"))??;
+    Ok(())
+}
+
+fn serve_native(local: &UnixListener) -> Result<(), String> {
+    let mut workers = Vec::new();
+    for _ in 0..2 {
+        let (mut stream, _) = local.accept().map_err(|error| error.to_string())?;
+        workers.push(std::thread::spawn(move || -> Result<(), String> {
+            let greeting = crate::protocol::Greeting::fresh("0123456789abcdef0123456789abcdef");
+            writeln!(stream, "{}", greeting.line()).map_err(|error| error.to_string())?;
+            let mut rest = Vec::new();
+            stream
+                .read_to_end(&mut rest)
+                .map_err(|error| error.to_string())?;
+            if !rest.is_empty() {
+                return Err("an unaccepted poll sent a native request".to_owned());
+            }
+            Ok(())
+        }));
+    }
+    for worker in workers {
+        worker
+            .join()
+            .map_err(|panic| format!("native fixture panicked: {panic:?}"))??;
+    }
     Ok(())
 }

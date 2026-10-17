@@ -140,54 +140,7 @@ impl Owned {
             std::thread::Builder::new()
                 .name("qualification-reader".to_owned())
                 .spawn(move || {
-                    let completion = Completion(Some(finished));
-                    let mut reader = BufReader::new(stdout);
-                    let ready = process::frame(&mut reader)
-                        .map(Message::Frame)
-                        .map_err(|error| error.to_string());
-                    let failed = ready.is_err();
-                    if send.blocking_send(ready).is_err() || failed {
-                        return;
-                    }
-                    if probe {
-                        let mut bytes = Vec::new();
-                        let result = reader
-                            .take(129)
-                            .read_to_end(&mut bytes)
-                            .map_err(io_failed)
-                            .and_then(|_| {
-                                if bytes.len() > 128 {
-                                    Err("qualification_version_report_invalid".to_owned())
-                                } else {
-                                    Ok(Message::Version(bytes))
-                                }
-                            });
-                        if let Err(error) = send.blocking_send(result) {
-                            drop(error);
-                            eprintln!("qualification_receiver_ended");
-                        }
-                    } else {
-                        loop {
-                            match reader.fill_buf() {
-                                Ok([]) => break,
-                                Ok(_) => {}
-                                Err(error) => {
-                                    if send.blocking_send(Err(io_failed(error))).is_err() {
-                                        eprintln!("qualification_receiver_ended");
-                                    }
-                                    break;
-                                }
-                            }
-                            let result = process::frame(&mut (&mut reader).take(1_048_576))
-                                .map(Message::Frame)
-                                .map_err(|error| error.to_string());
-                            let failed = result.is_err();
-                            if send.blocking_send(result).is_err() || failed {
-                                break;
-                            }
-                        }
-                    }
-                    drop(completion);
+                    read_frames(stdout, probe, &send, finished);
                 })
                 .map_err(io_failed)?,
         );
@@ -486,4 +439,60 @@ impl Owned {
             exited: None,
         }
     }
+}
+
+fn read_frames(
+    stdout: std::process::ChildStdout,
+    probe: bool,
+    send: &mpsc::Sender<Result<Message>>,
+    finished: tokio::sync::oneshot::Sender<()>,
+) {
+    let completion = Completion(Some(finished));
+    let mut reader = BufReader::new(stdout);
+    let ready = process::frame(&mut reader)
+        .map(Message::Frame)
+        .map_err(|error| error.to_string());
+    let failed = ready.is_err();
+    if send.blocking_send(ready).is_err() || failed {
+        return;
+    }
+    if probe {
+        let mut bytes = Vec::new();
+        let result = reader
+            .take(129)
+            .read_to_end(&mut bytes)
+            .map_err(io_failed)
+            .and_then(|_| {
+                if bytes.len() > 128 {
+                    Err("qualification_version_report_invalid".to_owned())
+                } else {
+                    Ok(Message::Version(bytes))
+                }
+            });
+        if let Err(error) = send.blocking_send(result) {
+            drop(error);
+            eprintln!("qualification_receiver_ended");
+        }
+    } else {
+        loop {
+            match reader.fill_buf() {
+                Ok([]) => break,
+                Ok(_) => {}
+                Err(error) => {
+                    if send.blocking_send(Err(io_failed(error))).is_err() {
+                        eprintln!("qualification_receiver_ended");
+                    }
+                    break;
+                }
+            }
+            let result = process::frame(&mut (&mut reader).take(1_048_576))
+                .map(Message::Frame)
+                .map_err(|error| error.to_string());
+            let failed = result.is_err();
+            if send.blocking_send(result).is_err() || failed {
+                break;
+            }
+        }
+    }
+    drop(completion);
 }

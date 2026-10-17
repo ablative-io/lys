@@ -230,93 +230,7 @@ fn gated_fixture(
             },
         )
     };
-    match transport {
-        Transport::Claude => {
-            let initialize = {
-                let mut table = sessions.lock()?;
-                crate::harness_control::events::runtime(&mut table, "fixture", binding.generation)?
-                    .controller
-                    .bootstrap()
-            };
-            let correlation = initialize
-                .dispatches
-                .first()
-                .ok_or("fixture initialize missing")?
-                .frame["request_id"]
-                .as_str()
-                .ok_or("fixture initialize uncorrelated")?;
-            observe(
-                &sessions,
-                &binding,
-                &json!({"type":"control_response",
-                "response":{"subtype":"success","request_id":correlation,"response":{}}}),
-            )?;
-            let uuid = {
-                let mut table = sessions.lock()?;
-                let controller = &mut crate::harness_control::events::runtime(
-                    &mut table,
-                    "fixture",
-                    binding.generation,
-                )?
-                .controller;
-                let pending = crate::harness_control::events::Pending::new(
-                    "fixture-initialization".to_owned(),
-                    crate::harness_control::events::Kind::Human,
-                    "first turn".to_owned(),
-                );
-                let uuid = pending.uuid.clone();
-                controller.enqueue(pending)?;
-                let status = controller.control_status();
-                let update = controller.boundary_reply(&crate::harness_control::BoundaryReply {
-                    generation: status.generation,
-                    boundary: status.boundary,
-                    context: crate::harness_control::ContextDecision::Released,
-                    reminders: Vec::new(),
-                })?;
-                assert_eq!(update.dispatches.len(), 1);
-                assert_eq!(
-                    update.dispatches[0].frame["message"]["content"],
-                    "first turn"
-                );
-                uuid
-            };
-            observe(
-                &sessions,
-                &binding,
-                &json!({"type":"system","subtype":"init",
-                "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
-            )?;
-            observe(
-                &sessions,
-                &binding,
-                &json!({"type":"user","session_id":"conversation","uuid":uuid,
-                "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
-            )?;
-            observe(
-                &sessions,
-                &binding,
-                &json!({"type":"result","session_id":"conversation",
-                "uuid":"fixture-initialization-result","is_error":false}),
-            )?;
-        }
-        Transport::Codex => {
-            observe(
-                &sessions,
-                &binding,
-                &json!({"id":"lys-initialize","result":{"userAgent":"lys-runner/9.8.7 (fixture)"}}),
-            )?;
-            for expected in ["initialized", "thread/resume"] {
-                let frame: Value = serde_json::from_slice(&frames.recv()?)?;
-                assert_eq!(frame["method"], expected);
-            }
-            observe(
-                &sessions,
-                &binding,
-                &json!({"id":"lys-thread","result":{"thread":{"id":"conversation","status":{"type":"idle"}}}}),
-            )?;
-        }
-        Transport::Pty => return Err("fixture requires a managed adapter".into()),
-    }
+    initialize_transport(&sessions, &binding, &frames, transport)?;
     let service = if automatic {
         Some(Service::start(&sessions, &binding)?)
     } else {
@@ -367,3 +281,99 @@ mod behavior_0;
 mod behavior_1;
 #[path = "notices.rs"]
 mod notices;
+
+fn initialize_transport(
+    sessions: &Arc<Sessions>,
+    binding: &Binding,
+    frames: &mpsc::Receiver<Vec<u8>>,
+    transport: Transport,
+) -> Result {
+    match transport {
+        Transport::Claude => {
+            let initialize = {
+                let mut table = sessions.lock()?;
+                crate::harness_control::events::runtime(&mut table, "fixture", binding.generation)?
+                    .controller
+                    .bootstrap()
+            };
+            let correlation = initialize
+                .dispatches
+                .first()
+                .ok_or("fixture initialize missing")?
+                .frame["request_id"]
+                .as_str()
+                .ok_or("fixture initialize uncorrelated")?;
+            observe(
+                sessions,
+                binding,
+                &json!({"type":"control_response",
+                "response":{"subtype":"success","request_id":correlation,"response":{}}}),
+            )?;
+            let uuid = {
+                let mut table = sessions.lock()?;
+                let controller = &mut crate::harness_control::events::runtime(
+                    &mut table,
+                    "fixture",
+                    binding.generation,
+                )?
+                .controller;
+                let pending = crate::harness_control::events::Pending::new(
+                    "fixture-initialization".to_owned(),
+                    crate::harness_control::events::Kind::Human,
+                    "first turn".to_owned(),
+                );
+                let uuid = pending.uuid.clone();
+                controller.enqueue(pending)?;
+                let status = controller.control_status();
+                let update = controller.boundary_reply(&crate::harness_control::BoundaryReply {
+                    generation: status.generation,
+                    boundary: status.boundary,
+                    context: crate::harness_control::ContextDecision::Released,
+                    reminders: Vec::new(),
+                })?;
+                assert_eq!(update.dispatches.len(), 1);
+                assert_eq!(
+                    update.dispatches[0].frame["message"]["content"],
+                    "first turn"
+                );
+                uuid
+            };
+            observe(
+                sessions,
+                binding,
+                &json!({"type":"system","subtype":"init",
+                "session_id":"conversation","claude_code_version":"9.8.7","slash_commands":["compact"]}),
+            )?;
+            observe(
+                sessions,
+                binding,
+                &json!({"type":"user","session_id":"conversation","uuid":uuid,
+                "parent_tool_use_id":null,"message":{"role":"user","content":"first turn"}}),
+            )?;
+            observe(
+                sessions,
+                binding,
+                &json!({"type":"result","session_id":"conversation",
+                "uuid":"fixture-initialization-result","is_error":false}),
+            )?;
+        }
+        Transport::Codex => {
+            observe(
+                sessions,
+                binding,
+                &json!({"id":"lys-initialize","result":{"userAgent":"lys-runner/9.8.7 (fixture)"}}),
+            )?;
+            for expected in ["initialized", "thread/resume"] {
+                let frame: Value = serde_json::from_slice(&frames.recv()?)?;
+                assert_eq!(frame["method"], expected);
+            }
+            observe(
+                sessions,
+                binding,
+                &json!({"id":"lys-thread","result":{"thread":{"id":"conversation","status":{"type":"idle"}}}}),
+            )?;
+        }
+        Transport::Pty => return Err("fixture requires a managed adapter".into()),
+    }
+    Ok(())
+}

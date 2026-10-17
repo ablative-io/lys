@@ -70,10 +70,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
 
     step("3. The agent has its own key; no grant yet, so no handle");
     let agent_key = Ed25519Identity::load_or_generate(&keys.join("agent-noor.key"))?;
-    let agent = Holder {
-        identity: "agent:noor".to_owned(),
-        key: agent_key.public_key_bytes(),
-    };
+    let agent = agent_holder(&agent_key);
     match broker.issue(&agent, "github-token", 2, now_ms() + 600_000) {
         Err(error) => println!("  refused, {error}"),
         Ok(_) => println!("  UNEXPECTED: issued without a grant"),
@@ -91,59 +88,7 @@ fn run(root: &Path) -> Result<(), SecretsError> {
         issued.id
     );
 
-    step("5. The agent uses the handle; the credential goes upstream, never to the agent");
-    let operation = new_operation_id()?;
-    let call = request_digest("GET", "/github-token/user/repos", b"")?;
-    let presentation = Presentation::sign(&issued.id, &operation, now_ms(), call, &agent_key)?;
-    match broker.use_handle(&issued.token, &presentation, Secret::len)? {
-        Used::Forwarded { answer, uses_left } => println!(
-            "  upstream received a {answer}-byte credential; the agent got the answer only; {uses_left} use left"
-        ),
-        Used::Retried { outcome } => println!("  retried: {outcome}"),
-    }
-
-    step("6. The same call retried is answered from the log, not sent again");
-    match broker.use_handle(&issued.token, &presentation, Secret::len)? {
-        Used::Retried { outcome } => {
-            println!("  retry answered from the log: {outcome}; nothing forwarded, no use counted");
-        }
-        Used::Forwarded { .. } => println!("  UNEXPECTED: forwarded twice"),
-    }
-
-    step("7. Someone who stole the handle but not the agent's key");
-    let thief_key = Ed25519Identity::load_or_generate(&keys.join("thief.key"))?;
-    let forged = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, &thief_key)?;
-    refused(
-        "stolen handle",
-        broker.use_handle(&issued.token, &forged, Secret::len),
-    );
-
-    step("8. The second use, then the lease is spent");
-    let second = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, &agent_key)?;
-    broker.use_handle(&issued.token, &second, Secret::len)?;
-    println!("  second use admitted");
-    let third = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, &agent_key)?;
-    refused(
-        "third use",
-        broker.use_handle(&issued.token, &third, Secret::len),
-    );
-
-    step("9. A fresh handle, then Tom revokes the grant and drops it");
-    let again = broker.issue(&agent, "github-token", 5, now_ms() + 600_000)?;
-    broker.permissions().revoke("agent:noor", "github-token")?;
-    let after_revoke =
-        Presentation::sign(&again.id, &new_operation_id()?, now_ms(), call, &agent_key)?;
-    refused(
-        "use after revoke",
-        broker.use_handle(&again.token, &after_revoke, Secret::len),
-    );
-    broker.drop_handle(&again.id)?;
-    let after_drop =
-        Presentation::sign(&again.id, &new_operation_id()?, now_ms(), call, &agent_key)?;
-    refused(
-        "use after drop",
-        broker.use_handle(&again.token, &after_drop, Secret::len),
-    );
+    let call = exercise_handle(&mut broker, &agent, &agent_key, &issued, &keys)?;
 
     step(
         "10. The store key is rotated; the old key file is gone and every entry opens under the new one",
@@ -196,6 +141,70 @@ fn run(root: &Path) -> Result<(), SecretsError> {
     Ok(())
 }
 
+fn exercise_handle(
+    broker: &mut Broker<LocalGrants>,
+    agent: &Holder,
+    agent_key: &Ed25519Identity,
+    issued: &lys_secrets::IssuedHandle,
+    keys: &Path,
+) -> Result<[u8; 32], SecretsError> {
+    step("5. The agent uses the handle; the credential goes upstream, never to the agent");
+    let operation = new_operation_id()?;
+    let call = request_digest("GET", "/github-token/user/repos", b"")?;
+    let presentation = Presentation::sign(&issued.id, &operation, now_ms(), call, agent_key)?;
+    match broker.use_handle(&issued.token, &presentation, Secret::len)? {
+        Used::Forwarded { answer, uses_left } => println!(
+            "  upstream received a {answer}-byte credential; the agent got the answer only; {uses_left} use left"
+        ),
+        Used::Retried { outcome } => println!("  retried: {outcome}"),
+    }
+
+    step("6. The same call retried is answered from the log, not sent again");
+    match broker.use_handle(&issued.token, &presentation, Secret::len)? {
+        Used::Retried { outcome } => {
+            println!("  retry answered from the log: {outcome}; nothing forwarded, no use counted");
+        }
+        Used::Forwarded { .. } => println!("  UNEXPECTED: forwarded twice"),
+    }
+
+    step("7. Someone who stole the handle but not the agent's key");
+    let thief_key = Ed25519Identity::load_or_generate(&keys.join("thief.key"))?;
+    let forged = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, &thief_key)?;
+    refused(
+        "stolen handle",
+        broker.use_handle(&issued.token, &forged, Secret::len),
+    );
+
+    step("8. The second use, then the lease is spent");
+    let second = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, agent_key)?;
+    broker.use_handle(&issued.token, &second, Secret::len)?;
+    println!("  second use admitted");
+    let third = Presentation::sign(&issued.id, &new_operation_id()?, now_ms(), call, agent_key)?;
+    refused(
+        "third use",
+        broker.use_handle(&issued.token, &third, Secret::len),
+    );
+
+    step("9. A fresh handle, then Tom revokes the grant and drops it");
+    let again = broker.issue(agent, "github-token", 5, now_ms() + 600_000)?;
+    broker.permissions().revoke("agent:noor", "github-token")?;
+    let after_revoke =
+        Presentation::sign(&again.id, &new_operation_id()?, now_ms(), call, agent_key)?;
+    refused(
+        "use after revoke",
+        broker.use_handle(&again.token, &after_revoke, Secret::len),
+    );
+    broker.drop_handle(&again.id)?;
+    let after_drop =
+        Presentation::sign(&again.id, &new_operation_id()?, now_ms(), call, agent_key)?;
+    refused(
+        "use after drop",
+        broker.use_handle(&again.token, &after_drop, Secret::len),
+    );
+
+    Ok(call)
+}
+
 fn main() -> ExitCode {
     let Some(root) = std::env::args_os().nth(1) else {
         eprintln!("usage: lys-secrets-demo <empty folder>");
@@ -207,5 +216,12 @@ fn main() -> ExitCode {
             eprintln!("{} {error}", error.name());
             ExitCode::FAILURE
         }
+    }
+}
+
+fn agent_holder(key: &Ed25519Identity) -> Holder {
+    Holder {
+        identity: "agent:noor".to_owned(),
+        key: key.public_key_bytes(),
     }
 }

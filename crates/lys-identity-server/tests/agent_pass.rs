@@ -26,131 +26,7 @@ async fn agent_pass_start_act_and_end_report_keep_secrets_out_of_receipts() -> T
     let (send, receive) = std::sync::mpsc::channel();
     let lifetime = Lifetime::new(&socket);
     let ended = lifetime.signal();
-    let answering = std::thread::spawn(move || {
-        let result = (|| -> TestResult {
-            let mut channels = Vec::new();
-            let mut started: std::collections::BTreeMap<String, String> =
-                std::collections::BTreeMap::new();
-
-            loop {
-                let (stream, _) = listener.accept()?;
-                if ended.load(Ordering::Acquire) {
-                    break;
-                }
-                let greeting = Greeting::fresh(&"a".repeat(32));
-                let mut writer = &stream;
-                writeln!(writer, "{}", greeting.line())?;
-                let mut line = zeroize::Zeroizing::new(String::new());
-                BufReader::new(&stream).read_line(&mut line)?;
-                let act = verify_request(&line, &key, &greeting)?;
-                match act {
-                    Act::GrantChannel => {
-                        writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
-                        channels.push(stream);
-                        continue;
-                    }
-                    Act::Feed { .. } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(Answer::Refused {
-                                refusal: "feed_not_kept".to_owned(),
-                                words: "this fixture keeps no feed".to_owned(),
-                                oldest: None
-                            })
-                        )?;
-                        continue;
-                    }
-                    Act::Status { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(runner_lifetime::status(started.keys(), session.as_deref()))
-                        )?;
-                        continue;
-                    }
-                    Act::ControlStatus { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(Answer::ControlStatus {
-                                session,
-                                control: None
-                            })
-                        )?;
-                        continue;
-                    }
-                    Act::Owned => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(Answer::Owned {
-                                owners: Vec::new(),
-                                unreachable: Vec::new()
-                            })
-                        )?;
-                        continue;
-                    }
-                    Act::Liveness { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(runner_lifetime::liveness(&started, session.as_deref()))
-                        )?;
-                        continue;
-                    }
-                    _ => {}
-                }
-                let Act::AsCaller { done, .. } = act else {
-                    return Err(format!(
-                        "expected a caller start, got {}",
-                        serde_json::to_value(&act)?["kind"]
-                    )
-                    .into());
-                };
-                let Act::Start {
-                    launch,
-                    lys_mcp: Some(entry),
-                    ..
-                } = *done
-                else {
-                    return Err("start carried no run pass".into());
-                };
-                assert_eq!(entry.pass.len(), 43);
-                assert!(!format!("{entry:?}").contains(&entry.pass));
-                assert!(!serde_json::to_string(&launch)?.contains(&entry.pass));
-                let session = launch.session.clone();
-                started.insert(
-                    session.clone(),
-                    launch
-                        .arguments
-                        .windows(2)
-                        .find(|pair| pair[0] == "--session-id" || pair[0] == "--resume")
-                        .map(|pair| pair[1].clone())
-                        .ok_or("captured start has no native id")?,
-                );
-                send.send((session.clone(), entry))
-                    .map_err(|error| error.to_string())?;
-                writeln!(
-                    writer,
-                    "{}",
-                    reply_line(Answer::Started {
-                        qualification: None,
-                        session,
-                        pid: 42,
-                        started_at: 1
-                    })
-                )?;
-            }
-            assert_eq!(started.len(), 1);
-            Ok(())
-        })();
-        let result = result.map_err(|error| error.to_string());
-        if let Err(error) = &result {
-            eprintln!("pass stand-in result: {error}");
-        }
-        result
-    });
+    let answering = std::thread::spawn(move || capture_first(&listener, key, &ended, &send));
     let machine = table.machine(&json!({"operation": operation()?, "name":"Capture", "kind":"laptop", "runtime":"sh", "slots":2, "may_run":[table.agent()], "may_reach":[]}), Some(json!({"kind":"socket", "path":socket.display().to_string()}))).await?;
     for _ in 0..1 {
         let (status, answer) = table
@@ -226,61 +102,18 @@ fn capture_starts(table: &Table, starts: usize) -> Result<Capture, Box<dyn Error
                 writeln!(writer, "{}", greeting.line())?;
                 let mut line = zeroize::Zeroizing::new(String::new());
                 BufReader::new(&stream).read_line(&mut line)?;
-                let done = match verify_request(&line, &key, &greeting)? {
-                    Act::AsCaller { done, .. } => done,
-                    Act::Status { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(runner_lifetime::status(native.keys(), session.as_deref()))
-                        )?;
-                        continue;
-                    }
-                    Act::Owned => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(Answer::Owned {
-                                owners: Vec::new(),
-                                unreachable: Vec::new()
-                            })
-                        )?;
-                        continue;
-                    }
-                    Act::Liveness { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(runner_lifetime::liveness(&native, session.as_deref()))
-                        )?;
-                        continue;
-                    }
-                    Act::ControlStatus { session } => {
-                        writeln!(
-                            writer,
-                            "{}",
-                            reply_line(Answer::ControlStatus {
-                                session,
-                                control: None
-                            })
-                        )?;
-                        continue;
-                    }
-                    Act::GrantChannel => {
-                        writeln!(writer, "{}", reply_line(Answer::GrantChannel))?;
+                let act = verify_request(&line, &key, &greeting)?;
+                if let Some(answer) =
+                    background_answer(&act, &native, "this stand-in keeps no feed")
+                {
+                    writeln!(writer, "{}", reply_line(answer))?;
+                    if matches!(act, Act::GrantChannel) {
                         channels.push(stream);
-                        continue;
                     }
-                    Act::Feed { .. } => {
-                        let refused = Answer::Refused {
-                            refusal: "feed_not_kept".to_owned(),
-                            words: "this stand-in keeps no feed".to_owned(),
-                            oldest: None,
-                        };
-                        writeln!(writer, "{}", reply_line(refused))?;
-                        continue;
-                    }
-                    other => return Err(format!("the stand-in was asked {other:?}").into()),
+                    continue;
+                }
+                let Act::AsCaller { done, .. } = act else {
+                    return Err(format!("the stand-in was asked {act:?}").into());
                 };
                 started += 1;
                 let Act::Start {
@@ -413,4 +246,109 @@ async fn an_ai_lys_starts_stands_on_one_certificate_and_its_withdrawal_ends_the_
         .join()
         .map_err(|error| format!("capture runner panicked: {error:?}"))??;
     table.close()
+}
+
+fn capture_first(
+    listener: &UnixListener,
+    key: [u8; 32],
+    ended: &std::sync::atomic::AtomicBool,
+    send: &std::sync::mpsc::Sender<(String, lys_runner::protocol::LysMcp)>,
+) -> Result<(), String> {
+    let result = (|| -> TestResult {
+        let mut channels = Vec::new();
+        let mut started: std::collections::BTreeMap<String, String> =
+            std::collections::BTreeMap::new();
+
+        loop {
+            let (stream, _) = listener.accept()?;
+            if ended.load(Ordering::Acquire) {
+                break;
+            }
+            let greeting = Greeting::fresh(&"a".repeat(32));
+            let mut writer = &stream;
+            writeln!(writer, "{}", greeting.line())?;
+            let mut line = zeroize::Zeroizing::new(String::new());
+            BufReader::new(&stream).read_line(&mut line)?;
+            let act = verify_request(&line, &key, &greeting)?;
+            if let Some(answer) = background_answer(&act, &started, "this fixture keeps no feed") {
+                writeln!(writer, "{}", reply_line(answer))?;
+                if matches!(act, Act::GrantChannel) {
+                    channels.push(stream);
+                }
+                continue;
+            }
+            let Act::AsCaller { done, .. } = act else {
+                return Err(format!(
+                    "expected a caller start, got {}",
+                    serde_json::to_value(&act)?["kind"]
+                )
+                .into());
+            };
+            let Act::Start {
+                launch,
+                lys_mcp: Some(entry),
+                ..
+            } = *done
+            else {
+                return Err("start carried no run pass".into());
+            };
+            assert_eq!(entry.pass.len(), 43);
+            assert!(!format!("{entry:?}").contains(&entry.pass));
+            assert!(!serde_json::to_string(&launch)?.contains(&entry.pass));
+            let session = launch.session.clone();
+            started.insert(
+                session.clone(),
+                launch
+                    .arguments
+                    .windows(2)
+                    .find(|pair| pair[0] == "--session-id" || pair[0] == "--resume")
+                    .map(|pair| pair[1].clone())
+                    .ok_or("captured start has no native id")?,
+            );
+            send.send((session.clone(), entry))
+                .map_err(|error| error.to_string())?;
+            writeln!(
+                writer,
+                "{}",
+                reply_line(Answer::Started {
+                    qualification: None,
+                    session,
+                    pid: 42,
+                    started_at: 1
+                })
+            )?;
+        }
+        assert_eq!(started.len(), 1);
+        Ok(())
+    })();
+    let result = result.map_err(|error| error.to_string());
+    if let Err(error) = &result {
+        eprintln!("pass stand-in result: {error}");
+    }
+    result
+}
+fn background_answer(
+    act: &Act,
+    native: &std::collections::BTreeMap<String, String>,
+    feed_words: &str,
+) -> Option<Answer> {
+    Some(match act {
+        Act::GrantChannel => Answer::GrantChannel,
+        Act::Feed { .. } => Answer::Refused {
+            refusal: "feed_not_kept".to_owned(),
+            words: feed_words.to_owned(),
+            oldest: None,
+        },
+        Act::Status { session } => runner_lifetime::status(native.keys(), session.as_deref()),
+        Act::Liveness { session } => runner_lifetime::liveness(native, session.as_deref()),
+        Act::ControlStatus { session } => Answer::ControlStatus {
+            session: session.clone(),
+            control: None,
+        },
+        Act::Owned => Answer::Owned {
+            owners: Vec::new(),
+            unreachable: Vec::new(),
+        },
+        _ => return None,
+    })
 }

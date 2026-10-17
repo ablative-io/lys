@@ -13,7 +13,7 @@ use identity_contract::apps::{
     Auth, BEA, FILES, NOTES, TestResult, approve, check, get, login, ok, op, post, refused,
     register, registered, registration, root, seeded, workspace_schema,
 };
-use identity_contract::harness::ADMINISTRATOR;
+use identity_contract::harness::{ADMINISTRATOR, Service};
 use serde_json::{Value, json};
 
 /// Whether any file under `dir` holds `needle`.
@@ -193,9 +193,6 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
     let (service, _) = seeded().await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
     let path = format!("/apps/{NOTES}/sign_in");
-    let settings = |redirects: Value, profile: bool| -> Result<Value, Box<dyn Error>> {
-        Ok(json!({"operation": op()?, "redirects": redirects, "profile": profile}))
-    };
     let listed = json!(["https://app.example.test/signed-in"]);
     register(&service, &admin, NOTES).await?;
     let mut refusals = 0;
@@ -205,7 +202,7 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
             &service,
             &path,
             Auth::Cookie(&admin),
-            &settings(listed.clone(), false)?,
+            &sign_in_settings(&listed, false)?,
         )
         .await?,
         403,
@@ -239,45 +236,7 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
     let approved = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
     assert_eq!(approved["sign_in"]["redirects"], listed, "{approved}");
     assert_eq!(approved["sign_in"]["profile"], false);
-    // Address rules: none, not absolute, a fragment, http away from this machine.
-    let none = post(
-        &service,
-        &path,
-        Auth::Cookie(&admin),
-        &settings(json!([]), false)?,
-    )
-    .await?;
-    refused(&none, 400, "redirect_invalid")?;
-    assert!(
-        none.1["reason"]
-            .as_str()
-            .is_some_and(|words| words.contains("can sign nobody in")),
-        "{}",
-        none.1
-    );
-    refusals += 1;
-    for address in [
-        "signed-in",
-        "https://app.example.test/signed-in#fragment",
-        "http://app.example.test/signed-in",
-    ] {
-        let answer = post(
-            &service,
-            &path,
-            Auth::Cookie(&admin),
-            &settings(json!([address]), false)?,
-        )
-        .await?;
-        refused(&answer, 400, "redirect_invalid")?;
-        assert!(
-            answer.1["reason"]
-                .as_str()
-                .is_some_and(|words| words.contains(address)),
-            "{}",
-            answer.1
-        );
-        refusals += 1;
-    }
+    refusals += assert_sign_in_addresses(&service, &path, &admin).await?;
     // A signed-in person who is not the administrator changes nothing.
     let bea = service.sign_in(login(BEA)).await?;
     let moved = json!(["https://app.example.test/moved"]);
@@ -286,7 +245,7 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
             &service,
             &path,
             Auth::Cookie(&bea),
-            &settings(moved.clone(), true)?,
+            &sign_in_settings(&moved, true)?,
         )
         .await?,
         403,
@@ -297,7 +256,7 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
     assert_eq!(unchanged["sign_in"], approved["sign_in"]);
     // The administrator's change, and the same operation again: the same
     // answer, nothing new kept; the same operation for another app: refused.
-    let change = settings(moved.clone(), true)?;
+    let change = sign_in_settings(&moved, true)?;
     let changed = ok(post(&service, &path, Auth::Cookie(&admin), &change).await?)?;
     assert_eq!(changed["sign_in"]["redirects"], moved);
     assert_eq!(changed["sign_in"]["profile"], true);
@@ -313,47 +272,7 @@ async fn sign_in_settings_are_the_administrators_judged_by_address_and_by_standi
     .await?;
     refused(&reused, 409, "app_operation_reused")?;
     refusals += 1;
-    // Declined and retired: refused by the standing's name.
-    let decline = json!({"operation": op()?, "reason": "not this one"});
-    ok(post(
-        &service,
-        &format!("/apps/{FILES}/decline"),
-        Auth::Cookie(&admin),
-        &decline,
-    )
-    .await?)?;
-    refused(
-        &post(
-            &service,
-            &format!("/apps/{FILES}/sign_in"),
-            Auth::Cookie(&admin),
-            &settings(listed.clone(), false)?,
-        )
-        .await?,
-        403,
-        "app_not_approved",
-    )?;
-    refusals += 1;
-    let retire = json!({"operation": op()?, "reason": "done"});
-    ok(post(
-        &service,
-        &format!("/apps/{NOTES}/retire"),
-        Auth::Cookie(&admin),
-        &retire,
-    )
-    .await?)?;
-    refused(
-        &post(
-            &service,
-            &path,
-            Auth::Cookie(&admin),
-            &settings(listed, false)?,
-        )
-        .await?,
-        403,
-        "app_retired",
-    )?;
-    refusals += 1;
+    refusals += assert_sign_in_standing(&service, &path, &admin, listed).await?;
     assert_eq!(refusals, 10);
     Ok(())
 }
@@ -1098,3 +1017,92 @@ async fn a_service_app_with_no_return_address_is_approved_with_none() -> TestRes
 
 #[path = "shared/app_registration.rs"]
 mod app_registration;
+
+fn sign_in_settings(redirects: &Value, profile: bool) -> Result<Value, Box<dyn Error>> {
+    Ok(json!({"operation": op()?, "redirects": redirects, "profile": profile}))
+}
+
+async fn assert_sign_in_addresses(
+    service: &Service,
+    path: &str,
+    admin: &str,
+) -> Result<usize, Box<dyn Error>> {
+    let mut refusals = 0;
+    // Address rules: none, not absolute, a fragment, http away from this machine.
+    let empty = sign_in_settings(&json!([]), false)?;
+    let none = post(service, path, Auth::Cookie(admin), &empty).await?;
+    refused(&none, 400, "redirect_invalid")?;
+    assert!(
+        none.1["reason"]
+            .as_str()
+            .is_some_and(|words| words.contains("can sign nobody in")),
+        "{}",
+        none.1
+    );
+    refusals += 1;
+    for address in [
+        "signed-in",
+        "https://app.example.test/signed-in#fragment",
+        "http://app.example.test/signed-in",
+    ] {
+        let settings = sign_in_settings(&json!([address]), false)?;
+        let answer = post(service, path, Auth::Cookie(admin), &settings).await?;
+        refused(&answer, 400, "redirect_invalid")?;
+        assert!(
+            answer.1["reason"]
+                .as_str()
+                .is_some_and(|words| words.contains(address)),
+            "{}",
+            answer.1
+        );
+        refusals += 1;
+    }
+    Ok(refusals)
+}
+
+async fn assert_sign_in_standing(
+    service: &Service,
+    path: &str,
+    admin: &str,
+    listed: Value,
+) -> Result<usize, Box<dyn Error>> {
+    let mut refusals = 0;
+    // Declined and retired: refused by the standing's name.
+    let decline = json!({"operation": op()?, "reason": "not this one"});
+    ok(post(
+        service,
+        &format!("/apps/{FILES}/decline"),
+        Auth::Cookie(admin),
+        &decline,
+    )
+    .await?)?;
+    let pending = sign_in_settings(&listed, false)?;
+    refused(
+        &post(
+            service,
+            &format!("/apps/{FILES}/sign_in"),
+            Auth::Cookie(admin),
+            &pending,
+        )
+        .await?,
+        403,
+        "app_not_approved",
+    )?;
+    refusals += 1;
+    let retire = json!({"operation": op()?, "reason": "done"});
+    ok(post(
+        service,
+        &format!("/apps/{NOTES}/retire"),
+        Auth::Cookie(admin),
+        &retire,
+    )
+    .await?)?;
+    let retired = sign_in_settings(&listed, false)?;
+    refused(
+        &post(service, path, Auth::Cookie(admin), &retired).await?,
+        403,
+        "app_retired",
+    )?;
+    refusals += 1;
+    Ok(refusals)
+}

@@ -143,87 +143,88 @@ impl Fixture {
             profiles,
             client,
         };
-        fixture.version(&fixture.target, 0, json!([]), true).await?;
-        fixture
-            .version(
-                &fixture.lead,
-                0,
-                json!([server("https://lead.example.test/mcp")]),
-                true,
-            )
-            .await?;
-        fixture
-            .version(
-                &fixture.lead,
-                1,
-                json!([server("https://unreviewed.example.test/mcp")]),
-                false,
-            )
-            .await?;
-        fixture.version(&fixture.narrow, 0, json!([]), true).await?;
-        fixture
-            .version(
-                &fixture.outside,
-                0,
-                json!([
-                    server("https://estate.example.test/mcp"),
-                    {"name": "waffles", "url": "https://waffles.example.test/mcp"}
-                ]),
-                true,
-            )
-            .await?;
-        fixture
-            .version(
-                &fixture.outside,
-                1,
-                json!([server("https://estate.example.test/mcp")]),
-                true,
-            )
-            .await?;
+        fixture.initialize().await?;
+        Ok(fixture)
+    }
+
+    async fn initialize(&self) -> TestResult {
+        self.version(&self.target, 0, json!([]), true).await?;
+        self.version(
+            &self.lead,
+            0,
+            json!([server("https://lead.example.test/mcp")]),
+            true,
+        )
+        .await?;
+        self.version(
+            &self.lead,
+            1,
+            json!([server("https://unreviewed.example.test/mcp")]),
+            false,
+        )
+        .await?;
+        self.version(&self.narrow, 0, json!([]), true).await?;
+        self.version(
+            &self.outside,
+            0,
+            json!([
+                server("https://estate.example.test/mcp"),
+                {"name": "waffles", "url": "https://waffles.example.test/mcp"}
+            ]),
+            true,
+        )
+        .await?;
+        self.version(
+            &self.outside,
+            1,
+            json!([server("https://estate.example.test/mcp")]),
+            true,
+        )
+        .await?;
         let parent = operation()?;
         let child = operation()?;
         for (team, under, lead) in [
-            (&parent, None, &fixture.lead),
-            (&child, Some(parent.as_str()), &fixture.narrow),
+            (&parent, None, &self.lead),
+            (&child, Some(parent.as_str()), &self.narrow),
         ] {
             post(
-                &fixture.client,
-                &fixture.service,
+                &self.client,
+                &self.service,
                 "/teams",
-                &fixture.administrator,
+                &self.administrator,
                 &json!({"operation": team, "name": "approval team", "parent": under}),
                 200,
             )
             .await?;
             post(
-                &fixture.client,
-                &fixture.service,
+                &self.client,
+                &self.service,
                 &format!("/teams/{team}/members"),
-                &fixture.administrator,
+                &self.administrator,
                 &json!({"operation": operation()?, "member": lead}),
                 200,
             )
             .await?;
             post(
-                &fixture.client,
-                &fixture.service,
+                &self.client,
+                &self.service,
                 &format!("/teams/{team}/nesting"),
-                &fixture.administrator,
+                &self.administrator,
                 &json!({"operation": operation()?, "parent": under, "lead": lead}),
                 200,
             )
             .await?;
         }
         post(
-            &fixture.client,
-            &fixture.service,
+            &self.client,
+            &self.service,
             &format!("/teams/{child}/members"),
-            &fixture.administrator,
-            &json!({"operation": operation()?, "member": fixture.target}),
+            &self.administrator,
+            &json!({"operation": operation()?, "member": self.target}),
             200,
         )
         .await?;
-        Ok(fixture)
+        Ok(())
     }
 
     pub async fn version(

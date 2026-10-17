@@ -137,20 +137,7 @@ async fn a_found_session_is_kept_without_an_identity_and_stops_only_when_confirm
     assert_eq!(seen["reported_by"], table.seeded.people[1].id.to_string());
     assert_eq!(seen["stopped"], Value::Null);
 
-    let (status, hers) = table.service.get("/network", Some(&table.bea)).await?;
-    assert_eq!(status, 200, "{hers}");
-    assert_eq!(
-        hers["machines"],
-        json!([]),
-        "a person who neither named the computer nor may run on it does not see it"
-    );
-    let (status, network) = table.service.get("/network", Some(&table.ada)).await?;
-    assert_eq!(status, 200, "{network}");
-    assert_eq!(network["reports_served"], true);
-    assert_eq!(
-        network["machines"][0]["last_report_at"],
-        seen["last_report_at"]
-    );
+    assert_network_reports(&table, &seen).await?;
 
     let unconfirmed = table
         .service
@@ -290,5 +277,24 @@ async fn forged_browser_reports_cannot_change_an_agents_session() -> TestResult 
         .send()
         .await?;
     assert_eq!(response.status(), 200, "{}", response.text().await?);
+    Ok(())
+}
+
+async fn assert_network_reports(table: &Table, seen: &Value) -> TestResult {
+    let (status, hers) = table.service.get("/network", Some(&table.bea)).await?;
+    assert_eq!(status, 200, "{hers}");
+    assert_eq!(
+        hers["machines"],
+        json!([]),
+        "a person who neither named the computer nor may run on it does not see it"
+    );
+    let (status, network) = table.service.get("/network", Some(&table.ada)).await?;
+    assert_eq!(status, 200, "{network}");
+    assert_eq!(network["reports_served"], true);
+    assert_eq!(
+        network["machines"][0]["last_report_at"],
+        seen["last_report_at"]
+    );
+
     Ok(())
 }

@@ -328,21 +328,14 @@ async fn replace_value(
     let replace = serde_json::to_vec(&json!({
         "operation": "op-replace-0123456789abcdef", "secret": "fixture-token", "value": NEW_VALUE,
     }))?;
-    let stranger = crate::values::replace(
-        State(Arc::clone(shared)),
-        vouched(key, ("POST", "/_lys/replace"), OTHER, &replace)?,
-    )
-    .await
-    .err()
-    .ok_or("someone who does not own the secret replaced its value")?;
+    let request = vouched(key, ("POST", "/_lys/replace"), OTHER, &replace)?;
+    let stranger = crate::values::replace(State(Arc::clone(shared)), request)
+        .await
+        .err()
+        .ok_or("someone who does not own the secret replaced its value")?;
     assert_eq!(stranger.0, StatusCode::FORBIDDEN);
-    let replaced = answered(
-        crate::values::replace(
-            State(Arc::clone(shared)),
-            vouched(key, ("POST", "/_lys/replace"), PERSON, &replace)?,
-        )
-        .await,
-    )?;
+    let request = vouched(key, ("POST", "/_lys/replace"), PERSON, &replace)?;
+    let replaced = answered(crate::values::replace(State(Arc::clone(shared)), request).await)?;
     assert_eq!(replaced["sequence"], 2);
     assert!(!replaced.to_string().contains(NEW_VALUE));
     let (_, text) = call(shared, ("fixture-token", issued), agent).await?;
@@ -359,13 +352,11 @@ async fn refuse_unreadable_value(shared: &Arc<Shared>, key: &Ed25519Identity) ->
     let mut quoted = serde_json::Map::new();
     quoted.insert(VALUE.to_owned(), Value::from(VALUE));
     let unread = serde_json::to_vec(&quoted)?;
-    let refused = crate::values::add(
-        State(Arc::clone(shared)),
-        vouched(key, ("POST", "/_lys/add"), PERSON, &unread)?,
-    )
-    .await
-    .err()
-    .ok_or("an unreadable body was taken")?;
+    let request = vouched(key, ("POST", "/_lys/add"), PERSON, &unread)?;
+    let refused = crate::values::add(State(Arc::clone(shared)), request)
+        .await
+        .err()
+        .ok_or("an unreadable body was taken")?;
     assert_eq!(refused.0, StatusCode::BAD_REQUEST);
     assert!(!refused.1.contains(VALUE));
 

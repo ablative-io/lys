@@ -254,72 +254,7 @@ async fn exchange(
                 json!({"message": "the engine takes no writes"}).to_string(),
             );
         }
-        "/v1/relationships/write" => {
-            let Some(updates) = request["updates"].as_array() else {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    "fixture_updates_missing".to_owned(),
-                );
-            };
-            let preconditions: &[Value] = match request.get("optionalPreconditions") {
-                None => &[],
-                Some(Value::Array(preconditions)) => preconditions,
-                Some(_) => {
-                    return (
-                        StatusCode::BAD_REQUEST,
-                        "fixture_preconditions_not_an_array".to_owned(),
-                    );
-                }
-            };
-            for precondition in preconditions {
-                let found = held
-                    .relationships
-                    .iter()
-                    .any(|row| matches(row, &precondition["filter"]));
-                let satisfied = match precondition["operation"].as_str() {
-                    Some("OPERATION_MUST_MATCH") => found,
-                    Some("OPERATION_MUST_NOT_MATCH") => !found,
-                    _ => {
-                        return (
-                            StatusCode::BAD_REQUEST,
-                            "fixture_precondition_unknown".to_owned(),
-                        );
-                    }
-                };
-                if !satisfied {
-                    return (StatusCode::BAD_REQUEST, "PRECONDITION_FAILED".to_owned());
-                }
-            }
-            for update in updates {
-                if !valid(&held, &update["relationship"]) {
-                    return (
-                        StatusCode::BAD_REQUEST,
-                        json!({"message": "resource relation absent from schema", "relationship": update["relationship"]}).to_string(),
-                    );
-                }
-                if !matches!(
-                    update["operation"].as_str(),
-                    Some("OPERATION_TOUCH" | "OPERATION_DELETE")
-                ) {
-                    return (StatusCode::BAD_REQUEST, "fixture_update_unknown".to_owned());
-                }
-            }
-            let Some(snapshot) = held.snapshot.checked_add(1) else {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "fixture_snapshot_exhausted".to_owned(),
-                );
-            };
-            for update in updates {
-                let relationship = &update["relationship"];
-                held.relationships.retain(|kept| kept != relationship);
-                if update["operation"] == "OPERATION_TOUCH" {
-                    held.relationships.push(relationship.clone());
-                }
-            }
-            held.snapshot = snapshot;
-            json!({"writtenAt": {"token": format!("fixture-snapshot-{snapshot}")}}).to_string()
-        }
+        "/v1/relationships/write" => return write_relationships(&mut held, &request),
         "/v1/permissions/check" => match permitted(&held, &request) {
             Ok(allowed) => json!({"permissionship": permissionship(allowed)}).to_string(),
             Err(reason) => return (StatusCode::BAD_REQUEST, reason.to_owned()),
@@ -346,4 +281,74 @@ async fn exchange(
         _ => return (StatusCode::NOT_FOUND, "fixture_route_unknown".to_owned()),
     };
     (StatusCode::OK, answer)
+}
+
+fn write_relationships(held: &mut Held, request: &Value) -> (StatusCode, String) {
+    let Some(updates) = request["updates"].as_array() else {
+        return (
+            StatusCode::BAD_REQUEST,
+            "fixture_updates_missing".to_owned(),
+        );
+    };
+    let preconditions: &[Value] = match request.get("optionalPreconditions") {
+        None => &[],
+        Some(Value::Array(preconditions)) => preconditions,
+        Some(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                "fixture_preconditions_not_an_array".to_owned(),
+            );
+        }
+    };
+    for precondition in preconditions {
+        let found = held
+            .relationships
+            .iter()
+            .any(|row| matches(row, &precondition["filter"]));
+        let satisfied = match precondition["operation"].as_str() {
+            Some("OPERATION_MUST_MATCH") => found,
+            Some("OPERATION_MUST_NOT_MATCH") => !found,
+            _ => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "fixture_precondition_unknown".to_owned(),
+                );
+            }
+        };
+        if !satisfied {
+            return (StatusCode::BAD_REQUEST, "PRECONDITION_FAILED".to_owned());
+        }
+    }
+    for update in updates {
+        if !valid(held, &update["relationship"]) {
+            return (
+                StatusCode::BAD_REQUEST,
+                json!({"message": "resource relation absent from schema", "relationship": update["relationship"]}).to_string(),
+            );
+        }
+        if !matches!(
+            update["operation"].as_str(),
+            Some("OPERATION_TOUCH" | "OPERATION_DELETE")
+        ) {
+            return (StatusCode::BAD_REQUEST, "fixture_update_unknown".to_owned());
+        }
+    }
+    let Some(snapshot) = held.snapshot.checked_add(1) else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "fixture_snapshot_exhausted".to_owned(),
+        );
+    };
+    for update in updates {
+        let relationship = &update["relationship"];
+        held.relationships.retain(|kept| kept != relationship);
+        if update["operation"] == "OPERATION_TOUCH" {
+            held.relationships.push(relationship.clone());
+        }
+    }
+    held.snapshot = snapshot;
+    (
+        StatusCode::OK,
+        json!({"writtenAt": {"token": format!("fixture-snapshot-{snapshot}")}}).to_string(),
+    )
 }

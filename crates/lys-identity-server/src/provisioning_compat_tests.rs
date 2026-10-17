@@ -60,33 +60,7 @@ fn an_old_profile_rewritten_without_edits_keeps_its_exact_bytes()
 #[test]
 fn an_old_session_profile_stays_manual_and_retains_its_exact_bytes()
 -> Result<(), Box<dyn std::error::Error>> {
-    let original = br#"{
-  "profiles": [
-    {
-      "agent": "ordinary-agent",
-      "versions": [
-        {
-          "number": 1,
-          "operation": "recorded-operation",
-          "settings": {
-            "model_access": [],
-            "tools": [],
-            "skills": [],
-            "mcp_servers": [],
-            "instructions": "",
-            "note": "",
-            "session": {
-              "message_prefix": "legacy prefix",
-              "sensitive": false
-            }
-          },
-          "set_by": "ordinary-person",
-          "set_at": 1
-        }
-      ]
-    }
-  ]
-}"#;
+    let original = old_session_bytes();
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("provisioning.json");
     std::fs::write(&path, original)?;
@@ -189,4 +163,34 @@ fn provisioning_old_shape_version_keeps_all_six_seat_fields_absent()
     assert_eq!(session.context_window, None);
     assert_eq!(session.config_dir, None);
     Ok(())
+}
+
+fn old_session_bytes() -> &'static [u8] {
+    br#"{
+  "profiles": [
+    {
+      "agent": "ordinary-agent",
+      "versions": [
+        {
+          "number": 1,
+          "operation": "recorded-operation",
+          "settings": {
+            "model_access": [],
+            "tools": [],
+            "skills": [],
+            "mcp_servers": [],
+            "instructions": "",
+            "note": "",
+            "session": {
+              "message_prefix": "legacy prefix",
+              "sensitive": false
+            }
+          },
+          "set_by": "ordinary-person",
+          "set_at": 1
+        }
+      ]
+    }
+  ]
+}"#
 }

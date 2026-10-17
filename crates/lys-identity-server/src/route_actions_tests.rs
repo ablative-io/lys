@@ -134,44 +134,15 @@ async fn fixture_with(
                 "",
                 3,
             )?;
-            let mut runtime = crate::runtime_store::RuntimeStore::open(
-                &config
+            reported_runtime(
+                config
                     .runtime_dir
-                    .clone()
+                    .as_deref()
                     .ok_or("fixture needs runtime records")?,
-                std::sync::Arc::new(lys_identity::signer::load_service_key(
-                    &config.event_key_file,
-                )?),
+                &config.event_key_file,
+                person,
+                agent,
             )?;
-            runtime.report(crate::runtime_state::Report {
-                operation: operation()?,
-                session: "session-proof".to_owned(),
-                agent: Some(agent.to_string()),
-                machine: "fixture-machine".to_owned(),
-                state: crate::runtime_state::Reported::Starting,
-                what: "starting".to_owned(),
-                confirmation: String::new(),
-                reported_by: person.to_string(),
-                at: 1,
-                launch: None,
-            })?;
-            // The runner answered the start: a pass on a session still only
-            // starting does not survive the restart.
-            runtime.report(crate::runtime_state::Report {
-                operation: operation()?,
-                session: "session-proof".to_owned(),
-                agent: Some(agent.to_string()),
-                machine: "fixture-machine".to_owned(),
-                state: crate::runtime_state::Reported::Running,
-                what: "running".to_owned(),
-                confirmation: String::new(),
-                reported_by: person.to_string(),
-                at: 2,
-                launch: None,
-            })?;
-            if let Some(reason) = runtime.snapshot_failure() {
-                return Err(format!("fixture runtime snapshot failed: {reason}").into());
-            }
             let mut passes = crate::agent_pass_store::Passes::open(
                 config.log_dir.with_file_name("agent-passes.json"),
             )?;
@@ -501,3 +472,45 @@ async fn an_unknown_kept_route_refuses_service_startup() -> TestResult {
 
 #[path = "requests_app_kind_tests.rs"]
 mod requests_app_kind_tests;
+
+fn reported_runtime(
+    runtime_dir: &std::path::Path,
+    key_file: &std::path::Path,
+    person: lys_identity::PersonId,
+    agent: lys_identity::AgentId,
+) -> TestResult {
+    let mut runtime = crate::runtime_store::RuntimeStore::open(
+        runtime_dir,
+        std::sync::Arc::new(lys_identity::signer::load_service_key(key_file)?),
+    )?;
+    runtime.report(crate::runtime_state::Report {
+        operation: operation()?,
+        session: "session-proof".to_owned(),
+        agent: Some(agent.to_string()),
+        machine: "fixture-machine".to_owned(),
+        state: crate::runtime_state::Reported::Starting,
+        what: "starting".to_owned(),
+        confirmation: String::new(),
+        reported_by: person.to_string(),
+        at: 1,
+        launch: None,
+    })?;
+    // The runner answered the start: a pass on a session still only
+    // starting does not survive the restart.
+    runtime.report(crate::runtime_state::Report {
+        operation: operation()?,
+        session: "session-proof".to_owned(),
+        agent: Some(agent.to_string()),
+        machine: "fixture-machine".to_owned(),
+        state: crate::runtime_state::Reported::Running,
+        what: "running".to_owned(),
+        confirmation: String::new(),
+        reported_by: person.to_string(),
+        at: 2,
+        launch: None,
+    })?;
+    if let Some(reason) = runtime.snapshot_failure() {
+        return Err(format!("fixture runtime snapshot failed: {reason}").into());
+    }
+    Ok(())
+}

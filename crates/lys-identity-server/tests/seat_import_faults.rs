@@ -333,38 +333,7 @@ async fn seat_import_signal_faults() -> TestResult {
     let manifest = scene.manifest(false, None);
     let mut answers = Vec::new();
 
-    // Source mutation: the file changes between preview and confirmation.
-    let prompt = scene.folder.join("system-prompt.md");
-    let plan = scene.dry_run(&manifest).await?;
-    assert_eq!(plan_refusals(&plan)?.len(), 0, "{plan}");
-    let before = scene.destinations().await?;
-    std::fs::write(&prompt, "You are Waffles, changed after the preview.\n")?;
-    let answer = scene.confirm(&plan, &operation()?).await?;
-    refused(&answer, SOURCE_MOVED);
-    assert!(
-        answer.1.to_string().contains("system-prompt.md"),
-        "{}",
-        answer.1
-    );
-    assert_eq!(scene.destinations().await?, before, "a moved source wrote");
-    answers.push(answer.1);
-    std::fs::write(&prompt, "You are Waffles.\n")?;
-
-    // Denied read: the settings file cannot be read.
-    let settings = scene.folder.join("settings.json");
-    std::fs::set_permissions(&settings, std::fs::Permissions::from_mode(0o000))?;
-    let plan = scene.dry_run(&manifest).await?;
-    std::fs::set_permissions(&settings, std::fs::Permissions::from_mode(0o600))?;
-    let refusals = plan_refusals(&plan)?;
-    assert!(
-        refusals
-            .iter()
-            .any(|refusal| refusal["name"] == "import_source_unreadable"
-                && refusal.to_string().contains("settings.json")),
-        "{plan}"
-    );
-    refused_and_unwritten(&scene, &plan).await?;
-    answers.push(plan);
+    assert_source_faults(&scene, &manifest, &mut answers).await?;
 
     // Credential-reference failure: absent, then unreadable, each refused
     // before confirmation and neither read for its key.
@@ -391,21 +360,7 @@ async fn seat_import_signal_faults() -> TestResult {
         answers.push(plan);
     }
 
-    // An Argus source that refuses to be read is unavailable, never empty.
-    scene.argus.set(Mode::Deny)?;
-    let plan = scene.dry_run(&scene.manifest(true, None)).await?;
-    scene.argus.set(Mode::Answer)?;
-    assert!(
-        plan_refusals(&plan)?
-            .iter()
-            .any(|refusal| refusal["name"] == "import_source_unavailable"
-                && refusal["member"]
-                    .as_str()
-                    .is_some_and(|member| member.contains("/api/"))),
-        "{plan}"
-    );
-    refused_and_unwritten(&scene, &plan).await?;
-    answers.push(plan);
+    assert_argus_fault(&scene, &mut answers).await?;
 
     // The competing reads all answered while every fault was refused.
     stop.send(true)?;
@@ -524,4 +479,66 @@ async fn seat_import_hot_paths_do_no_import_work() -> TestResult {
     let (status, text) = in_flight.await??;
     assert_eq!(status, 200, "{text}");
     scene.table.close()
+}
+
+async fn assert_source_faults(
+    scene: &Scene,
+    manifest: &Value,
+    answers: &mut Vec<Value>,
+) -> TestResult {
+    // Source mutation: the file changes between preview and confirmation.
+    let prompt = scene.folder.join("system-prompt.md");
+    let plan = scene.dry_run(manifest).await?;
+    assert_eq!(plan_refusals(&plan)?.len(), 0, "{plan}");
+    let before = scene.destinations().await?;
+    std::fs::write(&prompt, "You are Waffles, changed after the preview.\n")?;
+    let confirming = operation()?;
+    let answer = scene.confirm(&plan, &confirming).await?;
+    refused(&answer, SOURCE_MOVED);
+    assert!(
+        answer.1.to_string().contains("system-prompt.md"),
+        "{}",
+        answer.1
+    );
+    assert_eq!(scene.destinations().await?, before, "a moved source wrote");
+    answers.push(answer.1);
+    std::fs::write(&prompt, "You are Waffles.\n")?;
+
+    // Denied read: the settings file cannot be read.
+    let settings = scene.folder.join("settings.json");
+    std::fs::set_permissions(&settings, std::fs::Permissions::from_mode(0o000))?;
+    let plan = scene.dry_run(manifest).await?;
+    std::fs::set_permissions(&settings, std::fs::Permissions::from_mode(0o600))?;
+    let refusals = plan_refusals(&plan)?;
+    assert!(
+        refusals
+            .iter()
+            .any(|refusal| refusal["name"] == "import_source_unreadable"
+                && refusal.to_string().contains("settings.json")),
+        "{plan}"
+    );
+    refused_and_unwritten(scene, &plan).await?;
+    answers.push(plan);
+
+    Ok(())
+}
+
+async fn assert_argus_fault(scene: &Scene, answers: &mut Vec<Value>) -> TestResult {
+    // An Argus source that refuses to be read is unavailable, never empty.
+    scene.argus.set(Mode::Deny)?;
+    let plan = scene.dry_run(&scene.manifest(true, None)).await?;
+    scene.argus.set(Mode::Answer)?;
+    assert!(
+        plan_refusals(&plan)?
+            .iter()
+            .any(|refusal| refusal["name"] == "import_source_unavailable"
+                && refusal["member"]
+                    .as_str()
+                    .is_some_and(|member| member.contains("/api/"))),
+        "{plan}"
+    );
+    refused_and_unwritten(scene, &plan).await?;
+    answers.push(plan);
+
+    Ok(())
 }

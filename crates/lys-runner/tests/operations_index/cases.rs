@@ -933,59 +933,7 @@ fn typed_checkpoint_cost(count: usize) -> Result<(), Box<dyn Error>> {
     let sessions = crate::session::Sessions::open(dir.path(), 4096)?;
     let at = crate::session::now_ms();
     let retained = count.min(1_000);
-    {
-        let mut table = sessions.lock()?;
-        let operations = &mut table.operations;
-        operations.seen = (0..count)
-            .map(|index| format!("operation-{index:032x}"))
-            .collect();
-        for index in 0..retained {
-            let id = format!("operation-{index:032x}");
-            let reference = crate::harness_control::ReminderReference {
-                goal: format!("goal-{index}"),
-                occurrence: format!("occurrence-{index}"),
-                version: "version".to_owned(),
-                prior: None,
-            };
-            let request = super::OperationRequest::GoalReminder {
-                text: "private saved input".to_owned(),
-                reference: reference.clone(),
-            };
-            let mut prepared = control_preparation()?;
-            prepared.uuid = crate::harness_control::Pending::for_goal(
-                id.clone(),
-                "private saved input".to_owned(),
-                reference.clone(),
-            )
-            .uuid;
-            prepared.reference = Some(reference);
-            prepared.frame = serde_json::json!({"type":"user","uuid":prepared.uuid,"message":{"content":"private saved input"}});
-            let admission = super::control::Admission {
-                binding: prepared.binding.clone(),
-                uuid: prepared.uuid.clone(),
-                turn: Some(format!("turn-{index}")),
-            };
-            operations
-                .original_requests
-                .insert(id.clone(), request.identity()?);
-            operations.controls.insert(
-                id.clone(),
-                super::control::Control {
-                    prepared: Some(prepared),
-                    original_text: Some(super::TextDigest::of("private saved input")),
-                    certainty: super::Certainty::Observed,
-                    admitted: Some(admission),
-                    decision: None,
-                },
-            );
-            let mut kept = outcome(id);
-            kept.request = "goal_reminder".to_owned();
-            kept.state = OperationState::Confirmed;
-            kept.at = at;
-            kept.text = Some(super::TextDigest::of("private saved input"));
-            operations.fold(kept, at);
-        }
-    }
+    seed_checkpoint(&sessions, count, retained, at)?;
     sessions.writer.barrier()?;
     super::store::measurement::begin();
     let acquired = std::time::Instant::now();
@@ -1047,4 +995,64 @@ fn typed_checkpoint_one_hundred_thousand_used_ids() -> Result<(), Box<dyn Error>
 #[test]
 fn typed_checkpoint_one_million_used_ids() -> Result<(), Box<dyn Error>> {
     typed_checkpoint_cost(1_000_000)
+}
+
+fn seed_checkpoint(
+    sessions: &crate::session::Sessions,
+    count: usize,
+    retained: usize,
+    at: u64,
+) -> Result<(), Box<dyn Error>> {
+    let mut table = sessions.lock()?;
+    let operations = &mut table.operations;
+    operations.seen = (0..count)
+        .map(|index| format!("operation-{index:032x}"))
+        .collect();
+    for index in 0..retained {
+        let id = format!("operation-{index:032x}");
+        let reference = crate::harness_control::ReminderReference {
+            goal: format!("goal-{index}"),
+            occurrence: format!("occurrence-{index}"),
+            version: "version".to_owned(),
+            prior: None,
+        };
+        let request = super::OperationRequest::GoalReminder {
+            text: "private saved input".to_owned(),
+            reference: reference.clone(),
+        };
+        let mut prepared = control_preparation()?;
+        prepared.uuid = crate::harness_control::Pending::for_goal(
+            id.clone(),
+            "private saved input".to_owned(),
+            reference.clone(),
+        )
+        .uuid;
+        prepared.reference = Some(reference);
+        prepared.frame = serde_json::json!({"type":"user","uuid":prepared.uuid,"message":{"content":"private saved input"}});
+        let admission = super::control::Admission {
+            binding: prepared.binding.clone(),
+            uuid: prepared.uuid.clone(),
+            turn: Some(format!("turn-{index}")),
+        };
+        operations
+            .original_requests
+            .insert(id.clone(), request.identity()?);
+        operations.controls.insert(
+            id.clone(),
+            super::control::Control {
+                prepared: Some(prepared),
+                original_text: Some(super::TextDigest::of("private saved input")),
+                certainty: super::Certainty::Observed,
+                admitted: Some(admission),
+                decision: None,
+            },
+        );
+        let mut kept = outcome(id);
+        kept.request = "goal_reminder".to_owned();
+        kept.state = OperationState::Confirmed;
+        kept.at = at;
+        kept.text = Some(super::TextDigest::of("private saved input"));
+        operations.fold(kept, at);
+    }
+    Ok(())
 }

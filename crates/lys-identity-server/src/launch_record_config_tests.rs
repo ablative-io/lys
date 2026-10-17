@@ -17,55 +17,7 @@ use std::sync::Arc;
 fn a_launch_record_requires_a_proxy_then_writes_the_pass_into_the_seat_config()
 -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
-    let program = dir.path().join("seat with spaces");
-    std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
-    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
-    let agent = AgentId::from_bytes([1; 16]);
-    let agent_text = agent.to_string();
-    let mut harness = harness_description::declared();
-    harness["program"] = json!(program);
-    let version: Version = serde_json::from_value(json!({
-        "number":1, "operation":"op-fixture-profile", "settings":{
-            "model_access":["fixture-model"], "tools":[], "skills":[], "mcp_servers":[],
-            "permissions":{"default_mode":"plan"},
-            "instructions":"", "note":"", "harness":harness
-        }, "set_by":"fixture-person", "set_at":1,
-        "reviewed":{"operation":"op-fixture-review", "by":"fixture-person", "at":1}
-    }))?;
-    let rendered = render(
-        &Start {
-            agent: &agent_text,
-            session: "session-fixture",
-            machine: "machine-fixture",
-            runtime: "sh",
-            version: &version,
-            skills: &[],
-            policy: None,
-            model_proxy: Some("http://127.0.0.1:18484"),
-        },
-        &[],
-    )?;
-    let native = from_template(&version, &rendered.template, &rendered.template_sha256)?;
-    let record = LaunchRecord {
-        id: "launch-fixture".to_owned(),
-        agent: agent_text.clone(),
-        machine: "machine-fixture".to_owned(),
-        executable: native.program,
-        arguments: native.arguments,
-        working_directory: dir.path().display().to_string(),
-        profile_version: version.operation.clone(),
-        credential_ids: Vec::new(),
-        given_by: "fixture-person".to_owned(),
-        given_at: 1,
-        copied_from: None,
-    };
-    let mut store = ProvisioningStore::open(&dir.path().join("profiles.json"))?;
-    let mut later = version.clone();
-    later.number = 2;
-    later.operation = "op-fixture-later".to_owned();
-    later.settings.instructions = "a later profile must not replace this signed start".to_owned();
-    store.set(&agent_text, 0, version)?;
-    store.set(&agent_text, 1, later)?;
+    let (agent, store, record) = prepared_launch(dir.path())?;
     let mut unknown = record.clone();
     unknown.profile_version = "op-fixture-absent".to_owned();
     assert!(matches!(
@@ -124,58 +76,7 @@ fn a_launch_record_requires_a_proxy_then_writes_the_pass_into_the_seat_config()
         None,
         Some("http://127.0.0.1:18484/anthropic"),
     )?;
-    let proxy = "http://127.0.0.1:18484/anthropic";
-    let proxied = build(
-        &store,
-        &record,
-        "session-fixture".to_owned(),
-        "sh",
-        None,
-        Some(proxy),
-    )?;
-    // The run is given the proxy under a key minted for this launch alone.
-    let run = proxied
-        .environment
-        .get("LYS_RUN")
-        .ok_or("a start through the model proxy was given no run key")?;
-    if run.is_empty() || !run.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
-        return Err("the run key is not plain letters and digits".into());
-    }
-    if proxied
-        .environment
-        .get("ANTHROPIC_BASE_URL")
-        .map(String::as_str)
-        != Some(format!("http://127.0.0.1:18484/{run}/anthropic").as_str())
-    {
-        return Err("the run's base URL is not the model proxy under its run key".into());
-    }
-    assert_eq!(
-        proxied.environment.keys().collect::<Vec<_>>(),
-        launch.environment.keys().collect::<Vec<_>>()
-    );
-    for (name, value) in &launch.environment {
-        if !["ANTHROPIC_BASE_URL", "LYS_RUN", "LYS_LAUNCH_TEMPLATE"].contains(&name.as_str()) {
-            assert_eq!(
-                proxied.environment.get(name),
-                Some(value),
-                "proxy changed {name}"
-            );
-        }
-    }
-    assert_eq!(proxied.program, launch.program);
-    assert_eq!(proxied.arguments, launch.arguments);
-    assert!(proxied.environment.contains_key("ANTHROPIC_BASE_URL"));
-    let again = build(
-        &store,
-        &record,
-        "session-fixture".to_owned(),
-        "sh",
-        None,
-        Some(proxy),
-    )?;
-    if again.environment.get("LYS_RUN") == Some(run) {
-        return Err("two launches were given the same run key".into());
-    }
+    assert_proxy_runs(&store, &record, &launch)?;
     let mut passes = Passes::open(dir.path().join("passes.json"))?;
     let act =
         crate::runner_start_pass::act(&mut passes, agent, "http://fixture.test", launch, None)?;
@@ -361,5 +262,120 @@ fn a_start_again_record_with_a_legacy_pin_uses_the_current_command() -> Result<(
         ),
         Err(crate::error::ServerError::LaunchUnrenderable { .. })
     ));
+    Ok(())
+}
+
+fn prepared_launch(
+    dir: &std::path::Path,
+) -> Result<(AgentId, ProvisioningStore, LaunchRecord), Box<dyn Error>> {
+    let program = dir.join("seat with spaces");
+    std::fs::write(&program, "#!/bin/sh\nexit 0\n")?;
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700))?;
+    let agent = AgentId::from_bytes([1; 16]);
+    let agent_text = agent.to_string();
+    let mut harness = harness_description::declared();
+    harness["program"] = json!(program);
+    let version: Version = serde_json::from_value(json!({
+        "number":1, "operation":"op-fixture-profile", "settings":{
+            "model_access":["fixture-model"], "tools":[], "skills":[], "mcp_servers":[],
+            "permissions":{"default_mode":"plan"},
+            "instructions":"", "note":"", "harness":harness
+        }, "set_by":"fixture-person", "set_at":1,
+        "reviewed":{"operation":"op-fixture-review", "by":"fixture-person", "at":1}
+    }))?;
+    let rendered = render(
+        &Start {
+            agent: &agent_text,
+            session: "session-fixture",
+            machine: "machine-fixture",
+            runtime: "sh",
+            version: &version,
+            skills: &[],
+            policy: None,
+            model_proxy: Some("http://127.0.0.1:18484"),
+        },
+        &[],
+    )?;
+    let native = from_template(&version, &rendered.template, &rendered.template_sha256)?;
+    let record = LaunchRecord {
+        id: "launch-fixture".to_owned(),
+        agent: agent_text.clone(),
+        machine: "machine-fixture".to_owned(),
+        executable: native.program,
+        arguments: native.arguments,
+        working_directory: dir.display().to_string(),
+        profile_version: version.operation.clone(),
+        credential_ids: Vec::new(),
+        given_by: "fixture-person".to_owned(),
+        given_at: 1,
+        copied_from: None,
+    };
+    let mut store = ProvisioningStore::open(&dir.join("profiles.json"))?;
+    let mut later = version.clone();
+    later.number = 2;
+    later.operation = "op-fixture-later".to_owned();
+    later.settings.instructions = "a later profile must not replace this signed start".to_owned();
+    store.set(&agent_text, 0, version)?;
+    store.set(&agent_text, 1, later)?;
+    Ok((agent, store, record))
+}
+
+fn assert_proxy_runs(
+    store: &ProvisioningStore,
+    record: &LaunchRecord,
+    launch: &lys_runner::Launch,
+) -> Result<(), Box<dyn Error>> {
+    let proxy = "http://127.0.0.1:18484/anthropic";
+    let proxied = build(
+        store,
+        record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        Some(proxy),
+    )?;
+    // The run is given the proxy under a key minted for this launch alone.
+    let run = proxied
+        .environment
+        .get("LYS_RUN")
+        .ok_or("a start through the model proxy was given no run key")?;
+    if run.is_empty() || !run.bytes().all(|byte| byte.is_ascii_alphanumeric()) {
+        return Err("the run key is not plain letters and digits".into());
+    }
+    if proxied
+        .environment
+        .get("ANTHROPIC_BASE_URL")
+        .map(String::as_str)
+        != Some(format!("http://127.0.0.1:18484/{run}/anthropic").as_str())
+    {
+        return Err("the run's base URL is not the model proxy under its run key".into());
+    }
+    assert_eq!(
+        proxied.environment.keys().collect::<Vec<_>>(),
+        launch.environment.keys().collect::<Vec<_>>()
+    );
+    for (name, value) in &launch.environment {
+        if !["ANTHROPIC_BASE_URL", "LYS_RUN", "LYS_LAUNCH_TEMPLATE"].contains(&name.as_str()) {
+            assert_eq!(
+                proxied.environment.get(name),
+                Some(value),
+                "proxy changed {name}"
+            );
+        }
+    }
+    assert_eq!(proxied.program, launch.program);
+    assert_eq!(proxied.arguments, launch.arguments);
+    assert!(proxied.environment.contains_key("ANTHROPIC_BASE_URL"));
+    let again = build(
+        store,
+        record,
+        "session-fixture".to_owned(),
+        "sh",
+        None,
+        Some(proxy),
+    )?;
+    if again.environment.get("LYS_RUN") == Some(run) {
+        return Err("two launches were given the same run key".into());
+    }
     Ok(())
 }

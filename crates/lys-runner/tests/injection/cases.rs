@@ -180,34 +180,11 @@ fn old_session_record_migrates_with_explicitly_absent_responsibility() -> TestRe
 #[test]
 fn every_owned_legacy_act_uses_the_live_input_grant() -> TestResult {
     use crate::legacy_input::InputContext;
-    use crate::protocol::{Act, Answer, Greeting, Key, sign_request};
+    use crate::protocol::{Answer, Greeting, sign_request};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     let fixture = Fixture::owned()?;
     let server = lys_core::Ed25519Identity::ephemeral();
-    let acts = [
-        Act::InputBytes {
-            session: "session".to_owned(),
-            data: b"raw".to_vec(),
-        },
-        Act::Input {
-            session: "session".to_owned(),
-            text: "text".to_owned(),
-            enter: true,
-        },
-        Act::Keys {
-            session: "session".to_owned(),
-            keys: vec![Key::Enter],
-        },
-        Act::Operate {
-            operation: crate::operations::Operation {
-                operation: "compact-explicit".to_owned(),
-                session: "session".to_owned(),
-                request: crate::operations::OperationRequest::Compact {
-                    text: "/compact".to_owned(),
-                },
-            },
-        },
-    ];
+    let acts = owned_legacy_acts();
     let denied = |grant: &InputGrant<'_>| {
         assert_eq!(
             (grant.kind, grant.id, grant.action, grant.sender),
@@ -289,24 +266,7 @@ fn every_owned_legacy_act_uses_the_live_input_grant() -> TestResult {
         assert!(!matches!(answer, Answer::Refused { .. }), "{answer:?}");
     }
     assert_eq!(calls.load(Ordering::Relaxed), 4);
-    let entries = fixture.entries()?;
-    let injections: Vec<_> = entries
-        .iter()
-        .filter(|entry| entry["body"]["kind"] == "injection")
-        .collect();
-    assert_eq!(injections.len(), 4);
-    assert!(
-        injections
-            .iter()
-            .all(|entry| entry["body"]["entry"]["sender"] == "agent.caller")
-    );
-    assert!(
-        !fixture
-            .bytes
-            .lock()
-            .map_err(|error| error.to_string())?
-            .is_empty()
-    );
+    assert_owned_injections(&fixture)?;
     fixture.end()
 }
 
@@ -510,5 +470,55 @@ fn a_failed_durable_leaf_prevents_terminal_delivery() -> TestResult {
         .expect_err("sticky durability failure");
     assert_eq!(stopped.name(), "durable_writer_unavailable");
     drop(fixture.terminal);
+    Ok(())
+}
+
+fn owned_legacy_acts() -> Vec<crate::protocol::Act> {
+    use crate::protocol::{Act, Key};
+    vec![
+        Act::InputBytes {
+            session: "session".to_owned(),
+            data: b"raw".to_vec(),
+        },
+        Act::Input {
+            session: "session".to_owned(),
+            text: "text".to_owned(),
+            enter: true,
+        },
+        Act::Keys {
+            session: "session".to_owned(),
+            keys: vec![Key::Enter],
+        },
+        Act::Operate {
+            operation: crate::operations::Operation {
+                operation: "compact-explicit".to_owned(),
+                session: "session".to_owned(),
+                request: crate::operations::OperationRequest::Compact {
+                    text: "/compact".to_owned(),
+                },
+            },
+        },
+    ]
+}
+
+fn assert_owned_injections(fixture: &Fixture) -> TestResult {
+    let entries = fixture.entries()?;
+    let injections: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry["body"]["kind"] == "injection")
+        .collect();
+    assert_eq!(injections.len(), 4);
+    assert!(
+        injections
+            .iter()
+            .all(|entry| entry["body"]["entry"]["sender"] == "agent.caller")
+    );
+    assert!(
+        !fixture
+            .bytes
+            .lock()
+            .map_err(|error| error.to_string())?
+            .is_empty()
+    );
     Ok(())
 }

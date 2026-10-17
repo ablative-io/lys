@@ -475,36 +475,7 @@ async fn issuer_refusal(
     let fixture = IssuerRefusalFixture::new(status, error, expires)?;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let base = format!("http://{}", listener.local_addr()?);
-    let discovery = json!({
-        "issuer": base,
-        "authorization_endpoint": format!("{base}/oidc/authorize"),
-        "token_endpoint": format!("{base}/oidc/token"),
-        "jwks_uri": format!("{base}/jwks"),
-        "response_types_supported": ["code"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["EdDSA"],
-    });
-    let routes = axum::Router::new()
-        .route(
-            "/.well-known/openid-configuration",
-            axum::routing::get(move || {
-                let discovery = discovery.clone();
-                async move { axum::Json(discovery) }
-            }),
-        )
-        .route(
-            "/jwks",
-            axum::routing::get(|| async { axum::Json(json!({"keys": []})) }),
-        )
-        .route(
-            "/oidc/authorize",
-            axum::routing::get(|| async {
-                "<template id=\"tpl_csrf_token\">fixture-request-token</template>"
-            })
-            .post(refuse_authorization),
-        )
-        .route("/pow", axum::routing::post(refusal_challenge))
-        .with_state(fixture.clone());
+    let routes = issuer_refusal_routes(&base, fixture.clone());
     let (stop, stopped) = tokio::sync::oneshot::channel();
     let serving = tokio::spawn(async move {
         axum::serve(listener, routes)
@@ -794,4 +765,37 @@ async fn the_public_provider_start_refuses_expiry_before_posting_to_the_provider
     assert!(!live.log.contains("IssuerChallengeExpired"));
     assert_public_refusal_privacy(&live);
     Ok(())
+}
+
+fn issuer_refusal_routes(base: &str, fixture: IssuerRefusalFixture) -> axum::Router {
+    let discovery = json!({
+        "issuer": base,
+        "authorization_endpoint": format!("{base}/oidc/authorize"),
+        "token_endpoint": format!("{base}/oidc/token"),
+        "jwks_uri": format!("{base}/jwks"),
+        "response_types_supported": ["code"],
+        "subject_types_supported": ["public"],
+        "id_token_signing_alg_values_supported": ["EdDSA"],
+    });
+    axum::Router::new()
+        .route(
+            "/.well-known/openid-configuration",
+            axum::routing::get(move || {
+                let discovery = discovery.clone();
+                async move { axum::Json(discovery) }
+            }),
+        )
+        .route(
+            "/jwks",
+            axum::routing::get(|| async { axum::Json(json!({"keys": []})) }),
+        )
+        .route(
+            "/oidc/authorize",
+            axum::routing::get(|| async {
+                "<template id=\"tpl_csrf_token\">fixture-request-token</template>"
+            })
+            .post(refuse_authorization),
+        )
+        .route("/pow", axum::routing::post(refusal_challenge))
+        .with_state(fixture)
 }

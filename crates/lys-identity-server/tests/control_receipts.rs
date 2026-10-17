@@ -569,67 +569,8 @@ async fn control_session_pages_keep_stopped_ids_and_refuse_foreign_visibility_an
     use identity_contract::fake_issuer::Login;
     use identity_contract::harness::Service;
     use lys_identity::OperationId;
-    use lys_identity_server::dev_seed::seed_configured;
-    use lys_identity_server::runtime_state::{Report, Reported};
-    use lys_identity_server::runtime_store::RuntimeStore;
-    use std::sync::Arc;
-    let (service, (seeded, expected, foreign_session)) = Service::start_with(|config| {
-        let seeded = seed_configured(
-            config,
-            [identity_contract::harness::ADMINISTRATOR, "page-foreign"],
-        )?;
-        let key = Arc::new(lys_identity::signer::load_service_key(
-            &config.event_key_file,
-        )?);
-        let path = config.runtime_dir.as_deref().ok_or("runtime dir absent")?;
-        let mut runtime = RuntimeStore::open(path, Arc::clone(&key))?;
-        let ids: Vec<String> = (0..514)
-            .map(|_| OperationId::generate().map(|id| id.to_string()))
-            .collect::<Result<_, _>>()?;
-        let foreign = ids[0].clone();
-        let reports = ids
-            .iter()
-            .enumerate()
-            .map(|(number, session)| {
-                let person = &seeded.people[usize::from(number == 0)];
-                Report {
-                    operation: format!("start-{number}"),
-                    session: session.clone(),
-                    agent: Some(person.agents[0].id.to_string()),
-                    machine: "private-page-machine".to_owned(),
-                    state: Reported::Starting,
-                    what: "private report words".to_owned(),
-                    confirmation: String::new(),
-                    reported_by: person.id.to_string(),
-                    at: 1,
-                    launch: None,
-                }
-            })
-            .collect();
-        runtime.report_all(reports)?;
-        runtime.report(Report {
-            operation: "stop-first".to_owned(),
-            session: ids[1].clone(),
-            agent: Some(seeded.people[0].agents[0].id.to_string()),
-            machine: "private-page-machine".to_owned(),
-            state: Reported::Stopped,
-            what: String::new(),
-            confirmation: "exit".to_owned(),
-            reported_by: seeded.people[0].id.to_string(),
-            at: 2,
-            launch: None,
-        })?;
-        drop(runtime);
-        let reopened = RuntimeStore::open(path, key)?;
-        assert!(
-            reopened
-                .session(&ids[1])
-                .ok_or("stopped session absent")?
-                .stopped()
-        );
-        Ok((seeded, ids[1..].to_vec(), foreign))
-    })
-    .await?;
+    let (service, (seeded, expected, foreign_session)) =
+        Service::start_with(seed_control_sessions).await?;
     let owner = service
         .sign_in(Login {
             subject: identity_contract::harness::ADMINISTRATOR.to_owned(),
@@ -2080,4 +2021,69 @@ async fn controls_documents_an_unreachable_runner() -> TestResult {
     assert_eq!(status, 503, "{answer}");
     assert_eq!(answer["refusal"], "runner_unreachable", "{answer}");
     table.finish(&[]).await
+}
+
+fn seed_control_sessions(
+    config: &lys_identity_server::config::Config,
+) -> Result<(lys_identity_server::dev_seed::Seeded, Vec<String>, String), Box<dyn std::error::Error>>
+{
+    use lys_identity::OperationId;
+    use lys_identity_server::dev_seed::seed_configured;
+    use lys_identity_server::runtime_state::{Report, Reported};
+    use lys_identity_server::runtime_store::RuntimeStore;
+    use std::sync::Arc;
+    let seeded = seed_configured(
+        config,
+        [identity_contract::harness::ADMINISTRATOR, "page-foreign"],
+    )?;
+    let key = Arc::new(lys_identity::signer::load_service_key(
+        &config.event_key_file,
+    )?);
+    let path = config.runtime_dir.as_deref().ok_or("runtime dir absent")?;
+    let mut runtime = RuntimeStore::open(path, Arc::clone(&key))?;
+    let ids: Vec<String> = (0..514)
+        .map(|_| OperationId::generate().map(|id| id.to_string()))
+        .collect::<Result<_, _>>()?;
+    let foreign = ids[0].clone();
+    let reports = ids
+        .iter()
+        .enumerate()
+        .map(|(number, session)| {
+            let person = &seeded.people[usize::from(number == 0)];
+            Report {
+                operation: format!("start-{number}"),
+                session: session.clone(),
+                agent: Some(person.agents[0].id.to_string()),
+                machine: "private-page-machine".to_owned(),
+                state: Reported::Starting,
+                what: "private report words".to_owned(),
+                confirmation: String::new(),
+                reported_by: person.id.to_string(),
+                at: 1,
+                launch: None,
+            }
+        })
+        .collect();
+    runtime.report_all(reports)?;
+    runtime.report(Report {
+        operation: "stop-first".to_owned(),
+        session: ids[1].clone(),
+        agent: Some(seeded.people[0].agents[0].id.to_string()),
+        machine: "private-page-machine".to_owned(),
+        state: Reported::Stopped,
+        what: String::new(),
+        confirmation: "exit".to_owned(),
+        reported_by: seeded.people[0].id.to_string(),
+        at: 2,
+        launch: None,
+    })?;
+    drop(runtime);
+    let reopened = RuntimeStore::open(path, key)?;
+    assert!(
+        reopened
+            .session(&ids[1])
+            .ok_or("stopped session absent")?
+            .stopped()
+    );
+    Ok((seeded, ids[1..].to_vec(), foreign))
 }

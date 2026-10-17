@@ -370,57 +370,91 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         .as_object()
         .ok_or("the section names no acts")?;
     let id = "published".to_owned();
-    let every_act = [
+    let every_act = published_acts(&id);
+    let mut named = 0;
+    for act in &every_act {
+        let tag = serde_json::to_value(act)?["act"]
+            .as_str()
+            .ok_or("an act has no tag")?
+            .to_owned();
+        assert!(acts.contains_key(&tag), "{tag} is not published");
+        assert!(lys_runner::published::ACTS.contains(&tag.as_str()), "{tag}");
+        named += 1;
+    }
+    assert_eq!(
+        (named, acts.len()),
+        (
+            lys_runner::published::ACTS.len(),
+            lys_runner::published::ACTS.len()
+        )
+    );
+    let answers = described["answers"]
+        .as_array()
+        .ok_or("the section names no answers")?;
+    let every_answer = published_answers(&id);
+    let mut kinds = 0;
+    for answer in &every_answer {
+        let kind = serde_json::to_value(answer)?["kind"].clone();
+        assert!(answers.contains(&kind), "{kind} is not published");
+        kinds += 1;
+    }
+    assert_eq!(kinds, every_answer.len());
+    assert_eq!(answers.len(), lys_runner::published::ANSWERS.len());
+    Ok(())
+}
+
+fn published_acts(id: &str) -> Vec<Act> {
+    vec![
         Act::ReadBytes {
-            session: id.clone(),
+            session: id.to_owned(),
             cursor: None,
             follow: false,
         },
         Act::InputBytes {
-            session: id.clone(),
+            session: id.to_owned(),
             data: vec![0xff],
         },
         Act::Start {
             tracking: None,
             lys_mcp: None,
             proxy: None,
-            launch: Box::new(shell(&id)),
+            launch: Box::new(shell(id)),
         },
         Act::Input {
-            session: id.clone(),
+            session: id.to_owned(),
             text: String::new(),
             enter: false,
         },
         Act::Keys {
-            session: id.clone(),
+            session: id.to_owned(),
             keys: vec![Key::Enter],
         },
         Act::Read {
-            session: id.clone(),
+            session: id.to_owned(),
             cursor: None,
             lines: None,
             bytes: None,
             follow: false,
         },
         Act::Wait {
-            session: id.clone(),
+            session: id.to_owned(),
             cursor: None,
             pattern: "p".to_owned(),
             regex: false,
         },
         Act::Resize {
-            session: id.clone(),
+            session: id.to_owned(),
             columns: 1,
             rows: 1,
         },
         Act::End {
-            session: id.clone(),
+            session: id.to_owned(),
         },
         Act::Status { session: None },
         Act::Operate {
             operation: Operation {
                 operation: "op".to_owned(),
-                session: id.clone(),
+                session: id.to_owned(),
                 request: OperationRequest::Stop,
             },
         },
@@ -442,35 +476,18 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         },
         Act::Liveness { session: None },
         Act::AttachRead {
-            session: id.clone(),
+            session: id.to_owned(),
             cursor: None,
             follow: false,
         },
-    ];
-    let mut named = 0;
-    for act in &every_act {
-        let tag = serde_json::to_value(act)?["act"]
-            .as_str()
-            .ok_or("an act has no tag")?
-            .to_owned();
-        assert!(acts.contains_key(&tag), "{tag} is not published");
-        assert!(lys_runner::published::ACTS.contains(&tag.as_str()), "{tag}");
-        named += 1;
-    }
-    assert_eq!(
-        (named, acts.len()),
-        (
-            lys_runner::published::ACTS.len(),
-            lys_runner::published::ACTS.len()
-        )
-    );
-    let answers = described["answers"]
-        .as_array()
-        .ok_or("the section names no answers")?;
-    let every_answer = [
+    ]
+}
+
+fn published_answers(id: &str) -> Vec<Answer> {
+    vec![
         Answer::Bytes {
             output: lys_runner::terminal_bytes::ByteOutput {
-                session: id.clone(),
+                session: id.to_owned(),
                 from: 0,
                 cursor: 1,
                 oldest: 0,
@@ -480,22 +497,22 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
         },
         Answer::Started {
             qualification: None,
-            session: id.clone(),
+            session: id.to_owned(),
             pid: 1,
             started_at: 1,
         },
         Answer::Delivered {
-            session: id.clone(),
+            session: id.to_owned(),
         },
         Answer::Matched {
-            session: id.clone(),
+            session: id.to_owned(),
             matched: String::new(),
             cursor: 0,
         },
         Answer::Operation {
             outcome: OperationOutcome {
                 operation: "op".to_owned(),
-                session: id,
+                session: id.to_owned(),
                 request: "stop".to_owned(),
                 state: OperationState::Accepted,
                 at: 0,
@@ -537,14 +554,5 @@ fn the_published_section_names_every_act_and_answer_the_protocol_defines() -> Te
             cursor: 0,
             ended: false,
         },
-    ];
-    let mut kinds = 0;
-    for answer in &every_answer {
-        let kind = serde_json::to_value(answer)?["kind"].clone();
-        assert!(answers.contains(&kind), "{kind} is not published");
-        kinds += 1;
-    }
-    assert_eq!(kinds, every_answer.len());
-    assert_eq!(answers.len(), lys_runner::published::ANSWERS.len());
-    Ok(())
+    ]
 }

@@ -200,15 +200,7 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
         None,
         Some(settings),
         move |config| {
-            config.password_policy = Some(accounts::PasswordPolicy {
-                length_min: 14,
-                length_max: 128,
-                lower_case: Some(1),
-                upper_case: Some(1),
-                digits: Some(1),
-                special: None,
-                not_recently_used: None,
-            });
+            config.password_policy = Some(fixture_password_policy());
             config.requests_dir = None;
             config.certificates_dir = None;
             config.network_file = None;
@@ -787,4 +779,16 @@ async fn the_administrator_is_refused_an_email_or_password_the_policy_refuses() 
         .sign_in_with("bea@example.test", "Bea-Password-000111")
         .await?;
     Ok(())
+}
+
+fn fixture_password_policy() -> accounts::PasswordPolicy {
+    accounts::PasswordPolicy {
+        length_min: 14,
+        length_max: 128,
+        lower_case: Some(1),
+        upper_case: Some(1),
+        digits: Some(1),
+        special: None,
+        not_recently_used: None,
+    }
 }

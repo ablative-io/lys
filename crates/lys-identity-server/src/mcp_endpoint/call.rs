@@ -293,6 +293,16 @@ fn kept_before(
     Ok(kept)
 }
 
+pub(crate) async fn dispatch_router(
+    router: axum::Router,
+    request: Request,
+) -> axum::response::Response {
+    match router.oneshot(request).await {
+        Ok(response) => response,
+        Err(error) => match error {},
+    }
+}
+
 #[cfg(test)]
 mod validation_tests {
     use super::parsed;
@@ -325,15 +335,5 @@ mod validation_tests {
     fn discovery_accepts_only_the_empty_arguments_it_declares() {
         assert!(parsed(&json!({"name":"what-can-I-do","arguments":{"path":"/people"}})).is_err());
         assert!(parsed(&json!({"name":"what-can-I-do","arguments":{}})).is_ok());
-    }
-}
-
-pub(crate) async fn dispatch_router(
-    router: axum::Router,
-    request: Request,
-) -> axum::response::Response {
-    match router.oneshot(request).await {
-        Ok(response) => response,
-        Err(error) => match error {},
     }
 }

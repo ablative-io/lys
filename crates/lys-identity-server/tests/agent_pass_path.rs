@@ -51,42 +51,7 @@ impl Held {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         let custody = identity_contract::app_custody::start().await?;
-        let broker = Router::new()
-            .route(
-                "/_lys/apps/{*path}",
-                axum::routing::post(
-                    move |axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
-                          headers: axum::http::HeaderMap,
-                          body: axum::body::Bytes| {
-                        let custody = custody.clone();
-                        async move {
-                            match reqwest::Client::new()
-                                .post(format!("{custody}{}", uri.path()))
-                                .headers(headers)
-                                .body(body)
-                                .send()
-                                .await
-                            {
-                                Ok(answer) => {
-                                    let status = answer.status();
-                                    match answer.bytes().await {
-                                        Ok(bytes) => (status, bytes).into_response(),
-                                        Err(error) => {
-                                            (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
-                                                .into_response()
-                                        }
-                                    }
-                                }
-                                Err(error) => {
-                                    (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
-                                        .into_response()
-                                }
-                            }
-                        }
-                    },
-                ),
-            )
-            .fallback(|| async { axum::Json(json!({"handles": []})) });
+        let broker = custody_broker(custody);
         let broker = tokio::spawn(async move { axum::serve(listener, broker).await });
         let dir = tempfile::tempdir()?;
         let program = dir.path().join("seat");
@@ -283,29 +248,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     );
 
     let signed = (pass.as_str(), Some(seat.as_str()));
-    let (status, bare) = held
-        .mcp(&url, (pass.as_str(), None), "tools/list", json!({}))
-        .await?;
-    assert_eq!(status, 401, "a pass without its seat is refused: {bare}");
-    // The runner's signature with its last digit changed: the same seat, a
-    // signature it never made.
-    let mut forged = seat.clone();
-    let last = forged.pop().ok_or("the seat is empty")?;
-    forged.push(if last == '0' { '1' } else { '0' });
-    let (status, refused) = held
-        .mcp(
-            &url,
-            (pass.as_str(), Some(forged.as_str())),
-            "tools/list",
-            json!({}),
-        )
-        .await?;
-    assert_eq!(
-        status, 401,
-        "a seat that did not sign the pass is refused: {refused}"
-    );
-    eprintln!("proof: a bare pass and a forged seat are both refused 401");
-
+    assert_run_proof(&held, &url, &pass, &seat).await?;
     let (status, tools) = held.mcp(&url, signed, "tools/list", json!({})).await?;
     assert_eq!(status, 200, "{tools}");
     eprintln!(
@@ -405,3 +348,60 @@ async fn stop_api_a_failed_pass_end_still_keeps_the_stop_and_reports_the_failure
 
 #[path = "agent_pass_path/revoke.rs"]
 mod revoke;
+
+fn custody_broker(custody: String) -> Router {
+    Router::new()
+        .route(
+            "/_lys/apps/{*path}",
+            axum::routing::post(
+                move |axum::extract::OriginalUri(uri): axum::extract::OriginalUri,
+                      headers: axum::http::HeaderMap,
+                      body: axum::body::Bytes| {
+                    let custody = custody.clone();
+                    async move {
+                        match reqwest::Client::new()
+                            .post(format!("{custody}{}", uri.path()))
+                            .headers(headers)
+                            .body(body)
+                            .send()
+                            .await
+                        {
+                            Ok(answer) => {
+                                let status = answer.status();
+                                match answer.bytes().await {
+                                    Ok(bytes) => (status, bytes).into_response(),
+                                    Err(error) => {
+                                        (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
+                                            .into_response()
+                                    }
+                                }
+                            }
+                            Err(error) => (axum::http::StatusCode::BAD_GATEWAY, error.to_string())
+                                .into_response(),
+                        }
+                    }
+                },
+            ),
+        )
+        .fallback(|| async { axum::Json(json!({"handles": []})) })
+}
+
+async fn assert_run_proof(held: &Held, url: &str, pass: &str, seat: &str) -> TestResult {
+    let (status, bare) = held.mcp(url, (pass, None), "tools/list", json!({})).await?;
+    assert_eq!(status, 401, "a pass without its seat is refused: {bare}");
+    // The runner's signature with its last digit changed: the same seat, a
+    // signature it never made.
+    let mut forged = seat.to_owned();
+    let last = forged.pop().ok_or("the seat is empty")?;
+    forged.push(if last == '0' { '1' } else { '0' });
+    let (status, refused) = held
+        .mcp(&url, (pass, Some(forged.as_str())), "tools/list", json!({}))
+        .await?;
+    assert_eq!(
+        status, 401,
+        "a seat that did not sign the pass is refused: {refused}"
+    );
+    eprintln!("proof: a bare pass and a forged seat are both refused 401");
+
+    Ok(())
+}

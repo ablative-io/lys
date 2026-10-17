@@ -37,79 +37,7 @@ async fn stop_refuses_an_exit_answer_without_reap_evidence() -> Result<(), Box<d
     let key = table.server_key.public_key_bytes();
     let replying_session = session.clone();
     let answering = std::thread::spawn(move || -> Result<(), String> {
-        let mut liveness = 0;
-        let mut ends = 0;
-        while liveness < 1 || ends < 1 {
-            let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
-            let greeting = Greeting::fresh("00");
-            let mut writer = &stream;
-            writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
-            let mut line = String::new();
-            BufReader::new(&stream)
-                .read_line(&mut line)
-                .map_err(|error| error.to_string())?;
-            let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
-            let answer = match act {
-                Act::Feed { .. } => Answer::Refused {
-                    refusal: "feed_not_kept".to_owned(),
-                    words: "this fixture keeps no feed".to_owned(),
-                    oldest: None,
-                },
-                Act::Liveness { session: None } => Answer::Liveness {
-                    sessions: Vec::new(),
-                },
-                Act::GrantChannel => Answer::GrantChannel,
-                Act::ControlStatus { session } => Answer::ControlStatus {
-                    session,
-                    control: None,
-                },
-                Act::Owned => Answer::Owned {
-                    owners: Vec::new(),
-                    unreachable: Vec::new(),
-                },
-                Act::Liveness {
-                    session: Some(session),
-                } if session == replying_session => {
-                    liveness += 1;
-                    Answer::Liveness {
-                        sessions: vec![lys_runner::liveness::LivenessView {
-                            session,
-                            pid: Some(41),
-                            alive: true,
-                            harness_session: None,
-                            turn_active: false,
-                            last_signal_at: None,
-                            started_at: 1,
-                            ended: false,
-                            harness: lys_runner::liveness::HarnessLiveness {
-                                managed: false,
-                                started_fresh: false,
-                            },
-                        }],
-                    }
-                }
-                Act::End { session } if session == replying_session => {
-                    ends += 1;
-                    Answer::Ended {
-                        session,
-                        ended: Ended {
-                            how: EndedHow::Exited,
-                            at: 1,
-                            status: None,
-                            signal: None,
-                            reason: Some("the process exit could not be read".to_owned()),
-                            stopped: None,
-                        },
-                    }
-                }
-                other => return Err(format!("expected Owned, Liveness or End, got {other:?}")),
-            };
-            writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
-        }
-        if liveness != 1 || ends != 1 {
-            return Err(format!("liveness={liveness}, ends={ends}"));
-        }
-        Ok(())
+        answer_exit(&listener, key, &replying_session)
     });
     let sent = table
         .service
@@ -136,5 +64,85 @@ async fn stop_refuses_an_exit_answer_without_reap_evidence() -> Result<(), Box<d
             .contains("process_exit_unconfirmed"),
         "{body}"
     );
+    Ok(())
+}
+
+fn answer_exit(
+    listener: &UnixListener,
+    key: [u8; 32],
+    replying_session: &str,
+) -> Result<(), String> {
+    let mut liveness = 0;
+    let mut ends = 0;
+    while liveness < 1 || ends < 1 {
+        let (stream, _) = listener.accept().map_err(|error| error.to_string())?;
+        let greeting = Greeting::fresh("00");
+        let mut writer = &stream;
+        writeln!(writer, "{}", greeting.line()).map_err(|error| error.to_string())?;
+        let mut line = String::new();
+        BufReader::new(&stream)
+            .read_line(&mut line)
+            .map_err(|error| error.to_string())?;
+        let act = verify_request(&line, &key, &greeting).map_err(|error| error.to_string())?;
+        let answer = match act {
+            Act::Feed { .. } => Answer::Refused {
+                refusal: "feed_not_kept".to_owned(),
+                words: "this fixture keeps no feed".to_owned(),
+                oldest: None,
+            },
+            Act::Liveness { session: None } => Answer::Liveness {
+                sessions: Vec::new(),
+            },
+            Act::GrantChannel => Answer::GrantChannel,
+            Act::ControlStatus { session } => Answer::ControlStatus {
+                session,
+                control: None,
+            },
+            Act::Owned => Answer::Owned {
+                owners: Vec::new(),
+                unreachable: Vec::new(),
+            },
+            Act::Liveness {
+                session: Some(session),
+            } if session == replying_session => {
+                liveness += 1;
+                Answer::Liveness {
+                    sessions: vec![lys_runner::liveness::LivenessView {
+                        session,
+                        pid: Some(41),
+                        alive: true,
+                        harness_session: None,
+                        turn_active: false,
+                        last_signal_at: None,
+                        started_at: 1,
+                        ended: false,
+                        harness: lys_runner::liveness::HarnessLiveness {
+                            managed: false,
+                            started_fresh: false,
+                        },
+                    }],
+                }
+            }
+            Act::End { session } if session == replying_session => {
+                ends += 1;
+                Answer::Ended {
+                    session,
+                    ended: Ended {
+                        how: EndedHow::Exited,
+                        at: 1,
+                        status: None,
+                        signal: None,
+                        reason: Some("the process exit could not be read".to_owned()),
+                        stopped: None,
+                    },
+                }
+            }
+            other => return Err(format!("expected Owned, Liveness or End, got {other:?}")),
+        };
+        writeln!(writer, "{}", reply_line(answer)).map_err(|error| error.to_string())?;
+    }
+    if liveness != 1 || ends != 1 {
+        return Err(format!("liveness={liveness}, ends={ends}"));
+    }
     Ok(())
 }

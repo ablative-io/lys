@@ -162,92 +162,7 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
             return Err(failure.into());
         }
     };
-    let checks = async {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()?;
-        for path in [
-            "/auth/v1/admin",
-            "/auth/v1/assets/admin.js",
-            "/auth/v1/users",
-            "/auth/v1/oidc/callback?code=opaque&state=held",
-            "/auth/v1/api_keys",
-        ] {
-            let answer = client
-                .get(format!("{}{path}", service.base))
-                .header(
-                    header::COOKIE,
-                    "issuer_session=held; lys_directory_session=private",
-                )
-                .header(header::HOST, "untrusted.example.test")
-                .header("x-forwarded-for", "198.51.100.60")
-                .header("x-forwarded-host", "untrusted.example.test")
-                .send()
-                .await?;
-            assert_eq!(
-                answer.status(),
-                if path == "/auth/v1/api_keys" {
-                    401
-                } else {
-                    200
-                }
-            );
-            assert_eq!(
-                answer.headers().get_all(header::SET_COOKIE).iter().count(),
-                2
-            );
-            assert_eq!(answer.text().await?, path);
-        }
-        let body = vec![b'a'; 32_768];
-        let answer = client
-            .post(format!("{}/auth/v1/users/import", service.base))
-            .header(header::COOKIE, "issuer_session=held; lys_provider=private")
-            .body(body.clone())
-            .send()
-            .await?;
-        assert_eq!(answer.status(), 200);
-        assert_eq!(answer.bytes().await?.as_ref(), body.as_slice());
-        let callback = client
-            .get(format!(
-                "{}/auth/v1/providers/callback?state=unknown&code=opaque",
-                service.base
-            ))
-            .send()
-            .await?;
-        assert_eq!(callback.status(), 303);
-        assert!(
-            callback
-                .headers()
-                .get(header::LOCATION)
-                .ok_or("callback location")?
-                .to_str()?
-                .contains("SignInStateUnknown")
-        );
-        let held = seen
-            .lock()
-            .map_err(|error| format!("observer lock failed: {error}"))?;
-        assert_eq!(
-            held.len(),
-            6,
-            "the Lys callback never reaches the native issuer"
-        );
-        let authority = service
-            .base
-            .strip_prefix("http://")
-            .ok_or("fixture origin")?;
-        for observed in held.iter() {
-            assert_eq!(observed.cookie, "issuer_session=held", "{}", observed.path);
-            assert_eq!(observed.host, authority);
-            assert_eq!(observed.forwarded_host, authority);
-            assert_eq!(observed.forwarded_address, "127.0.0.1");
-            assert!(
-                observed.authorization.is_none(),
-                "no service credential is injected"
-            );
-        }
-        Ok::<_, Box<dyn Error>>(())
-    }
-    .await;
+    let checks = assert_forwarded_authentication(&service, &seen).await;
     let closed = service.close();
     let sent = stop.send(()).map_err(|()| "issuer stopped before shutdown");
     let joined = task.await;
@@ -255,4 +170,90 @@ async fn administrator_pages_and_native_callback_keep_issuer_authentication() ->
     sent?;
     joined??;
     checks
+}
+
+async fn assert_forwarded_authentication(service: &Service, seen: &Seen) -> TestResult {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    for path in [
+        "/auth/v1/admin",
+        "/auth/v1/assets/admin.js",
+        "/auth/v1/users",
+        "/auth/v1/oidc/callback?code=opaque&state=held",
+        "/auth/v1/api_keys",
+    ] {
+        let answer = client
+            .get(format!("{}{path}", service.base))
+            .header(
+                header::COOKIE,
+                "issuer_session=held; lys_directory_session=private",
+            )
+            .header(header::HOST, "untrusted.example.test")
+            .header("x-forwarded-for", "198.51.100.60")
+            .header("x-forwarded-host", "untrusted.example.test")
+            .send()
+            .await?;
+        assert_eq!(
+            answer.status(),
+            if path == "/auth/v1/api_keys" {
+                401
+            } else {
+                200
+            }
+        );
+        assert_eq!(
+            answer.headers().get_all(header::SET_COOKIE).iter().count(),
+            2
+        );
+        assert_eq!(answer.text().await?, path);
+    }
+    let body = vec![b'a'; 32_768];
+    let answer = client
+        .post(format!("{}/auth/v1/users/import", service.base))
+        .header(header::COOKIE, "issuer_session=held; lys_provider=private")
+        .body(body.clone())
+        .send()
+        .await?;
+    assert_eq!(answer.status(), 200);
+    assert_eq!(answer.bytes().await?.as_ref(), body.as_slice());
+    let callback = client
+        .get(format!(
+            "{}/auth/v1/providers/callback?state=unknown&code=opaque",
+            service.base
+        ))
+        .send()
+        .await?;
+    assert_eq!(callback.status(), 303);
+    assert!(
+        callback
+            .headers()
+            .get(header::LOCATION)
+            .ok_or("callback location")?
+            .to_str()?
+            .contains("SignInStateUnknown")
+    );
+    let held = seen
+        .lock()
+        .map_err(|error| format!("observer lock failed: {error}"))?;
+    assert_eq!(
+        held.len(),
+        6,
+        "the Lys callback never reaches the native issuer"
+    );
+    let authority = service
+        .base
+        .strip_prefix("http://")
+        .ok_or("fixture origin")?;
+    for observed in held.iter() {
+        assert_eq!(observed.cookie, "issuer_session=held", "{}", observed.path);
+        assert_eq!(observed.host, authority);
+        assert_eq!(observed.forwarded_host, authority);
+        assert_eq!(observed.forwarded_address, "127.0.0.1");
+        assert!(
+            observed.authorization.is_none(),
+            "no service credential is injected"
+        );
+    }
+    Ok::<_, Box<dyn Error>>(())
 }

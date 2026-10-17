@@ -22,31 +22,7 @@ fn native_profile_confines_fixture_but_entry_refuses_without_audit_owner()
     // This exact target is writable by this user before containment.
     std::fs::write(&outside, "control")?;
     std::os::unix::fs::symlink(&outside, workspace.join("link"))?;
-    let policy = NativePolicy {
-        tools: Policy {
-            version: 1,
-            agent: "native-smoke".to_owned(),
-            rules: Vec::new(),
-        },
-        home,
-        workspace: workspace.clone(),
-        runtime_reads: [
-            "/bin".into(),
-            "/usr/bin".into(),
-            "/usr/lib".into(),
-            "/System/Library".into(),
-        ]
-        .into(),
-        protected: [].into(),
-        allowed_hosts: [].into(),
-        denied_hosts: [].into(),
-        required: [
-            Capability::Filesystem,
-            Capability::HostnameEgress,
-            Capability::KernelAudit,
-        ]
-        .into(),
-    };
+    let policy = native_policy(home, workspace.clone());
     let expected = Binding {
         runner: "native-smoke".to_owned(),
         session: "native-smoke".to_owned(),
@@ -122,4 +98,32 @@ fn native_profile_confines_fixture_but_entry_refuses_without_audit_owner()
     );
     assert_eq!(std::fs::read_to_string(outside)?, "control");
     Ok(())
+}
+
+fn native_policy(home: std::path::PathBuf, workspace: std::path::PathBuf) -> NativePolicy {
+    NativePolicy {
+        tools: Policy {
+            version: 1,
+            agent: "native-smoke".to_owned(),
+            rules: Vec::new(),
+        },
+        home,
+        workspace,
+        runtime_reads: [
+            "/bin".into(),
+            "/usr/bin".into(),
+            "/usr/lib".into(),
+            "/System/Library".into(),
+        ]
+        .into(),
+        protected: [].into(),
+        allowed_hosts: [].into(),
+        denied_hosts: [].into(),
+        required: [
+            Capability::Filesystem,
+            Capability::HostnameEgress,
+            Capability::KernelAudit,
+        ]
+        .into(),
+    }
 }

@@ -281,21 +281,7 @@ async fn bridge(mode: ReplyMode) -> Result<(), Failure> {
         .ok_or("the bridge ended early")?
         .err()
         .ok_or("a refused bridge stayed running")?;
-    let posted = remote.posted.lock().map_err(|error| error.to_string())?;
-    assert!(
-        posted.values().all(|count| *count == 1),
-        "a reply was posted twice"
-    );
-    if mode == ReplyMode::Refused {
-        assert!(
-            error.to_string().contains("fixture_reply_refused"),
-            "{error}"
-        );
-    } else {
-        assert_eq!(posted.len(), 4);
-        assert!(error.to_string().contains("fixture_finished"), "{error}");
-    }
-    Ok(())
+    assert_posted(&remote, mode, &error)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -329,4 +315,26 @@ async fn unknown_replies_are_retired_once_while_other_requests_remain_usable() -
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn an_unavailable_reply_is_not_replayed_and_does_not_end_the_bridge() -> Result<(), Failure> {
     bridge(ReplyMode::Unavailable).await
+}
+
+fn assert_posted(
+    remote: &Remote,
+    mode: ReplyMode,
+    error: &crate::RunnerError,
+) -> Result<(), Failure> {
+    let posted = remote.posted.lock().map_err(|error| error.to_string())?;
+    assert!(
+        posted.values().all(|count| *count == 1),
+        "a reply was posted twice"
+    );
+    if mode == ReplyMode::Refused {
+        assert!(
+            error.to_string().contains("fixture_reply_refused"),
+            "{error}"
+        );
+    } else {
+        assert_eq!(posted.len(), 4);
+        assert!(error.to_string().contains("fixture_finished"), "{error}");
+    }
+    Ok(())
 }

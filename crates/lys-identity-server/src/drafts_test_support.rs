@@ -107,19 +107,10 @@ impl Table {
                     "",
                     3,
                 )?;
-                let sessions = crate::session::Sessions::open(
+                let (owner, other_cookie) = cookies(
                     config.sessions_file.clone().ok_or("session file missing")?,
-                    600,
-                    false,
+                    &config.issuer,
                 )?;
-                let owner = sessions.begin(Actor::new(
-                    LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
-                    Provenance::new(AuthMethod::Oidc, crate::session::now()),
-                ))?;
-                let other_cookie = sessions.begin(Actor::new(
-                    LoginBinding::new(&config.issuer, "other-subject")?,
-                    Provenance::new(AuthMethod::Oidc, crate::session::now()),
-                ))?;
                 certify(
                     &config.event_key_file,
                     config
@@ -226,4 +217,17 @@ fn certify(
         },
     )?;
     Ok(())
+}
+
+fn cookies(sessions_file: std::path::PathBuf, issuer: &str) -> Result<(String, String)> {
+    let sessions = crate::session::Sessions::open(sessions_file, 600, false)?;
+    let owner = sessions.begin(Actor::new(
+        LoginBinding::new(issuer, ADMINISTRATOR)?,
+        Provenance::new(AuthMethod::Oidc, crate::session::now()),
+    ))?;
+    let other_cookie = sessions.begin(Actor::new(
+        LoginBinding::new(issuer, "other-subject")?,
+        Provenance::new(AuthMethod::Oidc, crate::session::now()),
+    ))?;
+    Ok((owner, other_cookie))
 }

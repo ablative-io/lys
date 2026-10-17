@@ -16,14 +16,7 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
     let signal_dir = tempfile::tempdir_in("/tmp")?;
     let gate_path = signal_dir.path().join("release.sock");
     let gate = UnixListener::bind(&gate_path)?;
-    let program = table.dir.path().join("declared-harness");
-    let script = format!(
-        "#!/usr/bin/python3\nimport signal, socket, sys, os\nfirst = not os.path.exists({:?})\nopen({:?}, 'a').close()\ndef end(signum, frame):\n if not first: sys.exit(0)\n s = socket.socket(socket.AF_UNIX)\n s.connect({:?})\n s.recv(1)\n sys.exit(0)\nsignal.signal(signal.SIGHUP, end)\nprint('profile-read', flush=True)\nsignal.pause()\n",
-        table.dir.path().join("first").display().to_string(),
-        table.dir.path().join("first").display().to_string(),
-        gate_path.display().to_string()
-    );
-    std::fs::write(program, script)?;
+    write_stopping_harness(&table, &gate_path)?;
     let provisioning = format!("/agents/{}/provisioning", table.agent());
     table
         .ok(
@@ -73,26 +66,7 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
     })?;
     let stop_url = format!("{}/agents/{}/stop", table.service.base, table.agent());
     let cookie = table.ada.clone();
-    let stopped = tokio::spawn(async move {
-        let response = reqwest::Client::new()
-            .post(stop_url)
-            .header("cookie", cookie)
-            .header("content-type", "application/json")
-            .body(
-                json!({"operation": operation().map_err(|error| error.to_string())?,
-                "reason": "ordered restart"})
-                .to_string(),
-            )
-            .send()
-            .await
-            .map_err(|error| error.to_string())?;
-        let status = response.status().as_u16();
-        let text = response.text().await.map_err(|error| error.to_string())?;
-        Ok::<_, String>((
-            status,
-            serde_json::from_str::<Value>(&text).map_err(|error| error.to_string())?,
-        ))
-    });
+    let stopped = tokio::spawn(async move { request_stop(stop_url, cookie).await });
     let (mut release, _) = gate.accept()?;
     let transition =
         json!({"operation": operation()?, "transition": "reinstate", "reason": "restart"});
@@ -135,4 +109,40 @@ async fn start_refuses_until_stop_has_reaped_the_harness() -> Result<(), Box<dyn
         second.1
     );
     table.close()
+}
+
+async fn request_stop(stop_url: String, cookie: String) -> Result<(u16, Value), String> {
+    let response = reqwest::Client::new()
+        .post(stop_url)
+        .header("cookie", cookie)
+        .header("content-type", "application/json")
+        .body(
+            json!({"operation": operation().map_err(|error| error.to_string())?,
+            "reason": "ordered restart"})
+            .to_string(),
+        )
+        .send()
+        .await
+        .map_err(|error| error.to_string())?;
+    let status = response.status().as_u16();
+    let text = response.text().await.map_err(|error| error.to_string())?;
+    Ok::<_, String>((
+        status,
+        serde_json::from_str::<Value>(&text).map_err(|error| error.to_string())?,
+    ))
+}
+
+fn write_stopping_harness(
+    table: &Table,
+    gate_path: &std::path::Path,
+) -> Result<(), Box<dyn Error>> {
+    let program = table.dir.path().join("declared-harness");
+    let script = format!(
+        "#!/usr/bin/python3\nimport signal, socket, sys, os\nfirst = not os.path.exists({:?})\nopen({:?}, 'a').close()\ndef end(signum, frame):\n if not first: sys.exit(0)\n s = socket.socket(socket.AF_UNIX)\n s.connect({:?})\n s.recv(1)\n sys.exit(0)\nsignal.signal(signal.SIGHUP, end)\nprint('profile-read', flush=True)\nsignal.pause()\n",
+        table.dir.path().join("first").display().to_string(),
+        table.dir.path().join("first").display().to_string(),
+        gate_path.display().to_string()
+    );
+    std::fs::write(program, script)?;
+    Ok(())
 }

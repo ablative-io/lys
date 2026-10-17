@@ -285,19 +285,7 @@ async fn serialized_grant_answers_share_the_selected_degradation_and_omit_privat
 -> TestResult {
     let table = Table::fresh().await?;
     let readings = (|| -> TestResult<_> {
-        let healthy = crate::grants::with_grants(&table.state, |judged| {
-            let frame = judged.grants.frame(judged.directory, None)?;
-            let request = lys_identity::grants::ExerciseRequest {
-                caller: IdentityId::Person(table.asker),
-                route: Route::Api,
-                resource: Resource::new("agent", &table.agent.to_string())?,
-                action: Action::new("read")?,
-            };
-            let permit = judged
-                .grants
-                .explain_in(&frame, &request, crate::session::now())?;
-            wire(crate::grant_contract::PermitView::from(&permit))
-        })?;
+        let healthy = healthy_permit(&table)?;
         table.projection_pending()?;
         let degraded = crate::grants::with_grants(&table.state, |mut judged| {
             let frame = judged.grants.frame(judged.directory, None)?;
@@ -470,3 +458,19 @@ async fn projection_degradation_is_private_to_its_service_instance() -> TestResu
 
 #[path = "grants_lock_tests.rs"]
 mod lock_tests;
+
+fn healthy_permit(table: &Table) -> Result<serde_json::Value, ServerError> {
+    crate::grants::with_grants(&table.state, |judged| {
+        let frame = judged.grants.frame(judged.directory, None)?;
+        let request = lys_identity::grants::ExerciseRequest {
+            caller: IdentityId::Person(table.asker),
+            route: Route::Api,
+            resource: Resource::new("agent", &table.agent.to_string())?,
+            action: Action::new("read")?,
+        };
+        let permit = judged
+            .grants
+            .explain_in(&frame, &request, crate::session::now())?;
+        wire(crate::grant_contract::PermitView::from(&permit))
+    })
+}

@@ -162,16 +162,7 @@ impl Table {
                     Profile::new("Owner")?,
                     1,
                 )?;
-                let target_actor = Actor::new(
-                    LoginBinding::new(&config.issuer, "target")?,
-                    Provenance::new(AuthMethod::Oidc, 1),
-                );
-                let (target, _) = directory.setup_person(
-                    target_actor,
-                    OperationId::generate()?,
-                    Profile::new("Target")?,
-                    1,
-                )?;
+                let target = target_person(&mut directory, &config.issuer)?;
                 let (agent, _) = directory.register_agent(
                     actor.clone(),
                     OperationId::generate()?,
@@ -416,4 +407,21 @@ async fn an_agent_cannot_disable_its_responsible_administrator() -> TestResult {
         true
     );
     Ok(())
+}
+
+fn target_person(
+    directory: &mut Directory<FileLeafStore>,
+    issuer: &str,
+) -> TestResult<lys_identity::PersonId> {
+    let target_actor = Actor::new(
+        LoginBinding::new(issuer, "target")?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    );
+    let (target, _) = directory.setup_person(
+        target_actor,
+        OperationId::generate()?,
+        Profile::new("Target")?,
+        1,
+    )?;
+    Ok(target)
 }

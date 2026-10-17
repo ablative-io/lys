@@ -42,12 +42,20 @@ pub(super) struct Compaction {
     uuid: String,
     compact_boundary_seen: bool,
     boundary_triggers: Vec<Trigger>,
-    matching_user_replay_seen: bool,
-    replay_before_boundary: bool,
-    replay_after_boundary: bool,
+    #[serde(flatten)]
+    replay: Replay,
     result_seen: bool,
     result_is_error: Option<bool>,
     statuses: Vec<StatusFrame>,
+}
+
+#[derive(Default, Serialize)]
+struct Replay {
+    matching_user_replay_seen: bool,
+    #[serde(rename = "replay_before_boundary")]
+    before_boundary: bool,
+    #[serde(rename = "replay_after_boundary")]
+    after_boundary: bool,
 }
 
 impl Compaction {
@@ -57,9 +65,7 @@ impl Compaction {
             uuid: uuid.to_owned(),
             compact_boundary_seen: false,
             boundary_triggers: Vec::new(),
-            matching_user_replay_seen: false,
-            replay_before_boundary: false,
-            replay_after_boundary: false,
+            replay: Replay::default(),
             result_seen: false,
             result_is_error: None,
             statuses: Vec::new(),
@@ -88,11 +94,11 @@ impl Compaction {
                     && frame.pointer("/message/role").and_then(Value::as_str) == Some("user")
                     && frame.get("parent_tool_use_id") == Some(&Value::Null) =>
             {
-                self.matching_user_replay_seen = true;
+                self.replay.matching_user_replay_seen = true;
                 if self.compact_boundary_seen {
-                    self.replay_after_boundary = true;
+                    self.replay.after_boundary = true;
                 } else {
-                    self.replay_before_boundary = true;
+                    self.replay.before_boundary = true;
                 }
             }
             (Some("result"), _) => {

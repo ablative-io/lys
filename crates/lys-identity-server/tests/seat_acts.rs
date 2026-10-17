@@ -66,7 +66,7 @@ fn live_pty(table: &Table, answer: &(u16, Value)) -> Result<String, Box<dyn Erro
     let live = runner.liveness(Some(session))?;
     assert_eq!(live.len(), 1, "{live:?}");
     assert!(live[0].alive, "{live:?}");
-    assert!(!live[0].managed, "{live:?}");
+    assert!(!live[0].harness.managed, "{live:?}");
     assert!(!live[0].ended, "{live:?}");
     let client = lys_runner::Client::new(
         table.dir.path().join("runner.sock"),

@@ -6,7 +6,8 @@ use identity_contract::apps::{
     seeded,
 };
 use identity_contract::harness::ADMINISTRATOR;
-use serde_json::json;
+use identity_contract::harness::Service;
+use serde_json::{Value, json};
 
 #[tokio::test]
 async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds() -> TestResult {
@@ -61,52 +62,7 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
     approve(&service, &admin, FILES).await?;
 
     let model = ok(get(&service, "/grants/model", Auth::Cookie(&caller)).await?)?;
-    assert_eq!(
-        model["kinds"],
-        json!({
-            &channel: {
-                "agents": ["read", "send"],
-                "relations": {
-                    "custodian": ["grant_delegate", "read", "send"],
-                    "participant": ["read", "send"]
-                }
-            },
-            &document: {
-                "agents": ["read"],
-                "relations": {"editor": ["delete", "read"], "reader": ["read"]}
-            }
-        }),
-        "{model}"
-    );
-    assert!(model["kinds"].get(&pending_kind).is_none(), "{model}");
-    let withheld = model["withheld_from_agents"]
-        .as_array()
-        .ok_or("the model did not answer withheld_from_agents")?;
-    assert!(withheld.contains(&json!("grant.delegate")), "{model}");
-    for declared in model["kinds"]
-        .as_object()
-        .ok_or("the model did not answer kinds")?
-        .values()
-    {
-        let agents = declared["agents"]
-            .as_array()
-            .ok_or("the kind did not answer agents")?;
-        assert!(
-            withheld.iter().all(|action| !agents.contains(action)),
-            "a withheld action appeared among the agent actions: {declared}"
-        );
-    }
-    for (app, kind) in [(NOTES, &channel), (FILES, &document)] {
-        let registered = ok(get(&service, &format!("/apps/{app}"), Auth::Cookie(&admin)).await?)?;
-        assert_eq!(
-            model["kinds"][kind]["agents"],
-            registered["schema"]["kinds"][kind]["agents"]
-        );
-        assert_eq!(
-            model["kinds"][kind]["relations"],
-            registered["schema"]["kinds"][kind]["relations"]
-        );
-    }
+    assert_current_model(&service, &admin, &model, &channel, &document, &pending_kind).await?;
 
     let mut changed = notes;
     changed["kinds"][&channel]["agents"] = json!(["read"]);
@@ -155,5 +111,63 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
     assert_eq!(retired["version"], before["version"]);
     assert_eq!(retired["relations"], before["relations"]);
     assert_eq!(get(&service, "/grants/model", Auth::Nobody).await?.0, 401);
+    Ok(())
+}
+
+async fn assert_current_model(
+    service: &Service,
+    admin: &str,
+    model: &Value,
+    channel: &str,
+    document: &str,
+    pending_kind: &str,
+) -> TestResult {
+    assert_eq!(
+        model["kinds"],
+        json!({
+            channel: {
+                "agents": ["read", "send"],
+                "relations": {
+                    "custodian": ["grant_delegate", "read", "send"],
+                    "participant": ["read", "send"]
+                }
+            },
+            document: {
+                "agents": ["read"],
+                "relations": {"editor": ["delete", "read"], "reader": ["read"]}
+            }
+        }),
+        "{model}"
+    );
+    assert!(model["kinds"].get(pending_kind).is_none(), "{model}");
+    let withheld = model["withheld_from_agents"]
+        .as_array()
+        .ok_or("the model did not answer withheld_from_agents")?;
+    assert!(withheld.contains(&json!("grant.delegate")), "{model}");
+    for declared in model["kinds"]
+        .as_object()
+        .ok_or("the model did not answer kinds")?
+        .values()
+    {
+        let agents = declared["agents"]
+            .as_array()
+            .ok_or("the kind did not answer agents")?;
+        assert!(
+            withheld.iter().all(|action| !agents.contains(action)),
+            "a withheld action appeared among the agent actions: {declared}"
+        );
+    }
+    for (app, kind) in [(NOTES, channel), (FILES, document)] {
+        let registered = ok(get(service, &format!("/apps/{app}"), Auth::Cookie(admin)).await?)?;
+        assert_eq!(
+            model["kinds"][kind]["agents"],
+            registered["schema"]["kinds"][kind]["agents"]
+        );
+        assert_eq!(
+            model["kinds"][kind]["relations"],
+            registered["schema"]["kinds"][kind]["relations"]
+        );
+    }
+
     Ok(())
 }

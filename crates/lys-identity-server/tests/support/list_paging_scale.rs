@@ -36,10 +36,7 @@ pub fn seed(config: &Config) -> Result<Fixture, Box<dyn Error>> {
 }
 
 pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
-    let actor = Actor::new(
-        config.administrator_binding()?,
-        Provenance::new(AuthMethod::Oidc, 1),
-    );
+    let actor = administrator(config)?;
     let mut directory = open_directory(config)?;
     let mut people = Vec::new();
     let mut events = Vec::new();
@@ -145,4 +142,11 @@ fn event(
     change: Change,
 ) -> Result<IdentityEvent, lys_identity::IdentityError> {
     IdentityEvent::new(OperationId::generate()?, actor.clone(), identity, 1, change)
+}
+
+fn administrator(config: &Config) -> Result<Actor, Box<dyn Error>> {
+    Ok(Actor::new(
+        config.administrator_binding()?,
+        Provenance::new(AuthMethod::Oidc, 1),
+    ))
 }

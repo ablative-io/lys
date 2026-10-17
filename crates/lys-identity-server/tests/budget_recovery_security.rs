@@ -27,105 +27,8 @@ async fn an_existing_team_crossing_cannot_act_on_a_legacy_member_now_held()
 }
 
 async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
-    let (mut service, (agent, victim, machine)) = Service::start_with(|config| {
-        let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
-        let agent = seeded.people[0].agents[0].id.to_string();
-        let other = seeded.people[1].agents[0].id.to_string();
-        let victim = OperationId::generate()?.to_string();
-        let machine = OperationId::generate()?.to_string();
-        let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
-        let runtime_dir = config
-            .runtime_dir
-            .as_deref()
-            .ok_or("no runtime directory")?;
-        let mut runtime = RuntimeStore::open(runtime_dir, Arc::clone(&key))?;
-        runtime.report(Report {
-            operation: OperationId::generate()?.to_string(),
-            session: victim.clone(),
-            agent: Some(if team_hold { agent.clone() } else { other }),
-            machine: machine.clone(),
-            state: Reported::Starting,
-            what: "legacy session".to_owned(),
-            confirmation: String::new(),
-            reported_by: seeded.people[1].id.to_string(),
-            at: 1,
-            launch: None,
-        })?;
-        let dir = config
-            .budgets_dir
-            .as_deref()
-            .ok_or("no budgets directory")?;
-        let holder = if team_hold {
-            use lys_identity_server::teams_state::{Changed, Created, Line};
-            use lys_identity_server::teams_store::TeamStore;
-            let team = OperationId::generate()?.to_string();
-            let by = lys_identity_server::read_views::Login {
-                provider: config.issuer.clone(),
-                subject: "bea-subject".to_owned(),
-            };
-            let mut teams = TeamStore::open(
-                config.teams_dir.as_deref().ok_or("no teams")?,
-                Arc::clone(&key),
-            )?;
-            teams.keep(Line::Created(Created {
-                id: team.clone(),
-                owner: seeded.people[1].id.to_string(),
-                name: "Legacy team".to_owned(),
-                description: String::new(),
-                by: by.clone(),
-                at: 1,
-            }))?;
-            teams.keep(Line::Added(Changed {
-                operation: OperationId::generate()?.to_string(),
-                team: team.clone(),
-                member: agent.clone(),
-                by,
-                at: 1,
-            }))?;
-            Holder {
-                kind: HolderKind::Team,
-                id: team,
-            }
-        } else {
-            Holder {
-                kind: HolderKind::Agent,
-                id: agent.clone(),
-            }
-        };
-        let mut budgets = BudgetStore::open(dir, key)?;
-        let crossing = Crossing {
-            operation: Crossing::id(&holder, Measure::Tokens, 1, "legacy", &victim),
-            holder,
-            measure: Measure::Tokens,
-            version: 1,
-            limit: 1.into(),
-            figure: Some(5.into()),
-            unavailable: None,
-            limit_index: 0,
-            warning: false,
-            context_tokens: None,
-            context_window: None,
-            account: None,
-            act: Act::Stop,
-            agent: agent.clone(),
-            session: Some(victim.clone()),
-            text: None,
-            at_ms: 1,
-        };
-        budgets.charge(Usage {
-            event: "legacy-cross-agent".to_owned(),
-            agent: agent.clone(),
-            at_ms: 1,
-            tokens: 5,
-            running_ms: 0,
-            session: Some(victim.clone()),
-            context_percent: None,
-            crossed: vec![crossing],
-            ..Usage::default()
-        })?;
-        Ok((agent, victim, machine))
-    })
-    .await?;
+    let (mut service, (agent, victim, machine)) =
+        Service::start_with(|config| seed(config, team_hold)).await?;
     let cookie = service
         .sign_in(Login {
             subject: ADMINISTRATOR.to_owned(),
@@ -162,4 +65,115 @@ async fn check_crossing(team_hold: bool) -> Result<(), Box<dyn Error>> {
     assert_eq!(status, 200, "{reopened}");
     assert_eq!(body, reopened, "the refusal remains settled after restart");
     Ok(())
+}
+
+fn seed(
+    config: &lys_identity_server::config::Config,
+    team_hold: bool,
+) -> Result<(String, String, String), Box<dyn Error>> {
+    let seeded = seed_configured(config, [ADMINISTRATOR, "bea-subject"])?;
+    let agent = seeded.people[0].agents[0].id.to_string();
+    let other = seeded.people[1].agents[0].id.to_string();
+    let victim = OperationId::generate()?.to_string();
+    let machine = OperationId::generate()?.to_string();
+    let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
+    let runtime_dir = config
+        .runtime_dir
+        .as_deref()
+        .ok_or("no runtime directory")?;
+    let mut runtime = RuntimeStore::open(runtime_dir, Arc::clone(&key))?;
+    runtime.report(Report {
+        operation: OperationId::generate()?.to_string(),
+        session: victim.clone(),
+        agent: Some(if team_hold { agent.clone() } else { other }),
+        machine: machine.clone(),
+        state: Reported::Starting,
+        what: "legacy session".to_owned(),
+        confirmation: String::new(),
+        reported_by: seeded.people[1].id.to_string(),
+        at: 1,
+        launch: None,
+    })?;
+    let dir = config
+        .budgets_dir
+        .as_deref()
+        .ok_or("no budgets directory")?;
+    let holder = if team_hold {
+        seed_team(config, &key, &agent, &seeded.people[1].id.to_string())?
+    } else {
+        Holder {
+            kind: HolderKind::Agent,
+            id: agent.clone(),
+        }
+    };
+    let mut budgets = BudgetStore::open(dir, key)?;
+    let crossing = Crossing {
+        operation: Crossing::id(&holder, Measure::Tokens, 1, "legacy", &victim),
+        holder,
+        measure: Measure::Tokens,
+        version: 1,
+        limit: 1.into(),
+        figure: Some(5.into()),
+        unavailable: None,
+        limit_index: 0,
+        warning: false,
+        context_tokens: None,
+        context_window: None,
+        account: None,
+        act: Act::Stop,
+        agent: agent.clone(),
+        session: Some(victim.clone()),
+        text: None,
+        at_ms: 1,
+    };
+    budgets.charge(Usage {
+        event: "legacy-cross-agent".to_owned(),
+        agent: agent.clone(),
+        at_ms: 1,
+        tokens: 5,
+        running_ms: 0,
+        session: Some(victim.clone()),
+        context_percent: None,
+        crossed: vec![crossing],
+        ..Usage::default()
+    })?;
+    Ok((agent, victim, machine))
+}
+
+fn seed_team(
+    config: &lys_identity_server::config::Config,
+    key: &Arc<Ed25519Identity>,
+    agent: &str,
+    person: &str,
+) -> Result<Holder, Box<dyn Error>> {
+    use lys_identity_server::teams_state::{Changed, Created, Line};
+    use lys_identity_server::teams_store::TeamStore;
+    let team = OperationId::generate()?.to_string();
+    let by = lys_identity_server::read_views::Login {
+        provider: config.issuer.clone(),
+        subject: "bea-subject".to_owned(),
+    };
+    let mut teams = TeamStore::open(
+        config.teams_dir.as_deref().ok_or("no teams")?,
+        Arc::clone(key),
+    )?;
+    teams.keep(Line::Created(Created {
+        id: team.clone(),
+        owner: person.to_owned(),
+        name: "Legacy team".to_owned(),
+        description: String::new(),
+        by: by.clone(),
+        at: 1,
+    }))?;
+    teams.keep(Line::Added(Changed {
+        operation: OperationId::generate()?.to_string(),
+        team: team.clone(),
+        member: agent.to_owned(),
+        by,
+        at: 1,
+    }))?;
+    Ok(Holder {
+        kind: HolderKind::Team,
+        id: team,
+    })
 }

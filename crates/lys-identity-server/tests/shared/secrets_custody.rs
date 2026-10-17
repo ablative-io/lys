@@ -97,24 +97,7 @@ async fn only_administrator_issues_and_revokes_a_client_credential_and_the_broke
         "the browser cannot supply an owner"
     );
     setup.log.lock().expect("fixture lock poisoned").clear();
-    let revoke = format!("/apps/{app}/credentials/{CREDENTIAL_ID}/revoke");
-    let revoked = json!({"operation": op()?, "reason": "rotated"});
-    assert_eq!(
-        post(&setup.service, &revoke, Auth::Cookie(&bea), &revoked)
-            .await?
-            .0,
-        403
-    );
-    assert!(received(&setup.log).is_empty());
-    let view = ok(post(&setup.service, &revoke, Auth::Cookie(&admin), &revoked).await?)?;
-    assert_eq!(view["client_credentials"][0]["live"], false);
-    assert_eq!(view["client_credentials"][0]["ended_at_broker"], true);
-    let calls = received(&setup.log);
-    assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0].path, "/_lys/apps/client/end");
-    signed_as_received(&calls[0], &setup.key)?;
-    let ended: Value = serde_json::from_slice(&calls[0].body)?;
-    assert_eq!(ended["credential_ids"], json!([CREDENTIAL_ID]));
+    assert_revocation(&setup, app, &admin, &bea).await?;
     Ok(())
 }
 
@@ -221,5 +204,28 @@ async fn approval_without_configured_broker_keeps_app_pending() -> TestResult {
     assert_eq!(answer.0, 503, "{}", answer.1);
     assert_eq!(answer.1["refusal"], "SecretsUnavailable");
     assert!(answer.1.get("client").is_none());
+    Ok(())
+}
+
+async fn assert_revocation(setup: &Setup, app: &str, admin: &str, bea: &str) -> TestResult {
+    use identity_contract::apps::{Auth, ok, op, post};
+    let revoke = format!("/apps/{app}/credentials/{CREDENTIAL_ID}/revoke");
+    let revoked = json!({"operation": op()?, "reason": "rotated"});
+    assert_eq!(
+        post(&setup.service, &revoke, Auth::Cookie(bea), &revoked)
+            .await?
+            .0,
+        403
+    );
+    assert!(received(&setup.log).is_empty());
+    let view = ok(post(&setup.service, &revoke, Auth::Cookie(admin), &revoked).await?)?;
+    assert_eq!(view["client_credentials"][0]["live"], false);
+    assert_eq!(view["client_credentials"][0]["ended_at_broker"], true);
+    let calls = received(&setup.log);
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].path, "/_lys/apps/client/end");
+    signed_as_received(&calls[0], &setup.key)?;
+    let ended: Value = serde_json::from_slice(&calls[0].body)?;
+    assert_eq!(ended["credential_ids"], json!([CREDENTIAL_ID]));
     Ok(())
 }

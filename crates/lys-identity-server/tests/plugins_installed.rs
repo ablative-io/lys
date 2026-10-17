@@ -88,12 +88,7 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
     let ada = service.sign_in(login(ADMINISTRATOR)).await?;
     let bea = service.sign_in(login(BEA)).await?;
 
-    let config = dir.path().join("claude-config");
-    std::fs::create_dir_all(config.join("plugins"))?;
-    std::fs::write(
-        config.join("plugins/installed_plugins.json"),
-        br#"{"version":2,"plugins":{"manifold@manifold":[{}],"argus@ablative":[{}]}}"#,
-    )?;
+    let config = installed_config(dir.path())?;
     let named = config.to_str().ok_or("the test folder is not UTF-8")?;
 
     let machine = operation()?;
@@ -129,16 +124,7 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
             "installed": ["argus@ablative", "manifold@manifold"] })
     );
 
-    let empty = dir.path().join("empty-config");
-    std::fs::create_dir(&empty)?;
-    let empty = empty.to_str().ok_or("the test folder is not UTF-8")?;
-    let (status, none) = service.get(&asked(empty), Some(&ada)).await?;
-    assert_eq!(status, 200, "{none}");
-    assert_eq!(
-        none["installed"],
-        json!([]),
-        "a folder with no plugins file has none"
-    );
+    assert_empty_config(&service, dir.path(), &machine, &ada).await?;
 
     let (status, home) = service
         .get(&format!("/harnesses/plugins?machine={machine}"), Some(&ada))
@@ -174,5 +160,40 @@ async fn a_machines_runner_names_the_plugins_installed_in_a_config_folder() -> T
 
     serving.stop()?;
     broker.abort();
+    Ok(())
+}
+
+fn installed_config(dir: &std::path::Path) -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let config = dir.join("claude-config");
+    std::fs::create_dir_all(config.join("plugins"))?;
+    std::fs::write(
+        config.join("plugins/installed_plugins.json"),
+        br#"{"version":2,"plugins":{"manifold@manifold":[{}],"argus@ablative":[{}]}}"#,
+    )?;
+    Ok(config)
+}
+
+async fn assert_empty_config(
+    service: &Service,
+    dir: &std::path::Path,
+    machine: &str,
+    ada: &str,
+) -> TestResult {
+    let empty = dir.join("empty-config");
+    std::fs::create_dir(&empty)?;
+    let empty = empty.to_str().ok_or("the test folder is not UTF-8")?;
+    let (status, none) = service
+        .get(
+            &format!("/harnesses/plugins?machine={machine}&config_dir={empty}"),
+            Some(ada),
+        )
+        .await?;
+    assert_eq!(status, 200, "{none}");
+    assert_eq!(
+        none["installed"],
+        json!([]),
+        "a folder with no plugins file has none"
+    );
+
     Ok(())
 }
