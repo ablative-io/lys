@@ -152,6 +152,10 @@ pub(super) async fn provider_callback(
     Json(back): Json<ProviderBack>,
 ) -> Response {
     fixture!(inner.record(&headers));
+    let refusal = fixture!(held(&inner.callback_refusal)).take();
+    if let Some(body) = refusal {
+        return (StatusCode::FORBIDDEN, Json(body)).into_response();
+    }
     let Some(session) = fixture!(session_with_token(&inner, &headers)) else {
         return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
     };

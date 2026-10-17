@@ -86,6 +86,33 @@ impl Service {
         .await
     }
 
+    /// Start the service as [`Service::start_saying`] does, after `adjust`,
+    /// reading the time from `clock`, so a test can move the time past an
+    /// instant and read every line the service said.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation, clock or service-start failures.
+    pub async fn start_clock_adjusted<T: Send>(
+        clock: Arc<dyn Clock>,
+        adjust: impl FnOnce(&mut Config) + Send,
+        say: Option<Say>,
+        prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
+    ) -> Result<(Self, T), Box<dyn Error>> {
+        Box::pin(Self::start_clock_saying(
+            GRANT_MODEL,
+            None,
+            None,
+            None,
+            adjust,
+            ClockServing {
+                say,
+                clock: ClockSource::Supplied(clock),
+            },
+            prepare,
+        ))
+        .await
+    }
+
     /// Start the service as [`Service::start_with`] does, judging grants by
     /// `model` and keeping their relationships in the permission database
     /// `spicedb` names, or in the process when it names none.

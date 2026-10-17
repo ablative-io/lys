@@ -359,4 +359,17 @@ mod repair_tests {
         );
         Ok(())
     }
+
+    /// DIRECTORY-099 R4: a new install's sign-in lasts thirty days.
+    #[test]
+    fn a_fresh_render_signs_people_in_for_thirty_days() -> Result<(), Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("deployment.toml");
+        std::fs::write(&path, include_str!("../config/deployment-2026-09-29.toml"))?;
+        let config = super::DeploymentConfig::load_install(&path)?;
+        let layout = super::Layout::at(folder.path().to_path_buf());
+        let value = super::render(&layout, &config, &super::Carried::default(), true);
+        assert_eq!(value["session_seconds"], 2_592_000);
+        Ok(())
+    }
 }

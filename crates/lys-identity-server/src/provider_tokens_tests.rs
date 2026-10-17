@@ -5,7 +5,8 @@ use std::os::unix::fs::PermissionsExt;
 
 use serde_json::json;
 
-use super::{Access, FORMAT, Tokens, dropped_words};
+use super::super::Kind;
+use super::{Access, ENDED_REFRESH_KEPT_SECONDS, FORMAT, Tokens, dropped_words};
 use crate::error::ServerError;
 use crate::error_provider::ProviderError;
 
@@ -18,6 +19,105 @@ fn access(ends: u64) -> Access {
         expires_at: ends,
         kind: None,
     }
+}
+
+fn refresh(ends: u64) -> Access {
+    Access {
+        kind: Some(Kind::Refresh),
+        ..access(ends)
+    }
+}
+
+/// The digests the table's file holds, read from the file itself.
+fn stored_keys(file: &std::path::Path) -> Result<Vec<String>, Box<dyn Error>> {
+    let written: serde_json::Value = serde_json::from_slice(&std::fs::read(file)?)?;
+    Ok(written["tokens"]
+        .as_array()
+        .ok_or("tokens")?
+        .iter()
+        .filter_map(|token| token["key"].as_str().map(str::to_owned))
+        .collect())
+}
+
+/// When the sign-in the fixtures' tokens stand on ends.
+const T: u64 = 1_000;
+
+/// DIRECTORY-099 R1: a refresh entry is kept past its end, answering when it
+/// ended and no token, until thirty days have passed; the next write then
+/// leaves it out of the file.
+#[test]
+fn an_ended_refresh_entry_is_kept_thirty_days_answering_its_end_and_no_token()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("provider.tokens.json");
+    let ended = "c".repeat(64);
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    tokens.insert(ended.clone(), refresh(T), 10)?;
+    drop(tokens);
+    let reopened = Tokens::open(file.clone(), T + 1)?;
+    assert_eq!(reopened.ended(&ended, T + 1), Some(T));
+    assert!(matches!(
+        reopened.get(&ended, T + 1),
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
+    ));
+    assert_eq!(stored_keys(&file)?, [ended.clone()]);
+    drop(reopened);
+    let past = T + ENDED_REFRESH_KEPT_SECONDS + 1;
+    let mut later = Tokens::open(file.clone(), past)?;
+    assert_eq!(later.ended(&ended, past), None);
+    let other = "d".repeat(64);
+    later.insert(other.clone(), access(past + 100), past)?;
+    assert_eq!(stored_keys(&file)?, [other], "the ended entry is gone");
+    Ok(())
+}
+
+/// DIRECTORY-099 R1: an access entry is pruned at its end as before, and
+/// is never answered as an ended sign-in.
+#[test]
+fn an_ended_access_entry_is_gone_at_its_end() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("provider.tokens.json");
+    let ended = "c".repeat(64);
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    tokens.insert(ended.clone(), access(T), 10)?;
+    drop(tokens);
+    let mut reopened = Tokens::open(file.clone(), T + 1)?;
+    assert_eq!(reopened.ended(&ended, T + 1), None);
+    assert!(matches!(
+        reopened.get(&ended, T + 1),
+        Err(ServerError::Provider(ProviderError::TokenUnknown))
+    ));
+    let other = "d".repeat(64);
+    reopened.insert(other.clone(), access(T + 100), T + 1)?;
+    assert_eq!(
+        stored_keys(&file)?,
+        [other],
+        "the ended access entry is gone"
+    );
+    Ok(())
+}
+
+/// DIRECTORY-099 R1: a refresh entry revoked by a sign-out, a reused code or
+/// its holder's retirement is removed, never kept as ended.
+#[test]
+fn a_revoked_refresh_entry_is_never_kept_as_ended() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::TempDir::new()?;
+    let file = dir.path().join("provider.tokens.json");
+    let revoked = "c".repeat(64);
+    let retired = "d".repeat(64);
+    let mut tokens = Tokens::open(file.clone(), 10)?;
+    tokens.insert(revoked.clone(), refresh(T), 10)?;
+    tokens.insert(retired.clone(), refresh(T), 10)?;
+    tokens.revoke(&revoked)?;
+    tokens.revoke_subject(&format!("person-{}", "b".repeat(32)))?;
+    assert_eq!(tokens.ended(&revoked, T + 1), None);
+    assert_eq!(tokens.ended(&retired, T + 1), None);
+    drop(tokens);
+    let reopened = Tokens::open(file.clone(), T + 1)?;
+    assert_eq!(reopened.ended(&revoked, T + 1), None);
+    assert_eq!(reopened.ended(&retired, T + 1), None);
+    assert!(stored_keys(&file)?.is_empty());
+    Ok(())
 }
 
 /// DIRECTORY-079 R3: a token written before the table kept the app and the

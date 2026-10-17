@@ -284,6 +284,56 @@ mod sign_in_tests {
             next,
             serde_json::json!({"secure_cookie": true, "session_seconds": 43200})
         );
+        let mut said = Vec::new();
+        super::say_sign_in_moved(
+            &serde_json::json!({"session_seconds": 43200}),
+            &next,
+            &mut |line| said.push(line.to_owned()),
+        );
+        assert!(said.is_empty(), "an operator's own length is carried silently");
         Ok(())
+    }
+
+    /// DIRECTORY-099 R4: an install still at the former eight-hour default
+    /// is moved to thirty days, and the upgrade says so once.
+    #[test]
+    fn an_upgrade_moves_the_former_default_and_says_so_once()
+    -> crate::identity::error::IdentityResult<()> {
+        let previous = serde_json::json!({"secure_cookie": true, "session_seconds": 28800});
+        let mut next = serde_json::json!({"secure_cookie": false, "session_seconds": 2_592_000});
+        super::carry_sign_in(&previous, &mut next)?;
+        assert_eq!(
+            next,
+            serde_json::json!({"secure_cookie": true, "session_seconds": 2_592_000})
+        );
+        let mut said = Vec::new();
+        super::say_sign_in_moved(&previous, &next, &mut |line| said.push(line.to_owned()));
+        assert_eq!(
+            said,
+            [
+                "identity.json: session_seconds 28800 -> 2592000 (a sign-in now lasts thirty \
+                 days; the former eight-hour default is not carried)"
+            ]
+        );
+        Ok(())
+    }
+
+    /// DIRECTORY-099 R4: a session length that is not a positive number of
+    /// seconds is still refused by name, never moved.
+    #[test]
+    fn an_upgrade_still_refuses_a_session_length_that_is_not_seconds() {
+        for previous in [
+            serde_json::json!({"session_seconds": 0}),
+            serde_json::json!({"session_seconds": "28800"}),
+        ] {
+            let mut next = serde_json::json!({"session_seconds": 2_592_000});
+            let refused = super::carry_sign_in(&previous, &mut next);
+            assert!(
+                refused.is_err_and(|error| {
+                    error.kind() == crate::identity::error::ErrorKind::ConfigInvalid
+                }),
+                "{previous}"
+            );
+        }
     }
 }

@@ -107,6 +107,8 @@ struct Inner {
     upstream: Mutex<HashMap<String, PendingUpstream>>,
     upstream_codes: Mutex<HashMap<String, Login>>,
     provider_redirects: Mutex<Vec<String>>,
+    /// The body the next provider callback is refused with, when one is set.
+    callback_refusal: Mutex<Option<Value>>,
 }
 
 /// A provider sign-in the issuer began and has not finished.
@@ -256,6 +258,7 @@ impl FakeIssuer {
             upstream: Mutex::new(HashMap::new()),
             upstream_codes: Mutex::new(HashMap::new()),
             provider_redirects: Mutex::new(Vec::new()),
+            callback_refusal: Mutex::new(None),
         });
         let provider_router = Router::new()
             .route("/authorize", get(provider_authorize))
@@ -396,6 +399,16 @@ impl FakeIssuer {
     /// Returns the named fixture fault if a state lock is poisoned.
     pub fn set_public_callback(&self, callback: &str) -> std::io::Result<()> {
         callback.clone_into(&mut *held(&self.inner.public_callback)?);
+        Ok(())
+    }
+
+    /// Refuse the next provider callback with 403 and `body`, as the issuer
+    /// refuses a person the provider signed in whom it will not admit.
+    ///
+    /// # Errors
+    /// Returns the named fixture fault if a state lock is poisoned.
+    pub fn refuse_provider_callback(&self, body: Value) -> std::io::Result<()> {
+        *held(&self.inner.callback_refusal)? = Some(body);
         Ok(())
     }
 

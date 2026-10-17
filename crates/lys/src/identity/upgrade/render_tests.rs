@@ -9,13 +9,16 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use zeroize::Zeroizing;
+
 use super::super::scratch::{
-    A, B, Behaviour, NEW_KEY, NEW_VALUE, Recorder, Scratch, TestResult, build, ready_lines, state,
+    A, B, Behaviour, Fixed, NEW_KEY, NEW_VALUE, Recorder, Scratch, TestResult, build, ready_lines,
+    state,
 };
-use super::super::version;
+use super::super::{Engine, Parts, upgrade, version};
 use super::{OWN_BUILD, Render, RenderedFile, Templates};
 use crate::identity::config::DeploymentConfig;
-use crate::identity::error::ErrorKind;
+use crate::identity::error::{ErrorKind, IdentityResult};
 use crate::identity::install::layout::{self, BINARIES, Layout, render_deployment};
 use crate::identity::install::server_config;
 use crate::identity::prepare::{self, COMPOSE_ENV, SECRETS};
@@ -383,5 +386,130 @@ fn an_older_permission_model_is_replaced_as_a_recorded_file_and_a_current_one_is
     std::fs::write(layout.grant_model(), lys_identity::grants::shipped_model())?;
     let files = Templates::default().render(&layout, &own_build(), true)?;
     assert!(files.iter().all(|file| file.name != "model.json"));
+    Ok(())
+}
+
+/// Each build's own templates, with identity.json carrying `seconds` as its
+/// sign-in length.
+struct Lasting(u64);
+
+impl Render for Lasting {
+    fn render(
+        &self,
+        layout: &Layout,
+        build: &BTreeMap<String, String>,
+        screens: bool,
+    ) -> IdentityResult<Vec<RenderedFile>> {
+        let mut files = Fixed.render(layout, build, screens)?;
+        for file in &mut files {
+            if file.name == "identity.json" {
+                let text = String::from_utf8_lossy(file.bytes.as_slice())
+                    .replacen('{', &format!("{{\"session_seconds\": {}, ", self.0), 1);
+                file.bytes = Zeroizing::new(text.into_bytes());
+            }
+        }
+        Ok(files)
+    }
+}
+
+/// An engine that, when it first applies, rewrites the placed identity.json
+/// with the former eight-hour length, as a stray writer between the
+/// placement and the start would.
+#[derive(Default)]
+struct Rewriting {
+    applied: usize,
+}
+
+impl Engine for Rewriting {
+    fn apply(&mut self, layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        self.applied += 1;
+        if self.applied == 1 {
+            let placed = private_files::read(&layout.service_config())?
+                .map(|bytes| String::from_utf8_lossy(bytes.as_slice()).into_owned())
+                .unwrap_or_default();
+            let changed = placed.replacen(
+                "\"session_seconds\": 2592000",
+                "\"session_seconds\": 28800",
+                1,
+            );
+            private_files::write(&layout.service_config(), changed.as_bytes())?;
+        }
+        say("compose applied");
+        Ok(())
+    }
+
+    fn settle(&mut self, _layout: &Layout, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        say("settled");
+        Ok(())
+    }
+}
+
+/// DIRECTORY-099 R4: an install at the former eight-hour default is told
+/// its sign-in now lasts thirty days before identity.json is written, and an
+/// identity.json that reads back with another length after it was placed is
+/// refused by name before anything starts, with the previous configuration
+/// put back from config.previous/.
+#[test]
+fn an_identity_json_reading_back_another_session_length_stops_before_the_start() -> TestResult {
+    let scratch = Scratch::new()?;
+    let service_config = scratch.layout.service_config();
+    let placed = std::fs::read_to_string(&service_config)?;
+    let former = placed.replacen('{', "{\"session_seconds\": 28800, ", 1);
+    private_files::write(&service_config, former.as_bytes())?;
+    let before = scratch.configuration()?;
+    let next = scratch.work().join("b");
+    build(&next, B, Behaviour::Serves)?;
+    let mut engine = Rewriting::default();
+    let mut said = Vec::new();
+    let mut parts = Parts {
+        runner: None,
+        units: &scratch.units,
+        engine: &mut engine,
+        render: &Lasting(2_592_000),
+    };
+    let refused = upgrade(&scratch.layout, &next, None, &mut parts, &mut |line| {
+        said.push(line.to_string());
+    });
+    let Err(error) = refused else {
+        return Err("an identity.json reading back 28800 was started".into());
+    };
+    assert_eq!(error.kind(), ErrorKind::UpgradeFailed, "{error}");
+    let words = error.to_string();
+    for named in [
+        "config_invalid",
+        "identity.json",
+        "written 2592000",
+        "reads back 28800",
+    ] {
+        assert!(words.contains(named), "{named} is not named: {words}");
+    }
+    let moved = "identity.json: session_seconds 28800 -> 2592000 (a sign-in now lasts thirty days; \
+                 the former eight-hour default is not carried)";
+    assert_eq!(
+        said.iter().filter(|line| line.as_str() == moved).count(),
+        1,
+        "{said:#?}"
+    );
+    assert_eq!(engine.applied, 2, "B's compose applied, then A's again");
+    assert_eq!(
+        scratch.configuration()?,
+        before,
+        "A's configuration and compose files are back, byte for byte"
+    );
+    let kept = std::fs::read(scratch.layout.config_previous_dir().join("identity.json"))?;
+    assert_eq!(
+        Some(&kept),
+        before.get(&service_config),
+        "the file put back is config.previous/identity.json"
+    );
+    assert_eq!(scratch.running()?, ready_lines(A));
+    for unit in &scratch.units {
+        let log = std::fs::read_to_string(&unit.log)?;
+        assert!(
+            !log.contains(&format!("{} {B} ready", unit.binary)),
+            "{} of build B was started: {log}",
+            unit.binary
+        );
+    }
     Ok(())
 }

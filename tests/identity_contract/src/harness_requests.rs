@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use lys_identity_server::Config;
+use lys_identity_server::{Config, Say};
 
 use super::{Answer, HARNESS_PASSWORD, Service, answer, location, session_cookie};
 use crate::fake_issuer::Login;
@@ -17,6 +17,15 @@ impl Service {
     /// # Errors
     /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
+        Box::pin(self.restart_saying(None)).await
+    }
+
+    /// Restart as [`Service::restart`] does, saying each line of the
+    /// restarted service's log to `say` when one is given.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
+    pub async fn restart_saying(&mut self, say: Option<Say>) -> Result<(), Box<dyn Error>> {
         let timing = StageTimer::new("fixture.restart");
         self.server.stop()?;
         let stage = StageTimer::new("fixture.restart_rebind");
@@ -26,7 +35,7 @@ impl Service {
         self.config.listen = listen;
         self.config.redirect_url = format!("{}/callback", self.base);
         drop(stage);
-        let (server, client) = serve(listener, &self.config, None, &self.clock).await?;
+        let (server, client) = serve(listener, &self.config, say, &self.clock).await?;
         self.server = server;
         self.client = client;
         drop(timing);
