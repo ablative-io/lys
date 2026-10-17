@@ -257,15 +257,15 @@ fn grant_authority_refusals_keep_their_forbidden_status() {
     }
 }
 
-#[path = "error_names_cases/app.rs"]
+#[path = "error_names_cases/app_tests.rs"]
 mod app;
-#[path = "error_names_cases/grant.rs"]
+#[path = "error_names_cases/grant_tests.rs"]
 mod grant;
-#[path = "error_names_cases/identity.rs"]
+#[path = "error_names_cases/identity_tests.rs"]
 mod identity;
-#[path = "error_names_cases/server_access.rs"]
+#[path = "error_names_cases/server_access_tests.rs"]
 mod server_access;
-#[path = "error_names_cases/server_provider.rs"]
+#[path = "error_names_cases/server_provider_tests.rs"]
 mod server_provider;
-#[path = "error_names_cases/server_runtime.rs"]
+#[path = "error_names_cases/server_runtime_tests.rs"]
 mod server_runtime;
