@@ -2200,6 +2200,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A return address for every machine an app runs on (DIRECTORY-097)",
+      "items": [
+        {
+          "id": "C739",
+          "text": "Registration and the Sign-in settings admit an https return address whose host is one wildcard label under a domain of two or more labels, and refuse by name an http wildcard, a bare wildcard, a wildcard deeper than one label and a one-label suffix.",
+          "done": false
+        },
+        {
+          "id": "C740",
+          "text": "A sign-in's redirect matches a wildcard entry by exactly one host label under the suffix with the entry's scheme, port and path, at /oauth/authorize and at the token exchange, and is never rewritten.",
+          "done": false
+        },
+        {
+          "id": "C741",
+          "text": "The app's Sign-in section and the developer registration form explain the wildcard form and the device-local http rule, and show a refused line with its reason.",
+          "done": false
+        },
+        {
+          "id": "C742",
+          "text": "The CHANGELOG and the apps skill's route notes record the admitted form and its refusals.",
+          "done": false
+        }
+      ]
     }
   ]
 }

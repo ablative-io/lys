@@ -6149,6 +6149,46 @@
       "path": "crates/lys/src/commands/sign_in.rs",
       "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
       "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-097.json",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "docs/design/directory/briefs/DIRECTORY-097.md",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_sign_in.rs",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_sign_in_tests.rs",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_binding_tests.rs",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "surface/identity/src/shell/help/pages.ts",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "plugin/skills/apps/references/routes.md",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "plugins/lys/skills/apps/references/routes.md",
+      "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
+      "brief": "DIRECTORY-096"
     }
   ],
   "inventory": [
