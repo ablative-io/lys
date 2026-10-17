@@ -19,6 +19,7 @@ pub enum Recipients {
 
 impl Recipients {
     /// The policy as it is written.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Anyone => "anyone",
@@ -28,6 +29,7 @@ impl Recipients {
 
     /// Whether `identity` may receive a handle under this policy. A person
     /// is named `person-...` in the directory and `person:...` locally.
+    #[must_use]
     pub fn admits(self, identity: &str) -> bool {
         match self {
             Self::Anyone => true,
@@ -38,6 +40,7 @@ impl Recipients {
 
 impl SecretStore {
     /// The recipient policy of `secret`.
+    #[must_use]
     pub fn recipients(&self, secret: &str) -> Recipients {
         self.index
             .recipients

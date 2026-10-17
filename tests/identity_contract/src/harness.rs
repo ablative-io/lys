@@ -200,6 +200,9 @@ pub const ORIGIN: &str = "example.test/lys/directory";
 
 impl Harness {
     /// A fresh log and a service key over `seed`.
+    ///
+    /// # Errors
+    /// Propagates fixture directory, key, log or session setup failures.
     pub fn new(seed: u8) -> Result<Self, Box<dyn Error>> {
         let dir = tempfile::TempDir::new()?;
         FileLeafStore::create(&dir.path().join("log"), ORIGIN)?;
@@ -213,6 +216,7 @@ impl Harness {
     }
 
     /// Where the log lives.
+    #[must_use]
     pub fn log_path(&self) -> PathBuf {
         self.dir.path().join("log")
     }
@@ -226,6 +230,7 @@ impl Harness {
     }
 
     /// A way to open the log's leaf store that fails where the plan says.
+    #[must_use]
     pub fn leaves(&self) -> Box<dyn Fn() -> StoreResult<FaultStore> + Send> {
         let path = self.log_path();
         let plan = Arc::clone(&self.plan);
@@ -241,6 +246,9 @@ impl Harness {
     }
 
     /// Open the directory over the log, as a restarted service would.
+    ///
+    /// # Errors
+    /// Propagates fixture directory, key, log or session setup failures.
     pub fn open(&self) -> Result<Directory<FaultStore>, Box<dyn Error>> {
         let path = self.log_path();
         let plan = Arc::clone(&self.plan);
@@ -327,6 +335,9 @@ fn secret_file(path: &Path, bytes: &[u8]) -> Result<(), Box<dyn Error>> {
 pub const HARNESS_PASSWORD: &str = "Harness-Password-2026";
 
 /// The session cookie an answer began, or its refusal as an error.
+///
+/// # Errors
+/// Propagates fixture directory, key, log or session setup failures.
 pub async fn session_cookie(signed_in: reqwest::Response) -> Result<String, Box<dyn Error>> {
     let timing = StageTimer::new("http.session_cookie");
     let cookie = signed_in

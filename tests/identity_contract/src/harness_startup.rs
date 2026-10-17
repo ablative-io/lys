@@ -44,6 +44,9 @@ impl Service {
 
     /// Start the service over a fresh log, with the fake issuer's administrator
     /// and link-audit source configured.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start() -> Result<Self, Box<dyn Error>> {
         Ok(Self::start_with(|_| Ok(())).await?.0)
     }
@@ -51,6 +54,9 @@ impl Service {
     /// Start the service as [`Service::start`] does, after `prepare` has
     /// written to the directory its configuration names, answering what
     /// `prepare` answered.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_with<T: Send>(
         prepare: impl FnOnce(&Config) -> Result<T, Box<dyn Error>> + Send,
     ) -> Result<(Self, T), Box<dyn Error>> {
@@ -83,6 +89,9 @@ impl Service {
     /// Start the service as [`Service::start_with`] does, judging grants by
     /// `model` and keeping their relationships in the permission database
     /// `spicedb` names, or in the process when it names none.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_judging<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -94,6 +103,9 @@ impl Service {
     /// Start the service as [`Service::start_judging`] does, asking the
     /// secrets broker `secrets` names for the secrets screens, when it names
     /// one.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_asking<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -106,6 +118,9 @@ impl Service {
     /// Start the service as [`Service::start_asking`] does, setting the
     /// sign-in providers through the issuer API `sign_in_providers` names,
     /// when it names one.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_setting<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -119,6 +134,9 @@ impl Service {
     /// Start the service as [`Service::start_setting`] does, after `adjust`
     /// has changed the configuration the harness wrote, so a test can
     /// configure an administrator the fake issuer never signs in.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_adjusted<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -142,6 +160,9 @@ impl Service {
     /// Start the service as [`Service::start_adjusted`] does, saying each
     /// line of its log to `say` when one is given, so a test reads every
     /// line the service said.
+    ///
+    /// # Errors
+    /// Propagates fixture configuration, preparation or service-start failures.
     pub async fn start_saying<T: Send>(
         model: &str,
         spicedb: Option<SpiceDbSettings>,
@@ -191,74 +212,15 @@ impl Service {
         issuer.set_public_callback(&format!("{base}/auth/v1/providers/callback"))?;
         drop(stage);
         let stage = StageTimer::new("fixture.configure_and_adjust");
-        let configured = |subject: &str| ConfiguredLogin {
-            issuer: issuer.issuer().to_owned(),
-            subject: subject.to_owned(),
-        };
-        let mut config = Config {
-            message_service: None,
+        let mut config = configured_service(
+            &dir,
+            &issuer,
             listen,
-            log_dir: dir.path().join("log"),
-            log_origin: ORIGIN.to_owned(),
-            event_key_file: dir.path().join("service.key"),
-            import_credential_file: None,
-            issuer: issuer.issuer().to_owned(),
-            client_id: CLIENT_ID.to_owned(),
-            client_secret_file: dir.path().join("client.secret"),
-            redirect_url: format!("{base}/callback"),
-            sign_in_api: Some(issuer.api().to_owned()),
-            trusted_proxies: Vec::new(),
-            profile: lys_identity_server::config::Profile::Service,
-            operator_token_file: None,
-            operator_upgrade_file: None,
-            administrator: Some(configured(ADMINISTRATOR)),
-            link_audit_source: configured(LINK_AUDIT_SOURCE),
-            issuer_moved_from: None,
-            session_seconds: 600,
-            sessions_file: Some(dir.path().join("sessions.json")),
-            secure_cookie: false,
-            grant_log_dir: dir.path().join("grant-log"),
-            grant_log_origin: GRANT_ORIGIN.to_owned(),
-            grant_model_file: dir.path().join("grant-model.json"),
+            &base,
             spicedb,
             secrets,
-            requests_dir: Some(dir.path().join("requests")),
-            certificates_dir: Some(dir.path().join("certificates")),
-            network_file: Some(dir.path().join("network.json")),
-            roles_file: Some(dir.path().join("roles.json")),
-            provisioning_file: Some(dir.path().join("provisioning.json")),
-            homes_dir: Some(dir.path().join("homes")),
-            runtime_dir: Some(dir.path().join("runtime")),
-            service_accounts_dir: Some(dir.path().join("service-accounts")),
-            teams_dir: Some(dir.path().join("teams")),
-            stops_dir: Some(dir.path().join("stops")),
-            budgets_dir: Some(dir.path().join("budgets")),
-            policies_dir: Some(dir.path().join("policies")),
-            goals_dir: Some(dir.path().join("goals")),
-            words_dir: Some(dir.path().join("words")),
-            variables_dir: Some(dir.path().join("variables")),
-            schedules_dir: Some(dir.path().join("schedules")),
-            reviews_dir: Some(dir.path().join("reviews")),
             sign_in_providers,
-            provider_origins: Some(ProviderOrigins {
-                google: issuer.provider_base().to_owned(),
-                microsoft: issuer.provider_base().to_owned(),
-                github: issuer.provider_base().to_owned(),
-            }),
-            provider: None,
-            setup: None,
-            password_policy: None,
-            model_proxy: Some("http://127.0.0.1:18484".to_owned()),
-            proxy_dir: None,
-            surface_dir: None,
-            runner_socket: None,
-            membership: Some(lys_identity_server::config::MembershipSettings {
-                page_rows_max: MEMBERSHIP_PAGE_ROWS_MAX,
-                page_bytes_max: MEMBERSHIP_PAGE_BYTES_MAX,
-                cursor_seconds: MEMBERSHIP_CURSOR_SECONDS,
-                cursors_max: MEMBERSHIP_CURSORS_MAX,
-            }),
-        };
+        );
         adjust(&mut config);
         std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
@@ -292,5 +254,84 @@ impl Service {
             },
             prepared,
         ))
+    }
+}
+
+fn configured_service(
+    dir: &tempfile::TempDir,
+    issuer: &FakeIssuer,
+    listen: std::net::SocketAddr,
+    base: &str,
+    spicedb: Option<SpiceDbSettings>,
+    secrets: Option<SecretsSettings>,
+    sign_in_providers: Option<SignInProvidersSettings>,
+) -> Config {
+    let configured = |subject: &str| ConfiguredLogin {
+        issuer: issuer.issuer().to_owned(),
+        subject: subject.to_owned(),
+    };
+    Config {
+        message_service: None,
+        listen,
+        log_dir: dir.path().join("log"),
+        log_origin: ORIGIN.to_owned(),
+        event_key_file: dir.path().join("service.key"),
+        import_credential_file: None,
+        issuer: issuer.issuer().to_owned(),
+        client_id: CLIENT_ID.to_owned(),
+        client_secret_file: dir.path().join("client.secret"),
+        redirect_url: format!("{base}/callback"),
+        sign_in_api: Some(issuer.api().to_owned()),
+        trusted_proxies: Vec::new(),
+        profile: lys_identity_server::config::Profile::Service,
+        operator_token_file: None,
+        operator_upgrade_file: None,
+        administrator: Some(configured(ADMINISTRATOR)),
+        link_audit_source: configured(LINK_AUDIT_SOURCE),
+        issuer_moved_from: None,
+        session_seconds: 600,
+        sessions_file: Some(dir.path().join("sessions.json")),
+        secure_cookie: false,
+        grant_log_dir: dir.path().join("grant-log"),
+        grant_log_origin: GRANT_ORIGIN.to_owned(),
+        grant_model_file: dir.path().join("grant-model.json"),
+        spicedb,
+        secrets,
+        requests_dir: Some(dir.path().join("requests")),
+        certificates_dir: Some(dir.path().join("certificates")),
+        network_file: Some(dir.path().join("network.json")),
+        roles_file: Some(dir.path().join("roles.json")),
+        provisioning_file: Some(dir.path().join("provisioning.json")),
+        homes_dir: Some(dir.path().join("homes")),
+        runtime_dir: Some(dir.path().join("runtime")),
+        service_accounts_dir: Some(dir.path().join("service-accounts")),
+        teams_dir: Some(dir.path().join("teams")),
+        stops_dir: Some(dir.path().join("stops")),
+        budgets_dir: Some(dir.path().join("budgets")),
+        policies_dir: Some(dir.path().join("policies")),
+        goals_dir: Some(dir.path().join("goals")),
+        words_dir: Some(dir.path().join("words")),
+        variables_dir: Some(dir.path().join("variables")),
+        schedules_dir: Some(dir.path().join("schedules")),
+        reviews_dir: Some(dir.path().join("reviews")),
+        sign_in_providers,
+        provider_origins: Some(ProviderOrigins {
+            google: issuer.provider_base().to_owned(),
+            microsoft: issuer.provider_base().to_owned(),
+            github: issuer.provider_base().to_owned(),
+        }),
+        provider: None,
+        setup: None,
+        password_policy: None,
+        model_proxy: Some("http://127.0.0.1:18484".to_owned()),
+        proxy_dir: None,
+        surface_dir: None,
+        runner_socket: None,
+        membership: Some(lys_identity_server::config::MembershipSettings {
+            page_rows_max: MEMBERSHIP_PAGE_ROWS_MAX,
+            page_bytes_max: MEMBERSHIP_PAGE_BYTES_MAX,
+            cursor_seconds: MEMBERSHIP_CURSOR_SECONDS,
+            cursors_max: MEMBERSHIP_CURSORS_MAX,
+        }),
     }
 }

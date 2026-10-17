@@ -23,6 +23,7 @@ pub struct Signature(Vec<u8>);
 
 impl Signature {
     /// The `COSE_Sign1` bytes to carry to the verifier.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -51,6 +52,7 @@ pub enum SigningRefusal {
 
 impl SigningRefusal {
     /// The name recorded in the use's settlement.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::KeyRequired { .. } => "SigningKeyRequired",

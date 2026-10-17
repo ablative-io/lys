@@ -22,6 +22,7 @@ pub enum OAuthRefusal {
 
 impl OAuthRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::ReconnectRequired { .. } => "ReconnectRequired",

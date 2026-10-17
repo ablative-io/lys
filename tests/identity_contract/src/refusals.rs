@@ -29,6 +29,7 @@ use serde_json::{Value, json};
 pub type Listed = Arc<BTreeMap<(String, String), BTreeSet<String>>>;
 
 /// The refusals the service's document lists, by route.
+#[must_use]
 pub fn listed() -> Listed {
     let routes = lys_identity_server::openapi::api()
         .routes()

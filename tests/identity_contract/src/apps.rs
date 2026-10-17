@@ -40,6 +40,7 @@ pub enum Auth<'a> {
 }
 
 /// A login at the fake issuer.
+#[must_use]
 pub fn login(subject: &str) -> Login {
     Login {
         subject: subject.to_owned(),
@@ -48,11 +49,17 @@ pub fn login(subject: &str) -> Login {
 }
 
 /// A new operation id.
+///
+/// # Errors
+/// Propagates random operation-identity generation failures.
 pub fn op() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
 }
 
 /// The service with the administrator's person and Bea seeded.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn seeded() -> Result<(Service, Seeded), Box<dyn Error>> {
     let broker = crate::app_custody::start().await?;
     Service::start_adjusted(
@@ -73,6 +80,9 @@ pub async fn seeded() -> Result<(Service, Seeded), Box<dyn Error>> {
 }
 
 /// Send `method` to `path` with `body`, authenticated as `auth`.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn send(
     service: &Service,
     method: reqwest::Method,
@@ -107,6 +117,9 @@ pub async fn send(
 }
 
 /// POST `body` to `path` as `auth`.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn post(
     service: &Service,
     path: &str,
@@ -117,11 +130,17 @@ pub async fn post(
 }
 
 /// GET `path` as `auth`.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn get(service: &Service, path: &str, auth: Auth<'_>) -> Result<Answer, Box<dyn Error>> {
     send(service, reqwest::Method::GET, path, auth, None).await
 }
 
 /// PUT `body` to `path` as `auth`.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn put(
     service: &Service,
     path: &str,
@@ -132,6 +151,9 @@ pub async fn put(
 }
 
 /// Refuse the test unless `answer` is the refusal `name` at `status`.
+///
+/// # Errors
+/// Refuses an unexpected response status or response shape.
 pub fn refused(answer: &Answer, status: u16, name: &str) -> TestResult {
     if answer.0 != status || answer.1["refusal"] != name {
         return Err(format!("expected {status} {name}, got {} {}", answer.0, answer.1).into());
@@ -140,6 +162,9 @@ pub fn refused(answer: &Answer, status: u16, name: &str) -> TestResult {
 }
 
 /// Refuse the test unless `answer` is a success, answering its body.
+///
+/// # Errors
+/// Refuses an unexpected response status or response shape.
 pub fn ok(answer: Answer) -> Result<Value, Box<dyn Error>> {
     if answer.0 != 200 {
         return Err(format!("expected 200, got {} {}", answer.0, answer.1).into());
@@ -151,6 +176,7 @@ pub fn ok(answer: Answer) -> Result<Value, Box<dyn Error>> {
 /// a document kind, all under `app`'s prefix. It is written in the form the
 /// service keeps a schema in, every member present and every list in order,
 /// so a version read back compares equal to it.
+#[must_use]
 pub fn workspace_schema(app: &str) -> Value {
     json!({"kinds": {
         format!("{app}.workspace"): {
@@ -172,6 +198,9 @@ pub fn workspace_schema(app: &str) -> Value {
 }
 
 /// The registration body of `app` with `schema`.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub fn registration(app: &str, schema: &Value) -> Result<Value, Box<dyn Error>> {
     Ok(json!({
         "operation": op()?,
@@ -183,6 +212,9 @@ pub fn registration(app: &str, schema: &Value) -> Result<Value, Box<dyn Error>> 
 }
 
 /// Register `app` with the workspace schema, as the administrator.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn register(service: &Service, admin: &str, app: &str) -> Result<Value, Box<dyn Error>> {
     let body = registration(app, &workspace_schema(app))?;
     ok(post(service, "/apps", Auth::Cookie(admin), &body).await?)
@@ -191,6 +223,9 @@ pub async fn register(service: &Service, admin: &str, app: &str) -> Result<Value
 /// Approve `app` as the administrator, answering the approval. The approval
 /// carries the app's sign-in settings as the Apps screen offers them: the
 /// addresses its registration asked for, and the person's name withheld.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn approve(service: &Service, admin: &str, app: &str) -> Result<Value, Box<dyn Error>> {
     let registered = ok(get(service, &format!("/apps/{app}"), Auth::Cookie(admin)).await?)?;
     let redirects = registered["redirects"].clone();
@@ -200,6 +235,9 @@ pub async fn approve(service: &Service, admin: &str, app: &str) -> Result<Value,
 /// Approve `app` as the administrator with the sign-in settings given:
 /// `redirects` as the JSON list of addresses, and whether the app is given
 /// the person's name.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn approve_with(
     service: &Service,
     admin: &str,
@@ -218,6 +256,9 @@ pub async fn approve_with(
 }
 
 /// Register and approve `app`, answering its credential.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn registered(
     service: &Service,
     admin: &str,
@@ -232,6 +273,9 @@ pub async fn registered(
 }
 
 /// A root grant of `relation` on `kind:id` to `holder`, as the administrator.
+///
+/// # Errors
+/// Propagates fixture transport, setup or response-decoding failures.
 pub async fn root(
     service: &Service,
     admin: &str,
@@ -252,6 +296,7 @@ pub async fn root(
 }
 
 /// One check of a batch.
+#[must_use]
 pub fn check(subject: &str, kind: &str, id: &str, action: &str) -> Value {
     json!({"subject": subject, "kind": kind, "id": id, "action": action})
 }

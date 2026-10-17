@@ -17,11 +17,13 @@ pub struct KeyId(String);
 
 impl KeyId {
     /// The fingerprint of `public`.
+    #[must_use]
     pub fn of_public(public: &[u8; 32]) -> Self {
         Self(hex(&sha256(public)))
     }
 
     /// The fingerprint as text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -98,16 +100,19 @@ impl StoreKey {
     }
 
     /// The key's fingerprint.
+    #[must_use]
     pub fn id(&self) -> &KeyId {
         &self.id
     }
 
     /// The Ed25519 public half, which verifies what this key signs.
+    #[must_use]
     pub fn verifying_key(&self) -> [u8; 32] {
         self.identity.public_key_bytes()
     }
 
     /// The X25519 public half entries are sealed to.
+    #[must_use]
     pub fn sealing_public(&self) -> [u8; 32] {
         self.identity.x25519_public_key()
     }

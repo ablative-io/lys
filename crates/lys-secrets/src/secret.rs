@@ -17,27 +17,32 @@ pub const REDACTED: &str = "[redacted]";
 
 impl Secret {
     /// Takes ownership of `bytes`; the vector's buffer becomes the secret's.
+    #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self(Zeroizing::new(bytes))
     }
 
     /// Copies `bytes` into a new secret buffer of exactly their length.
+    #[must_use]
     pub fn from_slice(bytes: &[u8]) -> Self {
         Self(Zeroizing::new(bytes.to_vec()))
     }
 
     /// The secret bytes. Every call site is a place the value is used, and
     /// the only such place in the broker is the forwarding closure.
+    #[must_use]
     pub fn expose(&self) -> &[u8] {
         &self.0
     }
 
     /// The number of secret bytes.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Whether the secret holds no bytes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

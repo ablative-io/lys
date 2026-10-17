@@ -34,6 +34,7 @@ pub struct LeaseView {
 
 impl LeaseView {
     /// Whether it still issues: `live` until it ends, `stopped` after.
+    #[must_use]
     pub fn issuing(&self) -> &'static str {
         if self.end.is_some() {
             "stopped"
@@ -44,6 +45,7 @@ impl LeaseView {
 
     /// Its provider state as the route reads it: `not_asked`; `pending`
     /// until the system behind confirms; `confirmed` once it has.
+    #[must_use]
     pub fn upstream_label(&self) -> &'static str {
         match self.upstream {
             UpstreamRevocation::NotAsked => "not_asked",
@@ -53,6 +55,7 @@ impl LeaseView {
     }
 
     /// The JSON body the lease route answers.
+    #[must_use]
     pub fn body(&self) -> Value {
         let end = self.end.as_ref();
         json!({

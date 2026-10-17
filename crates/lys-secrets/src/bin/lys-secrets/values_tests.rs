@@ -220,18 +220,7 @@ async fn a_secret_is_added_replaced_and_retired_and_its_value_goes_only_upstream
     .ok_or("a reused operation id was applied")?;
     assert!(again.1.starts_with("OperationReused"), "{}", again.1);
     // A body that does not read is refused in fixed words, never quoting it.
-    let mut quoted = serde_json::Map::new();
-    quoted.insert(VALUE.to_owned(), Value::from(VALUE));
-    let unread = serde_json::to_vec(&quoted)?;
-    let refused = crate::values::add(
-        State(Arc::clone(&shared)),
-        vouched(&key, ("POST", "/_lys/add"), PERSON, &unread)?,
-    )
-    .await
-    .err()
-    .ok_or("an unreadable body was taken")?;
-    assert_eq!(refused.0, StatusCode::BAD_REQUEST);
-    assert!(!refused.1.contains(VALUE));
+    refuse_unreadable_value(&shared, &key).await?;
 
     FileGrants::new(shared.layout.grants()).set(
         Relation::Use,
@@ -260,32 +249,7 @@ async fn a_secret_is_added_replaced_and_retired_and_its_value_goes_only_upstream
         Some(&format!("Bearer {VALUE}"))
     );
 
-    let replace = serde_json::to_vec(&json!({
-        "operation": "op-replace-0123456789abcdef", "secret": "fixture-token", "value": NEW_VALUE,
-    }))?;
-    let stranger = crate::values::replace(
-        State(Arc::clone(&shared)),
-        vouched(&key, ("POST", "/_lys/replace"), OTHER, &replace)?,
-    )
-    .await
-    .err()
-    .ok_or("someone who does not own the secret replaced its value")?;
-    assert_eq!(stranger.0, StatusCode::FORBIDDEN);
-    let replaced = answered(
-        crate::values::replace(
-            State(Arc::clone(&shared)),
-            vouched(&key, ("POST", "/_lys/replace"), PERSON, &replace)?,
-        )
-        .await,
-    )?;
-    assert_eq!(replaced["sequence"], 2);
-    assert!(!replaced.to_string().contains(NEW_VALUE));
-    let (_, text) = call(&shared, ("fixture-token", &issued), &agent).await?;
-    assert!(!text.contains(NEW_VALUE));
-    assert_eq!(
-        seen.lock().expect("test state lock poisoned").last(),
-        Some(&format!("Bearer {NEW_VALUE}"))
-    );
+    replace_value(&shared, &key, &agent, &issued, &seen).await?;
 
     let retire = serde_json::to_vec(&json!({
         "operation": "op-retire-0123456789abcdef", "secret": "fixture-token",
@@ -351,5 +315,59 @@ async fn a_value_is_given_only_by_a_person_through_a_trusted_screen_service() ->
         0
     );
     never_written(dir.path(), VALUE)?;
+    Ok(())
+}
+
+async fn replace_value(
+    shared: &Arc<Shared>,
+    key: &Ed25519Identity,
+    agent: &Ed25519Identity,
+    issued: &IssuedHandle,
+    seen: &Arc<Mutex<Vec<String>>>,
+) -> Outcome {
+    let replace = serde_json::to_vec(&json!({
+        "operation": "op-replace-0123456789abcdef", "secret": "fixture-token", "value": NEW_VALUE,
+    }))?;
+    let stranger = crate::values::replace(
+        State(Arc::clone(shared)),
+        vouched(key, ("POST", "/_lys/replace"), OTHER, &replace)?,
+    )
+    .await
+    .err()
+    .ok_or("someone who does not own the secret replaced its value")?;
+    assert_eq!(stranger.0, StatusCode::FORBIDDEN);
+    let replaced = answered(
+        crate::values::replace(
+            State(Arc::clone(shared)),
+            vouched(key, ("POST", "/_lys/replace"), PERSON, &replace)?,
+        )
+        .await,
+    )?;
+    assert_eq!(replaced["sequence"], 2);
+    assert!(!replaced.to_string().contains(NEW_VALUE));
+    let (_, text) = call(shared, ("fixture-token", issued), agent).await?;
+    assert!(!text.contains(NEW_VALUE));
+    assert_eq!(
+        seen.lock().expect("test state lock poisoned").last(),
+        Some(&format!("Bearer {NEW_VALUE}"))
+    );
+
+    Ok(())
+}
+
+async fn refuse_unreadable_value(shared: &Arc<Shared>, key: &Ed25519Identity) -> Outcome {
+    let mut quoted = serde_json::Map::new();
+    quoted.insert(VALUE.to_owned(), Value::from(VALUE));
+    let unread = serde_json::to_vec(&quoted)?;
+    let refused = crate::values::add(
+        State(Arc::clone(shared)),
+        vouched(key, ("POST", "/_lys/add"), PERSON, &unread)?,
+    )
+    .await
+    .err()
+    .ok_or("an unreadable body was taken")?;
+    assert_eq!(refused.0, StatusCode::BAD_REQUEST);
+    assert!(!refused.1.contains(VALUE));
+
     Ok(())
 }

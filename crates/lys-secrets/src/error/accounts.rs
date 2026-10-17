@@ -25,6 +25,7 @@ pub enum AccountsRefusal {
 
 impl AccountsRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::AllResting { .. } | Self::NoneToMoveTo { .. } => "AccountsRested",

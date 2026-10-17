@@ -49,6 +49,7 @@ pub enum LendingRefusal {
 
 impl LendingRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::NotPermitted { .. } | Self::NotActedFor { .. } => "LendingNotPermitted",

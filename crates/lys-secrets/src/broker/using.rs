@@ -44,16 +44,19 @@ pub struct Ticket {
 
 impl Ticket {
     /// The credential, for the one forward this ticket admits.
+    #[must_use]
     pub fn credential(&self) -> &Secret {
         &self.credential
     }
 
     /// Uses left on the lease after this one.
+    #[must_use]
     pub fn uses_left(&self) -> u64 {
         self.uses_left
     }
 
     /// The reservation, on a capped lease.
+    #[must_use]
     pub fn reserved(&self) -> Option<u64> {
         self.reserved
     }

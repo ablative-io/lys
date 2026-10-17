@@ -187,6 +187,9 @@ pub struct FakeIssuer {
 
 impl FakeIssuer {
     /// Start an issuer on a local port, signing with the seed in `key_file`.
+    ///
+    /// # Errors
+    /// Propagates fixture key, listener or server-start failures.
     pub async fn start(key_file: &Path) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let issuer = format!("http://{}", listener.local_addr()?);
@@ -198,6 +201,9 @@ impl FakeIssuer {
     /// does behind Lys: its name and every endpoint its discovery document
     /// gives are on `public`, and it answers only on its own loopback port,
     /// under the same path.
+    ///
+    /// # Errors
+    /// Propagates fixture key, listener or server-start failures.
     pub async fn start_behind(public: &str, key_file: &Path) -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let issuer = format!("{public}{PUBLIC_PATH}");
@@ -207,6 +213,9 @@ impl FakeIssuer {
     /// Start an issuer listening on `bind` that names itself `issuer`, for a
     /// development service a browser signs in to. Every sign-in the caller
     /// has not chosen with [`FakeIssuer::sign_in_as`] is signed as `standing`.
+    ///
+    /// # Errors
+    /// Propagates fixture key, listener or server-start failures.
     pub async fn start_at(
         bind: SocketAddr,
         issuer: String,
@@ -284,17 +293,20 @@ impl FakeIssuer {
     }
 
     /// The issuer URL, exactly as it signs it.
+    #[must_use]
     pub fn issuer(&self) -> &str {
         &self.inner.issuer
     }
 
     /// Where the issuer answers: its loopback origin and the path it
     /// serves under, the address a service reaches it at.
+    #[must_use]
     pub fn api(&self) -> &str {
         &self.inner.api
     }
 
     /// The issuer's loopback origin, which no browser is ever given.
+    #[must_use]
     pub fn loopback(&self) -> &str {
         &self.inner.loopback
     }
@@ -372,6 +384,7 @@ impl FakeIssuer {
     }
 
     /// The stand-in provider's origin.
+    #[must_use]
     pub fn provider_base(&self) -> &str {
         &self.inner.provider_base
     }
@@ -406,466 +419,12 @@ impl FakeIssuer {
 
 type Shared = Arc<Inner>;
 
-fn refused(reason: &str) -> Response {
-    (StatusCode::BAD_REQUEST, Json(json!({ "error": reason }))).into_response()
-}
-
-async fn discovery(State(inner): State<Shared>) -> Json<Value> {
-    let base = &inner.issuer;
-    Json(json!({
-        "issuer": base,
-        "authorization_endpoint": format!("{base}/authorize"),
-        "token_endpoint": format!("{base}/token"),
-        "jwks_uri": format!("{base}/jwks"),
-        "response_types_supported": ["code"],
-        "subject_types_supported": ["public"],
-        "id_token_signing_alg_values_supported": ["EdDSA"],
-        "code_challenge_methods_supported": ["S256"],
-    }))
-}
-
-async fn jwks(State(inner): State<Shared>) -> Json<Value> {
-    Json(json!({ "keys": [{
-        "kty": "OKP",
-        "crv": "Ed25519",
-        "use": "sig",
-        "alg": "EdDSA",
-        "kid": KEY_ID,
-        "x": URL_SAFE_NO_PAD.encode(inner.key.public_key_bytes()),
-    }]}))
-}
-
-#[derive(Deserialize)]
-struct AuthorizeRequest {
-    redirect_uri: String,
-    state: String,
-    nonce: String,
-    code_challenge: String,
-    code_challenge_method: String,
-}
-
-async fn authorize(
-    State(inner): State<Shared>,
-    Query(request): Query<AuthorizeRequest>,
-) -> Response {
-    if request.code_challenge_method != "S256" {
-        return refused("only S256 is accepted");
-    }
-    let Some(login) = fixture!(inner.chosen()) else {
-        return refused("the test chose no login");
-    };
-    let code = fixture!(inner.issue(login, &request.state, request.nonce, request.code_challenge));
-    let location = format!(
-        "{}?code={code}&state={}",
-        request.redirect_uri, request.state
-    );
-    (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
-}
-
-#[derive(Deserialize)]
-struct TokenRequest {
-    code: String,
-    code_verifier: String,
-}
-
-fn client_admitted(headers: &HeaderMap) -> bool {
-    let expected = format!(
-        "Basic {}",
-        STANDARD.encode(format!("{CLIENT_ID}:{CLIENT_SECRET}"))
-    );
-    headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value == expected)
-}
-
-async fn token(
-    State(inner): State<Shared>,
-    headers: HeaderMap,
-    Form(request): Form<TokenRequest>,
-) -> Response {
-    if !client_admitted(&headers) {
-        return refused("the client credentials are wrong");
-    }
-    let Some(issued) = fixture!(held(&inner.codes)).remove(&request.code) else {
-        return refused("the code is unknown or used");
-    };
-    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(request.code_verifier.as_bytes()));
-    if challenge != issued.challenge {
-        return refused("the PKCE verifier does not match");
-    }
-    let Ok(now) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) else {
-        return refused("the clock is before the epoch");
-    };
-    let now = now.as_secs();
-    let claims = json!({
-        "iss": inner.issuer,
-        "sub": issued.login.subject,
-        "email": issued.login.email,
-        "email_verified": true,
-        "aud": [CLIENT_ID],
-        "iat": now,
-        "exp": now + 300,
-        "auth_time": now,
-        "nonce": issued.nonce,
-    });
-    let header = json!({ "alg": "EdDSA", "typ": "JWT", "kid": KEY_ID });
-    let signing_input = format!(
-        "{}.{}",
-        URL_SAFE_NO_PAD.encode(header.to_string()),
-        URL_SAFE_NO_PAD.encode(claims.to_string())
-    );
-    let signature = URL_SAFE_NO_PAD.encode(inner.key.sign(signing_input.as_bytes()));
-    Json(json!({
-        "access_token": URL_SAFE_NO_PAD.encode(Sha256::digest(signing_input.as_bytes())),
-        "token_type": "bearer",
-        "expires_in": 300,
-        "id_token": format!("{signing_input}.{signature}"),
-    }))
-    .into_response()
-}
-
-#[derive(Deserialize)]
-struct PageRequest {
-    client_id: String,
-    code_challenge_method: String,
-}
-
-/// The start of the issuer's own sign-in: a session under a cookie, and its
-/// request token in the page's template.
-async fn login_page(
-    State(inner): State<Shared>,
-    headers: HeaderMap,
-    Query(request): Query<PageRequest>,
-) -> Response {
-    fixture!(inner.record(&headers));
-    if request.client_id != CLIENT_ID || request.code_challenge_method != "S256" {
-        return refused("the authorization request is not one this issuer takes");
-    }
-    let serial = inner.next_serial();
-    let session = format!("session{serial}");
-    let token = format!("token{serial}");
-    fixture!(held(&inner.sessions)).insert(session.clone(), token.clone());
-    let page = format!(
-        "<html><body><div hidden><template id=\"tpl_csrf_token\">{token}</template></div></body></html>"
-    );
-    (
-        StatusCode::OK,
-        [
-            (
-                header::SET_COOKIE,
-                format!("{SESSION_COOKIE}={session}; Path=/; HttpOnly"),
-            ),
-            (header::CONTENT_TYPE, "text/html".to_owned()),
-        ],
-        page,
-    )
-        .into_response()
-}
-
-/// A proof-of-work challenge, remembered until it is answered once.
-async fn pow(State(inner): State<Shared>, headers: HeaderMap) -> Response {
-    fixture!(inner.record(&headers));
-    let serial = inner.next_serial();
-    let challenge = format!("1:{DIFFICULTY}:4102444800:{serial:0>16}:{serial:0>43}:");
-    fixture!(held(&inner.challenges)).insert(challenge.clone());
-    challenge.into_response()
-}
-
-/// Whether `answer` answers a challenge this issuer gave and has not taken,
-/// taking it.
-fn answered(inner: &Inner, answer: &str) -> std::io::Result<bool> {
-    let Some((challenge, counter)) = answer.rsplit_once(':') else {
-        return Ok(false);
-    };
-    let hash = Sha256::digest(answer.as_bytes());
-    let zeros = hash[0] == 0 && hash[1] >> (16 - DIFFICULTY) == 0;
-    Ok(!counter.is_empty() && zeros && held(&inner.challenges)?.remove(&format!("{challenge}:")))
-}
-
-#[derive(Deserialize)]
-struct Credentials {
-    email: String,
-    password: Option<String>,
-    pow: String,
-    client_id: String,
-    redirect_uri: String,
-    state: Option<String>,
-    nonce: Option<String>,
-    code_challenge: Option<String>,
-    code_challenge_method: Option<String>,
-}
-
-fn session_of(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get(header::COOKIE)?
-        .to_str()
-        .ok()?
-        .split(';')
-        .filter_map(|pair| pair.trim().split_once('='))
-        .find(|(name, _)| *name == SESSION_COOKIE)
-        .map(|(_, value)| value.to_owned())
-}
-
-fn status(code: StatusCode, message: &str) -> Response {
-    (
-        code,
-        Json(json!({ "error": "Unauthorized", "message": message })),
-    )
-        .into_response()
-}
-
-/// The credentials, with the session, its token and the answered challenge.
-async fn credentials(
-    State(inner): State<Shared>,
-    headers: HeaderMap,
-    Json(request): Json<Credentials>,
-) -> Response {
-    // The issuer refuses a sign-in that names no User-Agent (Rauthy v0.36.2,
-    // "Empty User-Agent not allowed").
-    let agent = headers
-        .get(axum::http::header::USER_AGENT)
-        .and_then(|value| value.to_str().ok());
-    if agent.is_none_or(str::is_empty) {
-        return status(StatusCode::BAD_REQUEST, "Empty User-Agent not allowed");
-    }
-    let address = fixture!(inner.record(&headers));
-    let token = headers
-        .get("x-csrf-token")
-        .and_then(|value| value.to_str().ok());
-    let sessions = fixture!(held(&inner.sessions));
-    let session = session_of(&headers).and_then(|id| sessions.get(&id).cloned());
-    drop(sessions);
-    if session.is_none() || session.as_deref() != token {
-        return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
-    }
-    if !fixture!(answered(&inner, &request.pow)) {
-        return status(StatusCode::BAD_REQUEST, "Invalid PoW");
-    }
-    if fixture!(held(&inner.failures))
-        .get(&address)
-        .copied()
-        .unwrap_or(0)
-        >= FAILURES_BARRED
-    {
-        return status(StatusCode::TOO_MANY_REQUESTS, "Too many failed logins");
-    }
-    let password = request.password.unwrap_or_default();
-    let account = fixture!(held(&inner.accounts)).get(&request.email).cloned();
-    let login = match account {
-        Some(account) if account.password == password => {
-            if account.second_factor {
-                return (StatusCode::OK, Json(json!({ "code": "webauthn" }))).into_response();
-            }
-            Some(account.login)
-        }
-        Some(_) => None,
-        None if password.is_empty() => None,
-        None => fixture!(inner.chosen()),
-    };
-    let Some(login) = login else {
-        *fixture!(held(&inner.failures)).entry(address).or_insert(0) += 1;
-        return status(StatusCode::UNAUTHORIZED, "Invalid user credentials");
-    };
-    if request.client_id != CLIENT_ID || request.code_challenge_method.as_deref() != Some("S256") {
-        return status(
-            StatusCode::BAD_REQUEST,
-            "the client or its challenge is not taken",
-        );
-    }
-    let state = request.state.unwrap_or_default();
-    let code = fixture!(inner.issue(
-        login,
-        &state,
-        request.nonce.unwrap_or_default(),
-        request.code_challenge.unwrap_or_default(),
-    ));
-    let location = format!("{}?code={code}&state={state}", request.redirect_uri);
-    (StatusCode::ACCEPTED, [(header::LOCATION, location)]).into_response()
-}
-
-#[derive(Deserialize)]
-struct ProviderAsk {
-    client_id: String,
-    redirect_uri: String,
-    state: Option<String>,
-}
-
-/// The stand-in provider's sign-in address.
-async fn provider_authorize(
-    State(inner): State<Shared>,
-    Query(ask): Query<ProviderAsk>,
-) -> Response {
-    fixture!(held(&inner.provider_redirects)).push(ask.redirect_uri.clone());
-    if ask.client_id.starts_with("rejected") {
-        return (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({
-                "error": "invalid_client",
-                "error_description": "The OAuth client was not found.",
-            })),
-        )
-            .into_response();
-    }
-    let Some(state) = ask.state else {
-        return (StatusCode::OK, "<html><title>Sign in</title></html>").into_response();
-    };
-    let Some(login) = fixture!(inner.chosen()) else {
-        return refused("the test chose no login at the provider");
-    };
-    let code = format!("upstream{}", inner.next_serial());
-    fixture!(held(&inner.upstream_codes)).insert(code.clone(), login);
-    let location = format!("{}?code={code}&state={state}", ask.redirect_uri);
-    (StatusCode::SEE_OTHER, [(header::LOCATION, location)]).into_response()
-}
-
-#[derive(Deserialize)]
-struct ProviderLogin {
-    pow: String,
-    client_id: String,
-    redirect_uri: String,
-    state: Option<String>,
-    nonce: Option<String>,
-    code_challenge: Option<String>,
-    code_challenge_method: Option<String>,
-    provider_id: String,
-    pkce_challenge: String,
-}
-
-/// The session a request carries, when its request token is the session's.
-fn session_with_token(inner: &Inner, headers: &HeaderMap) -> std::io::Result<Option<String>> {
-    let Some(token) = headers
-        .get("x-csrf-token")
-        .and_then(|value| value.to_str().ok())
-    else {
-        return Ok(None);
-    };
-    let Some(session) = session_of(headers) else {
-        return Ok(None);
-    };
-    Ok(
-        (held(&inner.sessions)?.get(&session).map(String::as_str) == Some(token))
-            .then_some(session),
-    )
-}
-
-/// The issuer's start of a provider sign-in.
-async fn provider_login(
-    State(inner): State<Shared>,
-    headers: HeaderMap,
-    Json(request): Json<ProviderLogin>,
-) -> Response {
-    fixture!(inner.record(&headers));
-    let Some(session) = fixture!(session_with_token(&inner, &headers)) else {
-        return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
-    };
-    if !fixture!(answered(&inner, &request.pow)) {
-        return status(StatusCode::BAD_REQUEST, "Invalid PoW");
-    }
-    if request.provider_id.is_empty() || request.provider_id.starts_with("unknown") {
-        return status(StatusCode::NOT_FOUND, "no provider has that id");
-    }
-    if request.client_id != CLIENT_ID || request.code_challenge_method.as_deref() != Some("S256") {
-        return status(
-            StatusCode::BAD_REQUEST,
-            "the client or its challenge is not taken",
-        );
-    }
-    let serial = inner.next_serial();
-    let callback_id = format!("callback{serial}");
-    let xsrf = format!("xsrf{serial}");
-    fixture!(held(&inner.upstream)).insert(
-        callback_id.clone(),
-        PendingUpstream {
-            redirect_uri: request.redirect_uri,
-            state: request.state.unwrap_or_default(),
-            nonce: request.nonce.unwrap_or_default(),
-            code_challenge: request.code_challenge.unwrap_or_default(),
-            pkce_challenge: request.pkce_challenge,
-            xsrf: xsrf.clone(),
-            session,
-        },
-    );
-    let callback = fixture!(held(&inner.public_callback)).clone();
-    let Ok(mut location) = reqwest::Url::parse(&format!("{}/authorize", inner.provider_base))
-    else {
-        return status(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "the provider's address is not one",
-        );
-    };
-    location
-        .query_pairs_mut()
-        .append_pair("client_id", "stand-in-client")
-        .append_pair("response_type", "code")
-        .append_pair("redirect_uri", &callback)
-        .append_pair("state", &callback_id);
-    (
-        StatusCode::ACCEPTED,
-        [
-            (header::LOCATION, location.to_string()),
-            (
-                header::SET_COOKIE,
-                format!("IssuerUpstream={callback_id}; Path=/"),
-            ),
-        ],
-        xsrf,
-    )
-        .into_response()
-}
-
-#[derive(Deserialize)]
-struct ProviderBack {
-    state: String,
-    code: String,
-    xsrf_token: String,
-    pkce_verifier: String,
-}
-
-/// The issuer's finish of a provider sign-in.
-async fn provider_callback(
-    State(inner): State<Shared>,
-    headers: HeaderMap,
-    Json(back): Json<ProviderBack>,
-) -> Response {
-    fixture!(inner.record(&headers));
-    let Some(session) = fixture!(session_with_token(&inner, &headers)) else {
-        return status(StatusCode::UNAUTHORIZED, "Unauthorized Session");
-    };
-    let Some(pending) = fixture!(held(&inner.upstream)).remove(&back.state) else {
-        return status(
-            StatusCode::BAD_REQUEST,
-            "no provider sign-in has that state",
-        );
-    };
-    let cookie = headers
-        .get(header::COOKIE)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.contains(&format!("IssuerUpstream={}", back.state)));
-    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(back.pkce_verifier.as_bytes()));
-    let matches = cookie
-        && session == pending.session
-        && back.xsrf_token == pending.xsrf
-        && challenge == pending.pkce_challenge;
-    if !matches {
-        return status(
-            StatusCode::BAD_REQUEST,
-            "the provider sign-in does not match its start",
-        );
-    }
-    let Some(login) = fixture!(held(&inner.upstream_codes)).remove(&back.code) else {
-        return status(
-            StatusCode::BAD_REQUEST,
-            "the provider's code is unknown or used",
-        );
-    };
-    let code = fixture!(inner.issue(login, &pending.state, pending.nonce, pending.code_challenge));
-    let location = format!(
-        "{}?code={code}&state={}",
-        pending.redirect_uri, pending.state
-    );
-    (StatusCode::ACCEPTED, [(header::LOCATION, location)]).into_response()
-}
+mod oauth;
+mod provider;
+mod sign_in;
+use oauth::{authorize, discovery, jwks, refused, token};
+use provider::{provider_authorize, provider_callback, provider_login};
+use sign_in::{answered, credentials, login_page, pow, session_of, status};
 
 #[cfg(test)]
 mod poison_tests {

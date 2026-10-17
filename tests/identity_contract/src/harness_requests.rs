@@ -13,6 +13,9 @@ impl Service {
     /// address with a new client, so every store is opened from disk and no
     /// connection of the stopped service carries over. Signed-in sessions are
     /// among what is opened from disk: a cookie from before still answers.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn restart(&mut self) -> Result<(), Box<dyn Error>> {
         let timing = StageTimer::new("fixture.restart");
         self.server.stop()?;
@@ -32,6 +35,9 @@ impl Service {
 
     /// Restart an existing installation with the configuration an upgrade
     /// writes, retaining every durable log and credential.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn restart_adjusted(
         &mut self,
         adjust: impl FnOnce(&mut Config),
@@ -43,6 +49,9 @@ impl Service {
     /// Begin a sign-in through a sign-in provider and let it answer as
     /// `login`, answering the callback path and the initiating browser's
     /// binding cookie. The browser must return that cookie on the callback.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn issuer_answer(&self, login: Login) -> Result<(String, String), Box<dyn Error>> {
         let timing = StageTimer::new("http.issuer_answer");
         self.issuer.sign_in_as(login)?;
@@ -73,6 +82,9 @@ impl Service {
 
     /// Sign in on Lys's own sign-in route as `login`, which the issuer
     /// signs whatever password is typed, answering the session cookie.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn sign_in(&self, login: Login) -> Result<String, Box<dyn Error>> {
         let timing = StageTimer::new("http.sign_in");
         let email = login.email.clone();
@@ -84,6 +96,9 @@ impl Service {
 
     /// Sign in on Lys's own sign-in route with `email` and `password`,
     /// answering the session cookie, or the refusal as an error.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn sign_in_with(
         &self,
         email: &str,
@@ -104,6 +119,9 @@ impl Service {
     }
 
     /// GET `path`, with the session `cookie` when one is given.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn get(&self, path: &str, cookie: Option<&str>) -> Result<Answer, Box<dyn Error>> {
         let timing = StageTimer::new("http.get");
         let mut request = self.client.get(format!("{}{path}", self.base));
@@ -117,6 +135,9 @@ impl Service {
 
     /// GET `path` with the initiating browser's cookie, asking for a page: the
     /// status, the redirect it names, and whether it set a session cookie.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn get_page(
         &self,
         path: &str,
@@ -138,6 +159,9 @@ impl Service {
     }
 
     /// POST `body` as JSON to `path`, with the session `cookie` when one is given.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn post(
         &self,
         path: &str,
@@ -161,6 +185,9 @@ impl Service {
     /// The directory log's size as the public receipt route's checkpoint
     /// names it, so a test can prove a refused call logged nothing without
     /// a session. The checkpoint counts every leaf, an install event's too.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn log_size(&self) -> Result<u64, Box<dyn Error>> {
         let timing = StageTimer::new("http.log_size");
         let (status, first) = self.get("/receipts/0", None).await?;
@@ -177,6 +204,9 @@ impl Service {
     /// POST the JSON `body` bytes to `path` carrying the header `name: value`
     /// and no session cookie, so a request signed over those exact bytes
     /// arrives as signed.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn post_signed(
         &self,
         path: &str,
@@ -198,6 +228,9 @@ impl Service {
     /// POST the JSON `body` bytes to `path` carrying every header of
     /// `headers`, so a request may carry a signature over those exact bytes
     /// and a session cookie at once.
+    ///
+    /// # Errors
+    /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn post_carrying(
         &self,
         path: &str,

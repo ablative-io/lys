@@ -74,6 +74,7 @@ impl OnBehalf {
 
     /// The request as the five text values it travels in: service, person,
     /// operation id in hex, signing time, and the signature in hex.
+    #[must_use]
     pub fn to_wire(&self) -> [String; 5] {
         [
             self.service.clone(),
@@ -119,6 +120,7 @@ pub struct ServiceWindow {
 
 impl ServiceWindow {
     /// An empty window.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

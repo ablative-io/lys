@@ -60,6 +60,7 @@ impl Asker {
     /// The asker `identity` of `kind`, with the group claims on its token.
     /// A person's team ids are read from `claims` through
     /// [`crate::team_ids`]; an agent's claims are not read at all.
+    #[must_use]
     pub fn new(identity: &str, kind: AskerKind, claims: &Value) -> Self {
         let teams = match kind {
             AskerKind::Person => team_ids(claims),
@@ -73,21 +74,25 @@ impl Asker {
     }
 
     /// The identity asking.
+    #[must_use]
     pub fn identity(&self) -> &str {
         &self.identity
     }
 
     /// Whether it is a person or an agent.
+    #[must_use]
     pub fn kind(&self) -> AskerKind {
         self.kind
     }
 
     /// The team ids of a person asking; none for an agent.
+    #[must_use]
     pub fn teams(&self) -> &[String] {
         &self.teams
     }
 
     /// Whether the asker belongs to the team `team`.
+    #[must_use]
     pub fn in_team(&self, team: &str) -> bool {
         self.teams.iter().any(|mine| mine == team)
     }

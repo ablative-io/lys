@@ -37,6 +37,7 @@ pub enum Relation {
 
 impl Relation {
     /// The relation as it is written.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Use => "use",

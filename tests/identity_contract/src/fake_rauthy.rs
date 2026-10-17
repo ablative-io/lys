@@ -70,6 +70,9 @@ macro_rules! fixture {
 
 impl FakeRauthy {
     /// Start the stand-in on a local port.
+    ///
+    /// # Errors
+    /// Propagates fixture directory, listener or server-start failures.
     pub async fn start() -> Result<Self, Box<dyn Error>> {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let api = format!("http://{}/auth/v1", listener.local_addr()?);
@@ -100,12 +103,14 @@ impl FakeRauthy {
     }
 
     /// The API base the service is configured with.
+    #[must_use]
     pub fn api(&self) -> &str {
         &self.inner.api
     }
 
     /// The API key file, `name$secret`, mode 0600, as the installation
     /// writes it for the service.
+    #[must_use]
     pub fn api_key_file(&self) -> PathBuf {
         self.inner.keys.path().join("sign-in-providers.key")
     }
@@ -144,6 +149,7 @@ impl FakeRauthy {
     }
 
     /// How many requests reached the stand-in, on any route, answered or refused.
+    #[must_use]
     pub fn request_count(&self) -> usize {
         self.inner.requests.load(Ordering::SeqCst)
     }

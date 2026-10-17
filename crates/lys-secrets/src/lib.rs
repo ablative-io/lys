@@ -58,11 +58,13 @@ pub use store::{AccountView, EntryClass, EntryView, Recipients, Retired, Scope, 
 pub use teams::team_ids;
 
 /// `bytes` as lowercase hex.
+#[must_use]
 pub fn to_hex(bytes: &[u8]) -> String {
     encoding::hex(bytes)
 }
 
 /// The bytes of a hex string, or `None` when it is not hex.
+#[must_use]
 pub fn from_hex(text: &str) -> Option<Vec<u8>> {
     encoding::unhex(text)
 }

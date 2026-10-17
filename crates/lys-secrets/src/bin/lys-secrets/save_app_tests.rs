@@ -51,22 +51,7 @@ fn signed_path(
 async fn signed_prepare_is_private_repeatable_bound_to_body_and_its_route_presents_the_credential()
 -> Outcome {
     let dir = tempfile::tempdir()?;
-    let layout = Layout::new(&dir.path().join("broker"), &dir.path().join("keys"));
-    layout.prepare()?;
-    let key = Ed25519Identity::load_or_generate(&dir.path().join("service.key"))?;
-    layout.trust_service(ServiceKey {
-        name: "identity".to_owned(),
-        public_key: to_hex(&key.public_key_bytes()),
-    })?;
-    let grants = Grants::File(FileGrants::new(layout.grants()));
-    let broker = Broker::create(&layout.paths(), grants.clone(), Box::new(now_ms))?;
-    let shared = Arc::new(Shared {
-        broker: Mutex::new(broker),
-        layout,
-        client: reqwest::Client::new(),
-        window: Mutex::new(ServiceWindow::new()),
-        permissions: Arc::new(grants),
-    });
+    let (shared, key) = prepared_broker(dir.path())?;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let upstream = format!("http://{}/api", listener.local_addr()?);
     let body = serde_json::to_vec(&json!({"app":"fixture_app","upstream":upstream}))?;
@@ -81,21 +66,7 @@ async fn signed_prepare_is_private_repeatable_bound_to_body_and_its_route_presen
         .to_owned();
     // The upstream sees the credential the broker made, and only the
     // broker's digest of its secret tells the test it is the right one.
-    let target = axum::Router::new().route(
-        "/api/apps/me",
-        axum::routing::get(move |headers: axum::http::HeaderMap| async move {
-            let presented = headers
-                .get("authorization")
-                .and_then(|h| h.to_str().ok())
-                .and_then(|h| h.strip_prefix("Bearer lys-app.fixture_app."))
-                .map(|secret| to_hex(&Sha256::digest(secret.as_bytes())));
-            if presented.as_deref() == Some(digest.as_str()) {
-                "authorised fixture"
-            } else {
-                "wrong credential"
-            }
-        }),
-    );
+    let target = credential_target(digest);
     let serving = tokio::spawn(async move { axum::serve(listener, target).await });
     let again = crate::save_app::prepare(State(Arc::clone(&shared)), signed(&key, &body)?)
         .await
@@ -263,4 +234,44 @@ async fn prepare_reconciles_after_reopen_and_never_returns_plaintext() -> Outcom
             .is_err()
     );
     Ok(())
+}
+
+fn prepared_broker(
+    dir: &std::path::Path,
+) -> Result<(Arc<Shared>, Ed25519Identity), Box<dyn std::error::Error>> {
+    let layout = Layout::new(&dir.join("broker"), &dir.join("keys"));
+    layout.prepare()?;
+    let key = Ed25519Identity::load_or_generate(&dir.join("service.key"))?;
+    layout.trust_service(ServiceKey {
+        name: "identity".to_owned(),
+        public_key: to_hex(&key.public_key_bytes()),
+    })?;
+    let grants = Grants::File(FileGrants::new(layout.grants()));
+    let broker = Broker::create(&layout.paths(), grants.clone(), Box::new(now_ms))?;
+    let shared = Arc::new(Shared {
+        broker: Mutex::new(broker),
+        layout,
+        client: reqwest::Client::new(),
+        window: Mutex::new(ServiceWindow::new()),
+        permissions: Arc::new(grants),
+    });
+    Ok((shared, key))
+}
+
+fn credential_target(digest: String) -> axum::Router {
+    axum::Router::new().route(
+        "/api/apps/me",
+        axum::routing::get(move |headers: axum::http::HeaderMap| async move {
+            let presented = headers
+                .get("authorization")
+                .and_then(|h| h.to_str().ok())
+                .and_then(|h| h.strip_prefix("Bearer lys-app.fixture_app."))
+                .map(|secret| to_hex(&Sha256::digest(secret.as_bytes())));
+            if presented.as_deref() == Some(digest.as_str()) {
+                "authorised fixture"
+            } else {
+                "wrong credential"
+            }
+        }),
+    )
 }

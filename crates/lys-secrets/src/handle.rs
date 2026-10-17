@@ -46,11 +46,13 @@ impl HandleId {
     }
 
     /// A handle id as a person or a file writes it.
+    #[must_use]
     pub fn from_text(text: &str) -> Self {
         Self(text.to_owned())
     }
 
     /// The id as text.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -72,6 +74,7 @@ impl HandleToken {
     }
 
     /// Wraps handle bytes a holder presents.
+    #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> Self {
         Self(Secret::from_slice(bytes))
     }
@@ -82,6 +85,7 @@ impl HandleToken {
     }
 
     /// The handle bytes, for the holder to carry.
+    #[must_use]
     pub fn expose(&self) -> &[u8] {
         self.0.expose()
     }
@@ -127,6 +131,7 @@ pub struct Presentation {
 impl Presentation {
     /// The presentation as the four text values it travels in: handle id,
     /// operation id in hex, signing time, and the signature in hex.
+    #[must_use]
     pub fn to_wire(&self) -> [String; 4] {
         [
             self.handle_id.as_str().to_owned(),
@@ -203,6 +208,7 @@ impl Presentation {
     /// A presentation of `handle_id` for `operation_id` at `signed_at_ms`
     /// that carries no signature, as a presenter who skipped signing sends
     /// it. The broker refuses it as `PresentationUnsigned`.
+    #[must_use]
     pub fn unsigned(
         handle_id: &HandleId,
         operation_id: &[u8],

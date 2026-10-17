@@ -200,6 +200,7 @@ impl SecretStore {
     }
 
     /// The store's directory.
+    #[must_use]
     pub fn dir(&self) -> &Path {
         &self.dir
     }
@@ -210,6 +211,7 @@ impl SecretStore {
     }
 
     /// The entry named `name`.
+    #[must_use]
     pub fn entry(&self, name: &str) -> Option<&EntryView> {
         self.index.entries.get(name)
     }

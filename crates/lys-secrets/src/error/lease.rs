@@ -33,6 +33,7 @@ pub enum ListRefusal {
 
 impl ListRefusal {
     /// The refusal's name, the `error` of its body.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::UnknownScope { .. } => "unknown_scope",
@@ -41,6 +42,7 @@ impl ListRefusal {
     }
 
     /// The HTTP status a route answers it with.
+    #[must_use]
     pub fn status(&self) -> u16 {
         match self {
             Self::UnknownScope { .. } => 400,
@@ -49,6 +51,7 @@ impl ListRefusal {
     }
 
     /// The JSON body a route answers it with. It carries no list.
+    #[must_use]
     pub fn body(&self) -> Value {
         match self {
             Self::UnknownScope { given } => json!({
@@ -118,6 +121,7 @@ pub enum LeaseRefusal {
 
 impl LeaseRefusal {
     /// The refusal's name, the `error` of its body.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::NotFound => "lease_not_found",
@@ -130,6 +134,7 @@ impl LeaseRefusal {
     }
 
     /// The HTTP status a route answers it with.
+    #[must_use]
     pub fn status(&self) -> u16 {
         match self {
             Self::NotFound => 404,
@@ -142,6 +147,7 @@ impl LeaseRefusal {
     }
 
     /// The JSON body a route answers it with.
+    #[must_use]
     pub fn body(&self) -> Value {
         match self {
             Self::NotFound | Self::Failed(_) => json!({

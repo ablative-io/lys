@@ -6,6 +6,9 @@ use lys_identity::{
 };
 
 /// The configured administrator, as the service attests them.
+///
+/// # Errors
+/// Returns the underlying named setup or API refusal.
 pub fn administrator() -> Result<Actor, IdentityError> {
     Ok(Actor::new(
         LoginBinding::new("https://issuer.test", "administrator")?,
@@ -14,6 +17,9 @@ pub fn administrator() -> Result<Actor, IdentityError> {
 }
 
 /// The authenticated link-audit source.
+///
+/// # Errors
+/// Returns the underlying named setup or API refusal.
 pub fn source() -> Result<Actor, IdentityError> {
     Ok(Actor::new(
         LoginBinding::new("https://issuer.test", "link-audit-source")?,
@@ -22,16 +28,23 @@ pub fn source() -> Result<Actor, IdentityError> {
 }
 
 /// A fixed operation id.
+#[must_use]
 pub fn op(n: u8) -> OperationId {
     OperationId::from_bytes([n; 16])
 }
 
 /// A profile showing `name`.
+///
+/// # Errors
+/// Returns the underlying named setup or API refusal.
 pub fn shown(name: &str) -> Result<Profile, IdentityError> {
     Profile::new(name)
 }
 
 /// A link the issuer observed under `source_operation_id`.
+///
+/// # Errors
+/// Returns the underlying named setup or API refusal.
 pub fn linked(source_operation_id: &str) -> Result<LinkObservation, IdentityError> {
     LinkObservation::new(
         source_operation_id,

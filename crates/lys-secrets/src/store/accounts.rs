@@ -101,6 +101,7 @@ impl SecretStore {
     }
 
     /// The accounts of `secret` in order.
+    #[must_use]
     pub fn accounts(&self, secret: &str) -> Vec<AccountView> {
         match self.index.accounts.get(secret) {
             None => vec![AccountView {

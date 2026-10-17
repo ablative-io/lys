@@ -73,6 +73,7 @@ fn text(secret: &Secret, what: &'static str) -> Result<String, SecretsError> {
 
 impl OAuthGrant {
     /// A grant as consent produced it.
+    #[must_use]
     pub fn new(
         provenance: Provenance,
         client_secret: Option<Secret>,
@@ -136,16 +137,19 @@ impl OAuthGrant {
     }
 
     /// Where the grant came from.
+    #[must_use]
     pub fn provenance(&self) -> &Provenance {
         &self.provenance
     }
 
     /// The access token, for the one header the proxy writes it into.
+    #[must_use]
     pub fn access_token(&self) -> &Secret {
         &self.access_token
     }
 
     /// Every token the grant holds, for redacting an upstream's answer.
+    #[must_use]
     pub fn tokens(&self) -> Vec<&Secret> {
         let mut tokens = vec![&self.access_token, &self.refresh_token];
         tokens.extend(self.client_secret.as_ref());
@@ -153,11 +157,13 @@ impl OAuthGrant {
     }
 
     /// Whether the access token is expired, or expires within the margin.
+    #[must_use]
     pub fn needs_refresh(&self, now_ms: i64) -> bool {
         now_ms.saturating_add(REFRESH_MARGIN_MS) >= self.access_expires_ms
     }
 
     /// The form a refresh posts to the token endpoint.
+    #[must_use]
     pub fn refresh_form(&self) -> Vec<(&'static str, Secret)> {
         let mut form = vec![
             ("grant_type", Secret::from_slice(b"refresh_token")),
@@ -177,6 +183,7 @@ impl OAuthGrant {
     }
 
     /// The form a revocation posts: the refresh token, which ends the grant.
+    #[must_use]
     pub fn revocation_form(&self) -> Vec<(&'static str, Secret)> {
         let mut form = vec![
             ("token", Secret::from_slice(self.refresh_token.expose())),

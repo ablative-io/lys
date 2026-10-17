@@ -28,6 +28,7 @@ pub enum OwnerChangeRefusal {
 
 impl OwnerChangeRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Missing { .. } => "OperationMissing",

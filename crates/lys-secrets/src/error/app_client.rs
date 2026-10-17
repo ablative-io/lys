@@ -31,6 +31,7 @@ pub enum AppClientRefusal {
 
 impl AppClientRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::NoCustody { .. } => "AppClientNoCustody",

@@ -36,6 +36,7 @@ pub struct LocalGrants {
 
 impl LocalGrants {
     /// An empty set of relations.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

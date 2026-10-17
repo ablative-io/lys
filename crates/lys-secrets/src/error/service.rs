@@ -41,6 +41,7 @@ pub enum ServiceRefusal {
 
 impl ServiceRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Unknown { .. } => "ServiceUnknown",

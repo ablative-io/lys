@@ -17,10 +17,12 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 /// Fixed fixture bytes, never used by a production service.
+#[must_use]
 pub fn secret() -> String {
     "ab".repeat(32)
 }
 /// The app credential held by this stand-in, not returned by approval.
+#[must_use]
 pub fn credential(app: &str) -> String {
     format!("lys-app.{app}.{}", secret())
 }

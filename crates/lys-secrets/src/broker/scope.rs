@@ -64,6 +64,7 @@ impl ListScope {
     }
 
     /// The scope as it is written.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Self::Organisation => "organisation",

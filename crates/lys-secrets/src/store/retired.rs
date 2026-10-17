@@ -19,6 +19,7 @@ pub struct Retired {
 
 impl SecretStore {
     /// Who retired `name`, and when, when it was retired.
+    #[must_use]
     pub fn retired(&self, name: &str) -> Option<&Retired> {
         self.index.retired.get(name)
     }

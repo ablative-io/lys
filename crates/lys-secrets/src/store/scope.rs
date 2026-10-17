@@ -25,6 +25,7 @@ pub enum Scope {
 impl Scope {
     /// The scope as the permission source names it: `person/<id>`,
     /// `team/<name>` or `organisation/<name>`.
+    #[must_use]
     pub fn target(&self) -> String {
         match self {
             Self::Personal(person) => format!("person/{person}"),
@@ -34,6 +35,7 @@ impl Scope {
     }
 
     /// The kind of the scope: `personal`, `team` or `organisation`.
+    #[must_use]
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Personal(_) => "personal",
@@ -43,6 +45,7 @@ impl Scope {
     }
 
     /// Whom the scope names: the person, the team or the organisation.
+    #[must_use]
     pub fn name(&self) -> &str {
         match self {
             Self::Personal(name) | Self::Team(name) | Self::Organisation(name) => name,
@@ -74,6 +77,7 @@ impl Scope {
 impl SecretStore {
     /// The scope set on `secret`; an account sealed under a secret has that
     /// secret's scope. `None` when no scope is set.
+    #[must_use]
     pub fn scope(&self, secret: &str) -> Option<Scope> {
         match self.account_parent(secret) {
             Some(parent) => self.scope(parent),

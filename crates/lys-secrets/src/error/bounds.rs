@@ -33,6 +33,7 @@ pub enum BoundsRefusal {
 
 impl BoundsRefusal {
     /// The refusal's name.
+    #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::BeyondGrant { .. } => "LeaseBeyondGrant",
