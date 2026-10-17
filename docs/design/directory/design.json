@@ -6194,6 +6194,11 @@
       "path": "plugins/lys/skills/apps/references/routes.md",
       "note": "lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere.",
       "brief": "DIRECTORY-096"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_sign_in_declare.rs",
+      "note": "R1: one return address declared for an app by the administrator or by the app itself through its own credential, judged by the same rule as a saved line, written nowhere when already listed",
+      "brief": "DIRECTORY-098"
     }
   ],
   "inventory": [

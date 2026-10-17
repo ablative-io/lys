@@ -594,3 +594,9 @@
 - [ ] **C740** — A sign-in's redirect matches a wildcard entry by exactly one host label under the suffix with the entry's scheme, port and path, at /oauth/authorize and at the token exchange, and is never rewritten.
 - [ ] **C741** — The app's Sign-in section and the developer registration form explain the wildcard form and the device-local http rule, and show a refused line with its reason.
 - [ ] **C742** — The CHANGELOG and the apps skill's route notes record the admitted form and its refusals.
+
+## An app declares its own return address (DIRECTORY-098)
+
+- [ ] **C743** — POST /apps/{app}/sign_in/returns adds one return address for the administrator or the app itself acting through its own credential, judged by DIRECTORY-097's rule, written nowhere when already listed, refused NotAdmitted to anyone else.
+- [ ] **C744** — The Sign-in settings show a declared address with who declared it and when, and the administrator's save of the whole list still removes it.
+- [ ] **C745** — The CHANGELOG and the apps skill's route notes record the route, its callers and its refusals.

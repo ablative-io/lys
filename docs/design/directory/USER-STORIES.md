@@ -290,6 +290,8 @@
 
 **S421.** As a person adding a return address, I want a refused line shown with its reason, so that I learn why an http name cannot be saved instead of finding the list unchanged.
 
+**S422.** As the lead of a product whose console moves to a new name, I want the console to declare its own sign-in return address with the credential it already holds, so that people sign in there the day it moves and nobody edits Lys by hand.
+
 ## Person running a team of agents — Starts, watches, talks to and stops agents from Lys
 
 **S154.** As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.

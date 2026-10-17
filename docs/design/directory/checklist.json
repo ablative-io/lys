@@ -2225,6 +2225,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "An app declares its own return address (DIRECTORY-098)",
+      "items": [
+        {
+          "id": "C743",
+          "text": "POST /apps/{app}/sign_in/returns adds one return address for the administrator or the app itself acting through its own credential, judged by DIRECTORY-097's rule, written nowhere when already listed, refused NotAdmitted to anyone else.",
+          "done": false
+        },
+        {
+          "id": "C744",
+          "text": "The Sign-in settings show a declared address with who declared it and when, and the administrator's save of the whole list still removes it.",
+          "done": false
+        },
+        {
+          "id": "C745",
+          "text": "The CHANGELOG and the apps skill's route notes record the route, its callers and its refusals.",
+          "done": false
+        }
+      ]
     }
   ]
 }

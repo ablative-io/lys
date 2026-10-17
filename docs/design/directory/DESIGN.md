@@ -715,6 +715,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/data_kept.rs` | the data an upgrade starts from, kept whole in data.previous; DIRECTORY-082 R1 moves the window's data to data.rolled-back on a put-back instead of removing it | DIRECTORY-082 |
 | `crates/lys/src/identity/upgrade/data_kept_tests.rs` | the put-back, confirm and crash proofs of the kept data (DIRECTORY-082 R1, R2) | DIRECTORY-082 |
 | `crates/lys-identity-server/src/apps_api.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
+| `crates/lys-identity-server/src/apps_redirect.rs` | R1, R2: a return address as a registration and the Sign-in settings admit it, a wildcard label under a domain included, and a presented redirect judged against a listed entry by one label, never rewritten | DIRECTORY-097 |
 | `crates/lys-identity-server/src/apps_state.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
 | `crates/lys-identity-server/src/apps_store.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
 | `crates/lys-identity-server/tests/apps.rs` | R1: An app is a record, registered through the API and approved on a Lys screen | DIRECTORY-048 |
@@ -1337,6 +1338,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/shell/help/pages.ts` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 | `plugin/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 | `plugins/lys/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/apps_sign_in_declare.rs` | R1: one return address declared for an app by the administrator or by the app itself through its own credential, judged by the same rule as a saved line, written nowhere when already listed | DIRECTORY-098 |
 
 ## Inventory
 
