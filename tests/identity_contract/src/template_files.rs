@@ -8,11 +8,14 @@ use std::path::Path;
 use ring::digest::{Context, SHA256};
 
 pub(crate) fn hash_file(path: &Path) -> io::Result<String> {
-    let mut file = File::open(path)?;
+    hash_reader(File::open(path)?)
+}
+
+pub(crate) fn hash_reader(mut input: impl Read) -> io::Result<String> {
     let mut hash = Context::new(&SHA256);
     let mut buffer = [0; 8192];
     loop {
-        let count = file.read(&mut buffer)?;
+        let count = input.read(&mut buffer)?;
         if count == 0 {
             break;
         }

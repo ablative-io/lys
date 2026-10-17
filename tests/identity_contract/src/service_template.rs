@@ -29,9 +29,12 @@ fn executable_hash() -> Result<&'static str, Failure> {
 }
 
 fn program_hash(path: &Path) -> io::Result<String> {
-    let metadata = fs::metadata(path)?;
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    // Modification times can be restored after a same-length rewrite.
+    let contents = template_files::hash_reader(file)?;
     Ok(format!(
-        "{}:{}:{}:{}:{}",
+        "{}:{}:{}:{}:{}:{contents}",
         metadata.dev(),
         metadata.ino(),
         metadata.len(),
@@ -270,17 +273,49 @@ mod tests {
     }
 
     #[test]
-    fn program_hash_reads_every_byte_across_its_buffer_boundary() -> io::Result<()> {
+    fn program_key_is_stable_and_detects_same_length_rewrites_past_512_kib() -> io::Result<()> {
+        use std::io::{Seek, SeekFrom, Write};
+
         let dir = tempfile::tempdir()?;
         let path = dir.path().join("program");
-        let mut bytes = vec![13; 256 * 1024 * 2 + 1];
+        let bytes = vec![13; 512 * 1024 + 1];
+        let mut previous = None;
         for content in [&b""[..], &b"abc"[..], &bytes] {
             fs::write(&path, content)?;
-            assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+            let key = program_hash(&path)?;
+            assert_eq!(key, program_hash(&path)?, "unchanged key must be stable");
+            assert_ne!(
+                previous.as_ref(),
+                Some(&key),
+                "changed content reused a key"
+            );
+            previous = Some(key);
         }
-        bytes[256 * 1024 * 2] = 17;
-        fs::write(&path, bytes)?;
-        assert_eq!(program_hash(&path)?, template_files::hash_file(&path)?);
+        let metadata_key = |metadata: &fs::Metadata| {
+            (
+                metadata.dev(),
+                metadata.ino(),
+                metadata.len(),
+                metadata.mtime(),
+                metadata.mtime_nsec(),
+            )
+        };
+        let mut file = File::options().write(true).open(&path)?;
+        let original = file.metadata()?;
+        for offset in [512 * 1024, 0, 8191, 8192, 256 * 1024] {
+            file.seek(SeekFrom::Start(offset))?;
+            file.write_all(&[17])?;
+            file.set_times(std::fs::FileTimes::new().set_modified(original.modified()?))?;
+            assert_eq!(metadata_key(&file.metadata()?), metadata_key(&original));
+            let key = program_hash(&path)?;
+            assert_ne!(
+                previous.as_ref(),
+                Some(&key),
+                "same-length byte rewrite at {offset} reused a key with identical metadata"
+            );
+            assert_eq!(key, program_hash(&path)?, "unchanged key must be stable");
+            previous = Some(key);
+        }
         Ok(())
     }
 
