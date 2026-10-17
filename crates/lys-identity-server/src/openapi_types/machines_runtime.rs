@@ -154,6 +154,12 @@ fn provisioning(
             POST,
             "/agents/{id}/provisioning/{version}/review",
             Some(review),
+            Some(profile.clone()),
+        ),
+        (
+            POST,
+            "/agents/{id}/provisioning/{version}/seat-program-review",
+            Some(api.schema::<crate::provisioning_api::SeatProgramReviewBody>()),
             Some(profile),
         ),
         (

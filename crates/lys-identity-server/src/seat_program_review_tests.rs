@@ -13,7 +13,7 @@ async fn seat_program_rereview_keeps_old_inputs_and_atomically_reviews_the_found
     let path = format!("/agents/{agent}/provisioning");
     let spec = json!({"executable":"/opt/seat/host", "executable_sha256":"a".repeat(64),
         "arguments":["run","--config","{seat_file}"], "seat_file":"/opt/seat/seat.json",
-        "seat_file_sha256":"b".repeat(64), "adapter":"acp/1"});
+        "seat_file_sha256":"b".repeat(64), "adapter":"acp/1", "model_wire":"openai-responses"});
     let body = json!({"operation":op()?, "from_version":0, "model_access":[], "tools":[],
         "skills":[], "mcp_servers":[], "instructions":"", "note":"fixture",
         "harness":{"name":"Seat host", "program":"/opt/seat/host", "package":"seat 1",
@@ -42,7 +42,13 @@ async fn seat_program_rereview_keeps_old_inputs_and_atomically_reviews_the_found
     let found = &read["profile"]["harness"]["description"]["seat_program"];
     assert_eq!(found["executable_sha256"], "c".repeat(64));
     assert_eq!(found["seat_file_sha256"], "d".repeat(64));
-    for field in ["arguments", "executable", "seat_file", "adapter"] {
+    for field in [
+        "arguments",
+        "executable",
+        "seat_file",
+        "adapter",
+        "model_wire",
+    ] {
         assert_eq!(found[field], spec[field]);
     }
     let retry = ok(post(&service, &endpoint, Auth::Cookie(&cookie), &changed).await?)?;
