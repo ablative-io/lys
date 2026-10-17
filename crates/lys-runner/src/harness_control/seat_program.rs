@@ -12,6 +12,10 @@ pub(crate) use pipe::{Pipe, Writer};
 pub(crate) const SPEC_VARIABLE: &str = "LYS_SEAT_PROGRAM";
 pub(crate) const PROOF_VARIABLE: &str = "LYS_SEAT_PROGRAM_PROOF";
 
+#[cfg(test)]
+#[path = "seat_program/model_account_environment_tests.rs"]
+mod model_account_environment_tests;
+
 pub(crate) fn environment(
     given: &std::collections::BTreeMap<String, String>,
 ) -> std::collections::BTreeMap<std::ffi::OsString, std::ffi::OsString> {
