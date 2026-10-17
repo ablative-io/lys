@@ -1329,6 +1329,14 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/commands/sign_in/finish_tests.rs` | Finish tests: address refusals by name, the fixture receiver round trip, the receiver's refusal names reported. | DIRECTORY-096 |
 | `crates/lys-identity-server/src/mcp_oauth_native.rs` | The built-in native client lys-cli and its authorize address. | DIRECTORY-096 |
 | `crates/lys/src/commands/sign_in.rs` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `docs/design/directory/briefs/DIRECTORY-097.json` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `docs/design/directory/briefs/DIRECTORY-097.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/apps_sign_in.rs` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/apps_sign_in_tests.rs` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `crates/lys-identity-server/src/apps_binding_tests.rs` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `surface/identity/src/shell/help/pages.ts` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `plugin/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
+| `plugins/lys/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 
 ## Inventory
 

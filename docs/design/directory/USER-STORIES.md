@@ -286,6 +286,10 @@
 
 **S418.** As a person whose Claude Code session runs on one computer while I approve its Lys connection in a browser on another, I want the approval page to show me the finishing address and tell me it belongs to that session's complete_authentication, so that the sign-in finishes without me guessing or pasting a code into a chat.
 
+**S420.** As a person who runs an app on every machine of my tailnet, I want one registered return address to cover each machine's name, so that signing in at a new machine needs no edit in Lys.
+
+**S421.** As a person adding a return address, I want a refused line shown with its reason, so that I learn why an http name cannot be saved instead of finding the list unchanged.
+
 ## Person running a team of agents — Starts, watches, talks to and stops agents from Lys
 
 **S154.** As a person running agents, I want to start an agent from Lys and have it running in the background, so that I don't need a terminal or another tool.
