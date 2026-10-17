@@ -313,9 +313,10 @@ fn refused_to_sign_in(
     continuation: Option<&Continuation>,
     email: Option<&str>,
 ) -> Response {
-    // The browser is told only the refusal's name; the refusal, the route
-    // and the address tried are said through the WARN sink into the
-    // service's log, so whoever reads it can see who (DIRECTORY-099 R2).
+    // The browser is told only the refusal's name; the refusal, the route,
+    // the address tried and the refusal's sanitised words are said through
+    // the WARN sink into the service's log, so whoever reads it can see who
+    // and why (DIRECTORY-099 R2).
     refusal_line::refused(
         refusal_line::CALLBACK_ROUTE,
         email.unwrap_or_default(),

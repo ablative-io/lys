@@ -4,12 +4,15 @@
 //!
 //! The line is a WARN event through the identity server's WARN sink
 //! (`warn_lines`), which the install keeps as identity.log: the refusal's
-//! name, the route and the handle tried. The handle is the text tried,
-//! trimmed and lowercased, only when `accounts::check_email` admits it, so
-//! no space, newline or control character enters a line and a password typed
-//! into the email box is never written; otherwise it is `none` for an empty
-//! field and `not-an-email` for anything else. The password, the issuer's
-//! body and any token are never written.
+//! name, the route, the handle tried and the reason. The handle is the text
+//! tried, trimmed and lowercased, only when `accounts::check_email` admits
+//! it, so no space, newline or control character enters a line and a
+//! password typed into the email box is never written; otherwise it is
+//! `none` for an empty field and `not-an-email` for anything else. The
+//! reason is the refusal's own words as the browser is answered them, on one
+//! line; a refused callback's are what `callback_summary` reduced the
+//! issuer's body to, its recognised refusal words alone. The password, the
+//! issuer's raw body and any token are never written.
 
 use crate::error::ServerError;
 
@@ -34,15 +37,28 @@ fn handle(tried: &str) -> String {
     }
 }
 
+/// The refusal's words, as the browser is answered them, on one line.
+fn words(refusal: &ServerError) -> String {
+    // A newline or other control character in the words is replaced with a
+    // space, so the reason can never begin a second, forged log line.
+    refusal
+        .to_string()
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect()
+}
+
 /// Say that a person's sign-in on `route`, trying `tried`, was refused as
 /// `refusal`.
 pub(crate) fn refused(route: &'static str, tried: &str, refusal: &ServerError) {
     let handle = handle(tried);
+    let reason = words(refusal);
     let refusal = refusal.name();
     tracing::warn!(
         refusal = refusal.as_str(),
         route,
         handle = handle.as_str(),
+        reason = reason.as_str(),
         "a person's sign-in was refused"
     );
 }

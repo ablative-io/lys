@@ -30,11 +30,16 @@ unreleased things cannot be used to tell what a published version contains.
   callback `GET /auth/v1/providers/callback`, is one WARN line in
   identity.log: "lys-identity-server WARN
   lys_identity_server::sign_in_refusal_line: a person's sign-in was refused
-  refusal=<name> route=<route> handle=<handle>". The handle is the email
-  tried, trimmed and lowercased, when it is a well-formed address;
-  otherwise `none` for an empty field and `not-an-email` for anything else,
-  so a password typed into the email box is never written. The password,
-  the issuer's body and any token are never written. A refused provider
+  refusal=<name> route=<route> handle=<handle> reason=<words>". The
+  handle is the email tried, trimmed and lowercased, when it is a
+  well-formed address; otherwise `none` for an empty field and
+  `not-an-email` for anything else, so a password typed into the email box
+  is never written. The reason is
+  the refusal's words as the browser is answered them, for every handle;
+  for a refused callback, the words the issuer's body was already reduced
+  to (its recognised refusal words, never the body itself). A newline or
+  control character in them is written as a space. The password, the
+  issuer's raw body and any token are never written. A refused provider
   start says the same line with route `GET /api/sign-in/providers/{id}`.
   The callback's refusals no longer go to stderr. The issuer-level
   `IssuerRefused` and `IssuerChallengeExpired` lines stand beside it.
