@@ -395,7 +395,7 @@ async fn assert_run_proof(held: &Held, url: &str, pass: &str, seat: &str) -> Tes
     let last = forged.pop().ok_or("the seat is empty")?;
     forged.push(if last == '0' { '1' } else { '0' });
     let (status, refused) = held
-        .mcp(&url, (pass, Some(forged.as_str())), "tools/list", json!({}))
+        .mcp(url, (pass, Some(forged.as_str())), "tools/list", json!({}))
         .await?;
     assert_eq!(
         status, 401,
