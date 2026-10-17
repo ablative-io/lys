@@ -26,6 +26,7 @@
   "POST /apps/{app}/schema/approve": ["operation"],
   "POST /apps/{app}/schema/decline": ["operation"],
   "POST /apps/{app}/sign_in": ["operation", "profile", "redirects"],
+  "POST /apps/{app}/sign_in/returns": ["address", "operation"],
   "POST /drafts": ["body", "method", "note", "operation", "path", "target"],
   "POST /drafts/{id}/approve": ["application", "creation_hash", "operation"],
   "POST /drafts/{id}/correct": ["creation_hash", "operation", "reason", "replacement"],
