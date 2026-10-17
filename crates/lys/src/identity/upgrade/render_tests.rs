@@ -403,8 +403,11 @@ impl Render for Lasting {
         let mut files = Fixed.render(layout, build, screens)?;
         for file in &mut files {
             if file.name == "identity.json" {
-                let text = String::from_utf8_lossy(file.bytes.as_slice())
-                    .replacen('{', &format!("{{\"session_seconds\": {}, ", self.0), 1);
+                let text = String::from_utf8_lossy(file.bytes.as_slice()).replacen(
+                    '{',
+                    &format!("{{\"session_seconds\": {}, ", self.0),
+                    1,
+                );
                 file.bytes = Zeroizing::new(text.into_bytes());
             }
         }
