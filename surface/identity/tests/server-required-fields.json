@@ -6,6 +6,7 @@
   "POST /agents/{id}/mcp-requests/{request}/approve": ["note", "operation"],
   "POST /agents/{id}/provisioning": ["from_version", "instructions", "mcp_servers", "model_access", "note", "operation", "skills", "tools"],
   "POST /agents/{id}/provisioning/{version}/review": ["operation"],
+  "POST /agents/{id}/provisioning/{version}/seat-program-review": ["executable_sha256", "operation", "seat_file_sha256"],
   "POST /agents/{id}/reports-to": ["operation", "reports_to"],
   "POST /agents/{id}/restart": ["operation", "session"],
   "POST /agents/{id}/runtime/sessions/{session}/reports": ["machine", "operation", "state"],
