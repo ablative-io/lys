@@ -18,6 +18,41 @@ fn refusal_bytes_are_one_shape() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// DIRECTORY-101 R4: the request address carries what was refused, so the Ask
+/// form opens asking for it; each value is percent-encoded and reads back as
+/// it was given, and `request` is still one string.
+#[test]
+fn a_refusals_request_address_carries_the_kind_id_and_action_encoded()
+-> Result<(), Box<dyn std::error::Error>> {
+    let (kind, id, action) = ("sample.file", "q3 & q4/#draft?=100%", "read+write");
+    let refusal = Refusal::new("sample", kind, id, action, "https://issuer.example/lys")?;
+    let request = url::Url::parse(&refusal.refused.request)?;
+    assert_eq!(
+        request.as_str().split('#').next(),
+        Some("https://issuer.example/lys/")
+    );
+    let fragment = request.fragment().ok_or("the address has a fragment")?;
+    let (path, query) = fragment
+        .split_once('?')
+        .ok_or("the fragment carries a query")?;
+    assert_eq!(path, "/requests");
+    let read: Vec<(String, String)> = url::form_urlencoded::parse(query.as_bytes())
+        .map(|(name, value)| (name.into_owned(), value.into_owned()))
+        .collect();
+    assert_eq!(
+        read,
+        [("kind", kind), ("id", id), ("action", action)]
+            .map(|(name, value)| (name.to_owned(), value.to_owned()))
+    );
+    assert!(
+        !query.contains(' ') && !query.contains('#') && query.matches('&').count() == 2,
+        "{query}"
+    );
+    let wire: serde_json::Value = serde_json::to_value(&refusal)?;
+    assert!(wire["refused"]["request"].is_string(), "{wire}");
+    Ok(())
+}
+
 #[test]
 fn shipped_conformance_vectors_cover_authorization_and_refusal() {
     assert_eq!(conformance::cases().len(), 10);

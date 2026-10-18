@@ -42,7 +42,9 @@ pub struct Refusal {
 }
 
 impl Refusal {
-    /// Name an exact needed grant and the issuer's existing request screen.
+    /// Name an exact needed grant and the issuer's request screen, its
+    /// address carrying the kind, id and action form-encoded, so the screen
+    /// opens on exactly that request.
     ///
     /// # Errors
     ///
@@ -68,8 +70,13 @@ impl Refusal {
         if !base.path().ends_with('/') {
             base.set_path(&format!("{}/", base.path()));
         }
+        let query = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("kind", &target.kind)
+            .append_pair("id", &target.id)
+            .append_pair("action", &target.action)
+            .finish();
         let mut request = base;
-        request.set_fragment(Some("/requests"));
+        request.set_fragment(Some(&format!("/requests?{query}")));
         Ok(Self {
             refused: Refused {
                 resource: format!("{kind}:{id}"),
