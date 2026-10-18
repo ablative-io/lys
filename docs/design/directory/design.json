@@ -6334,6 +6334,41 @@
       "path": "surface/identity/src/features/runtime/canvas-widgets.ts",
       "note": "the canvas's figures; drawn from /usage/summary",
       "brief": "DIRECTORY-103"
+    },
+    {
+      "path": "surface/identity/src/features/apps/ConnectApp.tsx",
+      "note": "the connect and approve page; public_address sent and shown, the manifest read through the server, Connect again per app, no app names",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect_reconnect_tests.rs",
+      "note": "tests of apps_connect, red first: revocation after the exchange",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_api_read.rs",
+      "note": "the GET /apps answer builder, moved from apps_api.rs; public_address and connect_origin",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_api_read_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "surface/identity/tests/apps-connect.test.tsx",
+      "note": "the approve page's tests; the manifest read through the server",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect_manifest.rs",
+      "note": "GET /apps/connect/manifest: a manifest read server-side for an administrator, or a named reason",
+      "brief": "DIRECTORY-102"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_connect_manifest_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-102"
     }
   ],
   "inventory": [

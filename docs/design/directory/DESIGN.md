@@ -1366,6 +1366,13 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/usage_summary_tests.rs` | tests of the sibling module, red first | DIRECTORY-103 |
 | `surface/identity/src/features/dashboard/Spend.tsx` | Home's spend; drawn from /usage/summary | DIRECTORY-103 |
 | `surface/identity/src/features/runtime/canvas-widgets.ts` | the canvas's figures; drawn from /usage/summary | DIRECTORY-103 |
+| `surface/identity/src/features/apps/ConnectApp.tsx` | the connect and approve page; public_address sent and shown, the manifest read through the server, Connect again per app, no app names | DIRECTORY-102 |
+| `crates/lys-identity-server/src/apps_connect_reconnect_tests.rs` | tests of apps_connect, red first: revocation after the exchange | DIRECTORY-102 |
+| `crates/lys-identity-server/src/apps_api_read.rs` | the GET /apps answer builder, moved from apps_api.rs; public_address and connect_origin | DIRECTORY-102 |
+| `crates/lys-identity-server/src/apps_api_read_tests.rs` | tests of the sibling module, red first | DIRECTORY-102 |
+| `surface/identity/tests/apps-connect.test.tsx` | the approve page's tests; the manifest read through the server | DIRECTORY-102 |
+| `crates/lys-identity-server/src/apps_connect_manifest.rs` | GET /apps/connect/manifest: a manifest read server-side for an administrator, or a named reason | DIRECTORY-102 |
+| `crates/lys-identity-server/src/apps_connect_manifest_tests.rs` | tests of the sibling module, red first | DIRECTORY-102 |
 
 ## Inventory
 

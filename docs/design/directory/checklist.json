@@ -2326,6 +2326,27 @@
           "text": "Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts."
         }
       ]
+    },
+    {
+      "name": "Connecting an app keeps it running and needs no name in Lys (DIRECTORY-102)",
+      "items": [
+        {
+          "id": "C764",
+          "text": "Connecting an approved app again leaves its running credentials live until the exchange hands over the new ones; the revocation happens in the exchange with its reason, and the approve page says so."
+        },
+        {
+          "id": "C765",
+          "text": "GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it."
+        },
+        {
+          "id": "C766",
+          "text": "GET /apps/connect/manifest reads an app's manifest server-side for an administrator and answers it or one named reason; the approve page says each reason with its next act."
+        },
+        {
+          "id": "C767",
+          "text": "GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name."
+        }
+      ]
     }
   ]
 }

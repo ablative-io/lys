@@ -122,6 +122,12 @@
 
 **S434.** As an administrator who said the Lys computer is not for agents, I am not asked again from another browser.
 
+**S435.** As an administrator who connects Cambium again, the people signed in to it keep working until Cambium collects its new credentials, and nothing is cut off at the moment I press Approve.
+
+**S436.** As an administrator connecting an app from my laptop, Lys hands the app its own reachable address, and tells me when it has none and what to change.
+
+**S437.** As an administrator whose approve page could not read the app's manifest, I am told whether the app is not answering, answered with an error, or is not an app, and what to do next.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -293,6 +299,8 @@
 **S262.** As the developer of an approved app, I want to give a permission on one thing inside a space my app was given, so that a guest can be let into one room without the whole building.
 
 **S263.** As the developer of an approved app, I want to be told when a permission answer could have changed, and to know when an answer ends by time, so that a person removed in Lys stops being served by my app at once and my app does not ask again and again.
+
+**S438.** As the developer of an app, my app registers itself with Lys and appears on Apps under its own name, and Lys never has to know my app's name in advance.
 
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 

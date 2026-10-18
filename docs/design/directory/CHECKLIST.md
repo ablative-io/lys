@@ -626,3 +626,10 @@
 
 - [ ] **C768** — GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero.
 - [ ] **C769** — Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts.
+
+## Connecting an app keeps it running and needs no name in Lys (DIRECTORY-102)
+
+- [ ] **C764** — Connecting an approved app again leaves its running credentials live until the exchange hands over the new ones; the revocation happens in the exchange with its reason, and the approve page says so.
+- [ ] **C765** — GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it.
+- [ ] **C766** — GET /apps/connect/manifest reads an app's manifest server-side for an administrator and answers it or one named reason; the approve page says each reason with its next act.
+- [ ] **C767** — GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name.
