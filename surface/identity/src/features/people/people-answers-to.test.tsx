@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
-import { $$, mount, settle, unmountAll } from './harness';
-import { ADA, COURIER, DIRECTORY, SCRIBE, SERVICE, ok } from './fixtures';
+import { $$, mount, settle, unmountAll } from '../../../tests/harness';
+import { ADA, COURIER, DIRECTORY, SCRIBE, SERVICE, ok } from '../../../tests/fixtures';
 
 afterEach(() => unmountAll());
 

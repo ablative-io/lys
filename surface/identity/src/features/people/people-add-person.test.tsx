@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { $, $$, mount, settle, text, unmountAll } from './harness';
-import { BEA_SERVICE, refused } from './fixtures';
+import { $, $$, mount, settle, text, unmountAll } from '../../../tests/harness';
+import { BEA_SERVICE, refused } from '../../../tests/fixtures';
 
 // Bea is not the administrator: the service refuses her the whole directory and answers her own scope.
 const BEA = { ...BEA_SERVICE, '/directory/people': refused(403, 'NotAdmitted', 'only the administrator reads the whole directory') };

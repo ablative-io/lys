@@ -1,10 +1,10 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it } from 'vitest';
-import { CambiumNext } from '../src/features/file/CambiumNext';
-import { ok, SCRIBE } from './fixtures';
-import type { Route } from './fixtures';
-import { serve, settle } from './harness';
+import { CambiumNext } from './CambiumNext';
+import { ok, SCRIBE } from '../../../tests/fixtures';
+import type { Route } from '../../../tests/fixtures';
+import { serve, settle } from '../../../tests/harness';
 
 async function shown(apps: Route, administrator: boolean) {
   serve({ '/apps': apps, '/grants': ok({ revision: 1, grants: [] }) });
