@@ -71,3 +71,17 @@ Settings is gated on `/configuration`, which only administrators may read, so a 
 Recommendation: **A**. It works today at `#/settings/account` for everyone and needs one href from the shell. It matches CONSENSUS ("the service's own settings apart from my preferences").
 
 Second go. Looked at `#/settings/account` on the stand-in as an administrator and as a non-administrator (`/configuration` refused). The non-administrator sees "Settings / Your sign-in, and how Lys looks in this browser.", one tab "For you", Your account, and Layout, with no refusal anywhere. The administrator sees the same with three more tabs after it. What is still wrong: (1) until the shell points the rail at `#/settings/account`, a non-administrator still has no Settings in the menu, so the page is right and the door to it is missing; that is the ask. (2) A single tab "For you" on its own looks like a stray tab; I kept it, because hiding the tab row for one person and showing it for another moves the page. (3) "Change password" is offered to someone who signs in with Google and has no password; that is item 9, next. (4) The layout is still per browser, and the words now say so; keeping it per person needs a server setting, which I did not ask for because it is polish, not a blocker.
+
+## Item 6. "Lys is running on this computer" on a second computer, and an answer kept per browser
+
+Getting started (`features/dashboard/GettingStarted.tsx`, domain 06's file) asks "Lys is running on this computer. Should your agents run here too?" with the Lys host's own name filled in, whichever device the browser is on. "Not this one" is kept in this browser's localStorage, so it is asked again on every other browser and phone.
+
+| Option | What Cherie sees | Mistake it avoids | Purpose served |
+|---|---|---|---|
+| A. Name the host by its name: "Lys runs on Cherie's MacBook Pro. Should your agents run there too?", label "That computer's name", and keep "Not this one" on the server for the person (asks to 06 and the server). | On her phone, a question about the computer it is really about, asked once. | "This computer" meaning the server (CONSENSUS: it always means the device in hand; the host is named). | Problem: she is never asked to install agents on a computer she isn't holding. |
+| B. Ask only whether this browser's device should run agents, and drop the pre-filled host name. | A question about her phone, which cannot run agents. | The wrong noun, but it asks the wrong question. | Worse: phones and tablets cannot answer yes. |
+| C. Words only, answer still per browser. | Right words, asked again on each device. | The wrong noun. | Half. |
+
+Recommendation: **A**. None of it is in my folders: the words are an ask to 06 with the exact lines, and keeping the answer per person is a server ask. Nothing is implemented in this item.
+
+Second go. Re-read the file to check the ask is exact, and found one more "this computer" in its invalid-name message ("Give this computer a name"). It is in the ask too. What is still wrong: nothing changes on screen until 06 applies it. That is the honest state of an item whose every line is in another domain's file. I kept it to an ask rather than reach into the file.
