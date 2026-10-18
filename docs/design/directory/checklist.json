@@ -2270,6 +2270,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The development start script's readiness watcher reads lines as they arrive (DIRECTORY-100)",
+      "items": [
+        {
+          "id": "C750",
+          "text": "start_ready in surface/identity/dev/start.sh watches a child's output with a POSIX sh read loop, never awk, so the ready line is seen the moment it is written under mawk as under BSD awk.",
+          "done": false
+        }
+      ]
     }
   ]
 }

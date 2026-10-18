@@ -1340,6 +1340,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `plugins/lys/skills/apps/references/routes.md` | lys sign-in: opens the browser, waits on the loopback receiver, and names --finish for a sign-in approved elsewhere. | DIRECTORY-096 |
 | `crates/lys-identity-server/src/apps_sign_in_declare.rs` | R1: one return address declared for an app by the administrator or by the app itself through its own credential, judged by the same rule as a saved line, written nowhere when already listed | DIRECTORY-098 |
 | `crates/lys-identity-server/src/sign_in_refusal_line.rs` | R2: the one WARN line for a refused person sign-in, with the route, the refusal's name and the handle tried when it is a well-formed email, never the password | DIRECTORY-099 |
+| `surface/identity/dev/start.sh` | Development start script: seeds, starts the dev issuer, the identity server and the app with a readiness watcher per child (a POSIX sh read loop on the child's output FIFO, never awk). | DIRECTORY-100 |
 
 ## Inventory
 

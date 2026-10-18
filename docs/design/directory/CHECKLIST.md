@@ -607,3 +607,7 @@
 - [ ] **C747** — Every refused person sign-in on POST /api/sign-in and on the provider callback says one WARN line with the route, the refusal and the handle tried when it is a well-formed email, and never the password.
 - [ ] **C748** — The CHANGELOG records SessionEnded for an ended sign-in and the refused-sign-in line with its fields and handle rule.
 - [ ] **C749** — A sign-in lasts thirty days: a new install writes session_seconds 2592000, an upgrade moves an install still at the former 28800 and says so, carries any other value, and reads the file back before the start.
+
+## The development start script's readiness watcher reads lines as they arrive (DIRECTORY-100)
+
+- [ ] **C750** — start_ready in surface/identity/dev/start.sh watches a child's output with a POSIX sh read loop, never awk, so the ready line is seen the moment it is written under mawk as under BSD awk.

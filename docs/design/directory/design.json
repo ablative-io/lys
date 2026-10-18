@@ -6204,6 +6204,11 @@
       "path": "crates/lys-identity-server/src/sign_in_refusal_line.rs",
       "note": "R2: the one WARN line for a refused person sign-in, with the route, the refusal's name and the handle tried when it is a well-formed email, never the password",
       "brief": "DIRECTORY-099"
+    },
+    {
+      "path": "surface/identity/dev/start.sh",
+      "note": "Development start script: seeds, starts the dev issuer, the identity server and the app with a readiness watcher per child (a POSIX sh read loop on the child's output FIFO, never awk).",
+      "brief": "DIRECTORY-100"
     }
   ],
   "inventory": [

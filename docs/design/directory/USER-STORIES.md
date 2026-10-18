@@ -363,3 +363,5 @@
 ## Person running Lys's tests on a shared machine — Runs the test suites on a laptop other seats also build on
 
 **S260.** As a person running Lys's tests on a shared machine, I want every process and folder a test makes to be gone when it ends, however it ends, so a killed or failing test never leaves work running for days.
+
+**S424.** As a person running Lys's tests on a Linux machine whose awk is mawk, I want the development start script to see a child's ready line the moment it is written, so that the development scripts test passes there as it does on a Mac instead of timing out with an empty log.
