@@ -1,6 +1,7 @@
 /** The configured integrations served by Lys, with configuration kept apart from health. */
 import { ConfigTabs } from '../settings/ConfigTabs';
 import { request, useLoad } from '../../api';
+import { PageHeader } from '../../shell/PageHeader';
 import { Gate } from '../signin/Gate';
 import { SignInProviders } from './SignInProviders';
 
@@ -18,9 +19,7 @@ const labels = { configured: 'Configured', local: 'Local to Lys', unconfigured: 
 export function Connections() {
   const load = useLoad(readConnections, 'connections');
   return <div className="page fill">
-    <div className="head"><div><h1>Settings</h1>
-      <p className="sub">The services this Lys installation is configured to use, and the accounts people sign in with.</p></div>
-    </div>
+    <PageHeader title="Settings" subtitle="The services this Lys installation is configured to use, and the accounts people sign in with." />
     <ConfigTabs on="connections" />
     <Gate load={load} title="Connections" ok={(data) => <div className="pane stack">
       <p className="note">“Configured” means this installation is set up to use the service. It does not check that the service is answering right now.</p>

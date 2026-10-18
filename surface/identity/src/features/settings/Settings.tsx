@@ -2,6 +2,7 @@ import { EffectiveSettings } from './EffectiveSettings';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { request, useLoad } from '../../api';
+import { PageHeader } from '../../shell/PageHeader';
 import { useShell } from '../../shell/ShellContext';
 import { ConfigTabs } from './ConfigTabs';
 import { AccountSettings } from '../people/Account';
@@ -75,12 +76,7 @@ export function Settings() {
   const personal = sec === 'account' || sec === 'layout';
   return (
     <div className="page fill">
-      <div className="head">
-        <div>
-          <h1>Settings</h1>
-          <p className="sub">{personal ? 'Your sign-in, and how Lys looks in this browser.' : 'The settings this Lys started with, shown to its administrators.'}</p>
-        </div>
-      </div>
+      <PageHeader title="Settings" subtitle={personal ? 'Your sign-in, and how Lys looks in this browser.' : 'The settings this Lys started with, shown to its administrators.'} />
       <ConfigTabs on={personal ? 'account' : 'settings'} />
       <div className="card pane" data-section={sec}>
         {personal ? (
