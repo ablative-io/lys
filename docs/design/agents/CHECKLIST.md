@@ -53,3 +53,11 @@
 ## The runner's bridge under test
 
 - [ ] **C751** — The bridge test's fixture treats a reply write refused BrokenPipe or ConnectionReset after the barrier as the bridge's correct close of a lane already refused on the other, proven red first with the second write ordered after the bridge's join; green 20 of 20 on Linux and macOS; no sleep, retry or serial marker (AGENTS-011 R1).
+
+## The launcher when Lys is not answering (AGENTS-012)
+
+- [ ] **C752** — Every server-rendered launch is kept on the device for its agent with the template hash, harness, proxy identity, run pass and the pass's expiry, written atomically, shown by lys agents (AGENTS-012 R1).
+- [ ] **C753** — When the server's connect fails as the OS or TLS reports it, lys claude, lys codex and lys run start the agent from the kept launch with the proxy on the device recording every call, say so in the first line, and refuse by name with no kept launch or an expired pass; no clock anywhere (AGENTS-012 R2).
+- [ ] **C754** — A run started while Lys was unreachable is handed to Lys whole on the next command that reaches it, accepted by launch hash and pass validity at start, idempotent by run id, never dropped, refused by name (AGENTS-012 R3).
+- [ ] **C755** — The surface shows a handed-over session as started while Lys was not answering, from its device, counted in cost like any other (AGENTS-012 R4).
+- [ ] **C756** — On a bare machine the first lys command asks for the Lys address once and keeps it, never answers config_unreadable; the first launch writes the device's Claude Code settings and lys agents lists them by path (AGENTS-012 R5).

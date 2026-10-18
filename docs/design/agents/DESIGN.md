@@ -123,6 +123,22 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-runner/src/harness_control/` | harness admission and qualification | AGENTS-008 |
 | `surface/identity/src/features/provisioning/` | the harness description review form and its profile copies, where a seat program's executable, arguments, seat file and digests are reviewed | AGENTS-009 |
 | `crates/lys-runner/src/dial/bridge/tests.rs` | the bridge's two-lane arrival test and its fixture; a reply write refused after the barrier by a lane the bridge closed is the expected outcome | AGENTS-011 |
+| `crates/lys/src/commands/launch.rs` | the personal launch: server-rendered today; keeps the launch on the device after each render and starts from the kept one when the server does not answer | AGENTS-012 |
+| `crates/lys/src/commands/launch_context.rs` | sign-in state and server reach for a launch; the bare-machine first run asks for the address once | AGENTS-012 |
+| `crates/lys/src/commands/launch/kept.rs` | the launch kept on the device per agent after every server render: template hash, harness, proxy identity, pass and expiry; atomic write | AGENTS-012 |
+| `crates/lys/src/commands/launch/kept_tests.rs` | tests of the sibling module, red first | AGENTS-012 |
+| `crates/lys/src/cli/proxy.rs` | the proxy subcommand, started on the device for a run begun while the server was unreachable | AGENTS-012 |
+| `crates/lys/src/commands/launch/offline.rs` | the start from a kept launch when the server's connect fails, with the device's proxy and the first line that says so | AGENTS-012 |
+| `crates/lys/src/commands/launch/offline_tests.rs` | tests of the sibling module, red first | AGENTS-012 |
+| `crates/lys-identity-server/src/routes_startup.rs` | route table; mounts the unreachable-run hand-over route | AGENTS-012 |
+| `crates/lys/src/commands/launch/handover.rs` | hand-over of runs started while Lys was unreachable, one request per run, removed on acceptance by id | AGENTS-012 |
+| `crates/lys/src/commands/launch/handover_tests.rs` | tests of the sibling module, red first | AGENTS-012 |
+| `crates/lys-identity-server/src/sessions_unreachable.rs` | the route that accepts a run started while the server was unreachable, by launch hash and pass validity at start, idempotent by run id | AGENTS-012 |
+| `crates/lys-identity-server/src/sessions_unreachable_tests.rs` | tests of the sibling module, red first | AGENTS-012 |
+| `surface/identity/src/features/file/sections.tsx` | the agent file's sections; a handed-over session shown as started while Lys was not answering | AGENTS-012 |
+| `surface/identity/src/features/sessions/Sessions.tsx` | the sessions list; the handed-over marking | AGENTS-012 |
+| `surface/identity/src/features/runtime/Sessions.tsx` | Running agents' sessions view; the handed-over marking | AGENTS-012 |
+| `crates/lys/src/cli/sign_in.rs` | personal sign-in; asks for the Lys address on a bare machine instead of config_unreadable | AGENTS-012 |
 
 ## Inventory
 

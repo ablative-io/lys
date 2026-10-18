@@ -354,6 +354,86 @@
       "path": "crates/lys-runner/src/dial/bridge/tests.rs",
       "note": "the bridge's two-lane arrival test and its fixture; a reply write refused after the barrier by a lane the bridge closed is the expected outcome",
       "brief": "AGENTS-011"
+    },
+    {
+      "path": "crates/lys/src/commands/launch.rs",
+      "note": "the personal launch: server-rendered today; keeps the launch on the device after each render and starts from the kept one when the server does not answer",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch_context.rs",
+      "note": "sign-in state and server reach for a launch; the bare-machine first run asks for the address once",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/kept.rs",
+      "note": "the launch kept on the device per agent after every server render: template hash, harness, proxy identity, pass and expiry; atomic write",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/kept_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/cli/proxy.rs",
+      "note": "the proxy subcommand, started on the device for a run begun while the server was unreachable",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/offline.rs",
+      "note": "the start from a kept launch when the server's connect fails, with the device's proxy and the first line that says so",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/offline_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes_startup.rs",
+      "note": "route table; mounts the unreachable-run hand-over route",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/handover.rs",
+      "note": "hand-over of runs started while Lys was unreachable, one request per run, removed on acceptance by id",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/commands/launch/handover_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sessions_unreachable.rs",
+      "note": "the route that accepts a run started while the server was unreachable, by launch hash and pass validity at start, idempotent by run id",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sessions_unreachable_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "surface/identity/src/features/file/sections.tsx",
+      "note": "the agent file's sections; a handed-over session shown as started while Lys was not answering",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "surface/identity/src/features/sessions/Sessions.tsx",
+      "note": "the sessions list; the handed-over marking",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/Sessions.tsx",
+      "note": "Running agents' sessions view; the handed-over marking",
+      "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys/src/cli/sign_in.rs",
+      "note": "personal sign-in; asks for the Lys address on a bare machine instead of config_unreadable",
+      "brief": "AGENTS-012"
     }
   ],
   "principles": [

@@ -41,3 +41,9 @@
 **S414.** As an operator, I want every disk sync, checkpoint, queue and replay cost counted while keeping durable outcomes and old-install recovery, so that speed does not come from weakened safety.
 
 **S425.** As an operator, I want the runner's own tests to be green on every run on the Linux box Lys moves to, so that a battery's red always names a real defect and never a race in a fixture.
+
+**S427.** As an operator, I want every run that started while Lys was unreachable to appear under its person and agent with its calls and cost the moment Lys answers again, so that nothing an agent did in the storm case is missing from the record.
+
+## A person starting an agent on their own computer — types one word and expects the agent to start, whether or not the Lys console is up
+
+**S426.** As a person starting an agent on my own computer, I want lys claude to start my agent when the Lys console is off or unreachable, telling me plainly that it is, so that the one word works every time and I never have to open a terminal to work out why it did not.
