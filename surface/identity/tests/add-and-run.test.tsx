@@ -270,7 +270,7 @@ describe('Add and run on an existing computer', () => {
     expect(($('select[name="computer"]') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('Front desk');
     expect(face.textContent).toContain('No folder chosen yet.');
     // The found copy is chosen for the person: no path is asked.
-    expect(face.querySelector('.first-run-copy')?.textContent).toBe('Lys found Care program on this computer and uses /opt/bin/care.');
+    expect(face.querySelector('.first-run-copy')?.textContent).toBe('Lys found Care program on Front desk and uses /opt/bin/care.');
     expect(face.querySelector('[name="program-path"], [name="build"]')).toBeNull();
     for (const name of ['answers_to', 'team', 'model', 'build', 'prompt']) expect(more?.querySelector('[name="' + name + '"]')).not.toBeNull();
     // No managed adapter is reported qualified, so the controls requirement is not offered and stays off.

@@ -112,7 +112,7 @@ describe('why an agent cannot start', () => {
       ['POST ' + path]: (body) => ok({ machine: { ...ward, may_run: [{ id: SCRIBE, display_name: 'Scribe', state: 'active' }] }, recorded: { ...(body as object), machine: computer, by: ADA, at: 1 } }),
     });
     expect(host.textContent).toContain('No computer is allowed to run Scribe.');
-    expect(buttons(host)).toEqual(['Allow on this computer']);
+    expect(buttons(host)).toEqual(['Allow on Ward computer']);
     expect(host.textContent).toContain('Scribe will be allowed to run on Ward computer.');
     await click(host.querySelector('button'));
     expect(posted).toHaveLength(1);

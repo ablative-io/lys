@@ -126,8 +126,8 @@ export function addAndRunStep(current: AddAndRun): string {
   if (current.step === 'registration') return current.registration.activated ? current.registration.grants.some((entry) => entry.granted === null) ? 'giving selected access' : 'joining the team' : current.registration.agent ? 'activating the agent' : 'registering the agent';
   if (current.step === 'profile') return 'saving the settings';
   if (current.step === 'review') return 'approving the settings';
-  if (current.step === 'computer' && current.placement.kind === 'new') return current.placement.machine.phase === 'machine' ? 'adding this computer' : 'recording this computer’s runner';
-  if (current.step === 'admission') return 'allowing the agent on this computer';
+  if (current.step === 'computer' && current.placement.kind === 'new') return current.placement.machine.phase === 'machine' ? 'adding the computer' : 'recording the computer’s runner';
+  if (current.step === 'admission') return 'allowing the agent on its computer';
   return 'starting the agent';
 }
 export class AddAndRunFailure extends Error {
@@ -210,7 +210,7 @@ export async function firstRunChoices(capability: AddAndRunCapability, person: s
     const snapshot = (): FirstRunOptions => {
       const computers = runners.flatMap((entry) => entry.state === 'confirmed' ? [entry.machine] : []);
       const asking = runners.some((entry) => entry.state === 'asking');
-      const problem = choicesProblem ?? (computers.length || asking ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed Lys runner, on this computer or dialled in from another.' }));
+      const problem = choicesProblem ?? (computers.length || asking ? null : new Refused(0, { refusal: 'LocalRunnerUnconfirmed', reason: 'No in-use computer has a confirmed Lys runner, on the computer Lys runs on or dialled in from another.' }));
       return { choices: computers.length && choices ? { ...choices, machines: computers } : null, network, computers, runners, loading: choicesPending || !computers.length && asking, problem };
     };
     publish?.(snapshot());
@@ -228,7 +228,7 @@ export async function firstRunChoices(capability: AddAndRunCapability, person: s
             refusal: 'RunnerNotAnswering',
             reason: machine.name + ' is not answering right now; start its computer, then try again',
           });
-          if (isRecord(held) && isRecord(held.runner) && held.runner.kind === 'socket') throw new Refused(200, { refusal: 'RunnerNotLys', reason: 'The computer’s runner is a socket Lys does not hold. Agents start only through Lys’s own runner, on this computer or dialled in.' });
+          if (isRecord(held) && isRecord(held.runner) && held.runner.kind === 'socket') throw new Refused(200, { refusal: 'RunnerNotLys', reason: 'The computer’s runner is a socket Lys does not hold. Agents start only through Lys’s own runner, on the computer Lys runs on or dialled in.' });
           answer = { machine, state: 'confirmed' };
         } catch (problem) { answer = { machine, state: 'unavailable', reason: runnerProblemReason(problem) }; }
         runners = runners.map((entry) => entry.machine.id === machine.id ? answer : entry);

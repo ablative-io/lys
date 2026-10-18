@@ -80,7 +80,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     const previous: Record<string, { directory: string | null; problem: StartRefusal | null }> = Object.fromEntries(await Promise.all(choices.map(async (computer) => {
       try {
         const answer = await request<{ machine: string; directory: string | null }>(prefix + '/start-command?machine=' + encodeURIComponent(computer.id));
-        if (answer.machine !== computer.id || answer.directory !== null && (typeof answer.directory !== 'string' || !answer.directory.startsWith('/'))) throw new Error('ConversationFolderUnreadable: Lys did not name the earlier conversation’s folder on this computer.');
+        if (answer.machine !== computer.id || answer.directory !== null && (typeof answer.directory !== 'string' || !answer.directory.startsWith('/'))) throw new Error('ConversationFolderUnreadable: Lys did not name the earlier conversation’s folder on its computer.');
         return [computer.id, { directory: answer.directory, problem: null }];
       } catch (error) { return [computer.id, { directory: null, problem: refusalOf(error) }]; }
     })));

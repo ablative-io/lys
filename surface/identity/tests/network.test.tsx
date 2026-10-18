@@ -78,7 +78,7 @@ describe('Network', () => {
       expect($$('.stat .n').map((n) => n.textContent)).toEqual(['0', '1', '0']);
       // The plain words lead; the runner's own reason and the refusal name stay with it, for whoever checks the computer.
       const said = $('section[aria-label="Workshop laptop"] p[title]');
-      expect(said?.textContent).toBe('Its runner did not answer. Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+      expect(said?.textContent).toBe('Its runner did not answer. Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
       expect(said?.getAttribute('title')).toBe('runner_unreachable: /run/lys/runner.sock: connection refused');
       expect($('section[aria-label="Workshop laptop"]')?.textContent).not.toContain('runner_unreachable');
     });

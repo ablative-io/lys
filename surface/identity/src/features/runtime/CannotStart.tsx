@@ -175,7 +175,7 @@ function AllowComputer({ agent, name, machines, again }: { agent: string; name: 
     <a className="btn primary" href="#/network?add=computer">Add a computer</a>
   </>;
   return <>
-    {computers.map((computer) => <Act key={computer.id} symbol="approve" name={computers.length === 1 ? 'Allow on this computer' : 'Allow on ' + computer.name} word={computers.length === 1 ? 'Allow' : 'Allow on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void allow(computer.id); }} />)}
+    {computers.map((computer) => <Act key={computer.id} symbol="approve" name={'Allow on ' + computer.name} word={computers.length === 1 ? 'Allow' : 'Allow on ' + computer.name} tone="primary" disabled={busy} onClick={() => { void allow(computer.id); }} />)}
     {computers.length === 1 ? <p className="sec">{name} will be allowed to run on {computers[0].name}.</p> : null}
     <Failed refusal={failed} />
   </>;

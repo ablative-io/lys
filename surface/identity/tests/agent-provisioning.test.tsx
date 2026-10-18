@@ -231,7 +231,7 @@ describe('The folder an agent works in', () => {
     const failure = document.querySelector('.folder-problem');
     const warning = failure?.querySelector('[role="alert"]');
     expect(failure?.querySelector('p')?.textContent).toBe('Lys could not ask Ward desk about its folders. Check the computer’s runner, then try again.');
-    expect(warning?.querySelector('p')?.textContent).toBe('This computer has no connected Lys runner. Connect its runner before continuing.');
+    expect(warning?.querySelector('p')?.textContent).toBe('The chosen computer has no connected Lys runner. Connect its runner before continuing.');
     expect(warning?.querySelector('details')?.hasAttribute('open')).toBe(false);
     expect(warning?.querySelector('details')?.textContent).toContain('runner_absent: machine names no runner');
     expect(posted.map((entry) => ({ path: entry.path, body: entry.body }))).toEqual([

@@ -75,7 +75,7 @@ it('C738 offline and unknown leaves show their state, reason and Start without m
   expect(document.querySelector('.terminal-screen')).toBeNull();
   await act(async () => { root?.render(<NetworkTreePane key="unknown" seat={seat('unknown', 'unknown') as never} name="unknown" reason="runner_unreachable: socket absent" change={vi.fn()} />); });
   // The reason is said in plain words; the service's own words, refusal name and all, stay in its title.
-  expect(document.querySelector('.network-reason')?.textContent).toBe('Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+  expect(document.querySelector('.network-reason')?.textContent).toBe('Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
   expect(document.querySelector('.network-reason')?.getAttribute('title')).toBe('runner_unreachable: socket absent');
   expect(document.querySelector('.terminal-head [role="status"]')?.textContent).toBe('Unknown: its runner could not be read');
   expect(document.querySelector('.terminal-screen')).toBeNull();

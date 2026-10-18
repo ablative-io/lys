@@ -18,7 +18,7 @@ describe('Add an agent keeps its fields', () => {
     await settle();
     expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('Clover');
     expect(($('[name="computer"]') as HTMLSelectElement).value).toBe(bad.id);
-    expect(document.body.textContent).toContain('Lys could not read this computer’s installed programs');
+    expect(document.body.textContent).toContain('Lys could not read the programs installed on');
     await chooseComputer(good.id);
     await settle();
     expect(($('[name="display_name"]') as HTMLInputElement).value).toBe('Clover');

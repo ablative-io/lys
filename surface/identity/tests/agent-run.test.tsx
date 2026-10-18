@@ -131,7 +131,7 @@ describe('An agent\'s run on People and agents', () => {
       ['POST /agents/' + SCRIBE + '/start-command']: started(SCRIBE),
     });
     // The sentence and its fix are said; the service's own words stay under Error details.
-    expect(text()).toContain('On Lab: Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+    expect(text()).toContain('On Lab: Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
     expect($('.team-start .why-not[role="alert"] > p')?.textContent).not.toContain('runner_unreachable');
     expect($('.team-start .why-not details .refusal-name')?.textContent).toBe('runner_unreachable: the catalogue read was refused');
     expect(text()).toContain('CapabilityUnavailable');

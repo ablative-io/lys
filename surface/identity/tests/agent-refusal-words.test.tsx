@@ -119,7 +119,7 @@ describe('agent page refusal wording', () => {
     ['UnsafeSearchPath', 'The runner’s program search folders include an invalid path.'],
     ['ProgramMetadataUnreadable', 'Lys could not inspect the installed program.'],
     ['ProgramPathUnreadable', 'Lys could not read the installed program’s full path.'],
-    ['CommandNotFound', 'The chosen command was not found on this computer.'],
+    ['CommandNotFound', 'The chosen command was not found on the chosen computer.'],
     ['VersionCommandUnreadable', 'The computer could not run the program’s version command.'],
     ['VersionCommandFailed', 'The program’s version command failed.'],
     ['VersionOutputUnreadable', 'The program did not return a readable version.'],

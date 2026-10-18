@@ -41,7 +41,7 @@ export const RESTRICTIVE = ['workspace-write', 'default', 'read-only', 'plan'] a
 /** A Claude Code session or Codex thread id, as Lys's server takes it: 8-4-4-4-12 hexadecimal. */
 const CONVERSATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, canChoose = true, agent, brief = false, newComputer = false, pin, more, render }: {
+export function ProfileFields({ profile, choices, strict = false, firstRun = false, folderFirst = false, computer, computerName, canChoose = true, agent, brief = false, newComputer = false, pin, more, render }: {
   /** Only the model and the computer are shown; everything else is kept as saved. */
   brief?: boolean;
   profile: ProvisioningProfile | null; choices: Choices; strict?: boolean; firstRun?: boolean;
@@ -53,6 +53,8 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   agent?: string;
   /** The agent runs on a computer not added yet: no runner can report its copies, so the copies Lys lists are offered. */
   newComputer?: boolean;
+  /** The name of that computer not added yet, so it is said by name and never as "this computer". */
+  computerName?: string;
   /** Told the computer of a copy picked from another computer's group, so the screen around it runs the agent there. */
   pin?: (machine: string) => void;
   /** Further choices of the screen around, shown with this form's own under More settings on a first run. */
@@ -123,22 +125,25 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
     ? { program: programPath, package: heldBuild && heldBuild.program === programPath ? heldBuild.package : programPath }
     : builds.find((entry) => entry.value === build);
   const selectedProgram = selected && launchCommand(selected.program);
+  // The computer is said by its name, never as "this computer": the browser may be on another device than the one the agent runs on.
+  const whereName = (preferred ? machines.find((entry) => entry.id === preferred)?.name : machines.length === 1 ? machines[0].name : undefined) ?? (newComputer ? computerName?.trim() : undefined);
+  const onWhere = whereName ? 'on ' + whereName : 'on the computer it runs on';
   let refusal = '';
   if (!preferred && choices.programs === null) refusal = 'This Lys is too old to list programs. It gets the list when Lys is updated.';
   else if (!aggregate && preferred && !machines.some((entry) => entry.id === preferred)) refusal = 'Choose a computer that is still in use and has a connected runner.';
-  else if (readingCopies) refusal = preferred ? 'Reading this computer’s programs.' : 'Reading the computers’ installed programs.';
-  else if (catalogue?.failed) refusal = 'Lys could not read this computer’s installed programs. Check its runner before choosing a copy.';
+  else if (readingCopies) refusal = preferred ? 'Reading the programs installed ' + onWhere + '.' : 'Reading the computers’ installed programs.';
+  else if (catalogue?.failed) refusal = 'Lys could not read the programs installed ' + onWhere + '. Check its runner before choosing a copy.';
   else if (!aggregate && !preferred && catalogues.some((entry) => entry.failed)) refusal = 'Choose a computer whose installed programs Lys could read.';
   else if (catalogue?.problem && !selectedProgram?.startsWith('/')) refusal = problemWords(catalogue.problem);
   else if (!program) refusal = available.length ? 'Choose the program this agent will use.' : 'Lys lists no programs it can start.';
   else if (!selected) refusal = build === 'another' ? PROGRAM_RULE : builds.length === 0
-    ? (aggregate ? 'Lys did not find ' + program.name + ' on this computer. Install it and open this page again, or choose “Another program” and type the command you use to start it.'
-      : preferred || machines.length === 1 ? program.name + ' is not installed on this computer.'
+    ? (aggregate ? 'Lys did not find ' + program.name + ' ' + onWhere + '. Install it and open this page again, or choose “Another program” and type the command you use to start it.'
+      : preferred || machines.length === 1 ? program.name + ' is not installed ' + onWhere + '.'
       : machines.length ? 'No computer reported an installed copy of ' + program.name + '.'
         : 'No computer with a connected runner is available to report installed copies of ' + program.name + '.')
       + (program.not_found ? ' ' + problemWords(program.not_found) : '')
     : 'Choose an installed copy of ' + program.name + '.';
-  else if (preferred && !selectedProgram?.startsWith('/') && !builds.some((entry) => launchCommand(entry.program) === selectedProgram)) refusal = 'This computer did not report ' + launchCommand(selected.program) + '. ' + PROGRAM_RULE;
+  else if (preferred && !selectedProgram?.startsWith('/') && !builds.some((entry) => launchCommand(entry.program) === selectedProgram)) refusal = (whereName ?? 'The chosen computer') + ' did not report ' + launchCommand(selected.program) + '. ' + PROGRAM_RULE;
   else if (!program.models.some((entry) => entry.id === model)) refusal = 'Choose a model this program lists.';
   else if (!program.modes.some((entry) => entry.id === mode)) refusal = firstRun ? program.name + ' offers no mode that keeps it in check, so Lys will not choose one for it. Choose a mode under More settings.' : 'Choose a mode this program lists.';
   else if (!supported.some((entry) => entry === prompt)) refusal = 'This program does not offer that prompt choice.';
@@ -218,7 +223,7 @@ export function ProfileFields({ profile, choices, strict = false, firstRun = fal
   const fields = firstRun ? <div className="form-grid">
     {folderFirst ? where : null}
     {programField}
-    {found ? <p className="wide first-run-copy">Lys found {program?.name} on this computer and uses <code>{launchCommand(found.program)}</code>.</p> : copyField}
+    {found ? <p className="wide first-run-copy">Lys found {program?.name} {onWhere} and uses <code>{launchCommand(found.program)}</code>.</p> : copyField}
     {fallbackMode ? <p className="wide hint first-run-mode">{program?.name} has no mode that limits its changes to its own folder with the internet off, so it starts in its most careful mode: {MODES[fallbackMode.id]?.name ?? fallbackMode.meaning}. You can change this under More settings.</p> : null}
     {folderFirst ? null : where}
     <details className="wide more-settings"><summary>More settings</summary><div className="form-grid">

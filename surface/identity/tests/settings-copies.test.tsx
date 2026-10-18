@@ -182,7 +182,7 @@ describe('Installed copies on an agent’s Settings page', () => {
     await mount('#/file/' + SCRIBE + '/provisioning', service);
     expect(groups().map((group) => group.label)).toEqual(['Writing desk']);
     expect(picker()?.value).toBe('claude\nclaude 1');
-    expect(text()).not.toContain('Lys could not read this computer’s installed programs');
+    expect(text()).not.toContain('Lys could not read the programs installed on');
   });
 
   it.each([
@@ -199,7 +199,7 @@ describe('Installed copies on an agent’s Settings page', () => {
     service['/harnesses?machine=' + desk.id] = ok(body);
     const result = await mount('#/file/' + SCRIBE + '/provisioning', service);
     expect(text()).toContain('Installed programs on Writing desk');
-    expect(text()).toContain('Lys could not read this computer’s installed programs');
+    expect(text()).toContain('Lys could not read the programs installed on');
     expect(document.querySelector('[title^="harness_programs_unreadable:"]')).not.toBeNull();
     expect(groups()).toEqual([]);
     if (!button()) throw new Error('Save button missing while naming ' + String(description));
@@ -213,7 +213,7 @@ describe('Installed copies on an agent’s Settings page', () => {
     service['/harnesses?machine=' + laptop.id] = refused(503, 'runner_unreachable', 'The laptop is disconnected.');
     const result = await mount('#/file/' + SCRIBE + '/provisioning', service);
     expect(text()).toContain('Installed programs on Travel laptop');
-    expect(text()).toContain('Lys could not reach this computer’s runner');
+    expect(text()).toContain('Lys could not reach the chosen computer’s runner');
     expect(button()?.disabled).toBe(true);
     expect(groups().map((group) => group.label)).toEqual(['Writing desk']);
     await choose(field('runs_on'), desk.id);

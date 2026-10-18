@@ -86,7 +86,7 @@ describe('Running: the list and the canvas', () => {
     await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [running], unanswered: [{ session, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'Socket closed' }] }) });
     expect(text()).toContain('Runner did not answer; current state unknown');
     // Plain words on the page; the runner's refusal by name stays in the line's title.
-    expect(text()).toContain('Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+    expect(text()).toContain('Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
     expect($('.session-canvas-strip [title="runner_unreachable: Socket closed"]')).not.toBeNull();
     expect($('.session-canvas-strip')?.textContent).not.toContain('runner_unreachable');
     const said = $$('[role="alert"]').map((alert) => alert.textContent ?? '').find((words) => words.includes('did not answer for')) ?? '';

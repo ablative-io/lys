@@ -74,7 +74,7 @@ describe('Seats', () => {
     expect(text()).toContain('Lys could not reach the computers\' runners, so every state below is unknown');
     // The service's reason is said in plain words; its own words, refusal name and all, stay in the title.
     const reason = $('.why-not [title="runner_unreachable: the runner on machine-one did not answer"]');
-    expect(reason?.textContent).toBe(' Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+    expect(reason?.textContent).toBe(' Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
     expect($('tr[data-seat="waffles"]')?.textContent).toContain('Unknown: its runner could not be read');
     expect($('tr[data-seat="waffles"]')?.textContent).not.toContain('Offline');
     expect($('form[aria-label="Send to waffles"]')).toBeNull();

@@ -107,7 +107,7 @@ it('keeps a leading dash in the server file name without turning it into a packa
 });
 
 it.each([
-  [403, 'not_your_computer', 'this computer belongs to someone else', 'You do not manage this computer. Ask its owner or the administrator to make the change.'],
+  [403, 'not_your_computer', 'this computer belongs to someone else', 'You do not manage that computer. Ask its owner or the administrator to make the change.'],
   [404, 'client_platform_unknown', 'no release for that kind', 'Lys has no installer for this kind of computer yet. Ask the administrator to add one.'],
 ] as const)('says the %s %s refusal in plain words and keeps its name in details', async (status, refusal, reason, words) => {
   const { host, updates } = await draw(() => new Response(JSON.stringify({ refusal, reason }), { status, headers: { 'content-type': 'application/json' } }));

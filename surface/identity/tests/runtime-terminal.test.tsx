@@ -125,7 +125,7 @@ describe('Running sessions', () => {
   it('names each session whose runner did not answer, and never shows it as running', async () => {
     const unanswered = [{ session: ID, machine: 'machine-one', refusal: 'runner_unreachable', reason: 'runner_unreachable: the socket is gone' }];
     await mount('#/canvas?view=canvas', { ...SERVICE, ['POST ' + base + '/resize']: ok({ receipt: { index: 0 } }), '/runtime/live': ok({ sessions: [running], unanswered }) });
-    expect(text()).toContain('Lys could not reach this computer’s runner. Check that the computer and its runner are connected.');
+    expect(text()).toContain('Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
     expect($('.session-canvas-strip [title^="runner_unreachable"]')).not.toBeNull();
     expect(text()).toContain('Its computer did not answer, so whether it is still running is not known.');
     expect($$('.running-list .running-state')).toHaveLength(1);

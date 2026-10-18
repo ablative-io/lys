@@ -168,7 +168,7 @@ function PasteServers({ kinds, taken, add }: { kinds: ServerKind[]; taken: strin
  * Claude Code is started without the person's own setup; Codex is not.
  */
 export function others(program: string): string {
-  if (program === 'Claude Code') return 'Lys’s own tools are there too. These are the only others: Lys starts Claude Code without the connected tools of anyone’s own setup on this computer.';
+  if (program === 'Claude Code') return 'Lys’s own tools are there too. These are the only others: Lys starts Claude Code without the connected tools of anyone’s own setup on its computer.';
   if (program === 'Codex') return 'Lys’s own tools are there too. Codex also uses whatever connected tools are set up for it on the agent’s computer; Lys does not list those here.';
   return '';
 }
