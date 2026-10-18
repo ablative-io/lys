@@ -16,6 +16,9 @@ describe('Surface words and controls', () => {
     await mount(address, SERVICE);
     expect($('.page h1')?.textContent).toBe('Not found');
     expect(text()).toContain(address.slice(1));
+    // The next step for an address with no page: Home, and Search for it by name.
+    expect($('.page a.btn[href="#/"]')?.textContent).toBe('Go Home');
+    expect($('.page [data-symbol="search"]')?.getAttribute('aria-label')).toBe('Search for the page by its name');
   });
   it('gives an unknown agent name the agents list instead of an access accusation', async () => {
     await mount('#/team/Unknown%20helper', SERVICE);

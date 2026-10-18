@@ -58,7 +58,7 @@ function AgentByName({ name }: { name: string }) {
         );
         if (matching.length === 1) return <Navigate replace to={"/file/" + encodeURIComponent(matching[0].id)} />;
         return (
-          <NotFound>
+          <NotFound next={<a className="btn" href="#/people/view/agents">Open the agents list</a>}>
             {matching.length ? (
               <>More than one agent is called {name}. Choose one from the agents list.</>
             ) : (

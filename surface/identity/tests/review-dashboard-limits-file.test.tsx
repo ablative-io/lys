@@ -127,7 +127,7 @@ describe('The shell', () => {
   it('offers the Dashboard from a page that is not found, and does not show the address as code', async () => {
     await mount('#/no-such-page', SERVICE);
     expect(text()).toContain('Not found');
-    expect($('a.btn[href="#/dashboard"]')?.textContent).toBe('Go to the Dashboard');
+    expect($('a.btn[href="#/"]')?.textContent).toBe('Go Home');
     expect($('.page p.code')).toBeNull();
   });
 });
