@@ -150,6 +150,16 @@ describe('An agent\'s run on People and agents', () => {
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toMatchObject([{ path: '/agents/' + SCRIBE + '/restart', body: { session: LIVE } }]);
   });
 
+  // A clinician reads the question at a glance: that the work in progress is not saved first is a line of its own, never inside the sentence.
+  it('says on a line of its own, before Stop or Restart, that Lys does not save the agent’s work first and how to keep it', async () => {
+    await mount('#/file/' + SCRIBE, routes);
+    await click($('section[aria-label="Run"] [data-act="stop"]'));
+    expect($('[role="alertdialog"] strong.run-loss')?.textContent).toBe('Lys does not save Scribe’s work first. To keep it, choose Keep it running and let Scribe finish.');
+    await click(button('Keep it running'));
+    await click($('section[aria-label="Run"] [data-act="restart"]'));
+    expect($('[role="alertdialog"] strong.run-loss')?.textContent).toBe('Lys does not save Scribe’s work first. To keep it, choose Keep it running and let Scribe finish.');
+  });
+
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
     const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
     await click($('section[aria-label="Run"] [data-act="stop"]'));

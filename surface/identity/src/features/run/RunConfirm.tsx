@@ -11,6 +11,7 @@ import { answeredNo } from '../../kept';
 import { Act } from '../../shell/Act';
 import { ErrorWords } from '../people/Words';
 import type { SessionEnd } from '../runtime/Terminal';
+import './run.css';
 
 export type RunDoing = 'stop' | 'restart';
 
@@ -27,6 +28,10 @@ export function runQuestion(doing: RunDoing, name: string, where: string | null)
     ? 'Stop ' + name + '? This ends its run' + on + '. What it has not saved is lost. You can start it again afterwards.'
     : 'Restart ' + name + '? This ends its run and starts it again in the same folder' + (where ? ', on ' + where : '') + '. What it has not saved is lost.';
 }
+
+/** What a glance at the question must not miss: Lys saves nothing first, and the work is kept only by not stopping. */
+export const runLoss = (name: string): string =>
+  'Lys does not save ' + name + '’s work first. To keep it, choose Keep it running and let ' + name + ' finish.';
 
 /** Stop and Restart for one session of `agent`. `done` hears each confirmed act, with the session's end when the runner said it. */
 export function useRunActs(agent: string | null, session: string, done: (doing: RunDoing, ended: SessionEnd | null) => void) {
@@ -63,7 +68,7 @@ export function RunConfirm({ doing, name, where, busy, refused, confirm, cancel,
 }) {
   const word = RUN_WORDS[doing];
   return <div className={className} role="alertdialog" aria-label={word + ' ' + name}>
-    <p>{runQuestion(doing, name, where)}</p>
+    <p>{runQuestion(doing, name, where)} <strong className="run-loss">{runLoss(name)}</strong></p>
     {refused ? <ErrorWords problem={refused} /> : null}
     <div className="actions">
       <Act symbol={doing === 'stop' ? 'stop' : 'retry'} name={word + ' ' + name} word={word} tone="danger" className={small ? 'small' : undefined} data-act={'confirm-' + doing} disabled={busy} onClick={confirm} />
