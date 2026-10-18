@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $$, choose, click, mount, settle } from './harness';
-import { ADA, ME, SERVICE, SCRIBE, ok } from './fixtures';
+import { ADA, ME, SERVICE, SCRIBE, ok, reportingTo } from './fixtures';
 import type { Route } from './fixtures';
 import type { CannotGiveAnswer, CannotGiveItem, PeopleView } from '../src/generated';
 import type { Grant, GrantModel, PassOn } from '../src/generated/grants';
@@ -37,7 +37,7 @@ const MODEL: GrantModel = { action_sentences: { view: 'View this resource', edit
 const PEOPLE: PeopleView = {
   scope: 'directory',
   people: [
-    { id: ADA, display_name: 'Ada (test person)', state: 'active', agents: [{ id: A1, display_name: 'Scribe', state: 'active' }] },
+    { id: ADA, display_name: 'Ada (test person)', state: 'active', agents: [{ id: A1, display_name: 'Scribe', state: 'active', ...reportingTo({ id: ADA, display_name: 'Ada (test person)', state: 'active' }) }] },
     { id: P2, display_name: 'Cara (test person)', state: 'active', agents: [] },
   ],
 };

@@ -1,4 +1,4 @@
-import type { AgentView, CannotGiveAnswer, MeView, PeopleView, ReceiptAnswer } from '../src/generated';
+import type { AgentView, CannotGiveAnswer, MeView, PeopleView, PersonSummary, ReceiptAnswer, ReportingAgent } from '../src/generated';
 import type { ActionBody, Grant, GrantModel, Permit, WhoBody } from '../src/generated/grants';
 
 // Fixture API responses in the shapes read_api.rs answers. Names are test names.
@@ -12,6 +12,15 @@ export const ARCHIVIST = 'agent-' + hex(13);
 export const REVIEWER = 'agent-' + hex(21);
 export const LAMPLIGHTER = 'agent-' + hex(22);
 
+/** An agent's reporting as `agent_summary` serves it when it reports to its own person: that person, accountable while active, else the gap. */
+export const reportingTo = (person: PersonSummary): Pick<ReportingAgent, 'reports_to' | 'accountable' | 'gap'> => ({
+  reports_to: { id: person.id, kind: 'person', display_name: person.display_name },
+  accountable: person.state === 'active' ? { id: person.id, display_name: person.display_name } : null,
+  gap: person.state === 'active' ? null : { identity: person.id, state: person.state },
+});
+const ADA_SUMMARY: PersonSummary = { id: ADA, display_name: 'Ada (test person)', state: 'active' };
+const BEA_RETIRED: PersonSummary = { id: BEA, display_name: 'Bea (test person)', state: 'retired' };
+
 export const ISSUER = 'http://issuer.test:9000';
 
 export const DIRECTORY: PeopleView = {
@@ -20,16 +29,16 @@ export const DIRECTORY: PeopleView = {
     {
       id: ADA, display_name: 'Ada (test person)', state: 'active',
       agents: [
-        { id: SCRIBE, display_name: "Scribe", state: 'active' },
-        { id: COURIER, display_name: "Courier", state: 'registered' },
-        { id: ARCHIVIST, display_name: "Archivist", state: 'suspended' },
+        { id: SCRIBE, display_name: "Scribe", state: 'active', ...reportingTo(ADA_SUMMARY) },
+        { id: COURIER, display_name: "Courier", state: 'registered', ...reportingTo(ADA_SUMMARY) },
+        { id: ARCHIVIST, display_name: "Archivist", state: 'suspended', ...reportingTo(ADA_SUMMARY) },
       ],
     },
     {
       id: BEA, display_name: 'Bea (test person)', state: 'retired',
       agents: [
-        { id: REVIEWER, display_name: "Reviewer", state: 'active' },
-        { id: LAMPLIGHTER, display_name: "Lamplighter", state: 'retired' },
+        { id: REVIEWER, display_name: "Reviewer", state: 'active', ...reportingTo(BEA_RETIRED) },
+        { id: LAMPLIGHTER, display_name: "Lamplighter", state: 'retired', ...reportingTo(BEA_RETIRED) },
       ],
     },
   ],
@@ -64,6 +73,7 @@ export const SCRIBE_VIEW: AgentView = {
   display_name: "Scribe",
   person: { id: ADA, display_name: 'Ada (test person)', state: 'active' },
   needs_new_person: false,
+  ...reportingTo(ADA_SUMMARY),
   role: null,
   version: null,
   state: 'active',
@@ -277,7 +287,7 @@ export const BEA_PERSON = {
   id: BEA,
   display_name: 'Bea (test person)',
   state: 'active' as const,
-  agents: [{ id: REVIEWER, display_name: 'Reviewer', state: 'active' as const }],
+  agents: [{ id: REVIEWER, display_name: 'Reviewer', state: 'active' as const, ...reportingTo({ id: BEA, display_name: 'Bea (test person)', state: 'active' }) }],
 };
 
 /** The directory as an administrator sees it with Bea active: both people. */

@@ -23,12 +23,41 @@ export interface PersonSummary {
   state: LifecycleState;
 }
 
-/** An agent in `agents_of`. */
+/** `ReportingTarget` (reporting_views.rs): the identity an agent reports to, a person or another agent, with its name now. */
+export interface ReportingTarget {
+  id: IdentityId;
+  kind: 'person' | 'agent';
+  display_name: string;
+}
+
+/** `AccountablePerson`: the active person its reporting chain reaches. */
+export interface AccountablePerson {
+  id: IdentityId;
+  display_name: string;
+}
+
+/** `ReportingGap`: the identity that is not active and breaks the chain, with its state. */
+export interface ReportingGap {
+  identity: IdentityId;
+  state: string;
+}
+
+/**
+ * An agent as the reads that only name it read it: the first three fields of `AgentSummary` (read_views.rs). The
+ * server sends the whole summary everywhere (dashboard, network, reviews too); those screens read only these.
+ */
 export type AgentSummary = PersonSummary;
+
+/** The whole `AgentSummary`, from `agent_summary`, as the people read (`agents_of`) is read: with its reporting. */
+export interface ReportingAgent extends AgentSummary {
+  reports_to: ReportingTarget;
+  accountable: AccountablePerson | null;
+  gap: ReportingGap | null;
+}
 
 /** `person_with_agents`. */
 export interface PersonWithAgents extends PersonSummary {
-  agents: AgentSummary[];
+  agents: ReportingAgent[];
 }
 
 /** Whose records a view shows: the signed-in person's own, or the administrator's whole directory. */
@@ -71,6 +100,9 @@ export interface AgentView {
   display_name: string;
   person: PersonSummary;
   needs_new_person: boolean;
+  reports_to: ReportingTarget;
+  accountable: AccountablePerson | null;
+  gap: ReportingGap | null;
   /** Not recorded by the directory yet; always null for now. */
   role: string | null;
   /** Not recorded by the directory yet; always null for now. */

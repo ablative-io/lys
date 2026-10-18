@@ -6,7 +6,7 @@ afterEach(() => unmountAll());
 
 // The service serves each agent's reports_to edge: Courier reports to the agent Scribe, Scribe to its person Ada.
 const reporting = { ...DIRECTORY, people: DIRECTORY.people.map((person) => person.id !== ADA ? person : { ...person, agents: person.agents.map((agent) =>
-  agent.id === COURIER ? { ...agent, reports_to: { id: SCRIBE, kind: 'agent' } } : { ...agent, reports_to: { id: ADA, kind: 'person' } }) }) };
+  agent.id === COURIER ? { ...agent, reports_to: { id: SCRIBE, kind: 'agent', display_name: 'Scribe' } } : agent) }) };
 
 it('says the agent an agent reports to, with the person who answers for it, and a person-reporting agent by its person', async () => {
   await mount('#/people/view/agents', { ...SERVICE, '/directory/people': ok(reporting) });
@@ -20,7 +20,7 @@ it('says the agent an agent reports to, with the person who answers for it, and 
 it('says the same on the agent’s own page: the agent it reports to, then its person', async () => {
   // Here Scribe, whose file the fixtures serve, reports to the agent Courier.
   const scribeReports = { ...DIRECTORY, people: DIRECTORY.people.map((person) => person.id !== ADA ? person : { ...person, agents: person.agents.map((agent) =>
-    agent.id === SCRIBE ? { ...agent, reports_to: { id: COURIER, kind: 'agent' } } : agent) }) };
+    agent.id === SCRIBE ? { ...agent, reports_to: { id: COURIER, kind: 'agent', display_name: 'Courier' } } : agent) }) };
   await mount('#/file/' + SCRIBE, { ...SERVICE, '/directory/people': ok(scribeReports) });
   await settle();
   const fact = [...document.querySelectorAll('.agent-facts dt')].find((term) => term.textContent === 'Answers to')?.nextElementSibling;

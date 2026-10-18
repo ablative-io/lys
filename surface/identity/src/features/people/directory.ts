@@ -17,20 +17,13 @@ export interface Entry {
   reportsTo?: { id: string; display_name: string | null } | null;
 }
 
-/** The `reports_to` edge the people view serves for an agent (`AgentSummary.reports_to` on the server), when it is there. */
-function reportingEdge(agent: unknown): { id: string; kind: string } | null {
-  const edge = agent && typeof agent === 'object' ? (agent as { reports_to?: unknown }).reports_to : undefined;
-  return edge && typeof edge === 'object' && typeof (edge as { id?: unknown }).id === 'string' && typeof (edge as { kind?: unknown }).kind === 'string'
-    ? edge as { id: string; kind: string } : null;
-}
-
 /** People first, then every agent, as the mock-up lists them. */
 export function entries(view: PeopleView): Entry[] {
   const people: Entry[] = view.people.map((p) => ({ id: p.id, display_name: p.display_name, state: p.state, kind: 'person', role: null, person: null, reportsTo: null }));
-  const agentNames = new Map(view.people.flatMap((p) => p.agents.map((a) => [a.id, a.display_name] as const)));
   const agents: Entry[] = view.people.flatMap((p) =>
     p.agents.map((a) => {
-      const edge = reportingEdge(a);
+      // The edge as the people read serves it (`agent_summary`): the agent or person it reports to, by its name now.
+      const edge = a.reports_to;
       return {
       id: a.id,
       display_name: a.display_name,
@@ -38,7 +31,7 @@ export function entries(view: PeopleView): Entry[] {
       kind: 'agent' as const,
       role: null,
       person: { id: p.id, display_name: p.display_name, state: p.state },
-      reportsTo: edge && edge.kind === 'agent' && edge.id !== a.id ? { id: edge.id, display_name: agentNames.get(edge.id) ?? null } : null,
+      reportsTo: edge.kind === 'agent' && edge.id !== a.id ? { id: edge.id, display_name: edge.display_name } : null,
       };
     }),
   );

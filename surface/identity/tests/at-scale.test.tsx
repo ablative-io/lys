@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, choose, click, mount, text, unmountAll } from './harness';
-import { ME, SERVICE, ok } from './fixtures';
+import { ME, SERVICE, ok, reportingTo } from './fixtures';
 import type { PeopleView } from '../src/generated';
 
 const hex = (n: number, width = 32) => n.toString(16).padStart(width, '0');
@@ -15,7 +15,7 @@ const departments = [0, 1, 2, 3, 4].map((d) => ({ id: teamId(d), name: 'Departme
 const squads = Array.from({ length: 35 }, (_, s) => ({ ...departments[0], id: teamId(10 + s), name: 'Squad ' + String(s + 1).padStart(2, '0'), parent: teamId(Math.floor(s / 7)), lead: personId(s), members: [] as string[] }));
 const people = Array.from({ length: 300 }, (_, n) => ({
   id: personId(n), display_name: 'Person ' + n, state: 'active' as const,
-  agents: [0, 1, 2, 3].map((a) => ({ id: agentId(n * 4 + a), display_name: 'Agent ' + (n * 4 + a), state: 'active' as const })),
+  agents: [0, 1, 2, 3].map((a) => ({ id: agentId(n * 4 + a), display_name: 'Agent ' + (n * 4 + a), state: 'active' as const, ...reportingTo({ id: personId(n), display_name: 'Person ' + n, state: 'active' }) })),
 }));
 for (const [n, person] of people.entries()) squads[n % 35].members.push(person.id);
 const teams = [...departments, ...squads];
