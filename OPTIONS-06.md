@@ -115,3 +115,17 @@ Second go. Looked at in headless Chrome. Two things were wrong at the first go a
 Recommendation: A. The plan wording "% of my plan" (wrong on an agent's page, 06 Words) becomes "% of its plan" in the same file.
 
 Second go. Checked against a browser that writes numbers the German way (a test forces it): every budget figure still reads "1,235 tokens" and "US$1,234.50". What I changed on reflection: the unit picker said "dollars" while every figure said "US$"; it now says "US dollars", and the spending input's accessible name says the same. Still wrong: "US$500.00" is heavier than "$500" in a sentence like "Near has used 90% of its US$500.00 a week"; I kept the two decimals everywhere because CONSENSUS asks for one formatter, and a second, lighter one for round limits is exactly how the seven began. The canvas's own formula and dial labels (`CanvasWidgets.tsx:48, 197-199`) still use the browser's locale; not my folder, asked.
+
+## Item 9: tile titles in 10px mono capitals; muted and secondary text look the same
+
+`.section-h` is 10px JetBrains Mono, uppercase, .15em tracking (`styles/screen.css:119`); `--text-muted #9b9ba5` and `--text-secondary #a1a1aa` (`styles/tokens.css:10`) cannot be told apart. Both files are shared and domain 01's.
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. Ask 01 for `.section-h` at 13px/600 in the body face, sentence case, the primary text colour; and `--text-muted` at the estate foundation's own muted `#8A9199` (`design-system-v2/palette/estate-colour-tokens.json`), so muted sits a clear step below secondary. Change nothing locally. Mock-ups for Tom to compare. | "Waiting on you", "Needs a look", "This week" as headings she reads at a glance, with the notes under them visibly quieter than the lines. | Tiny capitals that read as code (06 #9); two text levels that are one (06 #9); a second heading style made in one folder. | Obvious: the headings say what each panel is for. |
+| B. Override `.section-h` inside `dashboard.css` for the dashboard only. | The same, on the dashboard only. | The tiny capitals there, at the cost of two heading styles in one product (CONSENSUS "one of each"). | Partly. |
+| C. Leave it. | Mono capitals. | Nothing. | Nothing. |
+
+Recommendation: A. Before and after, drawn in headless Chrome from the real panels and the app's CSS with a Cherie fixture: `/Users/tom/Developer/.scratch/waffles/builders/surface-06-look/cherie.png` (now) and `cherie-after9.png` (with the ask applied). `#8A9199` on the page background `#121218` is about 5.9:1, above the 4.5:1 a note needs.
+
+Second go. Is a mock-up and an ask enough for a top-ten item? It is the only honest version: the fix is two lines in two shared files, and doing it in my folder would add the divergence the review counts as a defect. What the mock-up shows that I did not expect: with the headings readable, the count beside "Waiting on you" and "Needs a look" (a bare "2") now looks like a stray figure; it would read better as "2 things" or in a badge. That is mine to change, but only after 01 applies the heading, or it will be judged against the old style.
