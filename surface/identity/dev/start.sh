@@ -106,23 +106,21 @@ start_ready() {
   shift
   ready_dir=$(mktemp -d)
   mkfifo "$ready_dir/output" "$ready_dir/ready"
-  (trap '' HUP; exec awk -v ready="$ready_dir/ready" '
-    {
-      print
-      fflush()
-      if (!said && index($0, "listening on ")) {
-        print "ready" > ready
-        close(ready)
-        said = 1
-      }
-    }
-    END {
-      if (!said) {
-        print "ended" > ready
-        close(ready)
-      }
-    }
-  ') <"$ready_dir/output" >"$LOGS/$name.log" 2>&1 &
+  # A POSIX sh read loop, never awk: mawk (Debian's awk) block-buffers input
+  # from a pipe, so the ready line would sit unread until the buffer filled
+  # (DIRECTORY-100). The shell reads a pipe a byte at a time and sees each
+  # line the moment it is written.
+  (trap '' HUP; said=
+    while IFS= read -r line || [ -n "$line" ]; do
+      printf '%s\n' "$line"
+      if [ -z "$said" ]; then
+        case $line in
+          *"listening on "*) echo ready >"$ready_dir/ready"; said=1 ;;
+        esac
+      fi
+    done
+    [ -n "$said" ] || echo ended >"$ready_dir/ready"
+  ) <"$ready_dir/output" >"$LOGS/$name.log" 2>&1 &
   logger=$!
   nohup "$@" >"$ready_dir/output" 2>&1 &
   pid=$!
