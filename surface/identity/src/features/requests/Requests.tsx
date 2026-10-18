@@ -5,7 +5,7 @@ import { readTogether } from '../../reads';
 /** Requests use the service's visibility and approval decisions, never an inferred permission. A queue, oldest first, grouped by the asker's team; one request opens beside it. */
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { api, request, useLoad } from '../../api';
+import { Refused, api, request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
@@ -24,6 +24,10 @@ import { Act } from '../../shell/Act';
 
 type Show = 'mine' | 'waiting' | 'decided';
 
+/** Why an extra read is missing, as its cause and never a chore: the page carries on without it, so there is nothing to ask anyone. */
+const missing = (problem: unknown): string => problem instanceof Refused && problem.status === 403
+  ? 'Lys does not show this account that list.' : 'Lys could not read that list: ' + problemWords(problem);
+
 /** How long a request has waited, as a person says it. */
 function waited(asked: number): string {
   const gone = Math.max(0, Math.floor(Date.now() / 1000) - asked);
@@ -35,14 +39,17 @@ function waited(asked: number): string {
 export function Requests() {
   const [confirmed, setConfirmed] = useState<Record<string, AccessRequest>>({});
   const changed = (answer: AccessRequest) => setConfirmed((held) => ({ ...held, [answer.id]: answer }));
+  // Only the queue itself opens the page: names, teams and the asker's own access are extras, each said when missing, so no unrelated read hides the way to ask.
   const load = useLoad(() => readTogether({
-    list: request<{ requests: AccessRequest[] }>('/requests'), people: api.people(),
+    list: request<{ requests: AccessRequest[] }>('/requests'),
+    people: api.people().then((read) => ({ read, refused: '' }), (problem: unknown) => ({ read: null, refused: missing(problem) })),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'requests');
   const choices = useLoad(async () => {
-    const [me, grants, model] = await Promise.all([api.me(), api.grants(), api.model()]);
-    const resources = [...new Map(grants.grants.map((grant) => [JSON.stringify(grant.resource), grant.resource])).values()];
-    return { person: me.person.id, resources, model, grants: grants.grants };
+    const [me, model, held] = await Promise.all([api.me(), api.model(),
+      api.grants().then((read) => ({ grants: read.grants, refused: '' }), (problem: unknown) => ({ grants: [], refused: missing(problem) }))]);
+    const resources = [...new Map(held.grants.map((grant) => [JSON.stringify(grant.resource), grant.resource])).values()];
+    return { person: me.person.id, resources, model, grants: held.grants, unlisted: held.refused };
   }, 'request-choices');
   return <div className="page fill">
     <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) => {
@@ -52,14 +59,15 @@ export function Requests() {
   </div>;
 }
 
-type Loaded = { people: Awaited<ReturnType<typeof api.people>>; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string } };
-type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: string; id: string }[]; model: Awaited<ReturnType<typeof api.model>>; grants: Awaited<ReturnType<typeof api.grants>>['grants'] }>>;
+type Loaded = { people: { read: Awaited<ReturnType<typeof api.people>> | null; refused: string }; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string } };
+type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: string; id: string }[]; model: Awaited<ReturnType<typeof api.model>>; grants: Awaited<ReturnType<typeof api.grants>>['grants']; unlisted: string }>>;
 
 /** A request's state in words. */
 const STATE: Record<AccessRequest['state'], string> = { waiting: 'Awaiting a decision', approved: 'Approved', declined: 'Declined' };
 
 function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void }) {
-  const admin = data.people.scope === 'directory';
+  const admin = data.people.read?.scope === 'directory';
+  const directory = data.people.read?.people ?? [];
   const person = choices.status === 'ok' ? choices.data.person : '';
   const mayDecide = (entry: AccessRequest) => entry.state === 'waiting' && (entry.can_decide ?? entry.approvers.some((each) => each.id === person));
   const [whose, setWhose] = useWhose(admin);
@@ -67,8 +75,8 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   const retained = person !== '' && sessionStorage.getItem('lys.pending.request.' + person) !== null;
   const [asking, setAsking] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);
-  const agents = new Map(data.people.people.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
-  const names = new Map(data.people.people.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
+  const agents = new Map(directory.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
+  const names = new Map(directory.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   /** What a request is on, by name where it is someone, never a raw id. */
   const onWhat = (entry: AccessRequest): string => names.get(entry.resource.id) ?? entry.resource.id;
   const held = (entry: AccessRequest): Held => ({ id: entry.asked_by, person: agents.get(entry.asked_by) ?? null });
@@ -92,6 +100,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
       {!ask ? <Act symbol="add" name="Ask for access" word="Ask" tone="primary" onClick={() => setAsking(true)} /> : null}
     </div>
     <AccessTabs on="requests" />
+    {data.people.refused ? <p className="note">People's names are not shown here, so each request shows who asked by the name they gave. {data.people.refused}</p> : null}
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}
     <div className="body work">
       <Listing<AccessRequest> groups={groups} columns={columns} id={(entry) => entry.id} href={(entry) => '#/requests?request=' + entry.id}
@@ -103,7 +112,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
           <div className="seg">{([['mine', 'Waiting on me'], ['waiting', 'All waiting'], ['decided', 'Decided']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
         </>} />
       <div className="detail">
-        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm person={each.person} resources={each.resources} model={each.model} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }}
+        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm person={each.person} resources={each.resources} unlisted={each.unlisted} model={each.model} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }}
             cancel={entries.length && !retained ? () => setAsking(false) : undefined} />} />
           : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} describe={describeSource(choices.status === 'ok' ? choices.data.grants : [])} decider={open.decision ? names.get(open.decision.by) : undefined} entry={open} on={onWhat(open)} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : null}
       </div>

@@ -10,6 +10,7 @@ import { matchesAsk } from './contract';
 import type { AccessRequest, Ask } from './contract';
 import { keptSend, keepRecord, releaseRecord } from '../../kept';
 import { Act } from '../../shell/Act';
+import './requests.css';
 
 type Pending = { kind: 'empty' } | { kind: 'damaged' } | { kind: 'held'; asked: Ask };
 
@@ -65,8 +66,10 @@ function readRest(key: string): Rest {
   }
 }
 
-export function AskForm({ person, resources, model, changed, cancel }: {
+export function AskForm({ person, resources, unlisted = '', model, changed, cancel }: {
   person: string; resources: ResourceRef[]; model: GrantModel; changed: (answer: AccessRequest) => void;
+  /** Why the asker's own access is missing, as its cause, so an empty list is not read as holding nothing; empty when it was read. */
+  unlisted?: string;
   /** Closes the form; left out where the form is the only thing the page has to offer. */
   cancel?: () => void;
 }) {
@@ -76,7 +79,8 @@ export function AskForm({ person, resources, model, changed, cancel }: {
   const working = useRef(false);
   const [answer, setAnswer] = useState('');
   const [failure, setFailure] = useState('');
-  const [advanced, setAdvanced] = useState(false);
+  // With nothing to choose from, the fields for naming the thing are the form, not a box to tick first.
+  const [advanced, setAdvanced] = useState(resources.length === 0);
   const [noExpiry, setNoExpiry] = useState(false);
   const [resourceIndex, setResourceIndex] = useState('');
   const [picked, setPicked] = useState<string[]>([]);
@@ -196,12 +200,12 @@ export function AskForm({ person, resources, model, changed, cancel }: {
   };
   return <form className="card recorded-form" aria-label="Ask for access" onSubmit={submit}>
     <h2>Ask for access</h2><p>Choose what you need and explain why. Someone who can grant that access will review your request.</p>
-    <fieldset disabled={pending.kind !== 'empty' || rest.kind === 'held' || damaged || busy} style={{ border: 0, padding: 0 }}>
+    <fieldset className="ask-fields" disabled={pending.kind !== 'empty' || rest.kind === 'held' || damaged || busy}>
       {!advanced ? <label className="field">What do you need access to?<select value={resourceIndex} onChange={(event) => setResourceIndex(event.target.value)} required>
         <option value="">Choose what you need</option>{resources.map((resource, index) => <option key={JSON.stringify(resource)} value={index}>{resource.id} · {resource.kind}</option>)}
       </select></label> : null}
-      {!resources.length && !advanced ? <p className="note">Nothing appears in your access yet, so there is nothing to choose from. Tick the box below and enter what you were told you need.</p> : null}
-      <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />What I need is not in the list</label>
+      {!resources.length ? <p className="note">{(unlisted ? 'There is no list of your access to choose from. ' + unlisted : 'You hold no access yet, so there is no list to choose from.') + ' Type what you need below; whoever approves sees exactly what you typed.'}</p> : null}
+      {resources.length ? <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />What I need is not in the list</label> : null}
         {advanced ? <div className="form-grid"><label className="field">Type of thing<input name="kind" required autoComplete="off" /><span className="hint">For example, project or workspace.</span></label><label className="field">Its name<input name="resource" required autoComplete="off" /><span className="hint">Exactly as the person or app that told you about it wrote it.</span></label></div> : null}
       {(() => {
         const resource = advanced ? undefined : chosenResource;

@@ -1,0 +1,2 @@
+/* The Ask form's fields sit in a fieldset only so one switch disables them all; it draws no box of its own. */
+.ask-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
