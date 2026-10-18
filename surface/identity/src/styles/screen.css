@@ -155,7 +155,11 @@ ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
 .tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; }
 .tools .search { width: 280px; }
 .tools .count { margin-left: auto; }
-.whose select, .tools select { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 8px; font: 12.5px "DM Sans", system-ui, sans-serif; }
+/* "Showing" and its choice read as one phrase on the toolbar's line, the select as wide as its longest choice. */
+.whose { display: inline-flex; align-items: center; gap: 8px; }
+.whose select { width: auto; }
+/* background-color, not the shorthand, so the base select keeps its chevron: a choice must look choosable. */
+.whose select, .tools select { background-color: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); color: var(--text-primary); padding: 5px 30px 5px 8px; background-position: right 9px center; font: 12.5px "DM Sans", system-ui, sans-serif; }
 tr.group th { position: sticky; top: 34px; z-index: 1; background: var(--surface-base); padding-top: 14px; font-weight: 400; }
 tr.group .group-name { font-weight: 600; color: var(--text-primary); margin-right: 10px; }
 .btn.under { min-height: 0; padding: 0 8px; margin-left: 10px; font-size: 11.5px; }
