@@ -68,7 +68,8 @@ const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])]
 describe('The Dashboard is the front page', () => {
   it('is the rail\'s first entry, Home, and #/ lands on it', async () => {
     await mount('#/', routes);
-    expect($('.page h1')?.textContent).toBe('Dashboard');
+    // One PageHeader, titled as the rail names the page.
+    expect($$('.page .page-header h1').map((h1) => h1.textContent)).toEqual(['Home']);
     expect($('#rail a.on')?.dataset.nav).toBe('dashboard');
     // Home first, then what waits on you (CONSENSUS.md, 18 October 2026; it replaced Operations first, Tom, 4 October 2026).
     const [first, second] = $$('#rail a[data-nav]');
@@ -77,7 +78,7 @@ describe('The Dashboard is the front page', () => {
     await click($('#rail a[data-nav="people"]'));
     await click($('#rail a[data-nav="dashboard"]'));
     expect(location.hash).toBe('#/');
-    expect($('.page h1')?.textContent).toBe('Dashboard');
+    expect($('.page h1')?.textContent).toBe('Home');
   });
 
   it('shows no terminal until Watch is pressed, and resizes no session', async () => {
@@ -188,7 +189,8 @@ describe('The Dashboard is the front page', () => {
     expect(waiting?.querySelector('[data-waiting="count"]')?.textContent).toBe('2');
     const request = waiting?.querySelector('tr[data-request="r-1"]');
     expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe asks for reader access to store s-1to read the ward list', 'Decide']);
-    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests');
+    // Decide opens the request itself on Requests, beside the queue.
+    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests/r-1');
     expect(waiting?.textContent).not.toContain('already decided');
     expect(waiting?.querySelectorAll('tr[data-draft]')).toHaveLength(1);
     expect([...(waiting?.querySelectorAll('tr[data-draft] td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe prepared something for you to approvefor the night shift', 'Decide']);
@@ -255,7 +257,7 @@ describe('The Dashboard is the front page', () => {
       '/dashboard': ok({ ...dashboard(), waiting: { requests: 1, drafts: 2, reviews: 1, product_drafts: 2 } }) });
     const rows = $$('section[aria-label="Waiting on you"] tbody tr');
     expect(rows.map((tr) => [tr.querySelector('td')?.textContent, tr.querySelector('a.btn')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
-      ['Scribe asks for reader access to store s-1', 'Decide', '#/requests'],
+      ['Scribe asks for reader access to store s-1', 'Decide', '#/requests/r-1'],
       ['Scribe prepared something for you to approve', 'Decide', '#/access/drafts'],
       ['Scribe prepared something for you to approve', 'Decide', '#/access/drafts'],
       ['2 app actions wait for your approval', 'Open', '#/access/drafts'],

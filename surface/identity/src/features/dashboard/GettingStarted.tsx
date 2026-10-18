@@ -1,7 +1,7 @@
 /**
  * Getting started: what a fresh Lys still needs, in the order a person sets it up. Each step says what it is for,
  * is done where it already lives, and leaves the list once it is done. Nothing here is decided for the person:
- * whether agents run on this computer is asked, never assumed, because some computers Lys is installed on should
+ * whether agents run on the computer Lys runs on is asked, never assumed, because some computers Lys is installed on should
  * never run agents.
  */
 import { useState } from 'react';
@@ -18,7 +18,7 @@ interface AppsView { apps: { id: string; state: string }[] }
  * What Getting started reads. `google` is true only when Google is set up and switched on, as Settings → Services
  * and sign-in providers shows it. Only administrators read or see that step.
  */
-interface Standing { machines: number; cambium: string | null; google: boolean; read: boolean; administrator: boolean }
+interface Standing { machines: number; cambium: string | null; /** Whether `/apps` answered: Connect Cambium is offered only then. */ apps: boolean; google: boolean; read: boolean; administrator: boolean }
 
 async function readStanding(): Promise<Standing> {
   const people = await api.people();
@@ -32,7 +32,7 @@ async function readStanding(): Promise<Standing> {
     && (administrator || machine.named_by === people.people[0]?.id)).length : 0;
   const cambium = apps?.apps.find((app) => app.id === 'cambium')?.state ?? null;
   const google = providers?.providers.some((provider) => provider.provider === 'google' && provider.enabled) ?? false;
-  return { machines, cambium, google, read: network !== null && apps !== null, administrator };
+  return { machines, cambium, apps: apps !== null, google, read: network !== null, administrator };
 }
 
 /** "Not this one" is kept for the person on this browser, so Getting started can finish; the key names the person. */
@@ -49,7 +49,7 @@ function keepDeclined(person: string): boolean {
   catch { return false; }
 }
 
-/** The question about this computer: a name, and Yes; or Not this one, which leaves agents to other computers. */
+/** The question about the computer Lys runs on, named by its own name: a name, and Yes; or Not this one, which leaves agents to other computers. */
 function ThisComputer({ person, done, decline }: { person: string; done: () => void; decline: () => void }) {
   const [busy, setBusy] = useState(false);
   const [invalid, setInvalid] = useState('');
@@ -58,7 +58,7 @@ function ThisComputer({ person, done, decline }: { person: string; done: () => v
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const name = String(new FormData(event.currentTarget).get('name') ?? '').trim();
-    if (!validComputerName(name)) { setInvalid('Give this computer a name, for example "My MacBook".'); return; }
+    if (!validComputerName(name)) { setInvalid('Give that computer a name, for example "My MacBook".'); return; }
     setBusy(true); setInvalid(''); setFailure(null);
     try {
       // Your own agents may run here: those you have now are named, and each one you add later is allowed where you run it.
@@ -68,9 +68,9 @@ function ThisComputer({ person, done, decline }: { person: string; done: () => v
     } catch (error) { setFailure(error); }
     finally { setBusy(false); }
   };
-  return <form onSubmit={(event) => void submit(event)} aria-label="Run agents on this computer">
-    <p>Lys is running on this computer. Should your agents run here too? Only say yes if this is a computer you want agents to work on.</p>
-    <label className="field">This computer’s name<input key={host} name="name" defaultValue={host} placeholder="For example, My MacBook" autoComplete="off" disabled={busy} /></label>
+  return <form onSubmit={(event) => void submit(event)} aria-label="Run agents on the Lys computer">
+    <p>Lys runs on {host || 'the computer it was installed on'}. Should your agents run there too? Only say yes if that is a computer you want agents to work on.</p>
+    <label className="field">That computer’s name<input key={host} name="name" defaultValue={host} placeholder="For example, My MacBook" autoComplete="off" disabled={busy} /></label>
     <div className="chain">
       <Act symbol="add" name="Yes, run agents here" word={busy ? 'Adding…' : 'Yes, run agents here'} tone="primary" type="submit" disabled={busy} />
       <Act symbol="close" name="Not this one" word="Not this one" disabled={busy} onClick={decline} />
@@ -91,11 +91,13 @@ export function GettingStarted({ person, agents, standing, reread }: { person: s
     { key: 'computer', done: standing.machines > 0 || (standing.administrator && declined),
       title: standing.administrator ? 'Choose where agents run' : 'Add your own computer',
       body: standing.administrator ? <ThisComputer person={person} done={reread} decline={decline} />
-        : <p>Open <a href="#/network">Network</a>, choose Another computer, then download its installer and open it on your computer.</p> },
+        : <p>Open <a href="#/network">Computers</a>, choose Another computer, then download its installer and open it on your computer.</p> },
     ...(standing.administrator ? [{ key: 'google', done: standing.google, optional: true, title: 'Let people sign in with Google',
       body: <p>So nobody needs a Lys password: add Google under <a href="#/connections">Settings → services and sign-in providers</a>.</p> }] : []),
-    { key: 'cambium', done: standing.cambium === 'approved', title: 'Connect Cambium',
-      body: <p>{standing.cambium === 'pending' ? 'Cambium has asked to connect. Review what it asks for and approve it on ' : 'Connect your team’s chat to Lys on '}<a href="#/apps">Apps</a>.</p> },
+    // Offered only when Apps could be read; an administrator connects it there, and anyone else is told who does.
+    ...(standing.apps ? [{ key: 'cambium', done: standing.cambium === 'approved', title: 'Connect Cambium',
+      body: !standing.administrator ? <p>Cambium is not connected to Lys yet. An administrator connects it on Apps; once it is, this step is done.</p>
+        : <p>{standing.cambium === 'pending' ? 'Cambium has asked to connect. Review what it asks for and approve it on ' : 'Connect your team’s chat to Lys on '}<a href="#/apps">Apps</a>.</p> }] : []),
     { key: 'agent', done: agents > 0, title: 'Add your first agent',
       body: <p>Choose Claude Code or Codex, a folder and a computer: <a href="#/agents/new">Add an agent</a>.</p> },
   ];
@@ -104,7 +106,7 @@ export function GettingStarted({ person, agents, standing, reread }: { person: s
   return <section className="you-panel getting-started" aria-label="Getting started">
     <div className="section-h"><span>Getting started</span><span className="dim">{steps.length - open.length} of {steps.length} done</span></div>
     {answered ? <p className={answered === 'kept' ? 'dim' : 'why-not'} role="status">
-      Agents won’t run on this computer. Add another computer under <a href="#/network">Network</a> when you’re ready.
+      Agents won’t run on the computer Lys runs on. Add another computer under <a href="#/network">Computers</a> when you’re ready.
       {answered === 'unkept' ? ' This browser would not keep the answer, so Lys will ask again next time.' : null}
     </p> : null}
     {open.some((step) => !step.optional) ? <ol>{open.map((step) => <li key={step.key}><b>{step.title}</b>{step.optional ? <span className="dim"> (optional)</span> : null}{step.body}</li>)}</ol> : null}

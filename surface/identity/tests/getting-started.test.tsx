@@ -13,7 +13,7 @@ import type { Machine, NameMachine } from '../src/features/network/contract';
 let root: Root | null = null;
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.body.innerHTML = ''; });
-const empty: Standing = { machines: 0, cambium: null, google: false, read: true, administrator: true };
+const empty: Standing = { machines: 0, cambium: null, apps: true, google: false, read: true, administrator: true };
 
 function service(): Record<string, Route> {
   const routes: Record<string, Route> = { ...SERVICE, '/network': ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' }) };
@@ -53,15 +53,16 @@ describe('Getting started on an empty install', () => {
     const panel = $('[aria-label="Getting started"]');
     expect([...panel?.querySelectorAll('li > b') ?? []].map((title) => title.textContent)).toEqual(['Choose where agents run', 'Let people sign in with Google', 'Connect Cambium', 'Add your first agent']);
     expect(panel?.textContent).toContain('0 of 4 done');
-    expect(($('[aria-label="Run agents on this computer"] [name="name"]') as HTMLInputElement | null)?.value).toBe('Ada’s MacBook Pro');
+    expect(($('[aria-label="Run agents on the Lys computer"] [name="name"]') as HTMLInputElement | null)?.value).toBe('Ada’s MacBook Pro');
     expect(posted).toEqual([]);
   });
 
   it('declines this computer with Not this one and sends nothing', async () => {
     const { posted } = await open(service());
     await notThisOne();
-    expect(document.body.textContent).toContain('Agents won’t run on this computer.');
-    expect($('[aria-label="Run agents on this computer"]')).toBeNull();
+    expect(document.body.textContent).toContain('Agents won’t run on the computer Lys runs on. Add another computer under Computers when you’re ready.');
+    expect($('[aria-label="Getting started"] [role="status"] a')?.getAttribute('href')).toBe('#/network');
+    expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
     expect(posted).toEqual([]);
   });
 
@@ -73,7 +74,7 @@ describe('Getting started on an empty install', () => {
     await reopen(service());
     expect(titles()).toEqual(['Let people sign in with Google', 'Connect Cambium', 'Add your first agent']);
     expect($('[aria-label="Getting started"]')?.textContent).toContain('1 of 4 done');
-    expect($('[aria-label="Run agents on this computer"]')).toBeNull();
+    expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
   });
 
   it('keeps one person’s answer to that person', async () => {
@@ -103,7 +104,7 @@ describe('Getting started on an empty install', () => {
   it('adds this computer for the person’s own agents with Yes, checks its runner and reads the list again', async () => {
     const reread = vi.fn();
     const { posted } = await open(service(), reread);
-    const form = $('[aria-label="Run agents on this computer"]');
+    const form = $('[aria-label="Run agents on the Lys computer"]');
     await act(async () => { form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     expect(posted).toHaveLength(2);
     expect(posted[0]).toEqual({ path: '/network/machines', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), name: 'Ada’s MacBook Pro', kind: 'Computer', runtime: 'lys-runner', slots: 0, may_run: [SCRIBE, COURIER, ARCHIVIST], may_run_roles: [], may_reach: [] } });
@@ -131,8 +132,11 @@ describe('Getting started on an empty install', () => {
     expect(titles()).toEqual(['Add your own computer', 'Connect Cambium', 'Add your first agent']);
     expect(document.body.textContent).toContain('Another computer, then download its installer');
     expect($('[aria-label="Getting started"] a')?.getAttribute('href')).toBe('#/network');
-    expect($('[aria-label="Run agents on this computer"]')).toBeNull();
-    expect(document.body.textContent).not.toContain('Lys is running on this computer');
+    expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
+    expect(document.body.textContent).not.toContain('Lys runs on');
+    expect($('[aria-label="Getting started"] a')?.textContent).toBe('Computers');
+    // A member cannot connect an app: the step says who does, with no link to a page they cannot use.
+    expect([...document.querySelectorAll('[aria-label="Getting started"] li')].find((li) => li.querySelector('b')?.textContent === 'Connect Cambium')?.textContent).toBe('Connect CambiumCambium is not connected to Lys yet. An administrator connects it on Apps; once it is, this step is done.');
     expect(document.body.textContent).not.toContain('Let people sign in with Google');
     expect(posted).toEqual([]);
   });
@@ -142,5 +146,28 @@ describe('Getting started on an empty install', () => {
       '/people': ok(OWN), '/apps': ok({ apps: [] }) });
     expect(await readStanding()).toEqual({ ...empty, administrator: false });
     expect(requests).not.toContain('/sign-in-providers');
+  });
+
+  it('names the computer Lys runs on by its name, never as this computer, which is the one the browser is on', async () => {
+    await open(service());
+    const form = $('[aria-label="Run agents on the Lys computer"]');
+    expect(form?.querySelector('p')?.textContent).toBe('Lys runs on Ada’s MacBook Pro. Should your agents run there too? Only say yes if that is a computer you want agents to work on.');
+    expect(form?.querySelector('label')?.textContent).toBe('That computer’s name');
+    expect(document.body.textContent).not.toContain('this computer');
+    await act(async () => { (form?.querySelector('[name="name"]') as HTMLInputElement).value = ''; form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+    expect(form?.querySelector('[role="alert"]')?.textContent).toBe('Give that computer a name, for example "My MacBook".');
+    // A host that names none is still never "this computer".
+    await reopen({ ...service(), '/network': ok({ machines: [], reports_served: true }) });
+    expect($('[aria-label="Run agents on the Lys computer"] p')?.textContent).toContain('Lys runs on the computer it was installed on. Should your agents run there too?');
+  });
+
+  it('offers Connect Cambium only when Apps can be read, and still lists the other steps when it cannot', async () => {
+    serve({ ...service(), '/apps': refused(403, 'NotAdmitted', 'Only the administrator.') }, []);
+    const standing = await readStanding();
+    expect([standing.apps, standing.read]).toEqual([false, true]);
+    await reopen(service(), standing);
+    expect(titles()).toEqual(['Choose where agents run', 'Let people sign in with Google', 'Add your first agent']);
+    expect($('[aria-label="Getting started"] a[href="#/apps"]')).toBeNull();
+    expect($('[aria-label="Getting started"]')?.textContent).toContain('0 of 3 done');
   });
 });

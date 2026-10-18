@@ -176,6 +176,10 @@ describe('Widgets on the canvas', () => {
     expect($$('[data-widget] tr[data-figure]').map((row) => row.textContent)).toEqual(['Dollars todayNot reported']);
     expect(Array.from(card.querySelectorAll('[data-context-percent], [data-token-component], [data-provider-window] > b')).map((row) => row.textContent)).toEqual(['43%', 'New input120,000 tokens reported', 'Output3,210 tokens reported', 'Cache written10,000 tokens reported', 'Cache read300,000 tokens reported', '28%']);
     expect($$('[data-widget] tr[data-account]').map((row) => row.querySelector('td')?.textContent)).toEqual(['org-main, 7-day']);
+    // The level is the dashboard's own bar, a meter that says its figure in words, never a span sized by an inline width.
+    expect(card.querySelector('tr[data-account] meter')?.getAttribute('aria-label')).toBe('61% used');
+    expect(card.querySelector('tr[data-account] meter')?.getAttribute('value')).toBe('0.61');
+    expect(card.querySelector('tr[data-account] [style]')).toBeNull();
     await turn();
     expect(card.dataset.view).toBe('settings');
     expect([card.querySelector('[data-act="whole-page"]')?.textContent, card.querySelector('[data-act="whole-page"]')?.getAttribute('href')]).toEqual(['Open its model calls', '#/canvas?view=proxy&agent=' + SCRIBE]);

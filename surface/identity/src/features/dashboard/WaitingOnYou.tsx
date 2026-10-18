@@ -57,7 +57,7 @@ export function WaitingOnYou({ requests, drafts, waiting, me }: { requests: Acce
       {requests instanceof Refused ? <tr data-waiting="requests"><td colSpan={2}><Unread part={requests} words="Requests could not be read" /></td></tr> : null}
       {mine.map((entry) => <tr key={entry.id} data-request={entry.id}>
         <td>{asks(entry)}{entry.why ? <div className="note">{entry.why}</div> : null}</td>
-        <td className="you-act"><a className="btn" href="#/requests">Decide</a></td>
+        <td className="you-act"><a className="btn" href={'#/requests/' + encodeURIComponent(entry.id)}>Decide</a></td>
       </tr>)}
       {drafts instanceof Refused ? <tr data-waiting="drafts"><td colSpan={2}><Unread part={drafts} words="Drafts could not be read" /></td></tr>
         : drafts.map((draft) => <tr key={draft.id} data-draft="waiting">

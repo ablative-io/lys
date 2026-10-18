@@ -6,7 +6,7 @@
  * a plan account is said to be paid by its plan, in words on the face, never in a tooltip.
  */
 import { day } from '../file/time';
-import { money } from '../usage/budgetWords';
+import { money } from '../../shell/count';
 import type { Used } from '../usage/contract';
 import { refusedPart } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';

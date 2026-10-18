@@ -6,7 +6,7 @@
  */
 import { count } from '../../shell/count';
 import { clockMs, duration } from '../file/time';
-import { money } from './budgetWords';
+import { money } from '../../shell/count';
 import { tracking } from './contract';
 import type { AccountWindows, Length, Measure, Used, UsageView } from './contract';
 

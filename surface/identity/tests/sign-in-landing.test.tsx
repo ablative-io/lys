@@ -28,7 +28,7 @@ it('lands a Google sign-in begun on the sign-in page on Home, not on You', async
   await mount('#/me', signedIn);
   expect(location.hash).toBe('#/');
   expect($('.you-page'), 'You is not what is drawn').toBeNull();
-  expect($('h1')?.textContent).toBe('Dashboard');
+  expect($('h1')?.textContent).toBe('Home');
 });
 
 it('lands a Google sign-in begun on a page back on that page', async () => {

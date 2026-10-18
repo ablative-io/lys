@@ -1,4 +1,5 @@
 /** A budget's limits as a person says them: "US$500.00 a week", "50% of the weekly plan", "US$212.00 of US$500.00 this week". */
+import { money } from '../../shell/count';
 import type { BudgetsView, Length, Limit, Measure, Used } from './contract';
 
 export const UNITS: Record<Measure, string> = { dollars: 'US dollars', plan_percent: '% of its plan', tokens: 'tokens', running_ms: 'minutes running', context_percent: '% of its context' };
@@ -10,15 +11,8 @@ export const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', d
 const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', week: 'weekly', month: 'monthly' };
 
 /**
- * Money as every page writes it: US dollars, two decimals, Australian English grouping, never the browser's locale:
- * US$1,234.50. The figure is the harness's own `total_cost_usd`, so it is always US dollars.
- */
-export const money = (value: number): string =>
-  'US$' + value.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-/**
  * An amount as a person reads it, in Australian English whatever the browser's locale: US$500.00, 50%, 2,000,000 tokens,
- * 90 minutes running. Every figure of a budget on every page goes through here, money through `money`.
+ * 90 minutes running. Every figure of a budget on every page goes through here, money through the shell's one `money` (the figure is the harness's own `total_cost_usd`, so always US dollars).
  */
 export function amount(unit: Measure, value: number): string {
   if (unit === 'dollars') return money(value);

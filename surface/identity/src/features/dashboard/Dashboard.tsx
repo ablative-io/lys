@@ -35,6 +35,7 @@ import { Exceptions } from './Exceptions';
 import { WaitingOnYou } from './WaitingOnYou';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
 import { Alarms } from './Alarms';
 import { Unread } from './Unread';
 import { Spend } from './Spend';
@@ -155,7 +156,7 @@ export function Dashboard() {
     return <SignIn />;
   }
   return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
-    <div className="head"><div><h1>Dashboard</h1></div>{read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
+    <PageHeader title="Home" actions={read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null} />
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
       : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null}
         watch={(row, session) => { beside.current = new Set(liveOf(row).map((each) => each.session)); setWatched({ agent: row.agent.id, name: row.agent.display_name, session }); }} />} />

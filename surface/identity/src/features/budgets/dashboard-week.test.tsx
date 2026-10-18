@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { DashboardAgent } from '../dashboard/contract';
 import { Spend, weekSpend, weekTotal } from '../dashboard/Spend';
-import { money } from '../usage/budgetWords';
+import { money } from '../../shell/count';
 import type { AccountWindows, Used } from '../usage/contract';
 
 const monday = new Date(2026, 9, 12, 0, 0).getTime();

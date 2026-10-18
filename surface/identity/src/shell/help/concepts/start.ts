@@ -47,13 +47,13 @@ export const START: Seed[] = [
     title: 'Add this computer',
     summary: 'Agents run on computers Lys knows about; the first is usually the one Lys is on.',
     body: [
-      'On a new Lys the dashboard asks "Run agents on this computer?" Say yes only if this is a computer you want agents to work on; "Not this one" leaves agents to other computers. Lys keeps that answer for you on this browser, so the step counts as answered and is not asked again.',
+      'On a new Lys, Home asks whether your agents should run on the computer Lys runs on, by its name. Say yes only if that is a computer you want agents to work on; "Not this one" leaves agents to other computers. Lys keeps that answer for you on this browser, so the step counts as answered and is not asked again.',
       'Saying yes records the computer with the name you give it, and lets your own agents start there. Lys starts agents on it through its own runner.',
       'Another computer is added under Computers: give it a name, then get a connection code and run the command shown on that computer. The code works once and is not shown again.',
     ],
     steps: [
       {
-        text: 'On the dashboard, answer "Run agents on this computer?" with its name and "Yes, run agents here".',
+        text: 'On Home, answer whether agents run on the computer Lys runs on with its name and "Yes, run agents here".',
         href: '#/dashboard',
         link: 'Open the dashboard'
       },

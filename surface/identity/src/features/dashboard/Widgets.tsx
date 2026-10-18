@@ -26,10 +26,11 @@ function Unreadable({ what, refused }: { what: string; refused: Refused }) {
 /**
  * How near a limit is, as the HTML meter: the accent below where its warning begins, the warn colour from there, red at
  * the limit. A meter puts a value equal to `high` in its middle band, so `high` sits just under 1 and the limit itself
- * is red. `near` is the share of the limit used, 1 being reached; `warn` where the warning begins.
+ * is red. `near` is the share of the limit used, 1 being reached; `warn` where the warning begins. `says` is the bar's
+ * own words where it is a level rather than a limit (the canvas's context and plan levels).
  */
-export function LimitBar({ near, warn }: { near: number; warn: number }) {
-  const said = Math.round(near * 100) + '% of the nearest limit' + (near >= 1 ? ', reached' : near >= warn ? ', near it' : '');
+export function LimitBar({ near, warn, says }: { near: number; warn: number; says?: string }) {
+  const said = says ?? Math.round(near * 100) + '% of the nearest limit' + (near >= 1 ? ', reached' : near >= warn ? ', near it' : '');
   return <meter className="dash-meter" min={0} max={1} low={warn} high={0.999999} optimum={0} value={Math.max(0, Math.min(1, near))} aria-label={said} />;
 }
 
@@ -46,7 +47,7 @@ export function requestsPart({ requests, me }: { requests: AccessRequest[] | Ref
       {waiting.map((entry) => <tr key={entry.id} data-request={entry.id}>
         <td>{entry.asked_by_name ?? 'Name unavailable'}</td>
         <td className="sec">{entry.relation}: {entry.actions.join(', ')}<div className="note">{entry.why}</div></td>
-        <td className="you-act">{mine(entry) ? <a className="btn" href="#/requests">Decide</a> : <span className="dim">{entry.approvers.map((each) => each.display_name).join(', ') || 'No one can decide'}</span>}</td>
+        <td className="you-act">{mine(entry) ? <a className="btn" href={'#/requests/' + encodeURIComponent(entry.id)}>Decide</a> : <span className="dim">{entry.approvers.map((each) => each.display_name).join(', ') || 'No one can decide'}</span>}</td>
       </tr>)}
       {waiting.length ? null : <tr className="empty"><td className="dim">No request is waiting.</td></tr>}
     </tbody></table>

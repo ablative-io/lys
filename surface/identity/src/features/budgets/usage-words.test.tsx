@@ -4,7 +4,9 @@
  * domain 06 the test runner includes.
  */
 import { describe, expect, it, vi } from 'vitest';
+import * as budgetWords from '../usage/budgetWords';
 import { amount, limitWords, usedWords } from '../usage/budgetWords';
+import { money } from '../../shell/count';
 import { standing } from '../usage/contract';
 import type { BudgetsView, Limit, Receipt } from '../usage/contract';
 
@@ -20,6 +22,9 @@ describe('Budget figures in words', () => {
     expect(limitWords({ unit: 'dollars', amount: 500, period: 'week' })).toBe('US$500.00 a week');
     expect(usedWords({ unit: 'dollars', amount: 500, period: 'week', act: 'tell' }, { unit: 'dollars', period: 'week', since_ms: 0, figure: 212, unavailable: null }))
       .toBe('US$212.00 of US$500.00 this week');
+    // One money formatter (CONSENSUS.md), the shell's: budget words have none of their own.
+    expect('money' in budgetWords).toBe(false);
+    expect(amount('dollars', 1234.5)).toBe(money(1234.5));
   });
 
   it('ignores a browser that writes numbers another way', () => {

@@ -47,10 +47,10 @@ it('Reconnect appears only after a signed-in session loses its feed and recovers
   const feed = new Promise<{ status: number; body: unknown }>((resolve) => { failFeed = resolve; });
   const next = '/changes?after=op-' + '0'.repeat(32);
   const page = await render('#/', { ...SERVICE, [next]: (() => feed) as unknown as Route });
-  expect(page.querySelector('h1')?.textContent).toBe('Dashboard');
+  expect(page.querySelector('h1')?.textContent).toBe('Home');
   expect(page.textContent).not.toContain('Reconnect');
   await act(async () => { failFeed({ status: 503, body: { refusal: 'ChangeFeedUnavailable', reason: 'feed unavailable' } }); });
-  const reconnect = [...page.querySelectorAll('button')].find((button) => button.textContent === 'Reconnect');
+  const reconnect = [...page.querySelectorAll<HTMLButtonElement>('.page-header .head-actions button')].find((button) => button.textContent === 'Reconnect');
   expect(reconnect).toBeDefined();
   serve(SERVICE);
   await act(async () => { reconnect?.click(); });

@@ -8,7 +8,7 @@ import { Refused } from '../../api';
 import type { Load } from '../../api';
 import type { Board } from '../dashboard/board';
 import { refusedPart } from '../dashboard/contract';
-import { budgetPart, draftsPart, goalsPart, requestsPart } from '../dashboard/Widgets';
+import { LimitBar, budgetPart, draftsPart, goalsPart, requestsPart } from '../dashboard/Widgets';
 import { tightest } from '../dashboard/words';
 import type { Part } from '../dashboard/Widgets';
 import { WidgetUsageReadings, supportsUsageReading, usageSummary } from '../budgets/WidgetUsageReadings';
@@ -35,9 +35,8 @@ export function windowWords(minutes: number): string {
   return minutes % 60 === 0 ? minutes / 60 + '-hour' : minutes + '-minute';
 }
 
-/** A level as the dashboard's bar (dashboard.css `.dash-bar`), so the canvas and the dashboard draw one bar; a tint never repaints it. */
-const bar = (percent: number, says: string) => <span className="dash-bar" role="img" aria-label={says}>
-  <span className={percent >= 100 ? 'full' : ''} style={{ width: Math.max(0, Math.min(100, percent)) + '%' }} /></span>;
+/** A level as the dashboard's own bar (`LimitBar`, a meter, three bands, its words its own), so the canvas and the dashboard draw one bar. */
+const bar = (percent: number, says: string) => <LimitBar near={percent / 100} warn={0.8} says={says} />;
 
 type Look = Widget['look'];
 const full = (percent: number): number => Math.max(0, Math.min(100, percent));

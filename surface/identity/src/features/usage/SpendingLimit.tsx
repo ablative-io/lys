@@ -9,7 +9,8 @@ import { Act } from '../../shell/Act';
 import { ACTS, standing } from './contract';
 import type { BudgetAct, BudgetBody, BudgetsView, Length, Limit, Receipt } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
-import { PERIOD_WORDS, money, usedAgainst } from './budgetWords';
+import { PERIOD_WORDS, usedAgainst } from './budgetWords';
+import { money } from '../../shell/count';
 import { plain } from './reasons';
 import { ErrorWords } from '../people/Words';
 

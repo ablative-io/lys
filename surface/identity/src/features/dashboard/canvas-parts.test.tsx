@@ -48,7 +48,7 @@ describe('The canvas widgets that read the Dashboard', () => {
     expect(requests.querySelector('.dash-count')?.textContent).toBe('1');
     const request = requests.querySelector('tr[data-request="r-1"]');
     expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe', 'reader: readto read the ward list', 'Decide']);
-    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests');
+    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests/r-1');
     expect(requests.textContent).not.toContain('already decided');
     const drafts = drawn(draftsPart({ drafts: [prepared] }));
     expect(drafts.querySelector('.dash-count')?.textContent).toBe('1');
