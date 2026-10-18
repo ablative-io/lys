@@ -152,6 +152,7 @@ describe('Drafts under Access', () => {
       '/drafts?state=waiting&after=page-2': ok({ drafts: [draft({ id: OTHER, note: 'The second page', created_at: 1790000300 })], total: 2, next: null }),
     });
     expect($$('tr[data-draft]').map((tr) => tr.dataset.draft)).toEqual([DRAFT, OTHER]);
-    expect(requests.filter((path) => path.startsWith('/drafts'))).toEqual(['/drafts?state=waiting', '/drafts?state=waiting&after=page-2']);
+    // The first page is read twice: by the page, and once by the rail's own check of Drafts (domain 03's ask, applied by 01).
+    expect(requests.filter((path) => path.startsWith('/drafts'))).toEqual(['/drafts?state=waiting', '/drafts?state=waiting', '/drafts?state=waiting&after=page-2']);
   });
 });

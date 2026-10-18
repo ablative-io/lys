@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { api, request, useLoad } from '../api';
 import { readTogether } from '../reads';
+import { Act } from './Act';
 import { RAIL } from './railItems';
 import { useShell } from './ShellContext';
 import { useNavigationVerdict } from './NavigationAccess';
@@ -38,17 +40,35 @@ export function Rail() {
   const waiting = useWaiting();
   const { pathname } = useLocation();
   const on = railView(pathname);
+  // On a phone the rail is a bar with a Menu button; the menu opens the same rail over the page.
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => setDrawer(false), [pathname]);
+  useEffect(() => {
+    if (!drawer) return undefined;
+    const shut = (event: KeyboardEvent) => { if (event.key === 'Escape') setDrawer(false); };
+    document.addEventListener('keydown', shut);
+    return () => document.removeEventListener('keydown', shut);
+  }, [drawer]);
+  const count = waiting && ('problem' in waiting ? true : waiting.count > 0)
+    ? <span className="cnt" title={'problem' in waiting ? 'What waits on you could not be read: ' + waiting.problem : waiting.words}>{'problem' in waiting ? '?' : waiting.count}</span>
+    : null;
   const press = (id: string | undefined, dock: 'help' | undefined) => {
+    setDrawer(false);
     if (dock) return shell.toggleDock(dock);
     if (id === 'palBtn') return shell.openPalette();
     if (id === 'railBtn') return shell.toggleLabels();
     return undefined;
   };
   return (
-    <nav className={'rail' + (shell.labels ? ' open' : '')} id="rail" aria-label="Main">
+    <nav className={'rail' + (shell.labels || drawer ? ' open' : '') + (drawer ? ' drawer' : '')} id="rail" aria-label="Main">
       <div className="mark">
         <span className="seal">L</span>
         <span className="lbl">Lys</span>
+      </div>
+      <div className="menu">
+        {drawer ? null : count}
+        <Act className="quiet menu-btn" symbol={drawer ? 'close' : 'menu'} name={drawer ? 'Close the menu' : 'Open the menu'} word={drawer ? 'Close' : 'Menu'}
+          aria-expanded={drawer} onClick={() => setDrawer(!drawer)} />
       </div>
       {RAIL.map((item, index) => {
         if (item.t === 'sep') return <div className="sep" key={index} />;
@@ -59,7 +79,7 @@ export function Rail() {
           <>
             <svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: item.svg }} />
             <span className="lbl">{item.label}</span>
-            {item.nav === 'waiting' && waiting && ('problem' in waiting ? true : waiting.count > 0) ? <span className="cnt" title={'problem' in waiting ? 'What waits on you could not be read: ' + waiting.problem : waiting.words}>{'problem' in waiting ? '?' : waiting.count}</span> : null}
+            {item.nav === 'waiting' ? count : null}
             {item.kbd ? <span className="kbd lbl">{forThisComputer(item.kbd)}</span> : null}
           </>
         );

@@ -1,7 +1,9 @@
 /* Taken verbatim from docs/design/identity/mockup/index.v5.html; split only. */
-.shell { display: flex; height: 100vh; }
+.shell { display: flex; height: 100vh; height: 100dvh; }
 .shell.dock-right { flex-direction: row-reverse; }
-.rail { width: var(--rail); flex: none; background: var(--surface-base); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; transition: width .32s var(--spring); overflow: hidden; }
+.rail { width: var(--rail); flex: none; background: var(--surface-base); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 12px 8px; gap: 2px; transition: width .32s var(--spring); overflow-x: hidden; overflow-y: auto; }
+/* A short window scrolls the rail; it never squeezes its rows. */
+.rail > * { flex-shrink: 0; }
 .dock-right .rail { border-right: 0; border-left: 1px solid var(--border-subtle); }
 .rail.open { width: var(--rail-open); }
 .mark { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 7px; margin-bottom: 10px; font-weight: 600; font-size: 12px; white-space: nowrap; }
@@ -22,3 +24,21 @@
    because a failure is not a refusal and must not look like one. */
 .rail a[data-shut="refused"] { color: var(--muted-dot); }
 .rail a[data-shut="unchecked"]::after { content: ""; position: absolute; left: 21px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
+/* The Menu act, and the count of what waits beside it, exist for phones only. */
+.rail .menu { display: none; }
+@media (max-width: 600px) {
+  /* A phone: the rail is a bar across the top with the mark and Menu; Menu opens the same rail, with its words, over the page. */
+  .shell, .shell.dock-right { flex-direction: column; }
+  .rail, .rail.open { width: 100%; height: 52px; flex-direction: row; align-items: center; justify-content: space-between; padding: 0 8px; border: 0; border-bottom: 1px solid var(--border-subtle); transition: none; }
+  .rail:not(.drawer) > :not(.mark):not(.menu) { display: none; }
+  .rail .mark { margin: 0; }
+  .rail .menu { display: flex; align-items: center; gap: 8px; }
+  .rail .menu .act { min-height: 44px; }
+  .rail .menu .cnt { margin: 0; }
+  .rail.drawer { position: fixed; inset: 0; height: 100dvh; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 12px 8px; overflow-y: auto; z-index: 35; }
+  .rail.drawer .mark { margin-bottom: 4px; }
+  /* The drawer always shows its words, and a phone has no keys to press: no Menu labels, no key chips. */
+  .rail.drawer #railBtn, .rail.drawer .kbd { display: none; }
+}
+/* A finger, not a pointer: every rail entry is a 44 px target. */
+@media (pointer: coarse) { .rail a, .rail button.rb { height: 44px; } }

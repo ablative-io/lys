@@ -6,7 +6,7 @@ import { Settings } from '../src/features/settings/Settings';
 import { Shell } from '../src/shell/Shell';
 import { ShellProvider } from '../src/shell/ShellContext';
 import { NavigationProvider } from '../src/shell/NavigationAccess';
-import { SERVICE } from './fixtures';
+import { SERVICE, ok } from './fixtures';
 import { $, $$, click, mount, press, serve, settle, unmountAll } from './harness';
 
 // The rail and the dock side, as the mock-up keeps them (index.v5.html:39, 41, 42,
@@ -67,6 +67,38 @@ describe('rail and dock side (conformance 9.1)', () => {
     unmountAll();
     await mount('#/people');
     expect(railOpen()).toBe(true);
+  });
+
+  it('Menu opens the whole rail as a drawer, and choosing an entry, Escape or Menu again closes it', async () => {
+    await mount('#/people');
+    const menu = () => $('#rail .menu-btn');
+    const drawer = () => $('#rail')?.classList.contains('drawer');
+    expect(menu()?.getAttribute('aria-expanded')).toBe('false');
+    expect(menu()?.textContent).toBe('Menu');
+    expect(menu()?.getAttribute('aria-label')).toBe('Open the menu');
+    await click(menu());
+    expect(drawer()).toBe(true);
+    expect(railOpen()).toBe(true);
+    expect(menu()?.textContent).toBe('Close');
+    expect(menu()?.getAttribute('aria-label')).toBe('Close the menu');
+    await click($('#rail a[data-nav="network"]'));
+    expect(location.hash).toBe('#/network');
+    expect(drawer()).toBe(false);
+    await click(menu());
+    await press('Escape', {}, document.body);
+    expect(drawer()).toBe(false);
+    await click(menu());
+    await click(menu());
+    expect(drawer()).toBe(false);
+    // The drawer is not the labels preference: opening it stores nothing.
+    expect(prefKeys()).toEqual([]);
+  });
+
+  it('Menu carries the count of what waits on the person while the drawer is shut', async () => {
+    await mount('#/people', { ...SERVICE, '/requests': ok({ requests: [{ state: 'waiting' }, { state: 'approved' }] }), '/reviews': ok({ scope: 'personal', due: [{}], unanswered: [], revision: 0, judged_at: 1 }) });
+    expect($('#rail .menu .cnt')?.textContent).toBe('2');
+    expect($('#rail .menu .cnt')?.title).toBe('1 request waiting, 1 grant to review');
+    expect($('#rail a[data-nav="waiting"] .cnt')?.textContent).toBe('2');
   });
 
   it('palette act and backslash switch the dock side', async () => {

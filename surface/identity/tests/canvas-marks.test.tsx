@@ -322,14 +322,15 @@ describe('Addresses on the canvas', () => {
 });
 
 describe('The command palette', () => {
-  it('lists each agent running now first, and choosing one goes to its terminal on the canvas', async () => {
+  it('lists each agent running now once its name is typed, and choosing one goes to its terminal on the canvas', async () => {
     await mount('#/people', routes);
     await press('k', { metaKey: true }, document.body);
-    const rows = $$('#palList > *');
-    expect(rows[0].textContent).toBe('Running now');
-    expect(rows[1].textContent).toContain('Scribe: terminal');
-    expect(rows[1].textContent).toContain('on Test runner');
-    expect(rows[1].getAttribute('data-to')).toBe('#/canvas/' + SCRIBE);
+    // Nothing typed: what can be done and the rail's pages; terminals are a builder's, so they wait for a name (01 item 6).
+    expect($$('#palList .grp').map((group) => group.textContent)).not.toContain('Running now');
+    await type($('#palIn'), 'scribe');
+    const running = $$('#palList .it').find((row) => row.textContent?.includes('Scribe: terminal'));
+    expect(running?.textContent).toContain('on Test runner');
+    expect(running?.getAttribute('data-to')).toBe('#/canvas/' + SCRIBE);
     await type($('#palIn'), 'scribe: term');
     expect($('#palList .it')?.textContent).toContain('Scribe: terminal');
     expect($$('#palList .it')).toHaveLength(1);

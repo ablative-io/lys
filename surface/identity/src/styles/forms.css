@@ -96,3 +96,9 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 .mcp-servers .mcp-paste textarea { width: 100%; font-family: "JetBrains Mono", ui-monospace, monospace; }
 .mcp-servers .mcp-paste .act { justify-self: start; }
 .mcp-servers .mcp-paste-read { margin: 0; padding-left: 18px; overflow-wrap: anywhere; }
+/* On a phone or under a finger every field's text is 16 px, so the browser never zooms the page when a field is touched,
+   whatever size a screen's own rule gives it; a tick is a 22 px target. */
+@media (max-width: 600px), (pointer: coarse) {
+  .screen input:not([type=checkbox]):not([type=radio]), .screen select, .screen textarea, .palette input { font-size: 16px; }
+  input[type=checkbox] { width: 22px; height: 22px; }
+}
