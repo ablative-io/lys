@@ -34,8 +34,9 @@ export function useShellKeys(): void {
   live.current = { shell, navigate, pathname, mayOpen };
 
   useEffect(() => {
+    // g waits for its letter until the next key, a pointer press or the window losing focus: an event, never a clock.
     let pendingG = false;
-    let pendingTimer: ReturnType<typeof setTimeout> | undefined;
+    const forgetG = () => { pendingG = false; };
 
     // Help first, in the capture phase, so the page help owns Escape, ? and ⌘/ while it shows.
     const help = (e: KeyboardEvent) => {
@@ -76,8 +77,6 @@ export function useShellKeys(): void {
       }
       if (e.key === 'g') {
         pendingG = true;
-        clearTimeout(pendingTimer);
-        pendingTimer = setTimeout(() => (pendingG = false), 900);
         return;
       }
       if (e.key === '[') return s.toggleLabels();
@@ -105,10 +104,13 @@ export function useShellKeys(): void {
 
     document.addEventListener('keydown', help, true);
     document.addEventListener('keydown', keys);
+    document.addEventListener('pointerdown', forgetG);
+    window.addEventListener('blur', forgetG);
     return () => {
-      clearTimeout(pendingTimer);
       document.removeEventListener('keydown', help, true);
       document.removeEventListener('keydown', keys);
+      document.removeEventListener('pointerdown', forgetG);
+      window.removeEventListener('blur', forgetG);
     };
   }, []);
 }

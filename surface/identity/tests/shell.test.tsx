@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { HashRouter } from 'react-router';
+import { describe, expect, it, vi } from 'vitest';
+import { Shell } from '../src/shell/Shell';
+import { ShellProvider, useShell } from '../src/shell/ShellContext';
+import { NavigationProvider } from '../src/shell/NavigationAccess';
+import { SERVICE } from './fixtures';
 import { RAIL } from '../src/shell/railItems';
-import { $, $$, click, mount, press, type, unreachable } from './harness';
+import { $, $$, click, mount, press, serve, type, unreachable } from './harness';
 
 describe('shell (conformance 9.1)', () => {
   it('draws the rail item for item, each screen a deep link', async () => {
@@ -84,5 +91,44 @@ describe('shell (conformance 9.1)', () => {
   it('keeps every control reachable by keyboard on Configuration (9.3)', async () => {
     await mount('#/settings');
     expect(unreachable()).toEqual([]);
+  });
+});
+
+describe('no fixed waits in the shell (CONSENSUS.md)', () => {
+  it('keeps a toast until it is dismissed or replaced, on no clock', async () => {
+    serve(SERVICE);
+    location.hash = '#/me';
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    let said: ((text: string) => void) | null = null;
+    function Says() {
+      said = useShell().toast;
+      return null;
+    }
+    await act(async () => {
+      root.render(<HashRouter><ShellProvider><NavigationProvider><Shell><Says /></Shell></NavigationProvider></ShellProvider></HashRouter>);
+    });
+    const clock = vi.spyOn(globalThis, 'setTimeout');
+    act(() => said?.('Given.'));
+    expect(clock).not.toHaveBeenCalled();
+    clock.mockRestore();
+    expect($('#toast.show')?.textContent).toBe('Given.');
+    act(() => said?.('Taken back.'));
+    expect($('#toast.show')?.textContent).toBe('Taken back.');
+    await click($('#toast [aria-label="Dismiss this message"]'));
+    expect($('#toast.show')).toBeNull();
+    act(() => root.unmount());
+  });
+
+  it('lets g wait for its letter until a pointer press, not a clock', async () => {
+    await mount('#/people');
+    await press('g', {}, document.body);
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    await press('u', {}, document.body);
+    expect(location.hash).toBe('#/people');
+    await press('g', {}, document.body);
+    await press('u', {}, document.body);
+    expect(location.hash).toBe('#/me');
   });
 });

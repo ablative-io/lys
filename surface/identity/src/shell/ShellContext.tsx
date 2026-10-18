@@ -35,6 +35,8 @@ export interface Shell {
   toastText: string;
   toastShown: boolean;
   toast: (text: string) => void;
+  /** Hide the toast: it stays until the person dismisses it or another replaces it, never on a clock. */
+  dismissToast: () => void;
   rows: string[];
   cursor: number;
   setRows: (rows: string[]) => void;
@@ -105,7 +107,6 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const [signedOutScreens, setSignedOutScreens] = useState(0);
   const opener = useRef<Element | null>(null);
   const explainOpener = useRef<Element | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const state = useRef({ paletteOpen, explaining });
   state.current = { paletteOpen, explaining };
 
@@ -165,12 +166,12 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     opener.current = document.activeElement;
     setPaletteOpen(true);
   }, []);
+  // No fixed waits (CONSENSUS.md): a toast stays until dismissed or replaced.
   const toast = useCallback((text: string) => {
     setToastText(text);
     setToastShown(true);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToastShown(false), 2600);
   }, []);
+  const dismissToast = useCallback(() => setToastShown(false), []);
 
   const markSignedOut = useCallback(() => {
     setSignedOutScreens((count) => count + 1);
@@ -183,12 +184,12 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide,
       dockMode, toggleDock, openDock, closeDock, helpSel, showHelp,
       paletteOpen, openPalette, explaining, explainOn, explainOff, closeAll,
-      toastText, toastShown, toast, rows, cursor, setRows, setCursor, filterKind, setFilterKind,
+      toastText, toastShown, toast, dismissToast, rows, cursor, setRows, setCursor, filterKind, setFilterKind,
       signedOut, markSignedOut,
     }),
     [labels, toggleLabels, setLabels, dockRight, setDockSide, toggleDockSide, dockMode, toggleDock, openDock,
       closeDock, helpSel, showHelp, paletteOpen, openPalette, explaining, explainOn, explainOff,
-      closeAll, toastText, toastShown, toast, rows, cursor, filterKind, signedOut, markSignedOut],
+      closeAll, toastText, toastShown, toast, dismissToast, rows, cursor, filterKind, signedOut, markSignedOut],
   );
   return <ShellContext.Provider value={value}>{children}</ShellContext.Provider>;
 }

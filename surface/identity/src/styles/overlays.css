@@ -13,6 +13,9 @@
 .palette .list { max-height: 50vh; overflow: auto; padding-bottom: 6px; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translate(-50%, 20px); opacity: 0; transition: all .3s var(--spring); background: var(--surface-card); border: 1px solid var(--border-default); border-radius: 999px; padding: 6px 14px; font-size: var(--text-sm); box-shadow: var(--shadow-lg); z-index: 40; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+/* A hidden toast cannot be reached or pressed; a shown one says its words and offers Dismiss beside them. */
+.toast:not(.show) { visibility: hidden; pointer-events: none; }
+.toast { display: flex; align-items: center; gap: 6px; }
 .open-q { color: var(--accent); font: var(--text-2xs) "JetBrains Mono", ui-monospace, monospace; letter-spacing: .08em; border: 1px dashed var(--accent-strong); border-radius: 3px; padding: 0 5px; }
 .set-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: var(--text-md); }
 .set-nav a.on { background: var(--surface-hover); color: var(--text-primary); }

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Act } from './Act';
 import { Dock } from './Dock';
 import { Palette } from './Palette';
 import { Rail } from './Rail';
@@ -24,6 +25,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <Upgraded />
       <div className={'toast' + (shell.toastShown ? ' show' : '')} id="toast" role="status">
         {shell.toastText}
+        {shell.toastShown ? <Act symbol="close" name="Dismiss this message" className="small quiet" onClick={shell.dismissToast} /> : null}
       </div>
       {shell.explaining && !shell.signedOut ? <PageHelp /> : null}
     </>
