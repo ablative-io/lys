@@ -83,7 +83,7 @@ function recordNumbers(rows: Iterable<DashboardAgent>): ReadonlyMap<string, stri
 }
 
 function AgentName({ entry, number }: { entry: Entry; number: string | undefined }) {
-  return <>{entry.display_name}{number ? <span className="you-agent-context" title={entry.id}>Record {number}</span> : null}</>;
+  return <>{entry.display_name}{number ? <span className="you-agent-context">Record {number}</span> : null}</>;
 }
 
 /** Table rows cannot be wrapped in an element, so a keyed fragment stands in. */

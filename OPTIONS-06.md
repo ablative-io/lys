@@ -129,3 +129,17 @@ Second go. Checked against a browser that writes numbers the German way (a test 
 Recommendation: A. Before and after, drawn in headless Chrome from the real panels and the app's CSS with a Cherie fixture: `/Users/tom/Developer/.scratch/waffles/builders/surface-06-look/cherie.png` (now) and `cherie-after9.png` (with the ask applied). `#8A9199` on the page background `#121218` is about 5.9:1, above the 4.5:1 a note needs.
 
 Second go. Is a mock-up and an ask enough for a top-ten item? It is the only honest version: the fix is two lines in two shared files, and doing it in my folder would add the divergence the review counts as a defect. What the mock-up shows that I did not expect: with the headings readable, the count beside "Waiting on you" and "Needs a look" (a bare "2") now looks like a stray figure; it would read better as "2 things" or in a badge. That is mine to change, but only after 01 applies the heading, or it will be judged against the old style.
+
+## Item 10: on a phone, the page's foot is out of reach, wide cells are clipped, and explanations sit in tooltips
+
+The shell is `height: 100vh` under `body { overflow: hidden }` (`styles/rail.css:2`, `tokens.css:24`, shared). In my folders: `.you-scroll { overflow-x: hidden }` with `nowrap` action cells silently cuts off the column holding Stop; an alarm's "Acknowledged" names who only in a `title`, and a duplicate agent's "Record N" carries its identifier in a `title`; a touch screen shows neither.
+
+| Option | What Cherie sees on her phone | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. Below 640px of the dashboard's own width, every list row with an act puts the act on its own line under the words, wrapping, left-aligned; the agents table's card puts its acts on their own line too, so two sessions' Watch and Stop never push past the edge; `.you-scroll` scrolls rather than clips if anything still overflows; "Acknowledged 18 Oct 13:46" said in the cell; the identifier tooltip removed. 100dvh and 44px targets asked of 01 (shared). | Every button where her thumb can reach it, nothing cut off, nothing that needs a hover. | Clipping (06 #10); tooltip-only words (06 #10); identifiers shown (06 Words "Record A/…"). | The obvious law on the device most people check first. |
+| B. Let the panels scroll sideways. | Tables she has to drag sideways to find Stop. | Clipping only. | Less. |
+| C. Hide the act cells on phones and open each item to act. | Lists with no buttons. | Clipping, by removing the acts. | Fails "what is waiting on me, act on it". |
+
+Recommendation: A.
+
+Second go. Looked at in headless Chrome at a phone's width (`surface-06-look/cherie-phone.png`): each Decide and Open sits under its words, nothing reaches the edge, the week's figures keep their own column. What I would still change: the buttons are about 34px tall, short of the 44px CONSENSUS asks; the size belongs to the shared `.btn`, so it is asked rather than overridden here. Stacking every act doubles a row's height even where it would have fitted beside short words; a container query cannot see "fits", and a consistent place for the thumb is worth the height. The Limits and goals tab's add rows still explain three inputs only in tooltips (`Schedules.tsx:65-67`, `Variables.tsx:68`); I did not reach them and they are next.

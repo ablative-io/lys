@@ -100,7 +100,8 @@
 /* The agents table, moved here with its rows from You. */
 .you-panel { min-height: 0; display: flex; flex-direction: column; }
 .you-panel > .section-h { flex: none; margin: 0 0 8px; }
-.you-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+/* A list scrolls rather than clips: a cell that still does not fit is reached, never cut off silently. */
+.you-scroll { flex: 1; min-height: 0; overflow-y: auto; overflow-x: auto; }
 .you-tree { width: 100%; }
 .you-tree td { border-bottom: 0; padding: 0; }
 .you-tree tr[data-href] td { padding: 7px 10px; }
@@ -145,7 +146,13 @@
   .you-tree thead { display: none; }
   .you-tree tr[data-href] { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-bottom: 1px solid var(--border-subtle); }
   .you-tree tr[data-href] td { display: block; min-width: 0; max-width: none; white-space: normal; }
-  .you-tree tr[data-href] td.you-act { grid-column: 2; grid-row: 1; }
+  /* The row's acts take their own line under its name, so two sessions' Watch and Stop wrap and are never pushed past the edge. */
+  .you-tree tr[data-href] td.you-act { grid-column: 1 / -1; grid-row: auto; padding-top: 0; padding-left: 28px; text-align: left; white-space: normal; }
+  .you-tree .dash-acts { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; margin-right: 8px; }
+  /* Every list row with an act (Waiting on you, Needs a look, alarms): the words, then the act on a line of its own. */
+  .dash-table tr:has(> td.you-act) { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .dash-table tr:has(> td.you-act) > td { display: block; }
+  .dash-table tr:has(> td.you-act) > td.you-act { padding-top: 0; text-align: left; white-space: normal; }
   .you-tree tr[data-href] td:not(:first-child):not(.you-act) { grid-column: 1 / -1; padding-top: 0; padding-left: 28px; }
   .you-tree td.you-budget::before { content: "Budget: "; color: var(--text-muted); }
   .you-tree td.you-goals::before { content: "Goals: "; color: var(--text-muted); }

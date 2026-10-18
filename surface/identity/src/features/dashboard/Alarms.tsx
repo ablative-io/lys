@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { request, Refused } from '../../api';
 import { Act } from '../../shell/Act';
 import { SecurityEvents } from './SecurityEvents';
+import { clock } from '../file/time';
 import { ErrorWords } from '../people/Words';
 import { refusedPart, validAlarm } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
@@ -68,7 +69,7 @@ function SessionAlarms({ summary, agents }: { summary: AlarmSummary | PartRefuse
             <td>{agents.find((row) => row.agent.id === alarm.agent)?.agent.display_name ?? 'Agent name unavailable'}
               <div className="sec">{alarm.kind === 'seat_stalled' ? 'Stopped reporting in: it may be stuck' : 'Its model calls are not going through Lys, so its use is not counted'}</div>
               <div className="note">{alarm.detail}</div></td>
-            <td className="you-act">{alarm.cleared_at !== null ? 'Cleared' : alarm.acknowledged_by ? <span title={alarm.acknowledged_by}>Acknowledged</span>
+            <td className="you-act">{alarm.cleared_at !== null ? 'Cleared' : alarm.acknowledged_by ? <span>{alarm.acknowledged_at === null ? 'Acknowledged' : 'Acknowledged ' + clock(alarm.acknowledged_at)}</span>
               : <Act symbol="approve" name="Acknowledge" word="Acknowledge" disabled={busy !== null} onClick={() => void acknowledge(alarm)} />}</td>
           </tr>;
         })}{rows.length ? null : <tr className="empty"><td>No open alarms.</td></tr>}</tbody></table>}
