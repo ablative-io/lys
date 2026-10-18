@@ -1377,6 +1377,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/apps_connect_manifest.rs` | GET /apps/connect/manifest: a manifest read server-side for an administrator, or a named reason | DIRECTORY-102 |
 | `crates/lys-identity-server/src/apps_connect_manifest_tests.rs` | tests of the sibling module, red first | DIRECTORY-102 |
 | `surface/identity/src/features/dashboard/waiting.ts` | GET /waiting's lines, count and rail words; an entry carries the request or draft it decides | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard-touch.test.tsx` | tests that the dashboard's side panels draw with no title attribute | DIRECTORY-104 |
 | `surface/identity/src/features/dashboard/DashboardOptions.tsx` | the three dashboards A, B and C to decide between on the page, dev builds only | DIRECTORY-104 |
 | `surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts` | Cherie's fixture, so the page can be looked at signed out in a dev build | DIRECTORY-104 |
 | `surface/identity/src/features/dashboard/dashboard-options.css` | the option strip and the three layouts | DIRECTORY-104 |

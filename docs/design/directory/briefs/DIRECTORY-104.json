@@ -83,7 +83,9 @@
           "surface/identity/tests/help.test.tsx",
           "surface/identity/tests/shell-places.test.tsx",
           "surface/identity/tests/sign-in-landing.test.tsx",
-          "surface/identity/tests/signed-out-walk.test.tsx"
+          "surface/identity/tests/signed-out-walk.test.tsx",
+          "surface/identity/src/features/dashboard/waiting.ts",
+          "surface/identity/src/features/dashboard/dashboard-touch.test.tsx"
         ],
         "delete": []
       },

@@ -6386,6 +6386,7 @@
       "brief": "DIRECTORY-102"
     },
     {"path": "surface/identity/src/features/dashboard/waiting.ts", "note": "GET /waiting's lines, count and rail words; an entry carries the request or draft it decides", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard-touch.test.tsx", "note": "tests that the dashboard's side panels draw with no title attribute", "brief": "DIRECTORY-104"},
     {"path": "surface/identity/src/features/dashboard/DashboardOptions.tsx", "note": "the three dashboards A, B and C to decide between on the page, dev builds only", "brief": "DIRECTORY-104"},
     {"path": "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts", "note": "Cherie's fixture, so the page can be looked at signed out in a dev build", "brief": "DIRECTORY-104"},
     {"path": "surface/identity/src/features/dashboard/dashboard-options.css", "note": "the option strip and the three layouts", "brief": "DIRECTORY-104"},

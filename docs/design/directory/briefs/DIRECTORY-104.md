@@ -84,6 +84,8 @@ Behavioural. Merge origin/lane/surface-06 (f5f8539e) into main as one merge comm
 - modify: surface/identity/tests/shell-places.test.tsx
 - modify: surface/identity/tests/sign-in-landing.test.tsx
 - modify: surface/identity/tests/signed-out-walk.test.tsx
+- modify: surface/identity/src/features/dashboard/waiting.ts
+- modify: surface/identity/src/features/dashboard/dashboard-touch.test.tsx
 
 **Checklist:**
 - C771 — The dashboard decides in its rows from the one waiting read: Approve access and Decline request in a request's row, Approve and Decline in a draft's row, Open on an app action or a check due, a refused part on its own line, and the word Decide nowhere; the rail says Dashboard, the page has no heading of its own, the stop symbol stands alone, and the week's figure is said once with the person's own limit under it.
