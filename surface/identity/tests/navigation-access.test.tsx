@@ -10,15 +10,16 @@ const ANSWERS = {
   '/configuration': ok({}),
 };
 const NAVS = ['canvas', 'people', 'waiting', 'access', 'secrets', 'network', 'apps', 'settings'];
-// Each refused read: the rail entries it marks, and the Search rows it hides. Roles and the access map have no rail
-// entry of their own (CONSENSUS.md, 18 October 2026), so their refusals show only in Search and the keys.
+// Each refused read: the rail entries it marks, and the Search rows it hides. Jobs and the access map have no rail
+// entry of their own (CONSENSUS.md, 18 October 2026), so their refusals show only in Search and the keys. The rail's
+// Settings opens your own account, which nothing refuses, and Apps is decided by its own read (domain 05's ask).
 const DENIALS: [string, string[], string[]][] = [
   ['/runtime/live', ['canvas'], ['/canvas']], ['/roles', [], ['/roles']], ['/grants', ['access'], ['/access', '/graph']],
-  ['/secrets', ['secrets'], ['/secrets']], ['/network', ['network'], ['/network']], ['/configuration', ['settings', 'apps'], ['/settings', '/apps']],
+  ['/secrets', ['secrets'], ['/secrets']], ['/network', ['network'], ['/network']], ['/configuration', [], ['/settings']], ['/apps', ['apps'], ['/apps']],
 ];
 
 /** Search's name for each address a denial can hide: Search offers a page off the rail only once something is typed. */
-const NAMES: Record<string, string> = { '/canvas': 'Running agents', '/roles': 'Roles', '/access': 'Access', '/graph': 'Access map', '/secrets': 'Secrets', '/network': 'Computers', '/settings': 'Settings', '/apps': 'Apps' };
+const NAMES: Record<string, string> = { '/canvas': 'Running agents', '/roles': 'Jobs', '/access': 'Access', '/graph': 'Access map', '/secrets': 'Secrets', '/network': 'Computers', '/settings': 'Settings', '/apps': 'Apps' };
 const searchFor = async (name: string) => {
   await press('k', { metaKey: true }, document.body);
   await type($('#palIn'), name);
@@ -110,7 +111,8 @@ describe('navigation follows the answering API', () => {
     await mount('#/settings', { ...ANSWERS, '/configuration': refused(403, 'NotAdmitted', 'configuration is restricted to this service administrator') });
     // The rail's own check is asked once the entry page has answered, so it is waited for; "absent" used to pass while it was still loading.
     await settle();
-    expect(shut('settings')).toBe('refused');
+    // The rail's Settings is your own account, which is open to everyone, so it stays unmarked.
+    expect(shut('settings')).toBeUndefined();
     expect(text()).toContain('NotAdmitted');
     expect(text()).toContain('configuration is restricted to this service administrator');
     expect($('[data-dock="left"]')).toBeNull();
@@ -125,7 +127,7 @@ describe('navigation follows the answering API', () => {
   it('reads a formerly allowed entry again before mounting its controls', async () => {
     let admitted = true;
     await mount('#/me', { ...ANSWERS, '/roles': () => admitted ? ok({ roles: [] }) : refused(403, 'NotAdmitted', 'role access was removed') });
-    await searchFor('Roles');
+    await searchFor('Jobs');
     expect(offered('/roles')).toBe(true);
     await press('Escape', {}, document.body);
     admitted = false;
@@ -134,5 +136,27 @@ describe('navigation follows the answering API', () => {
     expect(text()).toContain('NotAdmitted');
     expect(text()).toContain('role access was removed');
     expect($('.page h1')?.textContent).not.toBe('Roles');
+  });
+
+  // Domain 03's ask: the four Access views say a refused read in place, under their own head and tabs.
+  it.each(['#/access', '#/access/can', '#/model', '#/resources'])('opens %s when the grants read is refused, so the view says it in place', async (hash) => {
+    await mount(hash, { ...ANSWERS, '/grants': refused(403, 'NotAdmitted', 'grants are not admitted') });
+    expect(text()).not.toContain('You do not have access to this');
+    if (hash === '#/model' || hash === '#/resources') expect($('nav[aria-label="Access views"]')).not.toBeNull();
+    else expect(text()).toContain('grants are not admitted');
+  });
+
+  it('still sends a person with no session to sign in from an Access view', async () => {
+    await mount('#/model', { ...ANSWERS, '/grants': refused(401, 'NoSession', 'no session') });
+    expect($('nav[aria-label="Access views"]')).toBeNull();
+    expect($('.page h1')?.textContent).toBe('Sign in');
+  });
+
+  it('keeps service accounts under Settings, read by their page alone', async () => {
+    const { requests } = await mount('#/settings/service-accounts', { ...ANSWERS, '/configuration': refused(403, 'NotAdmitted', 'configuration is restricted') });
+    expect($('.page h1')?.textContent).toBe('Settings');
+    expect($('nav[aria-label="Settings views"]')).not.toBeNull();
+    expect(text()).toContain('Keep a list of accounts used for work.');
+    expect(requests).toContain('/service-accounts');
   });
 });

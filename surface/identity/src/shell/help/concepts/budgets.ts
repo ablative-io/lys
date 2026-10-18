@@ -5,9 +5,9 @@ export const BUDGETS: Seed[] = [
   {
     id: 'budgets.limit',
     title: 'Spending limit',
-    summary: 'The most an agent may spend a period; the session ends when it is reached.',
+    summary: 'The most an agent may spend a period; what happens when it is reached is chosen beside it.',
     body: [
-      'On an agent’s Limits and goals tab. It applies as soon as it is saved, and when it is reached the session ends. Leave the amount empty and save to remove it.',
+      'On an agent’s Limits and goals tab. It applies as soon as it is saved, and what happens when it is reached is chosen beside it. Leave the amount empty and save to remove it.',
       'If Lys cannot measure spending for that agent yet, the tab says so and the limit cannot be set.',
     ],
     steps: [
@@ -21,7 +21,7 @@ export const BUDGETS: Seed[] = [
     title: 'Budget',
     summary: 'Further limits, each acting on its own, with an optional warning.',
     body: [
-      'Each limit is "Spend at most" an amount a period, and what happens "When it’s hit". Each limit acts on its own: whichever is reached first acts first.',
+      'Each limit is a "Limit": an amount a period, and what happens "When it’s hit". Each limit acts on its own: whichever is reached first acts first.',
       'You can be warned at a percentage of a limit; leave it blank for no warning.',
     ],
     steps: [],

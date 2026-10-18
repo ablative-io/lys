@@ -116,7 +116,7 @@ tbody tr.cursor td { background: var(--accent-faint); }
 .card { background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 14px 16px; }
 .card + .card { margin-top: 12px; }
 .card h2 { margin-bottom: 8px; }
-.section-h { font: 500 var(--text-2xs) "JetBrains Mono", ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.section-h { font: 600 var(--text-md)/1.4 var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--text-primary); margin: 20px 0 8px; display: flex; justify-content: space-between; align-items: center; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .row + .row { border-top: 1px solid var(--border-subtle); }
 .note { color: var(--text-muted); font-size: var(--text-sm); }

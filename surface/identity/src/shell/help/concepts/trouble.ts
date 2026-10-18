@@ -48,7 +48,7 @@ export const TROUBLE: Seed[] = [
     summary: 'Start is refused until the agent has what it needs.',
     body: [
       '"Choose the folder this agent works in before it can start", "Save this agent’s settings before starting it" and "Choose the installed program this agent uses": open its Settings tab, choose what is named, and save.',
-      '"This agent is not ready to start": check its state on Overview; its access may be awaiting activation, paused or retired.',
+      '"This agent is not ready to start": check its state on Overview; its access may be not turned on yet, paused or retired.',
       '"No runner is connected, so Lys cannot start agents here", or the computer is not answering: see Computers.',
       'If the computer does not let the agent start there, its May start here line on Computers does not name it.',
     ],

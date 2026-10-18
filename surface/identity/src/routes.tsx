@@ -18,6 +18,9 @@ import { Resources } from './features/access/Resources';
 import { Apps } from './features/apps/Apps';
 import { ConnectApp } from './features/apps/ConnectApp';
 import { SessionCanvas } from './features/runtime/SessionCanvas';
+import { ServiceAccountsList } from './features/service-accounts/ServiceAccounts';
+import { ConfigTabs } from './features/settings/ConfigTabs';
+import { PageHeader } from './shell/PageHeader';
 import { NotFound } from './shell/NotFound';
 import { AccessRoute, FileRoute, OneStart, PeopleRoute, SettingsRoute } from './shell/RouteChecks';
 
@@ -29,7 +32,7 @@ export function AppRoutes() {
       <Route path="/access/drafts" element={<Drafts />} />
       <Route path="/roles/:id?" element={<Roles />} />
       <Route path="/network" element={<Network />} />
-      <Route path="/service-accounts" element={<Navigate replace to="/people/view/accounts" />} />
+      <Route path="/service-accounts" element={<Navigate replace to="/settings/service-accounts" />} />
       <Route path="/connections" element={<Connections />} />
       <Route path="/model" element={<Model />} />
       <Route path="/apps" element={<Apps />} />
@@ -56,10 +59,22 @@ export function AppRoutes() {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/me" element={<You />} />
       <Route path="/account/:id" element={<Navigate replace to="/settings/account" />} />
+      <Route path="/settings/service-accounts" element={<ServiceAccountsPage />} />
       <Route path="/settings/:sec?" element={<SettingsRoute />} />
       <Route path="/access/:mode?/:arg?" element={<AccessRoute />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
+  );
+}
+
+/** Service accounts are kept under Settings, beside the person's own account and the service's settings (domain 02's ask). */
+function ServiceAccountsPage() {
+  return (
+    <div className="page fill">
+      <PageHeader title="Settings" subtitle="The accounts your agents use for work, kept so everyone knows what each is for." />
+      <ConfigTabs on="accounts" />
+      <ServiceAccountsList />
+    </div>
   );
 }
 

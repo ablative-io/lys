@@ -1,5 +1,5 @@
 // The rail in CONSENSUS.md's order (18 October 2026): what a person uses most sits first, the service's own pages
-// after, and the person's own things at the foot. Roles and the access map are reached from Access, by key and by Search.
+// after, and the person's own things at the foot. Jobs and the access map are reached from Access, by key and by Search.
 
 export type RailItem =
   | { t: 'sep' }
@@ -23,7 +23,7 @@ export const RAIL: RailItem[] = [
   {"t": "a", "title": "Apps (g n)", "label": "Apps", "svg": "<rect x=\"4\" y=\"4\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"4\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><rect x=\"4\" y=\"13.5\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><path d=\"M16.75 13.5v6.5M13.5 16.75H20\"/>", "href": "#/apps", "nav": "apps"},
   {"t": "a", "title": "Secrets (g v)", "label": "Secrets", "svg": "<rect x=\"4\" y=\"10\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3\"/><circle cx=\"12\" cy=\"15\" r=\"1.3\"/>", "href": "#/secrets", "nav": "secrets"},
   {"t": "grow"},
-  {"t": "a", "title": "Settings (g s)", "label": "Settings", "svg": "<path d=\"M4 7h10M18 7h2M4 17h4M12 17h8\"/><circle cx=\"16\" cy=\"7\" r=\"2\"/><circle cx=\"10\" cy=\"17\" r=\"2\"/>", "href": "#/settings", "nav": "settings"},
+  {"t": "a", "title": "Settings (g s)", "label": "Settings", "svg": "<path d=\"M4 7h10M18 7h2M4 17h4M12 17h8\"/><circle cx=\"16\" cy=\"7\" r=\"2\"/><circle cx=\"10\" cy=\"17\" r=\"2\"/>", "href": "#/settings/account", "nav": "settings"},
   {"t": "a", "title": "You (g u)", "label": "You", "svg": "<circle cx=\"12\" cy=\"8\" r=\"3.5\"/><path d=\"M5 20c1-4 3.8-6 7-6s6 2 7 6\"/>", "href": "#/me", "nav": "me"},
   {"t": "button", "title": "Help (?)", "label": "Help", "svg": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M9.6 9.5a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.01\"/>", "dock": "help", "kbd": "?"},
   {"t": "sep"},

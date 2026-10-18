@@ -32,7 +32,7 @@ export interface PageHelp {
 export const RAIL_REGION: Region = {
   sel: '#rail',
   title: 'The rail',
-  text: 'Every screen, one key away: g then the letter beside its name. Roles and the access map are found with Search. Help or ? opens this layer; Full help, below the notes, lists every topic. [ or Menu labels shows or hides the words.',
+  text: 'Every screen, one key away: g then the letter beside its name. Jobs and the access map are found with Search. Help or ? opens this layer; Full help, below the notes, lists every topic. [ or Menu labels shows or hides the words.',
   at: 'right',
 };
 
@@ -68,11 +68,11 @@ const PROFILE_FIELDS: readonly Region[] = [
 /** The sections of a person's or agent's page: the same seven, each with its own address. */
 const SECTIONS_REGION: Region = { sel: 'nav.tabs[aria-label="Agent sections"], nav.tabs[aria-label="Sections"]', title: 'Sections', text: 'Overview (who it is, Start), Settings (how it runs), Access (what it may reach), Limits and goals (spending, context, goals, messages), Sessions (what has run), Credentials (secrets it may use), Record (every change, signed). Keys 1 to 7; a person has no Settings.', at: 'below', dy: 30 };
 
-const HEAD_REGION: Region = { sel: '.file .head', title: 'Name and state', text: 'Its access state: active, awaiting activation, suspended or retired. That says what it may do in Lys, not whether it is running. The ⋯ menu suspends, restores or retires it, and asks for a reason each time; retiring is not undone.', at: 'below' };
+const HEAD_REGION: Region = { sel: '.file .head', title: 'Name and state', text: 'Its access state: active, not turned on yet, paused or retired. That says what it may do in Lys, not whether it is running. The ⋯ menu suspends, restores or retires it, and asks for a reason each time; retiring is not undone.', at: 'below' };
 
 export const PAGES: Readonly<Record<string, PageHelp>> = {
   dashboard: {
-    title: 'Dashboard',
+    title: 'Home',
     topic: 'people.dashboard',
     regions: [
       { sel: 'section.getting-started', title: 'Getting started', text: 'What this Lys still needs, in order: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; Not this one counts as an answer.', at: 'below' },
@@ -101,7 +101,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Add an agent',
     topic: 'start.agent',
     regions: [
-      { sel: 'label:has(input[name="display_name"])', title: 'Name', text: 'What the agent is called everywhere in Lys and in Cambium. A name already in use is refused. If you leave it, Lys suggests one from the person it answers to.', at: 'right' },
+      { sel: 'label:has(input[name="display_name"])', title: 'Name', text: 'What the agent is called everywhere in Lys and in Cambium. Two agents of one person cannot share a name. The name starts empty; type one.', at: 'right' },
       { sel: 'label:has(select[name="computer"])', title: 'Computer', text: 'The computer this agent runs on. Only computers with a connected runner are offered; its folders and installed programs are read from there.', at: 'right' },
       { sel: 'label:has(select[name="answers_to"])', title: 'Who it answers to', text: 'The person responsible for this agent: the only one who can give it access, and who is told when it hits a limit. Show retired and suspended lists people who no longer can.', at: 'right' },
       { sel: 'label:has(select[name="team"])', title: 'Team', text: 'The team the agent joins, which decides where it is grouped on the dashboard and which computers a team owns it may use.', at: 'right' },
@@ -109,7 +109,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
       { sel: '.first-run-mode', title: 'Careful mode', text: 'This program has no mode that keeps it to its folder with the internet off, so it starts in its most careful mode, named here. Change it under More settings.', at: 'right' },
       { sel: 'details.more-settings > summary', title: 'More settings', text: 'Everything a first run does not ask: installed copy, model, mode and rules, tools, plugins, connected tools, skills, prompt. Open it to change any of them; what you leave keeps its default.', at: 'right' },
       ...PROFILE_FIELDS,
-      { sel: 'form.add-agent > p:last-of-type', title: 'Add', text: 'Add and run it adds the agent and starts it at once on this computer. Add agent alone adds it; you start it from its page. If this browser kept an earlier unanswered request, Lys checks that first so the agent is not added twice.', at: 'right' },
+      { sel: 'form.add-agent > p:last-of-type', title: 'Add', text: 'Add and run it adds the agent and starts it at once on the computer you chose, once it has a folder to work in. Add agent alone adds it; you start it from its page. If this browser kept an earlier unanswered request, Lys checks that first so the agent is not added twice.', at: 'right' },
     ],
     keys: [],
   },
@@ -145,7 +145,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     regions: [
       SECTIONS_REGION,
       { sel: '.file-section-head', title: 'Give', text: 'Passes on access you hold and may pass to agents. Only the agent’s responsible person can give it access; if you hold nothing passable, Lys says so.', at: 'below' },
-      { sel: '.grant-table', title: 'Grants it holds', text: 'Every grant held by this agent: what it may do, on what, from whom, until when, and whether it stands now. Give passes part of one on; Revoke withdraws one after asking why.', at: 'right' },
+      { sel: '.grant-table', title: 'Grants it holds', text: 'Every grant held by this agent: what it may do, on what, from whom, until when, and whether it stands now. Give passes part of one on; Take back withdraws one after asking why.', at: 'right' },
       { sel: '[data-act="agent-roots"]', title: 'Let me give agents access', text: 'Records the administrator’s grants on the agents and apps directories only. It gives no access to Cambium channels; those need a separate grant you hold and may pass to agents.', at: 'right' },
       { sel: '[data-cambium-first]', title: 'Cambium', text: 'Cambium’s channels can be given once Cambium is connected and approved on Apps.', at: 'below' },
       { sel: '.access-halves', title: 'What it can reach, and a check', text: 'Left: everything this agent can reach, summed up from its grants. Right: ask whether it can do one thing; the answer shows the chain of grants back to a person, or says why not.', at: 'above' },
@@ -157,11 +157,11 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     topic: 'budgets.limit',
     regions: [
       SECTIONS_REGION,
-      { sel: 'input[name="spending_amount"]', title: 'Spending limit', text: 'The most this agent may spend, in dollars, in the period beside it (a 5-hour window, a day, a week or a month). When the spend reaches it the running session is ended. It applies from the moment you press Save. Clear the box and Save to remove it.', at: 'right' },
-      { sel: 'form[aria-label="Edit budget limits"] table', title: 'Limits in force', text: 'One row per limit. Spend at most is the amount and what it counts: dollars, tokens, % of your plan, minutes running, or % of its context (how full the conversation window is). Used shows how far along it is now. Change an amount or what happens, then Save.', at: 'right' },
+      { sel: 'input[name="spending_amount"]', title: 'Spending limit', text: 'The most this agent may spend, in dollars, in the period beside it (a 5-hour window, a day, a week or a month). When the spend reaches it, what happens is the act chosen beside it. It applies from the moment you press Save. Clear the box and Save to remove it.', at: 'right' },
+      { sel: 'form[aria-label="Edit budget limits"] table', title: 'Limits in force', text: 'One row per limit. Limit is the amount and what it counts: dollars, tokens, % of your plan, minutes running, or % of its context (how full the conversation window is). Used shows how far along it is now. Change an amount or what happens, then Save.', at: 'right' },
       { sel: 'form[aria-label="Edit budget limits"] select[name^="act-"]', title: 'When it’s hit', text: 'What Lys does the moment a limit is reached: Type a notice into the session warns the agent and lets it carry on; Compact the session squeezes its conversation so it can continue; End the session stops it; Tell the responsible person messages whoever answers for it.', at: 'right' },
       { sel: 'input[name="warn_at"]', title: 'Warn me at', text: 'A percentage of each limit at which Lys tells you it is getting close, before anything is done to the session. Leave it blank for no early warning.', at: 'right' },
-      { sel: 'form[aria-label="Set a budget"], input[aria-label="Spend at most"]', title: 'Add a limit', text: 'Type an amount, choose what it counts and over what period, choose what happens when it is hit, and press Add. Context limits have no period: they apply at any moment.', at: 'right' },
+      { sel: 'form[aria-label="Set a budget"], input[aria-label="Limit"], input[aria-label="Spend at most"]', title: 'Add a limit', text: 'Type an amount, choose what it counts and over what period, choose what happens when it is hit, and press Add. Context limits have no period: they apply at any moment.', at: 'right' },
       { sel: '[aria-label="Context default"]', title: 'Context levels for every agent', text: 'When this agent has no context limits of its own it follows the default: a warning typed into the session at 20% and 38% of its context window, and a compaction at 40%, at the first turn boundary past that level. Change for this agent copies these levels into the table above as this agent’s own. Change the default changes them for every agent that has none; only an administrator can.', at: 'right' },
       { sel: 'section.usage-goals', title: 'Goals', text: 'What this agent is working towards, in your words; each is sent to it as a reminder. A goal with a deadline shows how long is left. Untick Active to pause one without losing it; Reword changes its words.', at: 'right' },
       { sel: 'form[aria-label="Set a goal"], section.usage-goals tfoot', title: 'Set a goal', text: 'Type the goal in the last row, pick a deadline if it has one, and press Set or Enter.', at: 'right' },
@@ -259,7 +259,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     topic: 'access.grant',
     regions: [
       { sel: 'nav[aria-label="Access views"]', title: 'Views', text: 'Grants (every grant you may see); Ask (can someone do something?); Requests (access people asked for); Drafts (what agents want approved); Reviews (grants due a look); Resources (everything grants are on); Model (the permission rules themselves).', at: 'below' },
-      { sel: '.grant-table', title: 'Grants', text: 'Who holds what, on what, from whom, until when, and whether it stands now. Last used is an exercise seen where access is enforced; not seen never means never used. Give passes part of a grant to an agent; Revoke withdraws one after asking why.', at: 'c' },
+      { sel: '.grant-table', title: 'Grants', text: 'Who holds what, on what, from whom, until when, and whether it stands now. Last used is an exercise seen where access is enforced; not seen never means never used. Give passes part of a grant to an agent; Take back withdraws one after asking why.', at: 'c' },
       { sel: '.seg', title: 'Which question', text: 'Can: can this person or agent do this on that? Reach: everything one person or agent can reach. Who: everyone who can reach one thing. Give: give access from scratch, as an administrator.', at: 'below' },
       { sel: '[aria-label="Question"]', title: 'Ask', text: 'Choose who, what and on what, then Check (or c). Every yes shows the chain of grants back to a person; every no says why.', at: 'below' },
       { sel: 'select[aria-label="Resource"]', title: 'Which thing', text: 'The thing to ask about; the list below shows everyone who can reach it and how.', at: 'below' },
@@ -291,8 +291,8 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     topic: 'access.drafts',
     regions: [
       { sel: 'nav[aria-label="Access views"]', title: 'Views', text: 'Drafts sits beside Grants, Ask, Requests, Reviews, Resources and Model.', at: 'below' },
-      { sel: 'table.drafts', title: 'Drafts', text: 'What your agents prepared for you to decide: which agent, what it wants to do, its note, and the request exactly as it would be sent (open Prepared request). Nothing is done until you Approve; Refuse asks why, and the agent is told.', at: 'c' },
-      { sel: '[aria-label="Held for products"]', title: 'Held for products', text: 'Requests a connected app held for a person to approve: the product, what it wants, who holds it, and who approved it. Approve lets it run; Refuse stops it with your reason.', at: 'above' },
+      { sel: 'table.drafts', title: 'Drafts', text: 'What your agents prepared for you to decide: which agent, what it wants to do, its note, and the request exactly as it would be sent (open Prepared request). Nothing is done until you Approve; Decline asks why, and the agent is told.', at: 'c' },
+      { sel: '[aria-label="Held for products"]', title: 'Held for products', text: 'Requests a connected app held for a person to approve: the product, what it wants, who holds it, and who approved it. Approve lets it run; Decline stops it with your reason.', at: 'above' },
     ],
     keys: [],
   },
@@ -314,22 +314,22 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
       { sel: 'nav[aria-label="Access views"]', title: 'Views', text: 'Reviews sits beside Grants, Ask, Requests, Drafts, Resources and Model.', at: 'below' },
       { sel: '[aria-label="Agents needing an active owner"]', title: 'Agents needing an owner', text: 'Agents whose responsible person is suspended or retired. Their access cannot be renewed until someone active takes them on; open each to change who it answers to.', at: 'right' },
       { sel: '.listing', title: 'Grants due a review', text: 'Grants whose review date has come, or that have not been looked at for a long time. Choose one to see it whole.', at: 'in-bl' },
-      { sel: '[aria-label="Grant to review"]', title: 'The grant', text: 'Who holds it, on what, from whom, when it was last used. Keep records that it was reviewed and stands, with an optional note; Revoke withdraws it after asking why.', at: 'left' },
+      { sel: '[aria-label="Grant to review"]', title: 'The grant', text: 'Who holds it, on what, from whom, when it was last used. Approve records that it was reviewed and stands, with an optional note; Take back withdraws it after asking why.', at: 'left' },
     ],
     keys: ROWS,
   },
   roles: {
-    title: 'Roles',
+    title: 'Jobs',
     topic: 'access.grant',
     regions: [
-      { sel: '#screen .page-header', title: 'Roles', text: 'A role describes a job: its responsibilities, goals, practice and starting instructions for an agent, plus the access it usually needs. Assigning it to a person or agent hands them those words; it grants no access by itself.', at: 'below' },
-      { sel: '.listing', title: 'The roles', text: 'Every role with its latest version. Choose one to read it, assign it or publish a new version.', at: 'in-bl' },
-      { sel: '[aria-label="Role words"]', title: 'The role’s words', text: 'The version shown: responsibilities, goals, practice and the starting instructions an agent is given. If a newer version exists, it says so.', at: 'left' },
-      { sel: '[aria-label="Access templates"]', title: 'Access this role usually needs', text: 'The grants normally given with the role: the kind of thing, which one, the access level, and how many days it usually lasts. A template is a guide for whoever grants; it does not grant.', at: 'left' },
+      { sel: '#screen .page-header', title: 'Jobs', text: 'A job describes work: its responsibilities, goals, practice and starting instructions for an agent, plus the access it usually needs. Giving someone a job hands them those words; it gives no access by itself.', at: 'below' },
+      { sel: '.listing', title: 'The jobs', text: 'Every job with its latest version. Choose one to read it, give it to someone or publish a new version.', at: 'in-bl' },
+      { sel: '[aria-label="Job description"], [aria-label="Role words"]', title: 'The job’s words', text: 'The version shown: responsibilities, goals, practice and the starting instructions an agent is given. If a newer version exists, it says so.', at: 'left' },
+      { sel: '[aria-label="Access templates"]', title: 'Access this job usually needs', text: 'The grants normally given with the job: the kind of thing, which one, the access level, and how many days it usually lasts. A template is a guide for whoever grants; it does not grant.', at: 'left' },
       { sel: '[aria-label="Version history"]', title: 'Version history', text: 'Every version, who made it and why. Read shows an older one above.', at: 'left' },
-      { sel: '[aria-label="Holders"]', title: 'Assigned to', text: 'Each person or agent with this role and the version they hold. They keep that version until an administrator applies a newer one; Apply shows what changed first. Remove ends the assignment after asking.', at: 'left' },
-      { sel: 'form[aria-label="Assign role"]', title: 'Assign this role', text: 'Find a person or agent, give an end date or none, and Assign. They hold the latest version from then.', at: 'left' },
-      { sel: 'form[aria-label="Create role"], form[aria-label="Publish role version"]', title: 'Create or save a version', text: 'The role’s name (new roles only), its four parts, the access templates, and the reason for this version, which is kept in its history. Save publishes a new version; holders keep theirs until it is applied.', at: 'left' },
+      { sel: '[aria-label="Holders"]', title: 'Doing this job', text: 'Each person or agent with this job and the version they hold. They keep that version until an administrator applies a newer one; Apply shows what changed first. Remove ends the assignment after asking.', at: 'left' },
+      { sel: 'form[aria-label="Assign job"], form[aria-label="Assign role"]', title: 'Give this job to someone', text: 'Find a person or agent, give an end date or none, and Assign. They hold the latest version from then.', at: 'left' },
+      { sel: 'form[aria-label="Create job"], form[aria-label="Publish job version"], form[aria-label="Create role"], form[aria-label="Publish role version"]', title: 'Create or save a version', text: 'The job’s name (new jobs only), its four parts, the access templates, and the reason for this version, which is kept in its history. Save publishes a new version; holders keep theirs until it is applied.', at: 'left' },
     ],
     keys: ROWS,
   },
@@ -378,7 +378,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     keys: [],
   },
   graph: {
-    title: 'Graph',
+    title: 'Access map',
     topic: 'access.graph',
     regions: [{ sel: '[aria-label="Permission graph"]', title: 'The graph', text: 'The same answers as Access, drawn. Click a person or agent to light everything it reaches; click a resource to light everyone who reaches it; Enter on one opens its page. Zoom with the buttons or the wheel; Fit shows the whole graph.', at: 'c' }],
     keys: [],
@@ -387,7 +387,7 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     title: 'Running agents',
     topic: 'people.operations',
     regions: [
-      { sel: 'nav[aria-label="Operations views"]', title: 'Views', text: 'Four views of the same running agents: by computer (each computer, with what runs on it), Canvas (every running agent as a window), Sessions (the same as a list) and the proxy (every model call made through Lys).', at: 'below' },
+      { sel: 'nav[aria-label="Running agents views"], nav[aria-label="Operations views"]', title: 'Views', text: 'Four views of the same running agents: by computer (each computer, with what runs on it), Canvas (every running agent as a window), Sessions (the same as a list) and the proxy (every model call made through Lys).', at: 'below' },
       { sel: '.session-canvas-scroll', title: 'Running agents', text: 'Each running agent is a window showing its terminal. Drag its bar to move it and its corner to size it; drag the background or use the wheel to move the surface. Closing a window leaves the agent running.', at: 'c' },
       { sel: '[aria-label="Widgets to place"]', title: 'Place', text: 'Add a box to group windows, a note, or a line between two things. Boxes and notes can be labelled and coloured; × removes one.', at: 'above' },
       { sel: '[aria-label="Canvas view"]', title: 'View', text: 'Zoom in and out; the percentage returns to actual size. Find an agent jumps to its window.', at: 'above' },

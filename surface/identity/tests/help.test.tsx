@@ -131,7 +131,7 @@ describe('the page help', () => {
     layOut();
     await mount('#/dashboard');
     await press('?', {}, document.body);
-    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Dashboard');
+    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Home');
     await go('#/network');
     await frame();
     expect($('#helpLayer')).not.toBeNull();

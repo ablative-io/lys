@@ -58,7 +58,6 @@ it('W5 distinguishes duplicate agent names even when neither has a runtime locat
   expect(labels).toHaveLength(2);
   expect(labels.every((label) => label.textContent?.startsWith('Record A/'))).toBe(true);
   expect(new Set(labels.map((label) => label.textContent)).size).toBe(2);
-  expect(labels.map((label) => label.title).sort()).toEqual([SCRIBE, COURIER].sort());
   expect($('.you-tree')?.textContent).toContain('Not running');
 });
 

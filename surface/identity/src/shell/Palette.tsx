@@ -29,8 +29,8 @@ const keyFor = (hash: string): string => {
 export const PAGES: [string, string][] = [
   ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
   ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
-  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Roles', '#/roles'],
-  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings'], ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
+  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Jobs', '#/roles'],
+  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings/account'], ['Settings: this service', '#/settings'], ['Settings: service accounts', '#/settings/service-accounts'], ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
 ];
 
 /** The rail's own pages, read from the rail itself: what Search offers before anything is typed. Home's address is #/, which Search names #/dashboard. */

@@ -138,8 +138,8 @@ export const START: Seed[] = [
     title: 'Set a spending limit',
     summary: 'Cap what an agent may spend, and say what happens when it is reached.',
     body: [
-      'On the agent’s page, Limits and goals has its spending limit: an amount of dollars a period. It applies as soon as it is saved; when it is reached, the session ends. Leave it empty and save to remove it.',
-      'Below it, Budget holds further limits, each with "Spend at most", a period and what happens "When it’s hit", and can warn you at a percentage of a limit first. Whichever limit is reached first acts first.',
+      'On the agent’s page, Limits and goals has its spending limit: an amount of dollars a period. It applies as soon as it is saved; what happens when it is reached is chosen beside it. Leave it empty and save to remove it.',
+      'Below it, Budget holds further limits, each with a "Limit", a period and what happens "When it’s hit", and can warn you at a percentage of a limit first. Whichever limit is reached first acts first.',
       'If Lys cannot measure spending for that agent yet, it says so and the limit cannot be set.',
     ],
     steps: [

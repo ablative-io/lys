@@ -72,7 +72,7 @@ export const ACCESS: Seed[] = [
     summary: 'What your agents prepared for you to decide. Nothing is done until you approve it.',
     body: [
       'An agent may prepare a change it is not allowed to make and leave it for you. Each draft shows the request exactly as it would be sent.',
-      'Approve does it. Refuse asks why you refuse it, and the reason is shown with the draft, with who decided and when.'
+      'Approve does it. Decline asks why you decline it, and the reason is shown with the draft, with who decided and when.'
     ],
     steps: [{ text: 'Open Access → Drafts.', href: '#/access/drafts', link: 'Open Drafts' }],
     related: ['access.requests', 'people.dashboard'],

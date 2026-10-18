@@ -3,12 +3,12 @@ import { $, $$, click, mount, press, type } from './harness';
 
 // Every screen is one palette entry and one g letter away. The letters and where each goes are written out here
 // rather than read from the shell's own tables. The rail is CONSENSUS.md's (18 October 2026): what waits on you is its
-// own entry, Roles and the access map light Access, the computers are Computers, Apps has its own entry, and Running
+// own entry, Jobs and the access map light Access, Settings opens your own account, the computers are Computers, Apps has its own entry, and Running
 // agents is the canvas.
 
 const LETTERS: Record<string, [string, string]> = {
   p: ['#/people', 'people'], o: ['#/roles', 'access'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'waiting'], w: ['#/reviews', 'waiting'],
-  v: ['#/secrets', 'secrets'], n: ['#/apps', 'apps'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
+  v: ['#/secrets', 'secrets'], n: ['#/apps', 'apps'], m: ['#/model', 'access'], s: ['#/settings/account', 'settings'],
   h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], d: ['#/dashboard', 'dashboard'],
 };
 const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me'];
@@ -17,9 +17,9 @@ const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'netwo
 const PAGE_NAMES: [string, string][] = [
   ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
   ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
-  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Roles', '#/roles'],
-  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings'],
-  ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
+  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Jobs', '#/roles'],
+  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings/account'], ['Settings: this service', '#/settings'],
+  ['Settings: service accounts', '#/settings/service-accounts'],   ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
 ];
 
 const current = () => $('#rail a.on')?.dataset.nav;
@@ -39,7 +39,7 @@ describe('go-to keys and palette (conformance 9.1)', () => {
   it('palette, with nothing typed, offers what can be done, then the rail\'s pages in the rail\'s order', async () => {
     await mount('#/people');
     await press('k', { metaKey: true }, document.body);
-    expect(goToRows().map(({ hash }) => hash)).toEqual(['#/dashboard', '#/requests', '#/people', '#/canvas', '#/access', '#/network', '#/apps', '#/secrets', '#/settings', '#/me']);
+    expect(goToRows().map(({ hash }) => hash)).toEqual(['#/dashboard', '#/requests', '#/people', '#/canvas', '#/access', '#/network', '#/apps', '#/secrets', '#/settings/account', '#/me']);
     expect($$('#palList .grp').map((group) => group.textContent)).toEqual(['Do', 'Go to']);
   });
 
@@ -62,7 +62,7 @@ describe('go-to keys and palette (conformance 9.1)', () => {
       expect(nav, hash).toBeDefined();
       if (nav) lit.add(nav);
     }
-    expect(reached.size).toBe(18);
+    expect(reached.size).toBe(PAGE_NAMES.length);
     expect([...lit].sort()).toEqual([...RAIL_ITEMS].sort());
   });
 

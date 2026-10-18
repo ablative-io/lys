@@ -18,12 +18,14 @@ async function graphRead(): Promise<void> {
 const READS = {
   canvas: { title: 'Running agents', read: () => request('/runtime/live') },
   people: { title: 'People and agents', read: api.people },
-  roles: { title: 'Roles', read: () => request('/roles') },
+  roles: { title: 'Jobs', read: () => request('/roles') },
   access: { title: 'Access', read: grantsRead },
   graph: { title: 'Access map', read: graphRead },
   secrets: { title: 'Secrets', read: () => request('/secrets') },
   network: { title: 'Computers', read: () => request('/network') },
   settings: { title: 'Settings', read: () => request('/configuration') },
+  // Apps is decided by its own read, so a person who may approve apps but not read the startup configuration still reaches it (domain 05's ask).
+  apps: { title: 'Apps', read: () => request('/apps') },
   // Each way to ask or decide is its own read, so a person who may not read grants still reaches what waits on them (domain 03's ask).
   requests: { title: 'Requests', read: () => request('/requests') },
   reviews: { title: 'Reviews', read: () => request('/reviews') },
@@ -49,13 +51,14 @@ async function railDecision(place: Place): Promise<void> {
 }
 
 function placeOf(pathname: string): Place | null {
-  if (pathname === '/settings/account') return null;
+  // Your own account, your service accounts and the services page are read by their pages alone, each saying its own
+  // refusal in place; none waits on the startup configuration (domain 05's ask for the services page).
+  if (['/settings/account', '/settings/service-accounts', '/connections'].includes(pathname)) return null;
   if (pathname === '/access/drafts') return 'drafts';
   const view = pathname.split('/')[1];
   if (view === 'file' || view === 'agents' || view === 'service-accounts') return 'people';
   if (['resources', 'model'].includes(view)) return 'access';
   if (view === 'requests' || view === 'reviews') return view;
-  if (view === 'apps' || view === 'connections') return 'settings';
   if (view === 'vault') return 'secrets';
   if (view === 'runtime') return 'canvas';
   return Object.hasOwn(READS, view) ? view as Place : null;
@@ -80,12 +83,13 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const secrets = useDecision('secrets', entered);
   const network = useDecision('network', entered);
   const settings = useDecision('settings', entered);
+  const apps = useDecision('apps', entered);
   const requests = useDecision('requests', entered);
   const reviews = useDecision('reviews', entered);
   const drafts = useDecision('drafts', entered);
   return (
     <Entry.Provider value={enter}>
-      <Navigation.Provider value={{ canvas, people, roles, access, graph, secrets, network, settings, requests, reviews, drafts }}>{children}</Navigation.Provider>
+      <Navigation.Provider value={{ canvas, people, roles, access, graph, secrets, network, settings, apps, requests, reviews, drafts }}>{children}</Navigation.Provider>
     </Entry.Provider>
   );
 }
@@ -134,8 +138,16 @@ export function useNavigationAccess(): (pathname: string) => boolean {
   };
 }
 
-function ReadEntry({ place, children }: { place: Place; children: ReactNode }) {
+/**
+ * The four Access views draw their own head and tabs and say a refused read in place, so their entry read only
+ * sends a person with no session to sign in; any other answer lets the view open and say it (domain 03's ask).
+ */
+const saysItsOwn = (pathname: string): boolean =>
+  ['/access', '/access/can', '/model', '/resources'].includes(pathname) || pathname.startsWith('/access/can/');
+
+function ReadEntry({ place, own, children }: { place: Place; own: boolean; children: ReactNode }) {
   const load = useLoad(() => decision(place), 'navigation-entry');
+  if (own && load.status === 'refused' && load.refused.status !== 401) return <Entered>{children}</Entered>;
   // People and agents are refused in the directory's own words, as its pages refuse them.
   const words = place === 'people' ? (problem: Refused) => <ErrorWords problem={problem} /> : undefined;
   const gate = <Gate load={load} title={READS[place].title} ok={() => children} renderError={words} />;
@@ -146,5 +158,5 @@ function ReadEntry({ place, children }: { place: Place; children: ReactNode }) {
 export function NavigationGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const place = placeOf(pathname);
-  return place ? <ReadEntry key={pathname} place={place}>{children}</ReadEntry> : <Entered>{children}</Entered>;
+  return place ? <ReadEntry key={pathname} place={place} own={saysItsOwn(pathname)}>{children}</ReadEntry> : <Entered>{children}</Entered>;
 }

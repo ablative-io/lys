@@ -17,6 +17,9 @@ input:where(:not([type=radio]):not([type=checkbox])), select, textarea {
   padding: 8px 11px; min-height: 36px; width: 100%;
   transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
 }
+/* A phone: every field's text is 16 px, so iOS never zooms, and every field and act is a 44 px target. The selector keeps
+   the input rule's shape (:not() on the radio and the tick), or it loses to a scoped rule on specificity. */
+@media (max-width: 600px) { input:not([type=radio]):not([type=checkbox]), select, textarea { font-size: var(--text-xl); min-height: 44px; } .act, .btn { min-height: 44px; } }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 input:where(:not([type=radio]):not([type=checkbox])):hover, select:hover, textarea:hover { border-color: rgba(255,255,255,.14); }
 input:where(:not([type=radio]):not([type=checkbox])):focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
