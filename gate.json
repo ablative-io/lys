@@ -1,0 +1,7 @@
+{
+  "stages": ["tokei", "ast-grep", "clippy", "tsc", "nextest", "vitest", "push"],
+  "slow": 60,
+  "tsc": { "dirs": ["surface/identity"] },
+  "vitest": { "dirs": ["surface/identity"] },
+  "hook": { "refuse": ["cargo check", "cargo clippy", "cargo test", "cargo nextest", "tsc", "vitest"] }
+}
