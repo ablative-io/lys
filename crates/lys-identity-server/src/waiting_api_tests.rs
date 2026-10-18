@@ -330,6 +330,78 @@ async fn one_list_of_what_waits_oldest_first_and_a_refused_part_in_place() -> Re
     Ok(())
 }
 
+/// The entry of `kind` in a waiting list, or null.
+fn entry_of(items: &[Value], kind: &str) -> Value {
+    items
+        .iter()
+        .find(|item| item["kind"] == kind)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The member of `list` whose id is `id`, as that list answers it, or null.
+fn listed(answer: &Value, list: &str, id: &str) -> Value {
+    answer[list]
+        .as_array()
+        .and_then(|members| members.iter().find(|member| member["id"] == id))
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// Whether `entry` carries `member` at all, null or not.
+fn carries(entry: &Value, member: &str) -> bool {
+    entry
+        .as_object()
+        .is_some_and(|members| members.contains_key(member))
+}
+
+#[tokio::test]
+async fn a_request_and_a_draft_carry_the_record_their_own_lists_answer() -> Result {
+    let table = Table::set().await?;
+    let request = table.bea_asks().await?;
+    let draft = table.agent_drafts().await?;
+    let product = table.bea_product_drafts().await?;
+    let review = table.agent_holds().await?;
+
+    let ada = table.waiting(&table.ada).await?;
+    let requests = ok(get(&table.service, "/requests", Auth::Cookie(&table.ada)).await?)?;
+    let drafts = ok(get(&table.service, "/drafts", Auth::Cookie(&table.ada)).await?)?;
+
+    // What each list answers is there to compare with: the comparison is never null against null.
+    let asked = listed(&requests, "requests", &request);
+    let prepared = listed(&drafts, "drafts", &draft);
+    assert!(
+        asked.is_object(),
+        "GET /requests lists {request}: {requests}"
+    );
+    assert!(prepared.is_object(), "GET /drafts lists {draft}: {drafts}");
+
+    let entry = entry_of(&ada, "request");
+    assert_eq!(entry["id"], request.as_str(), "{ada:?}");
+    assert_eq!(
+        entry["request"], asked,
+        "the request entry carries the request as GET /requests answers it"
+    );
+    let entry = entry_of(&ada, "agent_draft");
+    assert_eq!(entry["id"], draft.as_str(), "{ada:?}");
+    assert_eq!(
+        entry["draft"], prepared,
+        "the agent_draft entry carries the draft as GET /drafts answers it"
+    );
+
+    // Decided on their own pages: neither member, not even a null one.
+    for (kind, id) in [("product_draft", &product), ("review", &review)] {
+        let entry = entry_of(&ada, kind);
+        assert_eq!(entry["id"], id.as_str(), "{ada:?}");
+        assert!(!carries(&entry, "request"), "{entry}");
+        assert!(!carries(&entry, "draft"), "{entry}");
+    }
+    // A request carries no draft and a draft no request.
+    assert!(!carries(&entry_of(&ada, "request"), "draft"));
+    assert!(!carries(&entry_of(&ada, "agent_draft"), "request"));
+    Ok(())
+}
+
 #[tokio::test]
 async fn waiting_is_for_a_signed_in_caller_only() -> Result {
     let table = Table::set().await?;
