@@ -76,6 +76,10 @@
         {
           "id": "S259",
           "text": "As the responsible person, I want the few responsibilities that are mine to stay mine whatever I grant, so that no one can hand away being responsible."
+        },
+        {
+          "id": "S428",
+          "text": "As a responsible person, I open Lys and see one list of everything waiting on me, oldest first, and when one part cannot be read I see that part's own line, so I decide what is mine without opening four pages."
         }
       ]
     },
@@ -208,6 +212,10 @@
         {
           "id": "S115",
           "text": "As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced."
+        },
+        {
+          "id": "S429",
+          "text": "As a person who gave access and lost the answer, I ask Lys whether my change was recorded by the receipt it gave me, and I am told yes with what it made, or no, so I never give the same access twice."
         }
       ]
     },
@@ -238,6 +246,10 @@
         {
           "id": "S423",
           "text": "As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing."
+        },
+        {
+          "id": "S434",
+          "text": "As an administrator who said the Lys computer is not for agents, I am not asked again from another browser."
         }
       ]
     },
@@ -298,6 +310,22 @@
         {
           "id": "S419",
           "text": "As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs."
+        },
+        {
+          "id": "S430",
+          "text": "As a person who signs in with Google and has no password, my account page says so, offers to set a password without asking for one I do not have, and lets me change my email."
+        },
+        {
+          "id": "S431",
+          "text": "As a person Lys refused, the link it gives me opens the Ask form already asking for the thing I was refused, so I do not have to describe it."
+        },
+        {
+          "id": "S432",
+          "text": "As a person who opened Lys at a different address, the sign-in page tells me before I try that Sign in with Google works only at Lys's registered address, and links me there."
+        },
+        {
+          "id": "S433",
+          "text": "As a person who is not an administrator, Open Cambium on my page is a link that opens Cambium."
         }
       ]
     },

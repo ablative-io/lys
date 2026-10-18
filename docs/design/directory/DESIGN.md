@@ -1341,6 +1341,26 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/apps_sign_in_declare.rs` | R1: one return address declared for an app by the administrator or by the app itself through its own credential, judged by the same rule as a saved line, written nowhere when already listed | DIRECTORY-098 |
 | `crates/lys-identity-server/src/sign_in_refusal_line.rs` | R2: the one WARN line for a refused person sign-in, with the route, the refusal's name and the handle tried when it is a well-formed email, never the password | DIRECTORY-099 |
 | `surface/identity/dev/start.sh` | Development start script: seeds, starts the dev issuer, the identity server and the app with a readiness watcher per child (a POSIX sh read loop on the child's output FIFO, never awk). | DIRECTORY-100 |
+| `crates/lys-identity-server/src/routes_startup.rs` | route table; mounts /waiting, /operations/{operation} and /me/getting-started | DIRECTORY-101 |
+| `surface/identity/src/shell/Rail.tsx` | the rail; Waiting on you's count from /waiting | DIRECTORY-101 |
+| `crates/lys-identity-server/src/waiting_api.rs` | GET /waiting: one list of everything waiting on the caller, refused parts named in place | DIRECTORY-101 |
+| `crates/lys-identity-server/src/waiting_api_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
+| `surface/identity/src/features/grants/StuckRecord.tsx` | the kept-change check; asks /operations | DIRECTORY-101 |
+| `crates/lys-identity-server/src/operations_api.rs` | GET /operations/{operation}: whether a change of the caller's was recorded, from the records that carry operation ids | DIRECTORY-101 |
+| `crates/lys-identity-server/src/operations_api_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
+| `surface/identity/src/features/people/AddPerson.tsx` | adding a person; the Google invitation words | DIRECTORY-101 |
+| `surface/identity/src/features/settings/Settings.tsx` | service settings; NoPasswordYet removed | DIRECTORY-101 |
+| `crates/lys-identity-server/src/accounts_own.rs` | the account read and the own-password and own-email handlers, split from accounts.rs; password and providers fields | DIRECTORY-101 |
+| `crates/lys-identity-server/src/accounts_own_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
+| `crates/lys-pass/src/refusal.rs` | a refusal's request address carries kind, id and action | DIRECTORY-101 |
+| `crates/lys-identity-server/src/sign_in_help.rs` | the providers offered at sign-in; origin added | DIRECTORY-101 |
+| `crates/lys-identity-server/src/sign_in_help_tests.rs` | tests of sign_in_help, red first: origin in both answers | DIRECTORY-101 |
+| `crates/lys-identity-server/src/apps_read.rs` | a person's view of an app; address added | DIRECTORY-101 |
+| `surface/identity/src/features/file/CambiumNext.tsx` | Open Cambium from an app's address | DIRECTORY-101 |
+| `crates/lys-identity-server/src/apps_read_tests.rs` | tests of apps_read, red first: address on a person's view | DIRECTORY-101 |
+| `surface/identity/src/features/dashboard/GettingStarted.tsx` | getting started; Not this one kept on the server | DIRECTORY-101 |
+| `crates/lys-identity-server/src/getting_started_api.rs` | PUT /me/getting-started and the getting_started field on /me | DIRECTORY-101 |
+| `crates/lys-identity-server/src/getting_started_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
 
 ## Inventory
 

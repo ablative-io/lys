@@ -6209,6 +6209,106 @@
       "path": "surface/identity/dev/start.sh",
       "note": "Development start script: seeds, starts the dev issuer, the identity server and the app with a readiness watcher per child (a POSIX sh read loop on the child's output FIFO, never awk).",
       "brief": "DIRECTORY-100"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes_startup.rs",
+      "note": "route table; mounts /waiting, /operations/{operation} and /me/getting-started",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/shell/Rail.tsx",
+      "note": "the rail; Waiting on you's count from /waiting",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/waiting_api.rs",
+      "note": "GET /waiting: one list of everything waiting on the caller, refused parts named in place",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/waiting_api_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/features/grants/StuckRecord.tsx",
+      "note": "the kept-change check; asks /operations",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/operations_api.rs",
+      "note": "GET /operations/{operation}: whether a change of the caller's was recorded, from the records that carry operation ids",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/operations_api_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/features/people/AddPerson.tsx",
+      "note": "adding a person; the Google invitation words",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/features/settings/Settings.tsx",
+      "note": "service settings; NoPasswordYet removed",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/accounts_own.rs",
+      "note": "the account read and the own-password and own-email handlers, split from accounts.rs; password and providers fields",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/accounts_own_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-pass/src/refusal.rs",
+      "note": "a refusal's request address carries kind, id and action",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_help.rs",
+      "note": "the providers offered at sign-in; origin added",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_help_tests.rs",
+      "note": "tests of sign_in_help, red first: origin in both answers",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_read.rs",
+      "note": "a person's view of an app; address added",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/features/file/CambiumNext.tsx",
+      "note": "Open Cambium from an app's address",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/apps_read_tests.rs",
+      "note": "tests of apps_read, red first: address on a person's view",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/GettingStarted.tsx",
+      "note": "getting started; Not this one kept on the server",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/getting_started_api.rs",
+      "note": "PUT /me/getting-started and the getting_started field on /me",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/getting_started_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-101"
     }
   ],
   "inventory": [

@@ -38,6 +38,8 @@
 
 **S259.** As the responsible person, I want the few responsibilities that are mine to stay mine whatever I grant, so that no one can hand away being responsible.
 
+**S428.** As a responsible person, I open Lys and see one list of everything waiting on me, oldest first, and when one part cannot be read I see that part's own line, so I decide what is mine without opening four pages.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -100,6 +102,8 @@
 
 **S115.** As a responsible person, I want my agent issued one certificate listing the grants it holds and naming its holder, against a key enrolled for it, so that it carries proof of those grants from its first spawn and a lost key or an expired certificate can be replaced.
 
+**S429.** As a person who gave access and lost the answer, I ask Lys whether my change was recorded by the receipt it gave me, and I am told yes with what it made, or no, so I never give the same access twice.
+
 ## Administrator — Suspends, reinstates and retires identities, and reads why a check refused
 
 **S18.** As the administrator, I want the screen to show an identity's state and the record that put it there, for a retired identity exactly as for a live one, so that I can answer why a check refused from the record and not from memory.
@@ -113,6 +117,8 @@
 **S266.** As an administrator, I want to issue, list and revoke the credential a product signs people in with, with nobody ever seeing the app's secret, so that I can arm a product and disarm it in one place.
 
 **S423.** As an administrator asked why someone could not sign in, I want every refused sign-in written down with its route, its reason and the email tried, and an ended sign-in named as ended, so I can answer from the log instead of guessing.
+
+**S434.** As an administrator who said the Lys computer is not for agents, I am not asked again from another browser.
 
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
@@ -141,6 +147,14 @@
 **S264.** As a person signed in to an app, I want a seat I start there to be registered in Lys as an agent I answer for, and only while I am signed in there, so that nobody is made responsible for an AI they did not start.
 
 **S419.** As a person running lys sign-in on a server over ssh, I want to approve in my own browser and finish on the server with one command that takes the address from the page, so that I never need a browser where Lys's client runs.
+
+**S430.** As a person who signs in with Google and has no password, my account page says so, offers to set a password without asking for one I do not have, and lets me change my email.
+
+**S431.** As a person Lys refused, the link it gives me opens the Ask form already asking for the thing I was refused, so I do not have to describe it.
+
+**S432.** As a person who opened Lys at a different address, the sign-in page tells me before I try that Sign in with Google works only at Lys's registered address, and links me there.
+
+**S433.** As a person who is not an administrator, Open Cambium on my page is a link that opens Cambium.
 
 ## Directory administrator — Resolves a refused act
 

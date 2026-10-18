@@ -611,3 +611,13 @@
 ## The development start script's readiness watcher reads lines as they arrive (DIRECTORY-100)
 
 - [ ] **C750** — start_ready in surface/identity/dev/start.sh watches a child's output with a POSIX sh read loop, never awk, so the ready line is seen the moment it is written under mawk as under BSD awk.
+
+## The server answers what the screens ask (DIRECTORY-101)
+
+- [ ] **C757** — GET /waiting answers one oldest-first list of the requests the caller may decide, agent drafts, product drafts and reviews due, with a refused part named in place, never dropped or zero; the rail's count and Home's Waiting on you read it.
+- [ ] **C758** — GET /operations/{operation} answers recorded true with kind and id for a change the caller made, recorded false for an unknown id, and a refusal for another person's operation; the kept-change check asks it.
+- [ ] **C759** — GET /me/account answers password and providers; own_password and own_email accept no current password when the account has none and require it when it does; accounts.rs is split under 500 lines.
+- [ ] **C760** — A refusal's request address is /requests?kind=…&id=…&action=…, percent-encoded, with Refused.request still a string.
+- [ ] **C761** — /sign-in/providers answers origin, the configured redirect_url's origin, in both its answers.
+- [ ] **C762** — A person's view of an approved app carries address, the origin of its first sign-in redirect, so Open <app> is a link for everyone who sees the app.
+- [ ] **C763** — "Not this one" on getting started is kept on the server per person (PUT /me/getting-started, read on /me), with the browser's kept value moved once and removed.
