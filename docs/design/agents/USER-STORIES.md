@@ -14,6 +14,8 @@
 
 **S420.** As the owner, I want to open Lys and see the network as a tree of machines and the agents running on them, and click one to watch its terminal, so that the state of the whole estate is one glance and one click away.
 
+**S441.** As a person adding an agent, I fill one form and press once, and the agent is added, turned on, allowed on the computer I named and started in its folder, or I am told exactly which step was refused and what was done before it.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.
@@ -47,3 +49,5 @@
 ## A person starting an agent on their own computer — types one word and expects the agent to start, whether or not the Lys console is up
 
 **S426.** As a person starting an agent on my own computer, I want lys claude to start my agent when the Lys console is off or unreachable, telling me plainly that it is, so that the one word works every time and I never have to open a terminal to work out why it did not.
+
+**S442.** As a person on a fresh install, I can name my computer and its folder on the same form that adds my first agent.

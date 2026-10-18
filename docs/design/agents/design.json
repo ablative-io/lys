@@ -434,6 +434,21 @@
       "path": "crates/lys/src/cli/sign_in.rs",
       "note": "personal sign-in; asks for the Lys address on a bare machine instead of config_unreadable",
       "brief": "AGENTS-012"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agents_add_run.rs",
+      "note": "POST /agents with run: register, activate, settings, computer, allow and start under one operation, one receipt",
+      "brief": "AGENTS-013"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agents_add_run_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "AGENTS-013"
+    },
+    {
+      "path": "surface/identity/src/features/people/AddAgent.tsx",
+      "note": "adding an agent; one request, the receipt part by part",
+      "brief": "AGENTS-013"
     }
   ],
   "principles": [

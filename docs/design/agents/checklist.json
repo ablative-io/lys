@@ -224,6 +224,19 @@
           "text": "On a bare machine the first lys command asks for the Lys address once and keeps it, never answers config_unreadable; the first launch writes the device's Claude Code settings and lys agents lists them by path (AGENTS-012 R5)."
         }
       ]
+    },
+    {
+      "name": "Adding an agent is one act (AGENTS-013)",
+      "items": [
+        {
+          "id": "C770",
+          "text": "POST /agents with run registers, turns on, saves and approves settings, records a new computer or allows on a named one, and starts only with a working folder, under one operation with one receipt naming each part and the first refusal."
+        },
+        {
+          "id": "C771",
+          "text": "AddAgent sends one request and keeps no walk in the browser; the act says Add or Add and run by whether a folder is chosen; a refused part says what was done and the next act."
+        }
+      ]
     }
   ]
 }

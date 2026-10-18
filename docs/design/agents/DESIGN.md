@@ -139,6 +139,9 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `surface/identity/src/features/sessions/Sessions.tsx` | the sessions list; the handed-over marking | AGENTS-012 |
 | `surface/identity/src/features/runtime/Sessions.tsx` | Running agents' sessions view; the handed-over marking | AGENTS-012 |
 | `crates/lys/src/cli/sign_in.rs` | personal sign-in; asks for the Lys address on a bare machine instead of config_unreadable | AGENTS-012 |
+| `crates/lys-identity-server/src/agents_add_run.rs` | POST /agents with run: register, activate, settings, computer, allow and start under one operation, one receipt | AGENTS-013 |
+| `crates/lys-identity-server/src/agents_add_run_tests.rs` | tests of the sibling module, red first | AGENTS-013 |
+| `surface/identity/src/features/people/AddAgent.tsx` | adding an agent; one request, the receipt part by part | AGENTS-013 |
 
 ## Inventory
 

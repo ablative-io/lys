@@ -61,3 +61,8 @@
 - [ ] **C754** — A run started while Lys was unreachable is handed to Lys whole on the next command that reaches it, accepted by launch hash and pass validity at start, idempotent by run id, never dropped, refused by name (AGENTS-012 R3).
 - [ ] **C755** — The surface shows a handed-over session as started while Lys was not answering, from its device, counted in cost like any other (AGENTS-012 R4).
 - [ ] **C756** — On a bare machine the first lys command asks for the Lys address once and keeps it, never answers config_unreadable; the first launch writes the device's Claude Code settings and lys agents lists them by path (AGENTS-012 R5).
+
+## Adding an agent is one act (AGENTS-013)
+
+- [ ] **C770** — POST /agents with run registers, turns on, saves and approves settings, records a new computer or allows on a named one, and starts only with a working folder, under one operation with one receipt naming each part and the first refusal.
+- [ ] **C771** — AddAgent sends one request and keeps no walk in the browser; the act says Add or Add and run by whether a folder is chosen; a refused part says what was done and the next act.
