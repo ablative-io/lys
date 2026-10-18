@@ -306,9 +306,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
     POST "/setup/administrator" "Register the first administrator" P [&["SignInFailed", "SignInThrottled", "AccountRefused", "SetupClosed", "SetupCodeRefused", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
     POST "/setup/password" "Set the administrator's password without changing other sign-in factors" P [&["SignInFailed", "SignInThrottled", "SetupCodeRefused", "SetupUnavailable", "AccountRefused", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "DirectoryUnavailable"]];
-    GET "/me/account" "The caller's sign-in account" C [SIGNED, &["AccountRefused"]];
-    POST "/me/account/email" "Change the caller's email" C [SIGNED_BODY, &["AccountRefused"]];
-    POST "/me/account/password" "Change the caller's password" C [SIGNED_BODY, &["AccountRefused"]];
+    GET "/me/account" "The caller's sign-in account: its email, whether it may sign in, whether it has a password and the providers it signs in with" C [SIGNED, &["AccountRefused"]];
+    POST "/me/account/email" "Change the caller's email, confirmed by their password when the account has one" C [SIGNED_BODY, &["AccountRefused"]];
+    POST "/me/account/password" "Set or change the caller's password, confirmed by the current one when the account has one" C [SIGNED_BODY, &["AccountRefused"]];
     GET "/directory/people/{id}/account" "A person's sign-in account" S [ADMIN, &["AccountRefused", "IdentityUnknown"]] scope("account", "read", ["id"]);
     POST "/directory/people/{id}/account/email" "Change a person's email" S [ADMIN_BODY, &["AccountRefused", "IdentityUnknown"]] scope("account", "person.email.set", ["id"]);
     POST "/directory/people/{id}/account/enabled" "Enable or disable a person's sign-in" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "AccountRefused", "IdentityUnknown", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable", "ProviderUnavailable"]] scope("account", "person.sign-in.set", ["id"]);

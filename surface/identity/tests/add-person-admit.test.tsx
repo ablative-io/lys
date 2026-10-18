@@ -100,6 +100,15 @@ describe('Add a person in one act', () => {
     expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They sign in at ' + location.origin + ' with helper@example.test.');
   });
 
+  it('names Lys\u2019s own address, as the service serves it, in the invitation, not the address this page was opened at', async () => {
+    const { entry } = await form({ 'POST /people/admit': (body: unknown) => ok(admitted(body)),
+      '/sign-in/providers': ok({ providers: [{ id: 'google', name: 'Google' }], origin: 'https://lys.example.test' }) });
+    await fill(entry);
+    await submit(entry);
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They open https://lys.example.test and choose Sign in with Google, using helper@example.test.');
+  });
+
   it('refuses an answer whose receipt is not for this operation, keeping the request', async () => {
     const { entry } = await form({ 'POST /people/admit': (body) => ok({ ...admitted(body), receipt: { ...admitted(body).receipt, operation: 'op-' + '0'.repeat(32) } }) });
     await fill(entry);

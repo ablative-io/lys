@@ -1,8 +1,11 @@
 /**
  * A Lys account's email, password and sign-in, changed on Lys screens and
- * carried out by the service: a person's own account in Settings,
- * confirmed by their password, and anyone's for the administrator.
- * Passwords are sent once and never shown or kept on the page.
+ * carried out by the service: a person's own account in Settings, and
+ * anyone's for the administrator. Lys says whether an account has a password
+ * and which providers it signs in with: a person's own change is confirmed by
+ * their password when they have one, and someone who signs in with Google and
+ * has none sets a first password and changes their email with nothing to
+ * confirm. Passwords are sent once and never shown or kept on the page.
  */
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -15,6 +18,23 @@ import type { SymbolName } from '../../shell/symbols';
 interface AccountView {
   email: string | null;
   enabled: boolean;
+  /** Whether the account has a Lys password; absent from an older service, which always asked for it. */
+  password?: boolean;
+  /** The providers it signs in with, by the name the sign-in page offers: "google"; absent from an older service. */
+  providers?: string[];
+}
+
+/** A provider as the sign-in page names it. */
+const PROVIDER: Record<string, string> = { google: 'Google', microsoft: 'Microsoft', github: 'GitHub' };
+const providerName = (provider: string): string => PROVIDER[provider] ?? provider;
+
+/** How the account signs in, in a sentence: its email, its providers, or both. */
+export function signsInWith(account: AccountView): string {
+  const providers = (account.providers ?? []).map(providerName);
+  const via = providers.join(' or ');
+  if (!account.password && providers.length) return `You sign in with ${via}.`;
+  const email = account.email ?? 'your email';
+  return providers.length ? `You sign in with ${email} or with ${via}.` : `You sign in with ${email}.`;
 }
 
 type Status = { kind: 'done'; words: string } | { kind: 'refused'; words: string } | null;
@@ -129,7 +149,7 @@ export function OwnAccount() {
   return (
     <div className="card" id="lys-account">
       <p className="note">
-        {unavailable || (account ? `You sign in with ${account.email ?? 'your email'}.` : 'Reading your sign-in address…')} <a href="#/settings/account">Change in Settings</a>
+        {unavailable || (account ? signsInWith(account) : 'Reading your sign-in address…')} <a href="#/settings/account">Change in Settings</a>
       </p>
     </div>
   );
@@ -161,7 +181,7 @@ export function AccountSettings() {
           <div className="set-row">
             <div>
               <div>Email</div>
-              <div className="d">{account ? `You sign in with ${account.email ?? 'your email'}.` : 'Reading your sign-in address…'}</div>
+              <div className="d">{account ? signsInWith(account) : 'Reading your sign-in address…'}</div>
             </div>
             <Act symbol="edit" name="Change email" word="Change email" disabled={!account || changing !== null} onClick={() => open('email')} />
           </div>
@@ -172,38 +192,71 @@ export function AccountSettings() {
               saved={saved}
               cancel={() => setChanging(null)}
               submit={async (form) => {
-                const changed = await request<AccountView>('/me/account/email', { email: text(form, 'account-email').trim(), password: text(form, 'account-password') });
+                // An account with no password has nothing to confirm with: its session is the proof.
+                const email = text(form, 'account-email').trim();
+                const changed = await request<AccountView>('/me/account/email', account?.password === false ? { email } : { email, password: text(form, 'account-password') });
                 setAccount(changed);
                 return `You now sign in with ${changed.email ?? 'your new email'}.`;
               }}
             >
               <Field id="account-email" label="New email" type="email" autoComplete="email" />
-              <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />
+              {account?.password === false ? null : <Field id="account-password" label="Your password, to confirm" type="password" autoComplete="current-password" />}
             </Change>
           ) : null}
-          <div className="set-row">
-            <div>
-              <div>Password</div>
-              <div className="d">Choose a new password to sign in to Lys.</div>
-            </div>
-            <Act symbol="edit" name="Change password" word="Change password" disabled={!account || changing !== null} onClick={() => open('password')} />
-          </div>
-          {changing === 'password' ? (
-            <Change
-              label="Change your password"
-              action="Save password"
-              saved={saved}
-              cancel={() => setChanging(null)}
-              submit={async (form) => {
-                await request<AccountView>('/me/account/password', { current: text(form, 'account-current-password'), password: samePasswords(form) });
-                return 'Your password is changed.';
-              }}
-            >
-              <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
-              <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
-              <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
-            </Change>
-          ) : null}
+          {account?.password === false ? (
+            <>
+              <div className="set-row">
+                <div>
+                  <div>Password</div>
+                  <div className="d">You have no Lys password yet. Set one to sign in with your email as well.</div>
+                </div>
+                <Act symbol="edit" name="Set a password" word="Set a password" disabled={changing !== null} onClick={() => open('password')} />
+              </div>
+              {changing === 'password' ? (
+                <Change
+                  label="Set your password"
+                  action="Save password"
+                  saved={saved}
+                  cancel={() => setChanging(null)}
+                  submit={async (form) => {
+                    const changed = await request<AccountView>('/me/account/password', { password: samePasswords(form) });
+                    setAccount(changed);
+                    const via = (changed.providers ?? []).map(providerName).join(' or ');
+                    return via ? `Your password is set. You can sign in with it or with ${via}.` : 'Your password is set.';
+                  }}
+                >
+                  <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
+                  <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
+                </Change>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <div className="set-row">
+                <div>
+                  <div>Password</div>
+                  <div className="d">Choose a new password to sign in to Lys.</div>
+                </div>
+                <Act symbol="edit" name="Change password" word="Change password" disabled={!account || changing !== null} onClick={() => open('password')} />
+              </div>
+              {changing === 'password' ? (
+                <Change
+                  label="Change your password"
+                  action="Save password"
+                  saved={saved}
+                  cancel={() => setChanging(null)}
+                  submit={async (form) => {
+                    await request<AccountView>('/me/account/password', { current: text(form, 'account-current-password'), password: samePasswords(form) });
+                    return 'Your password is changed.';
+                  }}
+                >
+                  <Field id="account-current-password" label="Current password" type="password" autoComplete="current-password" />
+                  <Field id="account-new-password" label="New password" type="password" autoComplete="new-password" />
+                  <Field id="account-new-password-again" label="New password again" type="password" autoComplete="new-password" />
+                </Change>
+              ) : null}
+            </>
+          )}
         </>
       )}
     </section>

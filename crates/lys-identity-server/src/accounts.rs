@@ -30,16 +30,15 @@ use axum::body::{Body, Bytes};
 use axum::extract::FromRequest;
 use axum::extract::rejection::{BytesRejection, JsonRejection};
 use axum::extract::{OriginalUri, Path, State};
-use axum::http::{Extensions, HeaderMap, Request};
+use axum::http::{HeaderMap, Request};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::{Actor, IdentityId, PersonId};
+use lys_identity::{IdentityId, PersonId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::error::ServerError;
 use crate::routes::{AppState, signed_in, with_directory};
-use crate::sign_in::{Attempt, person_address};
 use crate::sign_in_providers::{SignInProviders, api};
 
 fn refused(reason: impl Into<String>) -> ServerError {
@@ -48,8 +47,12 @@ fn refused(reason: impl Into<String>) -> ServerError {
     }
 }
 
+#[path = "accounts_own.rs"]
+mod own;
 #[path = "accounts_policy.rs"]
 mod policy;
+use own::shown;
+pub(crate) use own::{OwnEmail, OwnPassword};
 pub use policy::{PasswordPolicy, check_email, check_password};
 
 /// The name the issuer keeps for a person, when `display_name` is one the
@@ -273,9 +276,9 @@ pub async fn email_of(api: &SignInProviders, id: &str) -> Result<String, ServerE
 /// The account routes: a person's own, and the administrator's for anyone.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/me/account", get(own_account))
-        .route("/me/account/email", post(own_email))
-        .route("/me/account/password", post(own_password))
+        .route("/me/account", get(own::own_account))
+        .route("/me/account/email", post(own::own_email))
+        .route("/me/account/password", post(own::own_password))
         .route("/directory/people/{id}/account", get(account_of))
         .route("/directory/people/{id}/account/email", post(set_email))
         .route(
@@ -290,15 +293,6 @@ fn body_of<T>(body: Result<Json<T>, JsonRejection>) -> Result<T, ServerError> {
         .map_err(|refused| ServerError::RequestMalformed {
             reason: refused.body_text(),
         })
-}
-
-/// The account `actor` signed in with, when it is one at this service's issuer.
-fn own_id(state: &AppState, actor: &Actor) -> Result<String, ServerError> {
-    if actor.binding().issuer() == state.oidc.issuer() {
-        Ok(actor.binding().subject().to_owned())
-    } else {
-        Err(refused("this sign-in is not a Lys account"))
-    }
 }
 
 /// The account of person `id`: the login the directory binds them to at
@@ -318,109 +312,6 @@ fn account_id(state: &AppState, id: &str) -> Result<String, ServerError> {
             .map(|binding| binding.subject().to_owned())
             .ok_or_else(|| refused("this person has no Lys account to change"))
     })
-}
-
-/// The account as a screen shows it.
-async fn shown(api: &SignInProviders, id: &str) -> Result<Json<Value>, ServerError> {
-    let user = read(api, id).await?;
-    Ok(Json(json!({
-        "email": user.get("email").cloned().unwrap_or(Value::Null),
-        "enabled": user.get("enabled").cloned().unwrap_or(Value::Bool(true)),
-    })))
-}
-
-/// Confirm that `password` is account `id`'s by signing in with it.
-async fn confirm(
-    state: &AppState,
-    extensions: &Extensions,
-    id: &str,
-    password: &str,
-) -> Result<(), ServerError> {
-    let email = email_of(api(state)?, id).await?;
-    let attempt = Attempt {
-        email: &email,
-        password,
-        address: person_address(extensions)?,
-    };
-    let checked = state
-        .sign_in
-        .password(&state.oidc, &attempt)
-        .await
-        .map_err(|error| match error {
-            ServerError::SignInRefused => refused("that is not your current password"),
-            other => other,
-        })?;
-    if checked.binding().subject() == id {
-        Ok(())
-    } else {
-        Err(refused("that password belongs to another account"))
-    }
-}
-
-async fn own_account(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<Value>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let id = own_id(&state, &actor)?;
-    shown(api(&state)?, &id).await
-}
-
-/// A new email, confirmed by the password. Never printed.
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct OwnEmail {
-    email: String,
-    password: String,
-}
-
-async fn own_email(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    extensions: Extensions,
-    body: Result<Json<OwnEmail>, JsonRejection>,
-) -> Result<Json<Value>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let id = own_id(&state, &actor)?;
-    let body = body_of(body)?;
-    let email = check_email(&body.email)?.to_owned();
-    confirm(&state, &extensions, &id, &body.password).await?;
-    let api = api(&state)?;
-    change(api, &id, |update| {
-        update["email"] = Value::String(email);
-        update["email_verified"] = Value::Bool(true);
-    })
-    .await?;
-    shown(api, &id).await
-}
-
-/// A new password, confirmed by the current one. Never printed.
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct OwnPassword {
-    current: String,
-    password: String,
-}
-
-async fn own_password(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    extensions: Extensions,
-    body: Result<Json<OwnPassword>, JsonRejection>,
-) -> Result<Json<Value>, ServerError> {
-    let actor = signed_in(&state, &headers)?;
-    let id = own_id(&state, &actor)?;
-    let body = body_of(body)?;
-    let policy = state.password_policy.as_ref();
-    check_password(policy, &body.password)?;
-    confirm(&state, &extensions, &id, &body.current).await?;
-    let api = api(&state)?;
-    change(api, &id, |update| {
-        update["password"] = Value::String(body.password);
-        update["email_verified"] = Value::Bool(true);
-    })
-    .await?;
-    shown(api, &id).await
 }
 
 async fn account_of(

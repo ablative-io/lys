@@ -33,7 +33,7 @@ async function press(name: string) {
 }
 
 function fields() {
-  return $$('form[aria-label^="Change your"] input') as HTMLInputElement[];
+  return $$('form[aria-label^="Change your"] input, form[aria-label^="Set your"] input') as HTMLInputElement[];
 }
 
 function fill(values: Record<string, string>) {
@@ -133,5 +133,46 @@ describe('Account changes belong in Settings', () => {
     expect(location.hash).toBe('#/settings/account');
     expect($$('input[type="password"]')).toHaveLength(0);
     expect($('section[aria-label="Your account"]')).not.toBeNull();
+  });
+});
+
+/** The three kinds of account `/me/account` says: a password only, Google only, and both. */
+describe('Your account says how you sign in', () => {
+  const as = (password: boolean, providers: string[]) => ({ ...SERVICE, '/me/account': ok({ email: 'ada@example.test', enabled: true, password, providers }) });
+  const row = (name: string) => $$('section[aria-label="Your account"] .set-row').find((each) => each.firstElementChild?.firstElementChild?.textContent === name)?.textContent ?? '';
+
+  it('with a password only: the email, and a change that asks for the current password', async () => {
+    await open('#/settings/account', as(true, []));
+    expect(row('Email')).toContain('You sign in with ada@example.test.');
+    await press('Change password');
+    expect(fields().map((input) => input.autocomplete)).toEqual(['current-password', 'new-password', 'new-password']);
+  });
+
+  it('with Google only: says so, sets a password with no current one, and changes the email with no password', async () => {
+    const posted = await open('#/settings/account', { ...as(false, ['google']),
+      'POST /me/account/password': ok({ email: 'ada@example.test', enabled: true, password: true, providers: ['google'] }),
+      'POST /me/account/email': ok({ email: 'ada@lovelace.test', enabled: true, password: false, providers: ['google'] }) });
+    expect(row('Email')).toContain('You sign in with Google.');
+    expect(row('Password')).toContain('You have no Lys password yet.');
+    expect($('button[aria-label="Change password"]')).toBeNull();
+    await press('Change email');
+    expect(fields().map((input) => input.autocomplete)).toEqual(['email']);
+    await press('Cancel');
+    await press('Set a password');
+    expect(fields().map((input) => input.autocomplete)).toEqual(['new-password', 'new-password']);
+    fill({ 'account-new-password': 'First-password', 'account-new-password-again': 'First-password' });
+    await save('Set your password');
+    expect(posted).toEqual([{ path: '/me/account/password', body: { password: 'First-password' } }]);
+    expect(text()).toContain('Your password is set. You can sign in with it or with Google.');
+    // Now it has a password, a change asks for it.
+    await press('Change email');
+    expect(fields().map((input) => input.autocomplete)).toEqual(['email', 'current-password']);
+  });
+
+  it('with both: names the email and Google, and asks for the current password', async () => {
+    await open('#/settings/account', as(true, ['google']));
+    expect(row('Email')).toContain('You sign in with ada@example.test or with Google.');
+    await press('Change email');
+    expect(fields().map((input) => input.autocomplete)).toEqual(['email', 'current-password']);
   });
 });

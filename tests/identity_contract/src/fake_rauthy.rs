@@ -287,6 +287,15 @@ async fn create_user(
             .entry("email_verified")
             .or_insert_with(|| json!(false));
         fields.entry("user_values").or_insert_with(|| json!({}));
+        // The issuer's account type (Rauthy's `User::account_type`): no
+        // account is made with a password, so a new one is federated or new.
+        let federated = fields
+            .get("federation_uid")
+            .is_some_and(|uid| !uid.is_null());
+        fields.insert(
+            "account_type".to_owned(),
+            json!(if federated { "federated" } else { "new" }),
+        );
     }
     held.push(body.clone());
     Json(body).into_response()
@@ -370,6 +379,15 @@ async fn update_user(
         let mut held = fixture!(held(&inner.users));
         let Some(slot) = held.iter_mut().find(|user| user["id"] == id.as_str()) else {
             return no_user();
+        };
+        // The account type follows the password as Rauthy's does: a password
+        // set makes it a password account, federated or not; none keeps it.
+        let federated = slot.get("federation_uid").is_some_and(|uid| !uid.is_null());
+        body["account_type"] = match (&password, slot.get("account_type")) {
+            (Some(Value::String(_)), _) if federated => json!("federated_password"),
+            (Some(Value::String(_)), _) => json!("password"),
+            (_, Some(kept)) => kept.clone(),
+            (_, None) => json!(if federated { "federated" } else { "new" }),
         };
         // The issuer's account update cannot unlink federation or passkeys;
         // those have separate endpoints and are retained by User::update.

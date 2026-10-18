@@ -1,13 +1,11 @@
 import { EffectiveSettings } from './EffectiveSettings';
 import type { ReactNode } from 'react';
 import { useParams } from 'react-router';
-import { request, useLoad } from '../../api';
 import { PageHeader } from '../../shell/PageHeader';
 import { useShell } from '../../shell/ShellContext';
 import { ConfigTabs } from './ConfigTabs';
 import { AccountSettings } from '../people/Account';
 import './settings.css';
-import { AdministratorContact, useAdministratorContact } from '../signin/AccountHelp';
 
 function Row({ t, d, children }: { t: string; d: string; children: ReactNode }) {
   return (
@@ -52,21 +50,6 @@ function Layout() {
 }
 
 /**
- * A person who signs in with Google has no Lys password, and both changes above ask for the current one. The
- * service does not yet say which case a person is in (`/me/account` names only email and enabled; CONSENSUS 05
- * item 9), so the act that works today, an administrator setting a password, is said as a condition.
- */
-function NoPasswordYet() {
-  const { administrator } = useAdministratorContact();
-  // The administrator sets another person's password on their file (PersonSecurity's PersonAccount), never their own.
-  const service = useLoad(() => request('/configuration'), 'settings-tabs-configuration');
-  const next = service.status === 'loading' ? null : service.status === 'ok'
-    ? <>You administer this Lys, so there is no one to ask: until Lys can set a first password here, keep signing in with Google.</>
-    : <>Ask <AdministratorContact administrator={administrator} /> to set one for you, then change it here.</>;
-  return <p className="note settings-no-password">Signed in with Google and never set a Lys password? Changing your email or password here asks for one you do not have. {next}</p>;
-}
-
-/**
  * Settings, split by whose each setting is. "For you" (`/settings/account`, and `/settings/layout`) is the
  * person's own sign-in and layout, open to everyone: the navigation never gates that address. "This service"
  * (`/settings` and its sections) is the startup configuration, which only administrators may read.
@@ -82,7 +65,6 @@ export function Settings() {
         {personal ? (
           <>
             <AccountSettings />
-            <NoPasswordYet />
             <Layout />
           </>
         ) : (

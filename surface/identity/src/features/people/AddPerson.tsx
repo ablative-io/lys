@@ -98,25 +98,31 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
   </section>;
 }
 
-/** The address people sign in at. An administrator's change is accepted only from Lys's public origin
- * (crates/lys-identity-server/src/signed_json.rs checks each signed request against it), so the page that added
- * someone is open at that address. */
-const signInAddress = (): string => location.origin;
+/** The address people sign in at: Lys's own, as `/sign-in/providers` serves it (`origin`, the address every
+ * provider is registered with), else the address this page is open at, which an administrator's signed change
+ * already had to come from (crates/lys-identity-server/src/signed_json.rs). */
+const signInAddress = (served: string | null): string => served ?? location.origin;
 
 /** The invitation, as the person adding them would send it. When Lys offers Google, it tells them to choose it, with the email it knows them by. */
 export const invitation = (name: string, email: string, address: string, google: string | null = null): string => google
   ? 'Hello ' + name + ', you have been added to Lys. Open ' + address + ' and choose Sign in with ' + google + ', using ' + email + '.'
   : 'Hello ' + name + ', you have been added to Lys. Sign in at ' + address + ' with ' + email + '.';
 
-/** Google's name as Lys offers it at sign-in (`/sign-in/providers`), or null when it is not offered or the list cannot be read: the invitation then names the email and password way. */
-const readGoogle = (): Promise<string | null> => request<{ providers?: { id: string; name: string }[] }>('/sign-in/providers').then(
-  (answer) => answer.providers?.find((entry) => /google/i.test(entry.id + ' ' + entry.name))?.name ?? null, () => null);
+/**
+ * What the sign-in page offers (`/sign-in/providers`): Google's name, or null when it is not offered, and Lys's own
+ * address when the service names one. When the list cannot be read the invitation names the email and password way.
+ */
+const readSignIn = (): Promise<{ google: string | null; origin: string | null }> => request<{ providers?: { id: string; name: string }[]; origin?: unknown }>('/sign-in/providers').then(
+  (answer) => ({
+    google: answer.providers?.find((entry) => /google/i.test(entry.id + ' ' + entry.name))?.name ?? null,
+    origin: typeof answer.origin === 'string' && /^https?:\/\/[^/?#]+$/.test(answer.origin) ? answer.origin : null,
+  }), () => ({ google: null, origin: null }));
 
 function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; email: string }) {
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
-  const address = signInAddress();
-  const providers = useLoad(readGoogle, 'add-person-google');
-  const google = providers.status === 'ok' ? providers.data : null;
+  const providers = useLoad(readSignIn, 'add-person-sign-in');
+  const google = providers.status === 'ok' ? providers.data.google : null;
+  const address = signInAddress(providers.status === 'ok' ? providers.data.origin : null);
   const [copy, setCopy] = useState<'idle' | 'copied' | 'refused'>('idle');
   const copyInvite = async () => {
     try { await navigator.clipboard.writeText(invitation(name, email, address, google)); setCopy('copied'); }
