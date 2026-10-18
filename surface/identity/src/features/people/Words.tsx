@@ -26,7 +26,8 @@ const REFUSALS: Record<string, string> = {
   AlarmsUnreadable: 'Lys answered, but the alarms could not be read. Reload the page; if it happens again, ask the administrator to check the service.',
   UnconfirmedReceipt: 'The answer did not confirm this change. Use Check to see whether Lys saved it before sending another.',
   StorageUncertain: 'The change may have been saved, but its outcome is unknown. Use Check to see whether Lys saved it before sending another.',
-  ServiceUnreachable: 'Lys could not be reached. Ask the administrator to check the service. Keep any change whose outcome is unknown.',
+  // Read when shown: the address the page is open at names which Lys is not answering.
+  get ServiceUnreachable() { return 'Lys at ' + location.host + ' is not answering; the computer it runs on may be off or asleep. Keep any change whose outcome is unknown.'; },
   SecretsUnavailable: 'Lys could not reach or use its secret storage service. Ask the administrator to check it.',
   SignInProvidersUnavailable: 'Lys could not read or change its sign-in services. Ask the administrator to check them.',
   SignInProvidersRefused: 'The sign-in service did not accept these settings.',

@@ -4,9 +4,10 @@ import { api } from '../../api';
 import { Act } from '../../shell/Act';
 
 const KEY = 'lys.sign-in.file-return';
-const fileLink = (hash: string) => /^#\/file\/[^/?#]+\/access\?[^#]*$/.test(hash);
+// A give link, or an app's connect link (which carries only the app's manifest address, return address and state, never authority).
+const fileLink = (hash: string) => /^#\/file\/[^/?#]+\/access\?[^#]*$/.test(hash) || /^#\/apps\/connect\?[^#]*$/.test(hash);
 
-/** Keep only a file route in this tab; authority is never kept in the link. */
+/** Keep only a give or connect link in this tab; authority is never kept in the link. */
 export function rememberFileReturn(): void {
   if (fileLink(location.hash)) sessionStorage.setItem(KEY, location.hash);
 }
@@ -91,7 +92,7 @@ function takeDropped(): boolean {
 export function takeFileReturn(): string | null {
   const hash = sessionStorage.getItem(KEY);
   if (hash === null) return null;
-  if (!fileLink(hash)) throw new Error('The saved file link is invalid. Open the original access link again.');
+  if (!fileLink(hash)) throw new Error('The saved link is invalid. Open the original link again.');
   sessionStorage.removeItem(KEY);
   return hash;
 }
@@ -144,7 +145,7 @@ export function ProviderFileReturn() {
           }
         },
         (error: unknown) => {
-          if (live) setProblem('Lys could not confirm sign-in for the saved file link: ' + String(error));
+          if (live) setProblem('Lys could not confirm sign-in for the saved link: ' + String(error));
         }
       );
     });

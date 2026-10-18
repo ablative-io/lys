@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { api } from '../src/api';
 import { Callback, signedInHere } from '../src/features/signin/Gate';
+import { keepAcrossSignIn, rememberFileReturn, takeFileReturn } from '../src/features/signin/fileReturn';
 import { signedOutPage } from '../src/features/me/SignOut';
 import type { Grant, GrantModel } from '../src/generated/grants';
 import { ADA, BEA, GRANTS, ME, MODEL, SCRIBE, SERVICE, ok, refused, type Route } from './fixtures';
@@ -165,4 +166,28 @@ it('GUARD 6 Sign out forgets every link kept for a sign-in, and a signed-in page
   await click($$('.page-header button').find((each) => each.getAttribute('aria-label') === 'Sign out') ?? null);
   expect(sessionStorage.getItem('lys.sign-in.file-return')).toBeNull();
   expect(sessionStorage.getItem('lys.sign-in.landing')).toBeNull();
+});
+
+const connect = '#/apps/connect?manifest=' + encodeURIComponent('https://cambium.test/.well-known/lys-app') + '&return=' + encodeURIComponent('https://cambium.test/lys/return') + '&state=s1';
+
+it('CONNECT 1 the connect link is kept across sign-in as a file link is, and nothing else is', () => {
+  history.replaceState(null, '', '/' + connect);
+  rememberFileReturn();
+  expect(takeFileReturn()).toBe(connect);
+  for (const other of ['#/apps', '#/apps/connect', '#/settings?x=1']) {
+    history.replaceState(null, '', '/' + other);
+    rememberFileReturn();
+    expect(takeFileReturn(), other).toBeNull();
+  }
+  sessionStorage.setItem('lys.sign-in.file-return', '#/apps/connect/elsewhere?state=s1');
+  expect(() => takeFileReturn()).toThrow('The saved link is invalid. Open the original link again.');
+});
+
+it('CONNECT 2 a kept connect link is dropped when someone else signs in', async () => {
+  localStorage.setItem(PERSON, BEA);
+  serve(service(true));
+  history.replaceState(null, '', '/' + connect);
+  rememberFileReturn();
+  expect(await keepAcrossSignIn()).toBe(false);
+  expect(takeFileReturn()).toBeNull();
 });
