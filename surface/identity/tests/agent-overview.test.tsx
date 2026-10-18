@@ -76,7 +76,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect($('.file [data-act="rename"]')?.getAttribute('aria-label')).toBe('Edit name');
     expect($('.file .head [data-act="stop"]')).toBeNull();
     await click($('.file .head [aria-label="More actions"]'));
-    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend access');
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Pause now');
     expect($('.file .head [data-act="retire"]')?.textContent).toBe('Retire');
     expect(requests).not.toContain('/receipts/4');
     expect($('.agent-details')).toBeNull();
@@ -328,7 +328,7 @@ describe('An agent page explains the agent before its controls', () => {
     expect(requests).not.toContain('/receipts/5');
     expect($('.file .head [data-act="stop"]')).toBeNull();
     await click($('.file .head [aria-label="More actions"]'));
-    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Suspend access');
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Pause now');
     expect(posted).toEqual([]);
   });
 });

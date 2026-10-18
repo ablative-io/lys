@@ -14,8 +14,8 @@ describe('People and agents', () => {
     expect(scribe?.textContent).toContain('Ada (test person)');
     // A state is said in words, never by the service's own name for it.
     const states = $$('.state-of').map((cell) => cell.textContent);
-    expect(states).toContain('Awaiting activation');
-    expect(states).toContain('Access suspended');
+    expect(states).toContain('Not turned on yet');
+    expect(states).toContain('Paused');
     for (const raw of ['active', 'registered', 'suspended', 'retired']) expect(states).not.toContain(raw);
     expect($$('.stat .n').map((n) => n.textContent)).toEqual(['1', '2', '1', '0', '0']);
   });
@@ -23,20 +23,20 @@ describe('People and agents', () => {
   it('flags an agent whose person is retired (conformance 3.1)', async () => {
     await mount('#/people');
     const reviewer = $$('tbody tr').find((tr) => tr.textContent?.includes("Reviewer"));
-    expect(reviewer?.textContent).toContain('(permanently retired)');
+    expect(reviewer?.textContent).toContain('(retired)');
     // A retired agent is left out of the list until it is asked for.
     const lamplighter = () => $$('tbody tr').find((tr) => tr.textContent?.includes("Lamplighter"));
     expect(lamplighter()).toBeUndefined();
     await click($$('.tools button').find((each) => each.textContent?.startsWith('Show retired (')) ?? null);
     expect(lamplighter()).toBeDefined();
-    expect(lamplighter()?.textContent).not.toContain('(permanently retired)');
+    expect(lamplighter()?.textContent).not.toContain('(retired)');
   });
 
   it('flags an agent whose person is suspended, not only retired (conformance 3.1)', async () => {
     const suspended = { ...DIRECTORY, people: DIRECTORY.people.map((p) => (p.id === ADA ? { ...p, state: 'suspended' as const } : p)) };
     await mount('#/people', { ...SERVICE, '/directory/people': ok(suspended) });
     const scribe = $(`tr[data-href="#/file/${SCRIBE}"]`);
-    expect(scribe?.textContent).toContain('(access suspended)');
+    expect(scribe?.textContent).toContain('(paused)');
     expect($$('.stat .n')[2].textContent).toBe('4');
   });
 

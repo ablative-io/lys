@@ -20,7 +20,7 @@ import { FolderChooser } from '../provisioning/FolderChooser';
 import { saveFolder } from '../provisioning/working-folder';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import { readRoles } from '../roles/AssignedRoles';
-import { ErrorWords, problemWords } from '../people/Words';
+import { ACTION_SHORT, ErrorWords, problemWords, STATUS } from '../people/Words';
 import { Act } from '../../shell/Act';
 
 /** What refused a start: the refusal's name and its reason, as answered. */
@@ -28,7 +28,7 @@ export interface StartRefusal { refusal: string; reason: string }
 
 /** The one act that fixes a refusal, when there is one. */
 export type Fix =
-  | { kind: 'turn-on'; label: 'Turn on' | 'Turn back on'; transition: 'activate' | 'reinstate' }
+  | { kind: 'turn-on'; label: string; transition: 'activate' | 'reinstate' }
   | { kind: 'allow-computer' }
   | { kind: 'choose-folder' }
   | { kind: 'try-again' }
@@ -44,8 +44,8 @@ const NO_COMPUTER = ['MachineNotForAgent', 'MachineUnavailable'];
  */
 export function whyNot(name: string, refusal: StartRefusal): { sentence: string; fix: Fix } {
   const state = refusal.refusal === 'AgentNotActive' ? /\bis (registered|suspended|retired)\b/.exec(refusal.reason)?.[1] : undefined;
-  if (state === 'registered') return { sentence: name + ' is not turned on yet.', fix: { kind: 'turn-on', label: 'Turn on', transition: 'activate' } };
-  if (state === 'suspended') return { sentence: name + ' is paused.', fix: { kind: 'turn-on', label: 'Turn back on', transition: 'reinstate' } };
+  if (state === 'registered') return { sentence: name + ' is ' + STATUS.registered.toLowerCase() + '.', fix: { kind: 'turn-on', label: ACTION_SHORT.activate, transition: 'activate' } };
+  if (state === 'suspended') return { sentence: name + ' is ' + STATUS.suspended.toLowerCase() + '.', fix: { kind: 'turn-on', label: ACTION_SHORT.reinstate, transition: 'reinstate' } };
   if (state === 'retired') return { sentence: name + ' is retired and cannot be started again.', fix: { kind: 'nothing' } };
   if (refusal.refusal === 'WorkingFolderUnnamed') return { sentence: name + ' has no folder to work in.', fix: { kind: 'choose-folder' } };
   if (NO_COMPUTER.includes(refusal.refusal)) return { sentence: 'No computer is allowed to run ' + name + '.', fix: { kind: 'allow-computer' } };

@@ -92,14 +92,14 @@ function File({ data, tab, reload, stop, stopped, notice, note, giveQuery }: { d
         <div className="head">
           <div>
             <h1>{x.display_name}</h1>
-            {agent ? (x.state === 'active' ? null : <p className="sec">{x.state === 'registered' ? 'This agent still needs to be switched on before it can start.' : x.state === 'suspended' ? 'This agent’s access is suspended. A new start needs it to be reinstated.' : 'This agent is retired.'}</p>)
+            {agent ? (x.state === 'active' ? null : <p className="sec">{x.state === 'registered' ? 'This agent is not turned on yet. Turn it on before it can start.' : x.state === 'suspended' ? 'This agent is paused. Turn it back on before it can start again.' : 'This agent is retired.'}</p>)
               : person ? <p className="sec">Answers to <Pill x={person} /></p> : null}
           </div>
           <div className="head-actions">
             {ACTIONS[x.state].includes('activate') ? <Act symbol="start" name={ACTION.activate} word={ACTION_SHORT.activate} tone="primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')} /> : null}
-            <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Suspended in this stop answer' : STATUS[x.state]}</span>
+            <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Paused by this stop' : STATUS[x.state]}</span>
             <HeadMenu chosen={changing} choose={(act) => setChanging(changing === act ? null : act)}
-              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: agent && a === 'suspend' ? 'Suspend access' : ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
+              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: agent && a === 'suspend' ? 'Pause now' : ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
           </div>
         </div>
         {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}
@@ -108,8 +108,8 @@ function File({ data, tab, reload, stop, stopped, notice, note, giveQuery }: { d
           <label className="field">Display name<input name="display_name" required defaultValue={x.display_name} /></label>
         </RecordedForm> : null}
         {kind === 'agent' && (x.state === 'active' || x.state === 'suspended') ? <EmergencyStop id={x.id} active={x.state === 'active'} stopped={stopped} open={changing === 'suspend'} cancel={() => setChanging(null)} /> : null}
-        {changing && changing !== 'name' && !(agent && changing === 'suspend') ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access. Retirement is permanent.' : changing === 'suspend' ? 'Suspending stops its access until it is restored.' : undefined} submitLabel={ACTION[changing]} drawn={{ symbol: changing === 'retire' ? 'retire' : changing === 'suspend' ? 'suspend' : 'start', word: ACTION_SHORT[changing], tone: changing === 'retire' || changing === 'suspend' ? 'danger' : 'primary' }} done={reload}
-          success={(asked) => { const now: Record<string, string> = { activate: 'active', suspend: 'suspended', retire: 'retired', reinstate: 'active', resume: 'active' }; const words = x.display_name + ' is now ' + (now[String(asked.body.transition)] ?? 'updated') + '.'; note(words); return words; }}
+        {changing && changing !== 'name' && !(agent && changing === 'suspend') ? <RecordedForm key={changing} name="lifecycle" title="Record lifecycle change" heading={ACTION[changing]} description={changing === 'retire' ? 'Retiring stops its access for good; it cannot be turned back on.' : changing === 'suspend' ? 'Pausing stops its access until it is turned back on.' : undefined} submitLabel={ACTION[changing]} drawn={{ symbol: changing === 'retire' ? 'retire' : changing === 'suspend' ? 'suspend' : 'start', word: ACTION_SHORT[changing], tone: changing === 'retire' || changing === 'suspend' ? 'danger' : 'primary' }} done={reload}
+          success={(asked) => { const now: Record<string, string> = { activate: 'active', suspend: 'paused', retire: 'retired', reinstate: 'active', resume: 'active' }; const words = x.display_name + ' is now ' + (now[String(asked.body.transition)] ?? 'updated') + '.'; note(words); return words; }}
           change={(form) => ({ path: '/identities/' + encodeURIComponent(x.id) + '/transitions', body: { transition: changing, reason: String(form.get('reason') ?? '').trim() } })}>
           <label className="field">Reason<input name="reason" required /></label>
         </RecordedForm> : null}

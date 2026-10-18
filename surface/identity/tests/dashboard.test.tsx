@@ -113,8 +113,8 @@ describe('The Dashboard is the front page', () => {
     })) });
     expect(cells('Scribe').slice(2, 4)).toEqual(['900 tokens of 1,000 tokens today · $100 of $500 this week', '2 open, next due 6 Oct, 1 missed']);
     // A part that could not be read says so in plain words; its refusal is kept under Error details, never on the face.
-    expect(cells('Courier').slice(1, 4)).toEqual(['Awaiting activation', 'Its use could not be read', '1 missed']);
-    expect(cells('Archivist').slice(1, 4)).toEqual(['Access suspended', 'Its limits could not be read', 'No goal']);
+    expect(cells('Courier').slice(1, 4)).toEqual(['Not turned on yet', 'Its use could not be read', '1 missed']);
+    expect(cells('Archivist').slice(1, 4)).toEqual(['Paused', 'Its limits could not be read', 'No goal']);
     expect(folded(rowOf('Courier')?.querySelectorAll('td')[2])).toBe('UsageUnavailable: the usage store is closed');
     expect(folded(rowOf('Archivist')?.querySelectorAll('td')[2])).toBe('BudgetsUnavailable: the budgets store is closed');
     for (const name of ['Courier', 'Archivist']) expect(cells(name).join(' ')).not.toMatch(/Unavailable/);
@@ -360,7 +360,7 @@ describe('What the Dashboard reads, as the service answers it', () => {
     expect(rowOf('Scribe')?.querySelector('[data-act="start"], [data-act="stop"], [data-act="watch"]')).toBeNull();
     expect(cells('Scribe')[2]).toBe('No limit');
     const courier = [...($(`tr[data-href="#/file/${COURIER}"]`)?.querySelectorAll('td') ?? [])].map(face);
-    expect(courier.slice(0, 2)).toEqual(['CourierIts teams could not be read', 'Awaiting activation']);
+    expect(courier.slice(0, 2)).toEqual(['CourierIts teams could not be read', 'Not turned on yet']);
     expect(folded($(`tr[data-href="#/file/${COURIER}"] td`))).toBe('TeamsUnavailable: the teams store is closed');
     // An agent whose sessions could not be read is not counted as stopped: Running now names it and never says nothing runs.
     const panel = $('section[aria-label="Running now"]');

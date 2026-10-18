@@ -43,7 +43,7 @@ describe('An agent’s file', () => {
     expect(facts).toContain('AccessActive');
     expect(facts).not.toContain('authority only');
     expect(facts).not.toContain('A person answers for themselves');
-    expect($$('.grid2 .row .dim').map((each) => each.textContent)).toEqual(['Active', 'Awaiting activation', 'Access suspended']);
+    expect($$('.grid2 .row .dim').map((each) => each.textContent)).toEqual(['Active', 'Not turned on yet', 'Paused']);
   });
 
   it('offers a proof of each change by name rather than a log entry number, and no lifecycle diagram', async () => {

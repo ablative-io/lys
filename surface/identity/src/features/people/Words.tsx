@@ -43,7 +43,7 @@ const REFUSALS: Record<string, string> = {
   WorkingFolderUnnamed: 'Choose the folder this agent works in before it can start.',
   LaunchRecordMissing: 'Save this agent’s settings before starting it.',
   HarnessUndeclared: 'Choose the installed program this agent uses, then save its settings.',
-  AgentNotActive: 'This agent is not ready to start. Check whether its access is awaiting activation, paused or retired.',
+  AgentNotActive: 'This agent is not ready to start. Check whether it is not turned on yet, paused or retired.',
   AgentHasNoPolicy: 'Set this agent’s tool rules before starting it.',
   AgentSignatureRefused: 'Lys could not verify this agent’s identity. Ask the administrator to check its certificate.',
   AgentSettingsMismatch: 'Lys answered with settings for a different agent. Keep your changes and check this agent’s saved settings.',
@@ -228,8 +228,10 @@ function ReadName({ id }: { id: string }) {
   return <><Named id={id} name={name} waiting={load.status === 'loading'} />{load.status === 'refused' ? <small title={problemParts(load.refused).detail}> {problemWords(load.refused)}</small> : null}</>;
 }
 
-export const STATUS: Record<string, string> = { registered: 'Awaiting activation', active: 'Active', suspended: 'Access suspended', retired: 'Permanently retired' };
-export const ACTION: Record<string, string> = { activate: 'Activate access', suspend: 'Suspend access', retire: 'Retire permanently', reinstate: 'Restore access', resume: 'Restore access' };
+/** One word for each state, on every screen that names one: the table, the file's head, the reason an agent cannot start. */
+export const STATUS: Record<string, string> = { registered: 'Not turned on yet', active: 'Active', suspended: 'Paused', retired: 'Retired' };
+/** The act that moves to each state, in the same words: Turn on, Pause, Turn back on, Retire. */
+export const ACTION: Record<string, string> = { activate: 'Turn on', suspend: 'Pause', retire: 'Retire for good', reinstate: 'Turn back on', resume: 'Turn back on' };
 /** The same acts in one word, for a menu or a small button; the full words stay on the form each opens. */
-export const ACTION_SHORT: Record<string, string> = { activate: 'Activate', suspend: 'Suspend', retire: 'Retire', reinstate: 'Restore', resume: 'Restore' };
+export const ACTION_SHORT: Record<string, string> = { activate: 'Turn on', suspend: 'Pause', retire: 'Retire', reinstate: 'Turn back on', resume: 'Turn back on' };
 export const PART: Record<string, string> = { responsibilities: 'Responsibilities', goals: 'Goals', practice: 'How the work is done', profile: 'Starting instructions for an agent' };

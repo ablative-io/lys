@@ -18,10 +18,10 @@ export function EmergencyStop({ id, active, stopped, open = false, cancel }: { i
   const change = useRoleChange<StopAnswer>('lys.pending.stop.' + id, '/agents/' + encodeURIComponent(id) + '/stop',
     (result, body) => { if (result.agent !== id || result.operation !== body.operation || result.state !== 'suspended') return false; stopped(result); return true; }, () => undefined);
   return <>
-    {open && active ? <form className="card" aria-label="Confirm suspension" onSubmit={(event) => { event.preventDefault(); if (reason.trim()) change.submit({ operation: operationId(), reason: reason.trim() }); }}>
-      <p>This suspends the agent at once, withdraws its certificates, asks the credential service to end every credential it holds, and asks the runtime of each of its sessions to end it. A session shows unconfirmed until its runtime reports it stopped.</p>
+    {open && active ? <form className="card" aria-label="Confirm pause" onSubmit={(event) => { event.preventDefault(); if (reason.trim()) change.submit({ operation: operationId(), reason: reason.trim() }); }}>
+      <p>This pauses the agent at once, withdraws its certificates, asks the credential service to end every credential it holds, and asks the runtime of each of its sessions to end it. A session shows unconfirmed until its runtime reports it stopped.</p>
       <label className="field">Why<input required value={reason} disabled={change.blocked} onChange={(event) => setReason(event.target.value)} placeholder="What happened" /></label>
-      <Act symbol="suspend" name="Suspend this agent’s access" word="Suspend access" tone="danger" type="submit" disabled={change.blocked || !reason.trim()} />{' '}
+      <Act symbol="suspend" name="Pause this agent now" word="Pause now" tone="danger" type="submit" disabled={change.blocked || !reason.trim()} />{' '}
       <Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={cancel} />
     </form> : null}
     <ChangeStatus change={change} />

@@ -61,7 +61,7 @@ describe('Agent registration choices', () => {
     expect(select.options[0].value).toBe(ADA);
     expect(select.options[0].textContent).toBe('You (' + ME.person.display_name + ')');
     for (const id of [BEA, ARCHIVIST, LAMPLIGHTER]) expect([...select.options].some((option) => option.value === id)).toBe(false);
-    const show = [...form.querySelectorAll('button')].find((button) => button.textContent === 'Show retired and suspended (3)');
+    const show = [...form.querySelectorAll('button')].find((button) => button.textContent === 'Show retired and paused (3)');
     expect(show?.getAttribute('aria-pressed')).toBe('false');
     await click(show ?? null);
     expect(show?.getAttribute('aria-pressed')).toBe('true');

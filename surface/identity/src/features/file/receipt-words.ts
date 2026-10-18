@@ -73,8 +73,8 @@ function decode(data: Uint8Array): Cbor | null {
   return value === undefined || at !== data.length ? null : value;
 }
 
-const STATES: Record<number, string> = { 1: 'awaiting activation', 2: 'active', 3: 'suspended', 4: 'retired' };
-const MOVES: Record<number, string> = { 1: 'Switched on', 2: 'Suspended', 3: 'Restored', 4: 'Retired' };
+const STATES: Record<number, string> = { 1: 'not turned on yet', 2: 'active', 3: 'paused', 4: 'retired' };
+const MOVES: Record<number, string> = { 1: 'Turned on', 2: 'Paused', 3: 'Turned back on', 4: 'Retired' };
 /** Change kinds the generated table does not name yet (crates/lys-identity/src/event.rs, `wire`). */
 const MORE_KINDS: Record<number, string> = { 8: 'registered, answering to', 9: 'reporting changed', 10: 'a change it made through Lys' };
 
