@@ -5,7 +5,7 @@
  * value, a handle, a key, an upstream address or a header never reaches the
  * page, whatever else an answer carries.
  */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Refused, useLoad } from '../../api';
 import { clock } from '../file/time';
@@ -291,16 +291,23 @@ const RECIPIENT_WORDS: Record<Recipients, string> = {
   people_only: 'people only, never agents',
 };
 
-export function RecipientsChange({ change, secret: initial = '', store = tabStore(), changed }: { change: (secret: string, recipients: Recipients, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void }) {
+/**
+ * Who a secret can be handed to. `current` is what Lys holds now: the select starts there, and while it is unread (null) it
+ * starts on Choose with Save off, so a save never narrows the setting unseen; what Lys holds is taken up when it arrives,
+ * unless the person has already chosen; `unread` says Lys could not say. Left out, the form is the standalone one and starts on
+ * People only.
+ */
+export function RecipientsChange({ change, secret: initial = '', store = tabStore(), changed, current, unread = false }: { change: (secret: string, recipients: Recipients, operation: string) => Promise<unknown>; secret?: string; store?: PendingStore; changed?: () => void; current?: Recipients | null; unread?: boolean }) {
   const [secret, setSecret] = useState(initial);
-  const [recipients, setRecipients] = useState<Recipients>('people_only');
+  const [recipients, setRecipients] = useState<Recipients | ''>(current === undefined ? 'people_only' : current ?? '');
+  useEffect(() => { if (current && recipients === '') setRecipients(current); }, [current, recipients]);
   const { outcome, run, edited, retry } = useOwnerChange<RecipientsChanged>(pendingKey('recipients', secret.trim()), store, async (asked, operation) => {
     if (asked.type !== 'recipients') throw unconfirmed('The retained change is not a recipients change.');
     const confirmed = confirmRecipients(await change(asked.secret, asked.recipients, operation), asked.secret, asked.recipients, operation);
     changed?.();
     return confirmed;
   });
-  const ready = secret.trim() !== '';
+  const ready = secret.trim() !== '' && recipients !== '';
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!ready) return;
@@ -312,7 +319,7 @@ export function RecipientsChange({ change, secret: initial = '', store = tabStor
     <p className="note">{OWNER_NOTE}</p>
     {initial ? null : <label className="field">Secret<input disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={secret} onChange={(event) => { edited(); setSecret(event.target.value); }} /></label>}
     <label className="field">Can be handed to<select disabled={outcome.at !== 'editing' && outcome.at !== 'refused' && outcome.at !== 'done'} value={recipients} onChange={(event) => { edited(); setRecipients(recipientsOf(event.target.value)); }}>
-      <option value="anyone">Anyone who is permitted</option><option value="people_only">People only</option>
+      {recipients === '' ? <option value="" disabled>{unread ? 'Choose: Lys could not say what it is now' : 'Choose (reading what it is now…)'}</option> : null}<option value="anyone">Anyone who is permitted</option><option value="people_only">People only</option>
     </select></label>
     <Act symbol="save" name="Save who it can be handed to" word="Save" tone="primary" type="submit" disabled={!maySend(outcome) || !ready} />
     {retry ? <Act symbol="retry" name="Retry original change" word="Retry" onClick={retry} /> : null}
