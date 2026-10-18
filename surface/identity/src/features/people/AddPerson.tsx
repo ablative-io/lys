@@ -256,6 +256,6 @@ export function AddPerson() {
   }, 'add-person');
   return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory. Access is optional; they can start with none." />
     <DirectoryGate load={load} title="Add a person" ok={(data) => data.people.scope === 'directory'
-      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} names={data.names} /> : <p>Only the Lys administrator can add people.</p>} />
+      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} names={data.names} /> : <p>Only the Lys administrator adds people, so this form is not open to you. To have someone added, send the administrator their name and email address. You can add agents of your own: <a href="#/agents/new">Add an agent</a>.</p>} />
   </div>;
 }

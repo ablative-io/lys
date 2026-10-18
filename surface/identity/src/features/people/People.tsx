@@ -29,14 +29,17 @@ const VIEWS: [KindFilter, string, string][] = [
   ['teams', 'Teams', '/people/view/teams'], ['accounts', 'Service accounts', '/people/view/accounts'],
 ];
 
-function PeopleHead() {
+/** The page's head. Add person is offered only to the administrator, who alone may add one; `admin` is passed when the page already knows. */
+function PeopleHead({ admin }: { admin?: boolean }) {
   const shell = useShell();
   const navigate = useNavigate();
+  const scope = useLoad(async () => admin ?? (await api.people()).scope === 'directory', 'people-head-admin:' + String(admin));
+  const mayAddPeople = scope.status === 'ok' && scope.data;
   return (
     <>
       <PageHeader title="People and agents" subtitle="Everyone who works here, human or not. Every agent answers to a person." actions={<>
           <a className="btn primary" href="#/agents/new">Add agent</a>
-          <a className="btn" href="#/people/new">Add person</a>
+          {mayAddPeople ? <a className="btn" href="#/people/new">Add person</a> : null}
         </>} />
       <nav className="tabs" aria-label="People and agents views">
         {VIEWS.map(([k, l, path]) => (
@@ -171,7 +174,7 @@ function DirectoryPage() {
       title="Directory"
       ok={(d) => (
         <div className="page fill">
-          <PeopleHead />
+          <PeopleHead admin={d.view.scope === 'directory'} />
           {d.teams.refused ? <p className="why-not">Teams cannot be read, so everyone is listed without their team. {d.teams.refused}</p> : null}
           <List view={d.view} teams={d.teams.teams} me={d.me.person.id} reach={reach} />
         </div>
