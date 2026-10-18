@@ -8,8 +8,8 @@ import { field, RecordedForm } from '../people/RecordedForm';
 import { ErrorWords, STATUS } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { MODE_HINTS, MODES, modeWords } from './mode-words';
-import { actionWords } from './action-words';
 import { resourceNames, resourceWords } from '../people/agent-resource-names';
+import { LevelPicker } from './LevelPicker';
 
 /** The resource choice that opens a box for an id Lys holds no grant on yet. */
 const BY_ID = '\u0000by-id';
@@ -73,6 +73,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
   const relations = model.kinds?.[kind]?.relations ?? model.relations;
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
+  const [level, setLevel] = useState('');
   const [which, setWhich] = useState('');
   const roles = rolesOf(kinds, kind);
   const names = resourceNames(people, [], null);
@@ -102,7 +103,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
     <div className="field">{toAgent ? 'Agent' : 'Person'}<select aria-label="Give to" value={toAgent ? 'agent' : 'person'} onChange={(event) => setToAgent(event.target.value === 'agent')}>
       <option value="person">A person</option><option value="agent">One of my agents</option>
     </select><Picker key={toAgent ? 'agent' : 'person'} name="holder" label={toAgent ? 'Find one of your agents' : 'Find a person'} options={toAgent ? agents.map((agent) => ({ id: agent.id, name: agent.display_name })) : people.people.filter((p) => p.state !== 'retired').map((p) => ({ id: p.id, name: p.display_name, detail: STATUS[p.state] ?? p.state }))} /></div>
-    <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); }}>
+    <label className="field">Give them access to<select name="kind" required value={kind} onChange={(event) => { setKind(event.target.value); setRole(''); setWhich(''); setLevel(''); }}>
       <option value="" disabled>Choose a kind</option>
       {kinds.map((group) => <optgroup key={group.label} label={group.label}>{group.kinds.map((each) => <option key={each} value={each} title={each}>{kindLabel(each)}</option>)}</optgroup>)}
     </select></label>
@@ -112,7 +113,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
       {kind ? <option value={BY_ID}>{known.length ? 'Another one, by its id in its app' : 'One by its id in its app'}</option> : null}
     </select></label>
     {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /><span className="hint">{known.length ? 'The id the app itself gives it.' : 'Lys knows none of these by name yet. Enter the id the app itself gives it.'}</span></label> : null}
-    <label className="field">They may<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
+    <LevelPicker model={model} relations={relations} value={role ? '' : level} onChange={setLevel} name={role ? undefined : 'relation'} disabled={!!role} />
     {Object.keys(roles).length ? <label className="field">Role in the app<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
       <option value="">No role: what is chosen above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}

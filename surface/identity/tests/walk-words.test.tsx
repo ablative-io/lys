@@ -76,7 +76,7 @@ describe('Walk words', () => {
     await choose(form?.querySelector('select') ?? null, '0');
     const checkboxes = [...(form?.querySelectorAll<HTMLInputElement>('input[name="action"], input[name="all_actions"]') ?? [])];
     expect(checkboxes).toHaveLength(3);
-    expect([...form?.querySelectorAll('legend') ?? []].map((legend) => legend.textContent)).toEqual(['Access needed']);
+    expect([...form?.querySelectorAll('legend') ?? []].map((legend) => legend.textContent)).toEqual(['You need to', 'Specific actions']);
     expect([...form?.querySelectorAll('.field > label') ?? []].map((label) => label.textContent)).not.toContain('Access needed');
     expect(checkboxes.map((input) => input.closest('tr')?.querySelector('label')?.textContent?.trim())).toEqual(['Everything here', 'Start this agent', 'Stop this agent']);
     for (const input of checkboxes) {

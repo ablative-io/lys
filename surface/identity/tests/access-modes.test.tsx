@@ -5,7 +5,7 @@
  */
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, $$, choose, mount, pick, settle, text } from './harness';
+import { $, $$, choose, mount, pick, settle, text, click } from './harness';
 import { ADA, GRANTS, RECEIPTS, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
@@ -44,8 +44,8 @@ async function submit(page: Element) {
 
 async function fillIn(page: Element, kind: string, id: string, mode: string) {
   await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
-  await choose(page.querySelector('select[name="relation"]'), 'viewer');
   await choose(page.querySelector('select[name="kind"]'), kind);
+  await click(page.querySelector('.level-picker input[type="radio"][value="viewer"]'));
   await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
   const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
   if (!input) throw new Error('No resource id input');

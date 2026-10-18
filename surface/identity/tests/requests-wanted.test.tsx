@@ -51,7 +51,7 @@ describe('Asking for what a refusal named', () => {
   it('leaves the fields open when no single relation carries the named action, so nothing required hides under a fold', async () => {
     await mount('#/requests?kind=cambium.channel&id=general&action=archive', routes);
     expect(form().querySelector('details.ask-what')).toBeNull();
-    expect(form().querySelector<HTMLSelectElement>('select[name="relation"]')?.value).toBe('');
+    expect(form().querySelector('.level-picker input[type="radio"]:checked')).toBeNull();
   });
 
   it('opens the plain form, with no sentence and no fold, without a link', async () => {

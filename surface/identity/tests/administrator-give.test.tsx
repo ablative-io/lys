@@ -34,7 +34,7 @@ it('gives membership to an own active agent from standing, with its mode and pas
   await choose(page.querySelector('select[aria-label="Give to"]'), 'agent');
   await pick(page, 'Find one of your agents', 'Scribe', 'Scribe');
   await choose(page.querySelector('select[name="kind"]'), KIND);
-  await choose(page.querySelector('select[name="relation"]'), 'member');
+  await click(page.querySelector('.level-picker input[type="radio"][value="member"]'));
   await type(page.querySelector('input[name="resource_id"]'), 'ablative');
   await choose(page.querySelector('select[name="mode"]'), 'by_draft');
   await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
@@ -71,7 +71,7 @@ it('shows the server’s refusal when a gift is withheld from an agent', async (
   await choose(page.querySelector('select[aria-label="Give to"]'), 'agent');
   await pick(page, 'Find one of your agents', 'Scribe', 'Scribe');
   await choose(page.querySelector('select[name="kind"]'), KIND);
-  await choose(page.querySelector('select[name="relation"]'), 'owner');
+  await click(page.querySelector('.level-picker input[type="radio"][value="owner"]'));
   await type(page.querySelector('input[name="resource_id"]'), 'ablative');
   await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
   expect(posted).toHaveLength(1);
@@ -84,7 +84,7 @@ it('keeps an uncertain standing gift across reload and checks the original opera
   await choose(page.querySelector('select[aria-label="Give to"]'), 'agent');
   await pick(page, 'Find one of your agents', 'Scribe', 'Scribe');
   await choose(page.querySelector('select[name="kind"]'), KIND);
-  await choose(page.querySelector('select[name="relation"]'), 'member');
+  await click(page.querySelector('.level-picker input[type="radio"][value="member"]'));
   await type(page.querySelector('input[name="resource_id"]'), 'ablative');
   await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
   expect(page.textContent).toContain('UnconfirmedReceipt');

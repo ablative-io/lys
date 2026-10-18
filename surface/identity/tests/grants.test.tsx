@@ -424,7 +424,7 @@ describe('Give access is one row (walk of 4 Oct)', () => {
     expect(close?.classList.contains('primary')).toBe(false);
     const form = $('.act-panel.issue-root form[aria-label="Give access"]');
     expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
-    const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
+    const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field') || el.classList.contains('level-picker')).map((el) => el.firstChild?.textContent);
     expect(fields).toEqual(['Person', 'Give them access to', 'Which one', 'They may', 'May they pass it on', 'Expires (your local time)', 'More']);
     expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Give access');
     // None of the grant model's own words reach the person giving access.

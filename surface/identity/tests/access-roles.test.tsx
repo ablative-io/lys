@@ -107,7 +107,7 @@ describe('The issue form offers the kind\'s roles beside the mode', () => {
     await choose(page.querySelector('select[name="kind"]'), KIND);
     expect($$('select[name="role"] option').map((option) => option.getAttribute('value'))).toEqual(['', 'administrator', 'observer']);
     await choose(page.querySelector('select[name="role"]'), 'administrator');
-    expect(page.querySelector<HTMLSelectElement>('select[name="relation"]')?.disabled).toBe(true);
+    expect(page.querySelector<HTMLFieldSetElement>('fieldset.level-picker')?.disabled).toBe(true);
     await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
     const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
     if (!input) throw new Error('No resource id input');

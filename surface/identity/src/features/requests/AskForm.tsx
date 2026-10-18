@@ -7,6 +7,7 @@ import { ActionPicker, singleActionCarriers } from '../grants/ActionPicker';
 import { actionWords } from '../grants/action-words';
 import { kindLabel } from '../grants/IssueRoot';
 import { appKind } from '../grants/model';
+import { LevelPicker } from '../grants/LevelPicker';
 import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import { matchesAsk } from './contract';
@@ -113,8 +114,10 @@ export function AskForm({ person, resources, unlisted = '', wanted, model, chang
   const [picked, setPicked] = useState<string[]>(() => wanted && askable(model, wanted).includes(wanted.action) ? [wanted.action] : []);
   // A wanted ask names an exact action; its relation is the one carrying that action alone, when the kind has one.
   const wantedRelation = wanted ? singleActionCarriers(model, wanted.kind).get(wanted.action) ?? '' : '';
+  // A level (or an app's relation) is one ask; ticked actions are one ask each. Choosing either clears the other.
+  const [level, setLevel] = useState(() => picked.length ? '' : wantedRelation);
   // Folded only when every field the link filled is complete: a required field left empty under a closed fold would stop the form without a word.
-  const [folded] = useState(() => wanted !== undefined && (picked.length > 0 || wantedRelation !== ''));
+  const [folded] = useState(() => wanted !== undefined && (picked.length > 0 || level !== ''));
   // Nothing is chosen until the person chooses it: an empty choice is no resource, never the first in the list.
   const chosenResource: ResourceRef | undefined = resourceIndex === '' ? undefined : resources[Number(resourceIndex)];
   const [rest, setRest] = useState<Rest>(() => readRest(key));
@@ -218,7 +221,7 @@ export function AskForm({ person, resources, unlisted = '', wanted, model, chang
       const offered = askable(model, resource);
       const chosen = offered.length ? picked.filter((action) => offered.includes(action)) : [];
       const carriers = singleActionCarriers(model);
-      const relations = offered.length ? chosen.map((action) => carriers.get(action) ?? '') : [field(data, 'relation')];
+      const relations = level ? [level] : chosen.map((action) => carriers.get(action) ?? '');
       if (!relations.length || relations.some((relation) => !relation || !relationsOf(model, resource.kind)[relation])) throw new Error('Choose the access you need.');
       const why = field(data, 'why');
       if (!why) throw new Error('Explain why you need access.');
@@ -244,10 +247,10 @@ export function AskForm({ person, resources, unlisted = '', wanted, model, chang
       {(() => {
         const resource = advanced ? undefined : chosenResource;
         const offered = askable(model, resource);
-        return offered.length
-          ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} title="Access needed" />
-            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></>
-          : <label className="field">Access needed<select name="relation" required defaultValue={wantedRelation}><option value="">Choose access</option>{Object.entries(relationsOf(model, advanced ? typedKind : chosenResource?.kind ?? '')).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
+        return <LevelPicker model={model} relations={relationsOf(model, advanced ? typedKind : chosenResource?.kind ?? '')} value={level} legend="You need to" moreLabel="More: only some specific actions"
+          onChange={(relation) => { setLevel(relation); setPicked([]); }} moreOpen={picked.length > 0}
+          more={offered.length ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={(actions) => { setPicked(actions); setLevel(''); }} agents={false} title="Specific actions" />
+            <p className="note">Each ticked action is asked for on its own and approved on its own.</p></> : undefined} />;
       })()}
       </What>
       <label className="field">Why do you need this access?<textarea name="why" required /></label>

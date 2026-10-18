@@ -41,7 +41,7 @@ describe('Give to a person', () => {
     const m = await open(['person', 'agent'], { 'POST /grants': (body) => ok({ operation: (body as DelegateBody).operation, grant: 'grant-' + 'e'.repeat(32), receipt: { caller: DIRECTORY.people[0].id } }) });
     expect($('.act-panel h2')?.textContent).toBe('Give part of owner of project:identity to someone');
     await choose($('#dTo'), CY);
-    await click($('[data-pickrel="viewer"]'));
+    await click($('.level-picker input[type="radio"][value="viewer"]'));
     await click($('[data-act="delegatedo"]'));
     await settle();
     const given = m.posted.filter((p) => p.path === '/grants').map((p) => p.body as DelegateBody);

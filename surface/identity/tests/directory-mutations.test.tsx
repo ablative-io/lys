@@ -126,8 +126,8 @@ describe('Directory mutations', () => {
     const { posted } = await mount('#/access/issue', { ...SERVICE, 'POST /grants/roots': (body) => recorded(body, true) });
     const page = form('Give access');
     await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
-    await choose(page.querySelector('select[name="relation"]'), 'viewer');
     await choose(page.querySelector('select[name="kind"]'), 'project');
+    await click(page.querySelector('.level-picker input[type="radio"][value="viewer"]'));
     await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
     await fill(page, 'resource_id', 'integration-check');
     const noExpiry = [...page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((tick) => tick.closest('label')?.textContent?.includes('No expiry'));

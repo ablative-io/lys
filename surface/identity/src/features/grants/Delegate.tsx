@@ -6,7 +6,6 @@ import { useRef, useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
 import { keptSend, keepRecord, releaseRecord } from '../../kept';
 import type { DelegateBody, Grant, PassOn } from '../../generated/grants';
-import { keyable } from '../../shell/keyable';
 import { useShell } from '../../shell/ShellContext';
 import { clock, day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
@@ -16,6 +15,7 @@ import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from './CambiumFirst';
+import { LevelPicker } from './LevelPicker';
 import { PendingWords, RefusedWords } from './Outcome';
 import './grants.css';
 
@@ -268,19 +268,8 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
         <div className="note">{app ? 'Each choice gives exactly the actions shown.' : 'Each ticked action is given on its own; an agent is never given a wider relation.'}</div>
         {anyAppResource(w.list.grants.map((grant) => grant.resource)) ? null : <CambiumFirst />}
       </div> : <div className="field">
-        <label>Relation</label>
-        <div>
-          {relations.map(([r, acts]) =>
-            withinPassOn(source, acts) ? (
-              <span key={r} className={'chk' + (r === relation ? ' on' : '')} data-pickrel={r} title={acts.join(', ')} aria-disabled={locked} {...keyable(() => { if (!locked) setRelation(r); })}>
-                {r}
-              </span>
-            ) : (
-              <span key={r} className="chk more-than-held" title="More than you hold">{r}</span>
-            ),
-          )}
-        </div>
-        <div className="note">{kindProblem ?? 'Greyed: more than you hold.'}</div>
+        <LevelPicker model={w.model} relations={Object.fromEntries(relations)} value={relation} onChange={setRelation} allowed={(acts) => withinPassOn(source, acts)} disabled={locked} />
+        {kindProblem ? <div className="note">{kindProblem}</div> : null}
       </div>}
       <div className="field">
         <label htmlFor="dLease">Lasts</label>
