@@ -1,7 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ADA, DIRECTORY, OWN, SCRIBE, SERVICE, ok, refused } from '../../tests/fixtures';
 import type { Route } from '../../tests/fixtures';
 import { serve } from '../../tests/harness';
@@ -26,11 +26,11 @@ async function draw(routes: Record<string, Route> = {}) {
   return { host, posted };
 }
 
-it('shows the signed-in person the add row with Another computer chosen and This computer disabled', async () => {
+it('shows the signed-in person the add row with Another computer chosen and the computer Lys runs on disabled', async () => {
   const { host } = await draw();
   expect(host.querySelector('form[aria-label="Add a computer"]')).not.toBeNull();
   const buttons = [...host.querySelectorAll('button')];
-  expect(buttons.find((button) => button.textContent === 'This computer')?.disabled).toBe(true);
+  expect(buttons.find((button) => button.textContent === 'The computer Lys runs on')?.disabled).toBe(true);
   expect(buttons.find((button) => button.textContent === 'Another computer')?.getAttribute('aria-pressed')).toBe('true');
 });
 
@@ -60,11 +60,26 @@ it('adds an own computer and offers one installer download for it, asking for no
   expect(host.querySelector('select[aria-label="What kind of computer is My laptop?"]')).toBeNull();
 });
 
-it('keeps the administrator default as This computer with both choices enabled', async () => {
+it('chooses the computer Lys runs on first for an administrator whose page is open on that computer, and says it is this one', async () => {
+  // jsdom opens the page at a localhost address: only the computer Lys runs on answers it, so the browser is on that computer.
   const { host } = await draw({ '/people': ok(DIRECTORY) });
   const buttons = [...host.querySelectorAll('button')];
-  expect(buttons.find((button) => button.textContent === 'This computer')?.disabled).toBe(false);
-  expect(buttons.find((button) => button.textContent === 'This computer')?.getAttribute('aria-pressed')).toBe('true');
+  expect(buttons.find((button) => button.textContent === 'The computer Lys runs on')?.disabled).toBe(false);
+  expect(buttons.find((button) => button.textContent === 'The computer Lys runs on')?.getAttribute('aria-pressed')).toBe('true');
+  expect(host.querySelector('.add-computer-hint')?.textContent).toContain('This computer: Lys runs here');
+  expect(buttons.some((button) => button.textContent === 'This computer')).toBe(false);
+  expect(host.textContent).toContain('No computer yet. Add this one, where Lys runs, to start agents here.');
+});
+
+it('chooses Another computer first for an administrator whose page is open from elsewhere, and names the Lys host by its name', async () => {
+  vi.stubGlobal('location', { ...window.location, origin: 'https://lys.example.test', protocol: 'https:' });
+  const { host } = await draw({ '/people': ok(DIRECTORY), '/network': ok({ machines: [], reports_served: false, host_name: 'Mac Studio' }) });
+  vi.unstubAllGlobals();
+  const buttons = [...host.querySelectorAll('button')];
+  expect(buttons.find((button) => button.textContent === 'Another computer')?.getAttribute('aria-pressed')).toBe('true');
+  expect(buttons.find((button) => button.textContent === 'Mac Studio, where Lys runs')?.getAttribute('aria-pressed')).toBe('false');
+  expect(host.querySelector('.add-computer-hint')?.textContent).toContain('including the one you are using now');
+  expect(host.textContent).toContain('No computer yet. Add a computer below, the one you are using or another, to start agents on it.');
 });
 
 it('downloads the chosen Mac client with the install commit and names a missing platform', async () => {

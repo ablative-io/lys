@@ -27,6 +27,7 @@ import type { MachineIdentity } from './contract';
 import type { RunnerRecord } from './MachineDetail';
 import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
+import { onlyHere } from '../apps/ConnectApp';
 
 /**
  * What Lys knows of a computer's runner: still being asked; answered, with its record and whether the runner answered
@@ -176,7 +177,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
     {admin && machines.refused ? <p className="why-not">The machines cannot be read, so what each computer holds as a machine is not shown. {machines.refused}</p> : null}
     <div className="body halves">
       <Listing<Computer> groups={groups} columns={columns} id={(computer) => computer.machine.id} href={(computer) => '#/network?computer=' + computer.machine.id}
-        words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers" empty="No computer yet. Add the one Lys runs on to start agents here."
+        words={(computer) => computer.machine.name + ' ' + computer.machine.may_run.map((agent) => agent.display_name).join(' ')} noun="computers" empty={onlyHere(window.location.origin) ? 'No computer yet. Add this one, where Lys runs, to start agents here.' : 'No computer yet. Add a computer below, the one you are using or another, to start agents on it.'}
         holds={(items) => counted(items.length, 'computers')}
         selected={selected?.machine.id ?? null} select={(computer) => setPicked(computer.machine.id)} open={(computer) => setPicked(computer.machine.id)}
         foot={<>

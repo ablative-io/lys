@@ -1,6 +1,6 @@
 /**
- * Naming a computer keeps its request until it is confirmed: this computer, with Lys's own runner, until both the
- * computer and its runner are; another computer until it is named, after which its installer can be downloaded.
+ * Naming a computer keeps its request until it is confirmed: the computer Lys runs on, with Lys's own runner, until both
+ * the computer and its runner are; another computer until it is named, after which its installer can be downloaded.
  */
 import { useRef, useState } from 'react';
 import type { FormEvent, RefObject } from 'react';
@@ -12,6 +12,7 @@ import { answeredNo, keepRecord, releaseRecord } from '../../kept';
 import type { Connecting } from './JoinCode';
 import { Act } from '../../shell/Act';
 import './network.css';
+import { onlyHere } from '../apps/ConnectApp';
 
 export async function recordComputer(initial: PendingMachine, person: string, keep: (next: PendingMachine) => void): Promise<Machine> {
   let current = initial;
@@ -106,7 +107,7 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
   const { submit, blocked, standing } = useAddition({ person, agent, changed });
   const host = useHostName();
   return <form className="recorded-form" aria-label="Add a computer" onSubmit={submit}>
-    <h2>Add this computer</h2>
+    <h2>Add the computer Lys runs on</h2>
     <fieldset disabled={blocked} style={{ border: 0, padding: 0, margin: 0 }}>
       <label className="field">Name<input key={host} name="name" defaultValue={host} /></label>
       <div className="chain"><Act symbol="add" name="Add this computer" word="Add" tone="primary" type="submit" /><Act symbol="close" name="Cancel" word="Cancel" onClick={cancel} /></div>
@@ -121,7 +122,10 @@ export function AddMachine({ person, agent, changed, cancel }: Adding & { cancel
  * with how the addition stands under them.
  */
 export function AddComputerRow({ person, agents, changed, name, connect, selfService = false, width = 4 }: Omit<Adding, 'agent'> & { name: RefObject<HTMLInputElement | null>; connect: (next: Connecting) => void; selfService?: boolean; width?: number }) {
-  const [chosen, setChosen] = useState<'this' | 'another'>(selfService ? 'another' : 'this');
+  // A page open at an address only Lys's own computer answers is on that computer, so the Lys host is the computer in hand
+  // and is chosen first; anywhere else the computer in hand is another one, and that is chosen first.
+  const [atHost] = useState(() => onlyHere(window.location.origin));
+  const [chosen, setChosen] = useState<'this' | 'another'>(selfService || !atHost ? 'another' : 'this');
   const { submit, blocked, standing, pendingRemote } = useAddition({ person, agents, changed, remote: chosen === 'another', connect });
   // A kept addition is finished as it was begun, whatever is chosen now.
   const where = pendingRemote ? 'another' : chosen;
@@ -135,12 +139,13 @@ export function AddComputerRow({ person, agents, changed, name, connect, selfSer
         <label className="field">Add a computer<input key={where + ':' + offered} ref={name} name="name" aria-label="Name of the computer to add" placeholder="For example, Studio Mac mini" defaultValue={offered} disabled={blocked} /></label>
       </form>
       <div className="add-computer-which"><div className="seg" role="group" aria-label="Which computer">
-        {([['this', 'This computer'], ['another', 'Another computer']] as const).map(([key, label]) =>
+        {([['this', host ? host + ', where Lys runs' : 'The computer Lys runs on'], ['another', 'Another computer']] as const).map(([key, label]) =>
           <button key={key} type="button" className={where === key ? 'on' : ''} aria-pressed={where === key} disabled={blocked || (selfService && key === 'this')}
             title={selfService && key === 'this' ? 'Only an administrator adds the computer Lys runs on.' : undefined} onClick={() => setChosen(key)}>{label}</button>)}
       </div></div>
       <Act symbol="add" name="Add this computer" word="Add" tone="primary" type="submit" form={id} disabled={blocked} />
-      <p className="hint add-computer-hint">{where === 'another' ? 'After adding it, choose its kind and download one installer to open on that computer.' : 'The computer Lys itself runs on, named as it names itself.'}{selfService ? ' Only an administrator adds the computer Lys runs on.' : ''}</p>
+      <p className="hint add-computer-hint">{where === 'another' ? 'Any computer but the one Lys runs on, including the one you are using now if Lys is not on it. After adding it, choose its kind and download one installer to open on that computer.'
+        : atHost ? 'This computer: Lys runs here, so its runner is recorded with it.' : 'The computer Lys runs on, not necessarily the one you are using. Its runner is recorded with it.'}{selfService ? ' Only an administrator adds the computer Lys runs on.' : ''}</p>
     </div>
     <div className="add-computer-standing">{standing}</div></td>
   </tr>;
