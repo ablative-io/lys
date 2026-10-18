@@ -71,7 +71,7 @@ describe('Service accounts', () => {
   it('says each state in words and asks a retirement above the list, with Cancel', async () => {
     await mount('#/service-accounts', routes);
     const states = $$('tbody tr').map((row) => row.textContent ?? '');
-    expect(states.join(' ')).toContain('Registered');
+    expect(states.join(' ')).toContain('Active');
     expect(states.join(' ')).toContain('Retired');
     expect(states.join(' ')).not.toMatch(/\bretired\b/);
     await click(button('Retire this service account'));

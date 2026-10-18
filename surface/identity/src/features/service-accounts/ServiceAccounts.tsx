@@ -3,7 +3,7 @@ import { readTogether } from '../../reads';
 import { useState } from 'react';
 import { api, operationId, request, useLoad } from '../../api';
 import type { MeView, ServiceAccount } from '../../generated';
-import { DirectoryGate as Gate, IdentityName } from '../people/Words';
+import { DirectoryGate as Gate, IdentityName, STATUS } from '../people/Words';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { clock } from '../file/time';
@@ -35,7 +35,7 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
   const group = [{ id: '', name: 'Accounts', lead: null, depth: 0, items: accounts.service_accounts, within: accounts.service_accounts }];
   const columns: Column<ServiceAccount>[] = [
     { head: 'Account', cell: (account) => account.name },
-    { head: 'State', cell: (account) => <span className="sec">{ACCOUNT_STATE[account.state] ?? 'State not recognised'}</span> },
+    { head: 'State', cell: (account) => <span className="sec">{STATUS[account.state] ?? 'State not recognised'}</span> },
     { head: 'Owner', cell: (account) => <IdentityName id={account.owner} /> },
     { head: 'What it is for', cell: (account) => account.description },
     { head: 'Created', cell: (account) => <span className="sec">{clock(account.created_at)}</span> },
@@ -74,7 +74,6 @@ function Create({ person, administrator, changed, cancel }: { person: string; ad
 }
 const retireKey = (person: string, account: string): string => 'lys.pending.service-retire.' + person + '.' + account;
 /** An account's state in words; the service's own name never shows. */
-const ACCOUNT_STATE: Record<string, string> = { active: 'Registered', retired: 'Retired' };
 /** The retirement of one account, asked above the list where its words have room, never squeezed into a table cell. */
 function Retire({ account, person, changed, cancel }: { account: ServiceAccount; person: string; changed: (answer: ServiceAccount) => void; cancel: () => void }) {
   const change = useRoleChange<ServiceAccount>(retireKey(person, account.id), '/service-accounts/' + encodeURIComponent(account.id) + '/retire', (answer) => answer.id === account.id && answer.state === 'retired' && answer.retired_at !== null, changed);

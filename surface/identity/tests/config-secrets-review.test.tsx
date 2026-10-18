@@ -199,7 +199,7 @@ describe('You', () => {
   it('says a service account’s state in words, never its code', async () => {
     await mount('#/me?tab=account', { ...SERVICE, '/me': ok({ ...ME, service_accounts: [{ id: 'service-test', owner: ADA, name: 'Invoices', description: '', state: 'suspended', created_by: ME.signed_in, created_at: 1790000000, retired_by: null, retired_at: null }] }) });
     const accounts = $('#service-accounts');
-    expect(accounts?.textContent).toContain('Suspended');
+    expect(accounts?.textContent).toContain('Paused');
     expect(accounts?.textContent).not.toContain('suspended');
   });
 });

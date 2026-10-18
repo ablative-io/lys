@@ -7,6 +7,7 @@ import { readGrantWorld } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import { Gate } from '../signin/Gate';
 import { OwnAccount } from '../people/Account';
+import { STATUS } from '../people/Words';
 import { SessionList } from '../sessions/Sessions';
 import './you.css';
 import { PageHeader } from '../../shell/PageHeader';
@@ -29,8 +30,6 @@ async function readYou(): Promise<YouData> {
   return { kind: 'active', me: w.me, agents: (self?.agents ?? []).filter((a) => a.state !== 'retired'), w };
 }
 
-/** A service account's state as a person reads it; a state Lys has not named here is said as not known, never as its code. */
-const SERVICE_ACCOUNT_STATE: Record<string, string> = { registered: 'Awaiting activation', active: 'Registered', suspended: 'Suspended', retired: 'Retired' };
 
 /** An issuer URL named by its host, as a provider is shown. */
 const providerName = (provider: string): string => {
@@ -98,7 +97,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
                   {s.name}
                   <p className="note">{s.description}</p>
                 </span>
-                <span>{SERVICE_ACCOUNT_STATE[s.state] ?? 'State not known'}</span>
+                <span>{STATUS[s.state] ?? 'State not known'}</span>
               </div>
             ))
           ) : (
