@@ -85,7 +85,7 @@ describe('Usage', () => {
   it('adds a limit in the budget table\'s own last row, each control under its own head', async () => {
     await mount(file, { ...keeping(), [budgets]: ok(budgetsView(holder, [tokens])) });
     const heads = [...document.querySelectorAll('section[aria-label="Budgets"] thead th')].map((th) => th.textContent);
-    expect(heads).toEqual(['Spend at most', 'Used', 'When it\'s hit', 'Where it stands', 'Change']);
+    expect(heads).toEqual(['Limit', 'Used', 'When it\'s hit', 'Where it stands', 'Change']);
     const cells = [...($(addBudget)?.children ?? [])];
     expect(cells).toHaveLength(5);
     expect(cells.every((cell) => cell.tagName === 'TD' && !cell.hasAttribute('colspan'))).toBe(true);
@@ -251,7 +251,7 @@ describe('Usage', () => {
 
   it('says in plain words that a budget was reached and its act confirmed', async () => {
     await mount(file, { ...keeping(reached({ stands: 'confirmed', words: 'exit seen', at_ms: 1 })), [budgets]: ok(budgetsView(holder, [tokens], { used: [{ unit: 'tokens', period: 'day', figure: 1200, since_ms: 0, unavailable: null }] })) });
-    expect(text()).toContain('Reached at 1200. Its act was confirmed: end the session.');
+    expect(text()).toContain('Reached at 1,200 tokens. Its act was confirmed: end the session.');
   });
 
   it('never shows an uncertain act as confirmed', async () => {
@@ -471,7 +471,7 @@ describe('An agent\'s spending limit', () => {
     const put = posted.filter((call) => call.path === 'PUT ' + budgets);
     expect(put).toHaveLength(1);
     expect((put[0]?.body as BudgetBody).limits).toEqual([{ unit: 'dollars', amount: 25, period: 'week', act: 'stop' }]);
-    expect(text()).toContain('Spending limit set: $25 a week. It applies now.');
+    expect(text()).toContain('Spending limit set: US$25.00 a week. It applies now.');
     expect(($(limit + ' input[name="spending_amount"]') as HTMLInputElement | null)?.value).toBe('25');
   });
 

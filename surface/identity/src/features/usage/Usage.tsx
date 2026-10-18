@@ -35,7 +35,7 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
     return <div className="usage">
       <UsedNow usage={usage} />
-      <SpendingLimit key={budgets.version} budgets={budgets} changed={changed} />
+      <SpendingLimit key={budgets.version} budgets={budgets} receipts={usage.receipts} name={name} changed={changed} />
       <ControlSetup agent={agent} name={name} />
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} apart={spendingIndex(budgets.limits)} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />

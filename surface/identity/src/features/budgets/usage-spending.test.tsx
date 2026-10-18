@@ -6,7 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { REACHED, SpendingLimit, spendingIndex, withSpending } from '../usage/SpendingLimit';
 import { UsageBudgets } from '../usage/UsageBudgets';
-import type { BudgetsView, Limit } from '../usage/contract';
+import type { BudgetsView, Limit, Receipt } from '../usage/contract';
 
 const dollars = (act: Limit['act']): Limit => ({ unit: 'dollars', amount: 20, period: 'week', act });
 const tokens: Limit = { unit: 'tokens', amount: 1000, period: 'day', act: 'notice' };
@@ -42,5 +42,23 @@ describe('The spending limit has one editor', () => {
     expect([...agent.querySelectorAll('thead th')].map((th) => th.textContent)[0]).toBe('Limit');
     expect(table([dollars('tell')]).querySelector('tbody td.dim')?.textContent).toBe('No other limit is set for this agent.');
     expect(table([tokens, dollars('tell')], 'team').querySelectorAll('tbody tr').length).toBe(2);
+  });
+
+  it('says on the card what was used against the limit and where it stands, so a limit that only told is never read as a stop', () => {
+    const limits = [tokens, dollars('tell')];
+    const reached: Receipt = { crossing: { holder: { kind: 'agent', id: 'a' }, version: 3, limit_index: 1, measure: 'dollars', act: 'tell', figure: 21.5, at_ms: 5, warning: false },
+      acted: { stands: 'told', words: '' } } as unknown as Receipt;
+    const said = (receipts: Receipt[], figure: number | null) => {
+      const budgets = view(limits);
+      budgets.used[1] = figure === null ? { unit: 'dollars', period: 'week', since_ms: null, figure: null, unavailable: 'dollars were not reported' } : { unit: 'dollars', period: 'week', since_ms: null, figure, unavailable: null };
+      const shown = host(renderToStaticMarkup(<SpendingLimit budgets={budgets} receipts={receipts} name="Scribe" changed={() => undefined} />));
+      return [shown.querySelector('[data-limit="spending"] .usage-used')?.textContent, shown.querySelector('[data-limit="spending"] [data-reached]')?.textContent, shown.querySelector('[data-reached]')?.getAttribute('data-reached')];
+    };
+    expect(said([reached], 21.5)).toEqual(['US$21.50 of US$20.00 this week', 'Reached at US$21.50. The responsible person was told.', 'true']);
+    expect(said([], 12)).toEqual(['US$12.00 of US$20.00 this week', 'Held: not reached.', 'false']);
+    expect(said([], null)[0]).toBe('Nothing reported yet');
+    expect(said([], null)[1]).not.toMatch(/Held|reached/);
+    // With no limit set, nothing is said to stand.
+    expect(card([tokens]).querySelector('[data-limit="spending"]')).toBeNull();
   });
 });

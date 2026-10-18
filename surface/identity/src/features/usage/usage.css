@@ -55,10 +55,14 @@
 .managed-controls h3 { margin: 0 0 8px; font-size: 14px; }
 .current-control { border-inline-start: 3px solid currentColor; padding-inline-start: .75rem; }
 .control-operations > ul { list-style: none; padding: 0; }
-.control-operations article { border-block-start: 1px solid var(--line, #bbb); padding-block: .75rem; overflow-wrap: anywhere; }
+.control-operations article { border-block-start: 1px solid var(--line); padding-block: .75rem; overflow-wrap: anywhere; }
 .control-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 /* The spending limit: its heading on its own line, the amount, period and Save under it, the note under those. */
 .usage form.usage-spending { display: block; }
+/* What the limit has used and where it stands, before its controls; a reached limit in the danger colour. */
+.usage-stands { margin: 0 0 8px; }
+.usage-stands p { margin: 0; }
+.usage-stands [data-reached="true"] { color: var(--danger); }
 .usage-amount > span { flex: none; min-width: 0; }
 /* Save beside the amount and period keeps its own width; only the amount and the period stretch. */
 .usage-amount > button { flex: none; min-width: 0; }

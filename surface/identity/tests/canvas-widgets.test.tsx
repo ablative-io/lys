@@ -298,20 +298,20 @@ describe('Widgets on the canvas', () => {
     await mount('#/canvas?view=canvas', { ...routes, '/dashboard': ok(dashboard({ [SCRIBE]: { usage: usage(SCRIBE, [used('dollars', 'day', 120)]) }, [COURIER]: { usage: usage(COURIER, [used('dollars', 'day', 30)]) } })) });
     const card = (id: string) => $('[data-widget="' + id + '"]') as HTMLElement;
     const figure = (id: string) => card(id).querySelector('.canvas-widget-figure')?.textContent;
-    expect([card('widget:f').getAttribute('aria-label'), figure('widget:f'), figure('widget:t')]).toEqual(['Formula of 2 inputs', '$270', '$270']);
+    expect([card('widget:f').getAttribute('aria-label'), figure('widget:f'), figure('widget:t')]).toEqual(['Formula of 2 inputs', 'US$270.00', 'US$270.00']);
     // Dollars and a count of goals are not one number; a formula nothing feeds says so.
     expect([figure('widget:m'), figure('widget:n'), card('widget:n').getAttribute('aria-label')]).toEqual(['Mixed units', 'No input', 'Formula of 0 inputs']);
     await click(card('widget:f').querySelector('[data-act="widget-view"]'));
     expect(card('widget:f').dataset.view).toBe('detail');
-    expect($$('[data-widget="widget:f"] tr[data-input]').map((row) => row.textContent)).toEqual(['Usage of Scribe$120 today', 'Usage of Every agent$150 today']);
-    expect($('[data-widget="widget:f"] tr[data-result]')?.textContent).toBe('Sum$270');
+    expect($$('[data-widget="widget:f"] tr[data-input]').map((row) => row.textContent)).toEqual(['Usage of ScribeUS$120.00 today', 'Usage of Every agentUS$150.00 today']);
+    expect($('[data-widget="widget:f"] tr[data-result]')?.textContent).toBe('SumUS$270.00');
     await click(card('widget:f').querySelector('[data-act="widget-view"]'));
     expect($$('[data-widget="widget:f"] [data-variant]').map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['Sum', 'true'], ['Average', 'false'], ['Highest', 'false'], ['Lowest', 'false'], ['How many', 'false']]);
     expect([$('[data-widget="widget:f"] [data-face]'), $('[data-widget="widget:f"] a[href]')]).toEqual([null, null]);
     await click($('[data-widget="widget:f"] [data-variant="average"]'));
-    expect([figure('widget:f'), figure('widget:t'), kept().widgets.find((each) => each.id === 'widget:f')?.shows]).toEqual(['$135', '$135', 'average']);
+    expect([figure('widget:f'), figure('widget:t'), kept().widgets.find((each) => each.id === 'widget:f')?.shows]).toEqual(['US$135.00', 'US$135.00', 'average']);
     await click($('[data-widget="widget:f"] [data-variant="lowest"]'));
-    expect(figure('widget:f')).toBe('$120');
+    expect(figure('widget:f')).toBe('US$120.00');
     await click($('[data-widget="widget:f"] [data-variant="count"]'));
     expect(figure('widget:f')).toBe('2');
     // No widget beside an agent's window offers a formula: it is fed by widgets, not by an agent.

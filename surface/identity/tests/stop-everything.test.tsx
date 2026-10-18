@@ -1,6 +1,6 @@
 /**
- * The master off switch on the Dashboard: Stop everything for the administrator only, its question as a row of
- * Running now, the exact body it sends and what it did said by names; while everything is stopped one line across the
+ * The master off switch on the Dashboard: Stop everything for the administrator only, its question as a row under
+ * the Agents heading while something runs, the exact body it sends and what it did said by names; while everything is stopped one line across the
  * top and every Start disabled with why; Let agents start again; and a pull with no answer asked about, never sent twice.
  */
 import { afterEach, describe, expect, it } from 'vitest';
@@ -19,21 +19,27 @@ const CLEAN = { operation: PULLED.operation, pulled: PULLED, stopped: [], still_
 /** A pulled cord whose own result is kept and left nothing running; `last` null is a pull no runner has answered yet. */
 const stopping = (pulled: typeof PULLED | null, may_pull: boolean, last: unknown = pulled ? CLEAN : null) => ok({ ...CORD, pulled, last, may_pull });
 const session = (id: string, agent: string, agent_name: string, machine: string, machine_name: string) => ({ session: id, agent, agent_name, machine, machine_name });
-const row = () => $('section[aria-label="Running now"] tr.dash-cord');
+const row = () => $('section[aria-label="Agents"] table.dash-cord-ask tr.dash-cord');
+/** Ada's front page while Scribe runs on Lab: Stop all is offered only while something runs, or what runs cannot be read. */
+const RUNS = { ...SERVICE, '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [{ session: 'op-' + 'e'.repeat(32), agent: SCRIBE, machine: LAB, machine_name: 'Lab', shown: 'running', last_reported: 'running' }] } })) };
 const pulls = (posted: { path: string; body: unknown }[]) => posted.filter((entry) => entry.path === '/runtime/stop-everything');
 
 describe('Stop everything', () => {
-  it('is offered in the head of Running now to an administrator, and to no one else', async () => {
-    await mount('#/', SERVICE);
-    expect($('section[aria-label="Running now"] .section-h [data-act="stop-everything"]')?.getAttribute('aria-label')).toBe('Stop everything');
+  it('is offered in the Agents heading to an administrator while something runs, and to no one else', async () => {
+    await mount('#/', RUNS);
+    expect($('section[aria-label="Agents"] .section-h [data-act="stop-everything"]')?.getAttribute('aria-label')).toBe('Stop everything');
     expect($('.dash-cord-line')).toBeNull();
     expect(unreachable()).toEqual([]);
     unmountAll();
-    await mount('#/', { ...SERVICE, '/runtime/stop-everything': stopping(null, false) });
+    await mount('#/', { ...RUNS, '/runtime/stop-everything': stopping(null, false) });
+    expect($('[data-act="stop-everything"]')).toBeNull();
+    // With nothing running and nothing unread there is nothing to stop, so the administrator is offered none.
+    unmountAll();
+    await mount('#/', SERVICE);
     expect($('[data-act="stop-everything"]')).toBeNull();
   });
 
-  it('asks in a row of Running now, sends the reason and the kill tick, and says what it did by agent and computer names', async () => {
+  it('asks in a row under the Agents heading, sends the reason and the kill tick, and says what it did by agent and computer names', async () => {
     const answered = (body: unknown): Answer => {
       const asked = body as { operation: string; reason: string; kill: boolean };
       return ok({
@@ -44,12 +50,12 @@ describe('Stop everything', () => {
         handles_ended: ['h-1'], handles_refused: [],
       });
     };
-    const { posted } = await mount('#/', { ...SERVICE, 'POST /runtime/stop-everything': answered as Route });
+    const { posted } = await mount('#/', { ...RUNS, 'POST /runtime/stop-everything': answered as Route });
     await click($('[data-act="stop-everything"]'));
     expect(row()?.textContent).toContain('This tells every running agent on every computer to stop, and no agent can be started until you let them start again.');
     expect(row()?.textContent).not.toContain('Nothing Lys started is left running');
     expect(pulls(posted)).toEqual([]);
-    const now = $$('section[aria-label="Running now"] tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now');
+    const now = $$('section[aria-label="Agents"] tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now');
     expect(now?.hasAttribute('disabled')).toBe(true);
     await type(row()?.querySelector('input:not([type="checkbox"])') ?? null, 'a runaway loop');
     // Killing what ignores the stop is on unless the person takes it off: stop everything means everything.
@@ -144,7 +150,7 @@ describe('Stop everything', () => {
 
   it('asks about a pull that had no answer, and sends it again only as it was', async () => {
     const fault: Route = () => ({ status: 500, body: { refusal: 'Unanswered', reason: 'the service did not answer' } });
-    const first = await mount('#/', { ...SERVICE, 'POST /runtime/stop-everything': fault });
+    const first = await mount('#/', { ...RUNS, 'POST /runtime/stop-everything': fault });
     await click($('[data-act="stop-everything"]'));
     await type(row()?.querySelector('input:not([type="checkbox"])') ?? null, 'a runaway loop');
     await click($$('tr.dash-cord button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Stop everything now') ?? null);

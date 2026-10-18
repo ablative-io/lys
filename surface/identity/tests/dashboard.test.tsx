@@ -111,7 +111,7 @@ describe('The Dashboard is the front page', () => {
       [COURIER]: { usage: { refusal: 'UsageUnavailable', reason: 'the usage store is closed' }, goals: { goals: [goal('g-5', null, 'missed')] } },
       [ARCHIVIST]: { budget: { refusal: 'BudgetsUnavailable', reason: 'the budgets store is closed' } },
     })) });
-    expect(cells('Scribe').slice(2, 4)).toEqual(['900 tokens of 1,000 tokens today · $100 of $500 this week', '2 open, next due 6 Oct, 1 missed']);
+    expect(cells('Scribe').slice(2, 4)).toEqual(['900 tokens of 1,000 tokens today · US$100.00 of US$500.00 this week', '2 open, next due 6 Oct, 1 missed']);
     // A part that could not be read says so in plain words; its refusal is kept under Error details, never on the face.
     expect(cells('Courier').slice(1, 4)).toEqual(['Not turned on yet', 'Its use could not be read', '1 missed']);
     expect(cells('Archivist').slice(1, 4)).toEqual(['Paused', 'Its limits could not be read', 'No goal']);
@@ -130,7 +130,9 @@ describe('The Dashboard is the front page', () => {
     })) });
     expect(cells('Scribe')[2]).toBe('compacts at 40% · not reported yet');
     expect(rowOf('Scribe')?.textContent).not.toContain('40% of its context');
-    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · not reported yet');
+    expect(face(rowOf('Scribe')?.querySelector('td.you-budget'))).toBe('compacts at 40% · not reported yet');
+    // The compact level is the limit working, never a level used against a limit: no bar is drawn for it.
+    expect(rowOf('Scribe')?.querySelector('td.you-budget meter')).toBeNull();
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
     expect(requests.filter((path) => /\/usage|\/budgets/.test(path))).toEqual([]);
   });
@@ -141,7 +143,7 @@ describe('The Dashboard is the front page', () => {
     })) });
     expect(cells('Scribe')[2]).toBe('compacts at 40% · 23% now');
     expect(cells('Scribe')[2]).not.toContain('99%');
-    expect($('tr[data-budget="' + SCRIBE + '"]')?.textContent).toBe('Scribecompacts at 40% · 23% now');
+    expect(face(rowOf('Scribe')?.querySelector('td.you-budget'))).toBe('compacts at 40% · 23% now');
   });
 
   it('says 0% now when the current session reported zero context, without replacing it with the compact budget', async () => {
@@ -169,7 +171,8 @@ describe('The Dashboard is the front page', () => {
     expect(cells('Scribe')[2]).not.toContain('not reported');
   });
 
-  it('shows the widgets: waiting requests and drafts item by item, budgets nearest the limit first, goals missed first, and a part that could not be read by its refusal name', async () => {
+  // The canvas's own Requests, Drafts, Budget and Goals widgets are pinned in src/features/dashboard/canvas-parts.test.tsx.
+  it('says what waits on the person item by item, what needs a look worst first, each limit and goal in its row, and a part that could not be read in words', async () => {
     const asked = { id: 'r-1', asked_by: SCRIBE, asked_by_name: 'Scribe', responsible: { id: ADA, display_name: 'Ada (test person)', state: 'active' }, resource: { kind: 'store', id: 's-1' },
       relation: 'reader', actions: ['read'], ends_at: null, why: 'to read the ward list', asked_at: 1790000000, state: 'waiting', approvers: [], sources: [], can_decide: true };
     const decided = { ...asked, id: 'r-2', state: 'approved', why: 'already decided' };
@@ -180,45 +183,51 @@ describe('The Dashboard is the front page', () => {
       [COURIER]: { goals: { goals: [goal('g-5', null, 'missed')] } },
       [ARCHIVIST]: { budget: { refusal: 'BudgetsUnavailable', reason: 'the budgets store is closed' }, goals: { refusal: 'GoalsUnavailable', reason: 'the goals store is closed' } },
     })) });
-    const widget = (label: string) => $('section.dash-widget[aria-label="' + label + '"]');
-    expect(widget('Requests')?.querySelector('.dash-count')?.textContent).toBe('1');
-    const request = widget('Requests')?.querySelector('tr[data-request="r-1"]');
-    expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe', 'reader: readto read the ward list', 'Decide']);
+    const waiting = $('section[aria-label="Waiting on you"]');
+    // One request the person may decide and one draft: the number is the list's own.
+    expect(waiting?.querySelector('[data-waiting="count"]')?.textContent).toBe('2');
+    const request = waiting?.querySelector('tr[data-request="r-1"]');
+    expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe asks for reader access to store s-1to read the ward list', 'Decide']);
     expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests');
-    expect(widget('Requests')?.textContent).not.toContain('already decided');
-    expect(widget('Drafts')?.querySelector('.dash-count')?.textContent).toBe('1');
-    expect([...(widget('Drafts')?.querySelectorAll('tr[data-draft] td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe', 'grant.give on grantfor the night shift', 'Decide']);
-    expect(widget('Drafts')?.textContent).not.toMatch(/op-[0-9a-f]{32}/);
-    // Budget: the part that could not be read first, by its name; then the agent nearest its limit; the rest counted once.
-    expect(widget('Budget')?.querySelector('.dash-count')?.textContent).toBe('1 limited');
-    expect([...(widget('Budget')?.querySelectorAll('tr[data-budget]') ?? [])].map((tr) => tr.getAttribute('data-budget'))).toEqual([ARCHIVIST, SCRIBE]);
-    expect(face(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]'))).toBe('ArchivistIts limits could not be read');
-    expect(folded(widget('Budget')?.querySelector('tr[data-budget="' + ARCHIVIST + '"]'))).toBe('BudgetsUnavailable: the budgets store is closed');
-    expect(widget('Budget')?.querySelector('tr[data-budget="' + SCRIBE + '"] a')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/budgets');
-    expect(widget('Budget')?.querySelector('tr[data-budget="' + SCRIBE + '"] .dash-bar')?.getAttribute('aria-label')).toBe('90% of the nearest limit');
-    expect(widget('Budget')?.querySelector('tr.empty')?.textContent).toBe('1 other agent has no limit.');
-    // Goals: missed first, then open by deadline, then met; an agent whose goals could not be read is named.
-    expect(widget('Goals')?.querySelector('.dash-count')?.textContent).toBe('2 open, 2 missed');
-    expect([...(widget('Goals')?.querySelectorAll('tr[data-goal]') ?? [])].map((tr) => tr.getAttribute('data-goal'))).toEqual(['missed', 'missed', 'open', 'open', 'met', 'unread']);
-    const goals = widget('Goals')?.textContent ?? '';
-    expect(goals.indexOf('due 6 Oct')).toBeGreaterThan(-1);
-    expect(goals.indexOf('due 6 Oct')).toBeLessThan(goals.indexOf('due 9 Oct'));
-    expect(face(widget('Goals')?.querySelector('tr[data-goal="unread"]'))).toBe('ArchivistIts goals could not be read');
-    expect(folded(widget('Goals')?.querySelector('tr[data-goal="unread"]'))).toBe('GoalsUnavailable: the goals store is closed');
+    expect(waiting?.textContent).not.toContain('already decided');
+    expect(waiting?.querySelectorAll('tr[data-draft]')).toHaveLength(1);
+    expect([...(waiting?.querySelectorAll('tr[data-draft] td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe prepared something for you to approvefor the night shift', 'Decide']);
+    expect(waiting?.querySelector('tr[data-draft] a')?.getAttribute('href')).toBe('#/access/drafts');
+    expect(waiting?.textContent).not.toMatch(/op-[0-9a-f]{32}/);
+    // Needs a look: a missed goal before a limit near its end, each with Open to that agent's Limits and goals; nothing fine is listed.
+    const look = $$('section[aria-label="Needs a look"] tr[data-exception]');
+    expect(look.map((tr) => [tr.dataset.exception, tr.querySelector('td')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
+      ['missed', 'Scribe missed a goal: a goal', '#/file/' + SCRIBE + '/budgets'],
+      ['missed', 'Courier missed a goal: a goal', '#/file/' + COURIER + '/budgets'],
+      ['near', 'Scribe has used 90% of its 1,000 tokens a day', '#/file/' + SCRIBE + '/budgets'],
+    ]);
+    expect($('section[aria-label="Needs a look"] .dash-count')?.textContent).toBe('3');
+    // Each limit and goal is said in its agent's row: a part that could not be read in words, its refusal folded under them.
+    expect(cells('Archivist').slice(2, 4)).toEqual(['Its limits could not be read', 'Its goals could not be read']);
+    expect(folded(rowOf('Archivist')?.querySelector('td.you-budget'))).toBe('BudgetsUnavailable: the budgets store is closed');
+    expect(folded(rowOf('Archivist')?.querySelector('td.you-goals'))).toBe('GoalsUnavailable: the goals store is closed');
+    expect(rowOf('Scribe')?.querySelector('td.you-budget meter')?.getAttribute('aria-label')).toBe('90% of the nearest limit, near it');
+    expect(cells('Courier').slice(2, 4)).toEqual(['No limit', '1 missed']);
+    // The earliest open deadline is the one the row names.
+    expect(cells('Scribe')[3]).toBe('2 open, next due 6 Oct, 1 missed');
     expect(unreachable()).toEqual([]);
   });
 
-  it('says a widget whose own read was refused by the refusal name, with the rest of the Dashboard still shown', async () => {
+  it('says a list whose own read was refused in words where it would stand, with the rest of the Dashboard still shown', async () => {
     await mount('#/', { ...routes, '/requests': { status: 503, body: { refusal: 'RequestsUnavailable', reason: 'the requests store is closed' } }, '/drafts?state=waiting': { status: 503, body: { refusal: 'DraftsUnavailable', reason: 'closed' } } });
-    expect(face($('section.dash-widget[aria-label="Requests"]'))).toContain('Requests could not be read.');
-    expect(face($('section.dash-widget[aria-label="Requests"]'))).not.toContain('RequestsUnavailable');
-    expect(folded($('section.dash-widget[aria-label="Requests"]'))).toBe('RequestsUnavailable: the requests store is closed');
-    expect(face($('section.dash-widget[aria-label="Drafts"]'))).toContain('Drafts could not be read.');
-    expect(folded($('section.dash-widget[aria-label="Drafts"]'))).toBe('DraftsUnavailable: closed');
-    expect($('section.dash-widget[aria-label="Requests"] .dash-count')?.textContent).toBe('?');
+    const waiting = $('section[aria-label="Waiting on you"]');
+    expect(face(waiting?.querySelector('tr[data-waiting="requests"]'))).toBe('Requests could not be read');
+    expect(face(waiting)).not.toContain('RequestsUnavailable');
+    expect(folded(waiting?.querySelector('tr[data-waiting="requests"]'))).toBe('RequestsUnavailable: the requests store is closed');
+    expect(face(waiting?.querySelector('tr[data-waiting="drafts"]'))).toBe('Drafts could not be read');
+    expect(folded(waiting?.querySelector('tr[data-waiting="drafts"]'))).toBe('DraftsUnavailable: closed');
+    // No number and no "nothing" over a list that could not be read.
+    expect(waiting?.querySelector('[data-waiting="count"]')).toBeNull();
+    expect(waiting?.textContent).not.toContain('Nothing is waiting on you.');
     expect(rowOf('Scribe')).not.toBeNull();
-    expect($('section.dash-widget[aria-label="Budget"] tr.empty')?.textContent).toBe('No agent has a limit.');
-    expect($('section.dash-widget[aria-label="Goals"] tr.empty')?.textContent).toBe('No goal is set.');
+    // With no limit and no goal anywhere, nothing needs a look and each row says so.
+    expect($('section[aria-label="Needs a look"]')).toBeNull();
+    for (const name of ['Scribe', 'Courier', 'Archivist']) expect(cells(name).slice(2, 4)).toEqual(['No limit', 'No goal']);
   });
 
   it('says No limit and No goal for an agent with neither', async () => {
@@ -231,45 +240,62 @@ describe('The Dashboard is the front page', () => {
     const line = cells('Scribe')[2]?.split(' · ') ?? [];
     unmountAll();
     await mount('#/file/' + SCRIBE + '/budgets', { ...routes, ['/budgets/agent/' + SCRIBE]: ok(scribeBudget), ['/agents/' + SCRIBE + '/usage']: ok(scribeUsage), ['/agents/' + SCRIBE + '/goals']: ok({ goals: [] }) });
-    const page = $$('.usage-budgets .usage-used').map((td) => td.textContent ?? '');
+    // The table says every limit but the spending limit; the spending limit's card says that one, in the same words.
+    const page = $$('.usage-budgets .usage-used, [data-limit="spending"] .usage-used').map((each) => each.textContent ?? '');
     expect(page).toHaveLength(2);
     expect([...line].sort()).toEqual([...page].sort());
   });
 
-  it('counts what waits for the person, one in the singular, each a link to its place', async () => {
-    await mount('#/', { ...routes, '/dashboard': ok(dashboard({}, { requests: 1, drafts: 2, reviews: 1 })) });
-    const rows = $$('section[aria-label="Waiting for you"] tr[data-waiting]');
-    expect(rows.map((tr) => [tr.querySelector('.dash-num')?.textContent, tr.querySelector('a')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
-      ['1', 'request to decide', '#/requests'], ['2', 'drafts to approve', '#/access/drafts'], ['1', 'review due', '#/reviews'],
+  it('lists what waits for the person, one in the singular, each a link to its place, and counts what it lists', async () => {
+    const asked = { id: 'r-1', asked_by: SCRIBE, asked_by_name: 'Scribe', responsible: { id: ADA, display_name: 'Ada (test person)', state: 'active' }, resource: { kind: 'store', id: 's-1' },
+      relation: 'reader', actions: ['read'], ends_at: null, why: null, asked_at: 1790000000, state: 'waiting', approvers: [], sources: [], can_decide: true };
+    const prepared = (id: string) => ({ id: 'op-' + id.repeat(32), agent: { id: SCRIBE, display_name: 'Scribe' }, responsible: { id: ADA, display_name: 'Ada (test person)', state: 'active' },
+      target: { kind: 'grant', id: 'g-1', action: 'grant.give' }, method: 'POST', path: '/grants', body: '{}', note: null, created_at: 1790000000, creation_hash: 'h', state: 'waiting' });
+    await mount('#/', { ...routes, '/requests': ok({ requests: [asked] }), '/drafts?state=waiting': ok({ drafts: [prepared('1'), prepared('2')] }),
+      '/dashboard': ok({ ...dashboard(), waiting: { requests: 1, drafts: 2, reviews: 1, product_drafts: 2 } }) });
+    const rows = $$('section[aria-label="Waiting on you"] tbody tr');
+    expect(rows.map((tr) => [tr.querySelector('td')?.textContent, tr.querySelector('a.btn')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
+      ['Scribe asks for reader access to store s-1', 'Decide', '#/requests'],
+      ['Scribe prepared something for you to approve', 'Decide', '#/access/drafts'],
+      ['Scribe prepared something for you to approve', 'Decide', '#/access/drafts'],
+      ['2 app actions wait for your approval', 'Open', '#/access/drafts'],
+      ['Check the access you gave: 1 is due', 'Open', '#/reviews'],
     ]);
-    expect(text()).not.toContain('Nothing is waiting.');
+    // One request, two drafts, two app actions and one review: six, every one of them listed above.
+    expect($('section[aria-label="Waiting on you"] [data-waiting="count"]')?.textContent).toBe('6');
+    expect(text()).not.toContain('Nothing is waiting on you.');
   });
 
-  it('says once that nothing is waiting and nothing is running, in the tables\' bodies', async () => {
+  it('says once that nothing is waiting, and with nothing running offers no Stop, no Watch and no Stop all', async () => {
     await mount('#/', SERVICE);
-    expect($$('tr[data-waiting]')).toEqual([]);
-    expect(text().split('Nothing is waiting.')).toHaveLength(2);
-    expect($('section[aria-label="Waiting for you"] tbody tr.empty td')?.textContent).toBe('Nothing is waiting.');
-    expect(text().split('Nothing is running.')).toHaveLength(2);
-    expect($('section[aria-label="Running now"] tbody tr.empty td')?.textContent).toBe('Nothing is running.');
+    expect($$('tr[data-waiting], tr[data-request], tr[data-draft]')).toEqual([]);
+    expect(text().split('Nothing is waiting on you.')).toHaveLength(2);
+    expect($('section[aria-label="Waiting on you"] tbody tr.empty td')?.textContent).toBe('Nothing is waiting on you.');
+    expect($('section[aria-label="Waiting on you"] [data-waiting="count"]')).toBeNull();
+    // What runs is said once, in each agent's row: nothing runs, so no row says it does and nothing offers to stop it.
+    expect($('section[aria-label="Running now"]')).toBeNull();
+    expect($$('.you-tree .dot').map((dot) => dot.getAttribute('aria-label'))).toEqual(['not running', 'not running', 'not running']);
+    expect(cells('Scribe')[1]).toBe('Not running');
+    expect($('[data-act="stop"], [data-act="watch"], [data-act="stop-everything"]')).toBeNull();
   });
 
-  it('lists what is running now, each with Watch and Stop', async () => {
+  it('says in the running agent\'s own row where it runs, with Watch and Stop', async () => {
     await mount('#/', routes);
-    const rows = $$('section[aria-label="Running now"] tr[data-running]');
-    expect(rows.map((tr) => tr.querySelector('td')?.textContent)).toEqual(['Scribe']);
-    expect(rows.map((tr) => tr.dataset.running)).toEqual([LIVE]);
-    expect(rows[0].textContent).toContain('on Lab');
-    expect([...rows[0].querySelectorAll('button')].map((button) => button.dataset.act)).toEqual(['watch', 'stop']);
+    const acts = $$('.you-tree .dash-acts[data-session]');
+    expect(acts.map((each) => [each.closest('tr')?.querySelector('td')?.textContent, each.getAttribute('data-session')])).toEqual([['Scribe', LIVE]]);
+    expect(cells('Scribe')[1]).toBe('on Lab');
+    expect([...acts[0].querySelectorAll('button')].map((button) => button.dataset.act)).toEqual(['watch', 'stop']);
+    expect(rowOf('Scribe')?.querySelector('.dot')?.getAttribute('aria-label')).toBe('running');
   });
 
-  it('stops a running agent from Running now, after asking, in a row under it', async () => {
+  it('stops a running agent from its row, after asking, in a row under it, opened once', async () => {
     const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: ok({ session: LIVE, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
-    await click($('section[aria-label="Running now"] button[data-act="stop"]'));
-    expect($('section[aria-label="Running now"] .you-asked')?.textContent).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost.');
-    expect($('section[aria-label="Agents"] .you-asked')).toBeNull();
+    await click(rowOf('Scribe')?.querySelector('button[data-act="stop"]') ?? null);
+    expect($('section[aria-label="Agents"] .you-asked')?.textContent).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost.');
+    expect(rowOf('Scribe')?.nextElementSibling?.classList.contains('you-asked')).toBe(true);
+    expect($$('.you-asked')).toHaveLength(1);
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
-    await click($$('section[aria-label="Running now"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
+    await click($$('section[aria-label="Agents"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
   });
 
@@ -288,7 +314,7 @@ describe('The Dashboard is the front page', () => {
     expect(rowOf('Scribe')?.querySelector('[data-act="watch"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(posted.filter((call) => call.path.endsWith('/resize')).map((call) => call.path)).toEqual(['/runtime/sessions/' + LIVE + '/resize']);
 
-    await click($('section[aria-label="Running now"] tr[data-running="' + OTHER + '"] [data-act="watch"]'));
+    await click(rowOf('Courier')?.querySelector('[data-act="watch"]') ?? null);
     expect($$('.dash-picture')).toHaveLength(1);
     expect($('.dash-picture h2')?.textContent).toBe('Courier');
     expect($('.dash-picture a[data-act="full-size"]')?.getAttribute('href')).toBe('#/canvas/' + COURIER);
@@ -329,13 +355,13 @@ describe('What the Dashboard reads, as the service answers it', () => {
     expect(names()).toEqual(['Courier', 'Scribe', 'Archivist']);
   });
 
-  it('shows each live session of an agent with its own Watch and Stop, and Running now lists sessions', async () => {
+  it('shows each live session of an agent with its own Watch and Stop, in its one row', async () => {
     const { posted } = await mount('#/', { ...routes, ...terminalOf(OTHER),
       '/dashboard': ok(dashboard({ [SCRIBE]: { sessions: [running, session(OTHER, SCRIBE, 'Shed')] } })),
       ['POST /runtime/sessions/' + OTHER + '/end']: ok({ session: OTHER, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
     expect([...(rowOf('Scribe')?.querySelectorAll('td')[1].querySelectorAll('.dash-line') ?? [])].map((line) => line.textContent)).toEqual(['on Lab', 'on Shed']);
     expect([...(rowOf('Scribe')?.querySelectorAll('.dash-acts') ?? [])].map((acts) => acts.getAttribute('data-session'))).toEqual([LIVE, OTHER]);
-    expect($$('section[aria-label="Running now"] tr[data-running]').map((tr) => [tr.dataset.running, tr.textContent?.includes('on Shed')])).toEqual([[LIVE, false], [OTHER, true]]);
+    expect($$('.dash-acts[data-session]').map((acts) => [acts.getAttribute('data-session'), acts.closest('tr') === rowOf('Scribe')])).toEqual([[LIVE, true], [OTHER, true]]);
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="watch"]`) ?? null);
     expect($('.dash-picture')?.textContent).toContain('on Shed');
     await click(rowOf('Scribe')?.querySelector(`.dash-acts[data-session="${OTHER}"] [data-act="stop"]`) ?? null);
@@ -362,23 +388,23 @@ describe('What the Dashboard reads, as the service answers it', () => {
     const courier = [...($(`tr[data-href="#/file/${COURIER}"]`)?.querySelectorAll('td') ?? [])].map(face);
     expect(courier.slice(0, 2)).toEqual(['CourierIts teams could not be read', 'Not turned on yet']);
     expect(folded($(`tr[data-href="#/file/${COURIER}"] td`))).toBe('TeamsUnavailable: the teams store is closed');
-    // An agent whose sessions could not be read is not counted as stopped: Running now names it and never says nothing runs.
-    const panel = $('section[aria-label="Running now"]');
-    expect(panel?.textContent).not.toContain('Nothing is running.');
-    expect(face(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]'))).toBe('ScribeWhether it is running could not be read');
-    expect(folded(panel?.querySelector('tr[data-unread="' + SCRIBE + '"]'))).toBe('RuntimeUnavailable: no reports store');
+    // An agent whose sessions could not be read is not counted as stopped: its row never says it is not running, and
+    // Stop all stays in the Agents heading, since the off switch is needed most when what runs cannot be read.
+    expect(rowOf('Scribe')?.textContent).not.toContain('Not running');
     expect(rowOf('Scribe')?.querySelector('.dot')?.getAttribute('aria-label')).toBe('not known');
+    expect($('section[aria-label="Agents"] .section-h [data-act="stop-everything"]')).not.toBeNull();
   });
 
-  it('says a waiting count that could not be read by its refusal name, its link still there, never zero', async () => {
-    await mount('#/', { ...routes, '/dashboard': ok(dashboard({}, { requests: { refusal: 'RequestsUnavailable', reason: 'closed' } as unknown as number, drafts: 0, reviews: 0 })) });
+  it('says a waiting count that could not be read in words, its link still there, never zero', async () => {
+    await mount('#/', { ...routes, '/dashboard': ok({ ...dashboard(), waiting: { requests: 0, drafts: 0, reviews: { refusal: 'ReviewsUnavailable', reason: 'closed' }, product_drafts: { refusal: 'ProductDraftsUnavailable', reason: 'shut' } } }) });
     const rows = $$('tr[data-waiting]');
-    expect(rows.map((tr) => [tr.querySelector('.dash-num')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
-      ['?', '#/requests'], ['0', '#/access/drafts'], ['0', '#/reviews'],
+    expect(rows.map((tr) => [tr.dataset.waiting, face(tr), tr.querySelector('a')?.getAttribute('href')])).toEqual([
+      ['product-drafts', 'Whether an app action waits for your approval could not be readOpen', '#/access/drafts'],
+      ['reviews', 'Whether the access you gave is due a check could not be readOpen', '#/reviews'],
     ]);
-    expect(face(rows[0])).toBe('?requests to decideHow many could not be read');
-    expect(folded(rows[0])).toBe('RequestsUnavailable: closed');
-    expect(text()).not.toContain('Nothing is waiting.');
+    expect(rows.map(folded)).toEqual(['ProductDraftsUnavailable: shut', 'ReviewsUnavailable: closed']);
+    expect($('[data-waiting="count"]')).toBeNull();
+    expect(text()).not.toContain('Nothing is waiting on you.');
   });
 
   it('reads every page of agents, one after another, until there is no next page', async () => {

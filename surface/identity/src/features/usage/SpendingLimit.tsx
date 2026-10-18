@@ -6,10 +6,11 @@ import { useRef, useState } from 'react';
 import { Refused, request } from '../../api';
 import { answeredNo } from '../../kept';
 import { Act } from '../../shell/Act';
-import { ACTS } from './contract';
-import type { BudgetAct, BudgetBody, BudgetsView, Length, Limit } from './contract';
+import { ACTS, standing } from './contract';
+import type { BudgetAct, BudgetBody, BudgetsView, Length, Limit, Receipt } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
-import { PERIOD_WORDS, money } from './budgetWords';
+import { PERIOD_WORDS, money, usedAgainst } from './budgetWords';
+import { plain } from './reasons';
 import { ErrorWords } from '../people/Words';
 
 /** Where the spending limit sits among the limits: the first dollar limit over a period. */
@@ -32,7 +33,21 @@ export function withSpending(limits: Limit[], amount: number | null, period: Len
   return at < 0 ? [...limits, next] : limits.map((limit, index) => (index === at ? next : limit));
 }
 
-export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; changed: (words: string) => void }) {
+/**
+ * What the limit has used and where it stands, as the Budget table says it of every other limit: a reached limit says
+ * what its act did, so a limit that only told someone is never read as one that stopped the agent.
+ */
+function Stands({ budgets, at, receipts, name }: { budgets: BudgetsView; at: number; receipts: Receipt[]; name?: string }) {
+  const used = budgets.used[at];
+  const stands = standing(budgets, at, receipts);
+  const words = used && used.figure === null ? plain(used.unavailable, { id: budgets.holder.id, name: name ?? 'this ' + budgets.holder.kind }).join(' ') : stands.words;
+  return <div className="usage-stands" data-limit="spending">
+    <p className="usage-used">{usedAgainst(budgets, at) ?? 'Nothing reported yet'}</p>
+    <p data-reached={stands.reached}>{words}</p>
+  </div>;
+}
+
+export function SpendingLimit({ budgets, receipts = [], name, changed }: { budgets: BudgetsView; receipts?: Receipt[]; name?: string; changed: (words: string) => void }) {
   const at = spendingIndex(budgets.limits);
   const current = at < 0 ? null : budgets.limits[at];
   const [amount, setAmount] = useState(current ? String(current.amount) : '');
@@ -60,6 +75,7 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
   };
   return <form aria-label="Spending limit" className="card usage-spending" onSubmit={(event) => { event.preventDefault(); void save(); }}>
     <h3>Spending limit</h3>
+    {current ? <Stands budgets={budgets} at={at} receipts={receipts} name={name} /> : null}
     {unavailable ? <p className="usage-reason">Lys cannot measure this agent’s spending yet, so a spending limit cannot be set. Start it once through Lys so its model calls go through the Lys proxy, then come back.</p> : <>
       <div className="usage-amount">
         <span>US$</span>

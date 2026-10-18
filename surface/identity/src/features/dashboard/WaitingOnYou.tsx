@@ -34,12 +34,15 @@ export function waitingCount(requests: AccessRequest[] | Refused, drafts: Draft[
   return requests.filter((entry) => entry.state === 'waiting' && mayDecide(entry, me)).length + drafts.length + served;
 }
 
-/** One counted line the service gave: "1 app action waits for your approval", linked; nothing when there are none. */
+/**
+ * One counted line the service gave: "1 app action waits for your approval", linked; nothing when there are none. A
+ * count that could not be read says so and keeps its Open, so the place it counts is still one press away.
+ */
 function CountLine({ count, words, unread, href, kind }: { count: number | PartRefused | undefined; words: (count: number) => string; unread: string; href: string; kind: string }) {
   if (count === undefined || count === 0) return null;
   return <tr data-waiting={kind}>{refusedPart(count)
-    ? <td colSpan={2}><Unread part={count} words={unread} /></td>
-    : <><td><a href={href}>{words(count)}</a></td><td className="you-act"><a className="btn" href={href}>Open</a></td></>}</tr>;
+    ? <td><Unread part={count} words={unread} /></td>
+    : <td><a href={href}>{words(count)}</a></td>}<td className="you-act"><a className="btn" href={href}>Open</a></td></tr>;
 }
 
 export function WaitingOnYou({ requests, drafts, waiting, me }: { requests: AccessRequest[] | Refused; drafts: Draft[] | Refused; waiting: Waiting; me: string }) {
