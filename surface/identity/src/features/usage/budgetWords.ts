@@ -1,7 +1,7 @@
-/** A budget's limits as a person says them: "$500 a week", "50% of the weekly plan", "$212 of $500 this week". */
+/** A budget's limits as a person says them: "US$500.00 a week", "50% of the weekly plan", "US$212.00 of US$500.00 this week". */
 import type { BudgetsView, Length, Limit, Measure, Used } from './contract';
 
-export const UNITS: Record<Measure, string> = { dollars: 'dollars', plan_percent: '% of my plan', tokens: 'tokens', running_ms: 'minutes running', context_percent: '% of its context' };
+export const UNITS: Record<Measure, string> = { dollars: 'US dollars', plan_percent: '% of its plan', tokens: 'tokens', running_ms: 'minutes running', context_percent: '% of its context' };
 
 export const PERIOD_WORDS: Record<Length, string> = { five_hour: '5-hour window', day: 'day', week: 'week', month: 'month' };
 
@@ -16,12 +16,15 @@ const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', w
 export const money = (value: number): string =>
   'US$' + value.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** An amount as a person reads it: $500, 50%, 2,000,000 tokens, 90 minutes running. */
+/**
+ * An amount as a person reads it, in Australian English whatever the browser's locale: US$500.00, 50%, 2,000,000 tokens,
+ * 90 minutes running. Every figure of a budget on every page goes through here, money through `money`.
+ */
 export function amount(unit: Measure, value: number): string {
-  const figure = value.toLocaleString(undefined, { maximumFractionDigits: unit === 'dollars' ? 2 : 0 });
-  if (unit === 'dollars') return '$' + figure;
+  if (unit === 'dollars') return money(value);
+  if (unit === 'running_ms') return (value / 60000).toLocaleString('en-AU', { maximumFractionDigits: 0 }) + ' minutes running';
+  const figure = value.toLocaleString('en-AU', { maximumFractionDigits: 0 });
   if (unit === 'plan_percent' || unit === 'context_percent') return figure + '%';
-  if (unit === 'running_ms') return (value / 60000).toLocaleString(undefined, { maximumFractionDigits: 0 }) + ' minutes running';
   return figure + ' tokens';
 }
 

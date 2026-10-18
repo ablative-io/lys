@@ -136,7 +136,7 @@ export function contextPresentation(rows: DashboardAgent[], selectedSession?: st
     contextTokens === null && used.figure !== null ? 'context tokens not reported' : '',
     missingWindow ? 'declared context window not reported' : '']
     .filter(Boolean).join(' · ');
-  const display = figure !== null ? figure.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%'
+  const display = figure !== null ? figure.toLocaleString('en-AU', { maximumFractionDigits: 1 }) + '%'
     : noMessages ? 'No messages yet' : missing !== 'Not reported' ? missing : missingWindow ? 'Declared context window not reported' : 'Not reported';
   return { figure, display, read_at_ms: readAt, reported_none: reading?.reported_none ?? null, words,
     unavailable: used.unavailable && !noMessages ? [readings[0].agent + ': ' + used.unavailable] : [], session,

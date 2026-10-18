@@ -1,4 +1,5 @@
 import { clockMs } from '../file/time';
+import { amount } from './budgetWords';
 /** The budget, usage and goal shapes the identity service answers for one agent. */
 export type Measure = 'context_percent' | 'tokens' | 'running_ms' | 'dollars' | 'plan_percent';
 export type BudgetAct = 'compact' | 'notice' | 'stop' | 'tell';
@@ -61,7 +62,7 @@ export function standing(view: BudgetsView, index: number, receipts: Receipt[]):
   const latest = crossed[crossed.length - 1];
   if (!latest) return { reached: false, words: 'Held: not reached.' };
   const act = ACTS[latest.crossing.act].toLowerCase();
-  const figure = 'Reached at ' + shown(limit.unit, latest.crossing.figure) + '.';
+  const figure = 'Reached at ' + amount(limit.unit, latest.crossing.figure) + '.';
   if (!latest.acted) return { reached: true, words: figure + ' Nothing is known yet of its act (' + act + ').' };
   switch (latest.acted.stands) {
     case 'confirmed': return { reached: true, words: figure + ' Its act was confirmed: ' + act + '.' };

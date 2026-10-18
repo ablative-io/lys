@@ -32,7 +32,7 @@ describe('Needs a look on the Dashboard', () => {
     expect(exceptionsOf(rows).map((each) => [each.kind, each.words])).toEqual([
       ['reached', 'Full reached its limit of 1,000 tokens a day'],
       ['missed', 'Full missed a goal: send the invoice'],
-      ['near', 'Near has used 90% of its $500 a week'],
+      ['near', 'Near has used 90% of its US$500.00 a week'],
     ]);
   });
 

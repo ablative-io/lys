@@ -101,3 +101,17 @@ The Spending limit card and the dollar row of the Budget table both edit the sam
 Recommendation: B. It meets the review's aim, one editor per limit, without burying the one limit a person most wants. A team's tab has no card, so its table keeps every row.
 
 Second go. Looked at in headless Chrome. Two things were wrong at the first go and are changed: the "tell" sentence said "you are told", which is false when an administrator is looking at someone else's agent, so it says "the responsible person is told"; and Save sat on the amount's row, above the act it also saves, so it now ends the act's row, the last thing filled in. Still wrong: the Budget table below is wider than its card at laptop width and scrolls sideways (its TableScroll, not new); the card's "$" before the amount stays until item 8's money words.
+
+## Item 8: money with no unit, no fixed decimals, in the browser's locale
+
+"Reached at 512.34." has no unit. Money prints "$12.5" beside "$12.50", is never marked as US dollars though it is the harness's `total_cost_usd`, and follows the browser's locale ("1.234,5" in a German browser). Item 1 added `money()`; `amount()` beside it still writes the old way.
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. `amount()` writes money through `money()` (US$, two decimals) and every other figure in en-AU; `standing()` says the reached figure through `amount()` with its unit; the spending card says "US$". Every caller (dashboard, the Limits and goals tab, the canvas, a person's budgets) follows, because they already call `amount()`. | "US$212.00 of US$500.00 this week", "Reached at US$512.34.", "Reached at 2,000,000 tokens." | Seven formatters (06 Duplication); a bare number (06 #8); locale drift (06 "Device"). | Value: a bill she understands; CONSENSUS "one money/number formatter". |
+| B. Use `money()` only in new code. | "$212" in one place and "US$212.00" in another. | Nothing: two formatters. | Less. |
+| C. Write "USD" after the figure. | "212.00 USD". | The unit, but not the familiar reading order. | Same as A, less familiar. |
+
+Recommendation: A. The plan wording "% of my plan" (wrong on an agent's page, 06 Words) becomes "% of its plan" in the same file.
+
+Second go. Checked against a browser that writes numbers the German way (a test forces it): every budget figure still reads "1,235 tokens" and "US$1,234.50". What I changed on reflection: the unit picker said "dollars" while every figure said "US$"; it now says "US dollars", and the spending input's accessible name says the same. Still wrong: "US$500.00" is heavier than "$500" in a sentence like "Near has used 90% of its US$500.00 a week"; I kept the two decimals everywhere because CONSENSUS asks for one formatter, and a second, lighter one for round limits is exactly how the seven began. The canvas's own formula and dial labels (`CanvasWidgets.tsx:48, 197-199`) still use the browser's locale; not my folder, asked.

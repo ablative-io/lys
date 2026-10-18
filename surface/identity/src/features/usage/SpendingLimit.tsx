@@ -9,7 +9,7 @@ import { Act } from '../../shell/Act';
 import { ACTS } from './contract';
 import type { BudgetAct, BudgetBody, BudgetsView, Length, Limit } from './contract';
 import { PERIODS, confirmsBudget, validAmount } from './budgetForm';
-import { PERIOD_WORDS } from './budgetWords';
+import { PERIOD_WORDS, money } from './budgetWords';
 import { ErrorWords } from '../people/Words';
 
 /** Where the spending limit sits among the limits: the first dollar limit over a period. */
@@ -52,7 +52,7 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
     try {
       const answer = await request<unknown>('/budgets/' + budgets.holder.kind + '/' + encodeURIComponent(budgets.holder.id), body, 'PUT');
       if (!confirmsBudget(answer, body, budgets.holder)) throw new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm the spending limit.' });
-      changed(cleared ? 'Spending limit removed.' : 'Spending limit set: $' + Number(amount) + ' a ' + PERIOD_WORDS[period] + '. It applies now.');
+      changed(cleared ? 'Spending limit removed.' : 'Spending limit set: ' + money(Number(amount)) + ' a ' + PERIOD_WORDS[period] + '. It applies now.');
     } catch (error) {
       if (!answeredNo(error)) setUnsure(true);
       setFailure(error);
@@ -62,8 +62,8 @@ export function SpendingLimit({ budgets, changed }: { budgets: BudgetsView; chan
     <h3>Spending limit</h3>
     {unavailable ? <p className="usage-reason">Lys cannot measure this agent’s spending yet, so a spending limit cannot be set. Start it once through Lys so its model calls go through the Lys proxy, then come back.</p> : <>
       <div className="usage-amount">
-        <span>$</span>
-        <input name="spending_amount" aria-label="Spending limit in dollars" type="number" min={0} step="any" placeholder="No limit" value={amount} disabled={busy || unsure} onChange={(event) => setAmount(event.target.value)} />
+        <span>US$</span>
+        <input name="spending_amount" aria-label="Spending limit in US dollars" type="number" min={0} step="any" placeholder="No limit" value={amount} disabled={busy || unsure} onChange={(event) => setAmount(event.target.value)} />
         <select name="spending_period" aria-label="Spending limit period" value={period} disabled={busy || unsure} onChange={(event) => setPeriod(event.target.value as Length)}>
           {PERIODS.dollars.map((each) => <option key={each} value={each}>{'a ' + PERIOD_WORDS[each]}</option>)}
         </select>
