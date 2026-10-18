@@ -162,7 +162,8 @@
 /* Colour: a thing wears its tint where it would wear Lys's accent. */
 .canvas-widget .canvas-kind-symbol { color: var(--tint, var(--accent)); }
 .canvas-widget .canvas-dial-level { stroke: var(--tint, var(--accent)); }
-.canvas-widget .canvas-widget-level > span, .canvas-widget .dash-bar > span:not(.full) { background: var(--tint, var(--accent)); }
+/* A tint never repaints a level: only the widget's own level line wears it, never the shared bar (the dashboard's) nor a full one (the full class is on the level, so the :not sits there; red at the limit stays red). */
+.canvas-widget .canvas-widget-level:not(.full) > span { background: var(--tint, var(--accent)); }
 .canvas-group[style*="--tint"] { border-color: var(--tint); }
 .canvas-group[style*="--tint"] .canvas-group-bar input { color: var(--tint); }
 .canvas-note[style*="--tint"] { border-left-color: var(--tint); }

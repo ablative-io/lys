@@ -5,6 +5,7 @@ import type { Load } from '../../api';
 import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
+import { PageHeader } from '../../shell/PageHeader';
 import { RunningList } from './Sessions';
 import { Seats } from '../sessions/Seats';
 import { RuntimeSessions } from './RuntimeSessions';
@@ -53,7 +54,7 @@ function Whole({ graph, messages, keeping, board }: { graph: SessionGraph; messa
   const whole = read ? withMessages(graph, read.messages) : graph;
   return <>
     <div className="session-canvas-strip">
-      {!graph.nodes.length ? <p className="note" role="status">No agent is running, so the canvas has no windows yet. Start an agent from the Network view and its window appears here.</p> : null}
+      {!graph.nodes.length ? <p className="note" role="status">No agent is running, so the canvas has no windows yet. Start an agent from the By computer view and its window appears here.</p> : null}
       {graph.notices.map((notice) => <p className="note" role="status" key={notice}>{notice}</p>)}
       {graph.unanswered.map((entry) => <Unanswered key={entry.session} graph={graph} entry={entry} />)}
     </div>
@@ -129,14 +130,14 @@ function CanvasOperations() {
   // and widgets, and says why it has no windows. The lists are the Sessions view's.
   return <div className="canvas-side">
     {load.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}
-    <Gate load={load} title="Agent canvas" ok={(graph) => <Whole graph={graph} messages={messages} keeping={keeping} board={board} />} />
+    <Gate load={load} title="Running agents" ok={(graph) => <Whole graph={graph} messages={messages} keeping={keeping} board={board} />} />
   </div>;
 }
 
 export function SessionCanvas() {
   const keeping = useLoad(readKeeping, 'canvas-kept');
   return <div className="page fill session-canvas-page">
-    <div className="head"><h1>Operations</h1></div>
-    {keeping.status === 'ok' ? <Operations keeping={keeping.data} /> : keeping.status === 'refused' ? <p className="why-not" role="alert">{said(keeping.refused)}</p> : <p role="status">Reading your operations view…</p>}
+    <PageHeader title="Running agents" />
+    {keeping.status === 'ok' ? <Operations keeping={keeping.data} /> : keeping.status === 'refused' ? <p className="why-not" role="alert">{said(keeping.refused)}</p> : <p role="status">Reading which view of Running agents you last used…</p>}
   </div>;
 }

@@ -35,6 +35,7 @@ export function windowWords(minutes: number): string {
   return minutes % 60 === 0 ? minutes / 60 + '-hour' : minutes + '-minute';
 }
 
+/** A level as the dashboard's bar (dashboard.css `.dash-bar`), so the canvas and the dashboard draw one bar; a tint never repaints it. */
 const bar = (percent: number, says: string) => <span className="dash-bar" role="img" aria-label={says}>
   <span className={percent >= 100 ? 'full' : ''} style={{ width: Math.max(0, Math.min(100, percent)) + '%' }} /></span>;
 
@@ -45,7 +46,7 @@ const full = (percent: number): number => Math.max(0, Math.min(100, percent));
 export function Dial({ percent, face, children }: { percent: number; face?: 'mid' | 'large'; children?: ReactNode }) {
   const [size, r, stroke] = face === 'large' ? [132, 56, 10] : face === 'mid' ? [84, 35, 7] : [18, 7, 3];
   const round = 2 * Math.PI * r;
-  return <span className={'canvas-dial' + (face ? ' ' + face : '') + (percent >= 100 ? ' full' : '')} role="img" aria-label={percent.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%'}>
+  return <span className={'canvas-dial' + (face ? ' ' + face : '') + (percent >= 100 ? ' full' : '')} role="img" aria-label={percent.toLocaleString('en-AU', { maximumFractionDigits: 1 }) + '%'}>
     <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
       <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="canvas-dial-track" />
       <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke} className="canvas-dial-level" strokeDasharray={`${round * full(percent) / 100} ${round}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
@@ -196,7 +197,7 @@ const LEVELS: ReadonlySet<string> = new Set(['context_percent', 'plan_percent', 
 /** A combined figure in words: an amount in its own unit's words, a count as its number. */
 const said = (value: Value): string => value.unit === 'count' ? value.amount.toLocaleString('en-AU', { maximumFractionDigits: 1 })
   : value.unit === 'percent' ? Math.round(value.amount) + '%' : value.unit === 'context_percent'
-    ? value.amount.toLocaleString(undefined, { maximumFractionDigits: 1 }) + '%' : amount(value.unit as Measure, value.amount);
+    ? value.amount.toLocaleString('en-AU', { maximumFractionDigits: 1 }) + '%' : amount(value.unit as Measure, value.amount);
 
 /** A widget that feeds a formula: what it is, whose it is, its figure in words and as a number. */
 interface Input { id: string; label: string; whose: string; figure: ReactNode; value?: Value }

@@ -1,6 +1,6 @@
 /* A surface of windows: terminals and the things they are connected to, placed by the person, in the existing Lys palette. */
-.session-canvas-page > .head { align-items: center; justify-content: flex-start; gap: 14px; }
-.session-canvas-page > .head h1 { font-size: 16px; margin: 0; }
+.session-canvas-page > .page-header { align-items: center; justify-content: flex-start; gap: 14px; margin: 0; padding: 10px 16px 8px; }
+.session-canvas-page > .page-header h1 { margin: 0; }
 .canvas-about, .canvas-connections { position: relative; font-size: 12.5px; color: var(--text-secondary); }
 .canvas-about > summary, .canvas-connections > summary { cursor: pointer; }
 .canvas-about[open] > p, .canvas-about[open] > div, .canvas-connections[open] > ul, .canvas-connections[open] > p { position: absolute; z-index: 20; top: 22px; left: 0; width: min(640px, 70vw); max-height: 50vh; overflow: auto; margin: 0; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); }
@@ -75,11 +75,10 @@
 .canvas-connections, .canvas-about { max-height: 120px; overflow: auto; overscroll-behavior: contain; }
 .canvas-connections h4 { margin: 0 0 4px; }
 
-/* The Running page is the canvas, edge to edge: no title line, no strip, no frame. One small bar of symbols hovers over its bottom right; who is running is behind its Agents button. Only what a runner did not answer is said at the top. */
+/* The Running agents page is its title, then the canvas edge to edge: no strip, no frame. One small bar of symbols hovers over its bottom right; who is running is behind its Agents button. Only what a runner did not answer is said at the top. */
 .page.session-canvas-page { position: relative; padding: 0; }
-.session-canvas-page > .head { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
-.session-canvas-page > .head:has(button) { position: absolute; top: 10px; right: 12px; z-index: 8; width: auto; height: auto; overflow: visible; clip-path: none; }
-.session-canvas-page > .head:has(button) h1 { display: none; }
+/* On a phone the title and the view switch do not share a line: the switch sits under the title. */
+@media (max-width: 600px) { .session-canvas-page .operations-swap { position: static; transform: none; align-self: center; flex: none; margin: 0 12px 8px; max-width: calc(100% - 24px); overflow-x: auto; } }
 .session-canvas-page .canvas-side { position: relative; }
 /* With nothing running there is no canvas: that is said at the top left. */
 .session-canvas-page .canvas-side > .running-list { position: static; margin: 0 12px 12px; }

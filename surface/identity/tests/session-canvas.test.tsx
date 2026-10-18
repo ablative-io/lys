@@ -73,6 +73,13 @@ describe('Running: the list and the canvas', () => {
     expect($('.session-canvas')).toBeNull();
   });
 
+  it('is titled Running agents in the one page header, shown like every other page, with its views named By computer, Canvas, Sessions and Proxy', async () => {
+    await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [], unanswered: [] }) });
+    expect($$('.session-canvas-page > header.page-header h1').map((heading) => heading.textContent)).toEqual(['Running agents']);
+    expect($$('.session-canvas-page h1').filter((heading) => heading.textContent === 'Operations')).toHaveLength(0);
+    expect($$('nav[aria-label="Running agents views"] a').map((link) => link.textContent)).toEqual(['By computer', 'Canvas', 'Sessions', 'Proxy']);
+  });
+
   it('says an empty Running page is empty once, in the list\'s own body, under a title with no paragraph of instructions', async () => {
     await mount('#/canvas?view=canvas', { ...routes, '/runtime/live': ok({ sessions: [], unanswered: [] }) });
     expect(text().split('Nothing is running.')).toHaveLength(2);
