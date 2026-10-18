@@ -130,9 +130,9 @@ describe('Directory mutations', () => {
     await choose(page.querySelector('select[name="kind"]'), 'project');
     await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
     await fill(page, 'resource_id', 'integration-check');
-    const checks = page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    const noExpiry = [...page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((tick) => tick.closest('label')?.textContent?.includes('No expiry'));
     // No expiry is the default: nothing is ticked to get it, and the expiry field waits until it is unticked.
-    expect(checks[1]?.checked).toBe(true);
+    expect(noExpiry?.checked).toBe(true);
     expect(page.querySelector<HTMLInputElement>('input[name="expires"]')?.disabled).toBe(true);
     await submit(page);
     expect(posted).toHaveLength(1);

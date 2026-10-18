@@ -41,6 +41,10 @@ export const kindLabel = (kind: string): string => {
   return words.charAt(0).toUpperCase() + words.slice(1);
 };
 
+/** The recipients a root grant's holder may pass it on to, as the two ticks say: other people, their agents, both or neither. */
+const passTo = (data: FormData): ('person' | 'agent')[] => [
+  ...(data.get('pass-people') === 'on' ? ['person' as const] : []), ...(data.get('delegate') === 'on' ? ['agent' as const] : [])];
+
 /** Kinds whose every item the directory names: a person or agent is chosen by name, never typed as an id. */
 const DIRECTORY_KINDS = new Set(['person', 'agent', 'identity']);
 
@@ -89,7 +93,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
     return { path: toAgent ? '/grants' : '/grants/roots', body: {
       route: 'browser', ...(toAgent ? { source: 'administrator', recipient: holder, responsible: me.person.id } : { holder }),
       resource: { kind: chosen, id: field(data, 'resource') === BY_ID ? field(data, 'resource_id') : field(data, 'resource') }, relation,
-      pass_on: data.get('delegate') === 'on' ? { kind: 'to', actions, recipients: ['agent'] } : { kind: 'use_only' },
+      pass_on: passTo(data).length ? { kind: 'to', actions, recipients: passTo(data) } : { kind: 'use_only' },
       window: { starts_at: Math.floor(Date.now() / 1000), ends_at: expires },
       mode: field(data, 'mode'),
     } };
@@ -113,7 +117,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
       <option value="">No role: what is chosen above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}
     </select><span className="hint">A role gives what it carries whenever it is checked, so a widening you approve reaches this grant.</span></label> : null}
-    <div className="field">May pass on<label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
+    <div className="field">May they pass it on<label className="tick"><input name="pass-people" type="checkbox" /> to other people</label><label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
     <div className="field">Expires (your local time)<div className="expires"><input name="expires" type="datetime-local" aria-label="Expires" required={!noExpiry} disabled={noExpiry} />
       <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry</label></div></div>
     <details className="field"><summary>More</summary>

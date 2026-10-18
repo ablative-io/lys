@@ -206,6 +206,9 @@ export function passText(p: PassOn): string {
 
 export const passesToAgents = (p: PassOn): boolean => p.kind === 'to' && p.recipients.includes('agent');
 
+/** The kinds of recipient a grant lets its holder give it to, as its pass-on names them: people, agents, both or none. */
+export const givesTo = (p: PassOn): ('person' | 'agent')[] => p.kind === 'to' ? (['person', 'agent'] as const).filter((kind) => p.recipients.includes(kind)) : [];
+
 /**
  * When it was last seen exercised; a grant with no observed use reads `not seen`, never `never used` (conformance 8.4).
  * A missing use report is said, so a zero recorded count is never read as no use.

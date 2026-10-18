@@ -11,12 +11,13 @@ import { useShell } from '../../shell/ShellContext';
 import { clock, day } from '../file/time';
 import { readRoles } from '../roles/AssignedRoles';
 import { CannotGiveList } from './CannotGiveList';
-import { appKind, appKindProblem, givenOnText, grantNo, nameOf, named, passText, relationsOf, sourceText, withinPassOn } from './model';
+import { appKind, appKindProblem, givenOnText, givesTo, grantNo, nameOf, named, passText, relationsOf, sourceText, withinPassOn } from './model';
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from './CambiumFirst';
 import { PendingWords, RefusedWords } from './Outcome';
+import './grants.css';
 
 const DAY = 86400;
 
@@ -45,15 +46,18 @@ type Outcome =
 export function Delegate({ w, source, to, initialChoices = [], done, close }: { w: GrantWorld; source: Grant; to?: string; initialChoices?: string[]; done: () => void; close: () => void }) {
   const shell = useShell();
   const me = w.me.person.id;
-  const agents = [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired');
-  const people = [...w.who.entries()].filter(([id, x]) => x.kind === 'person' && id !== me && x.state !== 'retired');
+  // Only the kinds of recipient the source may be given to are offered: a name the service would refuse is never in the list.
+  const allowed = givesTo(source.pass_on);
+  const agents = allowed.includes('agent') ? [...w.who.entries()].filter(([, x]) => x.kind === 'agent' && x.responsible === me && x.state !== 'retired') : [];
+  const people = allowed.includes('person') ? [...w.who.entries()].filter(([id, x]) => x.kind === 'person' && id !== me && x.state !== 'retired') : [];
+  const firstActive = [...agents, ...people].find(([, x]) => x.state === 'active')?.[0];
   const app = source.resource.kind.includes('.');
   // An app kind the model does not declare (retired, or approved after this read) offers nothing and says why, beside the grant.
   const kindProblem = app ? appKindProblem(w.model, source.resource.kind) : null;
   const declared = app ? appKind(w.model, source.resource.kind) : null;
   const relations = declared ? Object.entries(declared.relations) : relationsOf(w);
   const fits = relations.filter(([, actions]) => withinPassOn(source, actions));
-  const [recipient, setRecipient] = useState(to ?? agents[0]?.[0] ?? '');
+  const [recipient, setRecipient] = useState(to ?? firstActive ?? '');
   const [relation, setRelation] = useState(fits.find(([r]) => r === 'viewer')?.[0] ?? fits.at(-1)?.[0] ?? '');
   const [picked, setPicked] = useState<string[]>(initialChoices);
   const [lasts, setLasts] = useState('7 days');
@@ -233,24 +237,27 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
   return (
     <>
       <div className="eyebrow">Your access</div>
-      <h2 style={{ marginTop: 6, fontSize: 16 }}>Give part of {source.relation} of {sourceText(source)} to an agent</h2>
-      <p className="sub" style={{ marginTop: 6 }}>Only what you hold and may pass on. It traces back to you, and ends when yours does.</p>
-      <fieldset disabled={locked} style={{ border: 0, padding: 0 }}>
+      <h2 className="give-head">Give part of {source.relation} of {sourceText(source)} to {allowed.includes('person') ? allowed.includes('agent') ? 'someone' : 'a person' : 'an agent'}</h2>
+      <p className="sub give-sub">Only what you hold and may pass on. It traces back to you, and ends when yours does.</p>
+      <fieldset className="give-fields" disabled={locked}>
       <div className="field">
         <label htmlFor="dTo">To</label>
         {agents.length || people.length ? <select id="dTo" value={recipient} onChange={(e) => setRecipient(e.target.value)}>
           {recipient ? null : <option value="" disabled>Choose who to give it to</option>}
           {agents.length > 0 ? (
             <optgroup label="Your agents">
-              {agents.map(([id, x]) => <option key={id} value={id}>{x.name}{stateWords(x.state)}</option>)}
+              {agents.map(([id, x]) => <option key={id} value={id} disabled={x.state !== 'active'}>{x.name}{stateWords(x.state)}</option>)}
             </optgroup>
           ) : null}
           {people.length > 0 ? (
             <optgroup label="People">
-              {people.map(([id, x]) => <option key={id} value={id}>{x.name}{stateWords(x.state)}</option>)}
+              {people.map(([id, x]) => <option key={id} value={id} disabled={x.state !== 'active'}>{x.name}{stateWords(x.state)}</option>)}
             </optgroup>
           ) : null}
-        </select> : <p className="note" data-no-recipient>You have no agent and there is no other person to give it to. Add an agent on People and agents first.</p>}
+        </select> : <p className="note" data-no-recipient>{allowed.includes('person')
+          ? <>There is no one to give it to yet. <a href="#/people">Add a person or an agent on People and agents</a> first.</>
+          : <>This access may be given only to your agents, and you have none yet. <a href="#/agents/new">Add an agent</a> first.</>}</p>}
+        {[...agents, ...people].some(([, x]) => x.state !== 'active') ? <div className="note">Someone not yet activated or suspended is listed but cannot be chosen: Lys gives access only to an active person or agent.</div> : null}
       </div>
       {toAgent ? <div className="field">
         {/* The picker's own legend names the actions; a label is the heading only when no picker is shown. */}
@@ -269,7 +276,7 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
                 {r}
               </span>
             ) : (
-              <span key={r} className="chk" style={{ opacity: 0.4 }} title="More than you hold">{r}</span>
+              <span key={r} className="chk more-than-held" title="More than you hold">{r}</span>
             ),
           )}
         </div>
@@ -286,14 +293,14 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
         </select>
       </div>
       <div className="field">
-        <label htmlFor="dPass">May the agent pass it on</label>
+        <label htmlFor="dPass">May they pass it on</label>
         <select id="dPass" value={pass} onChange={(e) => setPass(e.target.value)}>
           <option value="no">No</option>
           {onward ? <option value="to agents">Yes, to their own agents</option> : <option disabled value="">Yes (your own access does not allow it)</option>}
         </select>
       </div>
       </fieldset>
-      <div className="card" style={{ marginTop: 4 }}>
+      <div className="card give-source">
         <h2>Where it comes from</h2>
         <div className="row"><span className="sec">Source grant</span><span className="mono">{grantNo(source.id)} · {source.relation} of {sourceText(source)}</span></div>
         <div className="row"><span className="sec">Actions it allows</span><span className="mono">{actionWords(w.model, source.resource, source.actions)}</span></div>
@@ -309,7 +316,7 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
         </PendingWords>
       ) : null}
       {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
-      <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className="give-actions">
         {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
         <Act symbol={pending.kind === 'held' ? 'again' : 'send'} name={pending.kind === 'held' ? 'Check original grant' : 'Give'} word={pending.kind === 'held' ? 'Check' : 'Give'} tone="primary" data-act="delegatedo" disabled={outcome.at === 'sending' || whyNot !== ''} onClick={give} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />

@@ -191,3 +191,11 @@
   align-self: flex-end;
   line-height: 30px;
 }
+
+/* The give form (Delegate): its heading and actions as classes, never inline. */
+.give-head { margin-top: 6px; font-size: 16px; }
+.give-sub { margin-top: 6px; }
+.give-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.chk.more-than-held { opacity: .4; cursor: default; }
+.give-source { margin-top: 4px; }
+.give-actions { margin-top: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

@@ -44,7 +44,8 @@ export function readPendingRest(key: string, person: string, source: string): Pe
 /** One retained grant request, exactly as it was sent, or null when the record does not describe one. */
 export function parsePendingGrant(value: unknown, person: string, source: string): DelegateBody | null {
   if (!object(value) || typeof value.operation !== 'string' || !/^op-[0-9a-f]{32}$/.test(value.operation)
-    || value.route !== 'browser' || value.source !== source || value.responsible !== person
+    // The responsible is the giver for their own agent and the recipient for a person, who answers for themselves; the service judges which.
+    || value.route !== 'browser' || value.source !== source || typeof value.responsible !== 'string' || (value.responsible !== person && value.responsible !== value.recipient)
     || typeof value.recipient !== 'string' || typeof value.relation !== 'string'
     || !object(value.resource) || typeof value.resource.kind !== 'string' || typeof value.resource.id !== 'string'
     || !object(value.window) || !second(value.window.starts_at)
@@ -56,7 +57,7 @@ export function parsePendingGrant(value: unknown, person: string, source: string
     passOn = { kind: 'to', actions: value.pass_on.actions, recipients: value.pass_on.recipients as ('person' | 'agent')[] };
   } else return null;
   return {
-    operation: value.operation, route: 'browser', source, responsible: person, recipient: value.recipient,
+    operation: value.operation, route: 'browser', source, responsible: value.responsible, recipient: value.recipient,
     relation: value.relation, resource: { kind: value.resource.kind, id: value.resource.id },
     window: { starts_at: value.window.starts_at, ends_at: value.window.ends_at }, pass_on: passOn,
   };

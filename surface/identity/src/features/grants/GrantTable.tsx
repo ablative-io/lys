@@ -6,7 +6,7 @@ import type { Column } from '../../shell/Listing';
 import { TableScroll } from '../../shell/Listing';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
-import { chainOf, lastUsedText, mayText, nameOf, passText, passesToAgents, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
+import { chainOf, lastUsedText, mayText, nameOf, givesTo, passText, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 import { modeWords } from './mode-words';
@@ -99,18 +99,18 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
 export type Act = 'revoke' | 'delegate';
 
 /**
- * A grant's Change: give part of it to an agent, or revoke it. The same buttons
+ * A grant's Change: give part of it to whoever its pass-on allows, or revoke it. The same buttons
  * wherever a grant is listed; a press never also opens the row it sits in.
  */
 export function ChangeButtons({ w, g, give, open }: { w: GrantWorld; g: Grant; give: boolean; open: (act: Act, opener: HTMLElement) => void }) {
   const mayRevoke = !g.revoked && w.who.get(g.holder)?.state !== 'retired';
-  const mayGive = give && g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on);
+  const mayGive = give && g.holder === w.me.person.id && g.standing.stands && givesTo(g.pass_on).length > 0;
   return (
     <span className="g-change">
       {mayGive ? (
         <Act
           symbol="send"
-          name="Give to an agent…"
+          name={givesTo(g.pass_on).includes('person') ? 'Give to someone…' : 'Give to an agent…'}
           word="Give"
           data-act="delegate"
           data-g={g.id}

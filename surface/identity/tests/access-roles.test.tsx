@@ -8,7 +8,7 @@
 import { act } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, $$, choose, mount, pick, settle } from './harness';
+import { $, $$, choose, mount, pick, settle, unmountAll } from './harness';
 import { ADA, RECEIPTS, SERVICE, ok } from './fixtures';
 import type { Route } from './fixtures';
 import { SchemaMatrix } from '../src/features/apps/SchemaMatrix';
@@ -75,6 +75,29 @@ describe('The issue form offers the kind\'s roles beside the mode', () => {
     },
   };
 
+  it('lets the administrator say the grant may be passed on to other people, to their agents, or both', async () => {
+    const sent = async (ticks: string[]) => {
+      unmountAll();
+      const { posted } = await mount('#/access/issue', routes);
+      const page = $('form[aria-label="Give access"]');
+      if (!page) throw new Error('No Give access form');
+      await pick(page, 'Find a person', 'Ada', 'Ada (test person)');
+      await choose(page.querySelector('select[name="kind"]'), KIND);
+      await choose(page.querySelector('select[name="role"]'), 'observer');
+      await choose(page.querySelector('select[name="resource"]'), '\u0000by-id');
+      const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
+      if (!input) throw new Error('No resource id input');
+      input.value = 'ward';
+      for (const tick of ticks) page.querySelector<HTMLInputElement>(`input[name="${tick}"]`)?.click();
+      await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
+      await settle();
+      return (posted.at(-1)?.body as { pass_on: unknown }).pass_on;
+    };
+    expect(await sent(['pass-people'])).toEqual({ kind: 'to', actions: ['read'], recipients: ['person'] });
+    expect(await sent(['pass-people', 'delegate'])).toEqual({ kind: 'to', actions: ['read'], recipients: ['person', 'agent'] });
+    expect(await sent([])).toEqual({ kind: 'use_only' });
+  });
+
   it('sends the chosen role as the relation', async () => {
     const { posted } = await mount('#/access/issue', routes);
     const page = $('form[aria-label="Give access"]');
@@ -89,7 +112,7 @@ describe('The issue form offers the kind\'s roles beside the mode', () => {
     const input = page.querySelector<HTMLInputElement>('input[name="resource_id"]');
     if (!input) throw new Error('No resource id input');
     input.value = 'ward';
-    expect(page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[1]?.checked).toBe(true);
+    expect([...page.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((tick) => tick.closest('label')?.textContent?.includes('No expiry'))?.checked).toBe(true);
     await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
     await settle();
     expect(posted.at(-1)).toMatchObject({ path: '/grants/roots', body: { resource: { kind: KIND, id: 'ward' }, relation: 'administrator' } });

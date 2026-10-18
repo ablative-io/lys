@@ -187,9 +187,11 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(beaSource).toContain('Ends no later than15 Nov');
 
     // Nothing of the first person survived the change of session. Bea's own
-    // directory names Ada, so Ada is offered as a recipient in To and nowhere else.
+    // directory names Ada, but this grant passes on only to agents, so Ada is
+    // not offered in To either: a person here is a give the service refuses.
     const offered = $$('#dTo option').map((o) => (o as HTMLOptionElement).value);
-    expect(offered).toContain(ADA);
+    expect(offered).not.toContain(ADA);
+    expect(offered).toContain(REVIEWER);
     const rest = document.body.cloneNode(true) as HTMLElement;
     rest.querySelector('#dTo')?.remove();
     for (const id of [ROOT_G, LEDGER_G, SCRIBE_G, ADA, SCRIBE]) expect(rest.innerHTML).not.toContain(id);
@@ -423,7 +425,7 @@ describe('Give access is one row (walk of 4 Oct)', () => {
     const form = $('.act-panel.issue-root form[aria-label="Give access"]');
     expect(form?.querySelectorAll('.card, .act-panel')).toHaveLength(0);
     const fields = [...(form?.querySelector('fieldset')?.children ?? [])].filter((el) => el.classList.contains('field')).map((el) => el.firstChild?.textContent);
-    expect(fields).toEqual(['Person', 'Give them access to', 'Which one', 'They may', 'May pass on', 'Expires (your local time)', 'More']);
+    expect(fields).toEqual(['Person', 'Give them access to', 'Which one', 'They may', 'May they pass it on', 'Expires (your local time)', 'More']);
     expect(form?.querySelector('button[type="submit"]')?.textContent).toBe('Give access');
     // None of the grant model's own words reach the person giving access.
     for (const word of ['Holder', 'root grant', 'root authority', 'relation from the permission model']) expect(form?.textContent).not.toContain(word);
