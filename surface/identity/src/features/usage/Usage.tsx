@@ -7,7 +7,7 @@ import { refreshLive } from '../../live';
 import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
 import { UsageBudgets } from './UsageBudgets';
-import { SpendingLimit } from './SpendingLimit';
+import { SpendingLimit, spendingIndex } from './SpendingLimit';
 import { UsageGoals } from './UsageGoals';
 import { Words } from './Words';
 import { Variables } from './Variables';
@@ -37,7 +37,7 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
       <UsedNow usage={usage} />
       <SpendingLimit key={budgets.version} budgets={budgets} changed={changed} />
       <ControlSetup agent={agent} name={name} />
-      <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
+      <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} apart={spendingIndex(budgets.limits)} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
       {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <PanelUnread what="The messages this agent is sent" problem={words.refused} />}
       {'held' in variables ? <Variables agent={agent} variables={variables.held} changed={changed} /> : <PanelUnread what="The variables" problem={variables.refused} />}

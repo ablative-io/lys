@@ -15,9 +15,10 @@ import { InheritedContext } from './ContextDefault';
 import { ErrorWords } from '../people/Words';
 
 /** `name` is the holder's name, said wherever the service's words carry its identifier. */
-type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void; name?: string };
+/** `apart` is the index of a limit edited elsewhere (an agent's spending limit, in its own card), left out of the table. */
+type Props = { budgets: BudgetsView; receipts: Receipt[]; changed: (words: string) => void; name?: string; apart?: number };
 
-export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
+export function UsageBudgets({ budgets, receipts, changed, name, apart = -1 }: Props) {
   const holder: Named = { id: budgets.holder.id, name: name ?? 'this ' + budgets.holder.kind };
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
@@ -43,7 +44,7 @@ export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
   const missing = budgets.used.flatMap((used) => (used && used.figure === null ? plain(used.unavailable, holder) : []));
   const add = useSetBudget({ budgets, busy: blocked, save });
   return <section className="card usage-budgets" aria-label="Budgets"><h3>Budget</h3>
-    <EditBudgets budgets={budgets} receipts={receipts} busy={blocked} save={save} holder={holder} add={add.row} />
+    <EditBudgets budgets={budgets} receipts={receipts} busy={blocked} save={save} holder={holder} add={add.row} apart={apart} />
     {add.form}
     {budgets.context_default ? <InheritedContext inherited={budgets.context_default} busy={blocked}
       adopt={(limits) => void save({ limits: [...budgets.limits, ...limits], warn_at: budgets.warn_at, version: budgets.version })}
@@ -59,7 +60,7 @@ export function UsageBudgets({ budgets, receipts, changed, name }: Props) {
 type FormProps = { budgets: BudgetsView; busy: boolean; save: (body: BudgetBody) => Promise<void> };
 
 /** The limits as one table: each row's amount and act are changed where they stand, one button saves them all, and the last row adds one. */
-function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps & { receipts: Receipt[]; holder: Named; add: ReactNode }) {
+function EditBudgets({ budgets, receipts, busy, save, holder, add, apart }: FormProps & { receipts: Receipt[]; holder: Named; add: ReactNode; apart: number }) {
   const [rows, setRows] = useState(() => budgets.limits.map((limit) => ({ amount: String(shown(limit.unit, limit.amount)), act: limit.act })));
   const [warning, setWarning] = useState(budgets.warn_at === null ? '' : String(budgets.warn_at));
   const valid = rows.every((row, index) => validAmount(budgets.limits[index].unit, row.amount))
@@ -78,10 +79,11 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
   return <form aria-label="Edit budget limits" className="usage-edit" onSubmit={(event) => { event.preventDefault(); submit(); }}>
     <TableScroll label="Budget limits"><table className="usage-list usage-table">
       {/* The rows say each limit and its act; that the first reached acts first is said nowhere else, so once, here. */}
-      {budgets.limits.length > 1 ? <caption className="usage-caption">Each limit acts on its own: whichever is reached first acts first.</caption> : null}
-      <thead><tr><th>Spend at most</th><th>Used</th><th>When it's hit</th><th>Where it stands</th><th>Change</th></tr></thead>
+      {budgets.limits.length > 1 ? <caption className="usage-caption">Each limit acts on its own: whichever is reached first acts first.{apart >= 0 ? ' The spending limit is set above.' : ''}</caption> : null}
+      <thead><tr><th>Limit</th><th>Used</th><th>When it's hit</th><th>Where it stands</th><th>Change</th></tr></thead>
       <tbody>
         {budgets.limits.map((limit, index) => {
+          if (index === apart) return null;
           const stands = standing(budgets, index, receipts);
           const used = budgets.used[index];
           const words = used && used.figure === null ? plain(used.unavailable, holder).join(' ') : stands.words;
@@ -96,7 +98,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
             <td><Act symbol="remove" name={'Remove ' + limitWords(limit)} disabled={busy} onClick={() => remove(index)} /></td>
           </tr>;
         })}
-        {budgets.limits.length ? null : <tr><td colSpan={5} className="dim">No budget is set for this {budgets.holder.kind}.</td></tr>}
+        {budgets.limits.length - (apart >= 0 ? 1 : 0) > 0 ? null : <tr><td colSpan={5} className="dim">{apart >= 0 ? 'No other limit is set for this ' + budgets.holder.kind + '.' : 'No budget is set for this ' + budgets.holder.kind + '.'}</td></tr>}
       </tbody>
       <tfoot>{budgets.limits.length ? <tr>
         <td colSpan={3}><div className="usage-amount"><span id="warn-at-words">Warn me at this % of a limit (leave blank for no warning)</span>
@@ -107,7 +109,7 @@ function EditBudgets({ budgets, receipts, busy, save, holder, add }: FormProps &
   </form>;
 }
 
-/** The table's last row, which adds a limit in the table's own columns: Spend at most, Used (empty), When it's hit, Where it stands (empty), Change.
+/** The table's last row, which adds a limit in the table's own columns: Limit, Used (empty), When it's hit, Where it stands (empty), Change.
  * A form cannot hold a table row, so the row's controls belong to a form kept beside the table. */
 function useSetBudget({ budgets, busy, save }: FormProps): { row: ReactNode; form: ReactNode } {
   const [measure, setMeasure] = useState<Measure>('tokens');
@@ -126,7 +128,7 @@ function useSetBudget({ budgets, busy, save }: FormProps): { row: ReactNode; for
   const form = <form id={id} aria-label="Set a budget" className="usage-add-form" onSubmit={(event) => { event.preventDefault(); if (limit !== '') submit(); }} />;
   const row = <tr className="usage-add-line" data-add="budget">
     <td><div className="usage-amount">
-      <input form={id} name="limit" aria-label="Spend at most" type="number" min={0} step="any" required value={limit} disabled={busy} placeholder="Amount" onChange={(event) => setLimit(event.target.value)} />
+      <input form={id} name="limit" aria-label="Limit" type="number" min={0} step="any" required value={limit} disabled={busy} placeholder="Amount" onChange={(event) => setLimit(event.target.value)} />
       <select form={id} aria-label="Unit" value={measure} disabled={busy} onChange={(event) => {
         const next = event.target.value as Measure; setMeasure(next);
         if (next !== 'context_percent' && !PERIODS[next].includes(length)) setLength(PERIODS[next][0]);

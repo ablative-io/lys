@@ -87,3 +87,17 @@ PROXY.md promises "windows per account, per model … shown on the budgets tab".
 Recommendation: A. Per model is asked of the server; the card does not pretend to it.
 
 Second go. Looked at in headless Chrome with a Cherie fixture: the card reads in one glance, money first in each line, the plan's windows with their account and reset under each. What I changed before committing: a window whose reset has passed first said "resets" with a time in the past; it now says "reset 18 Oct 13:56; read again on its next use", the canvas's own rule. What is still wrong: tokens print exact ("1,204,330 tokens"), which Cherie cannot weigh; I left them exact because the tab is also where a builder checks a figure, and rounding there would make the canvas and this tab disagree. Per model is still nowhere (asked in item 1). The tab is called "Limits and goals", the card "Used", the gate's loading word "Usage": three names on one tab, which is item 6's neighbour in the review's Words table and not fixed here.
+
+## Item 7: the spending limit is set in two places
+
+The Spending limit card and the dollar row of the Budget table both edit the same limit, each with its own period picker. The card always says "When it is reached, the session ends", even when the limit's act is "tell".
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. Keep only the table (the review's fix). | A table with unit, period and act pickers to set a money limit. | Two editors for one limit; the false sentence. | Correct, but the money limit, the one she cares about, becomes the hardest thing on the tab to find. |
+| B. The card is the one editor of the spending limit; the table lists every other limit and leaves that row out, saying the spending limit is set above. The card gains "When it is reached" with the four acts, and its sentence is the chosen act's own words. The table's first column is "Limit", not "Spend at most" (which headed token and context rows too). | "Spending limit: US$ 20 a week. When it is reached: Tell me. You are told; the session keeps running." and below it, only her other limits. | Two editors for one limit (06 #7); the false "the session ends" (06 #7); "Spend at most 40% of its context" (06 Words). | Make the right thing easy first (Tom, 18 Oct 11:02): money is the limit rung 1 and 2 set. |
+| C. Keep both and fix the sentence. | Still two places to change one amount. | The false sentence only. | Less. |
+
+Recommendation: B. It meets the review's aim, one editor per limit, without burying the one limit a person most wants. A team's tab has no card, so its table keeps every row.
+
+Second go. Looked at in headless Chrome. Two things were wrong at the first go and are changed: the "tell" sentence said "you are told", which is false when an administrator is looking at someone else's agent, so it says "the responsible person is told"; and Save sat on the amount's row, above the act it also saves, so it now ends the act's row, the last thing filled in. Still wrong: the Budget table below is wider than its card at laptop width and scrolls sideways (its TableScroll, not new); the card's "$" before the amount stays until item 8's money words.
