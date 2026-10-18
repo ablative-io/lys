@@ -146,7 +146,10 @@ describe('the page help', () => {
     const keys = $$('#helpLayer .help-kt dt').map((k) => k.textContent);
     for (const letter of Object.keys(GO)) expect(keys.some((k) => k?.split(' or ').includes('g ' + letter))).toBe(true);
     expect(keys).toContain('? (outside a field) or ⌘/');
-    expect(keys).toContain('j / k');
+    // The page's own list keys are the shell's, said once.
+    expect(keys).toContain('j / k, Enter');
+    expect(keys).not.toContain('j / k');
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it('re-measures on a resize the observer reports, with no timer', async () => {
@@ -202,9 +205,17 @@ describe('the page help', () => {
 });
 
 describe('the full help', () => {
-  it('opens from the rail on an index of every topic, by track, usable by keyboard', async () => {
+  it('opens from the rail\'s Help, through Full help, on an index of every topic, by track, usable by keyboard', async () => {
     await mount('#/people');
     await click($('[data-dockbtn="help"]'));
+    // Help is this screen explained first; every topic is the layer's Full help.
+    expect($('#helpLayer')).not.toBeNull();
+    expect($('#dock.open')).toBeNull();
+    await click($('[data-help-full]'));
+    expect($('#helpLayer')).toBeNull();
+    // Full help opens on this page's own topic; Back goes to every topic.
+    expect(readHelpUrl().topic).toBe(PAGES[pageKeyOf('/people')].topic);
+    await click($('[data-help=""]'));
     expect($$('#helpList .concept').length).toBe(CONCEPTS.length);
     expect($$('#helpList .help-track').map((t) => t.dataset.track)).toEqual(TRACKS.map(([id]) => id));
     expect(unreachable()).toEqual([]);
@@ -225,6 +236,8 @@ describe('the full help', () => {
   it('filters the index by every word typed, and says when nothing matches', async () => {
     await mount('#/people');
     await click($('[data-dockbtn="help"]'));
+    await click($('[data-help-full]'));
+    await click($('[data-help=""]'));
     await type($('#helpQ'), 'spending limit');
     const shown = $$('#helpList .concept').map((c) => c.dataset.help);
     expect(shown).toEqual(conceptGroups('spending limit').flatMap((g) => g.concepts.map((c) => c.id)));
@@ -248,8 +261,25 @@ describe('the full help', () => {
   it('closes on Escape', async () => {
     await mount('#/dashboard');
     await click($('#rail [data-dockbtn="help"]'));
+    await click($('[data-help-full]'));
+    expect($('#dock.open')).not.toBeNull();
     await press('Escape');
     expect($('#dock.open')).toBeNull();
+  });
+
+  it('is one thing behind Help and ?: both open this screen\'s numbered notes, and the full help lists no second copy of them', async () => {
+    await mount('#/people');
+    await click($('#rail [data-dockbtn="help"]'));
+    expect($('#helpLayer')).not.toBeNull();
+    expect($('#rail [data-dockbtn="help"]')?.classList.contains('on')).toBe(true);
+    await click($('#rail [data-dockbtn="help"]'));
+    expect($('#helpLayer')).toBeNull();
+    await press('?', {}, document.body);
+    expect($('#helpLayer')).not.toBeNull();
+    await click($('[data-help-full]'));
+    expect($$('.dock-in [data-act="explain"]')).toHaveLength(1);
+    expect($('.dock-in .help-this-page')).toBeNull();
+    expect($('.dock-in')?.textContent).not.toContain('On this page');
   });
 });
 

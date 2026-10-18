@@ -8,9 +8,9 @@ describe("Surface polish for new users", () => {
   it("closes Help on Escape", async () => {
     await mount("#/dashboard", SERVICE);
     await click($('#rail [data-dockbtn="help"]'));
-    expect($("#dock.open")).not.toBeNull();
+    expect($("#helpLayer")).not.toBeNull();
     await press("Escape");
-    expect($("#dock.open")).toBeNull();
+    expect($("#helpLayer")).toBeNull();
   });
   it("shows the current sign-in first and names its provider with the full address in a title", async () => {
     const session = (id: string, current: boolean) => ({

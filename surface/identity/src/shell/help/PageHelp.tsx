@@ -133,15 +133,18 @@ export function PageHelp() {
             ))}
           </ol>
         ) : null}
-        <div className="help-kt-head">Keys</div>
-        <dl className="help-kt">
-          {[...help.keys, ...SHELL_SHORTCUTS, ...goShortcuts()].map(([k, d]) => (
-            <div key={k} className="help-kt-row"><dt>{k}</dt><dd>{d}</dd></div>
-          ))}
-        </dl>
         <div className="help-keys-foot">
           <Act symbol="help" name="Full help" hint="Every topic: getting started, how each screen works, and what to do when something isn’t working" word="Full help" tone="primary" data-help-full="" onClick={full} />
         </div>
+        {/* The keys are a builder's: folded under their name, so the way to every topic is never below them. */}
+        <details className="help-kt-fold">
+          <summary className="help-kt-head">Keys</summary>
+          <dl className="help-kt">
+            {[...help.keys.filter(([k]) => !SHELL_SHORTCUTS.some(([shellKeys]) => shellKeys.split(', ').includes(k))), ...SHELL_SHORTCUTS, ...goShortcuts()].map(([k, d]) => (
+              <div key={k} className="help-kt-row"><dt>{k}</dt><dd>{d}</dd></div>
+            ))}
+          </dl>
+        </details>
       </div>
     </section>
   );

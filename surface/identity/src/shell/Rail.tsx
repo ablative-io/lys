@@ -54,7 +54,8 @@ export function Rail() {
     : null;
   const press = (id: string | undefined, dock: 'help' | undefined) => {
     setDrawer(false);
-    if (dock) return shell.toggleDock(dock);
+    // Help and ? are one thing: this screen, explained where it stands; its foot opens every topic.
+    if (dock) return shell.explaining ? shell.explainOff() : shell.explainOn();
     if (id === 'palBtn') return shell.openPalette();
     if (id === 'railBtn') return shell.toggleLabels();
     return undefined;
@@ -94,7 +95,7 @@ export function Rail() {
         return (
           <button
             key={index}
-            className={'rb' + (item.dock && shell.dockMode === item.dock ? ' on' : '')}
+            className={'rb' + (item.dock && shell.explaining ? ' on' : '')}
             data-dockbtn={item.dock}
             id={item.id}
             title={forThisComputer(item.title)}

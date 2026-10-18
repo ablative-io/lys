@@ -15,6 +15,7 @@
 .help-kt dt { font: 11px "JetBrains Mono", ui-monospace, monospace; color: var(--accent); white-space: nowrap; }
 .help-kt dd { margin: 0; color: var(--text-secondary); }
 .help-keys-foot { margin-top: 10px; display: flex; justify-content: flex-end; }
+.help-kt-fold > summary { cursor: pointer; }
 /* The full help: the page's own notes first, then the sheet. */
 .help-this-page .help-notes { gap: 8px; margin-bottom: 14px; }
 .help-this-page .help-call-t { font-size: 12.5px; }
