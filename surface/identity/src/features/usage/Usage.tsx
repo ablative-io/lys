@@ -12,7 +12,7 @@ import { UsageGoals } from './UsageGoals';
 import { Words } from './Words';
 import { Variables } from './Variables';
 import { Schedules } from './Schedules';
-import { tracking } from './contract';
+import { UsedNow } from './UsedNow';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { BudgetsView, GoalsView, SchedulesView, UsageView, VariablesRead, WordsForAgent } from './contract';
 import './usage.css';
@@ -33,11 +33,10 @@ export function AgentUsage({ agent, name }: { agent: string; name?: string }) {
   }), 'usage:' + agent + ':' + revision);
   const changed = (words: string) => { setNotice(words); setRevision((value) => value + 1); };
   return <>{notice ? <p role="status" className="usage-notice">{notice}</p> : null}<Gate load={load} title="Usage" ok={({ budgets, usage, goals, words, variables, schedules }) => {
-    const tracked = tracking(usage);
     return <div className="usage">
+      <UsedNow usage={usage} />
       <SpendingLimit key={budgets.version} budgets={budgets} changed={changed} />
       <ControlSetup agent={agent} name={name} />
-      <p className="usage-tracking" data-complete={tracked.complete} role="status">{tracked.words}</p>
       <UsageBudgets budgets={budgets} receipts={usage.receipts} changed={changed} name={name} />
       <UsageGoals agent={agent} goals={goals.goals} changed={changed} />
       {'held' in words ? <Words agent={agent} words={words.held} changed={changed} /> : <PanelUnread what="The messages this agent is sent" problem={words.refused} />}

@@ -1,6 +1,11 @@
 /* Plain budget and goal controls, drawn from the shared tokens. No charts: analytics stay with the monitoring app. */
 .usage { display: flex; flex-direction: column; gap: 16px; }
 .usage-tracking { margin: 0; color: var(--text-secondary); }
+/* Used: what the agent used, first on the tab; the figures in tabular numbers, each window's account and reset beneath it. */
+.usage-used-list th { width: 30%; font-weight: 500; color: var(--text-secondary); }
+.usage-used-list td { font-variant-numeric: tabular-nums; }
+.usage-used-account { display: block; font-weight: 400; }
+.usage-used > .note { margin: 0 0 8px; }
 .usage-tracking[data-complete="false"] { color: var(--warn); }
 .usage-list { width: 100%; border-collapse: collapse; margin: 12px 0; }
 .usage-list th,

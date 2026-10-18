@@ -73,3 +73,17 @@ The canvas Usage widget sums dollars and running time and takes the highest cont
 Recommendation: A. The ask now carries the exact answer shape so the route and the page can be written against one contract. Nothing in my folders changes for this item; the commit is this page and the ask.
 
 Second go. Is A a dodge? The defect is that a total is computed in the page, and the only cure is the server; what I could do in my folders I did in item 1 (one sum, labelled by coverage, never a missing figure counted as zero). The honest cost: until the route exists, a rung-2 owner still cannot see other people's agents' spend, and the canvas widget still adds its own total a different way (it says "(n of m reporting)"; the dashboard says "from n of m agents in full"). I would rather the two wordings matched; the canvas is not mine, so it is in the ask.
+
+## Item 6: the budgets tab does not show what was used
+
+PROXY.md promises "windows per account, per model … shown on the budgets tab". The agent's Limits and goals tab opens on the spending-limit control and shows use only as one sentence, "Usage last reported 13:42". Everything to show it is already in the tab's own read, `GET /agents/{id}/usage`: dollars, tokens and running time today and this week (`figures`) and each account's windows (`accounts`). Per model is not in any answer.
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. A "Used" card first on the tab, before any control: this week and today, each as money, tokens and running time in words; then each account's windows ("5-hour window: 12% used, resets 3:00 pm"); then when it was last reported. A figure the service could not give says so. | "This week: US$4.20, 1,204,330 tokens, 3 hours 10 minutes running." and her plan's windows, before anything she could change. | Controls first, use nowhere (06 #6); "Usage last reported" as the only word on use; the canvas's engineering readings ("This 5-hour interval", token classes) on a person's page. | Value: "what did it cost"; obvious first, change second. |
+| B. Put the canvas's own readings components (`WidgetUsageReadings`) at the top. | Token classes, session pickers, "Context is per session". | One component, but the canvas's density and words on Cherie's page. | Less for rung 1. |
+| C. Link to the canvas Usage widget. | A link to build a widget. | none: "a manager has to build their own cost view by dragging widgets" (06). | Nothing. |
+
+Recommendation: A. Per model is asked of the server; the card does not pretend to it.
+
+Second go. Looked at in headless Chrome with a Cherie fixture: the card reads in one glance, money first in each line, the plan's windows with their account and reset under each. What I changed before committing: a window whose reset has passed first said "resets" with a time in the past; it now says "reset 18 Oct 13:56; read again on its next use", the canvas's own rule. What is still wrong: tokens print exact ("1,204,330 tokens"), which Cherie cannot weigh; I left them exact because the tab is also where a builder checks a figure, and rounding there would make the canvas and this tab disagree. Per model is still nowhere (asked in item 1). The tab is called "Limits and goals", the card "Used", the gate's loading word "Usage": three names on one tab, which is item 6's neighbour in the review's Words table and not fixed here.
