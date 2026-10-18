@@ -7,6 +7,7 @@ import { Gate } from '../signin/Gate';
 import { Act } from '../../shell/Act';
 import { RunningList } from './Sessions';
 import { Seats } from '../sessions/Seats';
+import { RuntimeSessions } from './RuntimeSessions';
 import { ProxyView, proxyHref } from '../proxy/ProxyView';
 import { readBoard } from '../dashboard/board';
 import type { Board } from '../dashboard/board';
@@ -89,14 +90,14 @@ function Operations({ keeping }: { keeping: Keeping }) {
     sending.current = sending.current.then(() => keepOperations(next)).then(() => setFailure(null), (error: unknown) => setFailure(saidOfKeeping(error)));
   };
   return <>
-    <nav className={'operations-swap' + (proxy || view === 'sessions' ? ' listing-swap' : '')} aria-label="Operations views">
+    <nav className={'operations-swap' + (proxy || view === 'sessions' ? ' listing-swap' : '')} aria-label="Running agents views">
       {(['tree', 'canvas', 'sessions'] as const).map((each) => <a key={each} href={'#/canvas?view=' + each} aria-current={!proxy && view === each ? 'page' : undefined}
         onClick={(event) => {
           event.preventDefault();
           if (!proxy && view === each) return;
           setSearch((now) => { const next = new URLSearchParams(now); next.set('view', each); return next; }, { replace: true });
           put({ ...choice, view: each });
-        }}>{each === 'tree' ? 'Network' : each === 'canvas' ? 'Canvas' : 'Sessions'}</a>)}
+        }}>{each === 'tree' ? 'By computer' : each === 'canvas' ? 'Canvas' : 'Sessions'}</a>)}
       <a href={proxyHref({})} aria-current={proxy ? 'page' : undefined}>Proxy</a>
     </nav>
     {failure || keeping.why ? <div className="operations-notices">
@@ -107,7 +108,7 @@ function Operations({ keeping }: { keeping: Keeping }) {
       setSearch((now) => { const next = new URLSearchParams(now); next.set('seat', selected); return next; }, { replace: true });
       put({ ...choice, selected });
     }} paneWidth={choice.pane_width} resize={(pane_width) => put({ ...choice, pane_width })} />
-      : view === 'sessions' ? <div className="canvas-side"><RunningList /><Seats /></div> : <CanvasOperations />}
+      : view === 'sessions' ? <div className="canvas-side"><RunningList /><Seats /><RuntimeSessions found /></div> : <CanvasOperations />}
   </>;
 }
 

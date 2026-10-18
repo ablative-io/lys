@@ -26,7 +26,7 @@ export function RuntimeSessions({ agent, found = false }: { agent?: string; foun
     const names = new Map(entries(await api.people()).map((entry) => [entry.id, entry.display_name]));
     return { ...answer, names };
   }, path);
-  return <section className="card"><p>{found ? 'Sessions a runner reported that belong to no agent in the directory. A report does not add an agent or give access.' : 'What each computer\'s Lys runner last reported about these sessions.'}</p>
+  return <section className="card" aria-label={found ? 'Sessions with no agent' : undefined}>{found ? <h2>Sessions with no agent</h2> : null}<p>{found ? 'Sessions a runner reported that belong to no agent in the directory. A report does not add an agent or give access.' : 'What each computer\'s Lys runner last reported about these sessions.'}</p>
     <Gate load={load} title="Sessions" ok={({ sessions, names }) => sessions.length ? <table><thead><tr><th>Agent</th><th>Computer</th><th>State</th><th>Last report</th></tr></thead><tbody>{sessions.map((session) => <tr key={session.session}>
       <td>{session.agent ? <a href={'#/file/' + session.agent} title={session.agent}>{names.get(session.agent) ?? 'An agent outside your view'}</a> : <>No agent attached <span className="mono dim">{session.session}</span></>}</td>
       <td>{session.machine_name ?? session.machine}</td>

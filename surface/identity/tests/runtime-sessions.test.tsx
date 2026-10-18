@@ -1,6 +1,6 @@
 /** Runtime reads preserve unknown outcomes and require a real stop report before showing stopped. */
 import { describe, expect, it } from 'vitest';
-import { $, click, mount, text } from './harness';
+import { $, click, mount, settle, text } from './harness';
 import { SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { RuntimeSession } from '../src/features/runtime/RuntimeSessions';
 const path = '/agents/' + SCRIBE + '/runtime/sessions';
@@ -25,9 +25,20 @@ describe('Runtime sessions', () => {
   it('shows found sessions without registering an identity', async () => {
     const { requests, posted } = await mount('#/people', { ...SERVICE, '/runtime/found': ok({ sessions: [{ ...session, agent: null, shown: 'running' }] }) });
     posted.length = 0;
-    await click($('a[data-kind="found"]'));
+    // They are listed with the running agents: the People stat links there, and People has no Found tab.
+    expect($('a[data-kind="found"]')).toBeNull();
+    await click($('.stat a[href="#/canvas?view=sessions"]'));
+    await settle();
+    expect(location.hash).toBe('#/canvas?view=sessions');
     expect(requests).toContain('/runtime/found'); expect(posted).toEqual([]);
+    expect($('section[aria-label="Sessions with no agent"] h2')?.textContent).toBe('Sessions with no agent');
     expect(text()).toContain('No agent attached'); expect(text()).toContain('Running, as its runner reported');
+  });
+  it('sends the old Found address to the running agents’ Sessions view', async () => {
+    const { requests } = await mount('#/people/view/found', { ...SERVICE, '/runtime/found': ok({ sessions: [{ ...session, agent: null, shown: 'running' }] }) });
+    await settle();
+    expect(location.hash).toBe('#/canvas?view=sessions');
+    expect(requests).toContain('/runtime/found');
   });
   it('names each session by its agent and computer, with no session id shown beside a named agent (#124)', async () => {
     await mount('#/file/' + SCRIBE + '/sessions', { ...SERVICE, [path]: ok({ sessions: [session] }) });

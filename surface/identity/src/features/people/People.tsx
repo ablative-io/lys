@@ -2,9 +2,8 @@ import { ServiceAccountsList } from '../service-accounts/ServiceAccounts';
 import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
-import { RuntimeSessions } from '../runtime/RuntimeSessions';
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Navigate, useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
@@ -27,7 +26,7 @@ import { PageHeader } from '../../shell/PageHeader';
 /** The views of People and agents, each with its own address. */
 const VIEWS: [KindFilter, string, string][] = [
   ['all', 'All', '/people'], ['person', 'People', '/people/view/people'], ['agent', 'Agents', '/people/view/agents'],
-  ['teams', 'Teams', '/people/view/teams'], ['accounts', 'Service accounts', '/people/view/accounts'], ['found', 'Found', '/people/view/found'],
+  ['teams', 'Teams', '/people/view/teams'], ['accounts', 'Service accounts', '/people/view/accounts'],
 ];
 
 function PeopleHead() {
@@ -150,11 +149,13 @@ export function People() {
   const { view } = useParams();
   const addressed = VIEWS.find(([, , path]) => path === '/people/view/' + view)?.[0];
   useEffect(() => { shell.setFilterKind(addressed ?? 'all'); }, [view]);
-  if (addressed === 'teams' || addressed === 'found' || addressed === 'accounts') {
+  // Sessions no agent claims are about what is running, so they are listed with the running agents, not with people.
+  if (view === 'found') return <Navigate to="/canvas?view=sessions" replace />;
+  if (addressed === 'teams' || addressed === 'accounts') {
     return (
       <div className="page fill">
         <PeopleHead />
-        {addressed === 'found' ? <RuntimeSessions found /> : addressed === 'accounts' ? <ServiceAccountsList /> : <Teams />}
+        {addressed === 'accounts' ? <ServiceAccountsList /> : <Teams />}
       </div>
     );
   }

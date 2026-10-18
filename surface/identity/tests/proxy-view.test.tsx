@@ -39,7 +39,7 @@ beforeEach(() => {
 describe('The proxy view in Operations', () => {
   it('is one of Operations\' four views: the head swaps between them, and the address says which', async () => {
     await mount('#/canvas?view=canvas', routes);
-    expect($$('.operations-swap a').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['Network', null], ['Canvas', 'page'], ['Sessions', null], ['Proxy', null]]);
+    expect($$('.operations-swap a').map((each) => [each.textContent, each.getAttribute('aria-current')])).toEqual([['By computer', null], ['Canvas', 'page'], ['Sessions', null], ['Proxy', null]]);
     expect($('.proxy-view')).toBeNull();
     await click($('.operations-swap a[href="#/canvas?view=proxy"]'));
     await settle();
