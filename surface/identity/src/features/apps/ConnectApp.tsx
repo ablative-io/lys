@@ -27,6 +27,25 @@ export function appOrigin(typed: string): string | null {
   } catch { return null; }
 }
 
+/** Whether a web address names only the computer it is opened on: localhost, a .localhost name, 127.0.0.0/8 or ::1. */
+export function onlyHere(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+    return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127(\.\d{1,3}){3}$/.test(host);
+  } catch { return false; }
+}
+
+/**
+ * Why the app is unlikely to call Lys back at the address this browser is on, or null when it can be handed over: Lys open at
+ * an address only its own computer answers, while the app is on another computer. An app on the same computer reaches it there.
+ * Said, never enforced: a person who has carried that address to the app's computer (a tunnel) still goes on.
+ */
+export function strandedWhy(name: string, lys: string, app: string): string | null {
+  if (!onlyHere(lys) || onlyHere(app)) return null;
+  // A browser on a loopback address is on the computer Lys runs on, so "this computer" is both the device in hand and Lys's own.
+  return name + ' is on another computer, but Lys is open here at ' + lys + ', which only this computer answers, so ' + name + ' will most likely not reach it. Open Lys at an address ' + name + '’s computer can reach, such as its https address, and connect from there.';
+}
+
 /** The known apps, each with its state on this Lys and a Connect button. */
 export function KnownApps({ apps }: { apps: AppRecord[] }) {
   return <section className="card" aria-label="Known apps">
@@ -39,6 +58,8 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
   const [asking, setAsking] = useState(false);
   const [address, setAddress] = useState('');
   const origin = appOrigin(address);
+  const lys = window.location.origin;
+  const stranded = origin ? strandedWhy(known.name, lys, origin) : null;
   const whyNot = origin ? null : address.trim()
     ? 'That is not a whole web address. Type it as it appears in the browser, starting with https://.'
     : 'Type ' + known.name + '’s web address to continue.';
@@ -55,9 +76,11 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
       {connected ? <ReplacesCredentials name={known.name} /> : null}
       <p className="note">Lys sends your browser to {known.name}, which asks to connect and brings you back here to approve what it asks for.</p>
       <label className="field">{known.name}’s web address<input type="url" inputMode="url" autoComplete="url" autoFocus value={address} onChange={(event) => setAddress(event.target.value)} placeholder="https://cambium.example.com" aria-label={known.name + ' web address'} /></label>
-      {whyNot ? <p className="note" aria-live="polite">{whyNot}</p> : null}
+      {whyNot ? <p className="note" aria-live="polite">{whyNot}</p>
+        : stranded ? <p className="app-replace" role="note">{stranded}</p>
+        : <p className="note">{known.name} will call Lys back at <span className="mono">{lys}</span>.</p>}
       <div className="app-actions">
-        <Act symbol="approve" name={'Continue to ' + known.name} word={'Continue to ' + known.name} tone="primary" disabled={!origin} hint={whyNot ?? undefined} onClick={() => { if (origin) window.location.assign(origin + '/identity/lys/connect?lys=' + encodeURIComponent(window.location.origin)); }} />
+        <Act symbol="approve" name={'Continue to ' + known.name} word={'Continue to ' + known.name} tone="primary" disabled={!origin} hint={whyNot ?? undefined} onClick={() => { if (origin) window.location.assign(origin + '/identity/lys/connect?lys=' + encodeURIComponent(lys)); }} />
         <Act symbol="close" name={'Cancel connecting ' + known.name} word="Cancel" onClick={cancel} />
       </div>
     </div> : null}
