@@ -268,7 +268,7 @@ describe('Sign-in providers on the sign-in page', () => {
 
   it('names a provider sign-in that came back refused', async () => {
     await mount('#/sign-in?refused=SignInStateUnknown', SERVICE);
-    expect($('[role="alert"]')?.textContent).toBe('That sign-in expired or was already used. Try again.');
+    expect($('[role="alert"]')?.textContent).toBe('That sign-in could not be finished. It began at a different address from this one (' + location.host + '), or it expired or was already used. Sign in again on this page.');
   });
 });
 

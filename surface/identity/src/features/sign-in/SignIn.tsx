@@ -37,7 +37,6 @@ interface Offered { id: string; name: string; provider: string | null }
 /** What a provider sign-in that did not finish is called, in Lys words. */
 const PROVIDER_REFUSALS: Record<string, string> = {
   SignInCancelled: 'Sign-in was cancelled or permission was not given. Try again.',
-  SignInStateUnknown: 'That sign-in expired or was already used. Try again.',
   SecondFactorUnsupported: 'That account asks for a second factor, which Lys sign-in does not take yet.',
   SignInThrottled: 'Too many sign-ins failed from here. Wait a little, then try again.',
 };
@@ -51,23 +50,43 @@ export function refusedInAddress(who = 'your administrator'): string {
   const account = 'This Google account' + (email ? ' (' + email + ')' : '');
   if (name === 'NotAdmittedYet') return account + " hasn't been added to Lys yet. Ask " + who + ' to add it.';
   if (name === 'AccountDisabled') return account + ' has been disabled in Lys. Ask ' + who + ' to enable it.';
+  // The browser-binding cookie is kept only at the address the sign-in began on. The service sends a refused
+  // return to this page, at Lys's own address, so trying again here is the act that works.
+  if (name === 'SignInStateUnknown') {
+    return 'That sign-in could not be finished. It began at a different address from this one (' + location.host
+      + '), or it expired or was already used. Sign in again on this page.';
+  }
   return PROVIDER_REFUSALS[name] ?? 'The sign-in did not finish. Try again.';
 }
 
-/** The providers Lys offers, and whether the list could be read at all. */
-interface ProviderList { offered: Offered[]; unread: boolean }
+/**
+ * The providers Lys offers, whether the list could be read at all, and Lys's own address when the service
+ * names it (`origin`, asked of the server in CONSENSUS 05 item 4): a provider returns only there.
+ */
+interface ProviderList { offered: Offered[]; unread: boolean; origin: string | null }
 
 function useProviders(): ProviderList {
-  const [list, setList] = useState<ProviderList>({ offered: [], unread: false });
+  const [list, setList] = useState<ProviderList>({ offered: [], unread: false, origin: null });
   useEffect(() => {
     let live = true;
-    request<{ providers: Offered[] }>('/sign-in/providers').then(
-      (answer) => { if (live) setList({ offered: answer.providers, unread: false }); },
-      () => { if (live) setList({ offered: [], unread: true }); },
+    request<{ providers: Offered[]; origin?: unknown }>('/sign-in/providers').then(
+      (answer) => { if (live) setList({ offered: answer.providers, unread: false, origin: typeof answer.origin === 'string' && /^https?:\/\/[^/?#]+$/.test(answer.origin) ? answer.origin : null }); },
+      () => { if (live) setList({ offered: [], unread: true, origin: null }); },
     );
     return () => { live = false; };
   }, []);
   return list;
+}
+
+/** A page opened at another address than Lys's own: a provider could not finish here, so say so before it is tried, and link to the same page there. */
+function Elsewhere({ offered, origin }: { offered: Offered[]; origin: string }) {
+  let host = origin;
+  try { host = new URL(origin).host; } catch { /* An origin that is not a URL is shown as the service gave it. */ }
+  const names = offered.map((entry) => entry.name).join(' or ');
+  return <div className="sign-in-providers" aria-label="Sign in with a provider">
+    <p className="note" role="status">Sign in with {names} works only at {host}. You opened Lys at {location.host}.</p>
+    <a className="btn" href={origin + '/' + location.hash}>Open Lys at {host}</a>
+  </div>;
 }
 
 /** The line under the heading names every way in, so a person invited to use Google reads Google before the password fields. */
@@ -83,6 +102,7 @@ function Providers({ list }: { list: ProviderList }) {
     return <p className="note sign-in-providers" role="status">Lys could not list its other ways to sign in, such as Google. Your email and password still work; to use another way, open this page again.</p>;
   }
   if (offered.length === 0) return null;
+  if (list.origin && list.origin !== location.origin) return <Elsewhere offered={offered} origin={list.origin} />;
   const next = continuation();
   const query = next ? '?continue=' + encodeURIComponent(next) : '';
   // A file link the person opened is kept for the provider's return to /me (fileReturn.tsx).
