@@ -33,7 +33,8 @@ describe('Registered own account', () => {
 
   it('can confirm ending its own session without requesting the directory or granting itself access', async () => {
     const { requests, posted } = await mount('#/me', waiting);
-    await click($$('button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Sign out') ?? null);
+    // The sessions list's own Sign out, which asks first; the page header's Sign out is tested in sign-out.test.tsx.
+    await click($$('section[aria-label="Your signed-in sessions"] button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Sign out') ?? null);
     await click($$('button').find((button) => (button.getAttribute('aria-label') ?? button.textContent) === 'Confirm end session') ?? null);
     expect(posted).toEqual([{ path: '/sessions/' + SESSION + '/end', body: {} }]);
     for (const path of ['/people', '/directory/people', '/grants', '/grants/model']) expect(requests).not.toContain(path);

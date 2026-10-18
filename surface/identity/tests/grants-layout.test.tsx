@@ -104,13 +104,15 @@ describe('LYSWALK layout contracts', () => {
     expect(element('[data-reference]').querySelectorAll('wbr')).toHaveLength(0);
   });
 
-  it('W2 fits the sessions table and keeps both end-session controls visible', async () => {
+  it('W2 fits the sessions table and keeps both end-session controls visible, in words', async () => {
     await showYou();
     expect(getComputedStyle(element('.you-sessions table')).width).toBe('100%');
     expect(getComputedStyle(element('.you-sessions td:first-child')).minWidth).not.toBe('170px');
     for (const button of document.querySelectorAll<HTMLElement>('.you-sessions td button')) {
       expect(button.getAttribute('aria-label')).toMatch(/^(Sign out|End session)$/);
-      expect(getComputedStyle(button.querySelector('.act-word') as HTMLElement).display).toBe('none');
+      // The word tells ending a session from stopping an agent, which draws the same square (review 05, item 2).
+      expect(getComputedStyle(button.querySelector('.act-word') as HTMLElement).display).not.toBe('none');
+      expect(button.querySelector('.act-word')?.textContent).toMatch(/^(Sign out|End)$/);
       expect(button.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
       for (let parent = button.parentElement; parent && !parent.classList.contains('you-account'); parent = parent.parentElement) {
         const css = getComputedStyle(parent);
