@@ -146,6 +146,21 @@ describe('navigation follows the answering API', () => {
     else expect(text()).toContain('grants are not admitted');
   });
 
+  // The ways to ask and decide are decided by their own reads, and say a refused one in place too.
+  it.each([
+    ['#/requests', '/requests'], ['#/reviews', '/reviews'], ['#/access/drafts', '/drafts?state=waiting'],
+  ])('opens %s when its own read is refused, so the view says it in place', async (hash, route) => {
+    await mount(hash, { ...ANSWERS, [route]: refused(403, 'NotAdmitted', 'this list is not admitted') });
+    expect(text()).not.toContain('You do not have access to this');
+    expect($('nav[aria-label="Access views"]')).not.toBeNull();
+  });
+
+  it('still sends a person with no session to sign in from Requests', async () => {
+    await mount('#/requests', { ...ANSWERS, '/requests': refused(401, 'NoSession', 'no session') });
+    expect($('nav[aria-label="Access views"]')).toBeNull();
+    expect($('.page h1')?.textContent).toBe('Sign in');
+  });
+
   it('still sends a person with no session to sign in from an Access view', async () => {
     await mount('#/model', { ...ANSWERS, '/grants': refused(401, 'NoSession', 'no session') });
     expect($('nav[aria-label="Access views"]')).toBeNull();

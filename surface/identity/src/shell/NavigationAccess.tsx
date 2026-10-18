@@ -139,11 +139,13 @@ export function useNavigationAccess(): (pathname: string) => boolean {
 }
 
 /**
- * The four Access views draw their own head and tabs and say a refused read in place, so their entry read only
+ * The Access views draw their own head and tabs and say a refused read in place, so their entry read only
  * sends a person with no session to sign in; any other answer lets the view open and say it (domain 03's ask).
+ * Requests, Reviews and Drafts are among them: their own reads decide the rail, never strand the page.
  */
 const saysItsOwn = (pathname: string): boolean =>
-  ['/access', '/access/can', '/model', '/resources'].includes(pathname) || pathname.startsWith('/access/can/');
+  ['/access', '/access/can', '/model', '/resources', '/requests', '/reviews', '/access/drafts'].includes(pathname)
+  || pathname.startsWith('/access/can/') || pathname.startsWith('/requests/');
 
 function ReadEntry({ place, own, children }: { place: Place; own: boolean; children: ReactNode }) {
   const load = useLoad(() => decision(place), 'navigation-entry');
