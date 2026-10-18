@@ -290,6 +290,8 @@
 
 **S183.** As a person setting up Lys with no terminal, I want to connect my message service and bind its participants to my people and agents on a screen, so that the canvas shows who has spoken.
 
+**S444.** As a person setting up Lys for the first time, every step, guide and help page speaks of the apps my team actually registered, by the names they registered, and of none that we did not, so Lys reads the same for a team with one app as for a team with twenty.
+
 ## Developer of an app that signs in with Lys — Builds a product that uses Lys for sign-in and permissions without Lys knowing about it
 
 **S151.** As a developer of an app, I want to register my app and its permission schema through a documented API, so that my app's resources and actions are checked by Lys without anyone changing Lys.

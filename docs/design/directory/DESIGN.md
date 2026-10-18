@@ -1400,6 +1400,23 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/dashboard/canvas-parts.test.tsx` | pins the acts in the widgets' rows and no Decide label (DIRECTORY-105 R1) | DIRECTORY-105 |
 | `surface/identity/src/features/runtime/CanvasWidgets.tsx` | passes the person and the board re-read to the requests and drafts widgets (DIRECTORY-105 R1) | DIRECTORY-105 |
 | `surface/identity/tests/canvas-widgets.test.tsx` | green against the widgets' new props (DIRECTORY-105 R1) | DIRECTORY-105 |
+| `surface/identity/src/features/grants/AppFirst.tsx` | CambiumFirst moved: the step before an agent holds any app access, by the apps list (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/file/AppNext.tsx` | CambiumNext moved: the step after an agent is added, each approved app by its registered name and address (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/apps/ClientCredentials.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/file/AgentOverview.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/file/GiveAccess.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/grants/IssueRoot.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/import/EstateApproval.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/features/people/AddAgent.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/HelpDock.tsx` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/access.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/apps.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/people.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/start.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/trouble.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/concepts/types.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `surface/identity/src/shell/help/url.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
+| `crates/lys-identity-server/src/seat_import_profiles/servers.rs` | the seat import excludes no server by a product word (DIRECTORY-106 R2) | DIRECTORY-106 |
 
 ## Inventory
 

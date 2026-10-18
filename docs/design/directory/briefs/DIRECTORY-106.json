@@ -1,0 +1,114 @@
+{
+  "id": "DIRECTORY-106",
+  "cluster": "directory",
+  "title": "Lys names no app: every screen and the server take an app's name from its registration",
+  "depends_on": [
+    "DIRECTORY-048",
+    "DIRECTORY-102"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C773",
+    "C774"
+  ],
+  "stories": [
+    "S444"
+  ],
+  "design_anchor": [
+    "ADR-116",
+    "ADR-111"
+  ],
+  "purpose": "ADR-116 (Tom, 28 September 2026): Lys depends on no app; it holds no app's name, kind, schema or code, and runs the same with no apps registered as with twenty. DIRECTORY-048 R7 wrote the rule that refuses a product's name in crates/ and surface/, and the first whole run of the declared gate on Lys main (fc669616, 19 October 2026) finds 146 of them: Getting started's 'Connect Cambium' step, the guides CambiumFirst and CambiumNext, the Apps page's subtitle, a connect page that knows Cambium's manifest path, an estate approval that parses Cambium's evidence sentence, help pages that teach Cambium's screens, and a seat import that retires a server because it is named argus. Each is a place Lys would have to change when an app changes, which is the dependence the ADR forbids. This brief takes every one of them to the registration: the app's name, id, state and address as GET /apps answers them, and words about apps in general where no app is registered.",
+  "task": "Rewrite the screens and help that name a product to read the apps list, rename the two guides to AppFirst and AppNext with git mv, drop KNOWN_APPS and the evidence parser, take the argus exclusion out of the seat import, give the tests made-up app names, and prove ast-grep's three app-name rules at 0 with tsc, vitest and the crate's tests green.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The screens take every app's name, id and address from its registration, and say nothing of any app's insides",
+      "spec": "Behavioural. Every screen under surface/identity/src that names a product today (the ast-grep record of the whole gate at fc669616 lists them: 95 findings under no-app-names-tsx in 14 files, 47 under no-app-names-typescript in 9) says it from the apps list instead (GET /apps: each app's id, name and state, and for an approved app the address every person's view carries), or says it of apps in general. In particular: Getting started's step 'Connect Cambium' becomes 'Connect your apps', done when any app is approved; its body names each app that has asked to connect by the name in its registration ('<name> has asked to connect: review what it asks for and approve it on Apps'), and with no app registered says 'Connect your team's apps on Apps' for an administrator and 'No app is connected to Lys yet; an administrator connects one on Apps' for anyone else; Standing carries the apps' states, never a field named for one app. CambiumFirst.tsx becomes AppFirst.tsx, said where an agent would be given access and no app resource is held yet: with no approved app, the connect step as above; with approved apps, '<name> is approved: give yourself <name> access on Access first; its resources appear here once you hold them', one sentence per approved app, the Access link carrying the app's registered id (#/access/issue?app=<id>). CambiumNext.tsx becomes AppNext.tsx, the step after an agent is added: for each approved app with an address, 'Your agent is ready for <name>: open <name>' linking the address, and for one without, the name alone; it says nothing of what the app does with the agent, because Lys does not know. Apps.tsx's subtitle says what apps do with Lys without naming one. ConnectApp.tsx carries no KNOWN_APPS: connect takes the manifest address the administrator types, as DIRECTORY-102 landed it (read the landed code first and change nothing of its behaviour). EstateApproval.tsx shows an estate resource's evidence exactly as the app sent it: no parsing of one app's sentence shape. GiveAccess.tsx says that an app's access is a separate grant, naming no app. IssueRoot.tsx's example kind is app.kind. HelpDock.tsx's comments name no other product. The help concepts (start, access, apps, people, trouble, types) and pages.ts and url.ts say 'an app' or 'your team's apps' where they name one today; the start concept's step is Connect your apps, its id start.apps, and the dashboard's step key matches; no help text teaches one app's screens. dashboard-cherie.fixture.ts follows the new Standing. Every test under surface/identity that asserted a product's words asserts the new words or a registered name its fixture supplies (test fixtures may name a made-up app; they never name a real product). sections.tsx, AddAgent.tsx, Delegate.tsx and AgentOverview.tsx import AppFirst and AppNext in place of the old names.",
+      "acceptance": [
+        "Red first: the ast-grep record of the last whole gate is the red (95 and 47); the vitest reds are the tests of Getting started, AppFirst and AppNext in their new words, written before the code",
+        "gate -stages ast-grep at the head: 0 findings under no-app-names-tsx and no-app-names-typescript; the record copied into the report",
+        "gate -stages tsc,vitest -dir surface/identity green, counts in the report; git log shows the two files moved with git mv, history kept",
+        "grep -rniE 'cambium|argus|aion|manifold|meridian|haematite' surface/identity/src answers nothing outside the ast-grep rule's own fixture exclusions, and the command and its answer are in the report"
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/grants/AppFirst.tsx",
+          "surface/identity/src/features/file/AppNext.tsx"
+        ],
+        "modify": [
+          "surface/identity/src/features/apps/Apps.tsx",
+          "surface/identity/src/features/apps/ClientCredentials.tsx",
+          "surface/identity/src/features/apps/ConnectApp.tsx",
+          "surface/identity/src/features/dashboard/GettingStarted.tsx",
+          "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+          "surface/identity/src/features/file/AgentOverview.tsx",
+          "surface/identity/src/features/file/GiveAccess.tsx",
+          "surface/identity/src/features/file/sections.tsx",
+          "surface/identity/src/features/grants/Delegate.tsx",
+          "surface/identity/src/features/grants/IssueRoot.tsx",
+          "surface/identity/src/features/import/EstateApproval.tsx",
+          "surface/identity/src/features/people/AddAgent.tsx",
+          "surface/identity/src/shell/help/HelpDock.tsx",
+          "surface/identity/src/shell/help/concepts/access.ts",
+          "surface/identity/src/shell/help/concepts/apps.ts",
+          "surface/identity/src/shell/help/concepts/people.ts",
+          "surface/identity/src/shell/help/concepts/start.ts",
+          "surface/identity/src/shell/help/concepts/trouble.ts",
+          "surface/identity/src/shell/help/concepts/types.ts",
+          "surface/identity/src/shell/help/pages.ts",
+          "surface/identity/src/shell/help/url.ts"
+        ],
+        "delete": [
+          "surface/identity/src/features/grants/CambiumFirst.tsx",
+          "surface/identity/src/features/file/CambiumNext.tsx"
+        ]
+      },
+      "checklist": [
+        "C773"
+      ],
+      "stories": [
+        "S444"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The server holds no product's name: the seat import excludes nothing by a product word, and tests name made-up apps",
+      "spec": "Behavioural. crates/lys-identity-server/src/seat_import_profiles/servers.rs lines 100 and 103 exclude an MCP server from a seat import because its name is argus, with the words 'retired: Argus is retired; this server entry is excluded'. That exclusion goes: the import carries every server the profile names, and a server the import cannot carry is reported in the import's receipt under the profile's own name for it and the reason the import found (an absent executable, an unreadable entry), never a product word of Lys's. The tests beside it that expected the exclusion assert the new receipt. crates/lys-identity-server/src/warn_lines.rs lines 219 and 231 are test lines naming cambium as an example app; they name a made-up app instead (one word, not a product of ours), and the assertions follow.",
+      "acceptance": [
+        "Red first: a test in the seat import's tests asserts a profile naming a server called argus is imported with that server carried, or reported by the profile's name and the import's reason, with no product word in the receipt",
+        "gate -stages ast-grep at the head: 0 findings under no-app-names-rust; the record copied into the report",
+        "gate -stages nextest -crates lys-identity-server -test 'package(lys-identity-server)' green, counts in the report"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/seat_import_profiles/servers.rs",
+          "crates/lys-identity-server/src/warn_lines.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C774"
+      ],
+      "stories": [
+        "S444"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No app registration changes and no manifest field is added: the registration already carries id, name, state and address, and that is all a screen may say of an app",
+    "DIRECTORY-102's connect flow is read, not redesigned: KNOWN_APPS goes and nothing else about connecting changes",
+    "No rule under rules/ast-grep changes and no #[allow] or biome-ignore is added; the three app-name rules reach 0 by the code, not by exemption",
+    "Test fixtures may name a made-up app; no test, fixture or comment names a product of ours",
+    "No timer, no fixed wait, no poll and no deadline anywhere, in code or test",
+    "Nothing installed, the installed Lys untouched; every file touched stays under 500 code lines (ADR-111, by scripts/file-length.sh)"
+  ],
+  "verification": [
+    "gate -stages ast-grep, its record read: 0 findings under no-app-names-tsx, no-app-names-typescript and no-app-names-rust",
+    "gate -stages tsc,vitest -dir surface/identity",
+    "gate -stages nextest -crates lys-identity-server -test 'package(lys-identity-server)'",
+    "gate -stages clippy, then the whole declared gate",
+    "python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory read for FAIL lines"
+  ]
+}

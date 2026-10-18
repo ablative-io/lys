@@ -642,3 +642,8 @@
 ## The canvas widgets decide in their rows (DIRECTORY-105)
 
 - [ ] **C772** — The canvas's requests and drafts widgets decide in their rows with the dashboard's own forms (Approve access and Decline request on a request the person may decide, the approvers' names on one they may not, Approve and Decline on a draft), and no label on the surface reads Decide.
+
+## Lys names no app (DIRECTORY-106)
+
+- [ ] **C773** — No screen or help page under surface/identity/src names a product: Getting started, AppFirst, AppNext, Apps, connect, estate approval, give-access and the help take an app's name, id, state and address from GET /apps or speak of apps in general, and ast-grep's tsx and typescript app-name rules find 0.
+- [ ] **C774** — The server names no product: the seat import excludes no server by a product word and reports what it cannot carry under the profile's own name, test lines name made-up apps, and ast-grep's rust app-name rule finds 0.
