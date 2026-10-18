@@ -29,22 +29,37 @@ export function SignIn() {
 
 /** The heading a refusal page carries: what happened, in words, never the refusal's code. */
 function refusedHeading(refused: Refused): string {
-  if (refused.status === 0 || refused.status >= 500) return 'The service could not complete this request';
+  if (refused.status >= 500) return 'Lys could not complete this request';
   if (refused.refusal.refusal === 'NoPerson') return 'Your account needs access';
   if (refused.status === 403) return 'You do not have access to this';
   if (refused.status === 404) return 'This could not be found';
   return 'Lys could not open this';
 }
 
-/** A refusal shown in plain words, its code and the service's own reason kept in the Error details fold. */
+/**
+ * Lys did not answer at all. The page's own address names where; the likely cause is the computer Lys runs on,
+ * which for a person with one computer is their own, so "ask the administrator" would send them to themselves.
+ * A failed read reads again by itself once Lys answers (api.ts `useLoad`), so nothing here asks to press anything.
+ */
+function NotAnswering({ refused }: { refused: Refused }) {
+  return <>
+    <h1>Lys at {location.host} is not answering</h1>
+    <p>The computer Lys runs on may be off, asleep or off the network: check that it is switched on and awake. When it answers, this page reads again by itself.</p>
+    <details className="note"><summary>Error details</summary><p className="refusal-name">{refused.refusal.refusal}: {refused.refusal.reason}</p></details>
+  </>;
+}
+
+/**
+ * A refusal shown in plain words, its code and the service's own reason kept in the Error details fold. A page
+ * shows this for a read, so it never warns about resending a change.
+ */
 export function RefusedPage({ refused, title }: { refused: Refused; title: string }) {
   if (refused.status === 401) return <SignIn />;
-  const serviceFailure = refused.status === 0 || refused.status >= 500;
+  if (refused.status === 0) return <div className="page"><div className="eyebrow">{title}</div><NotAnswering refused={refused} /></div>;
   return (
     <div className="page">
       <div className="eyebrow">{title}</div>
       <h1>{refusedHeading(refused)}</h1>
-      {serviceFailure ? <p>If you were making a change, keep its original request until its outcome is confirmed. Do not submit it again as a new change.</p> : null}
       {refused.refusal.refusal === 'NoPerson' ? <p>Your sign-in worked, but your account has not been connected to the directory yet. Ask your administrator to connect it on the Credentials tab of your page in People and agents.</p> : null}
       <ErrorWords problem={refused} />
       <p><a className="btn" href="#/">Back to the start</a></p>
