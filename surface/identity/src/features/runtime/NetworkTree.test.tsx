@@ -117,14 +117,15 @@ it('C737 reads all machine pages and refuses malformed or repeated pages', async
   serve({ '/network': ok({ machines: [{ id: 'broken' }] }), '/seats': ok(list) });
   await expect(readNetworkTree()).rejects.toThrow('Lys answered, but its list of computers could not be read.');
 });
-it('C737 renders ten machines and two hundred seats within 50 ms of React render work', async () => {
+// No bound in milliseconds (no time limits, in code or in a test): a slow tree is found by what it does, so this counts
+// the commits React made to draw it. Two hundred seats are drawn in the one commit that mounts the tree, never one per seat.
+it('C737 renders ten machines and two hundred seats in the one commit that mounts the tree', async () => {
   const machines = Array.from({ length: 10 }, (_, index) => machine(String(index)));
   const seats = Array.from({ length: 200 }, (_, index) => ({ ...seat(String(index), 'online-idle'), machine: String(index % 10) }));
-  let duration = 0;
-  const host = await render(<Profiler id="tree" onRender={(_id, _phase, elapsed) => { duration = elapsed; }}><NetworkBranches branches={branches({ machines } as never, { runner: 'read', seats } as never)} selected={null} select={vi.fn()} /></Profiler>);
+  const commits: string[] = [];
+  const host = await render(<Profiler id="tree" onRender={(_id, phase) => { commits.push(phase); }}><NetworkBranches branches={branches({ machines } as never, { runner: 'read', seats } as never)} selected={null} select={vi.fn()} /></Profiler>);
   expect(host.querySelectorAll('[data-seat]')).toHaveLength(200);
-  process.stderr.write('C737 React render ms=' + duration + '\n');
-  expect(duration).toBeLessThan(50);
+  expect(commits).toEqual(['mount']);
 });
 it('C739 first visits and old layouts open the tree with canvas, sessions and proxy one click away', async () => {
   const routes = { ...SERVICE, '/canvas': ok({ arrangement: { boxes: {}, open: [], groups: [], notes: [], links: [], widgets: [] }, layouts: [] }), '/network': ok({ machines: [machine('one')] }), '/seats': ok(list) };

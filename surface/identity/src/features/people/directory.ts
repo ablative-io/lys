@@ -10,20 +10,37 @@ export interface Entry {
   /** The role's title, when the service names one; the people view names none yet. */
   role: string | null;
   person: PersonSummary | null;
+  /**
+   * The agent this agent reports to, when it is an agent rather than its person. The person stays in `person`: an agent
+   * always has a person who answers for it, even when it reports to another agent.
+   */
+  reportsTo?: { id: string; display_name: string | null } | null;
+}
+
+/** The `reports_to` edge the people view serves for an agent (`AgentSummary.reports_to` on the server), when it is there. */
+function reportingEdge(agent: unknown): { id: string; kind: string } | null {
+  const edge = agent && typeof agent === 'object' ? (agent as { reports_to?: unknown }).reports_to : undefined;
+  return edge && typeof edge === 'object' && typeof (edge as { id?: unknown }).id === 'string' && typeof (edge as { kind?: unknown }).kind === 'string'
+    ? edge as { id: string; kind: string } : null;
 }
 
 /** People first, then every agent, as the mock-up lists them. */
 export function entries(view: PeopleView): Entry[] {
-  const people: Entry[] = view.people.map((p) => ({ id: p.id, display_name: p.display_name, state: p.state, kind: 'person', role: null, person: null }));
+  const people: Entry[] = view.people.map((p) => ({ id: p.id, display_name: p.display_name, state: p.state, kind: 'person', role: null, person: null, reportsTo: null }));
+  const agentNames = new Map(view.people.flatMap((p) => p.agents.map((a) => [a.id, a.display_name] as const)));
   const agents: Entry[] = view.people.flatMap((p) =>
-    p.agents.map((a) => ({
+    p.agents.map((a) => {
+      const edge = reportingEdge(a);
+      return {
       id: a.id,
       display_name: a.display_name,
       state: a.state,
       kind: 'agent' as const,
       role: null,
       person: { id: p.id, display_name: p.display_name, state: p.state },
-    })),
+      reportsTo: edge && edge.kind === 'agent' && edge.id !== a.id ? { id: edge.id, display_name: agentNames.get(edge.id) ?? null } : null,
+      };
+    }),
   );
   return [...people, ...agents];
 }

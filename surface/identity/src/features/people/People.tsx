@@ -22,6 +22,7 @@ import type { DirectoryReach } from './reach';
 import type { Load } from '../../api';
 import { readRoles, RoleSummary } from '../roles/AssignedRoles';
 import { PageHeader } from '../../shell/PageHeader';
+import './people.css';
 
 /** The views of People and agents, each with its own address. */
 const VIEWS: [KindFilter, string, string][] = [
@@ -37,7 +38,7 @@ function PeopleHead({ admin }: { admin?: boolean }) {
   const mayAddPeople = scope.status === 'ok' && scope.data;
   return (
     <>
-      <PageHeader title="People and agents" subtitle="Everyone who works here, human or not. Every agent answers to a person." actions={<>
+      <PageHeader title="People and agents" subtitle="Everyone who works here, human or not. Every agent has a person who answers for it." actions={<>
           <a className="btn primary" href="#/agents/new">Add agent</a>
           {mayAddPeople ? <a className="btn" href="#/people/new">Add person</a> : null}
         </>} />
@@ -56,7 +57,7 @@ function PeopleHead({ admin }: { admin?: boolean }) {
 function Stat({ n, l, warn }: { n: number; l: string; warn?: boolean }) {
   return (
     <div className="stat">
-      <div className="n" style={warn && n ? { color: 'var(--warn)' } : undefined}>
+      <div className={warn && n ? 'n warn' : 'n'}>
         {n}
       </div>
       <div className="l">
@@ -121,7 +122,8 @@ function List({ view, teams, me, reach }: { view: PeopleView; teams: OrgTeam[]; 
     { head: 'Name', cell: (x) => x.display_name },
     { head: 'Role', cell: (x) => <span className="sec"><RoleSummary load={roles} id={x.id} /></span> },
     { head: 'State', cell: (x) => <span className="state-of" data-state={x.state}><span className={'dot s-' + x.state} />{stateWords(x.state)}</span> },
-    { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.person.display_name}{needsNewPerson(x) ? <span style={{ color: 'var(--warn)' }}> ({stateWords(x.person.state).toLowerCase()})</span> : null}</span> : null },
+    // Who the agent reports to: its person, or another agent, with the person who answers for it said beside that agent.
+    { head: 'Answers to', cell: (x) => x.person ? <span className="sec">{x.reportsTo ? <>{x.reportsTo.display_name ?? 'An agent outside your view'}<span className="dim"> (agent), for {x.person.display_name}</span></> : x.person.display_name}{needsNewPerson(x) ? <span className="answers-warn"> ({stateWords(x.person.state).toLowerCase()})</span> : null}</span> : null },
     { head: 'Reaches', cell: (x) => <Reach load={reach} id={x.id} compact /> },
   ];
   return (

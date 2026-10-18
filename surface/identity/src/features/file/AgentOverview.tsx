@@ -14,6 +14,7 @@ import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { Team } from '../teams/contract';
 import { AgentTeams } from '../teams/TeamActions';
 import { Pill } from '../people/Pill';
+import { entries } from '../people/directory';
 import { AgentRun } from '../team/AgentRun';
 import './agent-overview.css';
 import { Act } from '../../shell/Act';
@@ -94,6 +95,8 @@ export function AgentOverview({ agent, details, added, rename }: { agent: AgentV
   const machine = network.status === 'ok' ? network.data.find((entry) => entry.id === computer) : undefined;
   const saved = profile.status === 'ok' ? profile.data?.model_access ?? [] : [];
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
+  // The agent it reports to, when that is an agent: said as in the directory list, with the person who answers for it.
+  const reportsTo = people.status === 'ok' ? entries(people.data).find((entry) => entry.id === agent.id)?.reportsTo ?? null : null;
   const problems = [profile, teams, network, programs, choices, people, me].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
   return <NetworkRead.Provider value={networkRead}><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
   {agent.state === 'active' && people.status === 'ok' ? <CambiumNext agent={agent.id} name={agent.display_name} administrator={people.data.scope === 'directory'} /> : null}
@@ -101,7 +104,7 @@ export function AgentOverview({ agent, details, added, rename }: { agent: AgentV
     <dl className="facts agent-facts">
       <dt>Name</dt><dd>{agent.display_name}{rename ? <>{' '}<Act symbol="edit" name="Edit name" className="small" data-act="rename" onClick={rename} /></> : null}</dd>
       {added ? <><dt>Added</dt><dd>{added}</dd></> : null}
-      <dt>Answers to</dt><dd><Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
+      <dt>Answers to</dt><dd>{reportsTo ? <><a href={'#/file/' + encodeURIComponent(reportsTo.id)}>{reportsTo.display_name ?? 'An agent outside your view'}</a> (agent), for </> : null}<Pill x={agent.person} />{agent.needs_new_person ? <p className="why-not">{agent.person.state}: needs a new person before its access can be renewed.</p> : null}</dd>
       <dt>Team</dt><dd>{teams.status !== 'ok' ? reading(teams, 'teams') : me.status !== 'ok' ? reading(me, 'who is signed in')
         : <AgentTeams key={teamRevision} agent={agent.id} name={agent.display_name} teams={teams.data} person={me.data.person.id} login={me.data.signed_in} administrator={people.status === 'ok' && people.data.scope === 'directory'} changed={() => setTeamRevision((value) => value + 1)} />}</dd>
       {/* The person the agent answers to may change its model and computer, as the service allows, not only the administrator. */}

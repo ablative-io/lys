@@ -1,0 +1,2 @@
+/* People and agents: the warning colour for a count that needs someone, and for an agent whose person is not active. */
+.stat .n.warn, .answers-warn { color: var(--warn); }
