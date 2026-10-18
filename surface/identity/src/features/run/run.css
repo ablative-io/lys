@@ -13,3 +13,7 @@
 .agent-run-words { flex: 1 1 320px; }
 .agent-run .team-stop { position: static; margin-top: 12px; padding: 12px 0 0; background: none; }
 .agent-run .team-start { width: 100%; }
+@media (max-width: 600px) {
+  .agent-run .act, .agent-run .btn, .team-stop .act, .team-start .act { min-height: 44px; min-width: 44px; }
+  .team-stop { flex-wrap: wrap; }
+}

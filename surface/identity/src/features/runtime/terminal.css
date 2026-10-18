@@ -1,8 +1,4 @@
 /* A running session's terminal, drawn from the shared tokens; every control is the surface's own. */
-.runner-sessions .runner-list { width: 100%; border-collapse: collapse; margin: 16px 0; }
-.runner-sessions .runner-list th,
-.runner-sessions .runner-list td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border-default); vertical-align: top; }
-.runner-sessions .runner-list tr[aria-current="true"] td { background: var(--accent-wash); }
 .terminal { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; padding: 16px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
 .terminal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .terminal-state { color: var(--text-secondary); }
@@ -18,11 +14,9 @@
 @media (max-width: 760px) {
   .terminal-head { align-items: flex-start; flex-wrap: wrap; }
 }
-/* A chosen session's terminal is what the person came for: it fills the page beside a narrow list. */
-.fill > .body.terminal-open { grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
-.fill > .body.terminal-open > .detail { display: flex; flex-direction: column; overflow: hidden; }
-.fill > .body.terminal-open > .detail > .terminal { flex: 1; min-height: 0; margin-top: 0; }
-.fill > .body.terminal-open > .detail .terminal-display { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.fill > .body.terminal-open > .detail .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }
-.fill > .body.terminal-open .tools { flex-wrap: wrap; }
-.fill > .body.terminal-open .tools .search { width: 100%; }
+/* The terminal's own keys wrap onto as many lines as a narrow screen needs. */
+.terminal-keys { display: flex; flex-wrap: wrap; gap: 6px; }
+/* On a phone every control of a run is a 44 px target, so a thumb can press it. */
+@media (max-width: 600px) {
+  .terminal-keys .act, .terminal-head .act, .terminal-stop .act { min-height: 44px; min-width: 44px; }
+}

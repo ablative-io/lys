@@ -32,7 +32,8 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-divider::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: var(--border-default); }
 .network-divider:hover::after, .network-divider:focus-visible::after { background: var(--accent); width: 2px; }
 .network-divider:focus-visible { outline: none; }
-.network-pane { flex: 1; min-width: 0; display: flex; padding: 48px 12px 12px; }
+/* The chosen agent's pane leaves room for the bar above it; on a phone the media rule below takes the top padding back. */
+.network-pane { flex: 1; min-width: 0; display: flex; padding: 44px 8px 8px; }
 .network-terminal { flex: 1; min-width: 0; min-height: 0; }
 .network-terminal .terminal-head h2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .network-terminal .seat-send { display: flex; gap: 8px; padding: 8px; }
@@ -50,7 +51,6 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-start .note { margin: 0; }
 /* The chosen agent's terminal is what Operations is for: it fills the pane's whole height and width, with one slim
    line of name and acts above it, never a fixed-height box under a large heading. */
-.network-pane { padding: 44px 8px 8px; }
 .network-pane > .terminal { flex: 1; min-height: 0; margin: 0; padding: 6px; gap: 6px; border-radius: var(--radius-md); }
 .network-pane > .terminal .terminal-head { gap: 8px; }
 .network-pane > .terminal .terminal-head h2 { font-size: 14px; line-height: 20px; margin: 0; }
@@ -61,3 +61,8 @@ details:not([open]) > .network-fold::before { content: '▸'; }
 .network-pane .terminal-display .terminal-screen { flex: 1; height: auto; min-height: 0; }
 /* The running terminal sits inside the pane's own box: one box, stretched, never a second card inside the first. */
 .network-terminal > .terminal { flex: 1; min-height: 0; margin: 0; padding: 0; border: 0; background: none; }
+/* A phone zooms into any input under 16 px; the message box is 16 px there, and its Send a 44 px target. */
+@media (max-width: 600px) {
+  .network-terminal .seat-send input { font-size: 16px; }
+  .network-terminal .act { min-height: 44px; min-width: 44px; }
+}

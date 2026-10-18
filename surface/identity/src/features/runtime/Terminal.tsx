@@ -11,7 +11,10 @@ import { RUN_WORDS, RunConfirm, useRunActs } from '../run/RunConfirm';
 export interface SessionEnd { how: 'exited' | 'ended_by_runner_restart' | 'accounts_exhausted'; at: number; status: number | null; signal: string | null }
 interface EndAnswer { answer?: { kind?: string; ended?: SessionEnd } }
 
-const terminalKeys = [['Escape', 'escape'], ['Enter', 'enter'], ['Up', 'up'], ['Down', 'down'], ['Tab', 'tab'], ['Ctrl-C', 'ctrl_c']] as const;
+// The keys a phone's keyboard has no way to send, as the runner names them: the line keys are here so a line can be
+// edited without a Mac's Command and Option keys.
+const terminalKeys = [['Escape', 'escape'], ['Enter', 'enter'], ['Up', 'up'], ['Down', 'down'], ['Left', 'left'], ['Right', 'right'],
+  ['Line start', 'home'], ['Line end', 'end'], ['Tab', 'tab'], ['Ctrl-C', 'ctrl_c']] as const;
 
 const asRefused = (error: unknown): Refused =>
   error instanceof Refused ? error : new Refused(0, { refusal: 'TerminalUnavailable', reason: String(error) });

@@ -16,6 +16,7 @@ import { TableScroll } from '../../shell/Listing';
 import { RecordName, useRecordNames } from '../../shell/RecordName';
 import { ErrorWords, problemWords } from '../people/Words';
 import { RUN_WORDS } from '../run/RunConfirm';
+import './seats.css';
 
 /** Each seat state in words, the same on every screen that names one. */
 export const STATE_WORDS: Record<SeatState, string> = {
@@ -110,12 +111,12 @@ function SeatRow({ seat, names }: { seat: SeatView; names: Map<string, string> }
   };
   const midTurn = refusal && refusal.doing !== 'start' && refusal.refused.refusal.refusal === 'seat_turn_in_progress' ? refusal.doing : null;
   return <tr data-seat={seat.name} data-state={seat.state}>
-    <td>{seat.name}</td>
-    <td><RecordName id={seat.agent} name={names.get(seat.agent)} /></td>
-    <td><RecordName id={seat.machine} name={names.get(seat.machine)} /></td>
-    <td>{STATE_WORDS[seat.state]}<p className="note">{seat.last_signal_at === undefined || seat.last_signal_at === null ? 'No signal seen' : 'Last signal ' + clockMs(seat.last_signal_at)}</p></td>
-    <td>{seat.session ? <RecordName id={seat.session} name={seat.name + ' session'} /> : <span className="dim">None</span>}</td>
-    <td>
+    <td data-label="Seat">{seat.name}</td>
+    <td data-label="Agent"><RecordName id={seat.agent} name={names.get(seat.agent)} /></td>
+    <td data-label="Computer"><RecordName id={seat.machine} name={names.get(seat.machine)} /></td>
+    <td data-label="State">{STATE_WORDS[seat.state]}<p className="note">{seat.last_signal_at === undefined || seat.last_signal_at === null ? 'No signal seen' : 'Last signal ' + clockMs(seat.last_signal_at)}</p></td>
+    <td data-label="Session">{seat.session ? <RecordName id={seat.session} name={seat.name + ' session'} /> : <span className="dim">None</span>}</td>
+    <td data-label="Actions">
       {(['start', 'stop', 'restart'] as const).filter((doing) => doing === 'start' ? !running(seat) : seat.state !== 'offline' && seat.state !== 'not-seen').map((doing) => <Act key={doing} symbol={DOING_WORDS[doing].symbol} name={DOING_WORDS[doing].word + ' ' + seat.name} word={DOING_WORDS[doing].word} className="small" disabled={busy} onClick={() => { void act(doing, false); }} />)}
       {midTurn ? <p className="why-not">A turn is in progress. {midTurn === 'stop' ? 'Stopping' : 'Restarting'} anyway ends it mid-turn.
         <Act symbol={DOING_WORDS[midTurn].symbol} name={DOING_WORDS[midTurn].word + ' ' + seat.name + ' anyway'} word={DOING_WORDS[midTurn].word + ' anyway'} tone="danger" className="small" disabled={busy} onClick={() => { void act(midTurn, true); }} />

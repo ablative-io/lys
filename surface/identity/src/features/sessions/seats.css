@@ -1,0 +1,10 @@
+/* The seats table on a phone: each seat is a card, each cell a labelled line, so nothing is cut off by six columns. */
+@media (max-width: 600px) {
+  .seats table, .seats tbody, .seats tr, .seats td { display: block; width: 100%; }
+  .seats thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .seats tr { padding: 10px 0; border-bottom: 1px solid var(--border-default); }
+  .seats td { padding: 4px 0; border: 0; }
+  .seats td[data-label]::before { content: attr(data-label); display: block; color: var(--text-secondary); font-size: 12px; }
+  .seats td .act { min-height: 44px; min-width: 44px; }
+  .seats .seat-send input { font-size: 16px; }
+}

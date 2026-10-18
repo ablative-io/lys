@@ -184,7 +184,8 @@ describe('Running sessions', () => {
     expect($('.terminal')).not.toBeNull();
     expect($('.terminal form')).toBeNull();
     expect($('.terminal input')).toBeNull();
-    const keys = [['Escape', 'escape'], ['Enter', 'enter'], ['Up', 'up'], ['Down', 'down'], ['Tab', 'tab'], ['Ctrl-C', 'ctrl_c']];
+    // Each name is one the runner publishes for its keys act (crates/lys-runner/src/published.rs, "keys").
+    const keys = [['Escape', 'escape'], ['Enter', 'enter'], ['Up', 'up'], ['Down', 'down'], ['Left', 'left'], ['Right', 'right'], ['Line start', 'home'], ['Line end', 'end'], ['Tab', 'tab'], ['Ctrl-C', 'ctrl_c']];
     expect($$('button[data-key]').map((button) => button.textContent)).toEqual(keys.map(([label]) => label));
     expect($('.terminal-head')?.textContent).toContain('Scribe');
     expect($('.terminal-head')?.textContent).toContain('on Dean laptop');
@@ -194,7 +195,7 @@ describe('Running sessions', () => {
       await click($$('button[data-key]').find((button) => button.textContent === label) ?? null);
       expect(posted.at(-1)).toEqual({ path: base + '/keys', body: { keys: [key] } });
     }
-    expect(posted.filter((entry) => entry.path === base + '/keys')).toHaveLength(6);
+    expect(posted.filter((entry) => entry.path === base + '/keys')).toHaveLength(10);
   });
 
 
