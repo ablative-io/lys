@@ -32,7 +32,7 @@ export interface PageHelp {
 export const RAIL_REGION: Region = {
   sel: '#rail',
   title: 'The rail',
-  text: 'Every screen, one key away: g then the letter beside its name. Roles and the access map are under Access. ? opens this layer; the Help button opens the full help. [ or Menu labels shows or hides the words.',
+  text: 'Every screen, one key away: g then the letter beside its name. Roles and the access map are found with Search. ? opens this layer; the Help button opens the full help. [ or Menu labels shows or hides the words.',
   at: 'right',
 };
 
@@ -76,11 +76,11 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     topic: 'people.dashboard',
     regions: [
       { sel: 'section.getting-started', title: 'Getting started', text: 'What this Lys still needs, in order: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; Not this one counts as an answer.', at: 'below' },
-      { sel: 'form[aria-label="Run agents on this computer"]', title: 'Run agents here?', text: 'Yes, run agents here adds this computer under the name typed, so agents can be started on it. Not this one records that this computer is not used; you can add another in Network.', at: 'right' },
+      { sel: 'form[aria-label="Run agents on this computer"]', title: 'Run agents here?', text: 'Yes, run agents here adds this computer under the name typed, so agents can be started on it. Not this one records that this computer is not used; you can add another under Computers.', at: 'right' },
       { sel: 'section.dash-agents', title: 'Agents', text: 'Your agents, grouped by team. The dot says whether each is running; Budget is how near it is to its nearest limit; Goals are what it is working towards. Start, Watch and Stop sit at the end of each row; pressing the row opens its page.', at: 'in-bl' },
       { sel: '[data-act="stop-everything"]', title: 'Stop all', text: 'Ends every running agent on every computer at once, after asking why. Agents stay stopped until an administrator presses Start again.', at: 'left' },
       { sel: 'section[aria-label="Waiting for you"]', title: 'Waiting for you', text: 'Access requests to decide, drafts your agents want approved, and grants due a review; each row opens its list. A ? means that count could not be read; press the words beside it to see why.', at: 'left' },
-      { sel: 'section[aria-label="Running now"]', title: 'Running now', text: 'Every live session, with the computer it is on. Watch shows it in a small picture here; the picture’s title opens it full size in Operations. Stop ends that one session after asking why.', at: 'left' },
+      { sel: 'section[aria-label="Running now"]', title: 'Running now', text: 'Every live session, with the computer it is on. Watch shows it in a small picture here; the picture’s title opens it full size in Running agents. Stop ends that one session after asking why.', at: 'left' },
       { sel: '[aria-label="Alarms"]', title: 'Alarms', text: 'What Lys could not do or saw go wrong: a start refused, a runner not answering, a limit hit. Acknowledge marks one as seen; Show all lists older ones.', at: 'above' },
       { sel: '.dash-widgets', title: 'Readings', text: 'Alarms, the requests and drafts waiting for you, how near each agent is to its limits (the bar), and every goal with its deadline. Open goes to the whole list; an agent’s name opens its Limits and goals.', at: 'above' },
     ],
@@ -210,13 +210,13 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     keys: [],
   },
   network: {
-    title: 'Network',
+    title: 'Computers',
     topic: 'computers.network',
     regions: [
       { sel: '.page-header .head-actions', title: 'Add a computer', text: 'Puts the keyboard in the add row: name the computer, say whether it is this one or another, and Add. Another computer is given a one-time connection code to type there.', at: 'below' },
       { sel: '.stat-strip', title: 'At a glance', text: 'Computers whose runner is up now, computers that need attention (not answering or never connected), and how many agents are running across them.', at: 'below', dy: 30 },
       { sel: '.body.halves .listing', title: 'Computers', text: 'Each computer with its state, what is running on it and who may start there. Not answering filters to the ones Lys cannot hear. Press a row to open it.', at: 'in-bl' },
-      { sel: '[aria-label="Running now"]', title: 'Running now', text: 'The agents running on the chosen computer; Watch opens each in Operations.', at: 'left' },
+      { sel: '[aria-label="Running now"]', title: 'Running now', text: 'The agents running on the chosen computer; Watch opens each in Running agents.', at: 'left' },
       { sel: '[aria-label="May start here"]', title: 'May start here', text: 'Who may start an agent on this computer and through what: a direct permission or a role. Below it, allow one of your own agents here.', at: 'left' },
       { sel: 'form[aria-label^="Team of"]', title: 'Team', text: 'The team that owns this computer; its agents may run here. Save keeps the choice.', at: 'left' },
       { sel: '.join-code', title: 'Connect this computer', text: 'Choose what kind of computer it is, then download its installer and open that file on the computer. The installer carries a one-time connection for this computer alone, connects it, and keeps its runner starting at every login and updating itself. Each download replaces any connection given before. People who prefer a terminal can ask for a code instead.', at: 'right' },
@@ -384,10 +384,10 @@ export const PAGES: Readonly<Record<string, PageHelp>> = {
     keys: [],
   },
   canvas: {
-    title: 'Operations',
+    title: 'Running agents',
     topic: 'people.operations',
     regions: [
-      { sel: 'nav[aria-label="Operations views"]', title: 'Views', text: 'Canvas (every running agent as a window), Sessions (the same as a list) and the proxy (every model call made through Lys).', at: 'below' },
+      { sel: 'nav[aria-label="Operations views"]', title: 'Views', text: 'Four views of the same running agents: by computer (each computer, with what runs on it), Canvas (every running agent as a window), Sessions (the same as a list) and the proxy (every model call made through Lys).', at: 'below' },
       { sel: '.session-canvas-scroll', title: 'Running agents', text: 'Each running agent is a window showing its terminal. Drag its bar to move it and its corner to size it; drag the background or use the wheel to move the surface. Closing a window leaves the agent running.', at: 'c' },
       { sel: '[aria-label="Widgets to place"]', title: 'Place', text: 'Add a box to group windows, a note, or a line between two things. Boxes and notes can be labelled and coloured; × removes one.', at: 'above' },
       { sel: '[aria-label="Canvas view"]', title: 'View', text: 'Zoom in and out; the percentage returns to actual size. Find an agent jumps to its window.', at: 'above' },

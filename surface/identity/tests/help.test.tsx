@@ -135,7 +135,7 @@ describe('the page help', () => {
     await go('#/network');
     await frame();
     expect($('#helpLayer')).not.toBeNull();
-    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Network');
+    expect($('#helpLayer [role="dialog"]')?.getAttribute('aria-label')).toBe('Help for Computers');
     expect(notes()).toEqual(present('network'));
   });
 
