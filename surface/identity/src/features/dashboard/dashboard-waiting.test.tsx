@@ -24,7 +24,9 @@ const page = (requests: AccessRequest[] | Refused, drafts: Draft[] | Refused, wa
   host.innerHTML = renderToStaticMarkup(<WaitingOnYou requests={requests} drafts={drafts} waiting={waiting} me={ME} />);
   return host;
 };
-const rows = (host: Element) => [...host.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('summary')?.textContent ?? tr.textContent);
+/** Each row as its words and its act: the link's word, or the decision acts by name (they decide in the row, Tom, 18 October 2026). */
+const rows = (host: Element) => [...host.querySelectorAll('tbody tr')].map((tr) => tr.querySelector('summary')?.textContent
+  ?? (tr.querySelector('td')?.textContent ?? '') + (tr.querySelector('a.btn')?.textContent ?? [...tr.querySelectorAll('td.dash-decide button')].map((act) => act.getAttribute('aria-label')).join('')));
 
 describe('Waiting on you on the Dashboard', () => {
   it('lists only what the person may decide, oldest first, in words, and its number is the list’s own length', () => {
@@ -32,10 +34,10 @@ describe('Waiting on you on the Dashboard', () => {
       ask('r4', 1, [ME], { state: 'approved' }), ask('r5', 30, ['person-other'], { can_decide: true, relation: 'owner' })];
     const host = page(requests, [draft('d1', 'Post the logo')], { ...none, reviews: 1, product_drafts: 2 });
     expect(rows(host)).toEqual([
-      'Kim asks to view project logoto fix the coloursDecide',
-      'Sam asks to edit project logoto fix the coloursDecide',
-      'Sam asks to own project logoto fix the coloursDecide',
-      'Helper prepared something for you to approvePost the logoDecide',
+      'Kim asks to view project logoto fix the coloursApprove accessDecline request',
+      'Sam asks to edit project logoto fix the coloursApprove accessDecline request',
+      'Sam asks to own project logoto fix the coloursApprove accessDecline request',
+      'Helper prepared something for you to approvePost the logoApproveDecline',
       '2 app actions wait for your approvalOpen',
       'Check the access you gave: 1 is dueOpen',
       '1 more request waits on someone else',
@@ -55,7 +57,7 @@ describe('Waiting on you on the Dashboard', () => {
   it('never shows a number or "nothing" when a list could not be read; it says which list, where it would stand', () => {
     const refused = new Refused(503, { refusal: 'RequestsUnreadable', reason: 'the requests store is closed' });
     const host = page(refused, [draft('d1', 'Post the logo')], { ...none, reviews: { refusal: 'ReviewsUnavailable', reason: 'closed' } });
-    expect(rows(host)).toEqual(['Requests could not be read', 'Helper prepared something for you to approvePost the logoDecide', 'Whether the access you gave is due a check could not be read']);
+    expect(rows(host)).toEqual(['Requests could not be read', 'Helper prepared something for you to approvePost the logoApproveDecline', 'Whether the access you gave is due a check could not be read']);
     expect(host.querySelector('[data-waiting="count"]')).toBeNull();
     expect(host.textContent).not.toContain('Nothing is waiting');
     expect(waitingCount(refused, [], none, ME)).toBeNull();

@@ -25,3 +25,7 @@
   .dash-opt { display: flex; flex-direction: column; overflow-y: auto; }
   .dash-tile { flex: none; max-height: 44vh; }
 }
+/* Decisions in the row: the two acts side by side, and the reason's form under them when one is pressed. */
+.dash-decide { white-space: nowrap; }
+.dash-decide > div { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.dash-decide form { white-space: normal; flex-basis: 100%; }

@@ -36,7 +36,6 @@ export function DashOptionStrip({ option }: { option: DashOption | null }) {
   const [query] = useSearchParams();
   const to = (letter: DashOption) => { const next = new URLSearchParams(query); next.set('option', letter); return '?' + next.toString(); };
   return <nav className="dash-options" aria-label="Dashboard options">
-    <span className="sec">Dashboard:</span>
     {OPTIONS.map((letter) => <Link key={letter} to={to(letter)} className={'btn' + (letter === option ? ' primary' : '')} aria-current={letter === option ? 'page' : undefined}>{letter}</Link>)}
     <span className="sec">{option ? option + ', ' + NAMED[option] : 'none asked: today’s page'}</span>
   </nav>;
@@ -106,12 +105,12 @@ function Agents({ shown }: { shown: Shown }) {
   </section>;
 }
 
-function Waiting({ data }: { data: Ready }) {
-  return <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />;
+function Waiting({ data, changed }: { data: Ready; changed: () => void }) {
+  return <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} changed={changed} />;
 }
 
 function Week({ data }: { data: Ready }) {
-  return <Spend rows={data.answer.agents.filter((row) => row.agent.state !== 'retired')} />;
+  return <Spend rows={data.answer.agents.filter((row) => row.agent.state !== 'retired')} budgets={data.budgets} />;
 }
 
 /** Alarms alone, as lines, for the tile that is only them. */
@@ -138,17 +137,17 @@ function SecurityTile({ fixture }: { fixture: boolean }) {
 export function DashboardOption({ option, shown }: { option: DashOption; shown: Shown }) {
   const { data, fixture } = shown;
   if (option === 'A') return <div className="dash-opt dash-opt-a">
-    <div className="dash-tile"><Waiting data={data} /></div>
+    <div className="dash-tile"><Waiting data={data} changed={shown.reload} /></div>
     <div className="dash-tile"><LookOut data={data} fixture={fixture} withSecurity /></div>
     <div className="dash-tile"><Agents shown={shown} /></div>
     <div className="dash-tile"><Week data={data} /></div>
   </div>;
   if (option === 'B') return <div className="dash-opt dash-opt-b">
     <AgentsStrip data={data} stoppable={shown.stoppable} openStop={shown.openStop} />
-    <div className="dash-tile dash-column"><Waiting data={data} /><LookOut data={data} fixture={fixture} withSecurity /></div>
+    <div className="dash-tile dash-column"><Waiting data={data} changed={shown.reload} /><LookOut data={data} fixture={fixture} withSecurity /></div>
   </div>;
   return <div className="dash-opt dash-opt-c">
-    <div className="dash-tile"><Waiting data={data} /></div>
+    <div className="dash-tile"><Waiting data={data} changed={shown.reload} /></div>
     <div className="dash-tile"><LookOut data={data} fixture={fixture} withSecurity={false} /></div>
     <div className="dash-tile"><Agents shown={shown} /></div>
     <div className="dash-tile"><Week data={data} /></div>

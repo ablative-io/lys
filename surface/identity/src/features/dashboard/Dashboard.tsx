@@ -21,6 +21,7 @@ import { Terminal } from '../runtime/Terminal';
 import '../runtime/terminal.css';
 import { Gate, SignIn } from '../signin/Gate';
 import type { Team } from '../teams/contract';
+import type { BudgetsView } from '../usage/contract';
 import { AgentTree, entryOf, liveOf, whereOf } from './AgentTree';
 import { GettingStarted, readStanding } from './GettingStarted';
 import type { Standing } from './GettingStarted';
@@ -35,21 +36,20 @@ import { Exceptions } from './Exceptions';
 import { WaitingOnYou } from './WaitingOnYou';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
-import { PageHeader } from '../../shell/PageHeader';
 import { Alarms } from './Alarms';
 import { Unread } from './Unread';
 import { Spend } from './Spend';
 import { DashOptionStrip, DashboardOption, dashOptionOf } from './DashboardOptions';
 import type { DashOption } from './DashboardOptions';
 
-export interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
+export interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused; budgets: BudgetsView | Refused }
 
 type Read = Ready | { kind: 'registered' };
 
 async function readPage(): Promise<Read> {
   const me = await api.me();
   if (me.person.state === 'registered') return { kind: 'registered' };
-  const { answer, teams, cord, requests, drafts, standing } = await readTogether({
+  const { answer, teams, cord, requests, drafts, standing, budgets } = await readTogether({
     standing: readStanding(),
     // Every page, so the count of what waits on the person is the length of the list it shows.
     requests: orRefused<AccessRequest[]>(readEveryPage<{ requests: AccessRequest[]; next?: string | null }>('/requests', (read, page) => {
@@ -60,8 +60,10 @@ async function readPage(): Promise<Read> {
     cord: readCord(),
     answer: readDashboard(),
     teams: request<{ teams: Team[] }>('/teams').then((list) => list.teams, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'TeamsUnreadable', reason: String(problem) })),
+    // The person's own limits on the whole week, against which the week's total is said.
+    budgets: request<BudgetsView>('/budgets/person/' + encodeURIComponent(me.person.id)).then((view) => view, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'BudgetsUnreadable', reason: String(problem) })),
   });
-  return { kind: 'active', me, answer, teams, cord, requests, drafts, standing };
+  return { kind: 'active', me, answer, teams, cord, requests, drafts, standing, budgets };
 }
 
 /**
@@ -119,9 +121,9 @@ function Page({ data, reload, watching, watch, option, fixture }: { data: Ready;
       <div className="you-scroll"><AgentTree branches={branches} context={context} /></div>
     </section>
     <div className="dash-side">
-      <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />
+      <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} changed={reload} />
       <Exceptions rows={rows} />
-      <Spend rows={rows} />
+      <Spend rows={rows} budgets={data.budgets} />
     </div>
     <div className="dash-widgets">
       <Alarms summary={data.answer.alarms} agents={every} />
@@ -176,7 +178,8 @@ export function Dashboard() {
     return <SignIn />;
   }
   return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
-    <PageHeader title={option ? 'Dashboard' : 'Home'} actions={read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null} />
+    {/* No heading: the rail names the page. Reconnect stands alone when the feed is lost. */}
+    {read.status === 'refused' && read.feed && last.current ? <div className="dash-reconnect"><Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /></div> : null}
     {DEV ? <DashOptionStrip option={option} /> : null}
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
       : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null} option={option} fixture={fixture !== null}

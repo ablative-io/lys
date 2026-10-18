@@ -22,13 +22,13 @@ async function pressGoogle(): Promise<void> {
   unmountAll();
 }
 
-it('lands a Google sign-in begun on the sign-in page on Home, not on You', async () => {
+it('lands a Google sign-in begun on the sign-in page on the Dashboard, not on You', async () => {
   await mount('#/sign-in', signedOut);
   await pressGoogle();
   await mount('#/me', signedIn);
   expect(location.hash).toBe('#/');
   expect($('.you-page'), 'You is not what is drawn').toBeNull();
-  expect($('h1')?.textContent).toBe('Home');
+  expect($('.page.dash-page'), 'the Dashboard is what is drawn').not.toBeNull();
 });
 
 it('lands a Google sign-in begun on a page back on that page', async () => {

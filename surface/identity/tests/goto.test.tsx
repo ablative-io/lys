@@ -15,7 +15,7 @@ const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'netwo
 
 /** Every page Search names, written out here rather than read from the palette's own table. */
 const PAGE_NAMES: [string, string][] = [
-  ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
+  ['Dashboard', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
   ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
   ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Jobs', '#/roles'],
   ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings/account'], ['Settings: this service', '#/settings'],

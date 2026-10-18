@@ -56,6 +56,7 @@ export function cherie(): { data: Ready; setUp: ReadonlyMap<string, boolean> } {
       kind: 'active', me, teams: [], requests: [], drafts: [draft],
       answer: { agents, waiting: { requests: 0, drafts: 1, reviews: 0, product_drafts: 0 }, alarms: { open_count: 0, newest: [] } } as unknown as Ready['answer'],
       cord: { pulled: null, last: null, released: null, may_pull: true },
+      budgets: { holder: { kind: 'person', id: ME }, limits: [{ unit: 'dollars', amount: 20, period: 'week', act: 'tell' }], warn_at: null, zone: 'Australia/Sydney', version: 1, by: ME, at: SATURDAY, used: [week(4.95)], unavailable: [], within: [], unconfirmed: [] },
       standing: { machines: 1, cambium: null, apps: false, google: false, read: true, administrator: true },
     },
     setUp: new Map([['agent-helper', true], ['agent-researcher', true], ['agent-sketcher', false]]),

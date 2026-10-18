@@ -8,6 +8,8 @@
 import { Refused } from '../../api';
 import { counted } from '../../shell/count';
 import type { Draft } from '../drafts/contract';
+import { DraftDecide } from '../drafts/DraftDecide';
+import { DecisionForm } from '../requests/DecisionForm';
 import { resourceWords } from '../grants/action-words';
 import type { AccessRequest } from '../requests/contract';
 import { refusedPart } from './contract';
@@ -45,7 +47,10 @@ function CountLine({ count, words, unread, href, kind }: { count: number | PartR
     : <td><a href={href}>{words(count)}</a></td>}<td className="you-act"><a className="btn" href={href}>Open</a></td></tr>;
 }
 
-export function WaitingOnYou({ requests, drafts, waiting, me }: { requests: AccessRequest[] | Refused; drafts: Draft[] | Refused; waiting: Waiting; me: string }) {
+/** A source grant in words on the dashboard, by its place in the request's list; the requests page names what each is on. */
+const sourceWords = (_source: string, index: number): string => 'Access you hold, ' + (index + 1);
+
+export function WaitingOnYou({ requests, drafts, waiting, me, changed = () => undefined }: { requests: AccessRequest[] | Refused; drafts: Draft[] | Refused; waiting: Waiting; me: string; changed?: () => void }) {
   const open = requests instanceof Refused ? [] : requests.filter((entry) => entry.state === 'waiting').sort((left, right) => left.asked_at - right.asked_at);
   const mine = open.filter((entry) => mayDecide(entry, me));
   const others = open.length - mine.length;
@@ -57,12 +62,12 @@ export function WaitingOnYou({ requests, drafts, waiting, me }: { requests: Acce
       {requests instanceof Refused ? <tr data-waiting="requests"><td colSpan={2}><Unread part={requests} words="Requests could not be read" /></td></tr> : null}
       {mine.map((entry) => <tr key={entry.id} data-request={entry.id}>
         <td>{asks(entry)}{entry.why ? <div className="note">{entry.why}</div> : null}</td>
-        <td className="you-act"><a className="btn" href={'#/requests/' + encodeURIComponent(entry.id)}>Decide</a></td>
+        <td className="you-act dash-decide"><DecisionForm entry={entry} person={me} canIssueRoot={entry.can_issue_root === true} changed={changed} describe={sourceWords} /></td>
       </tr>)}
       {drafts instanceof Refused ? <tr data-waiting="drafts"><td colSpan={2}><Unread part={drafts} words="Drafts could not be read" /></td></tr>
         : drafts.map((draft) => <tr key={draft.id} data-draft="waiting">
           <td>{(draft.agent?.display_name ?? 'An agent outside your view') + ' prepared something for you to approve'}{draft.note ? <div className="note">{draft.note}</div> : null}</td>
-          <td className="you-act"><a className="btn" href="#/access/drafts">Decide</a></td>
+          <td className="you-act dash-decide"><DraftDecide draft={draft} person={me} changed={changed} /></td>
         </tr>)}
       <CountLine count={waiting.product_drafts} words={(n) => counted(n, 'app actions wait for your approval', 'app action waits for your approval')}
         unread="Whether an app action waits for your approval could not be read" href="#/access/drafts" kind="product-drafts" />

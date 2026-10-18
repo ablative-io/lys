@@ -29,7 +29,7 @@ describe('the rail and the palette', () => {
     await mount('#/people', ROUTES);
     const navs = $$('#rail a[data-nav]').map((entry) => entry.dataset.nav);
     expect(navs).toEqual(['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me']);
-    expect($$('#rail a[data-nav] .lbl:not(.kbd)').map((entry) => entry.textContent)).toEqual(['Home', 'Waiting on you', 'People and agents', 'Running agents', 'Access', 'Computers', 'Apps', 'Secrets', 'Settings', 'You']);
+    expect($$('#rail a[data-nav] .lbl:not(.kbd)').map((entry) => entry.textContent)).toEqual(['Dashboard', 'Waiting on you', 'People and agents', 'Running agents', 'Access', 'Computers', 'Apps', 'Secrets', 'Settings', 'You']);
     expect($('#rail')?.textContent).not.toMatch(/Network|Operations|Graph|Command|Collapse/);
   });
   it('lights Access on the access map and on Roles', async () => {

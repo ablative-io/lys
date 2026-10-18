@@ -26,7 +26,7 @@ export const pullPending = (): boolean => sessionStorage.getItem(PULL_KEY) !== n
  */
 export function StopEverythingButton({ cord, open }: { cord: CordView | Refused; open: () => void }) {
   if (!(cord instanceof Refused) && !cord.may_pull) return null;
-  return <Act symbol="stop" name="Stop everything" word="Stop all" tone="danger" data-act="stop-everything" onClick={open} />;
+  return <Act symbol="stop" name="Stop everything" tone="danger" data-act="stop-everything" onClick={open} />;
 }
 
 /** The row Stop everything opens: why, whether to kill what does not stop, and then what the pull did. */

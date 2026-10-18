@@ -72,7 +72,7 @@ const HEAD_REGION: Region = { sel: '.file .head', title: 'Name and state', text:
 
 export const PAGES: Readonly<Record<string, PageHelp>> = {
   dashboard: {
-    title: 'Home',
+    title: 'Dashboard',
     topic: 'people.dashboard',
     regions: [
       { sel: 'section.getting-started', title: 'Getting started', text: 'What this Lys still needs, in order: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; Not this one counts as an answer.', at: 'below' },
