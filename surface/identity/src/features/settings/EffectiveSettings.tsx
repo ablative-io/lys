@@ -1,6 +1,7 @@
 /** Configuration shows the effective server values. It links nowhere the rail already goes. */
 import { api, request, useLoad } from '../../api';
-import { Gate } from '../signin/Gate';
+import type { Refused } from '../../api';
+import { Gate, RefusedPage } from '../signin/Gate';
 import { duration } from '../file/time';
 import { useState } from 'react';
 import { ModelWindows } from './ModelWindows';
@@ -28,7 +29,11 @@ export function EffectiveSettings({ section }: { section?: string }) {
   const [round, setRound] = useState(0);
   const load = useLoad(() => request<Configuration>('/configuration'), 'effective-configuration:' + round);
   const authority = useLoad(api.authority, 'service-build');
-  return <Gate load={load} title="Settings" ok={(settings) => <section className="effective-settings">
+  // A person who is not an administrator is told whose these are and where their own are, never shown a refusal page.
+  const notTheirs = (refused: Refused) => refused.status === 403
+    ? <p className="note settings-service-only">This service’s own settings are shown to its administrators. Yours are under <a href="#/settings/account">For you</a>.</p>
+    : <RefusedPage refused={refused} title="Settings" />;
+  return <Gate load={load} title="Settings" renderError={notTheirs} ok={(settings) => <section className="effective-settings">
     <p className="note">These are the settings this service started with. Changing startup configuration requires an administrator to update the service configuration and restart it. This screen does not pretend to apply those changes live.</p>
     {show('signin') ? <><h2>Sign-in</h2><dl className="facts"><dt>Provider</dt><dd>{settings.sign_in.provider_origin}</dd><dt>Session duration</dt><dd>{duration(settings.sign_in.session_seconds)}</dd><dt>HTTPS-only session cookie</dt><dd>{settings.sign_in.secure_cookie ? 'Yes' : 'No'}</dd></dl></> : null}
     {show('directory') ? <><h2>Directory</h2><dl className="facts"><dt>Role records</dt><dd>{configured(settings.directory.roles_configured)}</dd></dl></> : null}

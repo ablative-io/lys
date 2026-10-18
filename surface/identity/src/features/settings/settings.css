@@ -1,0 +1,4 @@
+/* Settings: the person's own sections stand apart; a row's control drops under its words when the screen is narrow. */
+.settings-layout { margin-top: 22px; }
+.settings-layout .set-row { flex-wrap: wrap; }
+.settings-service-only { margin: 0; }

@@ -43,8 +43,8 @@ describe('shell (conformance 9.1)', () => {
     expect($('#rail')?.classList.contains('open')).toBe(true);
   });
 
-  it('docks left or right with \\ and from Configuration', async () => {
-    await mount('#/settings');
+  it('docks left or right with \\ and from Settings, For you', async () => {
+    await mount('#/settings/account');
     expect($('#shell')?.classList.contains('dock-right')).toBe(false);
     await press('\\', {}, document.body);
     expect($('#shell')?.classList.contains('dock-right')).toBe(true);
