@@ -155,6 +155,17 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-runner/tests/seat_conversation.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
 | `crates/lys-runner/tests/seat_owner_socket.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
 | `crates/lys-runner/tests/seat_restart.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-identity-server/tests/agent_starts_agent.rs` | an agent registers, sets up, has reviewed and starts another agent under grants (AGENTS-015 R1, R2) | AGENTS-015 |
+| `crates/lys-identity-server/src/signed_first.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/routes/identities.rs` | an agent registers an agent for its person, and holds the five set-up rights under the person's chain (AGENTS-015 R1, R2) | AGENTS-015 |
+| `crates/lys-identity-server/src/provisioning_api.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/start.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/seats_api.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/runner_api.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/grants.rs` | admits an agent's signed call under its own grants (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys/src/commands/mcp_bridge.rs` | reaches Lys over verified https from any device (AGENTS-015 R3) | AGENTS-015 |
+| `crates/lys/src/commands/mcp_bridge_tests.rs` | the https and loopback URL rules (AGENTS-015 R3) | AGENTS-015 |
+| `crates/lys/src/identity/loopback_http.rs` | carries the bridge's https exchange beside loopback (AGENTS-015 R3) | AGENTS-015 |
 
 ## Inventory
 

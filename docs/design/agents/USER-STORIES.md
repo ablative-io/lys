@@ -53,3 +53,5 @@
 **S426.** As a person starting an agent on my own computer, I want lys claude to start my agent when the Lys console is off or unreachable, telling me plainly that it is, so that the one word works every time and I never have to open a terminal to work out why it did not.
 
 **S442.** As a person on a fresh install, I can name my computer and its folder on the same form that adds my first agent.
+
+**S444.** As a person running agents on several computers, I give one of my agents the right to set up and start my assistants once, and it does so on any of my computers without me at a screen, every act on the record as the agent's and every right one I can take back.

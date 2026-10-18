@@ -466,7 +466,18 @@
     {"path": "crates/lys-runner/tests/seat_cost.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
     {"path": "crates/lys-runner/tests/seat_conversation.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
     {"path": "crates/lys-runner/tests/seat_owner_socket.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_restart.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"}
+    {"path": "crates/lys-runner/tests/seat_restart.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-identity-server/tests/agent_starts_agent.rs", "note": "an agent registers, sets up, has reviewed and starts another agent under grants (AGENTS-015 R1, R2)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/signed_first.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/routes/identities.rs", "note": "an agent registers an agent for its person, and holds the five set-up rights under the person's chain (AGENTS-015 R1, R2)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/provisioning_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/start.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/seats_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/runner_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys-identity-server/src/grants.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
+    {"path": "crates/lys/src/commands/mcp_bridge.rs", "note": "reaches Lys over verified https from any device (AGENTS-015 R3)", "brief": "AGENTS-015"},
+    {"path": "crates/lys/src/commands/mcp_bridge_tests.rs", "note": "the https and loopback URL rules (AGENTS-015 R3)", "brief": "AGENTS-015"},
+    {"path": "crates/lys/src/identity/loopback_http.rs", "note": "carries the bridge's https exchange beside loopback (AGENTS-015 R3)", "brief": "AGENTS-015"}
   ],
   "principles": [
     {
