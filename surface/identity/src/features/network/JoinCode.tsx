@@ -11,7 +11,7 @@ import { problemWords } from '../people/Words';
 /** A connection code as the service answers it, once. */
 export interface JoinCode { machine: string; server: string; command: string; code: string }
 
-type InstallerKind = 'macos-pkg' | 'deb' | 'arch';
+export type InstallerKind = 'macos-pkg' | 'deb' | 'arch';
 type InstallerGiven = { kind: 'installer'; platform: InstallerKind; filename: string };
 
 /** A successful download or code uses the same receipt to ask the existing runner state again. */
@@ -74,13 +74,13 @@ export function Copy({ text, what }: { text: string; what: string }) {
 }
 
 /** The command and the code, each with its Copy button, shown until the person is done with them. */
-export function JoinShown({ name, given, done }: { name: string; given: JoinCode; done: () => void }) {
+export function JoinShown({ name, given, kind, done }: { name: string; given: JoinCode; kind: InstallerKind | ''; done: () => void }) {
   return <div className="join-code" role="group" aria-label={'Connect ' + name}>
+    <ClientDownload kind={kind} name={name} />
     <p>Run this on that computer. The code works once and is not shown again.</p>
     <p className="sec">The command asks for the code: paste it there.</p>
     <p><code data-join="command">{given.command}</code> <Copy text={given.command} what="The command" /></p>
     <p><code data-join="code">{given.code}</code> <Copy text={given.code} what="The code" /></p>
-    <ClientDownload />
     <Act symbol="approve" name="Done" word="Done" onClick={done} />
   </div>;
 }
@@ -88,9 +88,24 @@ export function JoinShown({ name, given, done }: { name: string; given: JoinCode
 type ClientRelease = { commit: string; files: Record<string, string> };
 type Clients = { platforms: Record<string, ClientRelease> };
 
-/** A Mac's architecture can be hidden by its browser, so the person can choose it explicitly. */
-export function ClientDownload() {
-  const [platform, setPlatform] = useState(navigator.userAgent.includes('ARM64') ? 'aarch64-apple-darwin' : '');
+/** The builds of `lys` Lys holds for the kind of computer chosen above, by the platform names its clients list. */
+export const platformsFor = (kind: InstallerKind | '', held: string[]): string[] =>
+  kind === '' ? [] : held.filter((platform) => (kind === 'macos-pkg' ? platform.includes('apple-darwin') : platform.includes('linux')));
+
+/** A platform's processor in words, as the person would know it for that kind of computer. */
+const chipWords = (platform: string): string => {
+  const mac = platform.includes('apple-darwin');
+  if (platform.startsWith('aarch64')) return mac ? 'Apple silicon' : 'ARM';
+  if (platform.startsWith('x86_64')) return mac ? 'Intel' : 'Intel or AMD';
+  return platform;
+};
+
+/**
+ * `lys` for the computer being connected, for the kind chosen above it: only the builds Lys holds for that kind, chosen
+ * already when there is one. Nothing is guessed from this browser, which runs on the device in hand, not that computer.
+ */
+export function ClientDownload({ kind, name }: { kind: InstallerKind | ''; name: string }) {
+  const [chosen, setChosen] = useState('');
   const [clients, setClients] = useState<Clients | null>(null);
   const [failure, setFailure] = useState('');
   useEffect(() => {
@@ -101,16 +116,22 @@ export function ClientDownload() {
     }).catch((error: unknown) => { if (current) setFailure(joinFailure(error)); });
     return () => { current = false; };
   }, []);
+  const offered = platformsFor(kind, Object.keys(clients?.platforms ?? {}));
+  const platform = offered.length === 1 ? offered[0] : offered.includes(chosen) ? chosen : '';
   const release = clients?.platforms[platform];
+  const family = kind === 'macos-pkg' ? 'Mac' : 'Linux computer';
+  if (failure) return <div className="client-download"><p className="why-not">Lys could not read its downloads of lys. {failure}</p></div>;
+  if (!clients) return null;
+  if (kind === '') return <div className="client-download"><p>First, put lys on {name}: the command below runs it. Choose what kind of computer {name} is above, and its download of lys is offered here.</p></div>;
+  if (!offered.length) return <div className="client-download"><p>Lys has no download of lys for a {family} yet, so this command cannot run on {name}. Use the installer above, or ask the administrator to add lys for a {family}.</p></div>;
   return <div className="client-download">
-    <label>This Mac <select aria-label="This Mac" value={platform} onChange={(event) => setPlatform(event.target.value)}>
-      <option value="">Choose its chip</option><option value="aarch64-apple-darwin">Apple silicon</option><option value="x86_64-apple-darwin">Intel</option>
-    </select></label>
-    {failure ? <p className="why-not">Lys could not read its clients. {failure}</p> : clients && platform ? release ?
-      <p><a href={'/api/clients/' + encodeURIComponent(platform) + '/lys'} download="lys">Download lys for this Mac</a>
+    <p>First, put lys on {name}: the command below runs it.</p>
+    {offered.length > 1 ? <label>{name}’s processor <select aria-label={name + '’s processor'} value={platform} onChange={(event) => setChosen(event.target.value)}>
+      <option value="">Choose its processor</option>{offered.map((each) => <option key={each} value={each}>{chipWords(each)}</option>)}
+    </select></label> : null}
+    {release ? <p><a href={'/api/clients/' + encodeURIComponent(platform) + '/lys'} download="lys">Download lys for {name} ({chipWords(platform)})</a>
 {' · built from commit ' + release.commit + ' · '}<a href={'/api/clients/' + encodeURIComponent(platform) + '/lys-containment-entry'} download="lys-containment-entry">Download its companion</a>
-        <span className="sec"> Keep both files together.</span></p>
-      : <p>Lys has no download for {platform === 'aarch64-apple-darwin' ? 'Apple silicon' : platform === 'x86_64-apple-darwin' ? 'Intel' : 'this'} Macs yet. Ask the administrator to add one.</p> : null}
+      <span className="sec"> Keep both files together.</span></p> : null}
   </div>;
 }
 
@@ -168,6 +189,7 @@ export function ConnectingNow({ connecting, connect, renew, busy, done }: { conn
         <option value="">Choose its kind</option><option value="macos-pkg">Mac</option><option value="deb">Linux: Debian or Ubuntu</option><option value="arch">Linux: Arch</option>
       </select>
     </label>
+    <p className="sec">A Windows computer cannot run agents for Lys yet: there is no installer or lys for Windows.</p>
     <Act symbol="save" name={'Download the installer for ' + connecting.name} word={'Download the installer for ' + connecting.name} tone="primary" disabled={!kind || busy || downloading} onClick={() => void download()} />
     {downloading ? <p role="status">Making the installer…</p> : null}
     {failure ? <div className="why-not" role="alert"><p>{joinFailure(failure)}</p><details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{joinDetail(failure)}</p></details></div> : null}
@@ -181,7 +203,7 @@ export function ConnectingNow({ connecting, connect, renew, busy, done }: { conn
       <summary onClick={(event) => { event.preventDefault(); setTerminal((open) => !open); }}>Connect from a terminal instead</summary>
       {terminal ? <>
         <p className="sec">A new code replaces any code given before, and the earlier one stops working. It also replaces any installer downloaded before it.</p>
-        {code ? <JoinShown name={connecting.name} given={code} done={done} /> : null}
+        {code ? <JoinShown name={connecting.name} given={code} kind={kind} done={done} /> : null}
         {connecting.failure ? <><p className="why-not" role="alert">Lys could not give a connection code for {connecting.name}. If one was given, it is not shown again: a new code replaces it.</p><p>{connecting.failure}</p>{connecting.detail ? <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{connecting.detail}</p></details> : null}</> : null}
         <Act symbol="again" name="Get a new connection code" word="New code" disabled={busy || downloading} onClick={() => { setFailure(null); renew(); }} />
       </> : null}

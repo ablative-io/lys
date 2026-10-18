@@ -14,3 +14,6 @@
 /* The computers table fits its half of the page: its columns wrap rather than run off the side, so May start here and the add row are always in view. */
 .table-scroll > table:has(> tfoot tr[data-add="computer"]) { width: 100%; }
 .table-scroll > table:has(> tfoot tr[data-add="computer"]) td { max-width: none; overflow-wrap: anywhere; }
+/* A one-time command, code or download line is long and unbroken: it wraps inside its card at any width rather than run off it. */
+.join-code code, .client-download a { overflow-wrap: anywhere; }
+.join-code code { display: inline-block; max-width: 100%; }

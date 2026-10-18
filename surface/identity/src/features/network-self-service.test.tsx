@@ -8,6 +8,7 @@ import { serve } from '../../tests/harness';
 import { Network } from './network/Network';
 import type { NameMachine } from './network/contract';
 import { ClientDownload } from './network/JoinCode';
+import type { InstallerKind } from './network/JoinCode';
 import { AddAgent } from './people/AddAgent';
 import { AgentCertificates } from './file/AgentCertificates';
 
@@ -82,19 +83,45 @@ it('chooses Another computer first for an administrator whose page is open from 
   expect(host.textContent).toContain('No computer yet. Add a computer below, the one you are using or another, to start agents on it.');
 });
 
-it('downloads the chosen Mac client with the install commit and names a missing platform', async () => {
-  serve({ '/clients': ok({ platforms: { 'aarch64-apple-darwin': { commit: '0123456789abcdef', files: { lys: 'digest', 'lys-containment-entry': 'digest' } } } }) });
+const RELEASE = { commit: '0123456789abcdef', files: { lys: 'digest', 'lys-containment-entry': 'digest' } };
+async function download(kind: InstallerKind | '', platforms: Record<string, typeof RELEASE>) {
+  serve({ '/clients': ok({ platforms }) });
   const host = document.createElement('div'); document.body.append(host);
   root = createRoot(host);
-  await act(async () => { root?.render(<ClientDownload />); });
-  const choice = host.querySelector<HTMLSelectElement>('select[aria-label="This Mac"]');
-  if (!choice) throw new Error('Mac choice missing');
-  await act(async () => { choice.value = 'aarch64-apple-darwin'; choice.dispatchEvent(new Event('change', { bubbles: true })); });
-  expect(host.querySelector('a[download="lys"]')?.getAttribute('href')).toBe('/api/clients/aarch64-apple-darwin/lys');
-  expect(host.textContent).toContain('commit 0123456789abcdef');
-  await act(async () => { choice.value = 'x86_64-apple-darwin'; choice.dispatchEvent(new Event('change', { bubbles: true })); });
-  expect(host.querySelector('a[download="lys"]')).toBeNull();
-  expect(host.textContent).toContain('Lys has no download for Intel Macs yet. Ask the administrator to add one.');
+  await act(async () => { root?.render(<ClientDownload kind={kind} name="Build box" />); });
+  return host;
+}
+const lysLink = (host: HTMLElement) => host.querySelector('a[download="lys"]')?.getAttribute('href') ?? null;
+
+it('offers lys for the kind of computer chosen, never a Mac build for a Linux computer', async () => {
+  const both = { 'aarch64-apple-darwin': RELEASE, 'x86_64-unknown-linux-gnu': RELEASE };
+  expect(lysLink(await download('deb', both))).toBe('/api/clients/x86_64-unknown-linux-gnu/lys');
+  act(() => root?.unmount()); root = null;
+  const mac = await download('macos-pkg', both);
+  expect(lysLink(mac)).toBe('/api/clients/aarch64-apple-darwin/lys');
+  expect(mac.textContent).toContain('Download lys for Build box (Apple silicon)');
+  expect(mac.textContent).toContain('commit 0123456789abcdef');
+});
+
+it('asks the processor only among the builds Lys holds for that kind, with no guess from this browser', async () => {
+  const host = await download('macos-pkg', { 'aarch64-apple-darwin': RELEASE, 'x86_64-apple-darwin': RELEASE, 'x86_64-unknown-linux-gnu': RELEASE });
+  const choice = host.querySelector<HTMLSelectElement>('select[aria-label="Build box’s processor"]');
+  expect([...choice?.options ?? []].map((option) => option.textContent)).toEqual(['Choose its processor', 'Apple silicon', 'Intel']);
+  expect(lysLink(host)).toBeNull();
+  await act(async () => { if (choice) { choice.value = 'x86_64-apple-darwin'; choice.dispatchEvent(new Event('change', { bubbles: true })); } });
+  expect(lysLink(host)).toBe('/api/clients/x86_64-apple-darwin/lys');
+});
+
+it('says lys cannot be had for a kind Lys holds no build for, and points to the installer', async () => {
+  const host = await download('arch', { 'aarch64-apple-darwin': RELEASE });
+  expect(lysLink(host)).toBeNull();
+  expect(host.textContent).toContain('Lys has no download of lys for a Linux computer yet, so this command cannot run on Build box. Use the installer above');
+});
+
+it('asks for the kind of computer first when none is chosen', async () => {
+  const host = await download('', { 'aarch64-apple-darwin': RELEASE });
+  expect(lysLink(host)).toBeNull();
+  expect(host.textContent).toContain('Choose what kind of computer Build box is above');
 });
 
 it('shows a non-administrator the own-agent add row and the own-agent certificate issue act', async () => {
