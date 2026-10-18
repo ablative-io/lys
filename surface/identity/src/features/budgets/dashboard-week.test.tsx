@@ -37,15 +37,17 @@ describe('This week on the Dashboard', () => {
     expect(lines(host)).toEqual([['Scribe', 'US$12.50'], ['Courier', 'US$3.00'], ['Quiet', 'US$0.00']]);
     expect(host.querySelector('[data-spend="total"]')?.textContent).toBe('US$15.50');
     expect(host.querySelector('.dash-spend-total')?.textContent).toBe('US$15.50 since 12 Oct');
+    expect(host.querySelector('[data-spend="coverage"]')).toBeNull();
   });
 
-  it('never counts a missing figure as nothing: the total says at least, and each line says why', () => {
+  it('never counts a missing figure as nothing: the total says how many agents it covers in full, and each line says why', () => {
     const rows = [row('Scribe', [week(10)]), row('Courier', [week(null, { reported: { figure: 2, missing: 3 } } as Partial<Used>)]),
       row('Silent', [week(null)]), row('Unread', null), row('Old', [today(4)])];
     expect(rows.map((each) => weekSpend(each).kind)).toEqual(['spent', 'partial', 'none', 'unread', 'none']);
     expect(weekTotal(rows)).toEqual({ total: 12, short: 4, priced: 2 });
     const host = page(rows);
-    expect(host.querySelector('[data-spend="total"]')?.textContent).toBe('At least US$12.00');
+    expect(host.querySelector('[data-spend="total"]')?.textContent).toBe('US$12.00');
+    expect(host.querySelector('[data-spend="coverage"]')?.textContent).toBe('from 1 of 5 agents in full');
     expect(lines(host)).toEqual([['Scribe', 'US$10.00'], ['Courier', 'at least US$2.00some of its use gave no price'], ['Silent', 'Nothing reported'],
       ['Unread', 'Could not be read'], ['Old', 'Nothing reported']]);
   });
@@ -59,7 +61,8 @@ describe('This week on the Dashboard', () => {
   it('says nothing was reported, never US$0.00, when no agent gave a figure', () => {
     const host = page([row('Silent', [week(null)]), row('Unread', null)]);
     expect(host.querySelector('[data-spend="total"]')?.textContent).toBe('Nothing reported yet');
-    expect(page([row('Silent', [week(null)]), row('Idle', [week(0)])]).querySelector('[data-spend="total"]')?.textContent).toBe('At least US$0.00');
+    const idle = page([row('Silent', [week(null)]), row('Idle', [week(0)])]);
+    expect([idle.querySelector('[data-spend="total"]')?.textContent, idle.querySelector('[data-spend="coverage"]')?.textContent]).toEqual(['US$0.00', 'from 1 of 2 agents in full']);
   });
 
   it('with no agent, says so and links to adding one', () => {

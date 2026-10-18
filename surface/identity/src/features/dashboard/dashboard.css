@@ -67,6 +67,7 @@
 .dash-money { white-space: nowrap; }
 .dash-money-why { display: block; white-space: normal; }
 .dash-spend-note { margin: 6px 0 0; }
+.dash-spend-cover { display: block; }
 .you-tree thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); padding: 6px 10px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .dash-table { width: 100%; }
 .dash-table td { padding: 7px 10px; }

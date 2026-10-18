@@ -1,8 +1,8 @@
 /**
  * What the person's agents cost this week: one total in US dollars, then every agent, the dearest first, whether or not
  * it has a limit. Each figure is the service's own (`usage.figures`, dollars over the week); the page only adds them
- * up for the total. A figure the service could not give is never counted as nothing: the total then says "at least"
- * and the line says which agent is missing and why. The price is what the harness reports, at API rates, so an agent on
+ * up for the total. A figure the service could not give is never counted as nothing: the total then says how many
+ * agents it covers in full, and the line says which agent is missing and why. The price is what the harness reports, at API rates, so an agent on
  * a plan account is said to be paid by its plan, in words on the face, never in a tooltip.
  */
 import { day } from '../file/time';
@@ -54,11 +54,20 @@ export function weekTotal(rows: DashboardAgent[]): { total: number; short: numbe
     priced: weeks.filter((week) => week.kind === 'spent' || week.kind === 'partial').length };
 }
 
-/** The total as said: the sum, "at least" the sum when some agent gave less than a whole figure, or that nothing was priced. */
+/**
+ * The total as said: the sum, or that nothing was priced. When some agent gave less than a whole figure the total is
+ * never said bare: the line under it says how many agents it covers, and each agent's line says what is missing.
+ */
 function totalWords(rows: DashboardAgent[]): string {
   const { total, short, priced } = weekTotal(rows);
-  if (!priced && short) return 'Nothing reported yet';
-  return (short ? 'At least ' : '') + money(total);
+  return !priced && short ? 'Nothing reported yet' : money(total);
+}
+
+/** "from 2 of 3 agents", when the total does not cover every agent; nothing when it does. */
+function coverage(rows: DashboardAgent[]): string | null {
+  const whole = rows.filter((row) => weekSpend(row).kind === 'spent').length;
+  const { short, priced } = weekTotal(rows);
+  return short && priced ? 'from ' + whole + ' of ' + rows.length + ' agents in full' : null;
 }
 
 function Figure({ week }: { week: Week }) {
@@ -80,6 +89,7 @@ export function Spend({ rows }: { rows: DashboardAgent[] }) {
     <p className="dash-spend-total">
       <b data-spend="total">{totalWords(rows)}</b>
       <span className="sec">{start === null ? ' so far this week' : ' since ' + day(Math.floor(start / 1000))}</span>
+      {coverage(rows) ? <span className="note dash-spend-cover" data-spend="coverage">{coverage(rows)}</span> : null}
     </p>
     <div className="you-scroll">
       {rows.length ? <table className="dash-table"><tbody>
