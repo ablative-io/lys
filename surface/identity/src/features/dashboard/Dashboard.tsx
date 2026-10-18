@@ -9,8 +9,7 @@ import { Navigate } from 'react-router';
 import { Refused, api, request, useLive } from '../../api';
 import type { MeView } from '../../generated';
 import { refreshLive } from '../../live';
-import { readTogether } from '../../reads';
-import { singular } from '../../shell/count';
+import { readEveryPage, readTogether } from '../../reads';
 import type { Entry } from '../people/directory';
 import { agentsOf, buildTree } from '../people/tree';
 import type { Node } from '../people/tree';
@@ -28,11 +27,12 @@ import type { Standing } from './GettingStarted';
 import type { Asked, RowContext } from './AgentTree';
 import { orRefused } from './board';
 import { readDashboard, refusedPart } from './contract';
-import type { DashboardAgent, DashboardAnswer, Waiting } from './contract';
+import type { DashboardAgent, DashboardAnswer } from './contract';
 import { readCord, stoppedWhy } from './cord';
 import type { CordView } from './cord';
 import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from './StopEverything';
-import { BudgetWidget, DraftsWidget, GoalsWidget, RequestsWidget } from './Widgets';
+import { BudgetWidget, GoalsWidget } from './Widgets';
+import { WaitingOnYou } from './WaitingOnYou';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { Alarms } from './Alarms';
@@ -48,7 +48,11 @@ async function readPage(): Promise<Read> {
   if (me.person.state === 'registered') return { kind: 'registered' };
   const { answer, teams, cord, requests, drafts, standing } = await readTogether({
     standing: readStanding(),
-    requests: orRefused<AccessRequest[]>(request<{ requests: AccessRequest[] }>('/requests').then((list) => list.requests), 'RequestsUnreadable'),
+    // Every page, so the count of what waits on the person is the length of the list it shows.
+    requests: orRefused<AccessRequest[]>(readEveryPage<{ requests: AccessRequest[]; next?: string | null }>('/requests', (read, page) => {
+      if (!page || !Array.isArray(page.requests)) throw new Error('RequestsUnreadable: a later page did not answer a list of requests.');
+      return { ...read, requests: [...read.requests, ...page.requests] };
+    }).then((list) => list.requests), 'RequestsUnreadable'),
     drafts: orRefused(readDrafts('waiting'), 'DraftsUnreadable'),
     cord: readCord(),
     answer: readDashboard(),
@@ -78,25 +82,6 @@ function treeOf(me: MeView, rows: DashboardAgent[], teams: Team[]): Node {
   return trim(complete);
 }
 
-const WAITING: [keyof Waiting, string, string][] = [
-  ['requests', 'requests to decide', '#/requests'], ['drafts', 'drafts to approve', '#/access/drafts'], ['reviews', 'reviews due', '#/reviews'],
-];
-
-/** The three counts, one in the singular; a count that could not be read says its refusal's name in place of a number, never zero. */
-function WaitingTable({ waiting }: { waiting: Waiting }) {
-  const none = WAITING.every(([key]) => waiting[key] === 0);
-  return <table className="dash-table" aria-label="Waiting for you">
-    <tbody>{none ? <tr className="empty"><td className="dim">Nothing is waiting.</td></tr>
-      : WAITING.map(([key, words, href]) => {
-        const count = waiting[key];
-        return <tr key={key} data-waiting={key}>
-          <td className="dash-num">{refusedPart(count) ? '?' : count}</td>
-          <td><a href={href}>{count === 1 ? singular(words) : words}</a>{refusedPart(count) ? <Unread part={count} words="How many could not be read" /> : null}</td>
-        </tr>;
-      })}</tbody>
-  </table>;
-}
-
 function Page({ data, reload, watching, watch }: { data: Ready; reload: () => void; watching: string | null; watch: (row: DashboardAgent, session: RuntimeSession) => void }) {
   const [asked, setAsked] = useState<Asked | null>(null);
   // A pull with no confirmed answer in this tab opens its row by itself, so it is asked about and never sent twice.
@@ -121,10 +106,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
       <div className="you-scroll"><AgentTree branches={treeOf(data.me, rows, teams).branches} context={context} /></div>
     </section>
     <div className="dash-side">
-      <section className="you-panel" aria-label="Waiting for you">
-        <div className="section-h"><span>Waiting for you</span></div>
-        <div className="you-scroll"><WaitingTable waiting={data.answer.waiting} /></div>
-      </section>
+      <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />
       <Spend rows={rows} />
       <section className="you-panel" aria-label="Running now">
         <div className="section-h"><span>Running now</span><StopEverythingButton cord={data.cord} open={() => setPulling(true)} /></div>
@@ -134,8 +116,6 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
     </div>
     <div className="dash-widgets">
       <Alarms summary={data.answer.alarms} agents={every} />
-      <RequestsWidget requests={data.requests} me={data.me.person.id} />
-      <DraftsWidget drafts={data.drafts} />
       <BudgetWidget rows={rows} />
       <GoalsWidget rows={rows} />
     </div>

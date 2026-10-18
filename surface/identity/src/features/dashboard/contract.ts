@@ -24,7 +24,11 @@ export interface DashboardAgent {
 }
 
 /** How many wait on the person, each counted from its own route, or that route's refusal. */
-export interface Waiting { requests: number | PartRefused; drafts: number | PartRefused; reviews: number | PartRefused }
+export interface Waiting {
+  requests: number | PartRefused; drafts: number | PartRefused; reviews: number | PartRefused;
+  /** The product drafts not yet closed; absent from a service older than ACCESS-001. */
+  product_drafts?: number | PartRefused;
+}
 
 export interface DashboardAnswer extends Paged { agents: DashboardAgent[]; waiting: Waiting; alarms: AlarmSummary | PartRefused }
 
@@ -57,6 +61,9 @@ export async function readDashboard(): Promise<DashboardAnswer> {
   const waiting = answer.waiting as Partial<Waiting> | undefined;
   if (!waiting || !counted(waiting.requests) || !counted(waiting.drafts) || !counted(waiting.reviews)) {
     throw new Error('DashboardUnreadable: the service did not say how many requests, drafts and reviews wait for you.');
+  }
+  if (waiting.product_drafts !== undefined && !counted(waiting.product_drafts)) {
+    answer.waiting.product_drafts = { refusal: 'ProductDraftsUnreadable', reason: 'The service did not answer how many app drafts wait for you.' };
   }
   for (const row of answer.agents) {
     if (!row || !row.agent || typeof row.agent.id !== 'string' || !row.usage || !row.goals || !row.budget) throw new Error('DashboardUnreadable: an agent row is missing its agent, usage, budget or goals.');
