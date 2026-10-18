@@ -97,3 +97,18 @@ it('keeps an uncertain standing gift across reload and checks the original opera
   expect(document.querySelector('.next-step')?.textContent).toContain('Scribe can now read, on a cambium workspace, ablative.');
   expect(sessionStorage.getItem('lys.pending.root-grant')).toBeNull();
 });
+
+// Apps links "Give people access" from an approved app's card to #/access/issue?app=<id> (domain 04's ask).
+it('opens with the named app’s first kind chosen when the address names the app', async () => {
+  await mount('#/access/issue?app=cambium', { ...routes, '/apps/cambium/schema': ok({ app: 'cambium', version: 1, schema: { kinds: {
+    'cambium.workspace': { actions: ['read'], relations: { member: ['read'] }, agents: [], parents: [] },
+    'cambium.channel': { actions: ['read'], relations: { member: ['read'] }, agents: [], parents: [] },
+  } } }) });
+  expect((form().querySelector('select[name="kind"]') as HTMLSelectElement).value).toBe('cambium.channel');
+  expect((form().querySelector('select[name="resource"]') as HTMLSelectElement).disabled).toBe(false);
+});
+
+it('opens on no kind when the address names an app that is not approved', async () => {
+  await mount('#/access/issue?app=elsewhere', routes);
+  expect((form().querySelector('select[name="kind"]') as HTMLSelectElement).value).toBe('');
+});

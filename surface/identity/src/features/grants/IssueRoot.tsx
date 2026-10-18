@@ -1,5 +1,6 @@
 /** Give access: the administrator gives a person access to something outright (a root grant); the server alone decides who may. */
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { api, Refused, request, useLoad } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import type { PeopleView, MeView } from '../../generated';
@@ -69,7 +70,10 @@ export function knownOf(kind: string, resources: ResourceRef[], people: PeopleVi
 function Form({ people, me, model, kinds, resources, done }: { people: PeopleView; me: MeView; model: GrantModel; kinds: KindGroup[]; resources: ResourceRef[]; done: () => void }) {
   // A root grant has no expiry unless the issuer gives one.
   const [noExpiry, setNoExpiry] = useState(true);
-  const [kind, setKind] = useState('');
+  // `?app=<id>` (Apps' "Give people access") opens on that app's first kind, so the form starts where the person meant to be.
+  const [params] = useSearchParams();
+  const app = params.get('app');
+  const [kind, setKind] = useState(() => (app ? kinds.flatMap((group) => group.kinds).find((each) => each.startsWith(app + '.')) : undefined) ?? '');
   const [toAgent, setToAgent] = useState(false);
   const agents = people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state === 'active') ?? [];
   const relations = model.kinds?.[kind]?.relations ?? model.relations;

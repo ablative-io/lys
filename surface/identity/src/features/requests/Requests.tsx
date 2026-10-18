@@ -4,7 +4,7 @@ import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
 /** Requests use the service's visibility and approval decisions, never an inferred permission. A queue, oldest first, grouped by the asker's team; one request opens beside it. */
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { Refused, api, request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -45,6 +45,8 @@ function wantedOf(params: URLSearchParams): Wanted | undefined {
 
 export function Requests() {
   const [params] = useSearchParams();
+  // `#/requests/<id>` opens that request: the dashboard's Decide and a shared link land on the request itself.
+  const addressed = useParams().request ?? null;
   const wanted = wantedOf(params);
   const [confirmed, setConfirmed] = useState<Record<string, AccessRequest>>({});
   const changed = (answer: AccessRequest) => setConfirmed((held) => ({ ...held, [answer.id]: answer }));
@@ -69,7 +71,7 @@ export function Requests() {
   return <AccessLayout on="requests" subtitle="Ask for permission to use something, and decide what others have asked for, oldest first."
     actions={load.status === 'ok' && !ask ? <Act symbol="add" name="Ask for access" word="Ask" tone="primary" onClick={() => setAsking(true)} /> : null}>
     <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) =>
-      <Queue entries={entriesOf(data.list.requests)} data={data} choices={choices} changed={changed} wanted={wanted} ask={ask} retained={retained} setAsking={setAsking} />} />
+      <Queue entries={entriesOf(data.list.requests)} data={data} choices={choices} changed={changed} wanted={wanted} ask={ask} retained={retained} setAsking={setAsking} addressed={addressed} />} />
   </AccessLayout>;
 }
 
@@ -79,15 +81,15 @@ type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: st
 /** A request's state in words. */
 const STATE: Record<AccessRequest['state'], string> = { waiting: 'Waiting on a decision', approved: 'Approved', declined: 'Declined' };
 
-function Queue({ entries, data, choices, changed, wanted, ask, retained, setAsking }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined;
-  ask: boolean; retained: boolean; setAsking: (asking: boolean) => void }) {
+function Queue({ entries, data, choices, changed, wanted, ask, retained, setAsking, addressed }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined;
+  ask: boolean; retained: boolean; setAsking: (asking: boolean) => void; addressed: string | null }) {
   const admin = data.people.read?.scope === 'directory';
   const directory = data.people.read?.people ?? [];
   const person = choices.status === 'ok' ? choices.data.person : '';
   const mayDecide = (entry: AccessRequest) => entry.state === 'waiting' && (entry.can_decide ?? entry.approvers.some((each) => each.id === person));
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<Show>(() => entries.some(mayDecide) ? 'mine' : 'waiting');
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(addressed);
   const agents = new Map(directory.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
   const names = new Map(directory.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
   /** What a request is on, by name where it is someone, never a raw id. */
@@ -109,8 +111,9 @@ function Queue({ entries, data, choices, changed, wanted, ask, retained, setAski
   return <>
     {data.people.refused ? <p className="note">People's names are not shown here, so each request shows who asked by the name they gave. {data.people.refused}</p> : null}
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}
+    {addressed && !entries.some((entry) => entry.id === addressed) ? <p className="note" data-request-unknown>Lys shows you no request at this address: it is not one you may see, or the link is wrong. The requests you may see are below.</p> : null}
     <div className="body work">
-      <Listing<AccessRequest> groups={groups} columns={columns} id={(entry) => entry.id} href={(entry) => '#/requests?request=' + entry.id}
+      <Listing<AccessRequest> groups={groups} columns={columns} id={(entry) => entry.id} href={(entry) => '#/requests/' + entry.id}
         words={(entry) => (entry.asked_by_name ?? '') + ' ' + entry.relation + ' ' + onWhat(entry) + ' ' + entry.why} noun="requests" holds={count}
         empty={show === 'mine' ? 'Nothing is waiting on you.' : show === 'waiting' ? 'Nothing is waiting.' : 'Nothing has been decided yet.'}
         selected={open?.id ?? null} select={() => undefined} open={(entry) => { setPicked(entry.id); setAsking(false); }}

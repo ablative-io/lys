@@ -234,8 +234,31 @@ describe('An agent\'s access on an install with no app yet', () => {
     await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
     const note = $('[data-cambium-first]');
     expect(note?.textContent).toBe('Cambium is approved. Give yourself Cambium access on Access first; its channels appear here once you hold them.');
-    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue');
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue?app=cambium');
     expect(note?.textContent).not.toContain('Connect Cambium');
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  // Only the administrator gives access or connects an app, so anyone else is told who does it, never sent to a page they cannot use.
+  const notAdministrator = { ...SERVICE, '/directory/people': refused(403, 'NotAdmitted', 'only the administrator reads the whole directory') };
+  it('once Cambium is approved, tells someone who is not the administrator to ask one for Cambium access', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
+    const note = $('[data-cambium-first]');
+    expect(note?.textContent).toBe('Cambium is approved. Ask an administrator for Cambium access; its channels appear here once you hold it.');
+    expect(note?.querySelector('a')).toBeNull();
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  it('before Cambium is connected, tells someone who is not the administrator that an administrator connects it', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': ok({ apps: [] }) });
+    expect($('[data-cambium-first]')?.textContent).toBe('Cambium is not connected to Lys yet. An administrator connects it on Apps; its channels appear here once it is.');
+    expect($('[data-cambium-first] a')).toBeNull();
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  it('tells someone /apps refuses that an administrator connects Cambium, never sending them to Apps', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': refused(403, 'NotAdmitted', 'apps are not admitted') });
+    expect($('[data-cambium-first]')?.textContent).toBe('Cambium is not connected to Lys yet. An administrator connects it on Apps; its channels appear here once it is.');
     unmountAll(); document.body.innerHTML = '';
   });
 
