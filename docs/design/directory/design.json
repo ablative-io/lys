@@ -6309,6 +6309,31 @@
       "path": "crates/lys-identity-server/src/getting_started_tests.rs",
       "note": "tests of the sibling module, red first",
       "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-identity-server/src/budgets_totals.rs",
+      "note": "usage sums per holder; the summary's grouped sums",
+      "brief": "DIRECTORY-103"
+    },
+    {
+      "path": "crates/lys-identity-server/src/usage_summary_api.rs",
+      "note": "GET /usage/summary: a period's sums per person, agent, model and account, refused parts named",
+      "brief": "DIRECTORY-103"
+    },
+    {
+      "path": "crates/lys-identity-server/src/usage_summary_tests.rs",
+      "note": "tests of the sibling module, red first",
+      "brief": "DIRECTORY-103"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/Spend.tsx",
+      "note": "Home's spend; drawn from /usage/summary",
+      "brief": "DIRECTORY-103"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/canvas-widgets.ts",
+      "note": "the canvas's figures; drawn from /usage/summary",
+      "brief": "DIRECTORY-103"
     }
   ],
   "inventory": [

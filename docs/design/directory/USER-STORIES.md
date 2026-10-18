@@ -40,6 +40,8 @@
 
 **S428.** As a responsible person, I open Lys and see one list of everything waiting on me, oldest first, and when one part cannot be read I see that part's own line, so I decide what is mine without opening four pages.
 
+**S440.** As a responsible person, the cost on Home and the cost on the canvas are the same number, because both come from Lys.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.
@@ -335,6 +337,8 @@
 **S257.** As the person running a team of agents, I want to start an agent from Lys and never sign it in or paste anything, so that it can act at once and only within its grants.
 
 **S415.** As a person running a team of agents on rotating accounts, I want a session the runner hung up at its usage limit to end even when its program cannot receive the hang-up and prints nothing, so that a silent program never holds my agent, its next account or the runner forever.
+
+**S439.** As a person running a team, I read what my people and their agents spent this week as one figure per person from Lys, not added up on the page, and I am told when a part could not be read.
 
 ## Installer and operator — Provision and upgrade the internal audit connection
 

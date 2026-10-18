@@ -80,6 +80,10 @@
         {
           "id": "S428",
           "text": "As a responsible person, I open Lys and see one list of everything waiting on me, oldest first, and when one part cannot be read I see that part's own line, so I decide what is mine without opening four pages."
+        },
+        {
+          "id": "S440",
+          "text": "As a responsible person, the cost on Home and the cost on the canvas are the same number, because both come from Lys."
         }
       ]
     },
@@ -736,6 +740,10 @@
         {
           "id": "S415",
           "text": "As a person running a team of agents on rotating accounts, I want a session the runner hung up at its usage limit to end even when its program cannot receive the hang-up and prints nothing, so that a silent program never holds my agent, its next account or the runner forever."
+        },
+        {
+          "id": "S439",
+          "text": "As a person running a team, I read what my people and their agents spent this week as one figure per person from Lys, not added up on the page, and I am told when a part could not be read."
         }
       ]
     },

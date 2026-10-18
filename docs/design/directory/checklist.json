@@ -2313,6 +2313,19 @@
           "text": "\"Not this one\" on getting started is kept on the server per person (PUT /me/getting-started, read on /me), with the browser's kept value moved once and removed."
         }
       ]
+    },
+    {
+      "name": "The server sums the spend (DIRECTORY-103)",
+      "items": [
+        {
+          "id": "C768",
+          "text": "GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero."
+        },
+        {
+          "id": "C769",
+          "text": "Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts."
+        }
+      ]
     }
   ]
 }

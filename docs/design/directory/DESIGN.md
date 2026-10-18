@@ -1361,6 +1361,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/dashboard/GettingStarted.tsx` | getting started; Not this one kept on the server | DIRECTORY-101 |
 | `crates/lys-identity-server/src/getting_started_api.rs` | PUT /me/getting-started and the getting_started field on /me | DIRECTORY-101 |
 | `crates/lys-identity-server/src/getting_started_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
+| `crates/lys-identity-server/src/budgets_totals.rs` | usage sums per holder; the summary's grouped sums | DIRECTORY-103 |
+| `crates/lys-identity-server/src/usage_summary_api.rs` | GET /usage/summary: a period's sums per person, agent, model and account, refused parts named | DIRECTORY-103 |
+| `crates/lys-identity-server/src/usage_summary_tests.rs` | tests of the sibling module, red first | DIRECTORY-103 |
+| `surface/identity/src/features/dashboard/Spend.tsx` | Home's spend; drawn from /usage/summary | DIRECTORY-103 |
+| `surface/identity/src/features/runtime/canvas-widgets.ts` | the canvas's figures; drawn from /usage/summary | DIRECTORY-103 |
 
 ## Inventory
 

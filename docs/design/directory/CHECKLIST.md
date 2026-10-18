@@ -621,3 +621,8 @@
 - [ ] **C761** — /sign-in/providers answers origin, the configured redirect_url's origin, in both its answers.
 - [ ] **C762** — A person's view of an approved app carries address, the origin of its first sign-in redirect, so Open <app> is a link for everyone who sees the app.
 - [ ] **C763** — "Not this one" on getting started is kept on the server per person (PUT /me/getting-started, read on /me), with the browser's kept value moved once and removed.
+
+## The server sums the spend (DIRECTORY-103)
+
+- [ ] **C768** — GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero.
+- [ ] **C769** — Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts.

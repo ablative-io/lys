@@ -1,0 +1,78 @@
+---
+type: brief
+id: DIRECTORY-103
+cluster: directory
+title: The server sums a period's spend per person, agent, model and account, so Home and the canvas draw totals they never add up themselves
+---
+
+# DIRECTORY-103: The server sums a period's spend per person, agent, model and account, so Home and the canvas draw totals they never add up themselves
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-101
+> **Design anchor:**
+> - ADR-115 — Lys is the only sign-in a person or a product ever sees; the issuer inside it is never shown — Lys is the single sign-on for every product: every product is a client of Lys at Lys's own origin, and no product configuration names the issuer. A person meets only Lys screens: first-run setup, sign-in, provider setup and their own account are Lys pages, and the issuer's pages, admin site, name and password files are never part of any path a person follows. First run asks the person for the administrator's name, email and password; nothing is filled from the machine.
+> **Checklist:**
+> - C768 — GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero.
+> - C769 — Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts.
+> **Stories:**
+> - S439 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running a team, I read what my people and their agents spent this week as one figure per person from Lys, not added up on the page, and I am told when a part could not be read.
+> - S440 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, the cost on Home and the cost on the canvas are the same number, because both come from Lys.
+
+## Purpose
+
+The 18 October 2026 surface review's dashboard domain (builder 06, lys-review/CONSENSUS.md, Server asks) found that Home's cost-this-week figure is added up in the page from each agent's own numbers (surface/identity/src/features/dashboard/Spend.tsx weekTotal), as the canvas does again in its own way (surface/identity/src/features/runtime/canvas-widgets.ts, lines 106 to 125 at ca1228b0), so the two disagree when one agent's read is refused or one record has no price, and neither can say a per-person figure, which a small owner (rung 2 of lys-review/STAKEHOLDERS-2026-10-18.md) needs and GET /dashboard, own agents only, cannot give. The server already sums usage per holder in crates/lys-identity-server/src/budgets_totals.rs.
+
+## Task
+
+Add GET /usage/summary?period=day|week|month&by=person,agent,model,account to lys-identity-server, answering the period's spend in US dollars (micros), tokens and running time per person, per agent, per model and per account, each row the server's own sum, with a total and, for each, how many records gave no price, a refused part answered as {refusal, reason} in place of its rows, never a zero. Home's Spend and the canvas's widgets draw that answer and add nothing.
+
+## Requirements
+
+### R1: GET /usage/summary answers the period's sums per person, agent, model and account
+
+Behavioural. GET /usage/summary?period=day|week|month&by=person,agent,model,account answers, for the signed-in caller and over what the caller may read, { period, since_ms, zone, total: { dollars_micros, tokens, running_ms, unpriced_records }, by: { person | agent | model | account: [{ id, name, dollars_micros, tokens, running_ms, unpriced_records }] } }, each row summed by the server from the same records crates/lys-identity-server/src/budgets_totals.rs sums today; by lists only the groupings asked for; a grouping the caller may not read in full is answered as { refusal, reason } in place of its rows; a record with no price counts in unpriced_records and adds nothing to dollars_micros. The route is a row in openapi_table.rs. No fixed period boundary is assumed from the server's clock alone: since_ms and zone are those the caller's /me says, as /dashboard does today.
+
+**Acceptance:**
+- Red first: a test in crates/lys-identity-server/src/usage_summary_tests.rs seeds three agents of two people with priced and unpriced records across two models and reads the four groupings, the total, and unpriced_records equal to the unpriced count; a caller who may read only their own agents reads the person grouping as a refusal and their own agents' rows
+- The openapi contract test is green with the route
+
+**Files:**
+- create: crates/lys-identity-server/src/usage_summary_api.rs
+- create: crates/lys-identity-server/src/usage_summary_tests.rs
+- modify: crates/lys-identity-server/src/budgets_totals.rs
+- modify: crates/lys-identity-server/src/routes_startup.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+
+**Checklist:**
+- C768 — GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero.
+
+**Stories:**
+- S439 (Person running a team of agents, Starts, watches, talks to and stops agents from Lys) — As a person running a team, I read what my people and their agents spent this week as one figure per person from Lys, not added up on the page, and I am told when a part could not be read.
+
+### R2: Home and the canvas draw the server's sums and add nothing
+
+Behavioural. surface/identity/src/features/dashboard/Spend.tsx reads GET /usage/summary?period=week&by=person,agent and draws its total and rows as returned; weekTotal and every addition in the page go. surface/identity/src/features/runtime/canvas-widgets.ts reads the same route and draws it; its own sums (lines 106 to 125 at ca1228b0) go, and its "(n of m reporting)" becomes "from n of m agents in full", n being the agents with unpriced_records 0. A refused grouping is one line saying what could not be read, never a zero. Money through the one formatter (shell/count.ts money).
+
+**Acceptance:**
+- Spend's and the canvas's vitest cases feed one summary answer with a refused grouping and an unpriced record and show the server's figures, the refusal line, and "from 2 of 3 agents in full"; grep of Spend.tsx and canvas-widgets.ts for reduce( over dollars answers 0
+
+**Files:**
+- modify: surface/identity/src/features/dashboard/Spend.tsx
+- modify: surface/identity/src/features/runtime/canvas-widgets.ts
+
+**Checklist:**
+- C769 — Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts.
+
+**Stories:**
+- S440 (Responsible person, Relies on an agent's certificate staying ended once it is revoked) — As a responsible person, the cost on Home and the cost on the canvas are the same number, because both come from Lys.
+
+## Boundaries
+
+- SHALL NOT answer a zero for a part that could not be read: a refusal is named in place.
+- SHALL NOT sum anything in the surface.
+- SHALL NOT put a fixed wait, deadline or poll anywhere, in code or test.
+
+## Verification
+
+- Red first for every requirement; cargo nextest run only (never cargo test), clippy pedantic -D warnings, cargo fmt; vitest and tsc for the surface files; the design gate's validate.py and check-coverage.py on the cluster parsed for FAIL lines, never by exit code; file length 500 on every file touched.
+- Done means: every route and field answers as specified with the named tests green on the Mac, the surface reads each one, the openapi contract test is green, and the lane's END names any file it touched beyond the lists here so the brief is amended in one commit.
