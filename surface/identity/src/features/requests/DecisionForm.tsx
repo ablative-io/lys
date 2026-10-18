@@ -78,8 +78,13 @@ export function DecisionForm({ entry, person, canIssueRoot, changed, describe }:
     } catch (error) { setFailure(error instanceof Error ? error.message : String(error)); }
   };
   // A decision moves its request out of waiting, so a request still waiting has no recorded decision, whatever the copy said.
+  // Who may decide is worked out from the grants that stand now, so a request missing from the list says nothing either way.
   if (pending.kind === 'damaged') return <StuckRecord keys={[key]} what="your decision" byOperation={false}
-    recorded={async () => (await request<{ requests: AccessRequest[] }>('/requests')).requests.some((each) => each.id === entry.id && each.state !== 'waiting')}
+    recorded={async () => {
+      const found = (await request<{ requests: AccessRequest[] }>('/requests')).requests.find((each) => each.id === entry.id);
+      return found ? found.state !== 'waiting' : null;
+    }}
+    looked="the requests you may decide" again="decide it" look={`Ask ${entry.asked_by_name ?? 'whoever asked'} or an administrator whether this request was decided.`}
     settled={() => setPending(load(key))} />;
   return <div>
     {pending.kind === 'held' ? <div role="status"><p>This decision has no confirmed answer. Checking sends the same decision again and cannot create a second one.</p>

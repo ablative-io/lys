@@ -16,7 +16,7 @@ import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from './CambiumFirst';
 import { LevelPicker } from './LevelPicker';
-import { StuckRecord } from './StuckRecord';
+import { legibleRecipients, StuckRecord } from './StuckRecord';
 import { PendingWords, RefusedWords } from './Outcome';
 import './grants.css';
 
@@ -70,6 +70,10 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
   const working = useRef(false);
   const unreleased = useRef(false);
   const damaged = pending.kind === 'damaged' || rest.kind === 'damaged';
+  const stuckKeys = [...(pending.kind === 'damaged' ? [key] : []), ...(rest.kind === 'damaged' ? [restKey(key)] : [])];
+  // A give to someone else is not in the giver's own list of grants, so a kept copy that still names one recipient points at their file.
+  const legible = damaged ? legibleRecipients(stuckKeys).filter((id) => w.who.has(id)) : [];
+  const gaveTo = legible.length === 1 ? <a href={'#/file/' + encodeURIComponent(legible[0]) + '/access'}>{nameOf(w, legible[0])}’s file</a> : undefined;
   const locked = pending.kind !== 'empty' || outcome.at === 'sending';
   const toAgent = w.who.get(recipient)?.kind !== 'person';
   const { known, offered, carried, choices } = delegateChoices(w.model, source);
@@ -305,8 +309,11 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
           <div className="note">Lys has not confirmed this grant{outcome.at === 'pending' ? ' (' + named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, '')) + ')' : ''}. Check sends exactly the same request again, so it can never be given twice{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
         </PendingWords>
       ) : null}
-      {damaged ? <StuckRecord keys={[...(pending.kind === 'damaged' ? [key] : []), ...(rest.kind === 'damaged' ? [restKey(key)] : [])]} what="the access you gave"
+      {damaged ? <StuckRecord keys={stuckKeys} what="the access you gave"
+        // GET /grants holds every grant its caller issued (the server's grant_sight.rs), so a give missing from it was not recorded.
         recorded={async (operations) => (await api.grants()).grants.some((grant) => operations.includes(grant.operation))}
+        looked="the access you have given" again="give it" where={gaveTo}
+        look={<>Open {gaveTo ?? 'the file of the person or agent you gave it to'}, or ask an administrator to look at their access.</>}
         settled={() => { setPending(readPendingGrant(key, me, source.id)); setRest(readPendingRest(key, me, source.id)); }} /> : null}
       <div className="give-actions">
         {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
