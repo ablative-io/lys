@@ -1,5 +1,14 @@
 /* Sign-in and first-run setup share the surface's page, field and button styling. */
 .sign-in { max-width: 420px; margin: 0 auto; padding-top: 64px; }
+/* Outside the shell (sign-in, first-run setup) the body never scrolls (tokens.css) and #root has no height, so the page
+   is at most the window's height and scrolls itself; inside the shell it fills the screen as every page does. */
+.page.sign-in { max-height: 100dvh; overflow-y: auto; }
+/* A phone: iOS zooms into a field under 16 px, and a finger needs 44 px. 600 px is CONSENSUS's phone width. */
+@media (max-width: 600px) {
+  .page.sign-in { padding-top: 24px; padding-bottom: 24px; }
+  .page.sign-in input:not([type=radio]):not([type=checkbox]) { font-size: 16px; min-height: 44px; }
+  .page.sign-in .act, .page.sign-in .btn { min-height: 44px; }
+}
 .sign-in-form { display: grid; gap: 4px; }
 /* Inside the shell a page's form fills the page (screen.css); the sign-in form keeps its own height. */
 .page.sign-in > .sign-in-form { flex: none; overflow: visible; }
