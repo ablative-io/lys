@@ -633,3 +633,8 @@
 - [ ] **C765** — GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it.
 - [ ] **C766** — GET /apps/connect/manifest reads an app's manifest server-side for an administrator and answers it or one named reason; the approve page says each reason with its next act.
 - [ ] **C767** — GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name.
+
+## What waits carries what deciding needs; the dashboard decides in its rows (DIRECTORY-104)
+
+- [ ] **C770** — GET /waiting's request entries carry the request as GET /requests answers it and its agent_draft entries carry the draft as GET /drafts answers it, so one read serves the heading's number and the row's decision; product_draft and review entries carry neither.
+- [ ] **C771** — The dashboard decides in its rows from the one waiting read: Approve access and Decline request in a request's row, Approve and Decline in a draft's row, Open on an app action or a check due, a refused part on its own line, and the word Decide nowhere; the rail says Dashboard, the page has no heading of its own, the stop symbol stands alone, and the week's figure is said once with the person's own limit under it.

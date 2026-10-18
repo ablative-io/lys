@@ -6384,7 +6384,26 @@
       "path": "crates/lys-identity-server/src/apps_connect_manifest_tests.rs",
       "note": "tests of the sibling module, red first",
       "brief": "DIRECTORY-102"
-    }
+    },
+    {"path": "surface/identity/src/features/dashboard/waiting.ts", "note": "GET /waiting's lines, count and rail words; an entry carries the request or draft it decides", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/DashboardOptions.tsx", "note": "the three dashboards A, B and C to decide between on the page, dev builds only", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts", "note": "Cherie's fixture, so the page can be looked at signed out in a dev build", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard-options.css", "note": "the option strip and the three layouts", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard-options.test.tsx", "note": "tests of the option strip and the three layouts", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/drafts/DraftDecide.tsx", "note": "Approve and Decline in a waiting draft's own row, on Drafts and the dashboard alike", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/Dashboard.tsx", "note": "the front page: one read of what waits, the agents, the week's figure with the person's limit, no heading of its own", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/WaitingOnYou.tsx", "note": "Waiting on you: each line of GET /waiting with its decision in the row", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard-waiting.test.tsx", "note": "tests of Waiting on you: rows, acts, count, refused parts", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/StopEverything.tsx", "note": "the stop symbol alone and the cord line", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/dashboard.css", "note": "the dashboard's own styles", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/drafts/Drafts.tsx", "note": "the drafts page, deciding in the row", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/shell/railItems.ts", "note": "the rail's entries: Dashboard first", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/dashboard.test.tsx", "note": "tests of the front page as Tom read it on 18 October 2026", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/agent-run.test.tsx", "note": "tests of an agent's run page", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/help.test.tsx", "note": "tests of the help pages", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/shell-places.test.tsx", "note": "tests of the shell's places", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/sign-in-landing.test.tsx", "note": "tests of where sign-in lands", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/tests/signed-out-walk.test.tsx", "note": "tests of the signed-out walk", "brief": "DIRECTORY-104"}
   ],
   "inventory": [
     {

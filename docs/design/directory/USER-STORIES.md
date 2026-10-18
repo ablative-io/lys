@@ -42,6 +42,10 @@
 
 **S440.** As a responsible person, the cost on Home and the cost on the canvas are the same number, because both come from Lys.
 
+**S441.** As a responsible person, I approve or decline a request or a draft from the dashboard row it stands in, without opening another page, and the number in the heading is the number of rows I see.
+
+**S442.** As a responsible person, I open Lys and the rail says Dashboard, the page says it nowhere else, and the week's figure is said once with my own limit under it, so nothing on the front page repeats itself.
+
 ## Reviewer — Reviews a brief before any of its rows is dispatched
 
 **S2.** As the reviewer, I want each open identity row as a design-system brief with numbered requirements and criteria, so that rows can be dispatched to the loop one at a time and reviewed against their criteria.

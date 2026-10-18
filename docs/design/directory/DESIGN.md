@@ -1376,6 +1376,25 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/tests/apps-connect.test.tsx` | the approve page's tests; the manifest read through the server | DIRECTORY-102 |
 | `crates/lys-identity-server/src/apps_connect_manifest.rs` | GET /apps/connect/manifest: a manifest read server-side for an administrator, or a named reason | DIRECTORY-102 |
 | `crates/lys-identity-server/src/apps_connect_manifest_tests.rs` | tests of the sibling module, red first | DIRECTORY-102 |
+| `surface/identity/src/features/dashboard/waiting.ts` | GET /waiting's lines, count and rail words; an entry carries the request or draft it decides | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/DashboardOptions.tsx` | the three dashboards A, B and C to decide between on the page, dev builds only | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts` | Cherie's fixture, so the page can be looked at signed out in a dev build | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard-options.css` | the option strip and the three layouts | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard-options.test.tsx` | tests of the option strip and the three layouts | DIRECTORY-104 |
+| `surface/identity/src/features/drafts/DraftDecide.tsx` | Approve and Decline in a waiting draft's own row, on Drafts and the dashboard alike | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/Dashboard.tsx` | the front page: one read of what waits, the agents, the week's figure with the person's limit, no heading of its own | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/WaitingOnYou.tsx` | Waiting on you: each line of GET /waiting with its decision in the row | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard-waiting.test.tsx` | tests of Waiting on you: rows, acts, count, refused parts | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/StopEverything.tsx` | the stop symbol alone and the cord line | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/dashboard.css` | the dashboard's own styles | DIRECTORY-104 |
+| `surface/identity/src/features/drafts/Drafts.tsx` | the drafts page, deciding in the row | DIRECTORY-104 |
+| `surface/identity/src/shell/railItems.ts` | the rail's entries: Dashboard first | DIRECTORY-104 |
+| `surface/identity/tests/dashboard.test.tsx` | tests of the front page as Tom read it on 18 October 2026 | DIRECTORY-104 |
+| `surface/identity/tests/agent-run.test.tsx` | tests of an agent's run page | DIRECTORY-104 |
+| `surface/identity/tests/help.test.tsx` | tests of the help pages | DIRECTORY-104 |
+| `surface/identity/tests/shell-places.test.tsx` | tests of the shell's places | DIRECTORY-104 |
+| `surface/identity/tests/sign-in-landing.test.tsx` | tests of where sign-in lands | DIRECTORY-104 |
+| `surface/identity/tests/signed-out-walk.test.tsx` | tests of the signed-out walk | DIRECTORY-104 |
 
 ## Inventory
 

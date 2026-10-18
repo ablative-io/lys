@@ -2326,11 +2326,13 @@
       "items": [
         {
           "id": "C768",
-          "text": "GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero."
+          "text": "GET /usage/summary answers a period's dollars, tokens, running time and unpriced count per person, agent, model and account, summed by the server, with a refused grouping named in place and never a zero.",
+          "done": false
         },
         {
           "id": "C769",
-          "text": "Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts."
+          "text": "Home's spend and the canvas's widgets draw the server's summary and add nothing; a refused grouping is one line; n of m agents in full is said from unpriced counts.",
+          "done": false
         }
       ]
     },
@@ -2339,19 +2341,38 @@
       "items": [
         {
           "id": "C764",
-          "text": "Connecting an approved app again leaves its running credentials live until the exchange hands over the new ones; the revocation happens in the exchange with its reason, and the approve page says so."
+          "text": "Connecting an approved app again leaves its running credentials live until the exchange hands over the new ones; the revocation happens in the exchange with its reason, and the approve page says so.",
+          "done": false
         },
         {
           "id": "C765",
-          "text": "GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it."
+          "text": "GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it.",
+          "done": false
         },
         {
           "id": "C766",
-          "text": "GET /apps/connect/manifest reads an app's manifest server-side for an administrator and answers it or one named reason; the approve page says each reason with its next act."
+          "text": "GET /apps/connect/manifest reads an app's manifest server-side for an administrator and answers it or one named reason; the approve page says each reason with its next act.",
+          "done": false
         },
         {
           "id": "C767",
-          "text": "GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name."
+          "text": "GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "What waits carries what deciding needs; the dashboard decides in its rows (DIRECTORY-104)",
+      "items": [
+        {
+          "id": "C770",
+          "text": "GET /waiting's request entries carry the request as GET /requests answers it and its agent_draft entries carry the draft as GET /drafts answers it, so one read serves the heading's number and the row's decision; product_draft and review entries carry neither.",
+          "done": false
+        },
+        {
+          "id": "C771",
+          "text": "The dashboard decides in its rows from the one waiting read: Approve access and Decline request in a request's row, Approve and Decline in a draft's row, Open on an app action or a check due, a refused part on its own line, and the word Decide nowhere; the rail says Dashboard, the page has no heading of its own, the stop symbol stands alone, and the week's figure is said once with the person's own limit under it.",
+          "done": false
         }
       ]
     }
