@@ -5,7 +5,7 @@ import type { Load } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
 import { SignIn as SignInForm } from '../sign-in/SignIn';
 import { ErrorWords } from '../people/Words';
-import { takeFileReturn } from './fileReturn';
+import { keepAcrossSignIn, takeFileReturn } from './fileReturn';
 
 /** What a page shows while its read is pending: a sentence saying what is being read, never a page title spliced into one. */
 export function Loading({ words = 'Opening Lys…' }: { words?: string } = {}) {
@@ -88,7 +88,8 @@ export function Callback() {
     let live = true;
     exchange.current ??= api.callback(location.search);
     exchange.current.then(
-      () => {
+      async () => {
+        await keepAcrossSignIn();
         if (live) {
           try { location.replace('/' + (takeFileReturn() ?? '#/')); }
           catch (error) { setRefused(new Refused(0, { refusal: 'FileReturnUnreadable', reason: String(error) })); }

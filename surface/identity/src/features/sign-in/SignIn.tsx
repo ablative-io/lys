@@ -13,7 +13,7 @@ import './sign-in.css';
 import { Act } from '../../shell/Act';
 import { AccountHelpWords, administratorWords, useAdministratorContact } from '../signin/AccountHelp';
 import { LysMark } from '../../shell/LysMark';
-import { forgetLanding, rememberFileReturn, rememberLanding } from '../signin/fileReturn';
+import { forgetLanding, keepAcrossSignIn, rememberFileReturn, rememberLanding } from '../signin/fileReturn';
 
 /** Where every sign-in begun on the sign-in page lands: Home. One begun on a page lands back on it (signin/Gate.tsx, signin/fileReturn.tsx). */
 export const SIGNED_IN = '/#/';
@@ -167,7 +167,8 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
     setProviderDismissed(true);
     try {
       await request<SignedIn>('/sign-in', { email, password });
-      const next = continuation();
+      // What someone else left open on this screen is never filled in for this person (fileReturn.tsx).
+      const next = (await keepAcrossSignIn()) ? continuation() : null;
       if (next) location.assign(next);
       else signedIn();
     } catch (failure) {

@@ -122,7 +122,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
 function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
   return (
     <div className="page fill you-page">
-      <PageHeader title={data.me.person.display_name} subtitle="Your account, signed-in sessions and the access you hold." actions={<SignOut />} />
+      <PageHeader title={data.me.person.display_name} subtitle="Your account, signed-in sessions and the access you hold." actions={<SignOut person={data.me.person.id} />} />
       <Account data={data} reload={reload} />
     </div>
   );
@@ -131,7 +131,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
 function Registered({ me }: { me: MeView }) {
   return (
     <div className="page fill">
-      <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." actions={<SignOut />} />
+      <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." actions={<SignOut person={me.person.id} />} />
       <div className="pane">
         <OwnAccount />
         <section className="card" aria-label="Your signed-in sessions">
