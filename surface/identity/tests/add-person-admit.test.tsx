@@ -6,6 +6,7 @@ import { App } from '../src/App';
 import { ADA, BEA, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { choose, serve, type } from './harness';
+import { invitation } from '../src/features/people/AddPerson';
 
 /** Adding a person is one act (POST /people/admit): their name, their email and their first grant, answered by one receipt naming each step's log leaf. */
 let root: Root | null = null;
@@ -82,6 +83,21 @@ describe('Add a person in one act', () => {
     expect(text).toContain('issuer account');
     expect(document.querySelector('a[href="#/file/' + BEA + '"]')).not.toBeNull();
     expect(sessionStorage.getItem('lys.add-person.' + ADA)).toBeNull();
+  });
+
+  it('tells a person invited where Lys offers Google to choose Sign in with Google, using their email, and names the password way otherwise', async () => {
+    const google = { 'POST /people/admit': (body: unknown) => ok(admitted(body)), '/sign-in/providers': ok({ providers: [{ id: 'google', name: 'Google' }] }) };
+    const { entry } = await form(google);
+    await fill(entry);
+    await submit(entry);
+    await act(async () => { await Promise.resolve(); });
+    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They open ' + location.origin + ' and choose Sign in with Google, using helper@example.test.');
+    expect(invitation('Care Helper', 'helper@example.test', location.origin, 'Google')).toBe('Hello Care Helper, you have been added to Lys. Open ' + location.origin + ' and choose Sign in with Google, using helper@example.test.');
+    act(() => root?.unmount()); root = null; document.body.innerHTML = ''; sessionStorage.clear();
+    const { entry: plain } = await form({ 'POST /people/admit': (body) => ok(admitted(body)), '/sign-in/providers': ok({ providers: [] }) });
+    await fill(plain);
+    await submit(plain);
+    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They sign in at ' + location.origin + ' with helper@example.test.');
   });
 
   it('refuses an answer whose receipt is not for this operation, keeping the request', async () => {

@@ -103,23 +103,32 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
  * someone is open at that address. */
 const signInAddress = (): string => location.origin;
 
-/** The invitation, as the person adding them would send it. */
-export const invitation = (name: string, email: string, address: string): string =>
-  'Hello ' + name + ', you have been added to Lys. Sign in at ' + address + ' with ' + email + '.';
+/** The invitation, as the person adding them would send it. When Lys offers Google, it tells them to choose it, with the email it knows them by. */
+export const invitation = (name: string, email: string, address: string, google: string | null = null): string => google
+  ? 'Hello ' + name + ', you have been added to Lys. Open ' + address + ' and choose Sign in with ' + google + ', using ' + email + '.'
+  : 'Hello ' + name + ', you have been added to Lys. Sign in at ' + address + ' with ' + email + '.';
+
+/** Google's name as Lys offers it at sign-in (`/sign-in/providers`), or null when it is not offered or the list cannot be read: the invitation then names the email and password way. */
+const readGoogle = (): Promise<string | null> => request<{ providers?: { id: string; name: string }[] }>('/sign-in/providers').then(
+  (answer) => answer.providers?.find((entry) => /google/i.test(entry.id + ' ' + entry.name))?.name ?? null, () => null);
 
 function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; email: string }) {
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
   const address = signInAddress();
+  const providers = useLoad(readGoogle, 'add-person-google');
+  const google = providers.status === 'ok' ? providers.data : null;
   const [copy, setCopy] = useState<'idle' | 'copied' | 'refused'>('idle');
   const copyInvite = async () => {
-    try { await navigator.clipboard.writeText(invitation(name, email, address)); setCopy('copied'); }
+    try { await navigator.clipboard.writeText(invitation(name, email, address, google)); setCopy('copied'); }
     catch { setCopy('refused'); }
   };
   return <section aria-label="Receipt" className="note">
-    <p role="status">{name} is added. They sign in at <a href={address}>{address}</a> with {email}.</p>
+    <p role="status">{google
+      ? <>{name} is added. They open <a href={address}>{address}</a> and choose Sign in with {google}, using {email}.</>
+      : <>{name} is added. They sign in at <a href={address}>{address}</a> with {email}.</>}</p>
     <p><Act symbol="copy" name={'Copy the invitation for ' + name} word="Copy invite" tone="primary" onClick={() => { void copyInvite(); }} />
       {copy === 'copied' ? <span role="status"> Copied. Send it to {name}.</span> : null}</p>
-    {copy === 'refused' ? <p role="alert" className="why-not">This browser would not copy. Send {name} this instead: {invitation(name, email, address)}</p> : null}
+    {copy === 'refused' ? <p role="alert" className="why-not">This browser would not copy. Send {name} this instead: {invitation(name, email, address, google)}</p> : null}
     {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
     <p><a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a></p>
     <details><summary>What Lys recorded</summary><ul>
