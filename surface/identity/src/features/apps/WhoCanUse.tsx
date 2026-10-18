@@ -16,8 +16,20 @@ export function holdersOf(app: string, grants: Grant[]): string[] {
   return [...new Set(held)];
 }
 
+/** The grants answer checked whole, so an answer of another shape is said as unreadable rather than taking the page down. */
+async function readGrants(): Promise<Grant[]> {
+  const answer: unknown = await api.grants();
+  const grants = (answer as { grants?: unknown } | null)?.grants;
+  const valid = Array.isArray(grants) && grants.every((grant) => {
+    const held = grant as Partial<Grant> | null;
+    return !!held && typeof held.holder === 'string' && typeof held.resource?.kind === 'string' && typeof held.standing?.stands === 'boolean';
+  });
+  if (!valid) throw new Error('Lys answered, but not with a list of grants, so who holds access could not be read.');
+  return grants as Grant[];
+}
+
 export function WhoCanUse({ app, name }: { app: string; name: string }) {
-  const load = useLoad(() => Promise.all([api.grants(), api.people()]), 'who-can-use:' + app);
+  const load = useLoad(() => Promise.all([readGrants(), api.people()]), 'who-can-use:' + app);
   const give = (primary: boolean) => <a className={'btn' + (primary ? ' primary' : '')} href={'#/access/issue?app=' + encodeURIComponent(app)}>Give people access</a>;
   if (load.status === 'loading') return <section className="app-users" aria-label={'Who can use ' + app}><b>Who can use {name}</b><p className="dim">Reading who holds {name} access…</p></section>;
   if (load.status === 'refused') return <section className="app-users" aria-label={'Who can use ' + app}>
@@ -26,7 +38,7 @@ export function WhoCanUse({ app, name }: { app: string; name: string }) {
     <ErrorWords problem={load.refused} />
     <div className="app-actions">{give(true)}</div>
   </section>;
-  const [{ grants }, people] = load.data;
+  const [grants, people] = load.data;
   const holders = holdersOf(app, grants);
   const whole = isRootAuthority(people);
   return <section className="app-users" aria-label={'Who can use ' + app}>

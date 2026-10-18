@@ -54,6 +54,14 @@ it('keeps Give people access when the grants cannot be read, and says the list i
   expect(give()).not.toBeNull();
 });
 
+it('says an answer that is not a list of grants as unreadable, and keeps the page and Give people access', async () => {
+  await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [cambium] }), '/grants': () => ok({ something: 'else' }) });
+  await settle();
+  expect(section()?.textContent).toContain('Lys could not read who holds Cambium access');
+  expect(document.querySelector('[aria-label="Connect an app"]')).not.toBeNull();
+  expect(give()).not.toBeNull();
+});
+
 it('says the next step in the approval notice', async () => {
   const pending = { ...cambium, state: 'pending' };
   const approved = { app: cambium, credentials: null };
