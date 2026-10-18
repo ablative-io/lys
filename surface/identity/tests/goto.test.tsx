@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, press } from './harness';
+import { $, $$, click, mount, press, type } from './harness';
 
 // Every screen is one palette entry and one g letter away. The letters and where each goes are written out here
 // rather than read from the shell's own tables. The rail is CONSENSUS.md's (18 October 2026): what waits on you is its
@@ -12,6 +12,15 @@ const LETTERS: Record<string, [string, string]> = {
   h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], d: ['#/dashboard', 'dashboard'],
 };
 const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me'];
+
+/** Every page Search names, written out here rather than read from the palette's own table. */
+const PAGE_NAMES: [string, string][] = [
+  ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
+  ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
+  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Roles', '#/roles'],
+  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings'],
+  ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
+];
 
 const current = () => $('#rail a.on')?.dataset.nav;
 
@@ -27,23 +36,30 @@ function goToRows(): { row: HTMLElement; hash: string }[] {
 }
 
 describe('go-to keys and palette (conformance 9.1)', () => {
-  it('palette Go to reaches every screen, each row arriving at its own address with a rail item lit', async () => {
+  it('palette, with nothing typed, offers what can be done, then the rail\'s pages in the rail\'s order', async () => {
     await mount('#/people');
     await press('k', { metaKey: true }, document.body);
-    const count = goToRows().length;
-    expect(count).toBe(18);
-    await press('Escape');
+    expect(goToRows().map(({ hash }) => hash)).toEqual(['#/dashboard', '#/requests', '#/people', '#/canvas', '#/access', '#/network', '#/apps', '#/secrets', '#/settings', '#/me']);
+    expect($$('#palList .grp').map((group) => group.textContent)).toEqual(['Do', 'Go to']);
+  });
+
+  it('palette Go to reaches every screen by its name, each row arriving at its own address with a rail item lit', async () => {
+    await mount('#/people');
     const reached = new Set<string>();
     const lit = new Set<string>();
-    for (let n = 0; n < count; n += 1) {
+    for (const [name, hash] of PAGE_NAMES) {
       await press('k', { metaKey: true }, document.body);
-      const entry = goToRows()[n];
+      await type($('#palIn'), name);
+      const entry = goToRows().find(({ row }) => row.firstElementChild?.textContent === name);
+      expect(entry, name).toBeDefined();
+      if (!entry) continue;
+      expect(entry.hash, name).toBe(hash);
       await click(entry.row);
       expect($('#palette')?.classList.contains('open')).toBe(false);
-      expect(location.hash, entry.hash).toBe(entry.hash);
+      expect(location.hash, name).toBe(hash);
       reached.add(location.hash);
       const nav = current();
-      expect(nav, entry.hash).toBeDefined();
+      expect(nav, hash).toBeDefined();
       if (nav) lit.add(nav);
     }
     expect(reached.size).toBe(18);

@@ -4,7 +4,7 @@
  * count of one is said in the singular, and an empty list says so once.
  */
 import { describe, expect, it } from 'vitest';
-import { $, $$, click, mount, press, text, unmountAll } from './harness';
+import { $, $$, click, mount, press, text, type, unmountAll } from './harness';
 import { MODEL, SERVICE, ok } from './fixtures';
 import { counted, singular } from '../src/shell/count';
 import type { ReactNode } from 'react';
@@ -42,8 +42,11 @@ describe('the rail and the palette', () => {
   it('shows a key, never an address, beside each place in the palette, and words its acts plainly', async () => {
     await mount('#/people', ROUTES);
     await press('k', { metaKey: true }, document.body);
+    expect($$('#palList .it[data-to]').map((row) => row.firstElementChild?.textContent)).toEqual(expect.arrayContaining(['Computers', 'Running agents', 'Waiting on you']));
+    await type($('#palIn'), 'Access map');
+    expect($$('#palList .it[data-to]').map((row) => row.firstElementChild?.textContent)).toEqual(['Access map']);
+    await type($('#palIn'), '');
     const rows = $$('#palList .it[data-to]');
-    expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual(expect.arrayContaining(['Computers', 'Access map', 'Running agents', 'Waiting on you']));
     expect(rows.map((row) => row.firstElementChild?.textContent)).not.toEqual(expect.arrayContaining(['Network']));
     for (const row of rows) expect(row.textContent).not.toContain('#/');
     expect(rows.find((row) => row.dataset.to === '#/people')?.lastElementChild?.textContent).toBe('g p');

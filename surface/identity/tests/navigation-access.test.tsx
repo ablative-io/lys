@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, press, settle, text, unmountAll } from './harness';
+import { $, $$, mount, press, settle, text, type, unmountAll } from './harness';
 import { ME, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
@@ -17,6 +17,14 @@ const DENIALS: [string, string[], string[]][] = [
   ['/secrets', ['secrets'], ['/secrets']], ['/network', ['network'], ['/network']], ['/configuration', ['settings', 'apps'], ['/settings', '/apps']],
 ];
 
+/** Search's name for each address a denial can hide: Search offers a page off the rail only once something is typed. */
+const NAMES: Record<string, string> = { '/canvas': 'Running agents', '/roles': 'Roles', '/access': 'Access', '/graph': 'Access map', '/secrets': 'Secrets', '/network': 'Computers', '/settings': 'Settings', '/apps': 'Apps' };
+const searchFor = async (name: string) => {
+  await press('k', { metaKey: true }, document.body);
+  await type($('#palIn'), name);
+};
+const offered = (address: string) => $('#palList [data-to="#' + address + '"]') !== null;
+
 const shut = (nav: string) => $('#rail a[data-nav="' + nav + '"]')?.dataset.shut;
 
 describe('navigation follows the answering API', () => {
@@ -30,14 +38,24 @@ describe('navigation follows the answering API', () => {
       expect($('#rail a[data-nav="' + nav + '"]')?.title).toContain('not open to you: this read is not admitted.');
       expect($('#rail a[data-nav="' + nav + '"]')?.title).not.toContain('NotAdmitted');
     }
-    await press('k', { metaKey: true }, document.body);
-    expect($$('#palList [data-to]').length).toBeGreaterThan(0);
-    for (const address of rows) expect($('#palList [data-to="#' + address + '"]'), address).toBeNull();
-    await press('Escape', {}, document.body);
+    for (const address of rows) {
+      await searchFor(NAMES[address]);
+      expect(offered(address), address).toBe(false);
+      await press('Escape', {}, document.body);
+    }
     if (rows.includes('/roles')) {
       await press('g', {}, document.body);
       await press('o', {}, document.body);
       expect(location.hash).toBe('#/me');
+    }
+  });
+
+  it('offers each of those pages in Search by name when nothing is refused, so their absence above is the refusal', async () => {
+    await mount('#/me', ANSWERS);
+    for (const [address, name] of Object.entries(NAMES)) {
+      await searchFor(name);
+      expect(offered(address), address).toBe(true);
+      await press('Escape', {}, document.body);
     }
   });
 
@@ -58,8 +76,8 @@ describe('navigation follows the answering API', () => {
     expect($$('#rail a[data-shut]').map((entry) => entry.dataset.nav)).toEqual(['secrets']);
     expect(shut('secrets')).toBe('unchecked');
     expect($('#rail a[data-nav="secrets"]')?.title).toBe('Secrets (g v): could not be checked: the secrets store could not be read. Open it to try again.');
-    await press('k', { metaKey: true }, document.body);
-    expect($('#palList [data-to="#/secrets"]')).not.toBeNull();
+    await searchFor('Secrets');
+    expect(offered('/secrets')).toBe(true);
   });
 
   it('decides Waiting on you by the requests read alone', async () => {
@@ -107,8 +125,8 @@ describe('navigation follows the answering API', () => {
   it('reads a formerly allowed entry again before mounting its controls', async () => {
     let admitted = true;
     await mount('#/me', { ...ANSWERS, '/roles': () => admitted ? ok({ roles: [] }) : refused(403, 'NotAdmitted', 'role access was removed') });
-    await press('k', { metaKey: true }, document.body);
-    expect($('#palList [data-to="#/roles"]')).not.toBeNull();
+    await searchFor('Roles');
+    expect(offered('/roles')).toBe(true);
     await press('Escape', {}, document.body);
     admitted = false;
     await press('g', {}, document.body);

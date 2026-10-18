@@ -7,6 +7,7 @@ import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
 import { useShell } from './ShellContext';
 import { GO } from './keys';
+import { RAIL } from './railItems';
 import { useNavigationAccess } from './NavigationAccess';
 
 interface Item {
@@ -27,10 +28,13 @@ const keyFor = (hash: string): string => {
 
 export const PAGES: [string, string][] = [
   ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
-  ['Access: grants', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
+  ['Access', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
   ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Roles', '#/roles'],
   ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings'], ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
 ];
+
+/** The rail's own pages, read from the rail itself: what Search offers before anything is typed. Home's address is #/, which Search names #/dashboard. */
+const ON_RAIL = new Set(RAIL.flatMap((item) => item.t === 'a' && item.href ? [item.href === '#/' ? '#/dashboard' : item.href] : []));
 
 export function Palette() {
   const shell = useShell();
@@ -65,20 +69,27 @@ export function Palette() {
   }, [open]);
 
   const go = (hash: string) => navigate(hash.slice(1));
-  const source: Item[] = [
+  const q = query.toLowerCase();
+  const typed = q.trim() !== '';
+  // Nothing typed: what can be done (the rows only Search has), then the rail's pages in its order, the same rows in the same place every time.
+  // Typed: every page and view, then people, running agents and the reach question, so a long directory never pushes the pages down.
+  const pages: Item[] = PAGES.filter(([, h]) => mayOpen(h.slice(1)) && (typed || ON_RAIL.has(h))).map(([t, h]) => ({ g: 'Go to', t, d: keyFor(h), to: h, go: () => go(h) }));
+  const acts: Item[] = [
+    ...([['Add a person', '#/people/new'], ['Add an agent', '#/agents/new']] as const)
+      .filter(([, h]) => mayOpen(h.slice(1))).map(([t, h]) => ({ g: 'Do', t, d: '', to: h, go: () => go(h) })),
+    { g: 'Do', t: 'Move Help to the other side', d: '\\', go: shell.toggleDockSide },
+    { g: 'Do', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
+  ];
+  const found: Item[] = typed ? [
+    ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...running.flatMap((session) => {
       const agent = ids.find((x) => x.id === session.agent);
       const to = '#/canvas/' + encodeURIComponent(session.agent ?? '');
       return agent ? [{ g: 'Running now', t: agent.display_name + ': terminal', d: 'on ' + (session.machine_name ?? session.machine), to, go: () => go(to) }] : [];
     }),
-    ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),
     ...ids.map((x) => ({ g: 'Ask', t: `What can ${x.display_name} reach?`, d: '', go: () => go('#/access/reach/' + x.id) })),
-    { g: 'Acts', t: 'Add an agent', d: '', go: () => go('#/agents/new') },
-    { g: 'Acts', t: 'Move Help to the other side', d: '\\', go: shell.toggleDockSide },
-    { g: 'Acts', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
-    ...PAGES.filter(([, h]) => mayOpen(h.slice(1))).map(([t, h]) => ({ g: 'Go to', t, d: keyFor(h), to: h, go: () => go(h) })),
-  ];
-  const q = query.toLowerCase();
+  ] : [];
+  const source: Item[] = [...acts, ...pages, ...found];
   const items = source.filter((i) => (i.t + ' ' + i.d + ' ' + i.g).toLowerCase().includes(q));
   const at = Math.min(sel, Math.max(0, items.length - 1));
 

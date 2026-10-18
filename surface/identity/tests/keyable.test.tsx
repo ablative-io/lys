@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it } from 'vitest';
 import { keyable } from '../src/shell/keyable';
-import { ADA, BEA, SCRIBE } from './fixtures';
+import { BEA, SCRIBE } from './fixtures';
 import { $, $$, click, mount, press, settle } from './harness';
 
 // Conformance 9.3: whatever acts on a click answers Enter and Space by one click
@@ -92,13 +92,13 @@ describe('keyable (conformance 9.3)', () => {
     expect(paletteRows().length).toBeGreaterThanOrEqual(2);
     await press('ArrowDown', {}, input);
     expect(paletteRows()[1].classList.contains('sel')).toBe(true);
-    expect(paletteRows()[1].textContent).toContain('Bea (test person)');
+    expect(paletteRows()[1].textContent).toContain('Add an agent');
     await tab();
     const first = paletteRows()[0];
     expect(document.activeElement).toBe(first);
-    expect(first.textContent).toContain('Ada (test person)');
+    expect(first.textContent).toContain('Add a person');
     await press('Enter', {}, first);
-    expect(location.hash).toBe('#/file/' + ADA);
+    expect(location.hash).toBe('#/people/new');
     expect($('#palette')?.classList.contains('open')).toBe(false);
   });
 
@@ -110,8 +110,9 @@ describe('keyable (conformance 9.3)', () => {
     const second = paletteRows()[1];
     expect(document.activeElement).toBe(second);
     expect(second.classList.contains('sel')).toBe(false);
+    expect(second.textContent).toContain('Add an agent');
     await press(' ', {}, second);
-    expect(location.hash).toBe('#/file/' + BEA);
+    expect(location.hash).toBe('#/agents/new');
     expect($('#palette')?.classList.contains('open')).toBe(false);
   });
 
@@ -121,9 +122,9 @@ describe('keyable (conformance 9.3)', () => {
     await press('ArrowDown', {}, input);
     await press('ArrowDown', {}, input);
     expect(paletteRows()[2].classList.contains('sel')).toBe(true);
-    expect(paletteRows()[2].textContent).toContain('Scribe');
+    expect(paletteRows()[2].textContent).toContain('Move Help to the other side');
     await press('Enter', {}, input);
-    expect(location.hash).toBe('#/file/' + SCRIBE);
+    expect($('#shell')?.classList.contains('dock-right')).toBe(true);
     expect($('#palette')?.classList.contains('open')).toBe(false);
   });
 

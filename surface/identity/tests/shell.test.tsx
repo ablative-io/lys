@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { RAIL } from '../src/shell/railItems';
-import { $, $$, click, mount, press, unreachable } from './harness';
+import { $, $$, click, mount, press, type, unreachable } from './harness';
 
 describe('shell (conformance 9.1)', () => {
   it('draws the rail item for item, each screen a deep link', async () => {
@@ -65,8 +65,15 @@ describe('shell (conformance 9.1)', () => {
     await mount('#/people');
     await press('k', { ctrlKey: true }, document.body);
     const input = $('#palIn') as HTMLInputElement;
-    expect($$('#palList .it').some((i) => i.textContent?.includes("Scribe"))).toBe(true);
-    expect($$('#palList .it').find((i) => i.textContent?.startsWith("Scribe"))?.textContent).toContain('agent · active');
+    // Nothing typed: what can be done, then the pages in the rail's order; no person yet, however long the directory.
+    expect($('#palList .it.sel')?.dataset.to).toBe('#/people/new');
+    expect($$('#palList .grp').map((g) => g.textContent)).toEqual(['Do', 'Go to']);
+    expect($$('#palList .it').some((i) => i.textContent?.includes('Scribe'))).toBe(false);
+    await type(input, 'Scribe');
+    expect($$('#palList .it').find((i) => i.textContent?.startsWith('Scribe'))?.textContent).toContain('agent · active');
+    await type(input, 'test person');
+    expect($$('#palList .grp').map((g) => g.textContent)).toEqual(['People and agents', 'Ask']);
+    expect($('#palList .it.sel')?.textContent).toContain('Ada (test person)');
     await press('ArrowDown', {}, input);
     expect($('#palList .it.sel')?.textContent).toContain('Bea (test person)');
     await press('ArrowUp', {}, input);
