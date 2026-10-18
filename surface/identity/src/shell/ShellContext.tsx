@@ -6,7 +6,7 @@ import type { HelpUrlState } from './help/url';
 
 export type DockMode = 'help' | null;
 
-export type KindFilter = 'all' | 'person' | 'agent' | 'teams' | 'accounts' | 'found';
+export type KindFilter = 'all' | 'person' | 'agent' | 'teams';
 
 export interface Shell {
   labels: boolean;

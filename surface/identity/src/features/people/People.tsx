@@ -1,9 +1,8 @@
-import { ServiceAccountsList } from '../service-accounts/ServiceAccounts';
 import { readTogether } from '../../reads';
 import { RuntimeCounts } from '../runtime/RuntimeCounts';
 import { Teams } from '../teams/Teams';
 import { useEffect, useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
@@ -27,7 +26,7 @@ import './people.css';
 /** The views of People and agents, each with its own address. */
 const VIEWS: [KindFilter, string, string][] = [
   ['all', 'All', '/people'], ['person', 'People', '/people/view/people'], ['agent', 'Agents', '/people/view/agents'],
-  ['teams', 'Teams', '/people/view/teams'], ['accounts', 'Service accounts', '/people/view/accounts'],
+  ['teams', 'Teams', '/people/view/teams'],
 ];
 
 /** The page's head. Add person is offered only to the administrator, who alone may add one; `admin` is passed when the page already knows. */
@@ -152,15 +151,18 @@ export function People() {
   const shell = useShell();
   // The address says which view is shown; the view is kept in the shell so the keys and the list agree with it.
   const { view } = useParams();
+  const location = useLocation();
   const addressed = VIEWS.find(([, , path]) => path === '/people/view/' + view)?.[0];
   useEffect(() => { shell.setFilterKind(addressed ?? 'all'); }, [view]);
   // Sessions no agent claims are about what is running, so they are listed with the running agents, not with people.
   if (view === 'found') return <Navigate to="/canvas?view=sessions" replace />;
-  if (addressed === 'teams' || addressed === 'accounts') {
+  // Service accounts are a page of Settings; an old link to them here keeps working and keeps what it asked.
+  if (view === 'accounts') return <Navigate to={{ pathname: '/settings/service-accounts', search: location.search }} replace />;
+  if (addressed === 'teams') {
     return (
       <div className="page fill">
         <PeopleHead />
-        {addressed === 'accounts' ? <ServiceAccountsList /> : <Teams />}
+        <Teams />
       </div>
     );
   }

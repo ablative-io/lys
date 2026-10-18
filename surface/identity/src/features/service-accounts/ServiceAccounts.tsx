@@ -12,7 +12,7 @@ import type { Column } from '../../shell/Listing';
 import { Picker } from '../../shell/Picker';
 import { Act } from '../../shell/Act';
 interface AccountsView { scope: 'personal' | 'directory'; service_accounts: ServiceAccount[] }
-/** The service-account records, as a view of People and agents. */
+/** The service-account records, as a page of Settings. */
 export function ServiceAccountsList() {
   const load = useLoad(() => readTogether({ me: api.me(), accounts: request<AccountsView>('/service-accounts') }), 'service-accounts');
   return <>
@@ -52,7 +52,7 @@ function AccountList({ initial, me }: { initial: AccountsView; me: MeView }) {
     {chosen ? <Retire key={chosen.id} account={chosen} person={me.person.id} changed={(answer) => { changed(answer); setRetiring(null); setNotice(answer.name + ' is retired in Lys. Its provider account and credentials are unchanged.'); }} cancel={() => setRetiring(null)} /> : null}
     {!adding && !accounts.service_accounts.length ? <p>No service accounts are registered yet.</p> : null}
     <div className="body one">
-      <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/people/view/accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
+      <Listing<ServiceAccount> groups={group} columns={columns} id={(account) => account.id} href={(account) => '#/settings/service-accounts?account=' + account.id} words={(account) => account.name + ' ' + account.description}
         noun="accounts" holds={(items) => items.length + ' accounts'} selected={null} select={() => undefined} />
     </div>
   </>;
