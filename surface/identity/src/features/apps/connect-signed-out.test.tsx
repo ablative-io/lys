@@ -10,6 +10,7 @@ const MANIFEST = ORIGIN + '/identity/lys/manifest';
 const BACK = ORIGIN + '/identity/lys/connected';
 const HASH = '#/apps/connect?manifest=' + encodeURIComponent(MANIFEST) + '&return=' + encodeURIComponent(BACK) + '&state=s1';
 const manifest = { id: 'cambium', name: 'Cambium', redirects: [ORIGIN + '/identity/oidc/callback'], profile: true, schema: { kinds: {} } };
+const READ = '/apps/connect/manifest?address=' + encodeURIComponent(MANIFEST);
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.getAttribute('aria-label') === label) ?? null;
 const signIn = () => [...document.querySelectorAll('a')].find((entry) => entry.textContent === 'Sign in again') ?? null;
 
@@ -17,7 +18,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 async function approveAnswering(answer: ReturnType<typeof refused>) {
   const assign = vi.fn();
-  const { posted } = await mount(HASH, { ...SERVICE, [MANIFEST]: () => ok(manifest), '/apps': () => ok({ apps: [] }), 'POST /apps/connect': () => answer });
+  const { posted } = await mount(HASH, { ...SERVICE, [READ]: () => ok({ manifest, origin: ORIGIN }), '/apps': () => ok({ apps: [] }), 'POST /apps/connect': () => answer });
   vi.stubGlobal('location', { ...window.location, assign, origin: window.location.origin });
   await settle();
   await click(button('Approve Cambium'));

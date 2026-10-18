@@ -1,28 +1,29 @@
-// Domain 04 item 6: a known app (Cambium) is given its credentials by connecting, so its card offers no hand-issued
-// secret, only the way back to Connect again; any other app's issued secret is shown beside its client id, the pair an
-// OpenID Connect client is configured with. The app's identity is the service's answer, never one the page assumed.
+// Domain 04 item 6 and DIRECTORY-102 R4: an app that connected (Lys answers its connect_origin) is given its credentials by
+// connecting, so its card offers no hand-issued secret, only the way back to Connect again; any other app's issued secret is
+// shown beside its client id, the pair an OpenID Connect client is configured with. Which is which is the service's answer.
 import { expect, it } from 'vitest';
 import { click, mount, settle } from '../../../tests/harness';
 import { SERVICE, ok } from '../../../tests/fixtures';
 
 const admin = { kind: 'operator', login: { provider: 'https://issuer.test', subject: 'administrator' } };
 const live = { credential_id: '0a1b2c3d4e5f6a7b', issued_by: admin, issued_at: 1_700_000_000, revoked_by: null, revoked_at: null, revoked_reason: null, ended_by_retirement: false, live: true, ended_at_broker: false };
-const app = (id: string, name: string, client_credentials: unknown[]) => ({ id, name, state: 'approved', redirects: [], sign_in: null, schema: { kinds: {} }, version: 1, versions: [1], pending: null,
-  client_id: id + '-client', service_account: null, client_credentials, registered_by: { kind: 'start' }, registered_at: 1 });
+const app = (id: string, name: string, client_credentials: unknown[], connect_origin: string | null = null) => ({ id, name, state: 'approved', redirects: [], sign_in: null, schema: { kinds: {} }, version: 1, versions: [1], pending: null,
+  client_id: id + '-client', service_account: null, client_credentials, registered_by: { kind: 'start' }, registered_at: 1, connect_origin });
+const CONNECTED = 'https://cambium.example.test';
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.getAttribute('aria-label') === label) ?? null;
 const section = (id: string) => document.querySelector('[aria-label="Client credentials of ' + id + '"]');
 
-it('offers Cambium no hand-issued secret, says connecting gives it its credentials, and its credentials can still be taken back', async () => {
-  await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [app('cambium', 'Cambium', [live])] }) });
+it('offers a connected Cambium no hand-issued secret, says connecting gives it its credentials, and its credentials can still be taken back', async () => {
+  await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [app('cambium', 'Cambium', [live], CONNECTED)] }) });
   await settle();
   expect(button('Issue a client credential for Cambium')).toBeNull();
   expect(section('cambium')?.textContent).toContain('Cambium is given its credentials by connecting');
-  expect(section('cambium')?.textContent).toContain('use Connect again under Connect an app');
+  expect(section('cambium')?.textContent).toContain('use Connect again on this card');
   expect(button('Take back credential ' + live.credential_id)).not.toBeNull();
 });
 
 it('says connecting gives Cambium a credential when Lys lists none, never that one must be issued', async () => {
-  await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [app('cambium', 'Cambium', [])] }) });
+  await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [app('cambium', 'Cambium', [], CONNECTED)] }) });
   await settle();
   expect(section('cambium')?.textContent).toContain('Lys lists no credential for Cambium yet: connecting gives it one.');
   expect(section('cambium')?.textContent).not.toContain('cannot sign anyone in yet');

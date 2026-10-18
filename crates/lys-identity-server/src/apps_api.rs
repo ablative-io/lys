@@ -61,6 +61,10 @@ const LYS_OPERATION: &str = "lys-model";
 #[path = "apps_api_tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "apps_api_read_tests.rs"]
+mod read_tests;
+
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RegisterBody {

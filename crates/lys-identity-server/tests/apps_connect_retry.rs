@@ -1,5 +1,6 @@
 #![cfg(test)]
-//! Retries preserve app credentials and a failed replacement preserves the old one.
+//! Retries preserve app credentials, and a replacement that fails before
+//! its exchange hands the new values over preserves the old one.
 
 use std::error::Error;
 use std::sync::Arc;
@@ -136,7 +137,7 @@ async fn connect_initializes_checkpoints_for_an_existing_app_install() -> TestRe
         .as_str()
         .ok_or("old credential reference absent")?;
     assert!(!service.dir.path().join("app-connections").exists());
-    ok(post(
+    let connected = ok(post(
         &service,
         "/apps/connect",
         Auth::Cookie(&admin),
@@ -144,10 +145,35 @@ async fn connect_initializes_checkpoints_for_an_existing_app_install() -> TestRe
     )
     .await?)?;
     let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert!(
+        live(&app)?.iter().any(|id| id == old),
+        "the connect ended the running credential before its exchange"
+    );
+    exchange(&service, &connected).await?;
+    let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
     let current = live(&app)?;
     assert_eq!(current.len(), 1);
     assert_ne!(current[0], old);
     Ok(())
+}
+
+/// The app's server collecting the code `connected` sends it back with.
+async fn exchange(service: &Service, connected: &Value) -> TestResult<(u16, Value)> {
+    let redirect = connected["redirect"]
+        .as_str()
+        .ok_or("connection redirect absent")?;
+    let code = reqwest::Url::parse(redirect)?
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, code)| code.into_owned())
+        .ok_or("connection code absent")?;
+    post(
+        service,
+        "/apps/connect/exchange",
+        Auth::Nobody,
+        &json!({"code":code}),
+    )
+    .await
 }
 
 #[derive(Clone)]
@@ -193,7 +219,7 @@ async fn proxy(State(state): State<Proxy>, request: Request) -> Response {
 }
 
 #[tokio::test]
-async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live() -> TestResult {
+async fn exchange_failure_before_the_hand_over_keeps_the_old_credential_live() -> TestResult {
     let custody = identity_contract::app_custody::serve().await?;
     let state = Proxy {
         upstream: custody.base,
@@ -227,55 +253,64 @@ async fn connect_failure_between_issue_and_revoke_keeps_the_old_credential_live(
     )
     .await?;
     let admin = service.sign_in(login(ADMINISTRATOR)).await?;
-    ok(post(
+    let first = ok(post(
         &service,
         "/apps/connect",
         Auth::Cookie(&admin),
         &body(&op()?),
     )
     .await?)?;
+    ok(exchange(&service, &first).await?)?;
     let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
     let before = live(&app)?;
-    state.client_issued.store(false, Ordering::SeqCst);
-    state.fail_bearer.store(true, Ordering::SeqCst);
     let replacement = body(&op()?);
-    let failed = post(
-        &service,
-        "/apps/connect",
-        Auth::Cookie(&admin),
-        &replacement,
-    )
-    .await?;
-    let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
-    assert_ne!(failed.0, 200, "the injected failure was not reported");
-    assert!(
-        state.client_issued.load(Ordering::SeqCst),
-        "failure did not follow a durable client issue"
-    );
-    assert!(
-        live(&app)?.contains(&before[0]),
-        "replacement failure revoked the previous credential"
-    );
-    let partial = live(&app)?;
-    assert_eq!(partial.len(), 2);
-    let replacement_id = partial
-        .iter()
-        .find(|id| !before.contains(id))
-        .ok_or("replacement reference absent")?;
-    state.client_issued.store(false, Ordering::SeqCst);
-    ok(post(
+    let connected = ok(post(
         &service,
         "/apps/connect",
         Auth::Cookie(&admin),
         &replacement,
     )
     .await?)?;
+    assert!(
+        state.client_issued.load(Ordering::SeqCst),
+        "the connect did not issue its client credential"
+    );
+    // The bearer is issued when the app's server collects its values, so
+    // the injected failure lands in the exchange, after the client issue.
+    state.client_issued.store(false, Ordering::SeqCst);
+    state.fail_bearer.store(true, Ordering::SeqCst);
+    let failed = exchange(&service, &connected).await?;
+    let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
+    assert_ne!(failed.0, 200, "the injected failure was not reported");
+    assert!(
+        live(&app)?.contains(&before[0]),
+        "a failed exchange revoked the previous credential"
+    );
+    let partial = live(&app)?;
+    assert_eq!(partial.len(), 2);
+    let replacement_id = partial
+        .iter()
+        .find(|id| !before.contains(id))
+        .ok_or("replacement reference absent")?
+        .clone();
+    let again = ok(post(
+        &service,
+        "/apps/connect",
+        Auth::Cookie(&admin),
+        &replacement,
+    )
+    .await?)?;
+    assert!(
+        again == connected,
+        "the retried connect answered another outcome"
+    );
+    ok(exchange(&service, &connected).await?)?;
     let app = ok(get(&service, &format!("/apps/{NOTES}"), Auth::Cookie(&admin)).await?)?;
     worker.abort();
     assert_eq!(live(&app)?, [replacement_id.as_str()]);
     assert!(
         !state.client_issued.load(Ordering::SeqCst),
-        "retry issued another client credential"
+        "a retry issued another client credential"
     );
     Ok(())
 }

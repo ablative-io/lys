@@ -1,7 +1,8 @@
 #![cfg(test)]
 //! Connect an app in one act: the administrator's approval of a manifest
 //! registers, approves and issues, and the app's server exchanges the
-//! one-time code for exactly its credentials.
+//! one-time code for exactly its credentials, the running app's own staying
+//! live until then.
 
 use identity_contract::apps::{
     Auth, NOTES, TestResult, get, login, ok, op, post, refused, seeded, workspace_schema,
@@ -86,8 +87,9 @@ async fn apps_connect_registers_approves_and_issues_in_one_act() -> TestResult {
     )?;
     assert_eq!(app["sign_in"]["redirects"], manifest()["redirects"]);
     assert_eq!(app["sign_in"]["profile"], true);
-    // Connecting again re-issues: the old client credential and bearer end,
-    // and the sign-in settings follow the manifest as it is now.
+    // Connecting again re-issues: the sign-in settings follow the manifest as
+    // it is now, and the old client credential and bearer end only when the
+    // app's server collects the new ones (DIRECTORY-102 R1).
     let mut moved = manifest();
     moved["redirects"] = json!([
         format!("{ORIGIN}/identity/oidc/callback"),
@@ -95,7 +97,21 @@ async fn apps_connect_registers_approves_and_issues_in_one_act() -> TestResult {
     ]);
     moved["profile"] = json!(false);
     let again = json!({"operation": op()?, "manifest": moved, "return": back, "state": "s456"});
-    ok(post(&service, "/apps/connect", Auth::Cookie(&admin), &again).await?)?;
+    let reconnected = ok(post(&service, "/apps/connect", Auth::Cookie(&admin), &again).await?)?;
+    ok(get(&service, "/apps/me", Auth::Bearer(bearer)).await?)?;
+    let redirect = reconnected["redirect"].as_str().ok_or("no redirect")?;
+    let code = reqwest::Url::parse(redirect)?
+        .query_pairs()
+        .find(|(key, _)| key == "code")
+        .map(|(_, code)| code.into_owned())
+        .ok_or("no code")?;
+    ok(post(
+        &service,
+        "/apps/connect/exchange",
+        Auth::Nobody,
+        &json!({"code": code}),
+    )
+    .await?)?;
     refused(
         &get(&service, "/apps/me", Auth::Bearer(bearer)).await?,
         401,

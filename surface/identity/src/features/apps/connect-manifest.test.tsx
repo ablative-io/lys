@@ -1,46 +1,50 @@
-// Domain 04 item 4: a manifest the page could not read is said as the two causes it could be, with the manifest offered to
-// open as the test between them; an https Lys reading a plain http Cambium is said by name before any read is tried.
+// DIRECTORY-102 R3: the approve page reads the app's manifest through Lys's own server (GET /apps/connect/manifest), so no
+// browser rule stands between them, and each reason Lys names is said as its own line with the next act: not answering,
+// answered with a status, not a manifest. The page never reads the app itself and never says it cannot tell which.
 import { afterEach, expect, it, vi } from 'vitest';
 import { mount, settle } from '../../../tests/harness';
-import { SERVICE, ok } from '../../../tests/fixtures';
+import { SERVICE, ok, refused } from '../../../tests/fixtures';
 
-const hash = (manifest: string) => '#/apps/connect?manifest=' + encodeURIComponent(manifest) + '&return=' + encodeURIComponent(new URL(manifest).origin + '/back') + '&state=s1';
+const ORIGIN = 'https://notes.example.test';
+const MANIFEST = ORIGIN + '/identity/lys/manifest';
+const HASH = '#/apps/connect?manifest=' + encodeURIComponent(MANIFEST) + '&return=' + encodeURIComponent(ORIGIN + '/back') + '&state=s1';
+const READ = '/apps/connect/manifest?address=' + encodeURIComponent(MANIFEST);
 const alert = () => document.querySelector('[role="alert"]')?.textContent ?? '';
-const openManifest = () => [...document.querySelectorAll('a')].find((entry) => entry.textContent === 'Open Cambium’s manifest') ?? null;
+const refusedWith = (status: number, refusal: string, reason: string, more: Record<string, unknown>) => ({ ...refused(status, refusal, reason), body: { refusal, reason, ...more } });
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
-it('says a rejected read as either not answering or not letting this Lys read it, and offers the manifest to open', async () => {
-  const manifest = 'https://cambium.example.test/identity/lys/manifest';
-  await mount(hash(manifest), { ...SERVICE, '/apps': () => ok({ apps: [] }), [manifest]: () => { throw new TypeError('Failed to fetch'); } });
+async function opened(answer: ReturnType<typeof ok>) {
+  const direct = vi.fn(() => ok({}));
+  await mount(HASH, { ...SERVICE, '/apps': () => ok({ apps: [] }), [READ]: () => answer, [MANIFEST]: direct });
   await settle();
-  expect(alert()).toBe('Lys could not read Cambium’s manifest at https://cambium.example.test from this page, so it cannot tell whether Cambium is not answering there or does not let this Lys read it.');
-  const which = document.querySelector('[aria-label="Find out which"]')?.textContent ?? '';
-  expect(which).toContain('does not let Lys at ' + window.location.origin + ' read it');
-  expect(which).toContain('Cambium is not answering at that address');
-  expect(alert()).not.toContain('Check that Cambium is running and the address is right');
-  expect(openManifest()?.getAttribute('href')).toBe(manifest);
-  expect(openManifest()?.getAttribute('target')).toBe('_blank');
-});
+  expect(direct).not.toHaveBeenCalled();
+}
 
-it('says an https Lys cannot read a plain http Cambium before trying, and offers no manifest to open', async () => {
-  const manifest = 'http://cambium.example.test/identity/lys/manifest';
-  const read = vi.fn(() => ok({}));
-  vi.stubGlobal('location', { ...window.location, protocol: 'https:', origin: 'https://lys.example.test' });
-  await mount(hash(manifest), { ...SERVICE, '/apps': () => ok({ apps: [] }), [manifest]: read });
-  await settle();
-  expect(alert()).toContain('Lys is open over https, and Cambium at http://cambium.example.test is served over plain http');
-  expect(read).not.toHaveBeenCalled();
-  expect(openManifest()).toBeNull();
-  expect(document.querySelector('[aria-label="Find out which"]')).toBeNull();
-});
-
-it('reads a plain http Cambium on this computer from an https Lys, which browsers allow', async () => {
-  const manifest = 'http://localhost:4000/identity/lys/manifest';
-  const read = vi.fn(() => ok({ id: 'cambium', name: 'Cambium', redirects: [], profile: false, schema: { kinds: {} } }));
-  vi.stubGlobal('location', { ...window.location, protocol: 'https:', origin: 'https://lys.example.test' });
-  await mount(hash(manifest), { ...SERVICE, '/apps': () => ok({ apps: [] }), [manifest]: read });
-  await settle();
-  expect(read).toHaveBeenCalledTimes(1);
+it('shows the manifest Lys read, under the app’s own name', async () => {
+  await opened(ok({ manifest: { id: 'notes', name: 'Notes', redirects: [], profile: false, schema: { kinds: {} } }, origin: ORIGIN }));
+  expect(document.querySelector('[aria-label="Connect an app"] h3')?.textContent).toBe('Notes');
   expect(alert()).toBe('');
+});
+
+it('says an app that is not answering as itself, with the connection’s words and the next act', async () => {
+  await opened(refusedWith(502, 'manifest_not_answering', 'Lys could not reach ' + ORIGIN + ': Connection refused', { error: 'Connection refused' }));
+  expect(alert()).toBe('Lys could not reach the app at ' + ORIGIN + ': Connection refused. Check that the app is running and answers at that address, then start again from the app.');
+});
+
+it('says an app that answered with an error by its status, with the next act', async () => {
+  await opened(refusedWith(502, 'manifest_answered_status', 'the app answered 503', { status: 503 }));
+  expect(alert()).toBe('The app at ' + ORIGIN + ' answered 503 for its manifest, so Lys could not read it. Check that the address is the app’s and that the app is running fully, then start again from the app.');
+});
+
+it('says an answer that is not a manifest by what was found, with the next act', async () => {
+  await opened(refusedWith(502, 'manifest_not_a_manifest', 'the app answered a page', { found: 'a text/html answer of 52 bytes' }));
+  expect(alert()).toBe('The app at ' + ORIGIN + ' answered with a text/html answer of 52 bytes, not a manifest Lys reads. Check that the address is the app’s own, then start again from the app.');
+});
+
+it('never says the two-cause sentence or offers the manifest to open', async () => {
+  await opened(refusedWith(502, 'manifest_not_answering', 'Lys could not reach ' + ORIGIN, { error: 'Connection refused' }));
+  expect(document.body.textContent).not.toContain('cannot tell');
+  expect([...document.querySelectorAll('a')].some((link) => link.getAttribute('href') === MANIFEST)).toBe(false);
+  expect(document.querySelector('[aria-label="Find out which"]')).toBeNull();
 });

@@ -70,9 +70,9 @@ describe('Configuration', () => {
 describe('Apps', () => {
   const by = { kind: 'start' };
   const base = { redirects: ['https://notes.example.test/back'], sign_in: null, schema: { kinds: {} }, version: 1, versions: [1], pending: null, client_id: null, service_account: null, client_credentials: [], registered_by: by, registered_at: 1 };
-  it('says a known app’s state in words, not its code', async () => {
+  it('says an app’s state in words, not its code', async () => {
     await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [{ ...base, id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
-    const card = $('[aria-label="Known app cambium"] .app-state');
+    const card = $('[aria-label="App cambium"] .app-state');
     expect(card?.textContent).toBe('Approved');
   });
   it('asks before retiring an app, with a reason and a Cancel that sends nothing', async () => {

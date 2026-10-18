@@ -442,3 +442,11 @@ async fn exchange(
 #[cfg(test)]
 #[path = "apps_connect_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "apps_connect_reconnect_tests.rs"]
+mod reconnect_tests;
+
+#[cfg(test)]
+#[path = "apps_connect_manifest_tests.rs"]
+mod manifest_tests;
