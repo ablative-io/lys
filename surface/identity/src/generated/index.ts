@@ -2,6 +2,9 @@
 // mirrors the Rust that writes it, named beside it: the screens' views are
 // crates/lys-identity-server/src/read_api.rs. Change them together.
 
+import type { Draft } from '../features/drafts/contract';
+import type { AccessRequest } from '../features/requests/contract';
+
 /** `IdentityId` text form: `person-` or `agent-` and 32 lowercase hex digits. */
 export type IdentityId = string;
 
@@ -287,4 +290,20 @@ export interface LaunchStateView {
   words: string;
   session: string | null;
   withdrawal: { by: string; at: number } | null;
+}
+
+/** `waiting_api.rs` `WaitingEntry`: one thing GET /waiting says waits on the signed-in person's decision. */
+export interface WaitingEntryView {
+  kind: 'request' | 'agent_draft' | 'product_draft' | 'review';
+  id: string;
+  asked_by: { id: string; name: string | null };
+  /** What it is, in one sentence, as the service words it. */
+  about: string;
+  /** RFC 3339. */
+  asked_at: string;
+  can_decide: boolean;
+  /** A request entry's request, exactly as GET /requests answers it; absent on every other kind and from an older service. */
+  request?: AccessRequest;
+  /** An agent_draft entry's draft, exactly as GET /drafts answers it; absent on every other kind and from an older service. */
+  draft?: Draft;
 }

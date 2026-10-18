@@ -424,6 +424,8 @@ fn entries_are_ordered_oldest_first_after_the_refused_parts() {
             about: String::new(),
             asked_at: String::new(),
             can_decide: true,
+            request: None,
+            draft: None,
         },
     };
     let refused = crate::waiting_api::WaitingRefused {

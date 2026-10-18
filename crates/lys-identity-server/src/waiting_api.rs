@@ -12,7 +12,11 @@
 //! - `review`: the grants `GET /reviews` answers due whose reviewer is the caller.
 //!
 //! Every entry is one the caller may decide; what they may only watch is not
-//! listed. Entries are oldest first by when they were asked, equal instants in
+//! listed. A `request` entry carries the request exactly as `GET /requests`
+//! answers it and an `agent_draft` entry the draft exactly as `GET /drafts`
+//! answers it, the very views those lists built the entry from, so one read
+//! serves both the count and a decision in the row; a `product_draft` or
+//! `review` entry carries neither, as each is decided on its own page. Entries are oldest first by when they were asked, equal instants in
 //! kind and then id order. A grant records no issue time of its own, so a
 //! review was asked when the grant was last kept, else when its window opened.
 //!
@@ -72,6 +76,12 @@ pub struct WaitingEntry {
     pub asked_at: String,
     /// Whether the caller may decide it: always true, as nothing else is listed.
     pub can_decide: bool,
+    /// A `request` entry's request, exactly as `GET /requests` answers it; absent on every other kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub request: Option<Box<crate::requests_views::RequestView>>,
+    /// An `agent_draft` entry's draft, exactly as `GET /drafts` answers it; absent on every other kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draft: Option<Box<crate::drafts_list::DraftView>>,
 }
 
 /// A part the caller may not read, in place of its entries.
@@ -182,6 +192,8 @@ fn dated(
             about,
             asked_at: rfc3339(at)?,
             can_decide: true,
+            request: None,
+            draft: None,
         },
     })
 }
@@ -217,16 +229,18 @@ fn requests(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, ServerE
                 &request.relation,
                 &resource_words(&request.resource.kind, &request.resource.id),
             );
-            dated(
+            let mut dated = dated(
                 "request",
-                request.id,
+                request.id.clone(),
                 Asker {
-                    id: request.asked_by,
-                    name: request.asked_by_name,
+                    id: request.asked_by.clone(),
+                    name: request.asked_by_name.clone(),
                 },
                 about,
                 request.asked_at,
-            )
+            )?;
+            dated.entry.request = Some(Box::new(request));
+            Ok(dated)
         })
         .collect()
 }
@@ -237,14 +251,14 @@ fn agent_drafts(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, Ser
     list.drafts
         .into_iter()
         .map(|draft| {
-            let asked_by = match draft.agent {
+            let asked_by = match &draft.agent {
                 Some(agent) => Asker {
-                    id: agent.id,
-                    name: agent.display_name,
+                    id: agent.id.clone(),
+                    name: agent.display_name.clone(),
                 },
                 None => Asker {
-                    id: draft.responsible.id,
-                    name: Some(draft.responsible.display_name),
+                    id: draft.responsible.id.clone(),
+                    name: Some(draft.responsible.display_name.clone()),
                 },
             };
             let who = asked_by
@@ -259,7 +273,15 @@ fn agent_drafts(state: &AppState, headers: &HeaderMap) -> Result<Vec<Dated>, Ser
                     draft.note.trim()
                 )
             };
-            dated("agent_draft", draft.id, asked_by, about, draft.created_at)
+            let mut dated = dated(
+                "agent_draft",
+                draft.id.clone(),
+                asked_by,
+                about,
+                draft.created_at,
+            )?;
+            dated.entry.draft = Some(Box::new(draft));
+            Ok(dated)
         })
         .collect()
 }

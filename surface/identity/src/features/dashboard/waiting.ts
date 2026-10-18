@@ -5,21 +5,17 @@
  * you both read this one answer, so they can never disagree.
  */
 import { request } from '../../api';
+import type { WaitingEntryView } from '../../generated';
 import { counted } from '../../shell/count';
 
-export type WaitingKind = 'request' | 'agent_draft' | 'product_draft' | 'review';
+export type WaitingKind = WaitingEntryView['kind'];
 
-/** One thing the person may decide. */
-export interface WaitingEntry {
-  kind: WaitingKind;
-  id: string;
-  asked_by: { id: string; name: string | null };
-  /** What it is, in one sentence, as the service words it. */
-  about: string;
-  /** RFC 3339. */
-  asked_at: string;
-  can_decide: boolean;
-}
+/**
+ * One thing the person may decide. A request entry carries the request as `GET /requests` answers it and an agent draft
+ * the draft as `GET /drafts` answers it, so the row decides it from this one read; an app action and a check due carry
+ * neither and are opened on their own pages.
+ */
+export type WaitingEntry = WaitingEntryView;
 
 /** A part the service could not read for the person, by its refusal. */
 export interface WaitingPartRefused { kind: WaitingKind; refusal: string; reason: string }
