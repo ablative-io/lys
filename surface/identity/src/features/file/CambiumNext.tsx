@@ -15,10 +15,13 @@ interface CambiumRead { state: string; address: string | null }
 
 const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/** The web address an app's first sign-in return address belongs to, or null when none is served or it is not a web address. */
+/**
+ * The app's web address: `address`, which every person's view of an approved app carries, else the origin of its first
+ * sign-in return address as the administrator's view serves it; null when none is served or it is not a web address.
+ */
 function addressOf(app: Record<string, unknown>): string | null {
   const signIn = app.sign_in && typeof app.sign_in === 'object' ? app.sign_in as Record<string, unknown> : null;
-  const first = [...strings(signIn?.redirects), ...strings(app.redirects)][0];
+  const first = [...strings([app.address]), ...strings(signIn?.redirects), ...strings(app.redirects)][0];
   if (!first) return null;
   try {
     const url = new URL(first);

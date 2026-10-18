@@ -41,14 +41,14 @@ use lys_identity::grants::{AppSchema, LYS_APP, app_id};
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::apps_binding::{Acting, Binding, Registrar, acting, new_secret};
+use crate::apps_binding::{Acting, Binding, acting};
 use crate::apps_error::AppError;
 use crate::apps_read::{AppRead, AppsRead, read_view, sees};
 use crate::apps_state::{
     Approved, By, Client, Decided, Line, LysRecorded, Registered, SignInSet, Standing,
 };
 use crate::apps_store::AppStore;
-use crate::apps_views::{AppView, Approval, RegistrarIssued};
+use crate::apps_views::{AppView, Approval};
 use crate::config::Config;
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
@@ -58,116 +58,8 @@ use crate::session::now;
 const LYS_OPERATION: &str = "lys-model";
 
 #[cfg(test)]
-mod tests {
-    use std::error::Error;
-    use std::sync::Arc;
-
-    use identity_contract::fake_issuer::Login;
-    use identity_contract::harness::{ADMINISTRATOR, Service};
-    use lys_core::Ed25519Identity;
-    use serde_json::json;
-
-    use crate::apps_binding::sha256_hex;
-    use crate::apps_state::{Approved, By, Client, Decided, Line, Registered, SignInSet};
-    use crate::apps_store::AppStore;
-    use identity_contract::lys_identity_server::Config;
-    use identity_contract::lys_identity_server::dev_seed::seed_configured;
-
-    type Outcome = Result<(), Box<dyn Error>>;
-
-    fn login(subject: &str) -> Login {
-        Login {
-            subject: subject.to_owned(),
-            email: "scope@example.test".to_owned(),
-        }
-    }
-
-    fn fixture(config: &Config) -> Result<(), Box<dyn Error>> {
-        seed_configured(config, [ADMINISTRATOR, "member"])?;
-        let mut apps = AppStore::open(
-            &config.apps_dir(),
-            Arc::new(Ed25519Identity::load(&config.event_key_file)?),
-        )?;
-        for id in ["ready", "no_settings", "retired", "pending"] {
-            apps.keep(Line::Registered(Registered {
-                operation: format!("register-{id}"),
-                app: id.to_owned(),
-                name: id.to_owned(),
-                redirects: vec!["https://app.example.test/callback".to_owned()],
-                // The smallest schema Lys reads back: one kind, one action, one relation.
-                schema: json!({"kinds": {format!("{id}.doc"): {
-                    "actions": ["read"], "relations": {"reader": ["read"]}, "parents": []}}}),
-                service_account: None,
-                by: By::Start,
-                at: 1,
-            }))?;
-            if id == "pending" {
-                continue;
-            }
-            apps.keep(Line::Approved(Approved {
-                operation: format!("approve-{id}"),
-                app: id.to_owned(),
-                client: Client {
-                    client_id: id.to_owned(),
-                    secret_sha256: sha256_hex("fixture-client-secret"),
-                },
-                binding: None,
-                by: By::Start,
-                at: 2,
-            }))?;
-            if id != "no_settings" {
-                apps.keep(Line::SignInSet(SignInSet {
-                    operation: format!("sign-in-{id}"),
-                    app: id.to_owned(),
-                    redirects: vec!["https://app.example.test/callback".to_owned()],
-                    profile: false,
-                    by: By::Start,
-                    at: 2,
-                }))?;
-            }
-            if id == "retired" {
-                apps.keep(Line::Retired(Decided {
-                    operation: "retire".to_owned(),
-                    app: id.to_owned(),
-                    reason: "withdrawn".to_owned(),
-                    by: By::Start,
-                    at: 3,
-                }))?;
-            }
-        }
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn personal_apps_only_name_sign_in_ready_apps_without_registry_details() -> Outcome {
-        let (service, ()) = Service::start_with(fixture).await?;
-        let member = service.sign_in(login("member")).await?;
-        let administrator = service.sign_in(login(ADMINISTRATOR)).await?;
-        let (status, personal) = service.get("/apps", Some(&member)).await?;
-        assert_eq!(status, 200, "{personal}");
-        assert_eq!(
-            personal,
-            json!({"apps": [{"id": "ready", "name": "ready", "state": "approved"}]})
-        );
-        let (status, one) = service.get("/apps/ready", Some(&member)).await?;
-        assert_eq!(status, 200, "{one}");
-        assert_eq!(one, personal["apps"][0]);
-        for id in ["no_settings", "retired", "pending"] {
-            let (status, hidden) = service.get(&format!("/apps/{id}"), Some(&member)).await?;
-            assert_eq!(status, 404, "{hidden}");
-            assert_eq!(hidden["refusal"], "app_unknown");
-        }
-        let (status, all) = service.get("/apps", Some(&administrator)).await?;
-        assert_eq!(status, 200, "{all}");
-        let apps = all["apps"].as_array().ok_or("apps missing")?;
-        assert_eq!(apps.len(), 5);
-        assert!(
-            apps.iter()
-                .all(|app| app.get("schema").is_some() && app.get("redirects").is_some())
-        );
-        Ok(())
-    }
-}
+#[path = "apps_api_tests.rs"]
+mod tests;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -202,13 +94,6 @@ pub(crate) struct AppApprovalBody {
     redirects: Vec<String>,
     /// Whether the app is given the person's name (the profile scope).
     profile: bool,
-}
-
-#[derive(Deserialize, utoipa::ToSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct RegistrarBody {
-    operation: String,
-    service_account: String,
 }
 
 /// The app routes.
@@ -363,6 +248,11 @@ fn service_account_held(state: &AppState, id: &str) -> Result<(), ServerError> {
 #[path = "apps_register.rs"]
 mod register_handler;
 pub(crate) use register_handler::register;
+
+#[path = "apps_registrar.rs"]
+mod registrar_handler;
+pub(crate) use registrar_handler::RegistrarBody;
+use registrar_handler::registrar;
 
 pub(crate) fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
     apps.app(id)
@@ -588,44 +478,4 @@ async fn retire(
     let answer = decided(&state, &headers, &id, &body, Line::Retired)?;
     crate::apps_client_credentials::ended_after(&state, &headers, &id).await;
     Ok(Json(answer))
-}
-
-/// Make a service account a registrar, answering its credential once.
-async fn registrar(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    body: Result<Json<RegistrarBody>, JsonRejection>,
-) -> Result<Json<RegistrarIssued>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let operation = OperationId::from_str(&body.operation)?.to_string();
-    with_apps(&state, |apps, projection| {
-        let by = administrator(&state, apps, &headers, projection)?;
-        if let Some(Line::Registrar(made)) = apps.held().operation(&operation) {
-            if made.service_account != body.service_account {
-                return Err(AppError::AppOperationReused { operation }.into());
-            }
-            return Ok(RegistrarIssued {
-                service_account: made.service_account,
-                credential: None,
-            });
-        }
-        service_account_held(&state, &body.service_account)?;
-        let (secret, digest) = new_secret()?;
-        apps.keep(Line::Registrar(Registrar {
-            operation,
-            service_account: body.service_account.clone(),
-            secret_sha256: digest,
-            by,
-            at: now(),
-        }))?;
-        Ok(RegistrarIssued {
-            credential: Some(format!(
-                "{}.{}.{secret}",
-                crate::apps_binding::REGISTRAR_CREDENTIAL,
-                body.service_account
-            )),
-            service_account: body.service_account,
-        })
-    })
-    .map(Json)
 }

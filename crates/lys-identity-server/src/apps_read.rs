@@ -1,6 +1,7 @@
 //! What a caller is shown of the apps it may see: the administrator, an app
 //! and a registrar read the registry's view, and a person reads only an
-//! approved app's id, name and standing.
+//! approved app's id, name, standing and address: the origin of its first
+//! sign-in redirect, where Open <app> takes them.
 
 use serde::Serialize;
 
@@ -42,6 +43,10 @@ pub(crate) enum AppRead {
         id: String,
         name: String,
         state: Standing,
+        /// The origin of the app's first sign-in redirect; absent when that
+        /// address has no web origin.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        address: Option<String>,
     },
     Registry(Box<AppView>),
 }
@@ -57,8 +62,21 @@ pub(crate) fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {
             id: app.registered.app.clone(),
             name: app.registered.name.clone(),
             state: app.standing(),
+            address: address(app),
         }
     } else {
         AppRead::Registry(Box::new(AppView::from(app)))
     }
 }
+
+/// The origin of `app`'s first sign-in redirect, when it is an http or https
+/// address.
+fn address(app: &crate::apps_state::App) -> Option<String> {
+    let first = app.sign_in.as_ref()?.redirects.first()?;
+    let parsed = reqwest::Url::parse(first).ok()?;
+    matches!(parsed.scheme(), "http" | "https").then(|| parsed.origin().ascii_serialization())
+}
+
+#[cfg(test)]
+#[path = "apps_read_tests.rs"]
+mod tests;

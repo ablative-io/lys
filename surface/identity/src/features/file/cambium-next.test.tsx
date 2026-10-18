@@ -24,7 +24,12 @@ it('gives the administrator Cambium’s own address and the agent’s Access tab
   expect(seen.links).toEqual([['Open Cambium', 'https://cambium.example'], ['Give Scribe the Cambium channels it may use', '#/file/' + SCRIBE + '/access']]);
 });
 
-it('names Cambium without a link for a person, whose view of the app carries no address', async () => {
+it('gives a person who is not the administrator Open Cambium as a link, from the address their view of the app carries', async () => {
+  const seen = await shown(ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved', address: 'https://cambium.example' }] }), false);
+  expect(seen.links).toEqual([['Open Cambium', 'https://cambium.example'], ['Give Scribe the Cambium channels it may use', '#/file/' + SCRIBE + '/access']]);
+});
+
+it('names Cambium without a link for a person whose view of the app carries no address, as an older Lys answers', async () => {
   const seen = await shown(ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }), false);
   expect(seen.text).toContain('Open Cambium, go to a channel and press Invite.');
   expect(seen.links).toEqual([['Give Scribe the Cambium channels it may use', '#/file/' + SCRIBE + '/access']]);
