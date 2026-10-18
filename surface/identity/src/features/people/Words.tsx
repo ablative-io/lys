@@ -203,10 +203,11 @@ export function problemWords(problem: unknown): string {
   return reason.trim() ? reason : UNEXPLAINED;
 }
 
-export function ErrorWords({ problem }: { problem: unknown }) {
+/** A problem in words, with the service's own words under Error details. `words` replaces the sentence when the screen says it itself. */
+export function ErrorWords({ problem, words }: { problem: unknown; words?: string }) {
   const { detail } = problemParts(problem);
   return <div className="why-not" role="alert" title={detail}>
-    <p>{problemWords(problem)}</p>
+    <p>{words ?? problemWords(problem)}</p>
     <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{detail}</p></details>
   </div>;
 }

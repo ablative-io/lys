@@ -60,3 +60,32 @@ describe('A retained give to a person', () => {
     expect(parsePendingGrant({ ...body, recipient: CY, responsible: DEE }, DIRECTORY.people[0].id, ROOT_G)).toBeNull();
   });
 });
+
+describe('Give from a person’s own file', () => {
+  const file = async (recipients: ('person' | 'agent')[], who = CY) => {
+    const m = await mount('#/file/' + who + '/access', routes(recipients));
+    await settle();
+    return m;
+  };
+
+  it('offers Give on another person’s file and opens the give with the grants that pass on to people', async () => {
+    await file(['person']);
+    await click($('[data-act="grant"]'));
+    const options = $$('select[aria-label="Grant to give"] option').filter((o) => (o as HTMLOptionElement).value).map((o) => (o as HTMLOptionElement).value);
+    expect(options).toEqual([ROOT_G]);
+    await choose($('select[aria-label="Grant to give"]'), ROOT_G);
+    expect($('#dTo') as HTMLSelectElement | null).not.toBeNull();
+  });
+
+  it('says what to do when nothing the giver holds may be passed on to people', async () => {
+    await file(['agent']);
+    await click($('[data-act="grant"]'));
+    expect($('select[aria-label="Grant to give"]')).toBeNull();
+    expect(document.body.textContent).toContain('You hold no access you may pass on to people. Ask for it on Requests, or ask whoever gave you yours to let it be passed on.');
+  });
+
+  it('offers no Give on the giver’s own file', async () => {
+    await file(['person'], DIRECTORY.people[0].id);
+    expect($('[data-act="grant"]')).toBeNull();
+  });
+});

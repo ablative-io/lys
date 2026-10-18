@@ -13,7 +13,7 @@ import { AgentCredentials } from '../src/features/file/AgentCredentials';
 import { StopReceipt } from '../src/features/file/EmergencyStop';
 import { RecordedForm, TextField } from '../src/features/people/RecordedForm';
 import { serve } from './harness';
-import { ADA, ME, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, ME, RECEIPTS, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
 let root: Root | undefined;
@@ -129,6 +129,28 @@ describe('Directory words and write answers', () => {
     expect(visibleWords()).toContain('Only the directory\'s root authority issues a root grant.');
     expect(visibleWords()).not.toContain('RootAuthorityRefused');
     expect(document.querySelector('details .refusal-name')?.textContent).toContain('RootAuthorityRefused');
+  });
+
+  it('says after a failed change that nothing typed was lost and what to do next, and keeps what was typed', async () => {
+    await show(<RecordedForm name="change-profile" title="Save name" done={() => undefined} change={(data) => ({ path: '/identities/' + ADA + '/profile', body: { display_name: String(data.get('display_name')) } })}><TextField name="display_name" label="Name" /></RecordedForm>, { ['POST /identities/' + ADA + '/profile']: refused(403, 'NotAdmitted', 'not yours') });
+    await fill('input[name="display_name"]', 'Ada Lovelace');
+    await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(document.querySelector('[role="alert"] > p')?.textContent).toBe('You do not have permission to do this. Ask the directory administrator to make the change. Nothing you typed was lost. Check the fields and give it again, or choose Check if it may have gone through.');
+    expect(document.querySelector('details .refusal-name')?.textContent).toBe('NotAdmitted: not yours');
+    expect((document.querySelector('input[name="display_name"]') as HTMLInputElement).value).toBe('Ada Lovelace');
+  });
+
+  it('folds "What Lys recorded" under the form only when the form asks for the receipt', async () => {
+    const answer = (body: unknown) => ok({ receipt: { ...RECEIPTS[4].receipt, operation: (body as { operation: string }).operation } });
+    const form = (receipt: boolean) => <RecordedForm name="register-person" title="Register a person" receipt={receipt} done={() => undefined} change={() => ({ path: '/people', body: { display_name: 'Cy' } })}><TextField name="display_name" label="Full name" optional /></RecordedForm>;
+    await show(form(false), { 'POST /people': answer });
+    await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Change recorded.');
+    expect(document.querySelector('.recorded-receipt')).toBeNull();
+    act(() => root?.unmount()); root = undefined; document.body.innerHTML = ''; sessionStorage.clear();
+    await show(form(true), { 'POST /people': answer });
+    await act(async () => document.querySelector('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    expect(document.querySelector('.recorded-receipt summary')?.textContent).toBe('What Lys recorded');
   });
 
   it('shows one heading when a registration tab already names its form', async () => {

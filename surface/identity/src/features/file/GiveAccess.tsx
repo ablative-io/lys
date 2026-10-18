@@ -3,7 +3,7 @@ import { Act } from '../../shell/Act';
 import { useShell } from '../../shell/ShellContext';
 import { Delegate } from '../grants/Delegate';
 import { ActPanel } from '../grants/GrantTable';
-import { grantNo, onText, passesToAgents, type GrantWorld } from '../grants/model';
+import { givesTo, grantNo, onText, type GrantWorld } from '../grants/model';
 import type { Entry } from '../people/directory';
 import { giveLink } from './giveLink';
 
@@ -28,15 +28,15 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
   const [opener, setOpener] = useState<HTMLElement | null>(null);
   const [sourceId, setSourceId] = useState(linked.at === 'ready' ? linked.source.id : '');
   const [fromLink, setFromLink] = useState(linked.at !== 'absent');
-  const passable = w.list.grants.filter((grant) => grant.holder === w.me.person.id && grant.standing.stands && passesToAgents(grant.pass_on));
+  const passable = w.list.grants.filter((grant) => grant.holder === w.me.person.id && grant.standing.stands && givesTo(grant.pass_on).includes(x.kind === 'agent' ? 'agent' : 'person'));
   const source = passable.find((grant) => grant.id === sourceId);
-  const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
+  const mineToGive = x.state !== 'retired' && (x.kind === 'person' ? x.id !== w.me.person.id : x.person?.id === w.me.person.id);
   const refused = fromLink && linked.at === 'refused';
   return (
     <>
       <div className="file-section-head">
         <span className="section-h">Grants</span>
-        {x.kind === 'agent' && x.state !== 'retired' ? (
+        {x.state !== 'retired' && x.id !== w.me.person.id ? (
           <Act
             symbol="send"
             name="Give access"
@@ -50,9 +50,11 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
                 setGiving(true);
               } else
                 shell.toast(
-                  mineToGive
-                    ? 'You hold no access you can give an agent. The button below records directory access only; Cambium needs a separate grant.'
-                    : `Only ${x.display_name}’s responsible person can give it access.`
+                  x.kind === 'person'
+                    ? 'You hold no access you may pass on to people. Ask for it on Requests, or ask whoever gave you yours to let it be passed on.'
+                    : mineToGive
+                      ? 'You hold no access you can give an agent. The button below records directory access only; Cambium needs a separate grant.'
+                      : `Only ${x.display_name}’s responsible person can give it access.`
                 );
             }}
           />

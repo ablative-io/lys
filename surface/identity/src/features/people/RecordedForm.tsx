@@ -1,10 +1,11 @@
 /** A directory change stays pending after an uncertain answer, including across reloads. */
 import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { operationId, Refused, request } from '../../api';
+import { operationId, request } from '../../api';
 import { answeredNo, sendKept, releaseRecord } from '../../kept';
 import { confirmReceipt } from './recorded-receipt';
 import { ErrorWords } from './Words';
+import { failureWords } from '../signin/words';
 import './recorded-form.css';
 import { Act } from '../../shell/Act';
 import type { SymbolName } from '../../shell/symbols';
@@ -35,7 +36,10 @@ function restored(value: unknown, name: string): PendingChange | null {
   return { path: value.path, operation: value.operation, body: { ...value.body } };
 }
 
-export function RecordedForm({ name, title, heading, description, submitLabel, drawn = SAVE, children, change, done, success }: {
+/** What is said after a change that failed: nothing typed is lost, and the two next acts. */
+const NEXT = 'Nothing you typed was lost. Check the fields and give it again, or choose Check if it may have gone through.';
+
+export function RecordedForm({ name, title, heading, description, submitLabel, drawn = SAVE, receipt = false, children, change, done, success }: {
   name: string;
   title: string;
   heading?: string;
@@ -43,6 +47,8 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
   submitLabel?: string;
   /** How the form's own act is drawn; left out, it is drawn as a save. What is said of it stays `submitLabel`, or the title. */
   drawn?: Drawn;
+  /** Whether "What Lys recorded" folds the service's answer under the form; off unless the form has no sentence that says what happened. */
+  receipt?: boolean;
   children: ReactNode;
   change: (data: FormData) => Change;
   done: () => void;
@@ -64,13 +70,13 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
   });
   const [answer, setAnswer] = useState('');
   const [message, setMessage] = useState('');
-  const [failure, setFailure] = useState('');
+  const [failure, setFailure] = useState<{ problem: unknown } | null>(null);
   const busy = useRef(false);
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy.current || pending) return;
     busy.current = true;
-    setFailure('');
+    setFailure(null);
     setAnswer('');
     setMessage('');
     try {
@@ -92,7 +98,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
         throw error;
       }
     } catch (error) {
-      setFailure(error instanceof Refused ? `${error.refusal.refusal}: ${error.refusal.reason}` : String(error));
+      setFailure({ problem: error });
     } finally {
       busy.current = false;
     }
@@ -100,7 +106,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
   const recover = async () => {
     if (busy.current || !pending || typeof pending === 'string') return;
     busy.current = true;
-    setFailure('');
+    setFailure(null);
     try {
       const result = await request<unknown>(pending.path, { ...pending.body, operation: pending.operation });
       confirmReceipt(result, pending.operation, pending.path);
@@ -111,7 +117,7 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
       done();
     } catch (error) {
       // Even a later refusal cannot establish that the original uncertain call did not commit.
-      setFailure(error instanceof Refused ? `${error.refusal.refusal}: ${error.refusal.reason}` : String(error));
+      setFailure({ problem: error });
     } finally {
       busy.current = false;
     }
@@ -128,9 +134,9 @@ export function RecordedForm({ name, title, heading, description, submitLabel, d
       : 'Lys has not confirmed whether it saved this change. Do not submit this change again. Use Check to see whether Lys saved it.'}</p>
       <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{typeof pending === 'string' ? pending : 'Kept request ' + pending.operation}</p></details></div> : null}
     {pending && typeof pending !== 'string' ? <Act symbol="again" name={directory ? 'Check whether Lys saved it' : 'Check original change'} word="Check" onClick={recover} /> : null}
-    {failure ? <ErrorWords problem={failure} /> : null}
+    {failure ? <ErrorWords problem={failure.problem} words={failureWords(failure.problem, NEXT)} /> : null}
     {message ? <p role="status">{message}</p> : null}
-    {answer ? <details className="recorded-receipt"><summary>What Lys recorded</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
+    {receipt && answer ? <details className="recorded-receipt"><summary>What Lys recorded</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{answer}</pre></details> : null}
   </form>;
 }
 
