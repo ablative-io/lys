@@ -51,7 +51,7 @@ describe('Person security tabs', () => {
     const { requests, posted } = await mount('#/file/' + BEA + '/sessions', { ...SERVICE, ['/directory/people/' + BEA + '/sessions']: ok({ person: BEA, sessions: [] }) });
     expect(requests).toContain('/directory/people/' + BEA + '/sessions');
     expect(requests).not.toContain('/sessions');
-    expect(text()).toContain('No live sessions');
+    expect(text()).toContain('This person is not signed in anywhere.');
     expect(posted).toEqual([]);
   });
 });

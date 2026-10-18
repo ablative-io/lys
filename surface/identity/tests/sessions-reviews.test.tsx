@@ -18,12 +18,18 @@ describe('Sessions', () => {
     expect(text()).toContain('This session');
     expect(text()).not.toContain('never-render-this-cookie');
     expect(unreachable()).toEqual([]);
+    // Leaving this browser is drawn as leaving; the stop square is kept for ending a session elsewhere.
+    expect(button('Sign out')?.getAttribute('data-symbol')).toBe('leave');
+    expect(button('End session')?.getAttribute('data-symbol')).toBe('stop');
+    expect(text()).not.toContain('You are not signed in anywhere else.');
     await click(button('End session'));
     expect(posted).toHaveLength(0);
     expect(text()).toContain('Your current session stays open');
     await click(button('Confirm end session'));
     expect(posted).toEqual([{ path: '/sessions/session-other/end', body: {} }]);
     expect(text()).not.toContain('Another signed-in session');
+    expect(text()).toContain('You are not signed in anywhere else.');
+    expect(text()).not.toContain('No live sessions were returned');
   });
 
   it('never repeats an uncertain end, and reads the list again itself instead of offering Refresh', async () => {

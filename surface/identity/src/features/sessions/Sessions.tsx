@@ -19,6 +19,9 @@ interface SessionsView { person: string; sessions: SessionView[] }
 const sessionPath = (person: string) => person ? '/directory/people/' + encodeURIComponent(person) + '/sessions' : '/sessions';
 const providerName = (issuer: string): string => { try { return new URL(issuer).host; } catch { return 'Provider address not recognised'; } };
 
+/** Said on a person's own page when this browser is the only place they are signed in. */
+const ELSEWHERE = 'You are not signed in anywhere else.';
+
 export function SessionList({ person }: { person: string }) {
   const [revision, setRevision] = useState(0);
   const [confirm, setConfirm] = useState<SessionView | null>(null);
@@ -55,15 +58,15 @@ export function SessionList({ person }: { person: string }) {
     {confirm ? <section aria-label="Confirm session end" className="card">
       <h2>{confirm.current ? 'Sign out of this session?' : 'End this session?'}</h2>
       <p>{confirm.current ? 'You will need to sign in again to continue.' : 'That session will need to sign in again. Your current session stays open.'}</p>
-      <Act symbol="stop" name={busy ? 'Ending session…' : 'Confirm end session'} word={busy ? 'Ending…' : 'End'} tone="danger" disabled={busy || blockedId === confirm.id} onClick={() => { void finish(confirm); }} />
+      <Act symbol={confirm.current ? 'leave' : 'stop'} name={busy ? 'Ending session…' : 'Confirm end session'} word={busy ? 'Ending…' : 'End'} tone="danger" disabled={busy || blockedId === confirm.id} onClick={() => { void finish(confirm); }} />
       <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setConfirm(null)} />
     </section> : null}
-    <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <TableScroll label="Sign-in sessions"><table>
+    <Gate load={load} title="the sign-in sessions" renderError={(error) => <ReadFailure error={error} subject="the sign-in sessions" administrator={Boolean(person)} />} ok={(view) => view.sessions.some((session) => !confirmedEnds.includes(session.id)) ? <><TableScroll label="Sign-in sessions"><table>
       <thead><tr><th>Session</th><th>Started</th><th>Expires</th><th>Action</th></tr></thead>
       <tbody>{view.sessions.filter((session) => !confirmedEnds.includes(session.id)).sort((a, b) => Number(b.current) - Number(a.current) || b.started_at - a.started_at).map((session) => <tr key={session.id}>
         <td>{session.current ? 'This session' : 'Another signed-in session'}<p className="note">Provider: <span title={session.login.issuer}>{providerName(session.login.issuer)}</span></p></td><td>{clock(session.started_at)}</td><td>{clock(session.ends_at)}</td>
-        <td><Act symbol="stop" name={session.current ? 'Sign out' : 'End session'} word={session.current ? 'Sign out' : 'End'} disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)} /></td>
+        <td><Act symbol={session.current ? 'leave' : 'stop'} name={session.current ? 'Sign out' : 'End session'} word={session.current ? 'Sign out' : 'End'} disabled={busy || blockedId === session.id} onClick={() => setConfirm(session)} /></td>
       </tr>)}</tbody>
-    </table></TableScroll> : <p className="note">No live sessions were returned for this person.</p>} />
+    </table></TableScroll>{!person && !view.sessions.some((session) => !session.current && !confirmedEnds.includes(session.id)) ? <p className="note">{ELSEWHERE}</p> : null}</> : <p className="note">{person ? 'This person is not signed in anywhere.' : ELSEWHERE}</p>} />
   </>;
 }
