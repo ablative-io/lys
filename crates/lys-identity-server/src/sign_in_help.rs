@@ -48,12 +48,15 @@ pub(super) async fn contact(State(state): State<Arc<AppState>>) -> Result<Respon
 }
 
 /// The providers a person may sign in with, one button each: their id at
-/// the issuer, their name and which offered provider each is.
+/// the issuer, their name and which offered provider each is; and Lys's own
+/// origin, the address a person is told to open.
 pub(super) async fn offered(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<serde_json::Value>, ServerError> {
     let Some(api) = state.sign_in_providers.as_ref() else {
-        return Ok(Json(json!({ "providers": [] })));
+        return Ok(Json(
+            json!({ "providers": [], "origin": state.oidc.public_origin() }),
+        ));
     };
     let mut providers: Vec<serde_json::Value> = api
         .listed()
@@ -69,5 +72,11 @@ pub(super) async fn offered(
         })
         .collect();
     providers.sort_by_key(|provider| provider["name"].as_str().map(str::to_owned));
-    Ok(Json(json!({ "providers": providers })))
+    Ok(Json(
+        json!({ "providers": providers, "origin": state.oidc.public_origin() }),
+    ))
 }
+
+#[cfg(test)]
+#[path = "sign_in_help_tests.rs"]
+mod tests;

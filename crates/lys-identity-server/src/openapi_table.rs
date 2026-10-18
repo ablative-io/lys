@@ -300,7 +300,7 @@ pub(crate) const TABLE: &[E] = entries! {
     GET "/oauth/userinfo" "The signed-in subject's claims" B [SIGNED, &["TokenUnknown", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"], &["apps_unavailable"]];
     GET "/apps/me/agents" "The access pass holder's own agents" B [SIGNED, &["TokenUnknown", "PassRefused", "ProductPassPersonRequired", "HolderRetired", "NoPerson", "RequestMalformed", "ProviderUnavailable", "SessionsUnavailable", "DirectoryUnavailable"]];
     POST "/sign-in" "Sign in with a password" P [&["SignInFailed", "NotAdmittedYet", "AccountDisabled", "SecondFactorUnsupported", "SignInRefused", "IssuerChallengeExpired", "IssuerRefused", "SignInThrottled", "SignInProvidersUnavailable", "SignInProvidersRefused", "SessionsUnavailable"]];
-    GET "/sign-in/providers" "The providers the sign-in page offers" P [];
+    GET "/sign-in/providers" "The providers the sign-in page offers and the address people open Lys at" P [];
     GET "/sign-in/help" "The configured administrator's sign-in contact" P [&["ConfigInvalid", "DirectoryUnavailable", "SignInProvidersUnavailable", "SignInProvidersRefused", "AccountRefused"]];
     GET "/sign-in/providers/{id}" "Begin sign-in through a provider" P [&["IssuerChallengeExpired"]];
     POST "/setup/open" "Open first-run setup with its code" P [&["SignInFailed", "SignInThrottled", "SetupClosed", "SetupCodeRefused", "DirectoryUnavailable"]];
