@@ -132,8 +132,8 @@ describe('An agent\'s run on People and agents', () => {
     });
     // The sentence and its fix are said; the service's own words stay under Error details.
     expect(text()).toContain('On Lab: Lys could not reach the chosen computer’s runner. Check that the computer and its runner are connected.');
-    expect($('.team-start .why-not[role="alert"] > p')?.textContent).not.toContain('runner_unreachable');
-    expect($('.team-start .why-not details .refusal-name')?.textContent).toBe('runner_unreachable: the catalogue read was refused');
+    expect($('.run-start .why-not[role="alert"] > p')?.textContent).not.toContain('runner_unreachable');
+    expect($('.run-start .why-not details .refusal-name')?.textContent).toBe('runner_unreachable: the catalogue read was refused');
     expect(text()).toContain('CapabilityUnavailable');
     expect((button('Start') as HTMLButtonElement).disabled).toBe(false);
     await click(button('Start'));
@@ -182,7 +182,7 @@ describe('An agent\'s run on People and agents', () => {
     expect(location.hash).toBe('#/file/' + SCRIBE);
     expect(text()).toContain('Scribe is not running.');
     expect(text()).toContain('On Lab, in the folder ' + FOLDER + '.');
-    expect($('.team-start select')).toBeNull();
+    expect($('.run-start select')).toBeNull();
     expect((button('Start') as HTMLButtonElement).disabled).toBe(false);
     await click(button('Start'));
     // The terminal that opens afterwards sends its own requests; the start itself is one request.
@@ -207,7 +207,7 @@ describe('An agent\'s run on People and agents', () => {
   it('offers each computer as its own Start when several are allowed and none is saved, and uses the saved one when there is one', async () => {
     const two = { ...stopped, '/network': ok({ machines: [machine(LAB, 'Lab', 'lys-runner', [SCRIBE]), machine(SHED, 'Shed', 'lys-runner', [SCRIBE])], reports_served: true }) };
     await mount('#/file/' + SCRIBE, two);
-    expect($$('.team-start-acts button').map((el) => el.textContent)).toEqual(['Start on Lab', 'Start on Shed']);
+    expect($$('.run-start-acts button').map((el) => el.textContent)).toEqual(['Start on Lab', 'Start on Shed']);
     await mount('#/file/' + SCRIBE, { ...two, ...provisioning(SCRIBE, profile({ runs_on: SHED })) });
     expect(text()).toContain('On Shed, in the folder ' + FOLDER + '.');
   });
@@ -251,8 +251,8 @@ describe('An agent\'s run on People and agents', () => {
     expect(text()).toContain('Lys could not reach or use its secret storage service. Ask the administrator to check it.');
     expect(text()).toContain('SecretsUnavailable: the secrets store is closed');
     expect((button('Try again') as HTMLButtonElement).disabled).toBe(false);
-    expect($$('button').filter((el) => (el as HTMLButtonElement).disabled && el.closest('.team-start'))).toEqual([]);
-    expect($$('.team-start details').map((each) => [each.querySelector('summary')?.textContent, each.hasAttribute('open')])).toEqual([['Error details', false]]);
+    expect($$('button').filter((el) => (el as HTMLButtonElement).disabled && el.closest('.run-start'))).toEqual([]);
+    expect($$('.run-start details').map((each) => [each.querySelector('summary')?.textContent, each.hasAttribute('open')])).toEqual([['Error details', false]]);
   });
 
   it('sends the old start addresses to the agent\'s own page, where Start is', async () => {

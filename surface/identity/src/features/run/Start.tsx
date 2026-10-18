@@ -91,7 +91,7 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
       })),
     ) : {};
     return { state: identity.state, machines: network.machines, roles: roles.roles, profile: provisioning.profile, availability, previous };
-  }, 'team-start:' + agent + ':' + round);
+  }, 'run-start:' + agent + ':' + round);
   const [refusal, setRefusal] = useState<StartRefusal | null>(null);
   const [ended, setEnded] = useState('');
   const [busy, setBusy] = useState(false);
@@ -158,22 +158,22 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
     if (load.status === 'ok' && !known && !noProgram && choices.length === 1) void run(choices[0].id);
   }, [load]);
 
-  if (load.status === 'loading') return wanted.current ? <p role="status" className="team-start-line">Starting {name}…</p> : null;
-  if (load.status === 'refused') return <div className="team-start">
-    <p className="team-start-line">Lys could not read what {name} needs to start.</p>
+  if (load.status === 'loading') return wanted.current ? <p role="status" className="run-start-line">Starting {name}…</p> : null;
+  if (load.status === 'refused') return <div className="run-start">
+    <p className="run-start-line">Lys could not read what {name} needs to start.</p>
     <ErrorWords problem={load.refused} />
-    <div className="team-start-acts"><Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={() => setRound((value) => value + 1)} /></div>
+    <div className="run-start-acts"><Act symbol="retry" name="Try again" word="Try again" tone="primary" onClick={() => setRound((value) => value + 1)} /></div>
   </div>;
   const stopped = refusal ?? known;
-  return <div className="team-start">
-    <p className="team-start-line">{name} is not running.</p>
+  return <div className="run-start">
+    <p className="run-start-line">{name} is not running.</p>
     {stopped && data ? <CannotStart agent={agent} name={name} refusal={stopped} machines={data.machines} again={again} startAgain={() => { fresh.current = true; again(); }} /> : null}
     {!stopped && noProgram ? <div role="alert" className="cannot-start">
       <p>{name} has no program chosen yet.</p>
       <Act symbol="open" name="Choose its program" word="Choose" tone="primary" onClick={settings} />
     </div> : null}
     {!stopped && ended ? <p role="alert">{name} started and stopped straight away. <a href={'#/file/' + encodeURIComponent(agent) + '/sessions'}>See what its runner reported</a></p> : null}
-    {!stopped && !noProgram ? <div className="team-start-acts">{choices.map((computer) => {
+    {!stopped && !noProgram ? <div className="run-start-acts">{choices.map((computer) => {
       const unavailable = data?.availability[computer.id];
       const previous = data?.previous[computer.id];
       const detail = unavailable ? unavailable.refusal + ': ' + unavailable.reason : '';
@@ -189,6 +189,6 @@ export function Start({ entry, me, admin, changed, settings, straightAway = fals
         </div> : null}
       </div>;
     })}</div> : null}
-    {!stopped && !noProgram && choices.length === 1 ? <p className="dim team-start-where">On {choices[0].name}, in the folder {profile?.working_folder}.</p> : null}
+    {!stopped && !noProgram && choices.length === 1 ? <p className="dim run-start-where">On {choices[0].name}, in the folder {profile?.working_folder}.</p> : null}
   </div>;
 }

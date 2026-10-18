@@ -15,7 +15,7 @@ import type { RunDoing } from './RunConfirm';
 /** Stop or Restart, asked first, on the agent's own page and on the dashboard: the one question and the one pair of requests. */
 function RunAsk({ doing, entry, session, changed, done }: { doing: RunDoing; entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
   const acts = useRunActs(entry.id, session.session, () => { done(); changed(); });
-  return <RunConfirm className="team-stop" doing={doing} name={entry.display_name} where={session.machine_name ?? session.machine} busy={acts.busy} refused={acts.refused}
+  return <RunConfirm className="run-stop" doing={doing} name={entry.display_name} where={session.machine_name ?? session.machine} busy={acts.busy} refused={acts.refused}
     confirm={() => { void acts.act(doing); }} cancel={done} />;
 }
 

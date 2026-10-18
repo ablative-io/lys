@@ -98,7 +98,7 @@
 /* Start and Stop sit in the agent's own row; what they need to say opens in a row under it. */
 .you-tree .you-act { white-space: nowrap; }
 .you-tree .you-asked td { padding: 4px 12px 14px; }
-.you-tree .you-asked .team-stopped, .you-tree .you-asked .team-start { align-items: flex-start; padding: 0; }
+.you-tree .you-asked .run-stopped, .you-tree .you-asked .run-start { align-items: flex-start; padding: 0; }
 .you-tree .you-asked .you-start-here { display: flex; align-items: flex-start; gap: 16px; }
 /* An agent with several live sessions says each on its own line, with that session's own Watch and Stop beside it. */
 .you-tree .dash-line, .you-tree .dash-acts { display: block; }

@@ -14,9 +14,9 @@ import { fileNo } from '../people/directory';
 import type { Branch } from '../people/tree';
 import type { ProvisioningAnswer } from '../provisioning/Provisioning';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
-import { Stop } from '../team/AgentRun';
-import { Start } from '../team/Start';
-import '../team/team.css';
+import { Stop } from '../run/AgentRun';
+import { Start } from '../run/Start';
+import '../run/run.css';
 import { refusedPart } from './contract';
 import type { DashboardAgent } from './contract';
 import { budgetLine, goalsLine } from './words';
@@ -132,7 +132,7 @@ export function AskedRow({ entry, place, context, columns }: { entry: Entry; pla
       ? <Stop entry={entry} session={session} changed={changed} done={() => ask(null)} />
       : asked.what === 'started'
       // The start was answered; the row offers no second Start while the page reads where it is running.
-      ? <p role="status" className="team-start-line">{entry.display_name} has started. Reading where it is running…</p>
+      ? <p role="status" className="run-start-line">{entry.display_name} has started. Reading where it is running…</p>
       : <StartHere key={entry.id + (asked.pressed ? ':pressed' : '')} entry={entry} me={me} pressed={asked.pressed} changed={() => { ask({ agent: entry.id, what: 'started', pressed: false, place }); changed(); }} close={() => ask(null)} />}
   </td></tr>;
 }

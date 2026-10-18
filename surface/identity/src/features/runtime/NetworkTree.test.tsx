@@ -199,7 +199,7 @@ it('C737 a seatless agent that is not running is chosen by its row, and the term
   expect(host.querySelector('[data-agent-only="' + SCRIBE + '"]')?.getAttribute('data-selected')).toBe('true');
   // The agent's own Start, the team page's, in the terminal space named for that agent.
   const pane = host.querySelector('.network-pane [aria-label="Terminal of ' + SCRIBE_VIEW.display_name + '"]');
-  expect([...(pane?.querySelectorAll('.team-start button') ?? [])].map((entry) => entry.getAttribute('aria-label'))).toEqual(['Start']);
+  expect([...(pane?.querySelectorAll('.run-start button') ?? [])].map((entry) => entry.getAttribute('aria-label'))).toEqual(['Start']);
   // Still nothing but rows in the tree itself.
   expect(host.querySelector('.network-list button')).toBeNull();
 });

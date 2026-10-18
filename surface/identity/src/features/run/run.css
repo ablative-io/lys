@@ -1,11 +1,11 @@
 /* An agent's run controls: Start with its line and acts, and the question before Stop or Restart (RunConfirm). */
-.team-start { display: flex; flex-direction: column; gap: 14px; width: min(100%, 480px); }
-.team-start-line { margin: 0; font-size: 14px; }
-.team-start-acts { display: flex; align-items: center; gap: 12px; }
-.team-start-acts .why-not { border: 0; padding: 0; }
-.team-start-where { margin: 0; font-size: 12.5px; }
-.team-stop { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-base); border-top: 1px solid var(--border-default); font-size: 13px; }
-.team-stop p { margin: 0; flex: 1; }
+.run-start { display: flex; flex-direction: column; gap: 14px; width: min(100%, 480px); }
+.run-start-line { margin: 0; font-size: 14px; }
+.run-start-acts { display: flex; align-items: center; gap: 12px; }
+.run-start-acts .why-not { border: 0; padding: 0; }
+.run-start-where { margin: 0; font-size: 12.5px; }
+.run-stop { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-base); border-top: 1px solid var(--border-default); font-size: 13px; }
+.run-stop p { margin: 0; flex: 1; }
 /* The loss is a line of its own inside the question, wherever the question is drawn. */
 .run-loss { display: block; margin-top: 4px; font-weight: 600; color: var(--text-primary); }
 
@@ -13,9 +13,9 @@
 .agent-run { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
 .agent-run-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .agent-run-words { flex: 1 1 320px; }
-.agent-run .team-stop { position: static; margin-top: 12px; padding: 12px 0 0; background: none; }
-.agent-run .team-start { width: 100%; }
+.agent-run .run-stop { position: static; margin-top: 12px; padding: 12px 0 0; background: none; }
+.agent-run .run-start { width: 100%; }
 @media (max-width: 600px) {
-  .agent-run .act, .agent-run .btn, .team-stop .act, .team-start .act { min-height: 44px; min-width: 44px; }
-  .team-stop { flex-wrap: wrap; }
+  .agent-run .act, .agent-run .btn, .run-stop .act, .run-start .act { min-height: 44px; min-width: 44px; }
+  .run-stop { flex-wrap: wrap; }
 }

@@ -31,7 +31,7 @@ it('returns to the selected agent after its live session ends so Start stays in 
     await act(async () => { root.render(<Tree />); });
     await settle();
     expect(selected).toHaveBeenCalledWith('agent:' + SCRIBE);
-    expect(host.querySelector('.network-pane .team-start')).not.toBeNull();
+    expect(host.querySelector('.network-pane .run-start')).not.toBeNull();
     expect(host.textContent).not.toContain('The selected session is not running');
   } finally { act(() => root.unmount()); host.remove(); }
 });
