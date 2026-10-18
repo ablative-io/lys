@@ -21,21 +21,23 @@ async function render(hash: string, routes: Record<string, Route>) {
   return container;
 }
 
-it('a signed-out visitor sees only the sign-in card, without Dashboard or Reconnect', async () => {
+it('a signed-out visitor sees only the one sign-in form, without Dashboard or Reconnect', async () => {
   const page = await render('#/', { ...SERVICE, '/me': refused(401, 'NotSignedIn', 'Sign in first') });
   expect([...page.querySelectorAll('h1')].map((heading) => heading.textContent)).toEqual(['Sign in']);
-  expect(page.querySelectorAll('.card')).toHaveLength(1);
+  expect(page.querySelectorAll('form[aria-label="Sign in"]')).toHaveLength(1);
+  expect(page.querySelector('a[href="/api/login"]')).toBeNull();
   expect(page.querySelector('.dash-page')).toBeNull();
   expect(page.querySelector('#rail')).toBeNull();
   expect(page.textContent).not.toContain('Reconnect');
 });
 
-it('both sign-in entries give one account admission and help line', async () => {
+it('both sign-in entries show the same form and one help line', async () => {
   for (const hash of ['#/', '#/sign-in']) {
     const page = await render(hash, { ...SERVICE, '/me': refused(401, 'NotSignedIn', 'Sign in first') });
     const lines = page.querySelectorAll('.account-help');
     expect(lines).toHaveLength(1);
-    expect(lines[0].textContent).toBe('No account? Ask your administrator to admit you. Contact your administrator for sign-in help.');
+    expect(lines[0].textContent).toBe('No account yet, or cannot get in? Ask your administrator.');
+    expect(page.querySelectorAll('form[aria-label="Sign in"]')).toHaveLength(1);
     act(() => roots.pop()?.unmount());
   }
 });

@@ -1,6 +1,8 @@
 /* Sign-in and first-run setup share the surface's page, field and button styling. */
 .sign-in { max-width: 420px; margin: 0 auto; padding-top: 64px; }
 .sign-in-form { display: grid; gap: 4px; }
+/* Inside the shell a page's form fills the page (screen.css); the sign-in form keeps its own height. */
+.page.sign-in > .sign-in-form { flex: none; overflow: visible; }
 .sign-in-form .field input { width: 100%; box-sizing: border-box; }
 .sign-in-form .note { font-size: 12px; color: var(--text-secondary); margin: 4px 0 0; }
 .sign-in-providers { display: grid; gap: 8px; margin-top: 18px; }

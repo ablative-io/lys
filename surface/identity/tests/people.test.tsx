@@ -96,7 +96,8 @@ describe('People and agents', () => {
   it('asks a caller with no session to sign in through the service', async () => {
     await mount('#/people', { ...SERVICE, '/directory/people': refused(401, 'NotSignedIn', 'NotSignedIn: sign in through the configured issuer first') });
     expect($('.page h1')?.textContent).toBe('Sign in');
-    expect($('a.btn.primary')?.getAttribute('href')).toBe('/api/login');
+    expect($('form[aria-label="Sign in"]')).not.toBeNull();
+    expect($('a[href="/api/login"]')).toBeNull();
   });
 
   it('names a refusal the service gives', async () => {

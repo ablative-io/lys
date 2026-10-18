@@ -5,7 +5,7 @@
  * which never say whether the email or the password was wrong.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, MouseEvent } from 'react';
 import { API, Refused, request } from '../../api';
 import type { SignedIn } from '../../generated';
 import '../people/recorded-form.css';
@@ -13,6 +13,7 @@ import './sign-in.css';
 import { Act } from '../../shell/Act';
 import { AccountHelpWords, administratorWords, useAdministratorContact } from '../signin/AccountHelp';
 import { LysMark } from '../../shell/LysMark';
+import { rememberFileReturn } from '../signin/fileReturn';
 
 /** Where a person lands once signed in. */
 export const SIGNED_IN = '/#/';
@@ -50,23 +51,49 @@ export function refusedInAddress(who = 'your administrator'): string {
   return PROVIDER_REFUSALS[name] ?? 'The sign-in did not finish. Try again.';
 }
 
-function Providers() {
-  const [offered, setOffered] = useState<Offered[]>([]);
+/** The providers Lys offers, and whether the list could be read at all. */
+interface ProviderList { offered: Offered[]; unread: boolean }
+
+function useProviders(): ProviderList {
+  const [list, setList] = useState<ProviderList>({ offered: [], unread: false });
   useEffect(() => {
     let live = true;
     request<{ providers: Offered[] }>('/sign-in/providers').then(
-      (answer) => { if (live) setOffered(answer.providers); },
-      () => { if (live) setOffered([]); },
+      (answer) => { if (live) setList({ offered: answer.providers, unread: false }); },
+      () => { if (live) setList({ offered: [], unread: true }); },
     );
     return () => { live = false; };
   }, []);
+  return list;
+}
+
+/** The line under the heading names every way in, so a person invited to use Google reads Google before the password fields. */
+function waysIn(offered: Offered[]): string {
+  if (offered.length === 0) return 'With your email and password.';
+  return 'With ' + offered.map((entry) => entry.name).join(' or ') + ', or with your email and password.';
+}
+
+function Providers({ list }: { list: ProviderList }) {
+  const { offered } = list;
+  const [problem, setProblem] = useState('');
+  if (list.unread) {
+    return <p className="note sign-in-providers" role="status">Lys could not list its other ways to sign in, such as Google. Your email and password still work; to use another way, open this page again.</p>;
+  }
   if (offered.length === 0) return null;
   const next = continuation();
   const query = next ? '?continue=' + encodeURIComponent(next) : '';
+  // A file link the person opened is kept for the provider's return to /me (fileReturn.tsx).
+  const remember = (event: MouseEvent) => {
+    try { rememberFileReturn(); } catch (error) {
+      event.preventDefault();
+      setProblem('This browser could not keep the link you opened while you sign in: ' + String(error) + '. Sign in, then open the link again.');
+    }
+  };
   return <div className="sign-in-providers" aria-label="Sign in with a provider">
-    {offered.map((entry) => <a key={entry.id} className="btn" href={API + '/sign-in/providers/' + encodeURIComponent(entry.id) + query}>
+    {offered.map((entry) => <a key={entry.id} className="btn" onClick={remember} href={API + '/sign-in/providers/' + encodeURIComponent(entry.id) + query}>
       Sign in with {entry.name}
     </a>)}
+    {problem ? <p role="alert" className="why-not">{problem}</p> : null}
   </div>;
 }
 
@@ -89,6 +116,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const help = useAdministratorContact();
+  const providers = useProviders();
   const providerError = refusedInAddress(administratorWords(help.administrator));
   const [providerDismissed, setProviderDismissed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -122,7 +150,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
   return <div className="page sign-in">
     <LysMark />
     <h1 ref={heading} tabIndex={-1}>Sign in</h1>
-    <p className="sub">Sign in to Lys with your email and password.</p>
+    <p className="sub">{waysIn(providers.offered)}</p>
     <form className="recorded-form sign-in-form" aria-label="Sign in" onSubmit={submit} aria-busy={busy} noValidate>
       <div className="field">
         <label htmlFor="sign-in-email">Email</label>
@@ -135,7 +163,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
       {error || (!providerDismissed && providerError) ? <p role="alert" className="why-not">{error || providerError}</p> : null}
       <Act symbol="enter" name={busy ? 'Signing in…' : 'Sign in'} word={busy ? 'Signing in…' : 'Sign in'} tone="primary" type="submit" disabled={busy} />
     </form>
-    <Providers />
+    <Providers list={providers} />
     <AccountHelpWords help={help} />
   </div>;
 }

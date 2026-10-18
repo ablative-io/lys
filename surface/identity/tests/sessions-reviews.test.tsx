@@ -45,7 +45,7 @@ describe('Sessions', () => {
     await click(button('Sign out'));
     expect(text()).toContain('You will need to sign in again');
     await click(button('Confirm end session'));
-    expect($('a[href="/api/login"]')).not.toBeNull();
+    expect($('form[aria-label="Sign in"]')).not.toBeNull();
   });
 
   it('uses the administrator route for an explicitly selected person', async () => {

@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { API, api, Refused } from '../../api';
+import { api, Refused } from '../../api';
 import type { Load } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
-import { AccountHelp } from './AccountHelp';
-import { LysMark } from '../../shell/LysMark';
+import { SignIn as SignInForm } from '../sign-in/SignIn';
 import { ErrorWords } from '../people/Words';
-import { rememberFileReturn, takeFileReturn } from './fileReturn';
+import { takeFileReturn } from './fileReturn';
 
 export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   return (
@@ -16,26 +15,16 @@ export function Loading({ title = 'the directory' }: { title?: string } = {}) {
   );
 }
 
-/** What a caller with no session is shown: a small card in the middle of the screen with the Lys mark, the title and one button that signs in through the service's configured issuer. The shell beside it shows nothing that needs a session. The service keeps the session; the running build is under Configuration. */
+/** Where a page that asked for sign-in goes once it is signed in: the same page, read again. */
+export const signedInHere = { open: (): void => location.reload() };
+
+/**
+ * What a caller with no session meets on any page that needed one: Lys's one sign-in form, in place, at the
+ * address they opened. Once signed in, that page opens. The shell beside it shows nothing that needs a session.
+ */
 export function SignIn() {
   useSignedOutScreen();
-  const [problem, setProblem] = useState('');
-  return (
-    <div className="page signed-out">
-      <div className="card">
-        <LysMark />
-        <h1>Sign in</h1>
-        <div><a className="btn primary" href={API + '/login'} onClick={(event) => {
-          try { rememberFileReturn(); } catch (error) {
-            event.preventDefault();
-            setProblem('The browser could not keep this file link for sign-in: ' + String(error));
-          }
-        }}>Sign in</a></div>
-        {problem ? <p role="alert">{problem}</p> : null}
-        <AccountHelp />
-      </div>
-    </div>
-  );
+  return <SignInForm signedIn={() => signedInHere.open()} />;
 }
 
 /** The heading a refusal page carries: what happened, in words, never the refusal's code. */

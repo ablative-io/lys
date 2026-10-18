@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { api } from '../src/api';
-import { Callback } from '../src/features/signin/Gate';
+import { Callback, signedInHere } from '../src/features/signin/Gate';
 import { pendingGrantKey, restKey } from '../src/features/grants/pendingGrant';
 import type { DelegateBody, Grant, GrantModel } from '../src/generated/grants';
 import { ADA, GRANTS, ME, MODEL, SCRIBE, SCRIBE_G, SERVICE, ok, refused, type Route } from './fixtures';
@@ -214,38 +214,37 @@ it('ITEM 8 opens an empty drawer when the link names an agent that does not exis
   expect(sent()).toEqual([]);
 });
 
-it('ITEM 9 returns to the exact give link after password sign-in', async () => {
+it('ITEM 9 keeps the exact give link through password sign-in on the page itself', async () => {
   const original = link('cambium.workspace:store%3Award:read,query');
+  const reopened = vi.spyOn(signedInHere, 'open').mockImplementation(() => undefined);
   const { page } = await open(original, [source], model, {
     '/me': refused(401, 'NotSignedIn', 'Sign in first'),
     '/directory/people': refused(401, 'NotSignedIn', 'Sign in first'),
+    'POST /sign-in': ok({ signed_in: ME.signed_in, authority: 'test' }),
   });
-  const login = page.querySelector<HTMLAnchorElement>('a[href="/api/login"]');
-  expect(login).not.toBeNull();
-  login?.addEventListener('click', (event) => event.preventDefault());
-  await press(login);
-  act(() => root?.unmount());
-  root = undefined;
-  const signed = await open('#/sign-in', [source], model, { 'POST /sign-in': ok({ signed_in: ME.signed_in, authority: 'test' }) });
-  const form = signed.page.querySelector<HTMLFormElement>('form[aria-label="Sign in"]');
-  if (!form) throw new Error('Sign in was not shown');
+  expect(page.querySelector('a[href="/api/login"]')).toBeNull();
+  const form = page.querySelector<HTMLFormElement>('form[aria-label="Sign in"]');
+  if (!form) throw new Error('Sign in was not shown in place');
   const email = form.querySelector<HTMLInputElement>('[name="email"]');
   const password = form.querySelector<HTMLInputElement>('[name="password"]');
   if (!email || !password) throw new Error('The sign-in fields were not shown');
   email.value = 'person@example.test';
   password.value = 'test password';
   await act(async () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+  expect(reopened).toHaveBeenCalledOnce();
   expect(location.hash).toBe(original);
   expect(sent()).toEqual([]);
 });
 
-it('ITEM 10 restores the give link through the existing callback path', async () => {
+it('ITEM 10 restores the give link through the existing callback path after Sign in with Google', async () => {
   const original = link();
   const { page } = await open(original, [source], model, {
     '/me': refused(401, 'NotSignedIn', 'Sign in first'),
     '/directory/people': refused(401, 'NotSignedIn', 'Sign in first'),
+    '/sign-in/providers': ok({ providers: [{ id: 'google-1', name: 'Google', provider: 'google' }] }),
   });
-  const login = page.querySelector<HTMLAnchorElement>('a[href="/api/login"]');
+  const login = page.querySelector<HTMLAnchorElement>('a[href^="/api/sign-in/providers/google-1"]');
+  expect(login).not.toBeNull();
   login?.addEventListener('click', (event) => event.preventDefault());
   await press(login);
   act(() => root?.unmount());
@@ -264,13 +263,15 @@ it('ITEM 10 restores the give link through the existing callback path', async ()
   expect(replace).toHaveBeenCalledExactlyOnceWith('/' + original);
 });
 
-it('ITEM 11 restores the give link after provider sign-in returns to /me', async () => {
+it('ITEM 11 restores the give link after Sign in with Google returns to /me', async () => {
   const original = link();
   const { page } = await open(original, [source], model, {
     '/me': refused(401, 'NotSignedIn', 'Sign in first'),
     '/directory/people': refused(401, 'NotSignedIn', 'Sign in first'),
+    '/sign-in/providers': ok({ providers: [{ id: 'google-1', name: 'Google', provider: 'google' }] }),
   });
-  const login = page.querySelector<HTMLAnchorElement>('a[href="/api/login"]');
+  const login = page.querySelector<HTMLAnchorElement>('a[href^="/api/sign-in/providers/google-1"]');
+  expect(login).not.toBeNull();
   login?.addEventListener('click', (event) => event.preventDefault());
   await press(login);
   act(() => root?.unmount());
