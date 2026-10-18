@@ -1,6 +1,5 @@
 /**
  * The Dashboard's "Waiting on you": one list of what the person may act on, its number counted from the list itself.
- * Kept here because this folder is the one of domain 06 the test runner includes.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

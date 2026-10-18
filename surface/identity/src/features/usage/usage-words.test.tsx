@@ -1,7 +1,6 @@
 /**
  * One formatter for every budget figure: money in US dollars with two decimals, everything in Australian English
- * whatever the browser's locale, and a reached limit said with its unit. Kept here because this folder is the one of
- * domain 06 the test runner includes.
+ * whatever the browser's locale, and a reached limit said with its unit.
  */
 import { describe, expect, it, vi } from 'vitest';
 import * as budgetWords from '../usage/budgetWords';

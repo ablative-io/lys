@@ -1,6 +1,6 @@
 /**
  * A limit's bar on the Dashboard and the canvas Budget widget: three bands, the warn colour from where the budget's
- * warning begins. Kept here because this folder is the one of domain 06 the test runner includes.
+ * warning begins.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

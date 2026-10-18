@@ -1,7 +1,6 @@
 /**
  * On a touch screen nothing that explains is left in a tooltip: who acknowledged an alarm and when is said in the
- * cell, and no panel of the dashboard carries a `title`. Kept here because this folder is the one of domain 06 the
- * test runner includes.
+ * cell, and no panel of the dashboard carries a `title`.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

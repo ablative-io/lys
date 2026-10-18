@@ -1,6 +1,6 @@
 /**
  * The Dashboard's "This week" panel: what the person's agents cost, from each agent's own figure as the service answers
- * it. Kept beside the usage readings because this folder is the one of domain 06 the test runner includes.
+ * it.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

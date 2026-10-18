@@ -1,6 +1,6 @@
 /**
  * Used, first on an agent's Limits and goals tab: what it used this week and today, and its account's windows, before
- * any control. Kept here because this folder is the one of domain 06 the test runner includes.
+ * any control.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

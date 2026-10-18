@@ -1,6 +1,5 @@
 /**
- * The Dashboard's "Needs a look": only what is wrong, in sentences, and nothing when nothing is. Kept here because this
- * folder is the one of domain 06 the test runner includes.
+ * The Dashboard's "Needs a look": only what is wrong, in sentences, and nothing when nothing is.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';

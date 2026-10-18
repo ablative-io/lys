@@ -1,6 +1,6 @@
 /**
  * One editor for the spending limit: the card says what its chosen act does, and the Budget table leaves that limit's
- * row out on an agent's tab. Kept here because this folder is the one of domain 06 the test runner includes.
+ * row out on an agent's tab.
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
