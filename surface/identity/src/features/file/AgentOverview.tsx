@@ -17,6 +17,7 @@ import { Pill } from '../people/Pill';
 import { AgentRun } from '../team/AgentRun';
 import './agent-overview.css';
 import { Act } from '../../shell/Act';
+import { CambiumNext } from './CambiumNext';
 
 function reading<T>(load: Load<T>, subject: string) {
   if (load.status === 'loading') return <span className="dim">Reading {subject}…</span>;
@@ -95,6 +96,7 @@ export function AgentOverview({ agent, details, added, rename }: { agent: AgentV
   const models = programs.status === 'ok' ? saved.map((id) => modelName(programs.data, id)).join(', ') : '';
   const problems = [profile, teams, network, programs, choices, people, me].flatMap((load) => load.status === 'refused' ? [load.refused] : []);
   return <NetworkRead.Provider value={networkRead}><AgentRun key={agent.id} entry={{ id: agent.id, display_name: agent.display_name, state: agent.state, kind: 'agent', role: agent.role, person: agent.person }} />
+  {agent.state === 'active' && people.status === 'ok' ? <CambiumNext agent={agent.id} name={agent.display_name} administrator={people.data.scope === 'directory'} /> : null}
   <section className="agent-overview" aria-label="About this agent">
     <dl className="facts agent-facts">
       <dt>Name</dt><dd>{agent.display_name}{rename ? <>{' '}<Act symbol="edit" name="Edit name" className="small" data-act="rename" onClick={rename} /></> : null}</dd>
