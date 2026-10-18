@@ -113,10 +113,10 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
     </select></label>
     {kind && chosenWhich === BY_ID ? <label className="field">Its id<input name="resource_id" required autoComplete="off" /><span className="hint">{known.length ? 'The id the app itself gives it.' : 'Lys knows none of these by name yet. Enter the id the app itself gives it.'}</span></label> : null}
     <label className="field">They may<select name="relation" required={!role} disabled={!!role} defaultValue=""><option value="" disabled>Choose what they may do</option>{Object.entries(relations).map(([relation, actions]) => <option key={relation} value={relation} title={relation}>{actionWords(model, { kind: kind || 'directory', id: '' }, actions)}</option>)}</select></label>
-    {Object.keys(roles).length ? <label className="field">Role<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
+    {Object.keys(roles).length ? <label className="field">Role in the app<select name="role" value={role} onChange={(event) => setRole(event.target.value)} aria-label="Role">
       <option value="">No role: what is chosen above</option>
       {Object.entries(roles).map(([name, carried]) => <option key={name} value={name}>{name} · {carried.join(', ')}</option>)}
-    </select><span className="hint">A role gives what it carries whenever it is checked, so a widening you approve reaches this grant.</span></label> : null}
+    </select><span className="hint">Gives whatever the app's role covers, including anything the app adds to it later once you approve that change.</span></label> : null}
     <div className="field">May they pass it on<label className="tick"><input name="pass-people" type="checkbox" /> to other people</label><label className="tick"><input name="delegate" type="checkbox" /> to their agents</label></div>
     <div className="field">Expires (your local time)<div className="expires"><input name="expires" type="datetime-local" aria-label="Expires" required={!noExpiry} disabled={noExpiry} />
       <label className="tick"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry</label></div></div>

@@ -30,7 +30,7 @@ describe('shell (conformance 9.1)', () => {
     await press('g', {}, document.body);
     await press('o', {}, document.body);
     expect(location.hash).toBe('#/roles');
-    expect($('.page h1')?.textContent).toBe('Roles');
+    expect($('.page h1')?.textContent).toBe('Jobs');
   });
 
   it('opens with its labels, collapses them with [ and keeps the choice', async () => {

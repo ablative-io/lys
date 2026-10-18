@@ -124,14 +124,14 @@ describe('Roles', () => {
 
   it('assigns through labelled fields under the table, and the editor has Cancel', async () => {
     await mount('#/roles/' + role.id, routes);
-    const form = $('form[aria-label="Assign role"]');
+    const form = $('form[aria-label="Assign job"]');
     expect(form?.closest('table')).toBeNull();
     expect(form?.textContent).toContain('Person or agent');
     expect(form?.textContent).toContain('Until (your local time)');
     await click(button('New version'));
-    expect($('form[aria-label="Publish role version"]')).not.toBeNull();
+    expect($('form[aria-label="Publish job version"]')).not.toBeNull();
     await click(button('Cancel editing'));
-    expect($('form[aria-label="Publish role version"]')).toBeNull();
+    expect($('form[aria-label="Publish job version"]')).toBeNull();
   });
 });
 

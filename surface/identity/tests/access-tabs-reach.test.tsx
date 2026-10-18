@@ -11,12 +11,12 @@ describe('Access tabs reach the access map and roles', () => {
     await mount('#/graph', { ...SERVICE, '/apps': ok({ apps: [] }) });
     expect(document.querySelector('h1')?.textContent).toBe('Access');
     expect(tabs()).toContainEqual(['Access map', '#/graph', 'page']);
-    expect(tabs()).toContainEqual(['Roles', '#/roles', null]);
+    expect(tabs()).toContainEqual(['Jobs', '#/roles', null]);
   });
 
-  it('shows the same tabs on Roles, so a person can go back to Access', async () => {
+  it('shows the same tabs on Jobs, so a person can go back to Access', async () => {
     await mount('#/roles', { ...SERVICE, '/roles': ok({ roles: [] }) });
-    expect(tabs()).toContainEqual(['Roles', '#/roles', 'page']);
+    expect(tabs()).toContainEqual(['Jobs', '#/roles', 'page']);
     expect(tabs()).toContainEqual(['Grants', '#/access', null]);
   });
 });

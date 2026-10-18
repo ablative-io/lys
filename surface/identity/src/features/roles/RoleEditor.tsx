@@ -37,15 +37,15 @@ export function RoleEditor({ role, person, model, changed, cancel }: { role?: Ro
         profile: field(data, 'profile'), note: field(data, 'note'), grant_templates: templates });
     } catch (error) { setFailure(String(error)); }
   };
-  return <form className="card recorded-form" aria-label={role ? 'Publish role version' : 'Create role'} onSubmit={submit}>
-    <h2>{role ? 'Save a new version of ' + role.name : 'Create a role'}</h2>
-    <p>Describe the work and the access normally needed. Saving a version leaves existing assignments on their current version and grants no access.</p>
+  return <form className="card recorded-form" aria-label={role ? 'Publish job version' : 'Create job'} onSubmit={submit}>
+    <h2>{role ? 'Save a new version of ' + role.name : 'Describe a job'}</h2>
+    <p>Describe the work and the access normally needed. Saving a version leaves everyone doing this job on their current version, and gives no access.</p>
     <fieldset className="form-grid" disabled={change.blocked} style={{ border: 0, padding: 0 }}>
-      {!role ? <label className="field wide">Role name<input name="name" required /></label> : null}
+      {!role ? <label className="field wide">Job name<input name="name" required /></label> : null}
       {(['responsibilities', 'goals', 'practice'] as const).map((name) => <label className="field wide" key={name}>{name === 'responsibilities' ? 'Responsibilities' : name === 'goals' ? 'Goals' : 'How the work is done'}<textarea name={name} rows={6} required defaultValue={current?.[name] ?? ''} /></label>)}
       <label className="field wide">Starting instructions for an agent<textarea name="profile" rows={6} defaultValue={current?.profile ?? ''} /></label>
-      <h3>Access this role usually needs</h3>
-      <p className="note">A template only describes the access; it grants nothing. Give the access itself on Access.</p>
+      <h3>Access this job usually needs</h3>
+      <p className="note">This only describes the access; it gives nothing. Give the access itself on Access.</p>
       <TableScroll label="Access templates"><table className="usage-table" aria-label="Access templates"><thead><tr><th>Type of thing</th><th>Name of the thing</th><th>Access level</th><th>Usual days</th><th>Change</th></tr></thead>
         <tbody>
           {rows.map(({ id, template }) => <tr key={id} aria-label={'Access template ' + (id + 1)}>
@@ -63,7 +63,7 @@ export function RoleEditor({ role, person, model, changed, cancel }: { role?: Ro
       <datalist id="role-ids">{resources.map((resource) => <option key={resource.kind + ':' + resource.id} value={resource.id} label={resource.kind} />)}</datalist>
       {known.status === 'refused' ? <div className="note"><p>The things already named in grants could not be read, so type each template’s type of thing and its name.</p><details><summary>Error details</summary><p className="refusal-name">{known.refused.refusal.refusal}: {known.refused.refusal.reason}</p></details></div> : null}
       <label className="field wide">Reason for this version<textarea name="note" rows={2} required /><span className="hint">Kept in the version history, so others know why it changed.</span></label>
-      <p><Act symbol="save" name={role ? 'Save this version' : 'Create role'} word={role ? 'Save' : 'Create'} tone="primary" type="submit" />{' '}<Act symbol="close" name="Cancel editing" word="Cancel" onClick={cancel} /></p>
+      <p><Act symbol="save" name={role ? 'Save this version' : 'Create job'} word={role ? 'Save' : 'Create'} tone="primary" type="submit" />{' '}<Act symbol="close" name="Cancel editing" word="Cancel" onClick={cancel} /></p>
     </fieldset>
     {failure ? <p role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;

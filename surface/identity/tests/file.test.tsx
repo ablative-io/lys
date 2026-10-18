@@ -83,7 +83,7 @@ describe("An agent's file", () => {
   it('shows role and version as not recorded, never a sample role', async () => {
     await mount('#/file/' + SCRIBE);
     const about = $('[aria-label="About this agent"]')?.textContent ?? '';
-    expect(text()).toContain('No role is currently assigned');
+    expect(text()).toContain('has no job yet');
     expect(about).toContain('Ada (test person)');
     expect(text()).not.toContain('Identity lead');
   });

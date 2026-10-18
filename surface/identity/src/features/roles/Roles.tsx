@@ -23,10 +23,10 @@ export function Roles() {
   const roles = load.status === 'ok' ? [...new Map([...load.data.roles.map((role) => [role.id, role] as const), ...answers]).values()] : [];
   const changed = (answer: RoleAnswer) => {
     const updated = 'id' in answer ? answer : roles.find((role) => role.id === answer.role);
-    if (!updated) throw new Error('The saved answer names a role that is not on this page. Open All roles to check the change.');
+    if (!updated) throw new Error('The saved answer names a job that is not on this page. Open All jobs to check the change.');
     const next = 'id' in answer ? answer : { ...updated, holders: updated.holders.map((holder) => holder.assignment === answer.holder.assignment ? answer.holder : holder) };
     setAnswers((values) => new Map([...values, [next.id, next]]));
-    setEditing(false); setNotice('Lys saved the role change. The details below came with its answer.');
+    setEditing(false); setNotice('Lys saved the job change. The details below came with its answer.');
   };
   const authority = useLoad(() => readTogether({ people: api.people(), me: api.me(), model: api.model() }), 'role-authority');
   const admin = authority.status === 'ok' && authority.data.people.scope === 'directory';
@@ -34,26 +34,26 @@ export function Roles() {
   const role = id ? roles.find((entry) => entry.id === id) : undefined;
   const me = authority.status === 'ok' ? authority.data.me.person.id : '';
   const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} cancel={() => setEditing(false)} /> : null;
-  return <div className="page fill"><PageHeader title={role ? role.name : 'Roles'} breadcrumb={id ? <a href="#/roles">Roles</a> : undefined} subtitle={id ? undefined : 'Describe a job, assign it to people or agents, and review changes before updating their assigned version.'} actions={admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} tone={editing ? 'plain' : 'primary'} onClick={() => setEditing((value) => !value)} /> : null} />
+  return <div className="page fill"><PageHeader title={role ? role.name : 'Jobs'} breadcrumb={id ? <a href="#/roles">Jobs</a> : undefined} subtitle={id ? undefined : 'Describe a job, assign it to people or agents, and review changes before updating their assigned version.'} actions={admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a job'} word={editing ? 'Close' : role ? 'New version' : 'Create'} tone={editing ? 'plain' : 'primary'} onClick={() => setEditing((value) => !value)} /> : null} />
     <AccessTabs on="roles" />
     {notice ? <p role="status">{notice}</p> : null}
-    <Gate load={load} title="Roles" ok={() => {
-      if (id && !role) return <div className="why-not"><p>This role is not among the roles Lys returned. It may have been removed, or the link may be wrong.</p><a className="btn" href="#/roles">All roles</a></div>;
+    <Gate load={load} title="jobs" ok={() => {
+      if (id && !role) return <div className="why-not"><p>This job is not among the jobs Lys returned. It may have been removed, or the link may be wrong.</p><a className="btn" href="#/roles">All jobs</a></div>;
       if (role) return <div className="body halves role-detail">
         <div className="pane">{editor ?? <RoleText role={role} />}</div>
         <div className="pane"><RoleHolders role={role} person={me} admin={admin} identities={identities} changed={changed} /></div>
       </div>;
       if (editor) return <div className="body one"><div className="pane">{editor}</div></div>;
-      const group = [{ id: '', name: 'Roles', lead: null, depth: 0, items: roles, within: roles }];
+      const group = [{ id: '', name: 'Jobs', lead: null, depth: 0, items: roles, within: roles }];
       const columns: Column<Role>[] = [
-        { head: 'Role', cell: (entry) => entry.name },
+        { head: 'Job', cell: (entry) => entry.name },
         { head: 'Latest version', cell: (entry) => <span className="sec">Version {entry.latest}</span> },
-        { head: 'Held by', cell: (entry) => <span className="sec">{entry.holders.filter((holder) => holder.state === 'holding').length}</span> },
+        { head: 'Doing it', cell: (entry) => <span className="sec">{entry.holders.filter((holder) => holder.state === 'holding').length}</span> },
       ];
       return <div className="body one">
         {roles.length ? <Listing<Role> groups={group} columns={columns} id={(entry) => entry.id} href={(entry) => '#/roles/' + encodeURIComponent(entry.id)} words={(entry) => entry.name}
-          noun="roles" holds={(items) => items.length + ' roles'} selected={null} select={() => undefined} open={(entry) => { location.hash = '/roles/' + encodeURIComponent(entry.id); }} />
-          : <p>No roles have been recorded.</p>}
+          noun="jobs" holds={(items) => items.length + (items.length === 1 ? ' job' : ' jobs')} selected={null} select={() => undefined} open={(entry) => { location.hash = '/roles/' + encodeURIComponent(entry.id); }} />
+          : <p>No jobs have been described yet.</p>}
       </div>;
     }} />
     {authority.status === 'refused' ? <ErrorWords problem={authority.refused} /> : null}
@@ -66,12 +66,12 @@ const PARTS = ['responsibilities', 'goals', 'practice', 'profile'] as const;
 function RoleText({ role }: { role: Role }) {
   const [number, setNumber] = useState<number | null>(null);
   const shown = role.versions.find((version) => version.number === (number ?? role.latest));
-  if (!shown) return <p className="why-not">Version {number ?? role.latest} of this role was not returned by the service.</p>;
+  if (!shown) return <p className="why-not">Version {number ?? role.latest} of this job was not returned by the service.</p>;
   return <>
-    <section className="card" aria-label="Role words"><h2>Version {shown.number}{shown.number === role.latest ? '' : ' (version ' + role.latest + ' is the latest)'}</h2><p className="note">A role assignment does not grant access.</p>
+    <section className="card" aria-label="Job description"><h2>Version {shown.number}{shown.number === role.latest ? '' : ' (version ' + role.latest + ' is the latest)'}</h2><p className="note">Giving someone this job does not give them access. The access it usually needs is listed below, to give on Access.</p>
       {PARTS.map((part) => <section key={part}><h3>{PART[part]}</h3><p style={{ whiteSpace: 'pre-wrap' }}>{shown[part] || 'None recorded.'}</p></section>)}
     </section>
-    <section className="card" aria-label="Access templates"><h3>Access templates</h3>
+    <section className="card" aria-label="Access templates"><h3>Access this job usually needs</h3>
       <table className="usage-table"><thead><tr><th>Access level</th><th>Type of thing</th><th>Name of the thing</th><th>Lasts</th></tr></thead><tbody>
         {shown.grant_templates.map((template, index) => <tr key={index}><td>{template.relation}</td><td>{template.resource.kind}</td><td>{template.resource.id}</td><td>{template.days === null ? 'No expiry of its own' : template.days + ' days'}</td></tr>)}
         {shown.grant_templates.length ? null : <tr><td colSpan={4} className="dim">None recorded.</td></tr>}

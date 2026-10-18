@@ -27,13 +27,13 @@ function AssignRole({ role, person, identities, changed }: { role: Role; person:
     if (!identities.some((identity) => identity.id === holder) || (ends !== null && (!Number.isSafeInteger(ends) || ends <= Date.now() / 1000))) { setFailure('Choose a person or agent and a future end date, or select No expiry.'); return; }
     change.submit({ operation: operationId(), holder, ends_at: ends });
   };
-  return <form aria-label="Assign role" onSubmit={submit} className="role-assign">
-    <h3>Assign this role</h3>
+  return <form aria-label="Assign job" onSubmit={submit} className="role-assign">
+    <h3>Give this job to someone</h3>
     <fieldset className="form-grid" disabled={change.blocked} style={{ border: 0, padding: 0, margin: 0 }}>
       <div className="field wide">Person or agent<Picker name="holder" label="Find a person or agent" options={identities} /></div>
-      <label className="field">Until (your local time)<input type="datetime-local" name="expires" aria-label="Role until, your local time" required={!noExpiry} disabled={noExpiry} /></label>
+      <label className="field">Until (your local time)<input type="datetime-local" name="expires" aria-label="Job until, your local time" required={!noExpiry} disabled={noExpiry} /></label>
       <label className="tick role-no-expiry"><input type="checkbox" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} />No expiry</label>
-      <p className="wide"><Act symbol="add" name="Assign role" word="Assign" tone="primary" type="submit" /></p>
+      <p className="wide"><Act symbol="add" name="Assign job" word="Assign" tone="primary" type="submit" /></p>
     </fieldset>{failure ? <p className="why-not" role="alert">{failure}</p> : null}<ChangeStatus change={change} />
   </form>;
 }
@@ -41,7 +41,7 @@ function AssignRole({ role, person, identities, changed }: { role: Role; person:
 function VersionDifference({ before, after }: { before: RoleVersion; after: RoleVersion }) {
   return <table><thead><tr><th>Part</th><th>Version {before.number}</th><th>Version {after.number}</th></tr></thead><tbody>
     {(['responsibilities', 'goals', 'practice', 'profile'] as const).map((part) => <tr key={part}><th>{PART[part]}</th><td style={{ whiteSpace: 'pre-wrap' }}>{before[part] || 'Empty'}</td><td style={{ whiteSpace: 'pre-wrap' }}>{after[part] || 'Empty'}</td></tr>)}
-    <tr><th>Access templates</th><td>{before.grant_templates.map((template) => `${template.relation} of ${template.resource.kind}:${template.resource.id} (${template.days === null ? 'no own expiry' : template.days + ' days'})`).join('; ') || 'None'}</td><td>{after.grant_templates.map((template) => `${template.relation} of ${template.resource.kind}:${template.resource.id} (${template.days === null ? 'no own expiry' : template.days + ' days'})`).join('; ') || 'None'}</td></tr>
+    <tr><th>Access it usually needs</th><td>{before.grant_templates.map((template) => `${template.relation} of ${template.resource.kind}:${template.resource.id} (${template.days === null ? 'no own expiry' : template.days + ' days'})`).join('; ') || 'None'}</td><td>{after.grant_templates.map((template) => `${template.relation} of ${template.resource.kind}:${template.resource.id} (${template.days === null ? 'no own expiry' : template.days + ' days'})`).join('; ') || 'None'}</td></tr>
   </tbody></table>;
 }
 
@@ -57,7 +57,7 @@ function HolderRow({ role, holder, person, admin, changed }: { role: Role; holde
   const end = useRoleChange<RoleAnswer>(key('end'), base + '/end', (answer, body) => 'id' in answer && answer.id === role.id && answer.holders.some((entry) => entry.assignment === body.assignment && entry.state === 'ended'), changed);
   const open = confirm ?? (move.pending ? 'move' : end.pending ? 'end' : null);
   const change = open === 'move' ? move : end;
-  const titles = { move: 'Review changes in version ' + role.latest, end: 'Remove this role assignment' };
+  const titles = { move: 'Review changes in version ' + role.latest, end: 'Take this job off them' };
   const name = holder.display_name ?? 'Name unavailable';
   return <>
     <tr aria-label={'Holder ' + name}>
@@ -69,25 +69,25 @@ function HolderRow({ role, holder, person, admin, changed }: { role: Role; holde
         {holder.moves.map((entry, index) => <div className="note" key={index}>Version {entry.from} → {entry.to}, {clock(entry.at)}, by <IdentityName id={entry.by} /></div>)}
         {holder.ended_at !== null ? <div className="note">Ended {clock(holder.ended_at)} by {holder.ended_by ? <IdentityName id={holder.ended_by} /> : 'Name unavailable'}</div> : null}</td>
       {admin ? <td>{holder.state !== 'holding' ? null : !holder.assignment ? <span className="why-not">The server must identify this assignment before it can be changed safely.</span> : open ? null : <>
-        {holder.behind ? <Act symbol="again" name={titles.move} word={'Move to v' + role.latest} onClick={() => setConfirm('move')} /> : null}
+        {holder.behind ? <Act symbol="again" name={titles.move} word={'Move to version ' + role.latest} onClick={() => setConfirm('move')} /> : null}
         <Act symbol="remove" name={titles.end} word="Remove" onClick={() => setConfirm('end')} /></>}
         <ChangeStatus change={move} /><ChangeStatus change={end} /></td> : null}
     </tr>
     {open && admin && holder.assignment ? <tr className="review-row"><td colSpan={6}>
       <h4>{titles[open]} for {name}?</h4>
       {open === 'move' && before && after ? <VersionDifference before={before} after={after} /> : null}
-      <p>{open === 'move' ? 'The expiry stays ' + (holder.ends_at === null ? 'unset' : clock(holder.ends_at)) + '. Existing grants are not changed.' : 'The assignment stays in its history. This does not retire the identity or revoke separately issued grants.'}</p>
-      {!change.pending ? <><Act symbol="approve" name={open === 'move' ? 'Apply version ' + role.latest : 'Yes, remove this assignment'} word={open === 'move' ? 'Apply' : 'Remove'} tone="primary" disabled={change.blocked || (open === 'move' && (!before || !after))} onClick={() => change.submit(open === 'move' ? { assignment: holder.assignment, from_version: holder.version, to_version: role.latest } : { assignment: holder.assignment })} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setConfirm(null)} /></> : null}
+      <p>{open === 'move' ? 'The expiry stays ' + (holder.ends_at === null ? 'unset' : clock(holder.ends_at)) + '. Existing grants are not changed.' : 'It stays in their history. This does not retire them, and access given separately is not taken back.'}</p>
+      {!change.pending ? <><Act symbol="approve" name={open === 'move' ? 'Apply version ' + role.latest : 'Yes, take this job off them'} word={open === 'move' ? 'Apply' : 'Remove'} tone="primary" disabled={change.blocked || (open === 'move' && (!before || !after))} onClick={() => change.submit(open === 'move' ? { assignment: holder.assignment, from_version: holder.version, to_version: role.latest } : { assignment: holder.assignment })} />{' '}<Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setConfirm(null)} /></> : null}
     </td></tr> : null}
   </>;
 }
 
 export function RoleHolders({ role, person, admin, identities, changed }: { role: Role; person: string; admin: boolean; identities: { id: string; name: string }[]; changed: (answer: RoleAnswer) => void }) {
-  return <section className="card" aria-label="Holders"><h2>People and agents assigned this role</h2><p className="note">Each person or agent keeps their assigned version until an administrator applies another. A version change never extends its expiry.</p>
-    <TableScroll label="People and agents assigned this role"><table className="usage-table"><thead><tr><th>Who</th><th>Version</th><th>State</th><th>Until</th><th>Assigned</th>{admin ? <th>Change</th> : null}</tr></thead>
+  return <section className="card" aria-label="Holders"><h2>People and agents doing this job</h2><p className="note">Each person or agent keeps their assigned version until an administrator applies another. A version change never extends its expiry.</p>
+    <TableScroll label="People and agents doing this job"><table className="usage-table"><thead><tr><th>Who</th><th>Version</th><th>State</th><th>Until</th><th>Assigned</th>{admin ? <th>Change</th> : null}</tr></thead>
       <tbody>
         {role.holders.map((holder) => <HolderRow key={holder.assignment ?? holder.holder + ':' + holder.assigned_at} role={role} holder={holder} person={person} admin={admin} changed={changed} />)}
-        {role.holders.length ? null : <tr><td colSpan={admin ? 6 : 5} className="dim">No holders yet.</td></tr>}
+        {role.holders.length ? null : <tr><td colSpan={admin ? 6 : 5} className="dim">Nobody is doing this job yet.</td></tr>}
       </tbody>
     </table></TableScroll>
     {admin ? <AssignRole key={role.id + ':' + role.holders.length} role={role} person={person} identities={identities} changed={changed} /> : null}
