@@ -6,7 +6,7 @@ import { GpuTerminal } from './GpuTerminal';
 import { Act } from '../../shell/Act';
 import { refreshLive } from '../../live';
 import { ErrorWords } from '../people/Words';
-import { RUN_WORDS, RunConfirm, useRunActs } from '../team/RunConfirm';
+import { RUN_WORDS, RunConfirm, useRunActs } from '../run/RunConfirm';
 
 export interface SessionEnd { how: 'exited' | 'ended_by_runner_restart' | 'accounts_exhausted'; at: number; status: number | null; signal: string | null }
 interface EndAnswer { answer?: { kind?: string; ended?: SessionEnd } }

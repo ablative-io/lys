@@ -15,7 +15,7 @@ import { clockMs } from '../file/time';
 import { TableScroll } from '../../shell/Listing';
 import { RecordName, useRecordNames } from '../../shell/RecordName';
 import { ErrorWords, problemWords } from '../people/Words';
-import { RUN_WORDS } from '../team/RunConfirm';
+import { RUN_WORDS } from '../run/RunConfirm';
 
 /** Each seat state in words, the same on every screen that names one. */
 export const STATE_WORDS: Record<SeatState, string> = {

@@ -1,15 +1,2 @@
-/* The terminal is the screen: edge to edge, split like a multiplexer, each pane with its own foot line. The tree of names is down the left and folds away. */
-.team-start { display: flex; flex-direction: column; gap: 14px; width: min(100%, 480px); }
-.team-start-line { margin: 0; font-size: 14px; }
-.team-start-acts { display: flex; align-items: center; gap: 12px; }
-.team-start-acts .why-not { border: 0; padding: 0; }
-.team-start-where { margin: 0; font-size: 12.5px; }
-.team-stop { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-base); border-top: 1px solid var(--border-default); font-size: 13px; }
-.team-stop p { margin: 0; flex: 1; }
-
-/* The run beside the list on People and agents: the pane gets room for a terminal when an agent is running. */
-.agent-run { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
-.agent-run-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.agent-run-words { flex: 1 1 320px; }
-.agent-run .team-stop { position: static; margin-top: 12px; padding: 12px 0 0; background: none; }
-.agent-run .team-start { width: 100%; }
+/* Moved to run/run.css. Kept only for the dashboard's import (dashboard/AgentTree.tsx) until it imports from run/; then this folder goes. */
+@import '../run/run.css';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readMachineHarness } from '../src/features/team/Start';
+import { readMachineHarness } from '../src/features/run/Start';
 
 const machine = 'chosen';
 const catalogue = { machine, programs: [{ name: 'Codex', builds: [{ program: 'codex', from: 'runner' }] }, { name: 'Claude Code', builds: [{ program: 'claude', from: 'runner' }] }] };

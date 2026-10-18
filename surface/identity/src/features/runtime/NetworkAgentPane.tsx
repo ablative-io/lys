@@ -1,11 +1,11 @@
 /**
  * The terminal space for an agent chosen in the network tree that holds no seat on that computer and is not running:
- * the agent's own Start, the same one its page and the dashboard offer (POST /agents/{id}/start, in team/Start), so a
+ * the agent's own Start, the same one its page and the dashboard offer (POST /agents/{id}/start-command, in run/Start), so a
  * press here starts it the way it starts everywhere else. What stops a start is said there, before the press.
  */
 import { api, useLoad } from '../../api';
 import type { Entry } from '../people/directory';
-import { Start } from '../team/Start';
+import { Start } from '../run/Start';
 import { said } from './canvas-kept';
 import { problemWords } from '../people/Words';
 

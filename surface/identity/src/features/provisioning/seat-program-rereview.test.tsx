@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
-import { AgentRun } from '../team/AgentRun';
+import { AgentRun } from '../run/AgentRun';
 import { serve, text } from '../../../tests/harness';
 import { ADA, SCRIBE, SCRIBE_VIEW, SERVICE, ok } from '../../../tests/fixtures';
 

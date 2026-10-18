@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
-import * as start from '../src/features/team/Start';
+import * as start from '../src/features/run/Start';
 import { ADA, SCRIBE, SCRIBE_VIEW } from './fixtures';
 
 const machine = 'op-' + '1'.repeat(32);

@@ -15,7 +15,7 @@ import type { Team } from '../teams/contract';
 import { AgentTeams } from '../teams/TeamActions';
 import { Pill } from '../people/Pill';
 import { entries } from '../people/directory';
-import { AgentRun } from '../team/AgentRun';
+import { AgentRun } from '../run/AgentRun';
 import './agent-overview.css';
 import { Act } from '../../shell/Act';
 import { CambiumNext } from './CambiumNext';

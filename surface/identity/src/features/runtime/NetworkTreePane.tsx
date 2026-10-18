@@ -8,7 +8,7 @@ import { STATE_WORDS } from '../sessions/Seats';
 import { ErrorWords, problemWords } from '../people/Words';
 import './terminal.css';
 import { Act } from '../../shell/Act';
-import { RUN_WORDS, RunConfirm } from '../team/RunConfirm';
+import { RUN_WORDS, RunConfirm } from '../run/RunConfirm';
 
 interface Attached { seat: SeatView; session: string; cursor: number; ended: boolean; lines: { at: number; kind: string; text: string }[] }
 
