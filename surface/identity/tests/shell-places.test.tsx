@@ -51,7 +51,7 @@ describe('the rail and the palette', () => {
     for (const row of rows) expect(row.textContent).not.toContain('#/');
     expect(rows.find((row) => row.dataset.to === '#/people')?.lastElementChild?.textContent).toBe('g p');
     const acts = $$('#palList .it[data-n]').map((row) => row.firstElementChild?.textContent);
-    expect(acts).toEqual(expect.arrayContaining(['Move Help to the other side', 'Show or hide menu labels']));
+    expect(acts).toEqual(expect.arrayContaining(['Move the menu and Help to the other side', 'Show or hide menu labels']));
     expect(acts.join(' ')).not.toContain('Toggle');
   });
 });

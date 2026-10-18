@@ -122,7 +122,7 @@ describe('keyable (conformance 9.3)', () => {
     await press('ArrowDown', {}, input);
     await press('ArrowDown', {}, input);
     expect(paletteRows()[2].classList.contains('sel')).toBe(true);
-    expect(paletteRows()[2].textContent).toContain('Move Help to the other side');
+    expect(paletteRows()[2].textContent).toContain('Move the menu and Help to the other side');
     await press('Enter', {}, input);
     expect($('#shell')?.classList.contains('dock-right')).toBe(true);
     expect($('#palette')?.classList.contains('open')).toBe(false);

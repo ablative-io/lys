@@ -16,9 +16,6 @@
 /* A hidden toast cannot be reached or pressed; a shown one says its words and offers Dismiss beside them. */
 .toast:not(.show) { visibility: hidden; pointer-events: none; }
 .toast { display: flex; align-items: center; gap: 6px; }
-.open-q { color: var(--accent); font: var(--text-2xs) "JetBrains Mono", ui-monospace, monospace; letter-spacing: .08em; border: 1px dashed var(--accent-strong); border-radius: 3px; padding: 0 5px; }
-.set-nav a { display: block; padding: 6px 10px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-size: var(--text-md); }
-.set-nav a.on { background: var(--surface-hover); color: var(--text-primary); }
 .set-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0; }
 .set-row + .set-row { border-top: 1px solid var(--border-subtle); }
 .set-row .d { color: var(--text-muted); font-size: var(--text-sm); }
@@ -29,17 +26,12 @@
 .rail.open .cnt + .kbd { margin-left: 6px; }
 .svc { font: var(--text-2xs) "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; padding: 0 6px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); white-space: nowrap; }
 .svc.built-in { color: var(--accent); border-color: var(--accent-edge); }
-.enf { font-size: var(--text-sm); white-space: nowrap; }
-.enf.enforcing { color: var(--ok); } .enf.registered { color: var(--warn); } .enf.awaiting { color: var(--text-muted); }
 .meta-line { font: var(--text-xs) "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
 .answer-box { margin-top: 12px; }
 .answer-box .answer { margin-top: 0; }
 .pass { color: var(--ok); } .fail { color: var(--danger); }
-.diff-add { color: var(--ok); } .diff-del { color: var(--danger); }
-.rq { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
 table.wrap td { white-space: normal; }
 .file { margin-top: 30px; }
-.empty-note { border: 1px dashed var(--border-default); border-radius: var(--radius-lg); padding: 12px 14px; color: var(--text-secondary); font-size: var(--text-md); }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: opacity .15s !important; } }
 
 .act-panel { border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-default); padding: 14px 16px; margin: 6px 0 12px; }

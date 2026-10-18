@@ -40,7 +40,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; letter-spacing: -.01em; margin
 .btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn.primary:disabled { background: var(--accent-deep); }
-.btn.lg { padding: 9px 16px; font-size: var(--text-md); }
 /* The act control (shell/Act.tsx): a symbol in a square, or a symbol and one word. It takes the button's face and its three tones. */
 .act { font-family: "DM Sans", system-ui, sans-serif; font-style: normal; letter-spacing: normal; text-transform: none; }
 .act { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 32px; min-height: 32px; padding: 0 7px; white-space: nowrap; border-radius: var(--radius-md); border: 1px solid var(--border-default); background: var(--surface-default); font-size: var(--text-md); color: var(--text-primary); cursor: pointer; transition: background .12s ease, border-color .12s ease; }
@@ -123,15 +122,9 @@ tbody tr.cursor td { background: var(--accent-faint); }
 .chain { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .chain .arr { color: var(--text-muted); font-size: var(--text-xs); }
 ul.plain { margin: 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
-.ver { font: var(--text-xs) "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 3px; padding: 0 5px; }
 .code { background: var(--surface-code); border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: 12px 14px; font: var(--text-sm)/1.7 "JetBrains Mono", ui-monospace, monospace; color: var(--text-secondary); white-space: pre-wrap; overflow-x: auto; }
 .code .k { color: var(--accent); }
-.mem { padding: 9px 0; }
-.mem + .mem { border-top: 1px solid var(--border-subtle); }
-.mem .meta { color: var(--text-muted); font-size: var(--text-sm); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
 .tag { font: var(--text-2xs) "JetBrains Mono", ui-monospace, monospace; letter-spacing: .06em; padding: 0 5px; border-radius: 3px; border: 1px solid var(--border-default); color: var(--text-secondary); }
-.tag.inf { color: var(--warn); border-color: rgba(251,191,36,.3); }
-.tag.obs { color: var(--ok); border-color: rgba(116,181,132,.3); }
 .timeline { border-left: 1px dashed var(--border-default); margin-left: 5px; padding-left: 16px; }
 .tl { position: relative; padding: 4px 0 10px; }
 .tl::before { content: ""; position: absolute; left: -20px; top: 10px; width: 7px; height: 7px; border-radius: 50%; background: var(--surface-hover); border: 1px solid var(--text-muted); }
@@ -180,8 +173,6 @@ tr.more td { border-bottom: 0; }
 .page.signed-out > .card { flex: none; overflow: visible; width: 280px; display: grid; justify-items: center; gap: 12px; padding: 28px 24px; }
 .page.signed-out .mark { margin: 0; }
 .page.signed-out h1 { margin: 0; }
-/* The add row of the secrets table: where a secret is used is three labelled inputs side by side. */
-.secret-where label { display: inline-flex; flex-direction: column; gap: 4px; margin: 0 10px 0 0; vertical-align: top; font-size: var(--text-sm); }
 /* A finger, not a pointer: acts are 44 px targets; a small act and a pill's remove keep their drawn size and take a 44 px hit area around it. */
 @media (pointer: coarse) {
   .act { min-height: 44px; min-width: 44px; }

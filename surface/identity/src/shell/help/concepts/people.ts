@@ -83,7 +83,7 @@ export const PEOPLE: Seed[] = [
     id: 'people.rail',
     title: 'The rail',
     summary: 'Every screen, one key away.',
-    body: ['g then a letter goes to a screen. [ shows or hides labels. \\ moves the help panel to the other side.'],
+    body: ['g then a letter goes to a screen. [ shows or hides labels. \\ moves the menu and Help to the other side.'],
     steps: [],
     related: ['start.keys'],
   },

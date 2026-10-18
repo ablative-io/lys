@@ -77,7 +77,7 @@ export function Palette() {
   const acts: Item[] = [
     ...([['Add a person', '#/people/new'], ['Add an agent', '#/agents/new']] as const)
       .filter(([, h]) => mayOpen(h.slice(1))).map(([t, h]) => ({ g: 'Do', t, d: '', to: h, go: () => go(h) })),
-    { g: 'Do', t: 'Move Help to the other side', d: '\\', go: shell.toggleDockSide },
+    { g: 'Do', t: 'Move the menu and Help to the other side', d: '\\', go: shell.toggleDockSide },
     { g: 'Do', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
   ];
   const found: Item[] = typed ? [
