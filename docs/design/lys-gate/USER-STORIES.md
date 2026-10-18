@@ -12,6 +12,8 @@
 
 **S5.** As an agent building a card, I want the length check to name the file and its count so that I split it before landing, not after.
 
+**S6.** As an agent building a card, I want the ast-grep leg to name only what is mine to fix, so that a test-only file says it is test code by its own first line and a real panic in production code is a red I fix, never a red I learn to ignore.
+
 ## Contributor — Reads CI results on a pull request
 
 **S3.** As a contributor reading CI on a pull request, I want the test step to report every failing test binary so that I can fix them all from one run.

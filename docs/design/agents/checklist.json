@@ -245,6 +245,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A test's runner and owners end with the test (AGENTS-014)",
+      "items": [
+        {
+          "id": "C772",
+          "text": "lys runner serve and lys runner seat-owner started with --ends-with-fd end, the way an intentional stop ends them, when that descriptor reaches end of file; the runner passes it to every owner it starts; without it nothing changes and the installed Lys never passes it.",
+          "done": false
+        },
+        {
+          "id": "C773",
+          "text": "Every lys-runner integration test that starts a runner holds the write end of its lifeline for the test's life, and the Mac's process list read before and after the crate's test run shows no runner or owner the run started outliving it.",
+          "done": false
+        }
+      ]
     }
   ]
 }

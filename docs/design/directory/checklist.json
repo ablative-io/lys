@@ -2375,6 +2375,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The canvas widgets decide in their rows (DIRECTORY-105)",
+      "items": [
+        {
+          "id": "C772",
+          "text": "The canvas's requests and drafts widgets decide in their rows with the dashboard's own forms (Approve access and Decline request on a request the person may decide, the approvers' names on one they may not, Approve and Decline on a draft), and no label on the surface reads Decide.",
+          "done": false
+        }
+      ]
     }
   ]
 }

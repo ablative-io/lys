@@ -24,3 +24,8 @@
 - [ ] **C14** — .land/gates.sh runs `leg sh scripts/file-length.sh`, CLAUDE.md's 'Gates before any commit' block lists the same command and the ast-grep command it was missing, and CI runs the same script.
 - [ ] **C15** — The leg exits 0 on the card's head and exits non-zero on a scratch file of 501 code lines that never reaches origin, naming that file.
 - [ ] **C16** — sh scripts/design/gate.sh exits 0 at the card's head.
+
+## The ast-grep findings outside app names (LYSGATE-003)
+
+- [ ] **C17** — Every test-only module file the whole gate's ast-grep named carries #![cfg(test)] as its first item, after its mod site was read and found under #[cfg(test)], and ast-grep names none of them.
+- [ ] **C18** — No unwrap, expect, panic or discarded Result remains in Lys code that is not test code: the fixture-binding panic in refusals_follow.rs is under test or returns the refusal by who calls it, and warn_lines.rs writes its field with push_str; ast-grep's only findings are the app-name rules', counts unchanged.

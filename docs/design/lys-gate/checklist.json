@@ -95,6 +95,21 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The ast-grep findings outside app names (LYSGATE-003)",
+      "items": [
+        {
+          "id": "C17",
+          "text": "Every test-only module file the whole gate's ast-grep named carries #![cfg(test)] as its first item, after its mod site was read and found under #[cfg(test)], and ast-grep names none of them.",
+          "done": false
+        },
+        {
+          "id": "C18",
+          "text": "No unwrap, expect, panic or discarded Result remains in Lys code that is not test code: the fixture-binding panic in refusals_follow.rs is under test or returns the refusal by who calls it, and warn_lines.rs writes its field with push_str; ast-grep's only findings are the app-name rules', counts unchanged.",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -143,6 +143,18 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-identity-server/src/agents_add_run_tests.rs` | tests of the sibling module, red first | AGENTS-013 |
 | `surface/identity/src/features/people/AddAgent.tsx` | adding an agent; one request, the receipt part by part | AGENTS-013 |
 | `surface/identity/src/features/people/add-and-run.ts` | the browser-kept add-and-run walk; deleted by AGENTS-013 (one request replaces it) | AGENTS-013 |
+| `crates/lys-runner/tests/ends_with_fd.rs` | red first: a runner and its owner exit when the lifeline's write end closes (AGENTS-014 R1, R2) | AGENTS-014 |
+| `crates/lys/src/commands/runner.rs` | carries the descriptor into the runner's Options and the owner's OwnerServe (AGENTS-014 R1) | AGENTS-014 |
+| `crates/lys-runner/src/socket.rs` | Options gains ends_with; the runner reads the lifeline and ends on its end of file (AGENTS-014 R1) | AGENTS-014 |
+| `crates/lys-runner/src/seat_owner/spawn.rs` | OwnerSpawn gains ends_with; start() passes the inheritable descriptor to the owner (AGENTS-014 R1) | AGENTS-014 |
+| `crates/lys-runner/src/seat_owner/process.rs` | the owner reads the lifeline and ends its managed session on end of file (AGENTS-014 R1) | AGENTS-014 |
+| `crates/lys-runner/src/seat_owner/exit_wait.rs` | the kernel's process-exit notice, read by the new test (AGENTS-014 R1) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_survival.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_survival_faults.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_cost.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_conversation.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_owner_socket.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
+| `crates/lys-runner/tests/seat_restart.rs` | starts its runner on a lifeline the test holds (AGENTS-014 R2) | AGENTS-014 |
 
 ## Inventory
 

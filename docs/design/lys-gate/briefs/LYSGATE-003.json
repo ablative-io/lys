@@ -1,0 +1,92 @@
+{
+  "id": "LYSGATE-003",
+  "cluster": "lys-gate",
+  "title": "The whole gate's ast-grep findings outside app names: test-only files say so by structure, and the two real ones are fixed",
+  "depends_on": [
+    "LYSGATE-002"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C17",
+    "C18"
+  ],
+  "stories": [
+    "S6"
+  ],
+  "design_anchor": [
+    "ADR-063",
+    "ADR-111"
+  ],
+  "purpose": "The first whole run of the declared gate on Lys main (fc669616, 19 October 2026) is red on ast-grep with 166 findings. 146 are app names inside Lys's screens and help (ADR-116; a brief of its own in the directory cluster). The other 20 are this brief's: 19 unwraps, expects and panics the rule reads as outside test code, 17 of them in files that are test-only modules whose parents carry the #[cfg(test)], so the file carries no structure of its own that says so; one panic in a pub mod's fixture-binding helper; and one let _ that discards a write into a String. The tokei stage's 94 files are the gate's own defect (it counts raw lines of test files and vendor trees where ADR-111 counts code lines of source; scripts/file-length.sh answers 0 over at the same head) and are reported to the gate's lead, not paid here.",
+  "task": "Give the nine test-only module files the #![cfg(test)] first item ADR-063 recognises, after reading each mod site; fix the panic in refusals_follow.rs by moving it under test or returning the refusal, by who calls it; replace the discarded write! in warn_lines.rs with push_str; prove ast-grep names nothing but the app-name rules, with their counts unchanged.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A test-only module file says so by structure: #![cfg(test)] as its first item",
+      "spec": "Behavioural. ADR-063 and the rule no-unwrap-expect-panic-outside-tests recognise test code by structure the file itself carries: a file whose first item is #![cfg(test)], a #[cfg(test)] mod body, a #[test] fn body, or a file under tests/. Nine files the whole gate names at fc669616 are test-only modules included from a parent under #[cfg(test)] (some through #[path]), so their parents know they are test code and the file does not: crates/lys-home/src/proxy/forward_codex_tests.rs, crates/lys-identity-server/src/mcp_test_answer.rs, crates/lys-identity-server/src/rights_batch_tests.rs, crates/lys-identity-server/src/runner_installer_fixture_tests.rs, crates/lys-identity-server/src/spicedb/batch_tests.rs, crates/lys-runner/src/harness_control/events/tests.rs, crates/lys-runner/src/operations/delivery_composer_tests.rs, crates/lys-secrets/src/bin/lys-secrets/account_binding_tests.rs, crates/lys/src/commands/launch_catalog_tests.rs. Each of these gains #![cfg(test)] as its first item, after its doc comment if it has one, and nothing else in it changes. Before adding it the lane reads each file's mod site and confirms it is under #[cfg(test)]; a file whose mod site is not under #[cfg(test)] is not test code and is listed in the report as R2's, never given the attribute.",
+      "acceptance": [
+        "gate -stages ast-grep at the head names none of the nine files under any rule; the record's findings copied into the report",
+        "gate -stages clippy green: the files compile under test and only under test, nothing outside test depended on them",
+        "For each crate touched, one detached gate -stages nextest -crates <crate> -test 'package(<crate>)' green, one crate at a time, counts in the report"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-home/src/proxy/forward_codex_tests.rs",
+          "crates/lys-identity-server/src/mcp_test_answer.rs",
+          "crates/lys-identity-server/src/rights_batch_tests.rs",
+          "crates/lys-identity-server/src/runner_installer_fixture_tests.rs",
+          "crates/lys-identity-server/src/spicedb/batch_tests.rs",
+          "crates/lys-runner/src/harness_control/events/tests.rs",
+          "crates/lys-runner/src/operations/delivery_composer_tests.rs",
+          "crates/lys-secrets/src/bin/lys-secrets/account_binding_tests.rs",
+          "crates/lys/src/commands/launch_catalog_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C17"
+      ],
+      "stories": [
+        "S6"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The findings in code that is not test code are fixed, not exempted",
+      "spec": "Behavioural. crates/lys-identity-server/src/refusals_follow.rs line 257 panics when the fixture runner cannot be bound, in a pub mod the crate compiles for everyone. The lane reads who calls that function: if only test code does, the function and what serves only it move under #[cfg(test)] (a #[cfg(test)] mod body of the same file, or the file's own test module), so the structure says it is test code; if production code calls it, the panic becomes the ServerError the caller already returns, the refusal named as the crate names refusals (read refusals_api.rs for the shape), and the caller propagates it. crates/lys-identity-server/src/warn_lines.rs line 76 discards the Result of write! into a String with let _; fmt::Write on a String cannot fail, so the line becomes fields.rest.push_str(&format!(...)), which has no Result to discard, and the rule finds nothing there. No #[allow], no sgconfig change, no rule change: the rules stand as written (the no-lint-bypass-attributes rule forbids the first; ADR-063 the rest).",
+      "acceptance": [
+        "Red first for refusals_follow.rs where production code calls it: a test asserts the refusal the caller answers when the runner cannot be bound, by name, and no panic; where only tests call it, the report says so with the call sites and the test is the existing one that exercises it",
+        "gate -stages ast-grep at the head names only the no-app-names-tsx, no-app-names-typescript and no-app-names-rust rules, their counts unchanged from fc669616 (95, 47, 4), and no finding under no-unwrap-expect-panic-outside-tests or no-let-underscore-on-results; the record copied into the report",
+        "gate -stages nextest -crates lys-identity-server -test 'package(lys-identity-server)' green, counts in the report"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/refusals_follow.rs",
+          "crates/lys-identity-server/src/warn_lines.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C18"
+      ],
+      "stories": [
+        "S6"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No rule under rules/ast-grep changes, sgconfig.yml does not change, and no #[allow] or #[expect] is added anywhere (no-lint-bypass-attributes)",
+    "The app-name findings (no-app-names-tsx, -typescript, -rust) are not touched: they are DIRECTORY-106's, under ADR-116",
+    "No file is split or reformatted beyond the lines named; cargo fmt --all before each commit",
+    "No timer, no fixed wait, no poll and no deadline anywhere, in code or test",
+    "Nothing installed, the installed Lys untouched"
+  ],
+  "verification": [
+    "gate -stages ast-grep, its record read: findings only under the three no-app-names rules, counts 95, 47 and 4",
+    "gate -stages clippy",
+    "gate -stages nextest -crates <crate> -test 'package(<crate>)' for each crate touched, one at a time",
+    "python3 scripts/design/validate.py docs/design/lys-gate and python3 scripts/design/check-coverage.py docs/design/lys-gate read for FAIL lines"
+  ]
+}

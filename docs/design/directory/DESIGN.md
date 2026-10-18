@@ -1396,6 +1396,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/tests/shell-places.test.tsx` | tests of the shell's places | DIRECTORY-104 |
 | `surface/identity/tests/sign-in-landing.test.tsx` | tests of where sign-in lands | DIRECTORY-104 |
 | `surface/identity/tests/signed-out-walk.test.tsx` | tests of the signed-out walk | DIRECTORY-104 |
+| `surface/identity/src/features/dashboard/Widgets.tsx` | the requests and drafts parts decide in their rows with DecisionForm and DraftDecide (DIRECTORY-105 R1) | DIRECTORY-105 |
+| `surface/identity/src/features/dashboard/canvas-parts.test.tsx` | pins the acts in the widgets' rows and no Decide label (DIRECTORY-105 R1) | DIRECTORY-105 |
+| `surface/identity/src/features/runtime/CanvasWidgets.tsx` | passes the person and the board re-read to the requests and drafts widgets (DIRECTORY-105 R1) | DIRECTORY-105 |
+| `surface/identity/tests/canvas-widgets.test.tsx` | green against the widgets' new props (DIRECTORY-105 R1) | DIRECTORY-105 |
 
 ## Inventory
 

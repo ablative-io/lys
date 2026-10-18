@@ -454,7 +454,19 @@
       "path": "surface/identity/src/features/people/add-and-run.ts",
       "note": "the browser-kept add-and-run walk; deleted by AGENTS-013 (one request replaces it)",
       "brief": "AGENTS-013"
-    }
+    },
+    {"path": "crates/lys-runner/tests/ends_with_fd.rs", "note": "red first: a runner and its owner exit when the lifeline's write end closes (AGENTS-014 R1, R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys/src/commands/runner.rs", "note": "carries the descriptor into the runner's Options and the owner's OwnerServe (AGENTS-014 R1)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/src/socket.rs", "note": "Options gains ends_with; the runner reads the lifeline and ends on its end of file (AGENTS-014 R1)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/src/seat_owner/spawn.rs", "note": "OwnerSpawn gains ends_with; start() passes the inheritable descriptor to the owner (AGENTS-014 R1)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/src/seat_owner/process.rs", "note": "the owner reads the lifeline and ends its managed session on end of file (AGENTS-014 R1)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/src/seat_owner/exit_wait.rs", "note": "the kernel's process-exit notice, read by the new test (AGENTS-014 R1)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_survival.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_survival_faults.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_cost.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_conversation.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_owner_socket.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
+    {"path": "crates/lys-runner/tests/seat_restart.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"}
   ],
   "principles": [
     {

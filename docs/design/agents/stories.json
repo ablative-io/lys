@@ -96,6 +96,10 @@
         {
           "id": "S427",
           "text": "As an operator, I want every run that started while Lys was unreachable to appear under its person and agent with its calls and cost the moment Lys answers again, so that nothing an agent did in the storm case is missing from the record."
+        },
+        {
+          "id": "S443",
+          "text": "As an operator running Lys's tests on a shared Mac, no runner or owner a test started is left running after the run, however the run ended, so the machine I share carries no stray session, harness or socket of a test long gone."
         }
       ]
     },

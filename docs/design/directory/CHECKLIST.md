@@ -638,3 +638,7 @@
 
 - [ ] **C770** — GET /waiting's request entries carry the request as GET /requests answers it and its agent_draft entries carry the draft as GET /drafts answers it, so one read serves the heading's number and the row's decision; product_draft and review entries carry neither.
 - [ ] **C771** — The dashboard decides in its rows from the one waiting read: Approve access and Decline request in a request's row, Approve and Decline in a draft's row, Open on an app action or a check due, a refused part on its own line, and the word Decide nowhere; the rail says Dashboard, the page has no heading of its own, the stop symbol stands alone, and the week's figure is said once with the person's own limit under it.
+
+## The canvas widgets decide in their rows (DIRECTORY-105)
+
+- [ ] **C772** — The canvas's requests and drafts widgets decide in their rows with the dashboard's own forms (Approve access and Decline request on a request the person may decide, the approvers' names on one they may not, Approve and Decline on a draft), and no label on the surface reads Decide.

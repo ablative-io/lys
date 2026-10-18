@@ -88,6 +88,17 @@ One commit changes the test leg's command to `cargo test --workspace --all-featu
 | `docs/design/rauthy-rebase/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
 | `docs/design/roots/design.json` | cluster gate; its '.' tree gains the file-length leg after ast-grep (LYSGATE-002 R4) | LYSGATE-002 |
 | `docs/design/lys-gate/PROOF-LYSGATE-002.md` | the green and red runs of the file-length leg (LYSGATE-002 R6) | LYSGATE-002 |
+| `crates/lys-home/src/proxy/forward_codex_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-identity-server/src/mcp_test_answer.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-identity-server/src/rights_batch_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-identity-server/src/runner_installer_fixture_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-identity-server/src/spicedb/batch_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-runner/src/harness_control/events/tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-runner/src/operations/delivery_composer_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-secrets/src/bin/lys-secrets/account_binding_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys/src/commands/launch_catalog_tests.rs` | test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1) | LYSGATE-003 |
+| `crates/lys-identity-server/src/refusals_follow.rs` | the fixture-binding panic is under test or returns the refusal (LYSGATE-003 R2) | LYSGATE-003 |
+| `crates/lys-identity-server/src/warn_lines.rs` | the at_ms field is written with push_str, no Result discarded (LYSGATE-003 R2) | LYSGATE-003 |
 
 ## Inventory
 

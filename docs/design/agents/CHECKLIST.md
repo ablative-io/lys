@@ -66,3 +66,8 @@
 
 - [ ] **C770** — POST /agents with run registers, turns on, saves and approves settings, records a new computer or allows on a named one, and starts only with a working folder, under one operation with one receipt naming each part and the first refusal.
 - [ ] **C771** — AddAgent sends one request and keeps no walk in the browser; the act says Add or Add and run by whether a folder is chosen; a refused part says what was done and the next act.
+
+## A test's runner and owners end with the test (AGENTS-014)
+
+- [ ] **C772** — lys runner serve and lys runner seat-owner started with --ends-with-fd end, the way an intentional stop ends them, when that descriptor reaches end of file; the runner passes it to every owner it starts; without it nothing changes and the installed Lys never passes it.
+- [ ] **C773** — Every lys-runner integration test that starts a runner holds the write end of its lifeline for the test's life, and the Mac's process list read before and after the crate's test run shows no runner or owner the run started outliving it.

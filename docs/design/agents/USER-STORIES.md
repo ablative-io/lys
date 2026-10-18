@@ -46,6 +46,8 @@
 
 **S427.** As an operator, I want every run that started while Lys was unreachable to appear under its person and agent with its calls and cost the moment Lys answers again, so that nothing an agent did in the storm case is missing from the record.
 
+**S443.** As an operator running Lys's tests on a shared Mac, no runner or owner a test started is left running after the run, however the run ended, so the machine I share carries no stray session, harness or socket of a test long gone.
+
 ## A person starting an agent on their own computer — types one word and expects the agent to start, whether or not the Lys console is up
 
 **S426.** As a person starting an agent on my own computer, I want lys claude to start my agent when the Lys console is off or unreachable, telling me plainly that it is, so that the one word works every time and I never have to open a terminal to work out why it did not.

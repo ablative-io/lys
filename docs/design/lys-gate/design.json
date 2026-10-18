@@ -221,7 +221,18 @@
       "path": "docs/design/lys-gate/PROOF-LYSGATE-002.md",
       "note": "the green and red runs of the file-length leg (LYSGATE-002 R6)",
       "brief": "LYSGATE-002"
-    }
+    },
+    {"path": "crates/lys-home/src/proxy/forward_codex_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/mcp_test_answer.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/rights_batch_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/runner_installer_fixture_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/spicedb/batch_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-runner/src/harness_control/events/tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-runner/src/operations/delivery_composer_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-secrets/src/bin/lys-secrets/account_binding_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys/src/commands/launch_catalog_tests.rs", "note": "test-only module: #![cfg(test)] as its first item (LYSGATE-003 R1)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/refusals_follow.rs", "note": "the fixture-binding panic is under test or returns the refusal (LYSGATE-003 R2)", "brief": "LYSGATE-003"},
+    {"path": "crates/lys-identity-server/src/warn_lines.rs", "note": "the at_ms field is written with push_str, no Result discarded (LYSGATE-003 R2)", "brief": "LYSGATE-003"}
   ],
   "inventory": [
     {

@@ -6404,7 +6404,11 @@
     {"path": "surface/identity/tests/help.test.tsx", "note": "tests of the help pages", "brief": "DIRECTORY-104"},
     {"path": "surface/identity/tests/shell-places.test.tsx", "note": "tests of the shell's places", "brief": "DIRECTORY-104"},
     {"path": "surface/identity/tests/sign-in-landing.test.tsx", "note": "tests of where sign-in lands", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/signed-out-walk.test.tsx", "note": "tests of the signed-out walk", "brief": "DIRECTORY-104"}
+    {"path": "surface/identity/tests/signed-out-walk.test.tsx", "note": "tests of the signed-out walk", "brief": "DIRECTORY-104"},
+    {"path": "surface/identity/src/features/dashboard/Widgets.tsx", "note": "the requests and drafts parts decide in their rows with DecisionForm and DraftDecide (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
+    {"path": "surface/identity/src/features/dashboard/canvas-parts.test.tsx", "note": "pins the acts in the widgets' rows and no Decide label (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
+    {"path": "surface/identity/src/features/runtime/CanvasWidgets.tsx", "note": "passes the person and the board re-read to the requests and drafts widgets (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
+    {"path": "surface/identity/tests/canvas-widgets.test.tsx", "note": "green against the widgets' new props (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"}
   ],
   "inventory": [
     {
