@@ -30,6 +30,7 @@ import type { CredentialRecord, StoredCredentials } from './ClientCredentials';
 import { Act } from '../../shell/Act';
 import { roleChanges } from './roleChanges';
 import { KNOWN_APPS, KnownApps } from './ConnectApp';
+import { WhoCanUse } from './WhoCanUse';
 import { ErrorWords, IdentityName, problemWords } from '../people/Words';
 import type { MeView } from '../../generated';
 
@@ -170,7 +171,7 @@ export function Apps() {
           <details className="card" aria-label="Add your own app (for developers)"><summary>Add your own app (for developers)</summary>
             {apps.some((app) => app.id !== LYS && !KNOWN_APPS.some((known) => known.id === app.id)) ? null : <p className="dim">No other apps yet.</p>}
             <Register changed={changed} /></details>
-          {open ? <AppCard me={me} edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved: people can sign in to it, and the permissions it asked for now apply.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : null}
+          {open ? <AppCard me={me} edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved. People can sign in to it now, and can do things there once you give them access, under Who can use ' + answer.name + ' below.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : null}
         </div>
       </>;
     }} />
@@ -202,6 +203,7 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
   return <article className="card app-card" aria-label={'App ' + app.id}>
     <h3>{app.name} <span className={'app-state app-' + app.state}>{STATE_WORDS[app.state]}</span></h3>
     <p className="note">Registered by <ByName by={app.registered_by} me={me} />.</p>
+    {app.state === 'approved' && app.id !== LYS ? <WhoCanUse app={app.id} name={app.name} /> : null}
     <details aria-label={'Details of ' + app.id}><summary>Details</summary><dl className="app-details">
       <dt>App id</dt><dd className="mono">{app.id}</dd>
       {app.version ? <><dt>Permissions version</dt><dd>{app.version}</dd></> : null}
