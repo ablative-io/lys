@@ -190,6 +190,9 @@ mod openapi_runner_types;
 mod openapi_table;
 mod openapi_typed;
 mod openapi_types;
+pub mod operations_api;
+#[cfg(test)]
+mod operations_api_tests;
 pub mod operator;
 #[cfg(test)]
 mod pass_provenance_tests;

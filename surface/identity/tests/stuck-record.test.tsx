@@ -21,41 +21,45 @@ const button = (label: string) => [...document.querySelectorAll('button')].find(
 const askOpen = () => $('form[aria-label="Ask for access"] fieldset.ask-fields') as HTMLFieldSetElement | null;
 
 describe('Check with Lys, on the Ask form', () => {
-  it('finds a damaged ask Lys already has, says so, and opens the form on Carry on without sending anything', async () => {
+  const asking = (answer: unknown) => ({ ...routes([]), ['/operations/' + OP]: answer });
+
+  it('asks Lys by the kept operation, says Lys recorded it with a link to it, and opens the form on Carry on without sending anything', async () => {
     sessionStorage.setItem(KEY, '{"operation":"' + OP + '", "resource": broken');
-    const m = await mount('#/requests', routes([asked(OP)]));
+    const m = await mount('#/requests', asking(ok({ recorded: true, kind: 'request', id: OP })));
     expect(askOpen()?.disabled).toBe(true);
     expect(text()).not.toContain('administrator');
     await click(button('Check with Lys'));
-    expect(text()).toContain('Lys has your request: it went through');
+    expect(text()).toContain('Lys recorded this: your request went through, so there is nothing to send again.');
+    expect($('.stuck-record a[href="#/requests/' + OP + '"]')).not.toBeNull();
     await click(button('Carry on'));
     expect(sessionStorage.getItem(KEY)).toBeNull();
     expect(askOpen()?.disabled).toBe(false);
     expect(m.posted).toHaveLength(0);
   });
 
-  it('says a legible ask Lys does not have most likely did not go through, and clears only on her press', async () => {
+  it('says a change Lys has no record of did not go through, keeps what was typed, and clears only on her press', async () => {
     sessionStorage.setItem(KEY, '{"operation":"' + OP + '", "resource": broken');
-    await mount('#/requests', routes([]));
+    await mount('#/requests', asking(ok({ recorded: false })));
     await click(button('Check with Lys'));
-    expect(text()).toContain('Lys has no record of it among your requests');
+    expect(text()).toContain('Lys has no record of your request, so it did not go through. Nothing you typed is lost: clear it and the form opens again.');
     expect(sessionStorage.getItem(KEY)).not.toBeNull();
     await click(button('Clear it and carry on'));
     expect(sessionStorage.getItem(KEY)).toBeNull();
     expect(askOpen()?.disabled).toBe(false);
   });
 
-  it('says a legible ask Lys does not have did not go through only because her requests would show it', async () => {
+  it('cannot tell when Lys refuses to say, and never says it did not go through', async () => {
     sessionStorage.setItem(KEY, '{"operation":"' + OP + '", "resource": broken');
-    await mount('#/requests', routes([]));
+    await mount('#/requests', asking(refused(403, 'NotAdmitted', 'this operation was not sent by the signed-in caller')));
     await click(button('Check with Lys'));
-    expect(text()).toContain('Lys has no record of it among your requests, which would show it, so it did not go through.');
+    expect(text()).toContain('Lys cannot tell from what you may see whether this went through. Do not ask for it again.');
+    expect(text()).not.toContain('did not go through');
+    expect(button('Forget this kept copy')).not.toBeNull();
   });
 
   it('cannot tell when no operation is left to ask about, says not to ask again, and offers only to forget the copy', async () => {
     sessionStorage.setItem(KEY, '{broken');
     await mount('#/requests', routes([]));
-    await click(button('Check with Lys'));
     expect(text()).toContain('Lys cannot tell from what you may see whether this went through. Do not ask for it again.');
     expect(text()).not.toContain('did not go through');
     expect(button('Clear it and carry on')).toBeNull();
@@ -66,9 +70,7 @@ describe('Check with Lys, on the Ask form', () => {
 
   it('clears nothing when Lys does not answer, and says to check again', async () => {
     sessionStorage.setItem(KEY, '{"operation":"' + OP + '", "resource": broken');
-    let closed = false;
-    await mount('#/requests', { ...routes([]), '/requests': () => (closed ? refused(503, 'RequestsUnavailable', 'the request log is closed') : ok({ requests: [] })) });
-    closed = true;
+    await mount('#/requests', asking(refused(503, 'DirectoryUnavailable', 'the directory is closed')));
     await click(button('Check with Lys'));
     expect(text()).toContain('Nothing was cleared');
     expect(sessionStorage.getItem(KEY)).not.toBeNull();
@@ -108,6 +110,17 @@ describe('Check with Lys, on a decision', () => {
 });
 
 describe('A job change kept unreadably', () => {
+  it('asks Lys by a legible operation, and links the job Lys recorded', async () => {
+    const JOB = 'op-' + '3'.repeat(32);
+    sessionStorage.setItem('lys.pending.role.' + ADA + '.new', '{"operation":"' + JOB + '", broken');
+    await mount('#/roles', { ...SERVICE, '/roles': ok({ roles: [] }), ['/operations/' + JOB]: ok({ recorded: true, kind: 'role_change', id: JOB }) });
+    await click(button('Create a job'));
+    await click(button('Check with Lys'));
+    expect(text()).toContain('Lys recorded this: your job change went through');
+    expect($('.stuck-record a[href="#/roles/' + JOB + '"]')).not.toBeNull();
+  });
+
+
   it('cannot be asked about from here, says to look at the list, and clears on her press', async () => {
     sessionStorage.setItem('lys.pending.role.' + ADA + '.new', '{broken');
     await mount('#/roles', { ...SERVICE, '/roles': ok({ roles: [] }) });
@@ -125,11 +138,11 @@ describe('Check with Lys, on a give', () => {
     const key = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
     const given = GRANTS[0].operation;
     sessionStorage.setItem(key, '{"operation":"' + given + '", "recipient": broken');
-    const m = await mount('#/me?tab=account', { ...SERVICE, '/grants/model': ok(AGENT_MODEL) });
+    const m = await mount('#/me?tab=account', { ...SERVICE, '/grants/model': ok(AGENT_MODEL), ['/operations/' + given]: ok({ recorded: true, kind: 'grant', id: GRANTS[0].id }) });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect($('[data-why-not]')?.textContent).toBe('Check what you gave earlier with Lys first (below).');
     await click(button('Check with Lys'));
-    expect(text()).toContain('Lys has the access you gave: it went through');
+    expect(text()).toContain('Lys recorded this: the access you gave went through');
     await click(button('Carry on'));
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(button('Check with Lys')).toBeNull();
@@ -150,16 +163,19 @@ describe('Check with Lys, after a give to someone else', () => {
   const cys = { ...GRANTS[2], id: 'grant-' + 'e'.repeat(32), issuer: ADA, holder: CY, responsible: CY, source: ROOT_G, operation: GIVEN };
   const key = 'lys.pending.grant.' + ADA + '.' + ROOT_G;
   const open = async (grants: typeof GRANTS) => {
-    const m = await mount('#/me?tab=account', { ...SERVICE, '/grants/model': ok(AGENT_MODEL), '/directory/people': ok(PEOPLE), '/people': ok(PEOPLE), '/grants': ok({ grants, revision: 7 }) });
+    const recorded = grants.some((grant) => grant.operation === GIVEN) ? { recorded: true, kind: 'grant', id: cys.id } : { recorded: false };
+    const m = await mount('#/me?tab=account', { ...SERVICE, '/grants/model': ok(AGENT_MODEL), '/directory/people': ok(PEOPLE), '/people': ok(PEOPLE), '/grants': ok({ grants, revision: 7 }), ['/operations/' + GIVEN]: ok(recorded) });
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
-    await click(button('Check with Lys'));
+    // With no operation left to ask about there is nothing to check: the cannot-tell words stand at once.
+    const check = button('Check with Lys');
+    if (check) await click(check);
     return m;
   };
 
   it('finds the give among the access she gave, and sends her to Cy\'s file, where it shows, not to her own list', async () => {
     sessionStorage.setItem(key, '{"operation":"' + GIVEN + '", "recipient":"' + CY + '", broken');
     await open([...passing, cys]);
-    expect(text()).toContain('Lys has the access you gave: it went through');
+    expect(text()).toContain('Lys recorded this: the access you gave went through');
     expect($(`a[href="#/file/${CY}/access"]`)?.textContent).toBe('Cy (test person)\u2019s file');
     expect(text()).not.toContain('in your list');
   });
@@ -167,7 +183,7 @@ describe('Check with Lys, after a give to someone else', () => {
   it('says a legible give Lys has not recorded did not go through, because the access she gave would show it', async () => {
     sessionStorage.setItem(key, '{"operation":"' + GIVEN + '", "recipient":"' + CY + '", broken');
     await open(passing);
-    expect(text()).toContain('Lys has no record of it among the access you have given, which would show it, so it did not go through.');
+    expect(text()).toContain('Lys has no record of the access you gave, so it did not go through.');
     expect(text()).not.toContain('in your list');
   });
 

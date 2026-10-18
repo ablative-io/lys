@@ -309,10 +309,7 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
           <div className="note">Lys has not confirmed this grant{outcome.at === 'pending' ? ' (' + named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, '')) + ')' : ''}. Check sends exactly the same request again, so it can never be given twice{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
         </PendingWords>
       ) : null}
-      {damaged ? <StuckRecord keys={stuckKeys} what="the access you gave"
-        // GET /grants holds every grant its caller issued (the server's grant_sight.rs), so a give missing from it was not recorded.
-        recorded={async (operations) => (await api.grants()).grants.some((grant) => operations.includes(grant.operation))}
-        looked="the access you have given" again="give it" where={gaveTo}
+      {damaged ? <StuckRecord keys={stuckKeys} what="the access you gave" again="give it" where={gaveTo}
         look={<>Open {gaveTo ?? 'the file of the person or agent you gave it to'}, or ask an administrator to look at their access.</>}
         settled={() => { setPending(readPendingGrant(key, me, source.id)); setRest(readPendingRest(key, me, source.id)); }} /> : null}
       <div className="give-actions">

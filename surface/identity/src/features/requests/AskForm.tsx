@@ -263,9 +263,7 @@ export function AskForm({ person, resources, unlisted = '', wanted, model, chang
     {pending.kind === 'held' ? <div role="status"><p>The result is not yet confirmed. Your original request is retained; checking will not create a duplicate.</p><Act symbol="again" name={busy ? 'Checking…' : rest.kind === 'held' ? `Check original request, then ask for the ${rest.asks.length} remaining` : 'Check original request'} word={busy ? 'Checking…' : rest.kind === 'held' ? 'Check, then ask' : 'Check'} disabled={busy} onClick={() => void send(pending.asked, true, rest.kind === 'held' ? rest.asks.filter((each) => each.operation !== pending.asked.operation) : [])} /></div> : null}
     {pending.kind === 'empty' && rest.kind === 'held' ? <div role="status"><p>{rest.asks.length} of an earlier run not yet sent: {rest.asks.map((each) => each.relation).join(', ')}.</p><Act symbol="send" name={busy ? 'Sending…' : `Ask for the ${rest.asks.length} remaining`} word={busy ? 'Sending…' : 'Ask'} data-act="ask-rest" disabled={busy} onClick={() => { const [head, ...tail] = rest.asks; if (head) void send(head, false, tail); }} /></div> : null}
     {damaged ? <StuckRecord keys={[...(pending.kind === 'damaged' ? [key] : []), ...(rest.kind === 'damaged' ? [restKey(key)] : [])]} what="your request"
-      // GET /requests, unpaged, holds every request its caller asked (the server's requests_api.rs, `shows`), and a request's id is its operation.
-      recorded={async (operations) => (await request<{ requests: AccessRequest[] }>('/requests')).requests.some((entry) => operations.includes(entry.id))}
-      looked="your requests" again="ask for it" look="Look for it under All waiting or Decided on this page; if it is not there, ask an administrator to look."
+      again="ask for it" look="Look for it under All waiting or Decided on this page; if it is not there, ask an administrator to look."
       settled={() => { setPending(readPending(key)); setRest(readRest(key)); }} /> : null}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
     {answer ? <p role="status">{answer}</p> : null}
