@@ -127,7 +127,7 @@ export function Palette() {
       <input
         id="palIn"
         ref={input}
-        placeholder="Find a person, an agent, a resource, or an act…"
+        placeholder="Find a page, a person or an agent, or something to do…"
         autoComplete="off"
         tabIndex={open ? 0 : -1}
         value={query}

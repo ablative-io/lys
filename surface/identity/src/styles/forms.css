@@ -10,15 +10,16 @@
 .form-grid > .field { margin: 0 0 14px; }
 /* A tick and its words stand on one line, aligned with the fields around them. */
 label.tick { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 13px; color: var(--text-primary); }
-input:not([type=radio]):not([type=checkbox]), select, textarea {
+/* The base weighs no more than an element (0,0,1, as `select` does), so any scoped rule (.palette input, .tools .search) wins over it. */
+input:where(:not([type=radio]):not([type=checkbox])), select, textarea {
   font: inherit; font-size: 13px; color: var(--text-primary);
   background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md);
   padding: 8px 11px; min-height: 36px; width: 100%;
   transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
-input:not([type=radio]):not([type=checkbox]):hover, select:hover, textarea:hover { border-color: rgba(255,255,255,.14); }
-input:not([type=radio]):not([type=checkbox]):focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+input:where(:not([type=radio]):not([type=checkbox])):hover, select:hover, textarea:hover { border-color: rgba(255,255,255,.14); }
+input:where(:not([type=radio]):not([type=checkbox])):focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
 input:disabled, select:disabled, textarea:disabled { opacity: .55; cursor: not-allowed; }
 select {
   appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px;

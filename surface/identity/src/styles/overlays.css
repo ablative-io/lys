@@ -4,6 +4,9 @@
 .palette { position: fixed; left: 50%; top: 14vh; width: 560px; max-width: 92vw; transform: translate(-50%, -8px) scale(.98); opacity: 0; pointer-events: none; transition: all .22s var(--spring); background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); z-index: 31; overflow: hidden; }
 .palette.open { opacity: 1; pointer-events: auto; transform: translate(-50%, 0) scale(1); }
 .palette input { width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--border-default); padding: 14px 16px; color: var(--text-primary); font: 14px "DM Sans", system-ui, sans-serif; outline: none; }
+/* Search's field is the panel's header line, not a form box: it keeps that look when hovered and focused. */
+.palette input:hover, .palette input:focus { border-color: var(--border-default); box-shadow: none; }
+.palette input { border-radius: 0; }
 .palette .grp { font: 500 10px "JetBrains Mono", ui-monospace, monospace; letter-spacing: .15em; text-transform: uppercase; color: var(--text-muted); padding: 10px 16px 4px; }
 .palette .it { padding: 7px 16px; display: flex; justify-content: space-between; cursor: pointer; }
 .palette .it.sel { background: rgba(212,151,90,.1); }
