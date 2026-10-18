@@ -43,3 +43,17 @@ The agents table has Running, Budget and Goals columns; beside and under it the 
 Recommendation: A. "Near" is the budget's own `warn_at` when it has one; when it has none, 80% (the review's figure, and early enough to act before the limit's act happens). The same threshold drives the bar's warn colour in item 4, from one helper.
 
 Second go. Rendered in jsdom. What I changed on reflection: a retired agent that still has a live session used to be reachable only from Running now; with that panel gone it would have lost its Stop, so the table now keeps a retired agent while it has a live session. Stop all first sat in the Agents heading always; the stakeholders sheet says "not Stop All with nothing running", so it shows only while something runs or while what runs cannot be read (the case the old comment guarded: the off switch is needed most when the page cannot say what runs). Still wrong: the near line says "$500 a week" with the old money words until item 8; the dashboard no longer lists upcoming goal deadlines anywhere but the table's "next due" line, which I think is right for Cherie but loses the one place a manager saw every goal at once (the canvas still has it).
+
+## Item 4: the budget bar has two states and ignores warn_at
+
+The bar is the accent below the limit and red at it; `warn_at` is never drawn, so "near" is never seen. On the canvas a tinted widget repaints every bar in its tint, so a bar at its limit can look like one far below it. Since item 3 the dashboard draws no bar at all: the table's Budget cell is words only.
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. One limit bar, drawn as the HTML `meter` element, under the words of the Budget cell in the agents table and in the canvas Budget widget: accent below where the warning begins, the warn colour from there, red at the limit. Context limits draw no bar (compacting is the limit working). The threshold is item 3's `warnFraction`. | A thin bar under "$212 of $500 this week" that turns amber at 80% (or her warn_at) and red at the limit. | Two-state bar (06 #4); a level said only in numbers; and, by using `meter`, no inline width style. | Problem: "could anyone have stopped it" (seen before it acts). |
+| B. Colour the words instead of drawing a bar. | Amber or red text. | Two-state, but colour on text alone is weak for anyone colour-blind and reads as an error. | Less. |
+| C. Keep the old span bar and add a third class. | The same as A on the canvas; nothing on the dashboard. | Two-state only. | Less. |
+
+Recommendation: A. The canvas tint rule is in `features/runtime` (not mine): asked, so a tint never repaints a near or full bar.
+
+Second go. Looked at in headless Chrome with the app's own tokens: the three bands draw as accent, amber and red, the red at exactly the limit. Changed on reflection: the first go removed the old `.dash-bar` rules, which the canvas's usage widget (not mine) still draws, so they are back, marked as the canvas's; and the first go also put the bar's words in a `title`, a tooltip a phone never shows (06 #10), so the words are only the meter's accessible name and the cell's own text. Still wrong: Firefox not looked at; the canvas's tint rule still repaints its own span bars (asked).

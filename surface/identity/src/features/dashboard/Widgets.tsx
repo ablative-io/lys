@@ -11,7 +11,8 @@ import { day } from '../file/time';
 import type { AccessRequest } from '../requests/contract';
 import { refusedPart } from './contract';
 import type { DashboardAgent } from './contract';
-import { budgetLine, tightest } from './words';
+import { budgetLine, nearestSpend, tightest, warnFraction } from './words';
+import type { BudgetsView } from '../usage/contract';
 import { Unread } from './Unread';
 
 /** What a widget holds, apart from the card around it: the Dashboard puts it in a card, the canvas in a window a person places. */
@@ -20,6 +21,16 @@ const part = (label: string, count: ReactNode, href: string, body: ReactNode): P
 
 function Unreadable({ what, refused }: { what: string; refused: Refused }) {
   return <div role="alert"><Unread part={refused} words={what + ' could not be read.'} /></div>;
+}
+
+/**
+ * How near a limit is, as the HTML meter: the accent below where its warning begins, the warn colour from there, red at
+ * the limit. A meter puts a value equal to `high` in its middle band, so `high` sits just under 1 and the limit itself
+ * is red. `near` is the share of the limit used, 1 being reached; `warn` where the warning begins.
+ */
+export function LimitBar({ near, warn }: { near: number; warn: number }) {
+  const said = Math.round(near * 100) + '% of the nearest limit' + (near >= 1 ? ', reached' : near >= warn ? ', near it' : '');
+  return <meter className="dash-meter" min={0} max={1} low={warn} high={0.999999} optimum={0} value={Math.max(0, Math.min(1, near))} aria-label={said} />;
 }
 
 /** An agent's name linked to its Limits and goals tab, where its budget and goals are changed. */
@@ -68,17 +79,23 @@ export function budgetPart({ rows }: { rows: DashboardAgent[] }) {
   const free = rows.length - limited.length;
   return part("Budget", reached ? reached + ' at limit' : known.length + ' limited', "#/people", <>
     <table className="dash-table"><tbody>
-      {limited.map(({ row, near, line }) => <tr key={row.agent.id} data-budget={row.agent.id}>
+      {limited.map(({ row, line }) => <tr key={row.agent.id} data-budget={row.agent.id}>
         <td className="dash-name">{limitsOf(row)}</td>
         <td className="sec">{line.refused ? <Unread part={line.refused} words={line.words} /> : <>
-          <span className="dash-bar" role="img" aria-label={near < 0 ? 'Nothing reported yet' : Math.round(near * 100) + '% of the nearest limit'}>
-            <span className={near >= 1 ? 'full' : ''} style={{ width: Math.max(0, Math.min(1, near)) * 100 + '%' }} /></span>
+          {refusedPart(row.budget) ? null : <Bar budget={row.budget} />}
           {line.lines.map((each, index) => <span className="dash-line" key={index}>{each}</span>)}</>}</td>
       </tr>)}
       {free ? <tr className="empty"><td className="dim" colSpan={2}>{limited.length ? free + (free === 1 ? ' other agent has' : ' other agents have') + ' no limit.' : 'No agent has a limit.'}</td></tr> : null}
     </tbody></table>
   </>);
 }
+
+/** The bar of a budget's nearest limit that is not a context limit; nothing when none has a reported figure. */
+function Bar({ budget }: { budget: BudgetsView }) {
+  const near = nearestSpend(budget);
+  return near === null ? null : <LimitBar near={near} warn={warnFraction(budget)} />;
+}
+export { Bar as BudgetBar };
 
 const ORDER = { missed: 0, open: 1, met: 2, dropped: 3 };
 const STANDING = { open: 'Open', met: 'Met', missed: 'Missed', dropped: 'Dropped' };

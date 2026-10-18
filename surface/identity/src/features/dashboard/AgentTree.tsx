@@ -22,6 +22,7 @@ import type { DashboardAgent } from './contract';
 import { budgetLine, goalsLine } from './words';
 import type { Line } from './words';
 import { Unread } from './Unread';
+import { BudgetBar } from './Widgets';
 import { STATUS } from '../people/Words';
 import { Act } from '../../shell/Act';
 
@@ -137,10 +138,10 @@ export function AskedRow({ entry, place, context, columns }: { entry: Entry; pla
   </td></tr>;
 }
 
-/** A budget or goals cell: each limit or goal on its own line, or in plain words that it could not be read. */
-function Cell({ line, kind }: { line: Line; kind: 'budget' | 'goals' }) {
+/** A budget or goals cell: each limit or goal on its own line, or in plain words that it could not be read; a budget's nearest limit as a bar under its words. */
+function Cell({ line, kind, bar = null }: { line: Line; kind: 'budget' | 'goals'; bar?: ReactNode }) {
   return <td className={'sec you-where you-' + kind}>{line.refused ? <Unread part={line.refused} words={line.words} />
-    : line.lines.map((each, index) => <span className="dash-line" key={index}>{each}</span>)}</td>;
+    : <>{line.lines.map((each, index) => <span className="dash-line" key={index}>{each}</span>)}{bar}</>}</td>;
 }
 
 /** What the Running cell says of an agent that is not running: why, in the directory's own words for its state. */
@@ -160,7 +161,7 @@ function AgentRow({ entry, level, place, open, context }: { entry: Entry; level:
       <td className="sec you-where">{sessionsRefused ? <Unread part={sessionsRefused} words="Not known" />
         : live.length ? live.map((session) => <span className="dash-line" key={session.session}>{whereOf(session)}</span>)
         : idle(entry.state)}</td>
-      {row ? <><Cell kind="budget" line={budgetLine(row)} /><Cell kind="goals" line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
+      {row ? <><Cell kind="budget" line={budgetLine(row)} bar={refusedPart(row.budget) || refusedPart(row.usage) ? null : <BudgetBar budget={row.budget} />} /><Cell kind="goals" line={goalsLine(row.goals)} /></> : <td colSpan={2} />}
       <td className="you-act">{sessionsRefused ? null
         : live.length ? live.map((session) => <RunningActs key={session.session} entry={entry} session={session} context={context} place={place} />)
         : asked?.agent === entry.id && asked.what !== 'stop' ? null : <RowStart entry={entry} ask={context.ask} place={place} stopped={context.stopped} />}</td>

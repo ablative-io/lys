@@ -27,6 +27,12 @@ export const tightest = (budget: BudgetsView): number | null => {
 export const warnFraction = (budget: Pick<BudgetsView, 'warn_at'>): number =>
   typeof budget.warn_at === 'number' && budget.warn_at >= 0 && budget.warn_at <= 100 ? budget.warn_at / 100 : 0.8;
 
+/** How near the agent's nearest limit that is not a context limit is, 1 being reached; null when none has a reported figure. Context limits compact by design and draw no bar. */
+export const nearestSpend = (budget: BudgetsView): number | null => {
+  const near = Math.max(-1, ...budget.limits.map((limit, index) => limit.unit === 'context_percent' ? -1 : nearness(budget, index)));
+  return near < 0 ? null : near;
+};
+
 const CONTEXT_ACTS: Record<Limit['act'], string> = { compact: 'compacts', notice: 'sends a notice', stop: 'stops', tell: 'tells you' };
 
 /** A context limit describes its act; the current reading comes from the same session evidence as the usage widget. */

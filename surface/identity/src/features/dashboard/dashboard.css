@@ -37,9 +37,19 @@
 .dash-widget > .section-h a { margin-left: auto; font: inherit; letter-spacing: 0; text-transform: none; color: var(--text-secondary); }
 .dash-count { font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-primary); }
 .dash-widget .note { margin-top: 2px; }
+/* The canvas's usage bar (features/runtime/CanvasWidgets.tsx) still draws this span; the dashboard's limits use .dash-meter. */
 .dash-bar { display: block; height: 4px; margin: 2px 0 5px; border-radius: 2px; background: var(--surface-hover); overflow: hidden; }
 .dash-bar > span { display: block; height: 100%; background: var(--accent, var(--text-secondary)); }
 .dash-bar > span.full { background: var(--danger); }
+/* A limit's bar: the meter's three bands are the accent, the warn colour from where the warning begins, and danger at the limit. */
+.dash-meter { -webkit-appearance: none; appearance: none; display: block; width: 100%; max-width: 24ch; height: 4px; margin: 4px 0 2px; border: 0; border-radius: 2px; background: var(--surface-hover); }
+.dash-meter::-webkit-meter-bar { height: 4px; border: 0; border-radius: 2px; background: var(--surface-hover); }
+.dash-meter::-webkit-meter-optimum-value { border-radius: 2px; background: var(--accent); }
+.dash-meter::-webkit-meter-suboptimum-value { border-radius: 2px; background: var(--warn); }
+.dash-meter::-webkit-meter-even-less-good-value { border-radius: 2px; background: var(--danger); }
+.dash-meter::-moz-meter-bar { border-radius: 2px; background: var(--accent); }
+.dash-meter:-moz-meter-sub-optimum::-moz-meter-bar { background: var(--warn); }
+.dash-meter:-moz-meter-sub-sub-optimum::-moz-meter-bar { background: var(--danger); }
 .dash-agents { min-height: 0; }
 .dash-side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
 .dash-side > .you-panel { flex: none; }
