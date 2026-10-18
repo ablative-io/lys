@@ -21,3 +21,6 @@ export function singular(noun: string): string {
 
 /** A count and its noun, singular for one: counted(1, 'computers') → "1 computer". */
 export const counted = (n: number, plural: string, one: string = singular(plural)): string => count(n) + ' ' + (n === 1 ? one : plural);
+
+/** The one money formatter (CONSENSUS.md): US dollars, two decimals, as Australian English groups them: US$1,500.00. */
+export const money = (value: number): string => 'US$' + value.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

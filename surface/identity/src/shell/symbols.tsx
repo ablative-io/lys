@@ -27,6 +27,7 @@ export const SYMBOLS = {
   help: <><circle cx="12" cy="12" r="8" /><path d="M9.8 9.6a2.3 2.3 0 1 1 3.4 2c-.8.5-1.2 1-1.2 1.9M12 16.4v.1" /></>,
   watch: <><path d="M3 12s3.3-6 9-6 9 6 9 6-3.3 6-9 6-9-6-9-6z" /><circle cx="12" cy="12" r="2.6" /></>,
   enter: <path d="M13 5h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-5M4 12h10M10.5 8.5L14 12l-3.5 3.5" />,
+  leave: <path d="M11 5H6a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h5M10 12h10M16.5 8.5L20 12l-3.5 3.5" />,
   search: <><circle cx="11" cy="11" r="6" /><path d="m15.5 15.5 4 4" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
   more: <><circle cx="6" cy="12" r="1.4" {...solid} /><circle cx="12" cy="12" r="1.4" {...solid} /><circle cx="18" cy="12" r="1.4" {...solid} /></>,

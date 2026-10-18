@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, text, type, unmountAll } from './harness';
 import { MODEL, SERVICE, ok } from './fixtures';
-import { counted, singular } from '../src/shell/count';
+import { counted, money, singular } from '../src/shell/count';
 import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Listing } from '../src/shell/Listing';
@@ -65,6 +65,9 @@ describe('count sentences', () => {
     expect(counted(1, 'people and agents')).toBe('1 person or agent');
     expect(counted(1500, 'secrets')).toBe('1,500 secrets');
     expect(singular('running sessions')).toBe('running session');
+  });
+  it('says money one way: US dollars, two decimals, grouped', () => {
+    expect([money(0), money(1.5), money(1500), money(0.005)]).toEqual(['US$0.00', 'US$1.50', 'US$1,500.00', 'US$0.01']);
   });
   it('counts and searches one row in the singular', async () => {
     await mount('#/resources', { ...ROUTES, '/resources': resources([{ kind: 'project', id: 'identity', standing: 1, ended: 0, holders: 1 }]) });
