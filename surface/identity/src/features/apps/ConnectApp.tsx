@@ -135,6 +135,8 @@ export function ConnectApp() {
   const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
+  // Whether the manifest could not be read from this page at all, so the person is offered the manifest itself to open.
+  const [blocked, setBlocked] = useState(false);
   // Whether the app is already connected, so approving says it replaces the running app's credentials; unread, the words say "if".
   const apps = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps');
   const held = apps.status === 'ok' ? apps.data.apps.find((app) => app.id === manifest?.id)?.state ?? null : undefined;
@@ -142,8 +144,14 @@ export function ConnectApp() {
     const name = appName(manifestUrl);
     const from = name === 'the app' ? 'the app’s' : name + '’s';
     if (!appOrigin(manifestUrl) || !back || !state) { setRefusal('This link is incomplete. Start again from ' + from + ' Connect to Lys.'); return; }
+    // An https page may not read a plain http address off its own computer: the browser blocks it unasked, so it is said before any read.
+    if (window.location.protocol === 'https:' && manifestUrl.startsWith('http:') && !onlyHere(manifestUrl)) {
+      setRefusal('Lys is open over https, and ' + name + ' at ' + appOrigin(manifestUrl) + ' is served over plain http, so the browser will not let this page read it. Serve ' + name + ' over https, then start again from ' + name + '.');
+      return;
+    }
     let live = true;
-    const unreachable = 'Lys could not reach ' + name + ' at ' + appOrigin(manifestUrl) + '. Check that ' + name + ' is running and the address is right, then start again from ' + name + '.';
+    // A read the browser rejects is either nothing answering or an answer this page is not allowed to read; the page cannot tell which.
+    const unreachable = 'Lys could not read ' + name + '’s manifest at ' + appOrigin(manifestUrl) + ' from this page, so it cannot tell whether ' + name + ' is not answering there or does not let this Lys read it.';
     const notManifest = (said: string) => 'Lys reached ' + appOrigin(manifestUrl) + ', but ' + said + ', so it is not ' + name + ' as Lys knows it. Check that the address is ' + from + ', then start again from ' + name + '.';
     // Not answering at all, answering with a refusal, and answering with something else are three different faults, each said as itself.
     fetch(manifestUrl).then(async (answer) => {
@@ -152,7 +160,7 @@ export function ConnectApp() {
       const value: unknown = await answer.json().catch(() => undefined);
       if (!live) return;
       if (validManifest(value)) setManifest(value); else setRefusal(notManifest('its answer is not a manifest Lys reads'));
-    }, () => { if (live) setRefusal(unreachable); });
+    }, () => { if (live) { setRefusal(unreachable); setBlocked(true); } });
     return () => { live = false; };
   }, [manifestUrl, back, state]);
   const approve = async () => {
@@ -185,6 +193,13 @@ export function ConnectApp() {
       </div>
     </> : refusal ? null : <p className="dim">Reading the app’s manifest…</p>}
     {refusal ? <p role="alert" className="app-refused">{refusal}</p> : null}
-    {refusal && !manifest ? <p><a className="btn" href="#/apps">Back to Apps</a></p> : null}
+    {blocked && !manifest ? <ul className="app-list" aria-label="Find out which">
+      <li>If {appName(manifestUrl)}’s manifest opens, {appName(manifestUrl)} is running but does not let Lys at <span className="mono">{window.location.origin}</span> read it: allow this Lys in {appName(manifestUrl)}, then start again from {appName(manifestUrl)}.</li>
+      <li>If it does not open, {appName(manifestUrl)} is not answering at that address: check that it is running, then start again from {appName(manifestUrl)}.</li>
+    </ul> : null}
+    {refusal && !manifest ? <p className="app-actions">
+      {blocked ? <a className="btn" href={manifestUrl} target="_blank" rel="noopener noreferrer">Open {appName(manifestUrl)}’s manifest</a> : null}
+      <a className="btn" href="#/apps">Back to Apps</a>
+    </p> : null}
   </section></div>;
 }
