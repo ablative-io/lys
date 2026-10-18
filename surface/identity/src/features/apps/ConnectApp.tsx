@@ -9,7 +9,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { operationId } from '../../api';
+import { operationId, useLoad } from '../../api';
 import { Act } from '../../shell/Act';
 import { send } from './SchemaBuilder';
 import { STATE_WORDS, SchemaTable, refusalWords } from './Apps';
@@ -43,13 +43,16 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
     ? 'That is not a whole web address. Type it as it appears in the browser, starting with https://.'
     : 'Type ' + known.name + '’s web address to continue.';
   const cancel = () => { setAsking(false); setAddress(''); };
+  const connected = state === 'approved';
+  // A connected app rests with nothing inviting it to be broken: connecting again is a quiet act whose cost is said before the address is asked for.
   // The address takes the card's whole width on its own line, its label above it and the acts under it.
   return <div aria-label={'Known app ' + known.id}>
     <div className="row">
-      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ? STATE_WORDS[state] : 'Not connected'}</span></span>
-      {asking ? null : <Act symbol="add" name={'Connect ' + known.name} word={state === 'approved' ? 'Connect again' : 'Connect'} tone="primary" onClick={() => setAsking(true)} />}
+      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{connected ? 'Connected' : state ? STATE_WORDS[state] : 'Not connected'}</span></span>
+      {asking ? null : <Act symbol="add" name={'Connect ' + known.name} word={connected ? 'Connect again' : 'Connect'} tone={connected ? 'plain' : 'primary'} onClick={() => setAsking(true)} />}
     </div>
     {asking ? <div className="app-connect">
+      {connected ? <ReplacesCredentials name={known.name} /> : null}
       <p className="note">Lys sends your browser to {known.name}, which asks to connect and brings you back here to approve what it asks for.</p>
       <label className="field">{known.name}’s web address<input type="url" inputMode="url" autoComplete="url" autoFocus value={address} onChange={(event) => setAddress(event.target.value)} placeholder="https://cambium.example.com" aria-label={known.name + ' web address'} /></label>
       {whyNot ? <p className="note" aria-live="polite">{whyNot}</p> : null}
@@ -59,6 +62,11 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
       </div>
     </div> : null}
   </div>;
+}
+
+/** What connecting an already connected app costs, said before it is done: approval replaces its credentials at once. */
+function ReplacesCredentials({ name }: { name: string }) {
+  return <p className="app-replace" role="note">{name} is already connected. Connecting again ends the credentials the running {name} uses, so nobody can sign in to it until it finishes connecting again. Do this only when {name} says it has lost its connection to Lys, or to move to another {name}.</p>;
 }
 
 /** The name a refusal gives the app: a known app's name when the link names its manifest, else "the app". */
@@ -102,6 +110,9 @@ export function ConnectApp() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
+  // Whether the app is already connected, so approving says it replaces the running app's credentials; unread, the words say "if".
+  const apps = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps');
+  const held = apps.status === 'ok' ? apps.data.apps.find((app) => app.id === manifest?.id)?.state ?? null : undefined;
   useEffect(() => {
     const name = appName(manifestUrl);
     const from = name === 'the app' ? 'the app’s' : name + '’s';
@@ -132,8 +143,10 @@ export function ConnectApp() {
       <h3>{manifest.name}</h3>
       <p className="note app-addresses">At <span className="mono">{appOrigin(manifestUrl)}</span>. It will send people back to <span className="mono">{back}</span>{manifest.profile ? ' and is given their name' : ''}.</p>
       <div><b>The permissions it asks for</b><SchemaTable app={manifest.id} schema={manifest.schema} label={'Permissions of ' + manifest.id} /></div>
+      {held === 'approved' ? <ReplacesCredentials name={manifest.name} />
+        : held === undefined ? <p className="note">If {manifest.name} is already connected, approving gives it new credentials and the {manifest.name} running now stops signing people in until it finishes connecting.</p> : null}
       <div className="app-actions">
-        <Act symbol="approve" name={'Approve ' + manifest.name} word="Approve" tone="primary" disabled={busy} onClick={() => { void approve(); }} />
+        <Act symbol="approve" name={'Approve ' + manifest.name} word={held === 'approved' ? 'Approve and replace its credentials' : 'Approve'} tone="primary" disabled={busy} onClick={() => { void approve(); }} />
         <Act symbol="decline" name={'Decline ' + manifest.name} word="Decline" tone="danger" disabled={busy} onClick={() => { const declined = declinedAddress(back, manifestUrl, state); if (declined) window.location.assign(declined); else void navigate('/apps'); }} />
       </div>
     </> : refusal ? null : <p className="dim">Reading the app’s manifest…</p>}

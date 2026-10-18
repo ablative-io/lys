@@ -45,3 +45,5 @@
 .apps .app-address-row input { flex: 1; min-width: 0; }
 .apps .app-retire { padding: 10px 12px; border: 1px solid rgba(248,113,113,.25); border-radius: var(--radius-md); }
 .apps .app-retire > p { flex-basis: 100%; margin: 0; }
+/* What connecting an already connected app costs: said in the warning colour before the address and again before Approve. */
+.apps .app-replace { margin: 8px 0; padding: 8px 12px; border: 1px solid var(--warn); border-radius: var(--radius-md); background: var(--warn-glow); color: var(--text-primary); }
