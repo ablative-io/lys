@@ -449,6 +449,11 @@
       "path": "surface/identity/src/features/people/AddAgent.tsx",
       "note": "adding an agent; one request, the receipt part by part",
       "brief": "AGENTS-013"
+    },
+    {
+      "path": "surface/identity/src/features/people/add-and-run.ts",
+      "note": "the browser-kept add-and-run walk; deleted by AGENTS-013 (one request replaces it)",
+      "brief": "AGENTS-013"
     }
   ],
   "principles": [
