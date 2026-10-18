@@ -11,12 +11,13 @@ import type { GrantModel } from '../../generated/grants';
 import { refreshLive } from '../../live';
 import { readTogether } from '../../reads';
 import { keyable } from '../../shell/keyable';
-import { AccessTabs } from '../access/AccessTabs';
+import { AccessLayout } from '../access/AccessLayout';
 import { clock } from '../file/time';
 import { actionSentence } from '../grants/action-words';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { Gate } from '../signin/Gate';
+import { ErrorWords } from '../people/Words';
 import { confirms, readDrafts } from './contract';
 import { ProductDrafts } from './ProductDrafts';
 import type { Draft, DraftAnswer, DraftFilter } from './contract';
@@ -132,17 +133,15 @@ export function Drafts() {
   const last = useRef<{ show: DraftFilter; read: typeof read } | null>(null);
   if (read.status === 'ok') last.current = { show, read };
   const load = read.status === 'loading' && last.current?.show === show ? last.current.read : read;
-  return <div className="page fill drafts-page">
-    <div className="head"><div><h1>Access</h1><p className="sub">What your agents prepared for you to decide. Nothing is done until you approve it.</p></div>
-      {read.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}</div>
-    <AccessTabs on="drafts" />
+  return <AccessLayout on="drafts" className="drafts-page" subtitle="What your agents prepared for you to decide. Nothing is done until you approve it."
+    actions={read.status === 'refused' ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null}>
     <div className="tools">
       <div className="seg">{([['waiting', 'Waiting'], ['decided', 'Decided']] as [DraftFilter, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
       {load.status === 'ok' && load.data.model instanceof Refused ? <div className="why-not"><p>What each action means could not be read, so actions are named as the agent wrote them.</p><details><summary>Error details</summary><p className="refusal-name">{load.data.model.refusal.refusal}: {load.data.model.refusal.reason}</p></details></div> : null}
     </div>
-    <Gate load={load} title="your drafts" ok={(data) => <div className="drafts-body">
+    <Gate load={load} title="your drafts" renderError={(error) => <ErrorWords problem={error} />} ok={(data) => <div className="drafts-body">
       <Table drafts={data.drafts} show={show} model={data.model} names={namesOf(data.people)} person={data.me.person.id} changed={() => setVersion((v) => v + 1)} />
       <ProductDrafts names={namesOf(data.people)} person={data.me.person.id} />
     </div>} />
-  </div>;
+  </AccessLayout>;
 }

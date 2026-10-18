@@ -1,4 +1,4 @@
-import { AccessTabs } from '../access/AccessTabs';
+import { AccessLayout } from '../access/AccessLayout';
 import { actionWords } from '../grants/action-words';
 import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
@@ -50,14 +50,11 @@ export function Reviews() {
     model: api.model(), view: request<ReviewsView>('/reviews'), me: api.me(), people: api.people(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'reviews:' + revision);
-  const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
-  return <div className="page fill reviews-page">
-    <div className="head"><div><h1>Access</h1>
-      <p className="sub">Check what each agent can do: approve the access it still needs, and take back the rest.</p></div></div>
-    <AccessTabs on="reviews" />
+  const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your approval was recorded: this access stays. It does not extend it or change what it allows.'); };
+  return <AccessLayout on="reviews" className="reviews-page" subtitle="Check what each agent can do: approve the access it still needs, and take back the rest.">
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} revision={revision} reload={() => setRevision((value) => value + 1)} />} />
-  </div>;
+  </AccessLayout>;
 }
 
 function Due({ model, view, me, people, teams, confirmed, kept, reload, revision }: { reload: () => void; revision: number; model: GrantModel; view: ReviewsView; me: MeView; people: PeopleView; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string }; confirmed: Record<string, Kept>; kept: (answer: Kept) => void }) {
@@ -78,7 +75,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
     { head: 'Agent', cell: (due) => due.agent.display_name },
     { head: 'Access', cell: (due) => <span className="sec">{breakable(due.grant.relation)} on {breakable(due.grant.resource.kind)} {breakable(names.get(due.grant.resource.id) ?? due.grant.resource.id)}</span> },
     { head: 'Responsible person', cell: (due) => <span className="sec">{due.reviewer.display_name}</span> },
-    { head: 'Last kept', cell: (due) => { const at = last(due); return at ? <span className="sec">{clock(at.at)}</span> : <span className="dim">never</span>; } },
+    { head: 'Last approved', cell: (due) => { const at = last(due); return at ? <span className="sec">{clock(at.at)}</span> : <span className="dim">never</span>; } },
   ];
   return <>
     <p className="note">{view.scope === 'directory' ? 'All agents in the directory.' : 'Agents you are responsible for.'} Checked {clock(view.judged_at)}.</p>
@@ -94,7 +91,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
         selected={open?.grant.id ?? null} select={() => undefined} open={(due) => { setPicked(due.grant.id); setRevoking(null); }}
         tools={<WhoseSelect whose={whose} set={setWhose} teams={teams.list} admin={admin} />} />
       <div className="detail">{open ? <section className="card" aria-label="Grant to review">
-        {/* The selected grant stays below the full-width list; its facts add who kept it and why. */}
+        {/* The selected grant stays below the full-width list; its facts add who last approved it and why. */}
         {drawn && world.status === 'ok' ? <GrantFacts w={world.data} g={drawn} agent={open.agent} />
           : <dl className="facts grant-facts">
             <dt>Holder</dt><dd><Link to={'/file/' + encodeURIComponent(open.agent.id) + '/access'}>{open.agent.display_name}</Link></dd>
@@ -102,7 +99,7 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
             <dt>On</dt><dd>{open.grant.resource.kind} {names.get(open.grant.resource.id) ?? open.grant.resource.id}</dd>
             <dt>Access level</dt><dd>{open.grant.relation}</dd>
           </dl>}
-        {last(open) ? <p className="note">Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
+        {last(open) ? <p className="note">Last approved by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
         <div className="grant-acts">
           {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p className="note">This Lys does not record approvals of access, so only Take back is offered.</p>}
           {drawn && world.status === 'ok' && !drawn.revoked ? <Act symbol="revoke" name={TAKE_BACK} word={TAKE_BACK} tone="danger" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)} /> : null}

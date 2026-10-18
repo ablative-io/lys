@@ -13,7 +13,7 @@ describe('Keep access', () => {
   it('records an explicit review without extending or changing access', async () => {
     const { posted } = await mount('#/reviews', { ...routes, ['POST ' + path]: kept });
     await click(button('Approve: this access stays')); expect(posted).toEqual([]); await click(button('Confirm approval'));
-    expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/), note: '' } }]); expect(text()).toContain('decision to keep this access was recorded'); expect(sessionStorage.length).toBe(0);
+    expect(posted).toEqual([{ path, body: { operation: expect.stringMatching(/^op-/), note: '' } }]); expect(text()).toContain('Your approval was recorded: this access stays'); expect(sessionStorage.length).toBe(0);
   });
   it('recovers the original decision after a lost reply and remount', async () => {
     const first = await mount('#/reviews', { ...routes, ['POST ' + path]: refused(503, 'ReviewsUnavailable', 'Unknown outcome') });
@@ -29,7 +29,7 @@ describe('Keep access', () => {
     await click(button('Approve: this access stays')); await click(button('Confirm approval')); expect(text()).toContain('This grant has ended');
     // The refusal's name is kept small beside the sentence, as on every other form.
     const face = document.body.cloneNode(true) as HTMLElement; for (const small of face.querySelectorAll('.refusal-name')) small.remove();
-    expect(face.textContent).not.toContain('GrantNotDue'); expect(text()).not.toContain('decision to keep this access was recorded');
+    expect(face.textContent).not.toContain('GrantNotDue'); expect(text()).not.toContain('Your approval was recorded: this access stays');
   });
   it('does not offer a recording action when the store is unavailable', async () => {
     await mount('#/reviews', { ...routes, '/reviews': ok({ ...view, decisions_recorded: false }) }); expect(button('Approve: this access stays')).toBeNull(); expect(text()).toContain('This Lys does not record approvals of access, so only Take back is offered.');

@@ -218,3 +218,6 @@
 /* Take back (Revoke): the reason box and the facts card, as classes. */
 .take-back-why { min-height: 60px; }
 .take-back-facts { margin-top: 12px; }
+
+/* The grants list with a form open above it: the form takes what it needs, the list the rest. */
+.grant-cols.with-panel { grid-template-rows: minmax(0, auto) minmax(0, 1fr); }

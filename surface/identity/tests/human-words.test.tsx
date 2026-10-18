@@ -196,7 +196,7 @@ it('shows the kept review and its person from the confirmed answer without rerea
   await clickNamed(view, 'Approve: this access stays');
   await clickNamed(view, 'Confirm approval');
   expect(reads).toBe(1);
-  expect(view.textContent).toContain('Last kept by ' + ME.person.display_name);
+  expect(view.textContent).toContain('Last approved by ' + ME.person.display_name);
 });
 
 

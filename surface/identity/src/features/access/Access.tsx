@@ -3,7 +3,7 @@ import { readTogether } from '../../reads';
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
-import { AccessTabs } from './AccessTabs';
+import { AccessLayout } from './AccessLayout';
 import { Listing } from '../../shell/Listing';
 import { groupByTeam, inWhose } from '../../shell/org';
 import type { Held, OrgTeam } from '../../shell/org';
@@ -151,18 +151,12 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
   const root = isRootAuthority(w.people);
   const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} done={reload} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
     : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
-  return <div className="page fill">
-    <div className="head">
-      <div><h1>Access</h1><p className="sub">{asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}</p></div>
-      {asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Give access</a> : null}
-    </div>
-    <AccessTabs on={asking ? 'ask' : 'grants'} />
-    {asking ? <div className="pane">
+  return asking ? <div className="pane">
       <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={(mode === 'ask' ? 'can' : mode) === k ? 'on' : ''} aria-current={(mode === 'ask' ? 'can' : mode) === k ? 'page' : undefined}>{l}</a>)}</div>
       <div className="check">{q}</div>
     </div> : <>
       {teams.refused ? <p className="why-not">Teams cannot be read, so grants are listed without their team. {teams.refused}</p> : null}
-      <div className="body one grant-cols" style={panel ? { gridTemplateRows: 'minmax(0, auto) minmax(0, 1fr)' } : undefined}>
+      <div className={'body one grant-cols' + (panel ? ' with-panel' : '')}>
         {panel ? <div className="pane">{panel}</div> : null}
         <Listing<Grant> groups={groups} columns={columns} id={(g) => g.id} href={(g) => `#/file/${g.holder}/access`}
           words={(g) => grantNo(g.id) + ' ' + nameOf(w, g.holder) + ' ' + g.relation + ' ' + resourceName(w, g.resource)} noun="grants"
@@ -173,8 +167,7 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
             <div className="seg">{([['all', 'All'], ['void', 'Not standing']] as ['all' | 'void', string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
           </>} />
       </div>
-    </>}
-  </div>;
+    </>;
 }
 
 type Teams = { list: OrgTeam[]; refused: string };
@@ -191,5 +184,13 @@ export function Access() {
   const last = useRef<(typeof load & { status: 'ok' })['data'] | null>(null);
   if (load.status === 'ok') last.current = load.data;
   const shown: typeof load = load.status === 'loading' && last.current ? { status: 'ok', data: last.current } : load;
-  return <Gate load={shown} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />;
+  const issuing = mode === 'issue';
+  const asking = mode !== '' && !issuing;
+  // Only the administrator (the root authority) is offered Give access; it appears once Lys has said who is signed in.
+  const root = shown.status === 'ok' && isRootAuthority(shown.data.w.people);
+  return <AccessLayout on={asking ? 'ask' : 'grants'}
+    subtitle={asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}
+    actions={asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Give access</a> : null}>
+    <Gate load={shown} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />
+  </AccessLayout>;
 }

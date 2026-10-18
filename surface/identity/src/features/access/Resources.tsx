@@ -1,5 +1,5 @@
 /** Resources and grant counts judged by the server within the caller's visibility, grouped by kind; a row opens who can reach it. */
-import { AccessTabs } from './AccessTabs';
+import { AccessLayout } from './AccessLayout';
 import { api, request, useLoad } from '../../api';
 import { entries } from '../people/directory';
 import { Listing } from '../../shell/Listing';
@@ -24,7 +24,7 @@ async function readResources(): Promise<{ list: ResourcesView; label: (resource:
 
 export function Resources() {
   const load = useLoad(readResources, 'resources');
-  return <div className="page fill">
+  return <AccessLayout on="resources" subtitle={'Everything named in the grants you may see, with how many grants are on each.' + (load.status === 'ok' ? ' Counted at ' + clock(load.data.list.judged_at) + '.' : '') + ' To find out whether someone can do something right now, use the Ask tab.'}>
     <Gate load={load} title="Resources" ok={({ list, label }) => {
       const groups = list.kinds.map((kind) => {
         const items = list.resources.filter((resource) => resource.kind === kind);
@@ -37,10 +37,6 @@ export function Resources() {
         { head: 'Current holders', cell: (resource) => resource.holders },
       ];
       return <>
-        <div className="head">
-          <div><h1>Access</h1><p className="sub">Everything named in the grants you may see, with how many grants are on each. Counted at {clock(list.judged_at)}. To find out whether someone can do something right now, use the Ask tab.</p></div>
-        </div>
-        <AccessTabs on="resources" />
         <div className="body one">
           <Listing<ResourceSummary> groups={groups} columns={columns} id={keyOf} href={(resource) => '#/access/who/' + encodeURIComponent(keyOf(resource))}
             words={(resource) => resource.kind + ' ' + label(resource)} noun="resources" empty="No resources appear in your visible grants yet." holds={(items) => counted(items.length, 'resources')}
@@ -48,5 +44,5 @@ export function Resources() {
         </div>
       </>;
     }} />
-  </div>;
+  </AccessLayout>;
 }

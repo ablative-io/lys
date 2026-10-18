@@ -13,7 +13,7 @@ import { installedOf } from './installed';
 import { counted } from '../../shell/count';
 import type { Installed } from './installed';
 import './graph.css';
-import { AccessTabs } from './AccessTabs';
+import { AccessLayout } from './AccessLayout';
 import { Act } from '../../shell/Act';
 import { visibleEntries } from '../people/directory';
 import { useGraphLabels } from './graph-labels';
@@ -244,12 +244,9 @@ function Summary({ world, nodes }: { world: GrantWorld; nodes: Node[] }) {
 export function Graph() {
   const { id } = useParams();
   const load = useLoad(readGraph, 'identity-graph');
-  return <div className="page fill">
-    <div className="head"><div><h1>Access</h1>
-      <p className="sub">Every person, agent and resource you may see, and the grants between them. Reading it does not use a grant.</p></div></div>
-    <AccessTabs on="graph" />
+  return <AccessLayout on="graph" subtitle="Every person, agent and resource you may see, and the grants between them. Reading it does not use a grant.">
     <Gate load={load} title="the access map" ok={({ world, installed }) => <>
       <Graphed world={world} installed={installed} focus={id} />
     </>} />
-  </div>;
+  </AccessLayout>;
 }

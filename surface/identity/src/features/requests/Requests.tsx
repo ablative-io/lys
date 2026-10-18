@@ -1,4 +1,4 @@
-import { AccessTabs } from '../access/AccessTabs';
+import { AccessLayout } from '../access/AccessLayout';
 import { actionWords } from '../grants/action-words';
 import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
@@ -60,12 +60,17 @@ export function Requests() {
     const resources = [...new Map(held.grants.map((grant) => [JSON.stringify(grant.resource), grant.resource])).values()];
     return { person: me.person.id, resources, model, grants: held.grants, unlisted: held.refused };
   }, 'request-choices');
-  return <div className="page fill">
-    <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) => {
-      const entries = [...data.list.requests.filter((entry) => !confirmed[entry.id]), ...Object.values(confirmed)];
-      return <Queue entries={entries} data={data} choices={choices} changed={changed} wanted={wanted} />;
-    }} />
-  </div>;
+  // A refusal's link opens the form asking for what it names. Whether the form is open is the page's, so the head's Ask is drawn with it.
+  const [asking, setAsking] = useState(wanted !== undefined);
+  const person = choices.status === 'ok' ? choices.data.person : '';
+  const retained = person !== '' && sessionStorage.getItem('lys.pending.request.' + person) !== null;
+  const entriesOf = (list: AccessRequest[]) => [...list.filter((entry) => !confirmed[entry.id]), ...Object.values(confirmed)];
+  const ask = asking || retained || (load.status === 'ok' && entriesOf(load.data.list.requests).length === 0);
+  return <AccessLayout on="requests" subtitle="Ask for permission to use something, and decide what others have asked for, oldest first."
+    actions={load.status === 'ok' && !ask ? <Act symbol="add" name="Ask for access" word="Ask" tone="primary" onClick={() => setAsking(true)} /> : null}>
+    <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) =>
+      <Queue entries={entriesOf(data.list.requests)} data={data} choices={choices} changed={changed} wanted={wanted} ask={ask} retained={retained} setAsking={setAsking} />} />
+  </AccessLayout>;
 }
 
 type Loaded = { people: { read: Awaited<ReturnType<typeof api.people>> | null; refused: string }; teams: { list: Awaited<ReturnType<typeof readTeams>>; refused: string } };
@@ -74,16 +79,14 @@ type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: st
 /** A request's state in words. */
 const STATE: Record<AccessRequest['state'], string> = { waiting: 'Waiting on a decision', approved: 'Approved', declined: 'Declined' };
 
-function Queue({ entries, data, choices, changed, wanted }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined }) {
+function Queue({ entries, data, choices, changed, wanted, ask, retained, setAsking }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined;
+  ask: boolean; retained: boolean; setAsking: (asking: boolean) => void }) {
   const admin = data.people.read?.scope === 'directory';
   const directory = data.people.read?.people ?? [];
   const person = choices.status === 'ok' ? choices.data.person : '';
   const mayDecide = (entry: AccessRequest) => entry.state === 'waiting' && (entry.can_decide ?? entry.approvers.some((each) => each.id === person));
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<Show>(() => entries.some(mayDecide) ? 'mine' : 'waiting');
-  const retained = person !== '' && sessionStorage.getItem('lys.pending.request.' + person) !== null;
-  // A refusal's link opens the form asking for what it names.
-  const [asking, setAsking] = useState(wanted !== undefined);
   const [picked, setPicked] = useState<string | null>(null);
   const agents = new Map(directory.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
   const names = new Map(directory.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
@@ -96,7 +99,6 @@ function Queue({ entries, data, choices, changed, wanted }: { entries: AccessReq
     .sort((left, right) => left.asked_at - right.asked_at);
   const groups = groupByTeam(shown, held, data.teams.list, whose, (id) => names.get(id) ?? 'someone outside your view');
   const open = entries.find((entry) => entry.id === picked) ?? shown[0] ?? null;
-  const ask = asking || retained || entries.length === 0;
   const columns: Column<AccessRequest>[] = [
     { head: 'Who asked', cell: (entry) => entry.asked_by_name ?? 'Name unavailable' },
     { head: 'For', cell: (entry) => <span className="sec">{entry.relation} on {onWhat(entry)}</span> },
@@ -105,11 +107,6 @@ function Queue({ entries, data, choices, changed, wanted }: { entries: AccessReq
   ];
   const count = (items: AccessRequest[]) => { const waiting = items.filter((entry) => entry.state === 'waiting').length; return waiting ? waiting + ' waiting' : items.length + ' decided'; };
   return <>
-    <div className="head">
-      <div><h1>Access</h1><p className="sub">Ask for permission to use something, and decide what others have asked for, oldest first.</p></div>
-      {!ask ? <Act symbol="add" name="Ask for access" word="Ask" tone="primary" onClick={() => setAsking(true)} /> : null}
-    </div>
-    <AccessTabs on="requests" />
     {data.people.refused ? <p className="note">People's names are not shown here, so each request shows who asked by the name they gave. {data.people.refused}</p> : null}
     {data.teams.refused ? <p className="why-not">Teams cannot be read, so requests are listed without their team. {data.teams.refused}</p> : null}
     <div className="body work">
