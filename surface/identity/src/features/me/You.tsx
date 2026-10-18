@@ -153,7 +153,8 @@ export function You() {
   return (
     <Gate
       load={load}
-      title="Signed in as"
+      title="You"
+      reading="Reading your account…"
       ok={(data) => (data.kind === 'registered' ? <Registered me={data.me} /> : <Page data={data} reload={() => setVersion((v) => v + 1)} />)}
     />
   );

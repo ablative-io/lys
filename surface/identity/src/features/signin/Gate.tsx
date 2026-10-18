@@ -7,10 +7,11 @@ import { SignIn as SignInForm } from '../sign-in/SignIn';
 import { ErrorWords } from '../people/Words';
 import { takeFileReturn } from './fileReturn';
 
-export function Loading({ title = 'the directory' }: { title?: string } = {}) {
+/** What a page shows while its read is pending: a sentence saying what is being read, never a page title spliced into one. */
+export function Loading({ words = 'Opening Lys…' }: { words?: string } = {}) {
   return (
     <div className="page">
-      <div className="dim">Reading {title}…</div>
+      <div className="dim">{words}</div>
     </div>
   );
 }
@@ -67,9 +68,12 @@ export function RefusedPage({ refused, title }: { refused: Refused; title: strin
   );
 }
 
-/** Render `ok` once the read has answered, the refusal if it was refused. */
-export function Gate<T>({ load, title, ok, renderError }: { load: Load<T>; title: string; ok: (data: T) => ReactNode; renderError?: (refused: Refused) => ReactNode }) {
-  if (load.status === 'loading') return <Loading title={title} />;
+/**
+ * Render `ok` once the read has answered, the refusal if it was refused. `title` names the page above a refusal;
+ * `reading` is the sentence shown while it reads, where "Reading {title}…" would not be one.
+ */
+export function Gate<T>({ load, title, reading, ok, renderError }: { load: Load<T>; title: string; reading?: string; ok: (data: T) => ReactNode; renderError?: (refused: Refused) => ReactNode }) {
+  if (load.status === 'loading') return <Loading words={reading ?? 'Reading ' + title + '…'} />;
   if (load.status === 'refused') return <>{load.refused.status !== 401 && renderError ? renderError(load.refused) : <RefusedPage refused={load.refused} title={title} />}</>;
   return <>{ok(load.data)}</>;
 }
@@ -95,5 +99,5 @@ export function Callback() {
     return () => { live = false; };
   }, []);
   if (refused) return <RefusedPage refused={refused} title="Sign in" />;
-  return <Loading />;
+  return <Loading words="Finishing sign-in…" />;
 }
