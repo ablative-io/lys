@@ -16,6 +16,7 @@
 .sign-in-form .note { font-size: 12px; color: var(--text-secondary); margin: 4px 0 0; }
 .sign-in-providers { display: grid; gap: 8px; margin-top: 18px; }
 .sign-in-providers .btn { justify-content: center; }
-/* After a sign-in that filled in nothing someone else left open (signin/fileReturn.tsx): the line and its Close. */
-.sign-in-dropped { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 16px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px; color: var(--text-secondary); }
+/* After a sign-in that filled in nothing someone else left open (signin/fileReturn.tsx): the line and its Close,
+   floating at the foot like the shell's toast so nothing on the page moves; it stays until closed. */
+.sign-in-dropped { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 40; width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); color: var(--text-secondary); }
 .sign-in-dropped p { margin: 0; }
