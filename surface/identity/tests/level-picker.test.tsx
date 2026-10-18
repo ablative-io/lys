@@ -37,6 +37,11 @@ describe('They may', () => {
     expect(rows(page)[0]).toBe('View it See it and change it.');
   });
 
+  it('counts the other actions a wide level carries, so it never reads narrower than it is', () => {
+    const page = draw({ ...LYS, editor: ['view', 'edit', 'agent.start', 'agent.stop', 'budget.set'] });
+    expect(rows(page)[1]).toBe('Edit it See it, change it and 3 other actions.');
+  });
+
   it('sends the chosen level, or the one specific thing, as the relation', () => {
     const page = draw(LYS);
     act(() => page.querySelector<HTMLInputElement>('input[value="editor"]')?.click());

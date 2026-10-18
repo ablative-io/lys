@@ -14,10 +14,15 @@ import './grants.css';
 const LEVELS: readonly (readonly [string, string])[] = [['viewer', 'View it'], ['editor', 'Edit it'], ['owner', 'Own it']];
 export const LEVEL_NAMES: readonly string[] = LEVELS.map(([relation]) => relation);
 
-/** What a level lets them do, from its actions: seeing, changing, giving others access; anything else by its count. */
+/** The actions a level's words name; any other it carries is counted, so a wide level never reads as a narrow one. */
+const NAMED = new Set(['view', 'read', 'edit', 'grant']);
+
+/** What a level lets them do, from its actions: seeing, changing, giving others access, and how many other actions besides. */
 export function levelWords(actions: readonly string[]): string {
-  const parts = [actions.includes('view') || actions.includes('read') ? 'see it' : '', actions.includes('edit') ? 'change it' : '', actions.includes('grant') ? 'give others access to it' : ''].filter(Boolean);
-  if (!parts.length) return actions.length === 1 ? 'one action' : actions.length + ' actions';
+  const others = actions.filter((action) => !NAMED.has(action)).length;
+  const parts = [actions.includes('view') || actions.includes('read') ? 'see it' : '', actions.includes('edit') ? 'change it' : '', actions.includes('grant') ? 'give others access to it' : '',
+    others ? others + (others === 1 ? ' other action' : ' other actions') : ''].filter(Boolean);
+  if (!parts.length) return 'Nothing.';
   const said = parts.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1];
   return said.charAt(0).toUpperCase() + said.slice(1) + '.';
 }
