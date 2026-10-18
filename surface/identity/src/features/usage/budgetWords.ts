@@ -9,6 +9,13 @@ export const THIS: Record<Length, string> = { five_hour: 'this 5-hour window', d
 
 const ADJECTIVE: Record<Length, string> = { five_hour: '5-hour', day: 'daily', week: 'weekly', month: 'monthly' };
 
+/**
+ * Money as every page writes it: US dollars, two decimals, Australian English grouping, never the browser's locale:
+ * US$1,234.50. The figure is the harness's own `total_cost_usd`, so it is always US dollars.
+ */
+export const money = (value: number): string =>
+  'US$' + value.toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 /** An amount as a person reads it: $500, 50%, 2,000,000 tokens, 90 minutes running. */
 export function amount(unit: Measure, value: number): string {
   const figure = value.toLocaleString(undefined, { maximumFractionDigits: unit === 'dollars' ? 2 : 0 });

@@ -37,6 +37,7 @@ import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { Alarms } from './Alarms';
 import { Unread } from './Unread';
+import { Spend } from './Spend';
 
 interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
@@ -124,6 +125,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
         <div className="section-h"><span>Waiting for you</span></div>
         <div className="you-scroll"><WaitingTable waiting={data.answer.waiting} /></div>
       </section>
+      <Spend rows={rows} />
       <section className="you-panel" aria-label="Running now">
         <div className="section-h"><span>Running now</span><StopEverythingButton cord={data.cord} open={() => setPulling(true)} /></div>
         <div className="you-scroll"><RunningNow rows={every} context={context}
