@@ -6,7 +6,7 @@ import type { Column } from '../../shell/Listing';
 import { TableScroll } from '../../shell/Listing';
 import { Delegate } from './Delegate';
 import { Chain } from './Chain';
-import { chainOf, lastUsedText, mayText, nameOf, givesTo, passText, resourceName, resourceTitle, voidOf, whoTitle, windowText } from './model';
+import { chainOf, givesTo, lastUsedText, mayText, nameOf, passText, resourceName, resourceTitle, voidOf, whichOne, whoTitle, windowText } from './model';
 import type { GrantWorld } from './model';
 import { Revoke } from './Revoke';
 import { modeWords } from './mode-words';
@@ -50,7 +50,7 @@ function Allows({ w, g }: { w: GrantWorld; g: Grant }) {
 export function grantColumns(w: GrantWorld): Column<Grant>[] {
   return [
     { head: 'Grant', cell: (g) => <span title={g.id}>Access to {resourceName(w, g.resource)}</span> },
-    { head: 'Holder', cell: (g) => <span title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}</span> },
+    { head: 'Holder', cell: (g) => <span title={whoTitle(w, g.holder)}>{nameOf(w, g.holder)}{whichOne(w, g.holder) ? <span className="sec g-which">{whichOne(w, g.holder)}</span> : null}</span> },
     { head: 'Allows', cell: (g) => <Allows w={w} g={g} /> },
     { head: 'Relation', cell: (g) => <span className="mono g-tight">{g.relation}</span> },
     {
@@ -86,7 +86,7 @@ export function grantColumns(w: GrantWorld): Column<Grant>[] {
           );
         return (
           <span className="danger" title={v.title}>
-            <span className="verdict-mark no" style={{ fontSize: 9, padding: '1px 6px' }}>
+            <span className="verdict-mark no void-tag">
               void
             </span>{' '}
             {breakable(v.why)}

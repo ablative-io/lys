@@ -58,11 +58,11 @@ function Closed({ draft }: { draft: ProductDraft }) {
 function Row({ draft, names, apps, person, changed }: { draft: ProductDraft; names: Map<string, string>; apps: Map<string, string>; person: string; changed: () => void }) {
   const approvals = draft.approvals ?? [];
   return <tr data-product-draft={draft.id}>
-    <td>{apps.get(draft.app) ?? draft.app}</td>
-    <td title={draft.words}>{draft.target.action} · {kindLabel(draft.target.kind)} {names.get(draft.target.id) ?? draft.target.id}{draft.mode ? <span className="sec"> · {modeWords(draft.mode)}</span> : null}</td>
-    <td>{nameOf(names, draft.holder)}<span className="sec"> · answered for by {nameOf(names, draft.responsible)}</span></td>
-    <td className="sec" data-col="approvals">{approvals.length ? approvals.map((approval) => nameOf(names, approval.by) + ', ' + clock(approval.at)).join('; ') : 'No approval yet'}</td>
-    <td>{draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Closed draft={draft} />}</td>
+    <td data-label="Product">{apps.get(draft.app) ?? draft.app}</td>
+    <td data-label="Wants to" title={draft.words}>{draft.target.action} · {kindLabel(draft.target.kind)} {names.get(draft.target.id) ?? draft.target.id}{draft.mode ? <span className="sec"> · {modeWords(draft.mode)}</span> : null}</td>
+    <td data-label="Holder">{nameOf(names, draft.holder)}<span className="sec"> · answered for by {nameOf(names, draft.responsible)}</span></td>
+    <td className="sec" data-col="approvals" data-label="Approved by">{approvals.length ? approvals.map((approval) => nameOf(names, approval.by) + ', ' + clock(approval.at)).join('; ') : 'No approval yet'}</td>
+    <td data-label="State">{draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Closed draft={draft} />}</td>
   </tr>;
 }
 

@@ -103,11 +103,11 @@ function Table({ drafts, show, model, names, person, changed }: { drafts: Draft[
           const isOpen = open === draft.id;
           return <Fragment key={draft.id}>
             <tr data-draft={draft.id} aria-expanded={isOpen} {...keyable(() => setOpened(isOpen ? null : draft.id))}>
-              <td>{agentOf(draft)}</td>
-              <td>{wantsTo(draft, model, names)}</td>
-              <td className="sec draft-note">{draft.note}</td>
-              <td className="sec">{clock(draft.created_at)}</td>
-              <td onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+              <td data-label="Agent">{agentOf(draft)}</td>
+              <td data-label="Wants to">{wantsTo(draft, model, names)}</td>
+              <td data-label="Note" className="sec draft-note">{draft.note}</td>
+              <td data-label="Asked" className="sec">{clock(draft.created_at)}</td>
+              <td data-label="Decision" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                 {draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Decided draft={draft} listed={listed} />}
               </td>
             </tr>

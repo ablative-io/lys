@@ -76,6 +76,16 @@ export const whoTitle = (w: GrantWorld, id: string): string => {
   return who.name + whose + ', ' + letter + id.slice(id.indexOf('-') + 1, id.indexOf('-') + 9);
 };
 
+/**
+ * Which one `id` is, said only when another identity in view has the same name: whose agent or account it is, else its
+ * file number. A finger never sees a title, so where names collide this is said in the row itself.
+ */
+export const whichOne = (w: GrantWorld, id: string): string => {
+  const who = w.who.get(id);
+  if (!who || ![...w.who.entries()].some(([other, each]) => other !== id && each.name === who.name)) return '';
+  return whoTitle(w, id).slice(who.name.length + 2);
+};
+
 /** A grant's short name, as the mock-up writes `G-5`. */
 export const grantNo = (id: string): string => 'G/' + id.slice(id.indexOf('-') + 1, id.indexOf('-') + 9);
 

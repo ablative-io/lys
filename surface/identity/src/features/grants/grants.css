@@ -65,9 +65,9 @@
   margin-top: 14px;
 }
 
-/* "Can [who] [do what] [on what]? [Check]": one sentence on one line, each field part of it. */
+/* "Can [who] [do what] [on what]? [Check]": one sentence, each field part of it, wrapping where the screen is narrow. */
 .ask-line {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 .ask-line select {
   min-width: 0;
@@ -221,3 +221,25 @@
 
 /* The grants list with a form open above it: the form takes what it needs, the list the rest. */
 .grant-cols.with-panel { grid-template-rows: minmax(0, auto) minmax(0, 1fr); }
+
+/* Which of two of the same name, said in the row, since a finger never sees a title. */
+.g-which { display: block; }
+.verdict-mark.void-tag { font-size: .75em; padding: 1px 6px; }
+
+/*
+ * A phone (CONSENSUS: tables become cards under 600 px): each grant is a card, one fact to a line, named by its
+ * column, so nothing scrolls sideways and nothing is a word to a line. Buttons and ticks in these forms are at
+ * least 44 px, the size of a fingertip.
+ */
+@media (max-width: 600px) {
+  .grant-cols .table-scroll > table, .grant-cols table { width: 100%; min-width: 0; }
+  .grant-cols thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .grant-cols table, .grant-cols tbody, .grant-cols tr, .grant-cols td { display: block; }
+  .grant-cols tbody tr { border: 1px solid var(--border-default); border-radius: var(--radius-lg); padding: 8px 12px; margin: 0 0 10px; }
+  .grant-cols td, .grant-cols td[data-col="Grant"], .grant-cols td[data-col="Relation"] { width: auto; padding: 4px 0; white-space: normal; max-width: none; }
+  .grant-cols td[data-col]::before { content: attr(data-col); display: block; font-size: .85em; color: var(--text-secondary); }
+  /* On a card, "On" repeats the Grant line ("Access to project identity") and "Relation" repeats Allows: each costs a scroll and says nothing new. */
+  .grant-cols td[data-col="On"], .grant-cols td[data-col="Relation"] { display: none; }
+  .ask-line select { max-width: 100%; flex: 1 1 100%; }
+  .give-actions .act, .level-picker .level, .stuck-record .act, .grant-cols .g-change .act { min-height: 44px; }
+}
