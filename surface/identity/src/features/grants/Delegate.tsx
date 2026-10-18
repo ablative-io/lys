@@ -16,6 +16,7 @@ import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from './CambiumFirst';
 import { LevelPicker } from './LevelPicker';
+import { StuckRecord } from './StuckRecord';
 import { PendingWords, RefusedWords } from './Outcome';
 import './grants.css';
 
@@ -93,7 +94,7 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
 
   // Give is never greyed without its reason beside it.
   const fresh = pending.kind !== 'held' && rest.kind !== 'held';
-  const whyNot = damaged ? 'Sending is blocked until the earlier request is settled.'
+  const whyNot = damaged ? 'Check what you gave earlier with Lys first (below).'
     : !recipient ? 'Choose who to give it to.'
       : !leaseKnown ? 'Choose how long it lasts.'
         : fresh && toAgent && picked.length === 0 ? 'Tick at least one thing they may do.'
@@ -304,7 +305,9 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
           <div className="note">Lys has not confirmed this grant{outcome.at === 'pending' ? ' (' + named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, '')) + ')' : ''}. Check sends exactly the same request again, so it can never be given twice{rest.kind === 'held' ? `, then gives the ${rest.bodies.length} remaining` : ''}.</div>
         </PendingWords>
       ) : null}
-      {damaged ? <p role="alert">The retained grant request could not be read. Sending is blocked until its original outcome is established.</p> : null}
+      {damaged ? <StuckRecord keys={[...(pending.kind === 'damaged' ? [key] : []), ...(rest.kind === 'damaged' ? [restKey(key)] : [])]} what="the access you gave"
+        recorded={async (operations) => (await api.grants()).grants.some((grant) => operations.includes(grant.operation))}
+        settled={() => { setPending(readPendingGrant(key, me, source.id)); setRest(readPendingRest(key, me, source.id)); }} /> : null}
       <div className="give-actions">
         {pending.kind === 'empty' && rest.kind === 'held' ? <div className="note" data-rest-held>{rest.bodies.length} of an earlier run not yet sent: {grantedWords(rest.bodies)}. Give sends them exactly as ticked, nothing else.</div> : null}
         <Act symbol={pending.kind === 'held' ? 'again' : 'send'} name={pending.kind === 'held' ? 'Check original grant' : 'Give'} word={pending.kind === 'held' ? 'Check' : 'Give'} tone="primary" data-act="delegatedo" disabled={outcome.at === 'sending' || whyNot !== ''} onClick={give} />

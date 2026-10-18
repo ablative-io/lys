@@ -115,7 +115,7 @@ describe('Requests', () => {
     const mounted = await mount('#/requests', routes);
     await submit();
     expect(mounted.posted).toHaveLength(0);
-    expect(text()).toContain('retained request could not be read');
+    expect(text()).toContain('Lys could not read back your request from earlier in this tab');
   });
 
   it('shows names, reason, status and expiry from the recorded request', async () => {

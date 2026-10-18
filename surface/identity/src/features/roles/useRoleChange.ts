@@ -17,12 +17,14 @@ function read(key: string, allowed: string): Saved | null {
 export function useRoleChange<T>(key: string, path: string, accepts: (answer: T, body: Record<string, unknown>) => boolean, changed: (answer: T) => void) {
   const [initial] = useState(() => { try { return { saved: read(key, path), error: '' }; } catch (error) { return { saved: null, error: String(error) }; } });
   const [saved, setSaved] = useState(initial.saved);
-  const [failure, setFailure] = useState(initial.error);
+  const [failure, setFailure] = useState('');
+  // A kept copy this tab cannot read: sending stays paused until the person clears it, after looking (ChangeStatus).
+  const [stuck, setStuck] = useState(Boolean(initial.error));
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const working = useRef(false);
   const send = async (body: Record<string, unknown>, retry: boolean) => {
-    if (working.current || initial.error) return;
+    if (working.current || stuck) return;
     working.current = true; setBusy(true); setFailure('');
     try {
       const answer = await sendKept(key, { path, body }, async () => {
@@ -37,7 +39,8 @@ export function useRoleChange<T>(key: string, path: string, accepts: (answer: T,
       setFailure(error instanceof Refused ? error.refusal.refusal + ': ' + error.message : String(error));
     } finally { working.current = false; setBusy(false); }
   };
-  return { busy, done, failure, pending: saved !== null, blocked: Boolean(initial.error) || saved !== null || busy || done,
+  return { busy, done, failure, pending: saved !== null, blocked: stuck || saved !== null || busy || done, stuck, key,
+    unstick: () => { setStuck(false); setSaved(null); },
     submit: (body: Record<string, unknown>) => { if (!saved && !done) void send(body, false); },
     retry: () => { if (saved) void send(saved.body, true); },
   };

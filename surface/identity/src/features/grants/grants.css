@@ -207,3 +207,7 @@
 .level-picker .level-refused { opacity: .55; cursor: default; }
 .level-picker .level-more > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--text-secondary); }
 .level-picker .level-more select { max-width: 100%; }
+
+/* Check with Lys (StuckRecord): why sending paused, one button, and Lys's answer, close together. */
+.stuck-record { display: grid; gap: 6px; justify-items: start; margin-top: 10px; }
+.stuck-record > p { margin: 0; }

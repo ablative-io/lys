@@ -7,6 +7,7 @@ import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
 import { Act } from '../../shell/Act';
+import { StuckRecord } from '../grants/StuckRecord';
 
 type Decision = { kind: 'approve'; operation: string; route: 'browser'; source: string | null; note: string }
   | { kind: 'decline'; note: string };
@@ -75,7 +76,10 @@ export function DecisionForm({ entry, person, canIssueRoot, changed, describe }:
       void send({ kind: action, operation: operationId(), route: 'browser', source: source === 'root' ? null : source, note }, false);
     } catch (error) { setFailure(error instanceof Error ? error.message : String(error)); }
   };
-  if (pending.kind === 'damaged') return <p role="alert">A retained decision could not be read. New decisions are blocked until its outcome can be established.</p>;
+  // A decision moves its request out of waiting, so a request still waiting has no recorded decision, whatever the copy said.
+  if (pending.kind === 'damaged') return <StuckRecord keys={[key]} what="your decision" byOperation={false}
+    recorded={async () => (await request<{ requests: AccessRequest[] }>('/requests')).requests.some((each) => each.id === entry.id && each.state !== 'waiting')}
+    settled={() => setPending(load(key))} />;
   return <div>
     {pending.kind === 'held' ? <div role="status"><p>This decision has no confirmed answer. Checking sends the same decision again and cannot create a second one.</p>
       <Act symbol="again" name={busy ? 'Checking…' : 'Check original decision'} word={busy ? 'Checking…' : 'Check'} disabled={busy} onClick={() => void send(pending.decision, true)} /></div>
