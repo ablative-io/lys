@@ -5,7 +5,7 @@
  * small picture over the page's bottom right corner, which stays while the page reads itself again.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 import { Refused, api, request, useLive } from '../../api';
 import type { MeView } from '../../generated';
 import { refreshLive } from '../../live';
@@ -39,8 +39,10 @@ import { PageHeader } from '../../shell/PageHeader';
 import { Alarms } from './Alarms';
 import { Unread } from './Unread';
 import { Spend } from './Spend';
+import { DashOptionStrip, DashboardOption, dashOptionOf } from './DashboardOptions';
+import type { DashOption } from './DashboardOptions';
 
-interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
+export interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
 
 type Read = Ready | { kind: 'registered' };
 
@@ -83,7 +85,7 @@ function treeOf(me: MeView, rows: DashboardAgent[], teams: Team[]): Node {
   return trim(complete);
 }
 
-function Page({ data, reload, watching, watch }: { data: Ready; reload: () => void; watching: string | null; watch: (row: DashboardAgent, session: RuntimeSession) => void }) {
+function Page({ data, reload, watching, watch, option, fixture }: { data: Ready; reload: () => void; watching: string | null; watch: (row: DashboardAgent, session: RuntimeSession) => void; option: DashOption | null; fixture: boolean }) {
   const [asked, setAsked] = useState<Asked | null>(null);
   // A pull with no confirmed answer in this tab opens its row by itself, so it is asked about and never sent twice.
   const [pulling, setPulling] = useState(pullPending);
@@ -102,13 +104,19 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
   const listed = { running: every.flatMap(liveOf).length, unread: every.filter((row) => refusedPart(row.sessions)).length };
   // Stop all is offered while anything runs, or while what runs cannot be read, when the off switch is needed most; never with nothing running.
   const stoppable = listed.running > 0 || listed.unread > 0 || data.cord instanceof Refused;
+  const branches = treeOf(data.me, listedRows, teams).branches;
+  // Under an option the page is one of the three dashboards being decided between; the cord line and the pull row stay the same.
+  if (option) return <><CordLine cord={data.cord} changed={reload} listed={listed} />
+    {pulling ? <table className="dash-table dash-cord-ask"><tbody><StopEverythingRow columns={1} close={() => setPulling(false)} changed={reload} /></tbody></table> : null}
+    <DashboardOption option={option} shown={{ data, context, branches, reload, fixture, stoppable: stoppable || pulling, openStop: () => setPulling(true) }} />
+  </>;
   return <><CordLine cord={data.cord} changed={reload} listed={listed} /><div className="dash-body">
     <GettingStarted person={data.me.person.id} agents={rows.length} standing={data.standing} reread={reload} />
     <section className="you-panel dash-agents" aria-label="Agents">
       <div className="section-h"><span>Agents</span>{stoppable || pulling ? <StopEverythingButton cord={data.cord} open={() => setPulling(true)} /> : null}</div>
       {pulling ? <table className="dash-table dash-cord-ask"><tbody><StopEverythingRow columns={1} close={() => setPulling(false)} changed={reload} /></tbody></table> : null}
       {data.teams instanceof Refused ? <Unread part={data.teams} words="Teams could not be read, so your agents are listed without their teams." /> : null}
-      <div className="you-scroll"><AgentTree branches={treeOf(data.me, listedRows, teams).branches} context={context} /></div>
+      <div className="you-scroll"><AgentTree branches={branches} context={context} /></div>
     </section>
     <div className="dash-side">
       <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />
@@ -136,13 +144,25 @@ function Picture({ watched, close }: { watched: Watched; close: () => void }) {
   </aside>;
 }
 
+/** True in a dev build (the dev server), where the option strip is drawn and `&fixture=cherie` draws the page from her fixture. */
+const DEV = process.env.NODE_ENV !== 'production';
+
 export function Dashboard() {
   const [version, setVersion] = useState(0);
   const read = useLive(readPage, 'dashboard:' + version);
+  const [query] = useSearchParams();
+  const option = dashOptionOf(query.get('option'));
+  // Dev builds only: Cherie's fixture stands in for the service, so the page can be looked at signed out.
+  const asFixture = DEV && query.get('fixture') === 'cherie';
+  const [fixture, setFixture] = useState<Ready | null>(null);
+  useEffect(() => {
+    if (!asFixture) { setFixture(null); return; }
+    void import('./dashboard-cherie.fixture').then((mod) => setFixture(mod.cherie().data));
+  }, [asFixture]);
   // While the page reads itself again after a start, a stop or a change, what it last showed stays; it never blanks.
   const last = useRef<typeof read | null>(null);
   if (read.status === 'ok') last.current = read;
-  const load = read.status === 'loading' && last.current ? last.current : read;
+  const load: typeof read = fixture ? { status: 'ok', data: fixture } : read.status === 'loading' && last.current ? last.current : read;
   const [watched, setWatched] = useState<Watched | null>(null);
   // The picture keeps the session it shows. When a later read no longer lists that session and its agent has exactly one
   // live session that was not there while the watched one ran, the agent was restarted, and the picture moves to the new
@@ -151,14 +171,15 @@ export function Dashboard() {
   const live = load.status === 'ok' && load.data.kind === 'active' && watched ? liveOf(load.data.answer.agents.find((row) => row.agent.id === watched.agent)) : [];
   if (watched && live.some((each) => each.session === watched.session.session)) for (const each of live) beside.current.add(each.session);
   const shown = watched && live.length === 1 && !beside.current.has(live[0].session) ? { ...watched, session: live[0] } : watched;
-  if (read.status === 'refused' && read.refused.status === 401) {
+  if (!fixture && read.status === 'refused' && read.refused.status === 401) {
     last.current = null;
     return <SignIn />;
   }
   return <div className={'page fill dash-page' + (shown ? ' dash-watching' : '')}>
-    <PageHeader title="Home" actions={read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null} />
+    <PageHeader title={option ? 'Dashboard' : 'Home'} actions={read.status === 'refused' && read.feed && last.current ? <Act symbol="retry" name="Reconnect" word="Reconnect" onClick={refreshLive} /> : null} />
+    {DEV ? <DashOptionStrip option={option} /> : null}
     <Gate load={load} title="your dashboard" ok={(data) => data.kind === 'registered' ? <Navigate replace to="/me" />
-      : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null}
+      : <Page data={data} reload={() => setVersion((v) => v + 1)} watching={shown?.session.session ?? null} option={option} fixture={fixture !== null}
         watch={(row, session) => { beside.current = new Set(liveOf(row).map((each) => each.session)); setWatched({ agent: row.agent.id, name: row.agent.display_name, session }); }} />} />
     {shown ? <Picture watched={shown} close={() => setWatched(null)} /> : null}
   </div>;
