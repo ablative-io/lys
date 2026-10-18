@@ -6271,6 +6271,21 @@
       "brief": "DIRECTORY-101"
     },
     {
+      "path": "crates/lys-pass/tests/conformance.rs",
+      "note": "lys-pass conformance: a refusal's request address carries kind, id and action, form-encoded",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-pass/fixtures/refusals/missing-grant.json",
+      "note": "conformance fixture: a missing grant's refusal, its request link naming the grant",
+      "brief": "DIRECTORY-101"
+    },
+    {
+      "path": "crates/lys-pass/fixtures/refusals/held-hot.json",
+      "note": "conformance fixture: a held-hot refusal, its request link naming the grant",
+      "brief": "DIRECTORY-101"
+    },
+    {
       "path": "crates/lys-identity-server/src/sign_in_help.rs",
       "note": "the providers offered at sign-in; origin added",
       "brief": "DIRECTORY-101"

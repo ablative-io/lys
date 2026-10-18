@@ -50,9 +50,22 @@ Behavioural. GET /waiting answers, for the signed-in caller only, one list of wh
 **Files:**
 - create: crates/lys-identity-server/src/waiting_api.rs
 - create: crates/lys-identity-server/src/waiting_api_tests.rs
+- create: surface/identity/src/features/dashboard/waiting.ts
 - modify: crates/lys-identity-server/src/routes_startup.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: surface/identity/src/shell/Rail.tsx
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/product_drafts.rs
+- modify: crates/lys-identity-server/src/product_drafts_list.rs
+- modify: crates/lys-identity-server/src/routes_table.rs
+- modify: surface/identity/src/features/dashboard/Dashboard.tsx
+- modify: surface/identity/src/features/dashboard/WaitingOnYou.tsx
+- modify: surface/identity/src/features/dashboard/dashboard-touch.test.tsx
+- modify: surface/identity/src/features/dashboard/dashboard-waiting.test.tsx
+- modify: surface/identity/tests/dashboard.test.tsx
+- modify: surface/identity/tests/fixtures.ts
+- modify: surface/identity/tests/rail.test.tsx
 
 **Checklist:**
 - C757 — GET /waiting answers one oldest-first list of the requests the caller may decide, agent drafts, product drafts and reviews due, with a refused part named in place, never dropped or zero; the rail's count and Home's Waiting on you read it.
@@ -75,6 +88,12 @@ Behavioural. GET /operations/{operation} answers, for the signed-in caller only,
 - modify: crates/lys-identity-server/src/routes_startup.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: surface/identity/src/features/grants/StuckRecord.tsx
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/routes_table.rs
+- modify: surface/identity/src/features/grants/Delegate.tsx
+- modify: surface/identity/src/features/requests/AskForm.tsx
+- modify: surface/identity/tests/stuck-record.test.tsx
 
 **Checklist:**
 - C758 — GET /operations/{operation} answers recorded true with kind and id for a change the caller made, recorded false for an unknown id, and a refusal for another person's operation; the kept-change check asks it.
@@ -100,6 +119,10 @@ Behavioural. accounts.rs's shown answer (the account read behind GET /me/account
 - modify: surface/identity/src/features/people/Account.tsx
 - modify: surface/identity/src/features/people/AddPerson.tsx
 - modify: surface/identity/src/features/settings/Settings.tsx
+- modify: surface/identity/tests/account-settings.test.tsx
+- modify: surface/identity/tests/add-person-admit.test.tsx
+- modify: surface/identity/tests/settings-for-you.test.tsx
+- modify: tests/identity_contract/src/fake_rauthy.rs
 
 **Checklist:**
 - C759 — GET /me/account answers password and providers; own_password and own_email accept no current password when the account has none and require it when it does; accounts.rs is split under 500 lines.
@@ -117,6 +140,9 @@ Behavioural. In crates/lys-pass/src/refusal.rs, the fragment set on the refusal'
 
 **Files:**
 - modify: crates/lys-pass/src/refusal.rs
+- modify: crates/lys-pass/fixtures/refusals/held-hot.json
+- modify: crates/lys-pass/fixtures/refusals/missing-grant.json
+- modify: crates/lys-pass/tests/conformance.rs
 
 **Checklist:**
 - C760 — A refusal's request address is /requests?kind=…&id=…&action=…, percent-encoded, with Refused.request still a string.
@@ -153,9 +179,13 @@ Behavioural. crates/lys-identity-server/src/apps_read.rs's AppRead::Personal add
 
 **Files:**
 - create: crates/lys-identity-server/src/apps_read_tests.rs
+- create: crates/lys-identity-server/src/apps_api_tests.rs
+- create: crates/lys-identity-server/src/apps_registrar.rs
 - modify: crates/lys-identity-server/src/apps_read.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: surface/identity/src/features/file/CambiumNext.tsx
+- modify: crates/lys-identity-server/src/apps_api.rs
+- modify: surface/identity/src/features/file/cambium-next.test.tsx
 
 **Checklist:**
 - C762 — A person's view of an approved app carries address, the origin of its first sign-in redirect, so Open <app> is a link for everyone who sees the app.
@@ -177,6 +207,18 @@ Behavioural. "Not this one" on Home's getting-started step (surface/identity/src
 - modify: crates/lys-identity-server/src/routes_startup.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: surface/identity/src/features/dashboard/GettingStarted.tsx
+- modify: crates/lys-identity-server/src/canvas_store.rs
+- modify: crates/lys-identity-server/src/grant_settlement_seed_tests.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/read_api.rs
+- modify: crates/lys-identity-server/src/read_views.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/routes_table.rs
+- modify: crates/lys-identity-server/tests/budgets_feed_entries.rs
+- modify: surface/identity/src/generated/index.ts
+- modify: surface/identity/tests/fixtures.ts
+- modify: surface/identity/tests/getting-started.test.tsx
 
 **Checklist:**
 - C763 — "Not this one" on getting started is kept on the server per person (PUT /me/getting-started, read on /me), with the browser's kept value moved once and removed.

@@ -42,12 +42,25 @@
       "files": {
         "create": [
           "crates/lys-identity-server/src/waiting_api.rs",
-          "crates/lys-identity-server/src/waiting_api_tests.rs"
+          "crates/lys-identity-server/src/waiting_api_tests.rs",
+          "surface/identity/src/features/dashboard/waiting.ts"
         ],
         "modify": [
           "crates/lys-identity-server/src/routes_startup.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
-          "surface/identity/src/shell/Rail.tsx"
+          "surface/identity/src/shell/Rail.tsx",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/openapi_types.rs",
+          "crates/lys-identity-server/src/product_drafts.rs",
+          "crates/lys-identity-server/src/product_drafts_list.rs",
+          "crates/lys-identity-server/src/routes_table.rs",
+          "surface/identity/src/features/dashboard/Dashboard.tsx",
+          "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+          "surface/identity/src/features/dashboard/dashboard-touch.test.tsx",
+          "surface/identity/src/features/dashboard/dashboard-waiting.test.tsx",
+          "surface/identity/tests/dashboard.test.tsx",
+          "surface/identity/tests/fixtures.ts",
+          "surface/identity/tests/rail.test.tsx"
         ],
         "delete": []
       },
@@ -75,7 +88,13 @@
         "modify": [
           "crates/lys-identity-server/src/routes_startup.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
-          "surface/identity/src/features/grants/StuckRecord.tsx"
+          "surface/identity/src/features/grants/StuckRecord.tsx",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/openapi_types.rs",
+          "crates/lys-identity-server/src/routes_table.rs",
+          "surface/identity/src/features/grants/Delegate.tsx",
+          "surface/identity/src/features/requests/AskForm.tsx",
+          "surface/identity/tests/stuck-record.test.tsx"
         ],
         "delete": []
       },
@@ -106,7 +125,11 @@
           "crates/lys-identity-server/src/openapi_table.rs",
           "surface/identity/src/features/people/Account.tsx",
           "surface/identity/src/features/people/AddPerson.tsx",
-          "surface/identity/src/features/settings/Settings.tsx"
+          "surface/identity/src/features/settings/Settings.tsx",
+          "surface/identity/tests/account-settings.test.tsx",
+          "surface/identity/tests/add-person-admit.test.tsx",
+          "surface/identity/tests/settings-for-you.test.tsx",
+          "tests/identity_contract/src/fake_rauthy.rs"
         ],
         "delete": []
       },
@@ -128,7 +151,10 @@
       "files": {
         "create": [],
         "modify": [
-          "crates/lys-pass/src/refusal.rs"
+          "crates/lys-pass/src/refusal.rs",
+          "crates/lys-pass/fixtures/refusals/held-hot.json",
+          "crates/lys-pass/fixtures/refusals/missing-grant.json",
+          "crates/lys-pass/tests/conformance.rs"
         ],
         "delete": []
       },
@@ -174,12 +200,16 @@
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/src/apps_read_tests.rs"
+          "crates/lys-identity-server/src/apps_read_tests.rs",
+          "crates/lys-identity-server/src/apps_api_tests.rs",
+          "crates/lys-identity-server/src/apps_registrar.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/apps_read.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
-          "surface/identity/src/features/file/CambiumNext.tsx"
+          "surface/identity/src/features/file/CambiumNext.tsx",
+          "crates/lys-identity-server/src/apps_api.rs",
+          "surface/identity/src/features/file/cambium-next.test.tsx"
         ],
         "delete": []
       },
@@ -206,7 +236,19 @@
         "modify": [
           "crates/lys-identity-server/src/routes_startup.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
-          "surface/identity/src/features/dashboard/GettingStarted.tsx"
+          "surface/identity/src/features/dashboard/GettingStarted.tsx",
+          "crates/lys-identity-server/src/canvas_store.rs",
+          "crates/lys-identity-server/src/grant_settlement_seed_tests.rs",
+          "crates/lys-identity-server/src/lib.rs",
+          "crates/lys-identity-server/src/openapi_types.rs",
+          "crates/lys-identity-server/src/read_api.rs",
+          "crates/lys-identity-server/src/read_views.rs",
+          "crates/lys-identity-server/src/routes.rs",
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity-server/tests/budgets_feed_entries.rs",
+          "surface/identity/src/generated/index.ts",
+          "surface/identity/tests/fixtures.ts",
+          "surface/identity/tests/getting-started.test.tsx"
         ],
         "delete": []
       },

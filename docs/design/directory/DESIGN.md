@@ -1353,6 +1353,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/accounts_own.rs` | the account read and the own-password and own-email handlers, split from accounts.rs; password and providers fields | DIRECTORY-101 |
 | `crates/lys-identity-server/src/accounts_own_tests.rs` | tests of the sibling module, red first | DIRECTORY-101 |
 | `crates/lys-pass/src/refusal.rs` | a refusal's request address carries kind, id and action | DIRECTORY-101 |
+| `crates/lys-pass/tests/conformance.rs` | lys-pass conformance: a refusal's request address carries kind, id and action, form-encoded | DIRECTORY-101 |
+| `crates/lys-pass/fixtures/refusals/missing-grant.json` | conformance fixture: a missing grant's refusal, its request link naming the grant | DIRECTORY-101 |
+| `crates/lys-pass/fixtures/refusals/held-hot.json` | conformance fixture: a held-hot refusal, its request link naming the grant | DIRECTORY-101 |
 | `crates/lys-identity-server/src/sign_in_help.rs` | the providers offered at sign-in; origin added | DIRECTORY-101 |
 | `crates/lys-identity-server/src/sign_in_help_tests.rs` | tests of sign_in_help, red first: origin in both answers | DIRECTORY-101 |
 | `crates/lys-identity-server/src/apps_read.rs` | a person's view of an app; address added | DIRECTORY-101 |
