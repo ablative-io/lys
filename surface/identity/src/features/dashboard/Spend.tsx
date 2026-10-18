@@ -80,7 +80,7 @@ function Figure({ week }: { week: Week }) {
   }
 }
 
-/** The week against the person's own limit on it: the figure the service holds against that limit, else the agents' total; or that no limit is set. */
+/** Under the total: the person's own limit on the whole week and the meter against it (the figure the service holds against that limit, else the agents' total), said once; or that no limit is set. */
 function Overall({ budgets, total }: { budgets: BudgetsView | Refused | undefined; total: number }) {
   if (budgets === undefined) return null;
   if (budgets instanceof Refused) return <p className="note dash-spend-overall" data-spend="overall"><Unread part={budgets} words="Your own limit could not be read" /></p>;
@@ -90,7 +90,7 @@ function Overall({ budgets, total }: { budgets: BudgetsView | Refused | undefine
   const used = budgets.used[index];
   const figure = used && used.figure !== null ? used.figure : total;
   return <p className="dash-spend-overall" data-spend="overall">
-    <span>{money(figure)} of your {money(limit.amount)} a week</span>
+    <span>of your {money(limit.amount)} a week</span>
     <meter className="dash-meter" min={0} max={limit.amount} low={limit.amount * (budgets.warn_at ?? 0.8)} high={limit.amount * 0.999} value={Math.min(figure, limit.amount)} aria-label="Your week against your limit" />
   </p>;
 }
