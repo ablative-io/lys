@@ -209,6 +209,7 @@ macro_rules! budgets_feed_entries {
                 configuration: Mutex::new(Box::new($crate::configuration_store::ConfigurationStore::open(&path.join("organisation"), Arc::clone(&key))?)),
                 cord: Mutex::new($crate::cord_store::CordStore::open(&path.join("cord"), Arc::clone(&key))?),
                 canvas: $crate::canvas_store::CanvasStore::beside(&config.log_dir), apps: Mutex::new(apps),
+                getting_started: $crate::getting_started_api::GettingStartedStore::beside(&config.log_dir),
                 grant_tokens: Mutex::new($crate::grant_token_store::Tokens::open(path.join("tokens.json"))?),
                 agent_passes: Arc::new(Mutex::new($crate::agent_pass_store::Passes::open(path.join("passes.json"))?)),
                 kept_responsibilities: $crate::kept_responsibilities::Kept::load(&path.join("responsibilities.json"))?,

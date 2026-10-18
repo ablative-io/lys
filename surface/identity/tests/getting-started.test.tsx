@@ -6,17 +6,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GettingStarted, readStanding } from '../src/features/dashboard/GettingStarted';
 import type { Standing } from '../src/features/dashboard/GettingStarted';
 import { $, serve } from './harness';
-import { ADA, ARCHIVIST, COURIER, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, ARCHIVIST, COURIER, ME, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Machine, NameMachine } from '../src/features/network/contract';
 
 let root: Root | null = null;
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.body.innerHTML = ''; });
-const empty: Standing = { machines: 0, cambium: null, apps: true, google: false, read: true, administrator: true };
+const empty: Standing = { machines: 0, cambium: null, apps: true, google: false, read: true, administrator: true, declined: false };
+const KEY = 'lys.getting-started.not-this-computer.' + ADA;
+const me = (declined: boolean) => ok({ ...ME, getting_started: { host_declined: declined } });
 
 function service(): Record<string, Route> {
-  const routes: Record<string, Route> = { ...SERVICE, '/network': ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' }) };
+  const routes: Record<string, Route> = { ...SERVICE, '/network': ok({ machines: [], reports_served: true, host_name: 'Ada’s MacBook Pro' }),
+    'PUT /me/getting-started': (body) => ok(body) };
   routes['POST /network/machines'] = (body) => {
     const request = body as NameMachine;
     const machine: Machine = { ...request, id: request.operation, may_run: request.may_run.map((id) => ({ id, display_name: id, state: 'active' })), named_by: ADA, named_at: 1, state: 'in_use', retired_at: null, last_report_at: null };
@@ -57,46 +60,75 @@ describe('Getting started on an empty install', () => {
     expect(posted).toEqual([]);
   });
 
-  it('declines this computer with Not this one and sends nothing', async () => {
+  it('declines this computer with Not this one, kept by Lys for the person and not by this browser', async () => {
     const { posted } = await open(service());
     await notThisOne();
     expect(document.body.textContent).toContain('Agents won’t run on the computer Lys runs on. Add another computer under Computers when you’re ready.');
     expect($('[aria-label="Getting started"] [role="status"] a')?.getAttribute('href')).toBe('#/network');
     expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
-    expect(posted).toEqual([]);
+    expect(posted).toEqual([{ path: 'PUT /me/getting-started', body: { host_declined: true } }]);
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 
-  it('keeps Not this one for the person across a reload and counts the step as answered', async () => {
-    await open(service());
-    await notThisOne();
-    expect($('[aria-label="Getting started"]')?.textContent).toContain('1 of 4 done');
-    expect(localStorage.getItem('lys.getting-started.not-this-computer.' + ADA)).toBe('yes');
-    await reopen(service());
+  it('hides the step when /me says it was declined, from any browser, and counts it as answered', async () => {
+    await open(service(), undefined, { ...empty, declined: true });
     expect(titles()).toEqual(['Let people sign in with Google', 'Connect Cambium', 'Add your first agent']);
     expect($('[aria-label="Getting started"]')?.textContent).toContain('1 of 4 done');
     expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
   });
 
-  it('keeps one person’s answer to that person', async () => {
-    localStorage.setItem('lys.getting-started.not-this-computer.' + SCRIBE, 'yes');
+  it('reads the answer from /me, the person’s own, and shows the step when it was not declined', async () => {
+    serve({ ...service(), '/me': me(true) }, []);
+    expect((await readStanding()).declined).toBe(true);
+    serve({ ...service(), '/me': me(false) }, []);
+    expect((await readStanding()).declined).toBe(false);
     await open(service());
     expect(titles()[0]).toBe('Choose where agents run');
   });
 
-  it('says so when this browser will not keep the answer', async () => {
-    const refuse = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('full', 'QuotaExceededError'); });
-    try {
-      await open(service());
-      await notThisOne();
-      expect($('[role="status"]')?.textContent).toContain('This browser would not keep the answer, so Lys will ask again next time.');
-    } finally { refuse.mockRestore(); }
+  it('moves an answer this browser kept before to Lys once, then removes it', async () => {
+    localStorage.setItem(KEY, 'yes');
+    const posted: { path: string; body: unknown }[] = [];
+    serve({ ...service(), '/me': me(false) }, posted);
+    expect((await readStanding()).declined).toBe(true);
+    expect(posted).toEqual([{ path: 'PUT /me/getting-started', body: { host_declined: true } }]);
+    expect(localStorage.getItem(KEY)).toBeNull();
+    // Once Lys has it, there is nothing left to move.
+    serve({ ...service(), '/me': me(true) }, posted);
+    expect((await readStanding()).declined).toBe(true);
+    expect(posted).toHaveLength(1);
+  });
+
+  it('keeps the browser’s answer, and still honours it, when Lys will not take it yet', async () => {
+    localStorage.setItem(KEY, 'yes');
+    serve({ ...service(), '/me': me(false), 'PUT /me/getting-started': refused(503, 'DirectoryUnavailable', 'closed') }, []);
+    expect((await readStanding()).declined).toBe(true);
+    expect(localStorage.getItem(KEY)).toBe('yes');
+  });
+
+  it('honours the browser’s answer, sending nothing, when Lys could not read its own', async () => {
+    localStorage.setItem(KEY, 'yes');
+    const posted: { path: string; body: unknown }[] = [];
+    const unread = ok({ ...ME, getting_started: { refusal: 'DirectoryUnavailable', reason: 'closed' } });
+    serve({ ...service(), '/me': unread }, posted);
+    expect((await readStanding()).declined).toBe(true);
+    expect(posted).toHaveLength(0);
+    expect(localStorage.getItem(KEY)).toBe('yes');
+    localStorage.clear();
+    serve({ ...service(), '/me': unread }, posted);
+    expect((await readStanding()).declined).toBe(false);
+  });
+
+  it('says so when Lys will not keep the answer', async () => {
+    await open({ ...service(), 'PUT /me/getting-started': refused(503, 'DirectoryUnavailable', 'the directory is closed') });
+    await notThisOne();
+    expect($('[role="status"]')?.textContent).toContain('Lys could not keep the answer, so it will ask again next time.');
   });
 
   it('finishes once every required step is done or answered, leaving Google optional', async () => {
-    localStorage.setItem('lys.getting-started.not-this-computer.' + ADA, 'yes');
-    await open(service(), undefined, { ...empty, cambium: 'approved' });
+    await open(service(), undefined, { ...empty, cambium: 'approved', declined: true });
     expect(titles()).toEqual(['Let people sign in with Google', 'Add your first agent']);
-    await reopen(service(), { ...empty, cambium: 'approved', google: true });
+    await reopen(service(), { ...empty, cambium: 'approved', google: true, declined: true });
     expect(titles()).toEqual(['Add your first agent']);
     expect($('[aria-label="Getting started"]')?.textContent).toContain('3 of 4 done');
   });
@@ -127,8 +159,7 @@ describe('Getting started on an empty install', () => {
   });
 
   it('takes a member to their own installer without offering the server or Google setup', async () => {
-    localStorage.setItem('lys.getting-started.not-this-computer.' + ADA, 'yes');
-    const { posted } = await open(service(), undefined, { ...empty, administrator: false });
+    const { posted } = await open(service(), undefined, { ...empty, administrator: false, declined: true });
     expect(titles()).toEqual(['Add your own computer', 'Connect Cambium', 'Add your first agent']);
     expect(document.body.textContent).toContain('Another computer, then download its installer');
     expect($('[aria-label="Getting started"] a')?.getAttribute('href')).toBe('#/network');

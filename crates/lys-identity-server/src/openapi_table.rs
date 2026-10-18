@@ -165,6 +165,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
     POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, and a first root grant only when one is asked for" S [ADMIN_BODY, &["RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller" C [SIGNED, &["NoPerson", "SetupRequired"]];
+    PUT "/me/getting-started" "Keep the caller's getting-started answers, read back on GET /me" C [SIGNED_BODY, &["NoPerson", "DirectoryUnavailable"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);
     GET "/agents/{id}" "An agent the caller answers for" S [PERSON, &["AgentNotVisible"]] scope("agent", "read", ["id"]);
     GET "/directory/people" "Every person, for the administrator" S [ADMIN, &["RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);

@@ -237,6 +237,7 @@ fn fixture_state(
             Arc::clone(&key),
         )?),
         canvas: crate::canvas_store::CanvasStore::beside(&config.log_dir),
+        getting_started: crate::getting_started_api::GettingStartedStore::beside(&config.log_dir),
         apps: Mutex::new(apps),
         grant_tokens: Mutex::new(crate::grant_token_store::Tokens::open(
             path.join("grant-tokens.json"),

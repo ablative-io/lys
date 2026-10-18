@@ -92,6 +92,11 @@ export interface MeView {
   signed_in: Login;
   sign_in_identities: Login[];
   service_accounts: ServiceAccount[];
+  /**
+   * Getting started's answers, kept for the person (`PUT /me/getting-started`); the refusal in their place when Lys
+   * could not read them; absent from an older service.
+   */
+  getting_started?: { host_declined: boolean } | { refusal: string; reason: string };
 }
 
 /** GET /agents/{id} and GET /directory/agents/{id}, from `agent_view`. */

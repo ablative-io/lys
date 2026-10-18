@@ -2,7 +2,8 @@
  * Getting started: what a fresh Lys still needs, in the order a person sets it up. Each step says what it is for,
  * is done where it already lives, and leaves the list once it is done. Nothing here is decided for the person:
  * whether agents run on the computer Lys runs on is asked, never assumed, because some computers Lys is installed on should
- * never run agents.
+ * never run agents. "Not this one" is kept by Lys for the person (`PUT /me/getting-started`, read back on `/me`), so it
+ * is not asked again from another browser; an answer a browser kept before is moved to Lys once and then removed.
  */
 import { useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -18,10 +19,35 @@ interface AppsView { apps: { id: string; state: string }[] }
  * What Getting started reads. `google` is true only when Google is set up and switched on, as Settings → Services
  * and sign-in providers shows it. Only administrators read or see that step.
  */
-interface Standing { machines: number; cambium: string | null; /** Whether `/apps` answered: Connect Cambium is offered only then. */ apps: boolean; google: boolean; read: boolean; administrator: boolean }
+interface Standing { machines: number; cambium: string | null; /** Whether `/apps` answered: Connect Cambium is offered only then. */ apps: boolean; google: boolean; read: boolean; administrator: boolean;
+  /** Whether the person said the Lys computer is not for agents, as Lys keeps it. */ declined: boolean }
+
+/** Where a browser kept "Not this one" before Lys kept it; read once, moved to Lys, then removed. */
+const declinedKey = (person: string) => 'lys.getting-started.not-this-computer.' + person;
+
+/** Keep "Not this one" for the person with Lys. */
+const keepDeclined = (): Promise<unknown> => request('/me/getting-started', { host_declined: true }, 'PUT');
+
+/**
+ * Whether the person declined the Lys computer, from `/me`. An answer this browser kept before is moved to Lys once and
+ * removed; while Lys will not take it, could not read it, or an older Lys says nothing, the browser's answer is still
+ * honoured and kept.
+ */
+async function readDeclined(): Promise<boolean> {
+  const me = await api.me();
+  const kept = me.getting_started && 'host_declined' in me.getting_started ? me.getting_started : undefined;
+  let local = false;
+  try { local = localStorage.getItem(declinedKey(me.person.id)) === 'yes'; } catch { /* A browser that keeps nothing has nothing to move. */ }
+  if (!local || !kept) return kept?.host_declined === true || local;
+  if (!kept.host_declined) {
+    try { await keepDeclined(); } catch { return true; }
+  }
+  try { localStorage.removeItem(declinedKey(me.person.id)); } catch { /* Lys has it now; a key the browser will not remove asks nothing again. */ }
+  return true;
+}
 
 async function readStanding(): Promise<Standing> {
-  const people = await api.people();
+  const [people, declined] = await Promise.all([api.people(), readDeclined()]);
   const administrator = people.scope === 'directory';
   const [network, apps, providers] = await Promise.all([
     request<NetworkView>('/network').catch(() => null),
@@ -32,21 +58,7 @@ async function readStanding(): Promise<Standing> {
     && (administrator || machine.named_by === people.people[0]?.id)).length : 0;
   const cambium = apps?.apps.find((app) => app.id === 'cambium')?.state ?? null;
   const google = providers?.providers.some((provider) => provider.provider === 'google' && provider.enabled) ?? false;
-  return { machines, cambium, apps: apps !== null, google, read: network !== null, administrator };
-}
-
-/** "Not this one" is kept for the person on this browser, so Getting started can finish; the key names the person. */
-const declinedKey = (person: string) => 'lys.getting-started.not-this-computer.' + person;
-
-function readDeclined(person: string): boolean {
-  try { return localStorage.getItem(declinedKey(person)) === 'yes'; }
-  catch { return false; }
-}
-
-/** Keeps the answer; false when this browser refuses to keep it (storage off or full), so the page can say so. */
-function keepDeclined(person: string): boolean {
-  try { localStorage.setItem(declinedKey(person), 'yes'); return true; }
-  catch { return false; }
+  return { machines, cambium, apps: apps !== null, google, read: network !== null, administrator, declined };
 }
 
 /** The question about the computer Lys runs on, named by its own name: a name, and Yes; or Not this one, which leaves agents to other computers. */
@@ -82,11 +94,15 @@ function ThisComputer({ person, done, decline }: { person: string; done: () => v
 
 /** The list itself; it is shown on the dashboard until every step is done. */
 export function GettingStarted({ person, agents, standing, reread }: { person: string; agents: number; standing: Standing; reread: () => void }) {
-  const [declined, setDeclined] = useState(() => readDeclined(person));
-  // What this view says after Not this one: kept, or not kept by this browser.
+  const [declinedHere, setDeclined] = useState(false);
+  const declined = standing.declined || declinedHere;
+  // What this view says after Not this one: kept by Lys, or not kept.
   const [answered, setAnswered] = useState<'kept' | 'unkept' | null>(null);
   if (!standing.read) return null;
-  const decline = () => { setAnswered(keepDeclined(person) ? 'kept' : 'unkept'); setDeclined(true); };
+  const decline = () => {
+    setDeclined(true);
+    keepDeclined().then(() => setAnswered('kept'), () => setAnswered('unkept'));
+  };
   const steps: { key: string; done: boolean; title: string; body: ReactNode; optional?: boolean }[] = [
     { key: 'computer', done: standing.machines > 0 || (standing.administrator && declined),
       title: standing.administrator ? 'Choose where agents run' : 'Add your own computer',
@@ -107,7 +123,7 @@ export function GettingStarted({ person, agents, standing, reread }: { person: s
     <div className="section-h"><span>Getting started</span><span className="dim">{steps.length - open.length} of {steps.length} done</span></div>
     {answered ? <p className={answered === 'kept' ? 'dim' : 'why-not'} role="status">
       Agents won’t run on the computer Lys runs on. Add another computer under <a href="#/network">Computers</a> when you’re ready.
-      {answered === 'unkept' ? ' This browser would not keep the answer, so Lys will ask again next time.' : null}
+      {answered === 'unkept' ? ' Lys could not keep the answer, so it will ask again next time.' : null}
     </p> : null}
     {open.some((step) => !step.optional) ? <ol>{open.map((step) => <li key={step.key}><b>{step.title}</b>{step.optional ? <span className="dim"> (optional)</span> : null}{step.body}</li>)}</ol> : null}
   </section>;

@@ -410,7 +410,7 @@ impl CanvasStore {
 
 /// Write `bytes` as the whole of `path`: written beside it, flushed, moved
 /// over it, and the folder flushed.
-fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+pub(crate) fn replace(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let beside = path.with_extension("writing");
     let mut file = fs::OpenOptions::new()
         .write(true)

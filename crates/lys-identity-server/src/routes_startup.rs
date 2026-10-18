@@ -267,6 +267,7 @@ async fn make_state(
         stops: primary.stops.map(Mutex::new),
         cord: Mutex::new(auxiliary.cord),
         canvas: crate::canvas_store::CanvasStore::beside(&config.log_dir),
+        getting_started: crate::getting_started_api::GettingStartedStore::beside(&config.log_dir),
         budgets: primary.budgets.map(Mutex::new),
         configuration: Mutex::new(primary.configuration),
         policies: primary.policies.map(Mutex::new),

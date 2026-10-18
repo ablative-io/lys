@@ -57,6 +57,9 @@ pub struct MeView {
     /// sign-in identities: every one of theirs not retired, in the order
     /// created. Empty when the configuration names no service accounts.
     pub service_accounts: Vec<ServiceAccountView>,
+    /// Getting started's answers, kept for the person; a refusal in their
+    /// place when they cannot be read.
+    pub getting_started: crate::getting_started_api::GettingStartedPart,
 }
 
 /// A service account as the views show it.

@@ -207,6 +207,7 @@ async fn me(
             signed_in: login(actor.binding()),
             sign_in_identities: record.bindings().iter().map(login).collect(),
             service_accounts: crate::service_accounts_api::owned_by(&state, person)?,
+            getting_started: state.getting_started.part(person),
         }))
     })
 }

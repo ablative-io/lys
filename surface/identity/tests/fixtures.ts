@@ -94,6 +94,7 @@ export const ME: MeView = {
   signed_in: { provider: ISSUER, subject: 'ada' },
   sign_in_identities: [{ provider: ISSUER, subject: 'ada' }],
   service_accounts: [],
+  getting_started: { host_declined: false },
 };
 
 export const ROOT_G = 'grant-' + hex(31);
@@ -232,7 +233,7 @@ export const SERVICE: Record<string, Route> = {
   '/receipts/4': ok(RECEIPTS[4]),
   '/receipts/5': ok(RECEIPTS[5]),
   '/me': ok(ME),
-  '/me/account': ok({ email: 'ada@example.test', enabled: true }),
+  '/me/account': ok({ email: 'ada@example.test', enabled: true, password: true, providers: [] }),
   '/roles': ok({ roles: [] }),
   '/teams': ok({ teams: [] }),
   '/network': ok({ machines: [], total: 0, next: null }),

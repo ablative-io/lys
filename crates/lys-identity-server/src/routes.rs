@@ -117,6 +117,9 @@ pub struct AppState {
     /// Each person's canvas, one file for each beside the directory log,
     /// read when asked and made at the person's first change.
     pub canvas: crate::canvas_store::CanvasStore,
+    /// Each person's getting-started answers, one file for each beside the
+    /// directory log, read when asked and made at the person's first answer.
+    pub getting_started: crate::getting_started_api::GettingStartedStore,
     /// The goals and their reminders, when the configuration names their directory.
     pub goals: Option<crate::goals_store::Goals>,
     /// The words a seat is sent (AGENTS-001 R1), when the configuration names their directory.
