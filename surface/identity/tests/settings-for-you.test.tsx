@@ -34,3 +34,17 @@ it('tells a person who reaches the service settings whose they are and where the
   expect(container.querySelector('a')?.getAttribute('href')).toBe('#/settings/account');
   act(() => root.unmount());
 });
+
+it('names the act that works today for a person with no Lys password, with the administrator as a link', async () => {
+  await mount('#/settings/account', { ...SERVICE, '/configuration': refused(403, 'NotAdmitted', 'Administrator only'), '/sign-in/help': ok({ administrator: { name: 'Tom Whiting', email: 'tom@example.test' } }) });
+  const line = $('.settings-no-password');
+  expect(line?.textContent).toBe('Signed in with Google and never set a Lys password? Changing your email or password here asks for one you do not have. Ask Tom Whiting (tom@example.test) to set one for you, then change it here.');
+  expect(line?.querySelector('a')?.getAttribute('href')).toBe('mailto:tom@example.test');
+});
+
+it('never tells the administrator to ask themselves', async () => {
+  await mount('#/settings/account', { ...SERVICE, '/configuration': ok(settings), '/sign-in/help': ok({ administrator: { name: 'Tom Whiting', email: 'tom@example.test' } }) });
+  const line = $('.settings-no-password')?.textContent ?? '';
+  expect(line).toContain('You administer this Lys, so there is no one to ask: until Lys can set a first password here, keep signing in with Google.');
+  expect(line).not.toContain('Ask Tom Whiting');
+});

@@ -2,3 +2,4 @@
 .settings-layout { margin-top: 22px; }
 .settings-layout .set-row { flex-wrap: wrap; }
 .settings-service-only { margin: 0; }
+.settings-no-password { margin: 10px 0 0; }

@@ -27,13 +27,15 @@ export function administratorWords(administrator: Administrator | null): string 
   return administrator ? administrator.name + (administrator.email ? ' (' + administrator.email + ')' : '') : 'your administrator';
 }
 
-/** The help line ends with the next step as a link: an email to the administrator, when Lys names one. */
-export function AccountHelpWords({ help }: { help: Help }) {
-  const administrator = help.administrator;
-  const who = administrator?.email
+/** The administrator named with the next step as a link, an email to them, when Lys names one. */
+export function AdministratorContact({ administrator }: { administrator: Administrator | null }) {
+  return administrator?.email
     ? <>{administrator.name} (<a href={'mailto:' + administrator.email}>{administrator.email}</a>)</>
-    : administratorWords(administrator);
-  return <p className="note account-help">No account yet, or cannot get in? Ask {who}.
+    : <>{administratorWords(administrator)}</>;
+}
+
+export function AccountHelpWords({ help }: { help: Help }) {
+  return <p className="note account-help">No account yet, or cannot get in? Ask <AdministratorContact administrator={help.administrator} />.
     {help.failure ? <span role="status"> {help.failure}</span> : null}
   </p>;
 }
