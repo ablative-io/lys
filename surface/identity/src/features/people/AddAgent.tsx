@@ -209,6 +209,12 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     </select></label>
   </>;
   const firstRunForm = onePress && Boolean(runOptions.choices);
+  // The button says "and run" only when a start can follow: without a working folder the agent is added and allowed,
+  // and its page asks for the folder before it starts, so the press never promises a run it cannot make.
+  const runsWith = (settings?: Record<string, unknown>) => {
+    const folder = walk ? walk.settings.working_folder : settings?.working_folder;
+    return typeof folder === 'string' && folder.trim() !== '';
+  };
   const renderForm = (fields: ReactNode, settings?: Record<string, unknown>, profileProblem = '') => <form className="add-agent" aria-label="Add an agent" onSubmit={(event) => { void submit(event, settings, profileProblem); }}>
     <fieldset disabled={locked} style={{ border: 0, padding: 0, margin: 0 }}>
       <div className={fields ? 'add-agent-two' : 'add-agent-one'}>
@@ -244,7 +250,8 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
     {/* The button is never greyed without its reason beside it: the reasons not already said above are said here. */}
     {!sending && !hold && !unavailable && !saved.error && !name.trim() ? <p className="why-not" role="alert">Give this agent a name.</p>
       : !sending && !hold && !unavailable && !saved.error && onePress && !walk && !profileProblem && !computerReady ? <p className="why-not" role="alert">{inUse.length ? 'Choose the computer this agent runs on.' : 'Give this computer a name.'}</p> : null}
-    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + ' and run it on ' + (runComputerName || 'the chosen computer') : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? 'Add and run' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
+    {onePress && !hold && !runsWith(settings) ? <p className="note add-agent-later">Without a folder, {name.trim() || 'this agent'} is added and allowed on {runComputerName || 'the chosen computer'} now, and its page asks for the folder before it starts.</p> : null}
+    <p><Act symbol="add" name={hold ? 'Saved request held' : onePress ? 'Add ' + (name.trim() || 'agent') + (runsWith(settings) ? ' and run it on ' : ' to ') + (runComputerName || 'the chosen computer') : sending ? 'Adding…' : pending ? 'Continue adding this agent' : 'Add agent'} word={hold ? 'Held' : onePress ? runsWith(settings) ? 'Add and run' : 'Add' : sending ? 'Adding…' : pending ? 'Continue' : 'Add'} tone="primary" type="submit" disabled={sending || Boolean(hold) || runUnavailable || unavailable || !name.trim() || Boolean(saved.error) || (!pending && !walk && Boolean(taken || invalidChoice)) || (onePress && !walk && (Boolean(profileProblem) || !computerReady))} /></p>
   </form>;
   return onePress && runOptions.choices ? <ProfileFields profile={walk ? profileFromSettings(walk.settings) : null} choices={runOptions.choices} firstRun computer={walk ? placementComputer(walk.placement).id : selectedComputer?.id ?? ''}
     newComputer={walk ? walk.placement.kind === 'new' : !inUse.length} more={moreRegistration}

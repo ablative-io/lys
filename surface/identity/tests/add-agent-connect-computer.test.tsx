@@ -39,7 +39,7 @@ describe('Adding an agent before connecting a personal computer', () => {
     await open(server.routes);
     await type($('[name="display_name"]'), 'Clover');
     expect($('[name="computer_name"]')).toBeNull();
-    expect($('form button[type="submit"]')?.getAttribute('aria-label')).toBe('Add Clover and run it on Front desk');
+    expect($('form button[type="submit"]')?.getAttribute('aria-label')).toBe('Add Clover to Front desk');
     expect(document.body.textContent).not.toContain(CONNECT_COMPUTER);
   });
 
