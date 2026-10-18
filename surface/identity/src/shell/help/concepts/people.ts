@@ -58,7 +58,7 @@ export const PEOPLE: Seed[] = [
     body: [
       'Getting started shows what a new Lys still needs, in order, until every step is done: where agents run, Google sign-in (optional), Cambium, and your first agent. A step leaves the list once it is done; "Not this one" counts as an answer.',
       'Agents lists yours by team, with where each runs, its budget and its goals; Start, Watch and Stop sit in each row. A part that could not be read says so in words; press them to see why. Waiting for you counts requests to decide, drafts to approve and reviews due, each linked to its list. Running now lists live sessions; Stop all, beside its heading, stops every agent at once and asks why first.',
-      'Choose a running agent to watch it in a small picture over the corner, or open it full size in Operations.',
+      'Choose a running agent to watch it in a small picture over the corner, or open it full size in Running agents.',
     ],
     steps: [
       { text: 'Choose where agents run: say yes for this computer, or Not this one.', href: '#/dashboard', link: 'Open the dashboard' },
@@ -71,12 +71,12 @@ export const PEOPLE: Seed[] = [
   },
   {
     id: 'people.operations',
-    title: 'Operations',
+    title: 'Running agents',
     summary: 'Each running agent is a window you can move.',
     body: [
       'Drag a window by its bar, drag its corner to size it, drag the background or use the wheel to move the surface. With a bar focused, arrows move the window and Shift with arrows sizes its terminal; with the surface focused, arrows move the surface. Closing a terminal view leaves the process running.',
     ],
-    steps: [{ text: 'Open Operations (g c).', href: '#/canvas', link: 'Open Operations' }],
+    steps: [{ text: 'Open Running agents (g c).', href: '#/canvas', link: 'Open Running agents' }],
     related: ['people.dashboard'],
   },
   {

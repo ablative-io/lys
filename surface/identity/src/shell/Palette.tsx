@@ -26,10 +26,10 @@ const keyFor = (hash: string): string => {
 };
 
 export const PAGES: [string, string][] = [
-  ['Dashboard', '#/dashboard'], ['You', '#/me'], ['People and agents', '#/people'], ['Operations', '#/canvas'], ['Roles', '#/roles'],
-  ['Access: grants', '#/access'], ['Access: ask', '#/access/can'], ['Access: requests', '#/requests'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
-  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Graph', '#/graph'],
-  ['Secrets', '#/secrets'], ['Network', '#/network'], ['Settings', '#/settings'], ['Settings: services and sign-in providers', '#/connections'], ['Settings: apps', '#/apps'],
+  ['Home', '#/dashboard'], ['Waiting on you', '#/requests'], ['People and agents', '#/people'], ['Running agents', '#/canvas'],
+  ['Access: grants', '#/access'], ['Access: ask', '#/access/can'], ['Access: drafts', '#/access/drafts'], ['Access: reviews', '#/reviews'],
+  ['Access: resources', '#/resources'], ['Access: model', '#/model'], ['Access map', '#/graph'], ['Roles', '#/roles'],
+  ['Computers', '#/network'], ['Apps', '#/apps'], ['Secrets', '#/secrets'], ['Settings', '#/settings'], ['Settings: services and sign-in providers', '#/connections'], ['You', '#/me'],
 ];
 
 export function Palette() {
@@ -123,7 +123,7 @@ export function Palette() {
   });
 
   return (
-    <div className={'palette' + (open ? ' open' : '')} id="palette" role="dialog" aria-label="Command palette" aria-hidden={!open}>
+    <div className={'palette' + (open ? ' open' : '')} id="palette" role="dialog" aria-label="Search" aria-hidden={!open}>
       <input
         id="palIn"
         ref={input}

@@ -2,15 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press } from './harness';
 
 // Every screen is one palette entry and one g letter away. The letters and where each goes are written out here
-// rather than read from the shell's own tables. Access is one rail item whose views are its tabs, the graph has its own rail
-// item beside it, the computers are the Network, and Running is the canvas.
+// rather than read from the shell's own tables. The rail is CONSENSUS.md's (18 October 2026): what waits on you is its
+// own entry, Roles and the access map light Access, the computers are Computers, Apps has its own entry, and Running
+// agents is the canvas.
 
 const LETTERS: Record<string, [string, string]> = {
-  p: ['#/people', 'people'], o: ['#/roles', 'roles'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'access'], w: ['#/reviews', 'access'],
-  v: ['#/secrets', 'secrets'], n: ['#/connections', 'settings'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
-  h: ['#/graph', 'graph'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], l: ['#/canvas', 'canvas'], d: ['#/dashboard', 'dashboard'],
+  p: ['#/people', 'people'], o: ['#/roles', 'access'], r: ['#/resources', 'access'], a: ['#/access', 'access'], q: ['#/requests', 'waiting'], w: ['#/reviews', 'waiting'],
+  v: ['#/secrets', 'secrets'], n: ['#/apps', 'apps'], m: ['#/model', 'access'], s: ['#/settings', 'settings'],
+  h: ['#/graph', 'access'], t: ['#/network', 'network'], u: ['#/me', 'me'], c: ['#/canvas', 'canvas'], d: ['#/dashboard', 'dashboard'],
 };
-const RAIL_ITEMS = ['dashboard', 'me', 'people', 'canvas', 'roles', 'access', 'graph', 'secrets', 'network', 'settings'];
+const RAIL_ITEMS = ['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me'];
 
 const current = () => $('#rail a.on')?.dataset.nav;
 

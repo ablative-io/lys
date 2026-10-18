@@ -8,13 +8,18 @@ import { useNavigationAccess } from './NavigationAccess';
 /** The view a hash path belongs to, as the rail marks it. */
 export function railView(pathname: string): string {
   const view = (pathname.split('/')[1] || 'dashboard').replace(/^team$/, 'dashboard');
-  if (view === 'file') return 'people';
-  if (['resources', 'requests', 'reviews', 'model'].includes(view)) return 'access';
-  if (view === 'connections' || view === 'apps') return 'settings';
+  if (view === 'file' || view === 'agents' || view === 'service-accounts') return 'people';
+  if (view === 'requests' || view === 'reviews') return 'waiting';
+  if (['resources', 'model', 'graph', 'roles'].includes(view)) return 'access';
+  if (view === 'connections') return 'settings';
   return view;
 }
 
-/** What waits under Access: requests awaiting a decision and grants due a review, as the service lists them for whoever is signed in. */
+/** ⌘ on a Mac, Ctrl elsewhere: the key a person on this computer actually presses. */
+const onMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const forThisComputer = (keys: string): string => onMac ? keys : keys.replace('⌘', 'Ctrl ');
+
+/** What waits on the signed-in person: requests awaiting a decision and grants due a review, as the service lists them. */
 function useWaiting(): { count: number; words: string } | { problem: string } | null {
   const load = useLoad(async () => { await api.me(); return readTogether({
     requests: request<{ requests: { state: string }[] }>('/requests'),
@@ -53,13 +58,13 @@ export function Rail() {
           <>
             <svg viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: item.svg }} />
             <span className="lbl">{item.label}</span>
-            {item.nav === 'access' && waiting && ('problem' in waiting ? true : waiting.count > 0) ? <span className="cnt" title={'problem' in waiting ? 'What waits under Access could not be read: ' + waiting.problem : waiting.words}>{'problem' in waiting ? '?' : waiting.count}</span> : null}
-            {item.kbd ? <span className="kbd lbl">{item.kbd}</span> : null}
+            {item.nav === 'waiting' && waiting && ('problem' in waiting ? true : waiting.count > 0) ? <span className="cnt" title={'problem' in waiting ? 'What waits on you could not be read: ' + waiting.problem : waiting.words}>{'problem' in waiting ? '?' : waiting.count}</span> : null}
+            {item.kbd ? <span className="kbd lbl">{forThisComputer(item.kbd)}</span> : null}
           </>
         );
         if (item.t === 'a') {
           return (
-            <a key={index} href={item.href} data-nav={item.nav} title={item.title} className={item.nav === on ? 'on' : undefined}>
+            <a key={index} href={item.href} data-nav={item.nav} title={forThisComputer(item.title)} className={item.nav === on ? 'on' : undefined}>
               {inner}
             </a>
           );
@@ -70,7 +75,7 @@ export function Rail() {
             className={'rb' + (item.dock && shell.dockMode === item.dock ? ' on' : '')}
             data-dockbtn={item.dock}
             id={item.id}
-            title={item.title}
+            title={forThisComputer(item.title)}
             onClick={() => press(item.id, item.dock)}
           >
             {inner}

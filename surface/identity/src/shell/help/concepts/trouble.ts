@@ -49,10 +49,10 @@ export const TROUBLE: Seed[] = [
     body: [
       '"Choose the folder this agent works in before it can start", "Save this agent’s settings before starting it" and "Choose the installed program this agent uses": open its Settings tab, choose what is named, and save.',
       '"This agent is not ready to start": check its state on Overview; its access may be awaiting activation, paused or retired.',
-      '"No runner is connected, so Lys cannot start agents here", or the computer is not answering: see Network.',
-      'If the computer does not let the agent start there, its May start here line on Network does not name it.',
+      '"No runner is connected, so Lys cannot start agents here", or the computer is not answering: see Computers.',
+      'If the computer does not let the agent start there, its May start here line on Computers does not name it.',
     ],
-    steps: [{ text: 'Check its computer on Network.', href: '#/network', link: 'Open Network' }],
+    steps: [{ text: 'Check that computer under Computers.', href: '#/network', link: 'Open Computers' }],
     related: ['people.settings', 'computers.may-start', 'trouble.computer'],
   },
   {
@@ -60,10 +60,10 @@ export const TROUBLE: Seed[] = [
     title: 'A computer is not answering',
     summary: 'Lys cannot hear its runner.',
     body: [
-      'Network counts computers not answering; filter by Not answering to see them. "Waiting for its runner to connect" means the runner on that computer has not reached Lys.',
-      'If it was never connected, or has to connect again, get a connection code on Network and run the command shown on that computer. A new code replaces any code given before.',
+      'The Computers page counts the computers not answering; filter by Not answering to see them. "Waiting for its runner to connect" means the runner on that computer has not reached Lys.',
+      'If it was never connected, or has to connect again, get a connection code on Computers and run the command shown on that computer. A new code replaces any code given before.',
     ],
-    steps: [{ text: 'Open Network.', href: '#/network', link: 'Open Network' }],
+    steps: [{ text: 'Open Computers.', href: '#/network', link: 'Open Computers' }],
     related: ['computers.runner', 'computers.add'],
   },
   {

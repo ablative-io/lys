@@ -89,10 +89,10 @@ export const ACCESS: Seed[] = [
   },
   {
     id: 'access.graph',
-    title: 'Graph',
+    title: 'Access map',
     summary: 'The same answers as Access, drawn.',
     body: ['Click a person or agent to light what it reaches; click a resource to light who reaches it.'],
-    steps: [{ text: 'Open Graph (g h).', href: '#/graph', link: 'Open Graph' }],
+    steps: [{ text: 'Open the access map (g h).', href: '#/graph', link: 'Open the access map' }],
     related: ['access.grant']
   },
   {

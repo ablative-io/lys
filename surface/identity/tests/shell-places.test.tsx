@@ -1,6 +1,6 @@
 /**
- * The places of the shell after the walk of 4 October 2026: the computers are the Network, the graph has its own
- * rail entry, one permissions matrix serves Apps and Model, every page head has its title before its tabs, a
+ * The places of the shell: the rail is CONSENSUS.md's of 18 October 2026 (it replaced the 4 October walk's Network
+ * and the graph's own rail entry), one permissions matrix serves Apps and Model, every page head has its title before its tabs, a
  * count of one is said in the singular, and an empty list says so once.
  */
 import { describe, expect, it } from 'vitest';
@@ -25,27 +25,26 @@ const ROUTES = {
 const before = (a: Element | null, b: Element | null) => Boolean(a && b && a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 describe('the rail and the palette', () => {
-  it('names the place Network and gives the graph its own entry beside Access', async () => {
+  it('names the computers Computers, gives Apps its own entry, and keeps Roles and the access map off the rail', async () => {
     await mount('#/people', ROUTES);
     const navs = $$('#rail a[data-nav]').map((entry) => entry.dataset.nav);
-    expect(navs.indexOf('graph')).toBe(navs.indexOf('access') + 1);
-    expect($('#rail a[data-nav="network"] .lbl')?.textContent).toBe('Network');
-    expect($('#rail a[data-nav="graph"]')?.getAttribute('href')).toBe('#/graph');
-    expect($('#rail')?.textContent).not.toContain('Computers');
+    expect(navs).toEqual(['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me']);
+    expect($$('#rail a[data-nav] .lbl:not(.kbd)').map((entry) => entry.textContent)).toEqual(['Home', 'Waiting on you', 'People and agents', 'Running agents', 'Access', 'Computers', 'Apps', 'Secrets', 'Settings', 'You']);
+    expect($('#rail')?.textContent).not.toMatch(/Network|Operations|Graph|Command|Collapse/);
   });
-  it('lights the graph entry on the graph, and Access no longer has a Graph tab', async () => {
+  it('lights Access on the access map and on Roles', async () => {
     await mount('#/graph', ROUTES);
-    expect($('#rail a.on')?.dataset.nav).toBe('graph');
+    expect($('#rail a.on')?.dataset.nav).toBe('access');
     unmountAll();
-    await mount('#/model', ROUTES);
-    expect($$('nav[aria-label="Access views"] a').map((tab) => tab.textContent)).not.toContain('Graph');
+    await mount('#/roles', ROUTES);
+    expect($('#rail a.on')?.dataset.nav).toBe('access');
   });
   it('shows a key, never an address, beside each place in the palette, and words its acts plainly', async () => {
     await mount('#/people', ROUTES);
     await press('k', { metaKey: true }, document.body);
     const rows = $$('#palList .it[data-to]');
-    expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual(expect.arrayContaining(['Network', 'Graph']));
-    expect(rows.map((row) => row.firstElementChild?.textContent)).not.toContain('Computers');
+    expect(rows.map((row) => row.firstElementChild?.textContent)).toEqual(expect.arrayContaining(['Computers', 'Access map', 'Running agents', 'Waiting on you']));
+    expect(rows.map((row) => row.firstElementChild?.textContent)).not.toEqual(expect.arrayContaining(['Network']));
     for (const row of rows) expect(row.textContent).not.toContain('#/');
     expect(rows.find((row) => row.dataset.to === '#/people')?.lastElementChild?.textContent).toBe('g p');
     const acts = $$('#palList .it[data-n]').map((row) => row.firstElementChild?.textContent);

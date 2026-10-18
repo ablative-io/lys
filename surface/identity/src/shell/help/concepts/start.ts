@@ -49,7 +49,7 @@ export const START: Seed[] = [
     body: [
       'On a new Lys the dashboard asks "Run agents on this computer?" Say yes only if this is a computer you want agents to work on; "Not this one" leaves agents to other computers. Lys keeps that answer for you on this browser, so the step counts as answered and is not asked again.',
       'Saying yes records the computer with the name you give it, and lets your own agents start there. Lys starts agents on it through its own runner.',
-      'Another computer is added under Network: give it a name, then get a connection code and run the command shown on that computer. The code works once and is not shown again.',
+      'Another computer is added under Computers: give it a name, then get a connection code and run the command shown on that computer. The code works once and is not shown again.',
     ],
     steps: [
       {
@@ -58,9 +58,9 @@ export const START: Seed[] = [
         link: 'Open the dashboard'
       },
       {
-        text: 'Or add a computer by name on Network, and connect it with its code.',
+        text: 'Or add a computer by name on Computers, and connect it with its code.',
         href: '#/network',
-        link: 'Open Network'
+        link: 'Open Computers'
       },
     ],
     related: ['computers.network', 'computers.runner', 'computers.may-start'],

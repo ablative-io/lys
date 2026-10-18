@@ -66,19 +66,17 @@ const folded = (element: Element | null | undefined): string => element?.querySe
 const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map(face);
 
 describe('The Dashboard is the front page', () => {
-  it('is the rail\'s second entry, after Operations, and #/ lands on it', async () => {
+  it('is the rail\'s first entry, Home, and #/ lands on it', async () => {
     await mount('#/', routes);
     expect($('.page h1')?.textContent).toBe('Dashboard');
     expect($('#rail a.on')?.dataset.nav).toBe('dashboard');
-    // Operations, the canvas of running agents, is the first thing in the rail (Tom, 4 October 2026).
-    const [operations, first] = $$('#rail a[data-nav]');
-    expect([operations.title, operations.getAttribute('href')]).toEqual(['Operations (g c)', '#/canvas']);
-    expect(first.dataset.nav).toBe('dashboard');
-    expect(first.getAttribute('href')).toBe('#/dashboard');
-    expect(first.title).toBe('Dashboard (g d)');
+    // Home first, then what waits on you (CONSENSUS.md, 18 October 2026; it replaced Operations first, Tom, 4 October 2026).
+    const [first, second] = $$('#rail a[data-nav]');
+    expect([first.dataset.nav, first.getAttribute('href'), first.title]).toEqual(['dashboard', '#/', 'Home (g d)']);
+    expect([second.dataset.nav, second.title]).toEqual(['waiting', 'Waiting on you (g q)']);
     await click($('#rail a[data-nav="people"]'));
     await click($('#rail a[data-nav="dashboard"]'));
-    expect(location.hash).toBe('#/dashboard');
+    expect(location.hash).toBe('#/');
     expect($('.page h1')?.textContent).toBe('Dashboard');
   });
 

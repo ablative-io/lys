@@ -16,13 +16,13 @@ async function graphRead(): Promise<void> {
 }
 
 const READS = {
-  canvas: { title: 'Operations', read: () => request('/runtime/live') },
+  canvas: { title: 'Running agents', read: () => request('/runtime/live') },
   people: { title: 'People and agents', read: api.people },
   roles: { title: 'Roles', read: () => request('/roles') },
   access: { title: 'Access', read: grantsRead },
-  graph: { title: 'Graph', read: graphRead },
+  graph: { title: 'Access map', read: graphRead },
   secrets: { title: 'Secrets', read: () => request('/secrets') },
-  network: { title: 'Network', read: () => request('/network') },
+  network: { title: 'Computers', read: () => request('/network') },
   settings: { title: 'Settings', read: () => request('/configuration') },
 };
 type Place = keyof typeof READS;

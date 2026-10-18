@@ -26,47 +26,47 @@ function prefKeys(): string[] {
 }
 
 describe('rail and dock side (conformance 9.1)', () => {
-  it('rail button toggles the labels', async () => {
+  it('rail button toggles the labels, which start shown', async () => {
     await mount('#/people');
     expect(localStorage.getItem('iam.labels')).toBeNull();
-    expect(railOpen()).toBe(false);
-    await click($('#railBtn'));
     expect(railOpen()).toBe(true);
-    expect(localStorage.getItem('iam.labels')).toBe('labels');
     await click($('#railBtn'));
     expect(railOpen()).toBe(false);
     expect(localStorage.getItem('iam.labels')).toBe('icons');
+    await click($('#railBtn'));
+    expect(railOpen()).toBe(true);
+    expect(localStorage.getItem('iam.labels')).toBe('labels');
     expect(prefKeys()).toEqual(['iam.labels']);
   });
 
   it('bracket toggles the rail outside a text field', async () => {
     await mount('#/people');
     await press('[', {}, document.body);
-    expect(railOpen()).toBe(true);
-    expect(localStorage.getItem('iam.labels')).toBe('labels');
-    await press('[', {}, document.body);
     expect(railOpen()).toBe(false);
     expect(localStorage.getItem('iam.labels')).toBe('icons');
+    await press('[', {}, document.body);
+    expect(railOpen()).toBe(true);
+    expect(localStorage.getItem('iam.labels')).toBe('labels');
     await press('k', { metaKey: true }, document.body);
     expect(document.activeElement?.id).toBe('palIn');
     await press('[', {}, $('#palIn'));
-    expect(railOpen()).toBe(false);
-    expect(localStorage.getItem('iam.labels')).toBe('icons');
+    expect(railOpen()).toBe(true);
+    expect(localStorage.getItem('iam.labels')).toBe('labels');
   });
 
   it('rail choice survives a remount', async () => {
     await mount('#/people');
     await press('[', {}, document.body);
-    expect(localStorage.getItem('iam.labels')).toBe('labels');
+    expect(localStorage.getItem('iam.labels')).toBe('icons');
     unmountAll();
     expect($$('#rail')).toHaveLength(0);
     await mount('#/people');
-    expect(railOpen()).toBe(true);
+    expect(railOpen()).toBe(false);
     await press('[', {}, document.body);
-    expect(localStorage.getItem('iam.labels')).toBe('icons');
+    expect(localStorage.getItem('iam.labels')).toBe('labels');
     unmountAll();
     await mount('#/people');
-    expect(railOpen()).toBe(false);
+    expect(railOpen()).toBe(true);
   });
 
   it('palette act and backslash switch the dock side', async () => {

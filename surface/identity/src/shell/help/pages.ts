@@ -32,7 +32,7 @@ export interface PageHelp {
 export const RAIL_REGION: Region = {
   sel: '#rail',
   title: 'The rail',
-  text: 'Every screen, one key away: g then the letter beside its name. Help (?) opens this layer; the full help is one button below. [ shows or hides the labels.',
+  text: 'Every screen, one key away: g then the letter beside its name. Roles and the access map are under Access. ? opens this layer; the Help button opens the full help. [ or Menu labels shows or hides the words.',
   at: 'right',
 };
 

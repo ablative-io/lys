@@ -69,7 +69,7 @@ function returnFocus(opener: Element | null) {
 }
 
 export function ShellProvider({ children }: { children: ReactNode }) {
-  const [labels, setLabelsState] = useState(pref('labels', 'icons') === 'labels');
+  const [labels, setLabelsState] = useState(pref('labels', 'labels') === 'labels');
   const [dockRight, setDockRight] = useState(pref('dock', 'left') === 'right');
   // The help's state is the address's (help/url.ts), so a help page can be linked and survives a reload.
   const [help, setHelpState] = useState<HelpUrlState>(readHelpUrl);
@@ -113,7 +113,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     setPref('labels', on ? 'labels' : 'icons');
     setLabelsState(on);
   }, []);
-  const toggleLabels = useCallback(() => setLabels(pref('labels', 'icons') !== 'labels'), [setLabels]);
+  const toggleLabels = useCallback(() => setLabels(pref('labels', 'labels') !== 'labels'), [setLabels]);
   const setDockSide = useCallback((side: 'left' | 'right') => {
     setPref('dock', side);
     setDockRight(side === 'right');

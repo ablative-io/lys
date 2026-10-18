@@ -9,7 +9,8 @@ describe('shell (conformance 9.1)', () => {
     const expected = RAIL.filter((i) => i.t === 'a');
     expect(links.map((a) => a.getAttribute('href'))).toEqual(expected.map((i) => 'href' in i && i.href));
     expect(links.map((a) => a.title)).toEqual(expected.map((i) => 'title' in i && i.title));
-    expect($$('#rail button.rb').map((b) => b.title)).toEqual(['Help (?)', 'Command palette (⌘K)', 'Menu labels ([)']);
+    // jsdom's navigator is not a Mac, so Search names Ctrl K, the key a person off a Mac presses.
+    expect($$('#rail button.rb').map((b) => b.title)).toEqual(['Help (?)', 'Search (Ctrl K)', 'Menu labels ([)']);
     expect($('#rail a.on')?.dataset.nav).toBe('people');
   });
 
@@ -25,14 +26,14 @@ describe('shell (conformance 9.1)', () => {
     expect($('.page h1')?.textContent).toBe('Roles');
   });
 
-  it('opens and collapses the rail with [ and keeps the choice', async () => {
+  it('opens with its labels, collapses them with [ and keeps the choice', async () => {
     await mount('#/people');
-    expect($('#rail')?.classList.contains('open')).toBe(false);
-    await press('[', {}, document.body);
     expect($('#rail')?.classList.contains('open')).toBe(true);
-    expect(localStorage.getItem('iam.labels')).toBe('labels');
-    await click($('#railBtn'));
+    await press('[', {}, document.body);
     expect($('#rail')?.classList.contains('open')).toBe(false);
+    expect(localStorage.getItem('iam.labels')).toBe('icons');
+    await click($('#railBtn'));
+    expect($('#rail')?.classList.contains('open')).toBe(true);
   });
 
   it('docks left or right with \\ and from Configuration', async () => {
@@ -42,6 +43,8 @@ describe('shell (conformance 9.1)', () => {
     expect($('#shell')?.classList.contains('dock-right')).toBe(true);
     await click($('[data-dock="left"]'));
     expect($('#shell')?.classList.contains('dock-right')).toBe(false);
+    await click($('[data-labels="icons"]'));
+    expect($('#rail')?.classList.contains('open')).toBe(false);
     await click($('[data-labels="labels"]'));
     expect($('#rail')?.classList.contains('open')).toBe(true);
   });

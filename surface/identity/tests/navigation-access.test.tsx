@@ -8,24 +8,24 @@ const ANSWERS = {
   '/secrets': ok({ secrets: [] }),
   '/configuration': ok({}),
 };
-const NAVS = ['canvas', 'people', 'roles', 'access', 'graph', 'secrets', 'network', 'settings'];
-const DENIALS: [string, string[]][] = [
-  ['/runtime/live', ['canvas']], ['/roles', ['roles']], ['/grants', ['access', 'graph']],
-  ['/secrets', ['secrets']], ['/network', ['network']], ['/configuration', ['settings']],
+const NAVS = ['canvas', 'people', 'waiting', 'access', 'secrets', 'network', 'apps', 'settings'];
+// Each refused read: the rail entries it hides, and the Search rows it hides. Roles and the access map have no rail
+// entry of their own (CONSENSUS.md, 18 October 2026), so their refusals show only in Search and the keys.
+const DENIALS: [string, string[], string[]][] = [
+  ['/runtime/live', ['canvas'], ['/canvas']], ['/roles', [], ['/roles']], ['/grants', ['access', 'waiting'], ['/access', '/graph', '/requests']],
+  ['/secrets', ['secrets'], ['/secrets']], ['/network', ['network'], ['/network']], ['/configuration', ['settings', 'apps'], ['/settings', '/apps']],
 ];
 
 describe('navigation follows the answering API', () => {
-  it.each(DENIALS)('hides only the entries refused by %s, in the rail, palette and keys', async (path, hidden) => {
+  it.each(DENIALS)('hides only the entries refused by %s, in the rail, palette and keys', async (path, hidden, rows) => {
     await mount('#/me', { ...ANSWERS, [path]: refused(403, 'NotAdmitted', 'this read is not admitted') });
     expect($$('#rail a[data-nav]').map((entry) => entry.dataset.nav)).toEqual(expect.arrayContaining(NAVS.filter((nav) => !hidden.includes(nav))));
     for (const nav of hidden) expect($('#rail a[data-nav="' + nav + '"]')).toBeNull();
     await press('k', { metaKey: true }, document.body);
-    for (const nav of hidden) {
-      const address = nav === 'settings' ? '/settings' : '/' + nav;
-      expect($('#palList [data-to="#' + address + '"]')).toBeNull();
-    }
+    expect($$('#palList [data-to]').length).toBeGreaterThan(0);
+    for (const address of rows) expect($('#palList [data-to="#' + address + '"]'), address).toBeNull();
     await press('Escape', {}, document.body);
-    if (hidden.includes('roles')) {
+    if (rows.includes('/roles')) {
       await press('g', {}, document.body);
       await press('o', {}, document.body);
       expect(location.hash).toBe('#/me');
@@ -57,7 +57,9 @@ describe('navigation follows the answering API', () => {
   it('reads a formerly allowed entry again before mounting its controls', async () => {
     let admitted = true;
     await mount('#/me', { ...ANSWERS, '/roles': () => admitted ? ok({ roles: [] }) : refused(403, 'NotAdmitted', 'role access was removed') });
-    expect($('#rail a[data-nav="roles"]')).not.toBeNull();
+    await press('k', { metaKey: true }, document.body);
+    expect($('#palList [data-to="#/roles"]')).not.toBeNull();
+    await press('Escape', {}, document.body);
     admitted = false;
     await press('g', {}, document.body);
     await press('o', {}, document.body);
