@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { api, request } from '../api';
+import { signOutNow } from '../features/me/SignOut';
 import { visibleEntries } from '../features/people/directory';
 import type { Entry } from '../features/people/directory';
 import { keyable } from './keyable';
@@ -79,6 +80,8 @@ export function Palette() {
       .filter(([, h]) => mayOpen(h.slice(1))).map(([t, h]) => ({ g: 'Do', t, d: '', to: h, go: () => go(h) })),
     { g: 'Do', t: 'Move the menu and Help to the other side', d: '\\', go: shell.toggleDockSide },
     { g: 'Do', t: 'Show or hide menu labels', d: '[', go: shell.toggleLabels },
+    // Ends this browser's session only; a failure stays on screen as a toast until dismissed.
+    { g: 'Do', t: 'Sign out', d: 'this browser', go: () => { void signOutNow().then((problem) => { if (problem) shell.toast(problem); }); } },
   ];
   const found: Item[] = typed ? [
     ...ids.map((x) => ({ g: 'People and agents', t: x.display_name, d: `${x.role ?? x.kind} · ${x.state}`, go: () => go('#/file/' + x.id) })),

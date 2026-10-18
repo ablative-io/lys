@@ -6,7 +6,8 @@ import { ADA, ME, SERVICE, ok, refused, BEA, BEA_DIRECTORY } from './fixtures';
 const current = { id: 'session-current', current: true, login: { issuer: 'https://issuer.test', subject: 'account-1' }, started_at: 1790000000, ends_at: 1790003600 };
 const other = { ...current, id: 'session-other', current: false };
 const sessions = { person: ADA, sessions: [current, other], cookie: 'never-render-this-cookie' };
-const button = (label: string) => [...document.querySelectorAll('button')].find((value) => (value.getAttribute('aria-label') ?? value.textContent) === label) ?? null;
+/** A button on the page, never the rail's (the rail's Sign out ends the session at once; these tests press the page's own). */
+const button = (label: string) => [...document.querySelectorAll('button')].find((value) => !value.closest('#rail') && (value.getAttribute('aria-label') ?? value.textContent) === label) ?? null;
 
 describe('Sessions', () => {
   it('reads sessions and requires confirmation before ending exactly the selected one', async () => {

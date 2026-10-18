@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { signedOutPage } from '../src/features/me/SignOut';
 import { SignIn } from '../src/features/sign-in/SignIn';
-import { $, $$, click, mount } from './harness';
+import { $, $$, click, leaveTheReachReadOutOfPosted, mount, press } from './harness';
 import { SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { serve } from './harness';
@@ -54,4 +54,36 @@ it('the sign-in page opened by Sign out says why it is showing, and only then', 
     act(() => root.unmount());
     container.remove();
   }
+});
+
+// The People page asks its reach question as a POST; it is a read, not a change this file counts.
+leaveTheReachReadOutOfPosted();
+const railSignOut = () => $$('.rail button').find((each) => each.getAttribute('aria-label') === 'Sign out') ?? null;
+
+it('the rail shows Sign out under You with the person\'s name, drawn with the leave symbol, and it ends only the current session', async () => {
+  const { posted } = await mount('#/people', { ...SERVICE, '/sessions': ok(sessions), 'POST /sessions/session-current/end': ok({ ended: 'session-current' }) });
+  const button = railSignOut();
+  const entry = button?.closest('.sign-out-rail');
+  expect(entry?.querySelector('.sign-out-who')?.textContent).toBe('Ada (test person)');
+  expect(entry?.previousElementSibling?.getAttribute('href')).toBe('#/me');
+  expect(button?.querySelector('path')?.getAttribute('d')).toContain('M11 5H6');
+  await click(button);
+  expect(posted.map((each) => each.path)).toEqual(['/sessions/session-current/end']);
+  expect(opened).toHaveBeenCalledOnce();
+});
+
+it('the rail keeps Sign out for a person whose waiting reads are refused, and says a failed end in a toast that stays', async () => {
+  await mount('#/people', { ...SERVICE, '/requests': refused(403, 'NotPermitted', 'not active'), '/sessions': ok(sessions), 'POST /sessions/session-current/end': refused(503, 'SessionsUnavailable', 'the session store is not answering') });
+  await click(railSignOut());
+  expect(opened).not.toHaveBeenCalled();
+  expect(document.body.textContent).toContain('You are still signed in. Press Sign out again.');
+});
+
+it('Search offers Sign out as an act, and it ends only the current session', async () => {
+  const { posted } = await mount('#/people', { ...SERVICE, '/sessions': ok(sessions), 'POST /sessions/session-current/end': ok({ ended: 'session-current' }) });
+  await press('k', { metaKey: true }, document.body);
+  const row = $$('#palList .it').find((each) => each.firstElementChild?.textContent === 'Sign out') ?? null;
+  await click(row);
+  expect(posted.map((each) => each.path)).toEqual(['/sessions/session-current/end']);
+  expect(opened).toHaveBeenCalledOnce();
 });

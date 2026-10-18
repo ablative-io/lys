@@ -2,3 +2,9 @@
 .sign-out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .sign-out-who { color: var(--text-secondary); }
 .sign-out > .why-not { flex-basis: 100%; margin: 0; }
+/* In the rail: the act under You, then the name, cut short when the rail is narrow; both words hide with the labels. */
+.rail .sign-out-rail { display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
+.rail .sign-out-rail .act { flex: none; justify-content: flex-start; gap: 12px; height: 32px; padding: 0 8px; }
+.rail .sign-out-rail .act-word { opacity: 0; transition: opacity .15s; }
+.rail.open .sign-out-rail .act-word { opacity: 1; transition-delay: .08s; }
+.rail .sign-out-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: var(--text-sm); }

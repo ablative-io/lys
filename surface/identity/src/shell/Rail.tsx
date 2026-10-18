@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
-import { api, request, useLoad } from '../api';
+import { api, Refused, request, useLoad } from '../api';
+import { SignOut } from '../features/me/SignOut';
+import type { MeView } from '../generated';
 import { readTogether } from '../reads';
 import { Act } from './Act';
 import { RAIL } from './railItems';
@@ -21,23 +23,35 @@ export function railView(pathname: string): string {
 const onMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 const forThisComputer = (keys: string): string => onMac ? keys : keys.replace('⌘', 'Ctrl ');
 
-/** What waits on the signed-in person: requests awaiting a decision and grants due a review, as the service lists them. */
-function useWaiting(): { count: number; words: string } | { problem: string } | null {
-  const load = useLoad(async () => { await api.me(); return readTogether({
-    requests: request<{ requests: { state: string }[] }>('/requests'),
-    reviews: request<{ due: unknown[] }>('/reviews'),
-  }); }, 'rail-waiting');
-  if (load.status === 'loading') return null;
-  if (load.status === 'refused') return load.refused.status === 401 || load.refused.status === 403 ? null : { problem: load.refused.refusal.reason };
-  const waiting = load.data.requests.requests.filter((entry) => entry.state === 'waiting').length;
-  const due = load.data.reviews.due.length;
-  return { count: waiting + due, words: waiting + (waiting === 1 ? ' request waiting, ' : ' requests waiting, ') + due + (due === 1 ? ' grant to review' : ' grants to review') };
+type Waiting = { count: number; words: string } | { problem: string } | null;
+const waitingOf = (refused: Refused): Waiting => refused.status === 401 || refused.status === 403 ? null : { problem: refused.refusal.reason };
+
+/**
+ * Who is signed in, and what waits on them: requests awaiting a decision and grants due a review, as the service
+ * lists them. The person stays known when the waiting reads are refused, so Sign out is drawn for everyone.
+ */
+function useWaiting(): { me: MeView | null; waiting: Waiting } {
+  const load = useLoad(async () => {
+    const me = await api.me();
+    const waiting = await readTogether({
+      requests: request<{ requests: { state: string }[] }>('/requests'),
+      reviews: request<{ due: unknown[] }>('/reviews'),
+    }).then((data) => ({ data }), (error: unknown) => ({ refused: error instanceof Refused ? error : new Refused(0, { refusal: 'WaitingUnread', reason: String(error) }) }));
+    return { me, waiting };
+  }, 'rail-waiting');
+  if (load.status === 'loading') return { me: null, waiting: null };
+  if (load.status === 'refused') return { me: null, waiting: waitingOf(load.refused) };
+  const { me, waiting: read } = load.data;
+  if ('refused' in read) return { me, waiting: waitingOf(read.refused) };
+  const waiting = read.data.requests.requests.filter((entry) => entry.state === 'waiting').length;
+  const due = read.data.reviews.due.length;
+  return { me, waiting: { count: waiting + due, words: waiting + (waiting === 1 ? ' request waiting, ' : ' requests waiting, ') + due + (due === 1 ? ' grant to review' : ' grants to review') } };
 }
 
 export function Rail() {
   const shell = useShell();
   const verdictOf = useNavigationVerdict();
-  const waiting = useWaiting();
+  const { me, waiting } = useWaiting();
   const { pathname } = useLocation();
   const on = railView(pathname);
   // On a phone the rail is a bar with a Menu button; the menu opens the same rail over the page.
@@ -85,12 +99,15 @@ export function Rail() {
           </>
         );
         if (item.t === 'a') {
-          return (
+          const link = (
             <a key={index} href={item.href} data-nav={item.nav} data-shut={verdict.open ? undefined : verdict.definite ? 'refused' : 'unchecked'}
               title={forThisComputer(item.title) + (verdict.open ? '' : ': ' + verdict.words)} className={item.nav === on ? 'on' : undefined}>
               {inner}
             </a>
           );
+          // Sign out sits under You, with the signed-in person's name; with labels off the name hides with the rest.
+          if (item.nav !== 'me' || !me) return link;
+          return [link, <SignOut key="sign-out" place="rail" who={me.person.display_name} person={me.person.id} told={shell.toast} />];
         }
         return (
           <button

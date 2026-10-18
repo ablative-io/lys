@@ -41,7 +41,8 @@ describe('Person security tabs', () => {
     expect(requests).toContain('/sessions');
     expect(requests).not.toContain('/directory/people/' + ADA + '/sessions');
     expect(text()).toContain('does not stop agent processes');
-    await click([...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Sign out') ?? null);
+    // The sessions table's own Sign out, which asks first; the rail's Sign out ends the session at once.
+    await click([...document.querySelectorAll('button')].find((entry) => !entry.closest('#rail') && (entry.getAttribute('aria-label') ?? entry.textContent) === 'Sign out') ?? null);
     expect(posted).toEqual([]);
     await click([...document.querySelectorAll('button')].find((entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === 'Confirm end session') ?? null);
     expect(posted).toEqual([{ path: '/sessions/session-this-browser/end', body: {} }]);
