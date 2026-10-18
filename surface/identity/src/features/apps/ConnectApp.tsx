@@ -16,9 +16,16 @@ import { send } from './SchemaBuilder';
 import { STATE_WORDS, SchemaTable, refusalWords } from './Apps';
 import type { AppRecord } from './Apps';
 
-/** An app Lys knows how to connect, built into the surface. */
+/** An app offered by name on the connect card: a suggestion only, since any app that serves the connect address connects. */
 export interface KnownApp { id: string; name: string; manifest: string }
+/** The one app offered by name (ADR-116: Lys holds no app's name; this line goes once apps register themselves first). */
 export const KNOWN_APPS: KnownApp[] = [{ id: 'cambium', name: 'Cambium', manifest: '/identity/lys/manifest' }];
+/** Where every app that connects to Lys starts the connect on its own side; Lys sends the browser there with its address. */
+export const CONNECT_PATH = '/identity/lys/connect';
+/** Any other app, by its web address alone: its name arrives from its manifest after the hand-off. */
+const ANOTHER: KnownApp = { id: 'another', name: 'the app', manifest: '' };
+/** `text` with its first letter capitalised, for a sentence or label that starts with an app's name. */
+const opening = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** The app's origin from what a person typed, or null when it is not a web address. */
 export function appOrigin(typed: string): string | null {
@@ -44,14 +51,15 @@ export function onlyHere(origin: string): boolean {
 export function strandedWhy(name: string, lys: string, app: string): string | null {
   if (!onlyHere(lys) || onlyHere(app)) return null;
   // A browser on a loopback address is on the computer Lys runs on, so "this computer" is both the device in hand and Lys's own.
-  return name + ' is on another computer, but Lys is open here at ' + lys + ', which only this computer answers, so ' + name + ' will most likely not reach it. Open Lys at an address ' + name + '’s computer can reach, such as its https address, and connect from there.';
+  return opening(name) + ' is on another computer, but Lys is open here at ' + lys + ', which only this computer answers, so ' + name + ' will most likely not reach it. Open Lys at an address ' + name + '’s computer can reach, such as its https address, and connect from there.';
 }
 
-/** The known apps, each with its state on this Lys and a Connect button. */
+/** Connect an app: each app offered by name with its state on this Lys, then any other app by its web address. */
 export function KnownApps({ apps }: { apps: AppRecord[] }) {
-  return <section className="card" aria-label="Known apps">
-    <h3>Known apps</h3>
+  return <section className="card" aria-label="Connect an app">
+    <h3>Connect an app</h3>
     {KNOWN_APPS.map((known) => <KnownAppRow key={known.id} known={known} state={apps.find((app) => app.id === known.id)?.state ?? null} />)}
+    <KnownAppRow known={ANOTHER} state={null} />
   </section>;
 }
 
@@ -64,24 +72,26 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
   const whyNot = origin ? null : address.trim()
     ? 'That is not a whole web address. Type it as it appears in the browser, starting with https://.'
     : 'Type ' + known.name + '’s web address to continue.';
+  const another = known === ANOTHER;
   const cancel = () => { setAsking(false); setAddress(''); };
   const connected = state === 'approved';
   // A connected app rests with nothing inviting it to be broken: connecting again is a quiet act whose cost is said before the address is asked for.
   // The address takes the card's whole width on its own line, its label above it and the acts under it.
-  return <div aria-label={'Known app ' + known.id}>
+  return <div aria-label={another ? 'Another app' : 'Known app ' + known.id}>
     <div className="row">
-      <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{connected ? 'Connected' : state ? STATE_WORDS[state] : 'Not connected'}</span></span>
-      {asking ? null : <Act symbol="add" name={'Connect ' + known.name} word={connected ? 'Connect again' : 'Connect'} tone={connected ? 'plain' : 'primary'} onClick={() => setAsking(true)} />}
+      {another ? <span><b>Another app</b> <span className="note">any app that connects to Lys, by its web address</span></span>
+        : <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{connected ? 'Connected' : state ? STATE_WORDS[state] : 'Not connected'}</span></span>}
+      {asking ? null : <Act symbol="add" name={another ? 'Connect another app' : 'Connect ' + known.name} word={connected ? 'Connect again' : 'Connect'} tone={connected || another ? 'plain' : 'primary'} onClick={() => setAsking(true)} />}
     </div>
     {asking ? <div className="app-connect">
       {connected ? <ReplacesCredentials name={known.name} /> : null}
       <p className="note">Lys sends your browser to {known.name}, which asks to connect and brings you back here to approve what it asks for.</p>
-      <label className="field">{known.name}’s web address<input type="url" inputMode="url" autoComplete="url" autoFocus value={address} onChange={(event) => setAddress(event.target.value)} placeholder="https://cambium.example.com" aria-label={known.name + ' web address'} /></label>
+      <label className="field">{opening(known.name)}’s web address<input type="url" inputMode="url" autoComplete="url" autoFocus value={address} onChange={(event) => setAddress(event.target.value)} placeholder={another ? 'https://app.example.com' : 'https://' + known.id + '.example.com'} aria-label={opening(known.name) + ' web address'} /></label>
       {whyNot ? <p className="note" aria-live="polite">{whyNot}</p>
         : stranded ? <p className="app-replace" role="note">{stranded}</p>
-        : <p className="note">{known.name} will call Lys back at <span className="mono">{lys}</span>.</p>}
+        : <p className="note">{opening(known.name)} will call Lys back at <span className="mono">{lys}</span>.</p>}
       <div className="app-actions">
-        <Act symbol="approve" name={'Continue to ' + known.name} word={'Continue to ' + known.name} tone="primary" disabled={!origin} hint={whyNot ?? undefined} onClick={() => { if (origin) window.location.assign(origin + '/identity/lys/connect?lys=' + encodeURIComponent(lys)); }} />
+        <Act symbol="approve" name={'Continue to ' + known.name} word={'Continue to ' + known.name} tone="primary" disabled={!origin} hint={whyNot ?? undefined} onClick={() => { if (origin) window.location.assign(origin + CONNECT_PATH + '?lys=' + encodeURIComponent(lys)); }} />
         <Act symbol="close" name={'Cancel connecting ' + known.name} word="Cancel" onClick={cancel} />
       </div>
     </div> : null}
