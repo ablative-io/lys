@@ -9,7 +9,8 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { operationId, useLoad } from '../../api';
+import { API, Refused, operationId, useLoad } from '../../api';
+import { rememberFileReturn } from '../signin/fileReturn';
 import { Act } from '../../shell/Act';
 import { send } from './SchemaBuilder';
 import { STATE_WORDS, SchemaTable, refusalWords } from './Apps';
@@ -133,6 +134,7 @@ export function ConnectApp() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [refusal, setRefusal] = useState('');
   const [busy, setBusy] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   // Whether the app is already connected, so approving says it replaces the running app's credentials; unread, the words say "if".
   const apps = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps');
   const held = apps.status === 'ok' ? apps.data.apps.find((app) => app.id === manifest?.id)?.state ?? null : undefined;
@@ -158,7 +160,13 @@ export function ConnectApp() {
     try {
       const answer = await send<{ redirect: string }>('POST', '/apps/connect', { operation: operationId(), manifest, return: back, state });
       window.location.assign(answer.redirect);
-    } catch (error) { setRefusal(refusalWords(error)); setBusy(false); }
+    } catch (error) {
+      setRefusal(error instanceof Refused && error.status === 401
+        ? 'Your sign-in to Lys ended before Approve reached it, so nothing was approved and ' + (manifest?.name ?? 'the app') + ' is still waiting. Sign in again; if Lys does not bring you back here, start again from ' + (manifest?.name ?? 'the app') + '’s Connect to Lys.'
+        : refusalWords(error));
+      setSignedOut(error instanceof Refused && error.status === 401);
+      setBusy(false);
+    }
   };
   return <div className="page apps"><section className="card" aria-label="Connect an app">
     <h1>Connect an app</h1>
@@ -169,7 +177,10 @@ export function ConnectApp() {
       {held === 'approved' ? <ReplacesCredentials name={manifest.name} />
         : held === undefined ? <p className="note">If {manifest.name} is already connected, approving gives it new credentials and the {manifest.name} running now stops signing people in until it finishes connecting.</p> : null}
       <div className="app-actions">
-        <Act symbol="approve" name={'Approve ' + manifest.name} word={held === 'approved' ? 'Approve and replace its credentials' : 'Approve'} tone="primary" disabled={busy} onClick={() => { void approve(); }} />
+        {signedOut ? <a className="btn primary" href={API + '/login'} onClick={(event) => {
+          try { rememberFileReturn(); } catch (error) { event.preventDefault(); setRefusal('The browser could not keep this link for sign-in: ' + String(error) + '. Copy the address from the address bar, sign in, then open it again.'); }
+        }}>Sign in again</a>
+          : <Act symbol="approve" name={'Approve ' + manifest.name} word={held === 'approved' ? 'Approve and replace its credentials' : 'Approve'} tone="primary" disabled={busy} onClick={() => { void approve(); }} />}
         <Act symbol="decline" name={'Decline ' + manifest.name} word="Decline" tone="danger" disabled={busy} onClick={() => { const declined = declinedAddress(back, manifestUrl, state); if (declined) window.location.assign(declined); else void navigate('/apps'); }} />
       </div>
     </> : refusal ? null : <p className="dim">Reading the app’s manifest…</p>}
