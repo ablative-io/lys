@@ -190,6 +190,15 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The runner's bridge under test",
+      "items": [
+        {
+          "id": "C751",
+          "text": "The bridge test's fixture treats a reply write refused BrokenPipe or ConnectionReset after the barrier as the bridge's correct close of a lane already refused on the other, proven red first with the second write ordered after the bridge's join; green 20 of 20 on Linux and macOS; no sleep, retry or serial marker (AGENTS-011 R1)."
+        }
+      ]
     }
   ]
 }

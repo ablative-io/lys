@@ -39,3 +39,5 @@
 **S413.** As an operator, I want one seat's ingest, delivery, registry and authority checks to ignore unrelated seats and history, so that three times the estate stays responsive.
 
 **S414.** As an operator, I want every disk sync, checkpoint, queue and replay cost counted while keeping durable outcomes and old-install recovery, so that speed does not come from weakened safety.
+
+**S425.** As an operator, I want the runner's own tests to be green on every run on the Linux box Lys moves to, so that a battery's red always names a real defect and never a race in a fixture.

@@ -122,6 +122,7 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-runner/src/socket/` | the runner socket's dispatch | AGENTS-008 |
 | `crates/lys-runner/src/harness_control/` | harness admission and qualification | AGENTS-008 |
 | `surface/identity/src/features/provisioning/` | the harness description review form and its profile copies, where a seat program's executable, arguments, seat file and digests are reviewed | AGENTS-009 |
+| `crates/lys-runner/src/dial/bridge/tests.rs` | the bridge's two-lane arrival test and its fixture; a reply write refused after the barrier by a lane the bridge closed is the expected outcome | AGENTS-011 |
 
 ## Inventory
 

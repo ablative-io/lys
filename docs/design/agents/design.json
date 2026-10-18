@@ -349,6 +349,11 @@
       "path": "surface/identity/src/features/provisioning/",
       "note": "the harness description review form and its profile copies, where a seat program's executable, arguments, seat file and digests are reviewed",
       "brief": "AGENTS-009"
+    },
+    {
+      "path": "crates/lys-runner/src/dial/bridge/tests.rs",
+      "note": "the bridge's two-lane arrival test and its fixture; a reply write refused after the barrier by a lane the bridge closed is the expected outcome",
+      "brief": "AGENTS-011"
     }
   ],
   "principles": [
