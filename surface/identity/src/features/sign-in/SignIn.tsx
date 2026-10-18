@@ -13,9 +13,9 @@ import './sign-in.css';
 import { Act } from '../../shell/Act';
 import { AccountHelpWords, administratorWords, useAdministratorContact } from '../signin/AccountHelp';
 import { LysMark } from '../../shell/LysMark';
-import { rememberFileReturn } from '../signin/fileReturn';
+import { forgetLanding, rememberFileReturn, rememberLanding } from '../signin/fileReturn';
 
-/** Where a person lands once signed in. */
+/** Where every sign-in begun on the sign-in page lands: Home. One begun on a page lands back on it (signin/Gate.tsx, signin/fileReturn.tsx). */
 export const SIGNED_IN = '/#/';
 
 /** A refusal in the words a person reads, without its name. */
@@ -87,7 +87,11 @@ function Providers({ list }: { list: ProviderList }) {
   const query = next ? '?continue=' + encodeURIComponent(next) : '';
   // A file link the person opened is kept for the provider's return to /me (fileReturn.tsx).
   const remember = (event: MouseEvent) => {
-    try { rememberFileReturn(); } catch (error) {
+    try {
+      rememberFileReturn();
+      // A product's or an app's sign-in continues to its own address instead (continuation below).
+      if (!next) rememberLanding();
+    } catch (error) {
       event.preventDefault();
       setProblem('This browser could not keep the link you opened while you sign in: ' + String(error) + '. Sign in, then open the link again.');
     }
@@ -123,7 +127,10 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
   const providerError = refusedInAddress(administratorWords(help.administrator));
   const [providerDismissed, setProviderDismissed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { heading.current?.focus(); }, []);
+  useEffect(() => {
+    heading.current?.focus();
+    try { forgetLanding(); } catch { /* Nothing kept to forget: the browser keeps no storage for this page. */ }
+  }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
