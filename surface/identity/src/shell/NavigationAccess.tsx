@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation } from 'react-router';
-import { api, request, useLive, useLoad } from '../api';
-import type { Load, Refused } from '../api';
+import { Refused, api, request, useLive, useLoad } from '../api';
+import type { Load } from '../api';
 import { Gate } from '../features/signin/Gate';
 import { ErrorWords } from '../features/people/Words';
 
@@ -24,6 +24,10 @@ const READS = {
   secrets: { title: 'Secrets', read: () => request('/secrets') },
   network: { title: 'Computers', read: () => request('/network') },
   settings: { title: 'Settings', read: () => request('/configuration') },
+  // Each way to ask or decide is its own read, so a person who may not read grants still reaches what waits on them (domain 03's ask).
+  requests: { title: 'Requests', read: () => request('/requests') },
+  reviews: { title: 'Reviews', read: () => request('/reviews') },
+  drafts: { title: 'Drafts', read: () => request('/drafts?state=waiting') },
 };
 type Place = keyof typeof READS;
 type Access = Record<Place, Load<void>>;
@@ -39,16 +43,18 @@ function decision(place: Place): Promise<void> {
 /** The rail's decision for `place`, asked of the service only for a person who may act there. */
 async function railDecision(place: Place): Promise<void> {
   if (ACTING.includes(place) && (await api.me()).person.state !== 'active') {
-    throw new Error('NotActive: this person may not act, so the service is not asked.');
+    throw new Refused(403, { refusal: 'NotActive', reason: 'your account is not active yet, so this is not open to you until an administrator activates it' });
   }
   return decision(place);
 }
 
 function placeOf(pathname: string): Place | null {
   if (pathname === '/settings/account') return null;
+  if (pathname === '/access/drafts') return 'drafts';
   const view = pathname.split('/')[1];
   if (view === 'file' || view === 'agents' || view === 'service-accounts') return 'people';
-  if (['resources', 'requests', 'reviews', 'model'].includes(view)) return 'access';
+  if (['resources', 'model'].includes(view)) return 'access';
+  if (view === 'requests' || view === 'reviews') return view;
   if (view === 'apps' || view === 'connections') return 'settings';
   if (view === 'vault') return 'secrets';
   if (view === 'runtime') return 'canvas';
@@ -74,9 +80,12 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
   const secrets = useDecision('secrets', entered);
   const network = useDecision('network', entered);
   const settings = useDecision('settings', entered);
+  const requests = useDecision('requests', entered);
+  const reviews = useDecision('reviews', entered);
+  const drafts = useDecision('drafts', entered);
   return (
     <Entry.Provider value={enter}>
-      <Navigation.Provider value={{ canvas, people, roles, access, graph, secrets, network, settings }}>{children}</Navigation.Provider>
+      <Navigation.Provider value={{ canvas, people, roles, access, graph, secrets, network, settings, requests, reviews, drafts }}>{children}</Navigation.Provider>
     </Entry.Provider>
   );
 }
@@ -88,12 +97,40 @@ function Entered({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-export function useNavigationAccess(): (pathname: string) => boolean {
+/**
+ * What the rail says of a place: open (or still being checked, which is drawn the same, so the rail never moves),
+ * not open to this person (the service said so: 403, or a person who is not active), or not checked because the
+ * read failed for another reason. Both of the last two carry the words a person reads.
+ */
+export type Verdict = { open: true } | { open: false; definite: boolean; words: string };
+
+/** The service's reason without its leading refusal name ("NotAdmitted: …"), which a person does not need. */
+const reasonOf = (refused: Refused): string => refused.refusal.reason.replace(/^[A-Z][A-Za-z]+: /, '');
+
+function verdictOf(load: Load<void>): Verdict {
+  if (load.status !== 'refused') return { open: true };
+  const definite = load.refused.status === 401 || load.refused.status === 403;
+  return definite
+    ? { open: false, definite, words: 'not open to you: ' + reasonOf(load.refused) + '. Open it to see what to do.' }
+    : { open: false, definite, words: 'could not be checked: ' + reasonOf(load.refused) + '. Open it to try again.' };
+}
+
+/** The rail's verdict for each address. Every entry is drawn whatever the verdict; only the marking differs. */
+export function useNavigationVerdict(): (pathname: string) => Verdict {
   const access = useContext(Navigation);
   if (!access) throw new Error('NavigationAccessMissing: the shell has no API decisions.');
   return (pathname) => {
     const place = placeOf(pathname);
-    return place === null || access[place].status === 'ok';
+    return place === null ? { open: true } : verdictOf(access[place]);
+  };
+}
+
+/** Whether Search and the g keys offer an address: everything except what the service said is not open to this person. */
+export function useNavigationAccess(): (pathname: string) => boolean {
+  const verdict = useNavigationVerdict();
+  return (pathname) => {
+    const said = verdict(pathname);
+    return said.open || !said.definite;
   };
 }
 

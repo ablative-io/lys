@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { $, $$, mount, press, text, unmountAll } from './harness';
-import { SERVICE, ok, refused } from './fixtures';
+import { $, $$, mount, press, settle, text, unmountAll } from './harness';
+import { ME, SERVICE, ok, refused } from './fixtures';
+import type { Route } from './fixtures';
 
 const ANSWERS = {
   ...SERVICE,
@@ -9,18 +10,26 @@ const ANSWERS = {
   '/configuration': ok({}),
 };
 const NAVS = ['canvas', 'people', 'waiting', 'access', 'secrets', 'network', 'apps', 'settings'];
-// Each refused read: the rail entries it hides, and the Search rows it hides. Roles and the access map have no rail
+// Each refused read: the rail entries it marks, and the Search rows it hides. Roles and the access map have no rail
 // entry of their own (CONSENSUS.md, 18 October 2026), so their refusals show only in Search and the keys.
 const DENIALS: [string, string[], string[]][] = [
-  ['/runtime/live', ['canvas'], ['/canvas']], ['/roles', [], ['/roles']], ['/grants', ['access', 'waiting'], ['/access', '/graph', '/requests']],
+  ['/runtime/live', ['canvas'], ['/canvas']], ['/roles', [], ['/roles']], ['/grants', ['access'], ['/access', '/graph']],
   ['/secrets', ['secrets'], ['/secrets']], ['/network', ['network'], ['/network']], ['/configuration', ['settings', 'apps'], ['/settings', '/apps']],
 ];
 
+const shut = (nav: string) => $('#rail a[data-nav="' + nav + '"]')?.dataset.shut;
+
 describe('navigation follows the answering API', () => {
-  it.each(DENIALS)('hides only the entries refused by %s, in the rail, palette and keys', async (path, hidden, rows) => {
-    await mount('#/me', { ...ANSWERS, [path]: refused(403, 'NotAdmitted', 'this read is not admitted') });
-    expect($$('#rail a[data-nav]').map((entry) => entry.dataset.nav)).toEqual(expect.arrayContaining(NAVS.filter((nav) => !hidden.includes(nav))));
-    for (const nav of hidden) expect($('#rail a[data-nav="' + nav + '"]')).toBeNull();
+  it.each(DENIALS)('marks only the entries refused by %s, and keeps them from Search and the keys', async (path, hidden, rows) => {
+    await mount('#/me', { ...ANSWERS, [path]: refused(403, 'NotAdmitted', 'NotAdmitted: this read is not admitted') });
+    // Every entry is drawn whatever the answer; the refused ones are marked and say why in their title.
+    expect($$('#rail a[data-nav]').map((entry) => entry.dataset.nav)).toEqual(expect.arrayContaining(NAVS));
+    expect($$('#rail a[data-shut]').map((entry) => entry.dataset.nav).sort()).toEqual([...hidden].sort());
+    for (const nav of hidden) {
+      expect(shut(nav)).toBe('refused');
+      expect($('#rail a[data-nav="' + nav + '"]')?.title).toContain('not open to you: this read is not admitted.');
+      expect($('#rail a[data-nav="' + nav + '"]')?.title).not.toContain('NotAdmitted');
+    }
     await press('k', { metaKey: true }, document.body);
     expect($$('#palList [data-to]').length).toBeGreaterThan(0);
     for (const address of rows) expect($('#palList [data-to="#' + address + '"]'), address).toBeNull();
@@ -32,17 +41,58 @@ describe('navigation follows the answering API', () => {
     }
   });
 
+  it('draws every entry, unmarked, while its check has not answered', async () => {
+    // Held until the end of the test, then answered, so no read is left in flight for the next test to join.
+    const held: (() => void)[] = [];
+    const later = (answer: Route) => (() => new Promise((resolve) => { held.push(() => resolve(answer)); })) as unknown as Route;
+    await mount('#/me', { ...ANSWERS, '/network': later(ANSWERS['/network']), '/configuration': later(ANSWERS['/configuration']) });
+    expect(held.length).toBeGreaterThan(0);
+    expect($$('#rail a[data-nav]').map((entry) => entry.dataset.nav)).toEqual(['dashboard', 'waiting', 'people', 'canvas', 'access', 'network', 'apps', 'secrets', 'settings', 'me']);
+    expect($$('#rail a[data-shut]')).toHaveLength(0);
+    for (const answer of held) answer();
+    await settle();
+  });
+
+  it('says a check that failed for another reason could not be checked, and still offers the page', async () => {
+    await mount('#/me', { ...ANSWERS, '/secrets': refused(500, 'StoreUnreadable', 'StoreUnreadable: the secrets store could not be read') });
+    expect($$('#rail a[data-shut]').map((entry) => entry.dataset.nav)).toEqual(['secrets']);
+    expect(shut('secrets')).toBe('unchecked');
+    expect($('#rail a[data-nav="secrets"]')?.title).toBe('Secrets (g v): could not be checked: the secrets store could not be read. Open it to try again.');
+    await press('k', { metaKey: true }, document.body);
+    expect($('#palList [data-to="#/secrets"]')).not.toBeNull();
+  });
+
+  it('decides Waiting on you by the requests read alone', async () => {
+    await mount('#/me', { ...ANSWERS, '/grants': refused(403, 'NotAdmitted', 'grants are not admitted') });
+    expect(shut('access')).toBe('refused');
+    expect(shut('waiting')).toBeUndefined();
+    unmountAll();
+    await mount('#/me', { ...ANSWERS, '/requests': refused(403, 'NotAdmitted', 'requests are not admitted') });
+    expect(shut('waiting')).toBe('refused');
+    expect(shut('access')).toBeUndefined();
+  });
+
+  it('marks the acting places for a person who is not active, in words, and leaves Waiting on you open', async () => {
+    await mount('#/me', { ...ANSWERS, '/me': ok({ ...ME, person: { ...ME.person, state: 'registered' } }) });
+    expect(['people', 'access'].map(shut)).toEqual(['refused', 'refused']);
+    expect($('#rail a[data-nav="people"]')?.title).toContain('your account is not active yet');
+    expect(shut('waiting')).toBeUndefined();
+  });
+
   it('keeps People and agents when the personal API answers after directory admission is refused', async () => {
     await mount('#/me', { ...ANSWERS, '/directory/people': refused(403, 'NotAdmitted', 'directory access refused') });
     expect($('#rail a[data-nav="people"]')).not.toBeNull();
+    expect(shut('people')).toBeUndefined();
     unmountAll();
     await mount('#/me', { ...ANSWERS, '/directory/people': refused(403, 'NotAdmitted', 'directory access refused'), '/people': refused(403, 'NoPerson', 'the login has no bound person') });
-    expect($('#rail a[data-nav="people"]')).toBeNull();
+    expect(shut('people')).toBe('refused');
   });
 
   it('answers a hidden Configuration URL with the API name and reason before exposing its controls', async () => {
     await mount('#/settings', { ...ANSWERS, '/configuration': refused(403, 'NotAdmitted', 'configuration is restricted to this service administrator') });
-    expect($('#rail a[data-nav="settings"]')).toBeNull();
+    // The rail's own check is asked once the entry page has answered, so it is waited for; "absent" used to pass while it was still loading.
+    await settle();
+    expect(shut('settings')).toBe('refused');
     expect(text()).toContain('NotAdmitted');
     expect(text()).toContain('configuration is restricted to this service administrator');
     expect($('[data-dock="left"]')).toBeNull();

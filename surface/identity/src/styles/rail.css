@@ -17,3 +17,8 @@
 .rail .grow { flex: 1; }
 .rail .sep { height: 1px; background: var(--border-subtle); margin: 8px 4px; }
 .kbd { font: 10px "JetBrains Mono", ui-monospace, monospace; color: var(--text-muted); border: 1px solid var(--border-default); border-radius: 4px; padding: 0 4px; margin-left: auto; }
+/* Every entry is drawn in place so the rail never moves, and each stays a link to the page that says why.
+   One the service would not open is muted; one it could not check keeps its colour and wears a warning dot,
+   because a failure is not a refusal and must not look like one. */
+.rail a[data-shut="refused"] { color: var(--muted-dot); }
+.rail a[data-shut="unchecked"]::after { content: ""; position: absolute; left: 21px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
