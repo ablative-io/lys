@@ -1,9 +1,12 @@
 /** A request keeps the same operation and exact body across an uncertain answer or reload. */
 import { useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { operationId, request } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
 import { ActionPicker, singleActionCarriers } from '../grants/ActionPicker';
+import { actionWords } from '../grants/action-words';
+import { kindLabel } from '../grants/IssueRoot';
+import { appKind } from '../grants/model';
 import { field } from '../people/RecordedForm';
 import { failureWords } from '../signin/words';
 import { matchesAsk } from './contract';
@@ -13,6 +16,12 @@ import { Act } from '../../shell/Act';
 import './requests.css';
 
 type Pending = { kind: 'empty' } | { kind: 'damaged' } | { kind: 'held'; asked: Ask };
+
+/** What a refusal's link names as needed: the thing, by its kind and its id in its app, and the one action that was not allowed. */
+export interface Wanted { kind: string; id: string; action: string }
+
+/** The relations a kind may be asked for under: an app's kind under its own, Lys's kinds under the model's. */
+const relationsOf = (model: GrantModel, kind: string): Record<string, string[]> => kind.includes('.') ? appKind(model, kind).relations : model.relations;
 
 /** The shipped actions a person may ask for on a shipped resource; an app's actions keep their own names and are asked as relations. */
 const askable = (model: GrantModel, resource: ResourceRef | undefined): string[] =>
@@ -66,10 +75,26 @@ function readRest(key: string): Rest {
   }
 }
 
-export function AskForm({ person, resources, unlisted = '', model, changed, cancel }: {
+/** What a refusal's link asks for, as one sentence: the model's words for the action with the thing named in place of "this resource". */
+const wantedWords = (model: GrantModel, wanted: Wanted): string => {
+  const words = actionWords(model, wanted, [wanted.action]);
+  const app = wanted.kind.includes('.') ? wanted.kind.slice(0, wanted.kind.indexOf('.')) : '';
+  const thing = kindLabel(wanted.kind) + ' ' + wanted.id + (app ? ' in ' + app.charAt(0).toUpperCase() + app.slice(1) : '');
+  const said = words.charAt(0).toLowerCase() + words.slice(1);
+  return said.includes('this resource') ? said.replace('this resource', thing) : said + ' on ' + thing;
+};
+
+/** The fields naming what is asked for: open as the form itself, or folded under one line when a refusal's link already filled them. */
+function What({ folded, children }: { folded: boolean; children: ReactNode }) {
+  return folded ? <details className="ask-what"><summary>Change what I am asking for</summary>{children}</details> : <>{children}</>;
+}
+
+export function AskForm({ person, resources, unlisted = '', wanted, model, changed, cancel }: {
   person: string; resources: ResourceRef[]; model: GrantModel; changed: (answer: AccessRequest) => void;
   /** Why the asker's own access is missing, as its cause, so an empty list is not read as holding nothing; empty when it was read. */
   unlisted?: string;
+  /** What a refusal named as needed, from its link: the form opens asking for exactly that. */
+  wanted?: Wanted;
   /** Closes the form; left out where the form is the only thing the page has to offer. */
   cancel?: () => void;
 }) {
@@ -79,11 +104,17 @@ export function AskForm({ person, resources, unlisted = '', model, changed, canc
   const working = useRef(false);
   const [answer, setAnswer] = useState('');
   const [failure, setFailure] = useState('');
-  // With nothing to choose from, the fields for naming the thing are the form, not a box to tick first.
-  const [advanced, setAdvanced] = useState(resources.length === 0);
+  const wantedIndex = wanted ? resources.findIndex((resource) => resource.kind === wanted.kind && resource.id === wanted.id) : -1;
+  // With nothing to choose from, or a wanted thing not in the list, the fields for naming the thing are the form, not a box to tick first.
+  const [advanced, setAdvanced] = useState(resources.length === 0 || (wanted !== undefined && wantedIndex < 0));
+  const [typedKind, setTypedKind] = useState(wanted && wantedIndex < 0 ? wanted.kind : '');
   const [noExpiry, setNoExpiry] = useState(false);
-  const [resourceIndex, setResourceIndex] = useState('');
-  const [picked, setPicked] = useState<string[]>([]);
+  const [resourceIndex, setResourceIndex] = useState(wantedIndex < 0 ? '' : String(wantedIndex));
+  const [picked, setPicked] = useState<string[]>(() => wanted && askable(model, wanted).includes(wanted.action) ? [wanted.action] : []);
+  // A wanted ask names an exact action; its relation is the one carrying that action alone, when the kind has one.
+  const wantedRelation = wanted ? singleActionCarriers(model, wanted.kind).get(wanted.action) ?? '' : '';
+  // Folded only when every field the link filled is complete: a required field left empty under a closed fold would stop the form without a word.
+  const [folded] = useState(() => wanted !== undefined && (picked.length > 0 || wantedRelation !== ''));
   // Nothing is chosen until the person chooses it: an empty choice is no resource, never the first in the list.
   const chosenResource: ResourceRef | undefined = resourceIndex === '' ? undefined : resources[Number(resourceIndex)];
   const [rest, setRest] = useState<Rest>(() => readRest(key));
@@ -188,7 +219,7 @@ export function AskForm({ person, resources, unlisted = '', model, changed, canc
       const chosen = offered.length ? picked.filter((action) => offered.includes(action)) : [];
       const carriers = singleActionCarriers(model);
       const relations = offered.length ? chosen.map((action) => carriers.get(action) ?? '') : [field(data, 'relation')];
-      if (!relations.length || relations.some((relation) => !relation || !model.relations[relation])) throw new Error('Choose the access you need.');
+      if (!relations.length || relations.some((relation) => !relation || !relationsOf(model, resource.kind)[relation])) throw new Error('Choose the access you need.');
       const why = field(data, 'why');
       if (!why) throw new Error('Explain why you need access.');
       const ends = noExpiry ? null : Date.parse(field(data, 'expires')) / 1000;
@@ -199,22 +230,26 @@ export function AskForm({ person, resources, unlisted = '', model, changed, canc
     } catch (error) { setFailure(error instanceof Error ? error.message : String(error)); }
   };
   return <form className="card recorded-form" aria-label="Ask for access" onSubmit={submit}>
-    <h2>Ask for access</h2><p>Choose what you need and explain why. Someone who can grant that access will review your request.</p>
+    <h2>Ask for access</h2>
+    {wanted ? <p className="ask-wanted">You are asking to <strong>{wantedWords(model, wanted)}</strong>. Say why, and someone who can give it will decide.</p>
+      : <p>Choose what you need and explain why. Someone who can grant that access will review your request.</p>}
     <fieldset className="ask-fields" disabled={pending.kind !== 'empty' || rest.kind === 'held' || damaged || busy}>
+      <What folded={folded}>
       {!advanced ? <label className="field">What do you need access to?<select value={resourceIndex} onChange={(event) => setResourceIndex(event.target.value)} required>
         <option value="">Choose what you need</option>{resources.map((resource, index) => <option key={JSON.stringify(resource)} value={index}>{resource.id} · {resource.kind}</option>)}
       </select></label> : null}
       {!resources.length ? <p className="note">{(unlisted ? 'There is no list of your access to choose from. ' + unlisted : 'You hold no access yet, so there is no list to choose from.') + ' Type what you need below; whoever approves sees exactly what you typed.'}</p> : null}
       {resources.length ? <label className="tick"><input type="checkbox" name="another" checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} />What I need is not in the list</label> : null}
-        {advanced ? <div className="form-grid"><label className="field">Type of thing<input name="kind" required autoComplete="off" /><span className="hint">For example, project or workspace.</span></label><label className="field">Its name<input name="resource" required autoComplete="off" /><span className="hint">Exactly as the person or app that told you about it wrote it.</span></label></div> : null}
+        {advanced ? <div className="form-grid"><label className="field">Type of thing<input name="kind" required autoComplete="off" value={typedKind} onChange={(event) => setTypedKind(event.target.value)} /><span className="hint">For example, project or workspace.</span></label><label className="field">Its name<input name="resource" required autoComplete="off" defaultValue={wanted && wantedIndex < 0 ? wanted.id : undefined} /><span className="hint">Exactly as the person or app that told you about it wrote it.</span></label></div> : null}
       {(() => {
         const resource = advanced ? undefined : chosenResource;
         const offered = askable(model, resource);
         return offered.length
           ? <><ActionPicker model={model} resource={resource as ResourceRef} actions={offered} value={picked} onChange={setPicked} agents={false} title="Access needed" />
             <p className="note">Each ticked action is asked for on its own and approved on its own.</p></>
-          : <label className="field">Access needed<select name="relation" required defaultValue=""><option value="">Choose access</option>{Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
+          : <label className="field">Access needed<select name="relation" required defaultValue={wantedRelation}><option value="">Choose access</option>{Object.entries(relationsOf(model, advanced ? typedKind : chosenResource?.kind ?? '')).map(([relation, actions]) => <option key={relation} value={relation}>{relation} · {actions.join(', ')}</option>)}</select></label>;
       })()}
+      </What>
       <label className="field">Why do you need this access?<textarea name="why" required /></label>
       <label className="field">Access until (your local time)<input name="expires" type="datetime-local" required={!noExpiry} disabled={noExpiry} /></label>
       <label className="tick"><input type="checkbox" name="no-expiry" checked={noExpiry} onChange={(event) => setNoExpiry(event.target.checked)} /> No expiry requested</label>

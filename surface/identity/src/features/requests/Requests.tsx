@@ -4,7 +4,7 @@ import type { GrantModel } from '../../generated/grants';
 import { readTogether } from '../../reads';
 /** Requests use the service's visibility and approval decisions, never an inferred permission. A queue, oldest first, grouped by the asker's team; one request opens beside it. */
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Refused, api, request, useLoad } from '../../api';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -17,6 +17,7 @@ import { Gate } from '../signin/Gate';
 import { ReadFailure } from '../signin/words';
 import { readTeams } from '../teams/Teams';
 import { AskForm } from './AskForm';
+import type { Wanted } from './AskForm';
 import { DecisionForm } from './DecisionForm';
 import { HeldApproval } from './HeldApproval';
 import type { AccessRequest } from './contract';
@@ -36,7 +37,15 @@ function waited(asked: number): string {
   return Math.floor(gone / 86400) + ' d';
 }
 
+/** What a refusal's link asks for (`#/requests?kind=…&id=…&action=…`), or nothing when any part is missing. */
+function wantedOf(params: URLSearchParams): Wanted | undefined {
+  const [kind, id, action] = ['kind', 'id', 'action'].map((name) => params.get(name)?.trim() ?? '');
+  return kind && id && action ? { kind, id, action } : undefined;
+}
+
 export function Requests() {
+  const [params] = useSearchParams();
+  const wanted = wantedOf(params);
   const [confirmed, setConfirmed] = useState<Record<string, AccessRequest>>({});
   const changed = (answer: AccessRequest) => setConfirmed((held) => ({ ...held, [answer.id]: answer }));
   // Only the queue itself opens the page: names, teams and the asker's own access are extras, each said when missing, so no unrelated read hides the way to ask.
@@ -54,7 +63,7 @@ export function Requests() {
   return <div className="page fill">
     <Gate load={load} title="your access requests" renderError={(error) => <ReadFailure error={error} subject="your access requests" />} ok={(data) => {
       const entries = [...data.list.requests.filter((entry) => !confirmed[entry.id]), ...Object.values(confirmed)];
-      return <Queue entries={entries} data={data} choices={choices} changed={changed} />;
+      return <Queue entries={entries} data={data} choices={choices} changed={changed} wanted={wanted} />;
     }} />
   </div>;
 }
@@ -65,7 +74,7 @@ type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: st
 /** A request's state in words. */
 const STATE: Record<AccessRequest['state'], string> = { waiting: 'Awaiting a decision', approved: 'Approved', declined: 'Declined' };
 
-function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void }) {
+function Queue({ entries, data, choices, changed, wanted }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined }) {
   const admin = data.people.read?.scope === 'directory';
   const directory = data.people.read?.people ?? [];
   const person = choices.status === 'ok' ? choices.data.person : '';
@@ -73,7 +82,8 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
   const [whose, setWhose] = useWhose(admin);
   const [show, setShow] = useState<Show>(() => entries.some(mayDecide) ? 'mine' : 'waiting');
   const retained = person !== '' && sessionStorage.getItem('lys.pending.request.' + person) !== null;
-  const [asking, setAsking] = useState(false);
+  // A refusal's link opens the form asking for what it names.
+  const [asking, setAsking] = useState(wanted !== undefined);
   const [picked, setPicked] = useState<string | null>(null);
   const agents = new Map(directory.flatMap((each) => each.agents.map((agent) => [agent.id, each.id] as const)));
   const names = new Map(directory.flatMap((each) => [[each.id, each.display_name] as const, ...each.agents.map((agent) => [agent.id, agent.display_name] as const)]));
@@ -112,7 +122,7 @@ function Queue({ entries, data, choices, changed }: { entries: AccessRequest[]; 
           <div className="seg">{([['mine', 'Waiting on me'], ['waiting', 'All waiting'], ['decided', 'Decided']] as [Show, string][]).map(([key, label]) => <button key={key} className={show === key ? 'on' : ''} aria-pressed={show === key} onClick={() => setShow(key)}>{label}</button>)}</div>
         </>} />
       <div className="detail">
-        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm person={each.person} resources={each.resources} unlisted={each.unlisted} model={each.model} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }}
+        {ask ? <Gate load={choices} title="the access you can request" renderError={(error) => <ReadFailure error={error} subject="the access you can request" />} ok={(each) => <AskForm key={wanted ? wanted.kind + ' ' + wanted.id + ' ' + wanted.action : 'ask'} person={each.person} resources={each.resources} unlisted={each.unlisted} wanted={wanted} model={each.model} changed={(answer) => { changed(answer); setAsking(true); setPicked(answer.id); }}
             cancel={entries.length && !retained ? () => setAsking(false) : undefined} />} />
           : open ? <Detail model={choices.status === 'ok' ? choices.data.model : null} describe={describeSource(choices.status === 'ok' ? choices.data.grants : [])} decider={open.decision ? names.get(open.decision.by) : undefined} entry={open} on={onWhat(open)} person={person} mayDecide={mayDecide(open)} changed={(answer) => { setPicked(answer.id); changed(answer); }} /> : null}
       </div>
