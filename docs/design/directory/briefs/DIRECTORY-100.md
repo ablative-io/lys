@@ -32,7 +32,7 @@ Behavioural. In surface/identity/dev/start.sh, start_ready's watcher subshell no
 
 **Acceptance:**
 - Red first on a mawk machine: at c5bda0bf on the 205 (mawk 1.3.4), tests/identity_contract/tests/dev_scripts.rs the_real_development_scripts_seed_their_named_grants_on_fresh_state TIMEOUT at 300 s with logs/issuer.log empty while the issuer answers discovery (the run of 18 October 00:13 UTC); at this brief's commit the same test passes on the 205 and on the Mac
-- `grep -c awk surface/identity/dev/start.sh` answers 0
+- start.sh invokes no awk: `grep -v '^ *#' surface/identity/dev/start.sh | grep -c awk` answers 0 (the watcher's comment names mawk as the reason, and is the only mention)
 - The test is unchanged by this brief
 
 **Files:**
