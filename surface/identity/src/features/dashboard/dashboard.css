@@ -41,7 +41,14 @@
 .dash-bar > span { display: block; height: 100%; background: var(--accent, var(--text-secondary)); }
 .dash-bar > span.full { background: var(--danger); }
 .dash-agents { min-height: 0; }
-.dash-side { min-height: 0; display: grid; grid-template-rows: auto auto minmax(0, 1fr); gap: 20px; }
+.dash-side { min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+.dash-side > .you-panel { flex: none; }
+/* Needs a look: a dot in the warn or danger colour beside each sentence. */
+.dash-dot-warn { background: var(--warn); }
+.dash-dot-danger { background: var(--danger); }
+.dash-exceptions .you-scroll { max-height: 200px; }
+/* Stop all's question opens under the Agents heading, above the table. */
+.dash-cord-ask { margin-bottom: 8px; }
 /* This week: the total first, large, then each agent's figure right-aligned in tabular figures, then what the price means. */
 .dash-spend-total { margin: 0 0 6px; }
 .dash-spend-total b { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -50,7 +57,6 @@
 .dash-money { white-space: nowrap; }
 .dash-money-why { display: block; white-space: normal; }
 .dash-spend-note { margin: 6px 0 0; }
-.dash-side > .you-panel { min-height: 0; }
 .you-tree thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-default); padding: 6px 10px; text-align: left; font-size: 12px; font-weight: 500; color: var(--text-muted); }
 .dash-table { width: 100%; }
 .dash-table td { padding: 7px 10px; }

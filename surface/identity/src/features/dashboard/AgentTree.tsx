@@ -3,7 +3,7 @@
  * listed under each. Each row says where each of its live sessions runs, its budget and goals, and offers Watch and
  * Stop for each session, or Start or Set up. Start and Stop open a row of their own under the row they were pressed in.
  */
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { api, request, useLoad } from '../../api';
@@ -210,28 +210,5 @@ export function AgentTree({ branches, context }: { branches: Branch[]; context: 
         ? <AgentRows branches={branches} level={0} place="tree" folded={folded} fold={fold} open={(id) => navigate('/file/' + id)} context={{ ...context, numbers: recordNumbers(context.rows.values()) }} />
         : <tr><td colSpan={COLUMNS} className="dim">You have no agents yet. <a href="#/agents/new">Add an agent</a></td></tr>}
     </tbody>
-  </table>;
-}
-
-/** Running now: one row for each live session, with its own Watch and Stop. */
-export function RunningNow({ rows, context, first = null }: { rows: DashboardAgent[]; context: RowContext; first?: ReactNode }) {
-  const numbers = recordNumbers(rows);
-  const running = rows.flatMap((row) => liveOf(row).map((session) => ({ entry: entryOf(row), session })));
-  // An agent whose sessions could not be read is not counted as stopped: the panel names it and says why.
-  const unread = rows.flatMap((row) => refusedPart(row.sessions) ? [{ entry: entryOf(row), refusal: row.sessions }] : []);
-  return <table className="dash-table" aria-label="Running now">
-    <tbody>{first}{running.length ? running.map(({ entry, session }) => {
-      const place = 'running/' + session.session;
-      return <Fragment key={session.session}>
-        <tr data-running={session.session} data-agent={entry.id}>
-          <td><AgentName entry={entry} number={numbers.get(entry.id)} /></td><td className="sec">{whereOf(session)}</td>
-          <td className="you-act"><RunningActs entry={entry} session={session} context={context} place={place} /></td>
-        </tr>
-        <AskedRow entry={entry} place={place} context={context} columns={3} />
-      </Fragment>;
-    }) : unread.length ? null : <tr className="empty"><td className="dim">Nothing is running.</td></tr>}
-    {unread.map(({ entry, refusal }) => <tr key={entry.id} data-unread={entry.id}>
-      <td><AgentName entry={entry} number={numbers.get(entry.id)} /></td><td colSpan={2}><Unread part={refusal} words="Whether it is running could not be read" /></td>
-    </tr>)}</tbody>
   </table>;
 }

@@ -1,7 +1,7 @@
 /**
  * The front page: the person's whole system at a glance, filling the screen with each panel scrolling inside itself.
  * Left, the agents under their teams with where each runs, its budget and its goals, started and stopped in their own
- * rows. Right, what waits for the person and what is running now. Watch puts one running agent's live terminal in a
+ * rows; each is said once, there. Right, what waits on the person, what needs a look, and what the week cost. Watch puts one running agent's live terminal in a
  * small picture over the page's bottom right corner, which stays while the page reads itself again.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -21,7 +21,7 @@ import { Terminal } from '../runtime/Terminal';
 import '../runtime/terminal.css';
 import { Gate, SignIn } from '../signin/Gate';
 import type { Team } from '../teams/contract';
-import { AgentTree, RunningNow, entryOf, liveOf, whereOf } from './AgentTree';
+import { AgentTree, entryOf, liveOf, whereOf } from './AgentTree';
 import { GettingStarted, readStanding } from './GettingStarted';
 import type { Standing } from './GettingStarted';
 import type { Asked, RowContext } from './AgentTree';
@@ -31,7 +31,7 @@ import type { DashboardAgent, DashboardAnswer } from './contract';
 import { readCord, stoppedWhy } from './cord';
 import type { CordView } from './cord';
 import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from './StopEverything';
-import { BudgetWidget, GoalsWidget } from './Widgets';
+import { Exceptions } from './Exceptions';
 import { WaitingOnYou } from './WaitingOnYou';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
@@ -88,9 +88,10 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
   const [pulling, setPulling] = useState(pullPending);
   // A started row waits only for the next read of the page. When that read arrives the row says what is so: Watch and Stop if it runs, Start again if it does not.
   useEffect(() => { setAsked((held) => held?.what === 'started' ? null : held); }, [data]);
-  // A retired agent leaves the agents list, but a session of its that has not stopped still stands in Running now.
+  // A retired agent leaves the agents list, but one with a session that has not stopped stays in the table, so its Stop is still there.
   const every = data.answer.agents;
   const rows = every.filter((row) => row.agent.state !== 'retired');
+  const listedRows = every.filter((row) => row.agent.state !== 'retired' || liveOf(row).length);
   const byId = new Map(every.map((row) => [row.agent.id, row]));
   const teams = data.teams instanceof Refused ? [] : data.teams;
   const context: RowContext = {
@@ -98,26 +99,23 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
     watch: (agent, id) => { const row = byId.get(agent); const session = liveOf(row).find((each) => each.session === id); if (row && session) watch(row, session); },
   };
   const listed = { running: every.flatMap(liveOf).length, unread: every.filter((row) => refusedPart(row.sessions)).length };
+  // Stop all is offered while anything runs, or while what runs cannot be read, when the off switch is needed most; never with nothing running.
+  const stoppable = listed.running > 0 || listed.unread > 0 || data.cord instanceof Refused;
   return <><CordLine cord={data.cord} changed={reload} listed={listed} /><div className="dash-body">
     <GettingStarted person={data.me.person.id} agents={rows.length} standing={data.standing} reread={reload} />
     <section className="you-panel dash-agents" aria-label="Agents">
-      <div className="section-h"><span>Agents</span></div>
+      <div className="section-h"><span>Agents</span>{stoppable || pulling ? <StopEverythingButton cord={data.cord} open={() => setPulling(true)} /> : null}</div>
+      {pulling ? <table className="dash-table dash-cord-ask"><tbody><StopEverythingRow columns={1} close={() => setPulling(false)} changed={reload} /></tbody></table> : null}
       {data.teams instanceof Refused ? <Unread part={data.teams} words="Teams could not be read, so your agents are listed without their teams." /> : null}
-      <div className="you-scroll"><AgentTree branches={treeOf(data.me, rows, teams).branches} context={context} /></div>
+      <div className="you-scroll"><AgentTree branches={treeOf(data.me, listedRows, teams).branches} context={context} /></div>
     </section>
     <div className="dash-side">
       <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />
+      <Exceptions rows={rows} />
       <Spend rows={rows} />
-      <section className="you-panel" aria-label="Running now">
-        <div className="section-h"><span>Running now</span><StopEverythingButton cord={data.cord} open={() => setPulling(true)} /></div>
-        <div className="you-scroll"><RunningNow rows={every} context={context}
-          first={pulling ? <StopEverythingRow columns={3} close={() => setPulling(false)} changed={reload} /> : null} /></div>
-      </section>
     </div>
     <div className="dash-widgets">
       <Alarms summary={data.answer.alarms} agents={every} />
-      <BudgetWidget rows={rows} />
-      <GoalsWidget rows={rows} />
     </div>
   </div></>;
 }

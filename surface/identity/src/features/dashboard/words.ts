@@ -8,7 +8,7 @@ import { refusedPart } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
 
 /** How near the limit at `index` is to being reached; a limit with no reported figure is placed after every measured one. */
-const nearness = (budget: BudgetsView, index: number): number => {
+export const nearness = (budget: BudgetsView, index: number): number => {
   const used = budget.used[index];
   const amount = budget.limits[index].amount;
   return used && used.figure !== null && amount > 0 ? used.figure / amount : -1;
@@ -19,6 +19,13 @@ export const tightest = (budget: BudgetsView): number | null => {
   const near = Math.max(-1, ...budget.limits.map((_, index) => nearness(budget, index)));
   return near < 0 ? null : near;
 };
+
+/**
+ * Where "near the limit" begins, as a fraction: the budget's own `warn_at` (a percentage) when it has one, else 80%,
+ * early enough to act before the limit's own act happens. The bar's warn colour and the Needs a look list both use it.
+ */
+export const warnFraction = (budget: Pick<BudgetsView, 'warn_at'>): number =>
+  typeof budget.warn_at === 'number' && budget.warn_at >= 0 && budget.warn_at <= 100 ? budget.warn_at / 100 : 0.8;
 
 const CONTEXT_ACTS: Record<Limit['act'], string> = { compact: 'compacts', notice: 'sends a notice', stop: 'stops', tell: 'tells you' };
 

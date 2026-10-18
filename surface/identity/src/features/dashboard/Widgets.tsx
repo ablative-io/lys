@@ -1,7 +1,8 @@
 /**
- * The Dashboard's widgets: what waits for the person said item by item (the requests they may decide, the drafts their
- * agents prepared), how much each agent has used against its limits, and every goal with its deadline. Each is one card
- * that scrolls inside itself; a part that could not be read says its refusal by name, never nothing.
+ * The canvas's widgets that read the Dashboard's answer: what waits for the person said item by item (the requests
+ * they may decide, the drafts their agents prepared), how much each agent has used against its limits, and every goal
+ * with its deadline. A person places each in a window of the canvas; the Dashboard itself says each of these once, in
+ * Waiting on you, the agents table and Needs a look. A part that could not be read says so by name, never nothing.
  */
 import type { ReactNode } from 'react';
 import { Refused } from '../../api';
@@ -13,18 +14,9 @@ import type { DashboardAgent } from './contract';
 import { budgetLine, tightest } from './words';
 import { Unread } from './Unread';
 
-/** One widget: a titled card, how many it holds, and where its whole list lives. */
-function Widget({ label, count, href, children }: { label: string; count: ReactNode; href: string; children: ReactNode }) {
-  return <section className="dash-widget" aria-label={label}>
-    <div className="section-h"><span>{label}</span><b className="dash-count">{count}</b><a href={href}>Open</a></div>
-    <div className="you-scroll">{children}</div>
-  </section>;
-}
-
 /** What a widget holds, apart from the card around it: the Dashboard puts it in a card, the canvas in a window a person places. */
 export interface Part { label: string; count: ReactNode; href: string; body: ReactNode; /** Its one figure, where that is not its count. */ figure?: ReactNode; /** That figure as a level from 0 to 100, when it is one. */ percent?: number }
 const part = (label: string, count: ReactNode, href: string, body: ReactNode): Part => ({ label, count, href, body });
-const card = (made: Part) => <Widget label={made.label} count={made.count} href={made.href}>{made.body}</Widget>;
 
 function Unreadable({ what, refused }: { what: string; refused: Refused }) {
   return <div role="alert"><Unread part={refused} words={what + ' could not be read.'} /></div>;
@@ -111,8 +103,3 @@ export function goalsPart({ rows }: { rows: DashboardAgent[] }) {
     </tbody></table>
   </>);
 }
-
-export const RequestsWidget = (props: Parameters<typeof requestsPart>[0]) => card(requestsPart(props));
-export const DraftsWidget = (props: Parameters<typeof draftsPart>[0]) => card(draftsPart(props));
-export const BudgetWidget = (props: Parameters<typeof budgetPart>[0]) => card(budgetPart(props));
-export const GoalsWidget = (props: Parameters<typeof goalsPart>[0]) => card(goalsPart(props));
