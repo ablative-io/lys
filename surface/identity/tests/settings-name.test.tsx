@@ -11,7 +11,8 @@ afterEach(() => {
   root = undefined;
 });
 
-it.each(['/settings', '/settings/account', '/connections', '/apps'])('W1 names %s Settings in the page, rail and tabs', async (path) => {
+// Apps has its own rail entry and page head (01 item 1); src/features/apps/apps-header.test.tsx pins it.
+it.each(['/settings', '/settings/account', '/connections'])('W1 names %s Settings in the page, rail and tabs', async (path) => {
   serve(SERVICE);
   history.replaceState(null, '', '#' + path);
   const container = document.createElement('div');

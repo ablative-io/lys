@@ -58,8 +58,8 @@ export function ComputerAdmission({ agent, name, person, admin, machines, roles,
       </div>;
     })}
     {computers.length ? <p className="hint">{admin ? 'Tick each computer ' + name + ' may run on.' : 'These are the computers ' + name + ' may run on. Only an administrator changes them.'}</p> : null}
-    {!computers.length && !admin ? <p className="hint">No computer is set up yet. Ask an administrator to add one in <a href="#/network">Network</a>.</p> : null}
-    {capability.status === 'ok' && !capability.data ? <p className="hint">This version of Lys changes which agents may run on a computer from Network. <a href="#/network">Open Network</a></p> : null}
+    {!computers.length && !admin ? <p className="hint">No computer is set up yet. Ask an administrator to add one under <a href="#/network">Computers</a>.</p> : null}
+    {capability.status === 'ok' && !capability.data ? <p className="hint">This version of Lys changes which agents may run on a computer from Computers. <a href="#/network">Open Computers</a></p> : null}
     {capability.status === 'refused' ? <ErrorWords problem={capability.refused} /> : null}
     {failure ? <ErrorWords problem={failure} /> : null}
     {Object.keys(pending).filter((machine) => !computers.some((entry) => entry.id === machine)).map((machine) => <div key={machine}><p>An unconfirmed change names a computer that is no longer listed. Check it to see whether it was saved.</p>{retry(machine)}</div>)}

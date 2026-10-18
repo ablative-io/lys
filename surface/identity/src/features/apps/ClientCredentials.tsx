@@ -2,7 +2,7 @@
  * An approved app's client credentials (DIRECTORY-081): the administrator issues one here and gives it to the app as
  * its client secret. Its value is shown once, with a way to copy it, and is gone when this page is left: Lys keeps no
  * copy, only the means to confirm it. Every credential the app holds is listed with who issued it and when, and who
- * revoked it and why; revoking asks first, and the app's next sign-in with it is refused. Approval's own custody of the
+ * took it back and why; taking one back asks first, and the app's next sign-in with it is refused. Approval's own custody of the
  * app's secrets is confirmed here too, by the names Lys secrets keeps them under, never their values.
  */
 import { useState } from 'react';
@@ -61,7 +61,7 @@ function listed(value: unknown, app: string): CredentialRecord[] {
 function standing(credential: CredentialRecord): string {
   if (credential.live) return 'In use: the app signs people in with it.';
   const ended = credential.revoked_by && credential.revoked_at !== null
-    ? 'Revoked by ' + who(credential.revoked_by) + ', ' + clock(credential.revoked_at) + (credential.revoked_reason ? ': ' + credential.revoked_reason : '') + '.'
+    ? 'Taken back by ' + who(credential.revoked_by) + ', ' + clock(credential.revoked_at) + (credential.revoked_reason ? ': ' + credential.revoked_reason : '') + '.'
     : 'Ended when the app was retired.';
   return credential.ended_at_broker ? ended : ended + ' Lys refuses it; Lys secrets is told to forget it at the next change made here.';
 }
@@ -72,7 +72,7 @@ export function CustodyConfirmed({ answer }: { answer: StoredCredentials }) {
     <p className="note">Their names in Lys secrets: sign-in secret {answer.client_secret_ref}; key for calling Lys {answer.api_credential_ref}.</p></section>;
 }
 
-/** An approved app's client credentials: issue one, shown once; the list; revoke one, after asking. A retired app's
+/** An approved app's client credentials: issue one, shown once; the list; take one back, after asking. A retired app's
  *  are listed only: its retirement ended them all. */
 export function ClientCredentials({ app }: { app: AppRecord }) {
   const open = app.state === 'approved';
@@ -104,10 +104,10 @@ export function ClientCredentials({ app }: { app: AppRecord }) {
   const issuable = open && !known;
   return <section className="app-credentials" aria-label={'Client credentials of ' + app.id}>
     <b>Client credentials</b>
-    {open && known ? <p className="note">{app.name} is given its credentials by connecting: Lys hands them to {app.name}’s server and nobody copies them. If {app.name} has lost them, use Connect again under Known apps.</p> : null}
+    {open && known ? <p className="note">{app.name} is given its credentials by connecting: Lys hands them to {app.name}’s server and nobody copies them. If {app.name} has lost them, use Connect again under Connect an app.</p> : null}
     {issuable ? <p className="note">{app.name} signs people in with its client id and a client secret issued here. Each secret is shown once, when issued.</p> : null}
     {shown ? <div className="app-secret" role="group" aria-label={'Credential ' + shown.credential_id + ' of ' + app.id}>
-      <p>Put these two in {app.name}’s sign-in settings, where it is configured as an OpenID Connect client of Lys. Keep the secret to {app.name} alone. It is shown once, here, and Lys keeps no copy: if it is lost, issue another and revoke this one.</p>
+      <p>Put these two in {app.name}’s sign-in settings, where it is configured as an OpenID Connect client of Lys. Keep the secret to {app.name} alone. It is shown once, here, and Lys keeps no copy: if it is lost, issue another and take this one back.</p>
       <dl>
         <dt>Client id</dt><dd><code data-credential="client-id">{app.client_id ?? app.id}</code> <Copy text={app.client_id ?? app.id} what="The client id" /></dd>
         <dt>Client secret</dt><dd><code data-credential="value">{shown.credential}</code> <Copy text={shown.credential} what="The credential" /></dd>
@@ -116,12 +116,12 @@ export function ClientCredentials({ app }: { app: AppRecord }) {
     </div> : null}
     {held.length ? <ul className="app-list">{held.map((credential) => <li key={credential.credential_id} data-credential={credential.credential_id}>
       <span className="mono">{credential.credential_id}</span> issued by {who(credential.issued_by)}, {clock(credential.issued_at)}. {standing(credential)}
-      {open && credential.live && asking !== credential.credential_id ? <> <Act symbol="revoke" name={'Revoke credential ' + credential.credential_id} word="Revoke" tone="danger" disabled={busy} onClick={() => { setAsking(credential.credential_id); setReason(''); }} /></> : null}
-      {asking === credential.credential_id ? <div className="app-actions" role="group" aria-label={'Revoke credential ' + credential.credential_id + '?'}>
-        <p>Revoke {credential.credential_id}? {app.name} is refused the next time it signs someone in with it. This cannot be undone.</p>
+      {open && credential.live && asking !== credential.credential_id ? <> <Act symbol="revoke" name={'Take back credential ' + credential.credential_id} word="Take back" tone="danger" disabled={busy} onClick={() => { setAsking(credential.credential_id); setReason(''); }} /></> : null}
+      {asking === credential.credential_id ? <div className="app-actions" role="group" aria-label={'Take back credential ' + credential.credential_id + '?'}>
+        <p>Take back {credential.credential_id}? {app.name} is refused the next time it signs someone in with it. This cannot be undone.</p>
         <label className="field">Why<input value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-        <Act symbol="revoke" name={'Revoke credential ' + credential.credential_id + ' now'} word="Revoke" tone="danger" disabled={busy} onClick={() => void revoke(credential.credential_id)} />
-        <Act symbol="close" name="Keep the credential" word="Keep" disabled={busy} onClick={() => setAsking(null)} />
+        <Act symbol="revoke" name={'Take back credential ' + credential.credential_id + ' now'} word="Take back" tone="danger" disabled={busy} onClick={() => void revoke(credential.credential_id)} />
+        <Act symbol="close" name={'Leave credential ' + credential.credential_id + ' in use'} word="Cancel" disabled={busy} onClick={() => setAsking(null)} />
       </div> : null}
     </li>)}</ul> : <p className="dim">{issuable ? 'No client credential has been issued, so ' + app.name + ' cannot sign anyone in yet.' : open ? 'Lys lists no credential for ' + app.name + ' yet: connecting gives it one.' : 'No client credential was issued.'}</p>}
     {issuable && !shown ? <Act symbol="add" name={'Issue a client credential for ' + app.name} word="Issue" tone="primary" disabled={busy} onClick={() => void issue()} /> : null}

@@ -180,7 +180,7 @@ export function ConnectApp() {
       window.location.assign(answer.redirect);
     } catch (error) {
       setRefusal(error instanceof Refused && error.status === 401
-        ? 'Your sign-in to Lys ended before Approve reached it, so nothing was approved and ' + (manifest?.name ?? 'the app') + ' is still waiting. Sign in again; if Lys does not bring you back here, start again from ' + (manifest?.name ?? 'the app') + '’s Connect to Lys.'
+        ? 'Your sign-in to Lys ended before Approve reached it, so nothing was approved and ' + (manifest?.name ?? 'the app') + ' is still waiting. Sign in again, and Lys brings you back to this page.'
         : refusalWords(error));
       setSignedOut(error instanceof Refused && error.status === 401);
       setBusy(false);

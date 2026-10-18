@@ -63,25 +63,27 @@ it('leaving the screen leaves no credential value behind', async () => {
   expect(document.querySelector('[data-credential="' + ID + '"]')).not.toBeNull();
 });
 
-it('revoking asks first, sends the reason, and lists who revoked it and why', async () => {
+it('taking a credential back asks first, sends the reason, and lists who took it back and why', async () => {
   const { posted } = await mount('#/apps', routes([live]));
-  await click(button('Revoke credential ' + ID));
+  await click(button('Take back credential ' + ID));
   expect(posted).toHaveLength(0);
   expect(text()).toContain('This cannot be undone');
-  await click(button('Keep the credential'));
+  await click(button('Leave credential ' + ID + ' in use'));
+  expect(text()).not.toMatch(/Revoke|Keep/);
   expect(posted).toHaveLength(0);
-  expect(button('Revoke credential ' + ID + ' now')).toBeNull();
-  await click(button('Revoke credential ' + ID));
-  await type(document.querySelector('[aria-label="Revoke credential ' + ID + '?"] input'), 'rotated');
-  await click(button('Revoke credential ' + ID + ' now'));
+  expect(button('Take back credential ' + ID + ' now')).toBeNull();
+  await click(button('Take back credential ' + ID));
+  await type(document.querySelector('[aria-label="Take back credential ' + ID + '?"] input'), 'rotated');
+  await click(button('Take back credential ' + ID + ' now'));
   expect(posted).toEqual([{ path: '/apps/' + APP + '/credentials/' + ID + '/revoke', body: { operation: expect.stringMatching(/^op-/), reason: 'rotated' } }]);
   const row = document.querySelector('[data-credential="' + ID + '"]')?.textContent ?? '';
-  expect(row).toContain('Revoked by');
+  expect(row).toContain('Taken back by');
+  expect(row).not.toContain('Revoke');
   expect(row).toContain('rotated');
-  expect(button('Revoke credential ' + ID)).toBeNull();
+  expect(button('Take back credential ' + ID)).toBeNull();
 });
 
-it('a refused issue and a refused revocation are said in Lys’s words, and nothing is shown as given', async () => {
+it('a refused issue and a refused take-back are said in Lys’s words, and nothing is shown as given', async () => {
   await mount('#/apps', { ...routes([live]),
     ['POST /apps/' + APP + '/credentials/issue']: refused(502, 'SecretsUnavailable', 'the secrets broker could not be reached'),
     ['POST /apps/' + APP + '/credentials/' + ID + '/revoke']: refused(401, 'credential_refused', 'no live client credential of this app has that id') });
@@ -90,8 +92,8 @@ it('a refused issue and a refused revocation are said in Lys’s words, and noth
   expect(document.querySelector('details .refusal-name')?.textContent).toContain('SecretsUnavailable');
   expect(text()).toContain('could not be reached');
   expect(text()).not.toContain('It is shown once, here');
-  await click(button('Revoke credential ' + ID));
-  await click(button('Revoke credential ' + ID + ' now'));
+  await click(button('Take back credential ' + ID));
+  await click(button('Take back credential ' + ID + ' now'));
   expect(document.querySelector('details .refusal-name')?.textContent).toContain('credential_refused');
   expect(text()).toContain('no live client credential');
 });
@@ -103,12 +105,12 @@ it('an issue answer for another app is refused in words and shows no value', asy
   expect(document.body.innerHTML).not.toContain(VALUE);
 });
 
-it('a retired app lists the credentials its retirement ended, offering neither issue nor revoke', async () => {
+it('a retired app lists the credentials its retirement ended, offering neither issue nor take back', async () => {
   const ended = { ...live, live: false, ended_by_retirement: true };
   await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [{ ...app([ended]), state: 'retired' }] }) });
   const row = document.querySelector('[data-credential="' + ID + '"]')?.textContent ?? '';
   expect(row).toContain('Ended when the app was retired.');
   expect(row).toContain('Lys secrets is told to forget it');
-  expect(button('Revoke credential ' + ID)).toBeNull();
+  expect(button('Take back credential ' + ID)).toBeNull();
   expect(button('Issue a client credential for Notes fixture')).toBeNull();
 });

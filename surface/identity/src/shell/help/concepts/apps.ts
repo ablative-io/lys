@@ -7,7 +7,7 @@ export const APPS: Seed[] = [
     title: 'Apps',
     summary: 'Every app that signs in with Lys and has its permissions checked here.',
     body: [
-      'Apps sits under Settings. Known apps, Cambium among them, are listed with Connect. Each app shows its state; nothing an app registers takes effect until you approve it here.',
+      'Apps has its own place in the menu. Connect an app lists Cambium, then Another app for any app that connects to Lys by its web address, each with Connect. Each app shows its state; nothing an app registers takes effect until you approve it here.',
       'Approving an app approves the permissions it asks for and the return addresses its sign-in may send a person back to. Declining sends you back to the app, which is told no; nothing it asked for takes effect.',
       'Add your own app (for developers) registers an app by name and id and builds its permission template.',
     ],
@@ -27,7 +27,7 @@ export const APPS: Seed[] = [
     title: 'Settings',
     summary: 'How this Lys runs, the services it uses and the accounts people sign in with.',
     body: [
-      'Settings (g s) has four tabs. Your account changes your sign-in email and password. This service holds the layout: which side the menu and Help sit on, and whether the menu shows labels, with the settings in effect below. Services and sign-in providers lists the services this Lys is configured to use and the sign-in providers people may use. Apps lists the apps.',
+      'Settings (g s) has four tabs. Your account changes your sign-in email and password. This service holds the layout: which side the menu and Help sit on, and whether the menu shows labels, with the settings in effect below. Services and sign-in providers lists the services this Lys is configured to use and the sign-in providers people may use. Apps is not a tab here: it has its own place in the menu.',
       'Configured means a service is selected in this installation. It does not confirm that service is reachable now.',
     ],
     steps: [

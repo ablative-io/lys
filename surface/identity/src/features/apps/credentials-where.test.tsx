@@ -12,13 +12,13 @@ const app = (id: string, name: string, client_credentials: unknown[]) => ({ id, 
 const button = (label: string) => [...document.querySelectorAll('button')].find((entry) => entry.getAttribute('aria-label') === label) ?? null;
 const section = (id: string) => document.querySelector('[aria-label="Client credentials of ' + id + '"]');
 
-it('offers Cambium no hand-issued secret, says connecting gives it its credentials, and keeps its credentials revocable', async () => {
+it('offers Cambium no hand-issued secret, says connecting gives it its credentials, and its credentials can still be taken back', async () => {
   await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [app('cambium', 'Cambium', [live])] }) });
   await settle();
   expect(button('Issue a client credential for Cambium')).toBeNull();
   expect(section('cambium')?.textContent).toContain('Cambium is given its credentials by connecting');
-  expect(section('cambium')?.textContent).toContain('use Connect again under Known apps');
-  expect(button('Revoke credential ' + live.credential_id)).not.toBeNull();
+  expect(section('cambium')?.textContent).toContain('use Connect again under Connect an app');
+  expect(button('Take back credential ' + live.credential_id)).not.toBeNull();
 });
 
 it('says connecting gives Cambium a credential when Lys lists none, never that one must be issued', async () => {

@@ -380,7 +380,7 @@ function CheckAnswer({ check }: { check: SchemaCheck }) {
       </ul>
       {check.stranded.length ? (
         <div role="alert" className="sb-stranded">
-          <b>This change cannot be saved.</b> It would strand standing grants: {check.stranded.map((strand) => strand.count + ' standing grant' + (strand.count === 1 ? '' : 's') + ' of ' + strand.relation + ' on ' + strand.kind).join('; ')}. Revoke them first through the ordinary revoke route.
+          <b>This change cannot be saved.</b> It would strand standing grants: {check.stranded.map((strand) => strand.count + ' standing grant' + (strand.count === 1 ? '' : 's') + ' of ' + strand.relation + ' on ' + strand.kind).join('; ')}. Take them back on Access first, then check again.
         </div>
       ) : (
         <p className="note">No standing grant is stranded. Saving makes version {check.next}.</p>

@@ -9,14 +9,14 @@
  * follows the change; nothing is restarted. Approval has Lys secrets make and
  * keep the app's secrets before it takes effect, and nobody is shown them; an
  * approved app is issued client credentials here instead, each shown once, and
- * they are revoked here. A proposed schema change waits
+ * they are taken back here. A proposed schema change waits
  * here the same way, each change it makes to a role named in words ("adds
  * seat_retire to administrator") so a widening is seen before it is approved
  * (ACCESS-004 R1); a schema's roles are listed under its matrix. The
  * permission template is built and edited here too, and
  * saved through the same routes an upload uses.
  */
-import { ConfigTabs } from '../settings/ConfigTabs';
+import { PageHeader } from '../../shell/PageHeader';
 import { useState } from 'react';
 import { Refused, api, operationId, useLoad } from '../../api';
 import { SchemaMatrix } from './SchemaMatrix';
@@ -148,8 +148,7 @@ export function Apps() {
   const self = useLoad(api.me, 'me');
   const me = self.status === 'ok' ? self.data : null;
   return <div className="page fill apps">
-    <div className="head"><div><h1>Settings</h1><p className="sub">Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here.</p></div></div>
-    <ConfigTabs on="apps" />
+    <PageHeader title="Apps" subtitle="Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here." />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
       const apps = answer.apps.map((app) => approved[app.id] ?? app);

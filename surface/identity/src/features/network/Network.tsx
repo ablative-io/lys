@@ -1,5 +1,5 @@
 import { readTogether } from '../../reads';
-/** The Network: the computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
+/** Computers: the computers agents run on, grouped by the teams whose agents start there: whether each is up, what runs on it now, and who may start there. */
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, request, useLoad } from '../../api';
@@ -122,7 +122,7 @@ export function Network() {
     roles: readRoles().then((answer) => new Map(answer.roles.map((role) => [role.id, role.name])), () => new Map<string, string>()),
   }), 'network:' + revision);
   return <div className="page fill">
-    <Gate load={load} title="Network" ok={(data) => <Computers {...data} roleNames={data.roles} teams={data.teams.teams} teamsRefused={data.teams.refused} machines={data.machines} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
+    <Gate load={load} title="Computers" ok={(data) => <Computers {...data} roleNames={data.roles} teams={data.teams.teams} teamsRefused={data.teams.refused} machines={data.machines} notice={notice} connecting={connecting} connect={setConnecting} refresh={(message) => { setNotice(message); setRevision((value) => value + 1); }} />} />
   </div>;
 }
 
@@ -164,7 +164,7 @@ function Computers({ computers: read, people, me, teams, teamsRefused, machines,
   ];
   const changed = (message: string) => { refresh(message); };
   return <>
-    <PageHeader title="Network" subtitle="The computers agents run on, and who may start there." actions={admin ? <Act symbol="add" name="Add a computer" word="Computer" tone="primary" onClick={() => name.current?.focus()} /> : null} />
+    <PageHeader title="Computers" subtitle="The computers agents run on, and who may start there." actions={admin ? <Act symbol="add" name="Add a computer" word="Computer" tone="primary" onClick={() => name.current?.focus()} /> : null} />
     {/* How many computers there are is the list's own count; the strip says only what the list does not. */}
     <div className="stat-strip">
       <div className="stat"><div className="n">{count(up)}</div><div className="l">up now</div></div>

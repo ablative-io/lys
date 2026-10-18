@@ -87,12 +87,12 @@ describe('Choosing where an agent can run', () => {
     { name: 'absent', schema: ok({ openapi: '3.1.0', paths: {} }) },
     { name: 'malformed', schema: ok({ paths: { '/network/machines/{id}/agents': { post: {} } } }) },
     { name: 'unavailable', schema: refused(503, 'SchemaUnavailable', 'The served schema could not be read') },
-  ])('points to Network, never a dead end, and sends no tick when the served route is $name', async ({ schema, name }) => {
+  ])('points to Computers, never a dead end, and sends no tick when the served route is $name', async ({ schema, name }) => {
     const { posted } = await open(service({ '/surface-contract': schema }));
     const section = $('[aria-label="Where can Scribe run?"]');
     expect(section?.textContent).not.toContain('does not serve');
     expect(section?.textContent).toContain('Tick each computer Scribe may run on.');
-    if (name === 'absent') expect(section?.querySelector('a[href="#/network"]')).not.toBeNull();
+    if (name === 'absent') expect(section?.querySelector('a[href="#/network"]')?.textContent).toBe('Open Computers');
     else expect(section?.querySelector('details .refusal-name')).not.toBeNull();
     expect(tick().disabled).toBe(true);
     await change();
@@ -104,6 +104,13 @@ describe('Choosing where an agent can run', () => {
     expect(tick().disabled).toBe(true);
     await change();
     expect(posted).toEqual([]);
+  });
+
+  it('tells a person who is not an administrator, with no computer set up, to ask for one under Computers', async () => {
+    await open(service({ '/directory/people': refused(403, 'NotAdmitted', 'not administrator'), '/network': ok({ machines: [], reports_served: true }) }));
+    const section = $('[aria-label="Where can Scribe run?"]');
+    expect(section?.textContent).toContain('Ask an administrator to add one under Computers.');
+    expect(section?.querySelector('a[href="#/network"]')?.textContent).toBe('Computers');
   });
 
   it('keeps a role-admitted computer ticked and locked even without a direct allowance', async () => {

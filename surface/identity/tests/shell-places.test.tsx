@@ -85,7 +85,7 @@ describe('count sentences', () => {
 });
 
 describe('page heads', () => {
-  it.each(['#/model', '#/resources', '#/settings', '#/connections', '#/apps'])('%s has its title before its tabs', async (hash) => {
+  it.each(['#/model', '#/resources', '#/settings', '#/connections'])('%s has its title before its tabs', async (hash) => {
     await mount(hash, ROUTES);
     expect($('#screen nav.tabs')).not.toBeNull();
     expect(before($('#screen h1'), $('#screen nav.tabs'))).toBe(true);

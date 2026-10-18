@@ -50,9 +50,9 @@ describe('Network', () => {
     expect($('section[aria-label="Workshop laptop"] h2')?.textContent).toBe('Workshop laptop');
     expect(button('Refresh network')).toBeNull();
   });
-  it('is titled Network and counts one computer in the singular, once', async () => {
+  it('is titled Computers and counts one computer in the singular, once', async () => {
     await mount('#/network', routes);
-    expect($('#screen .page.fill .head h1')?.textContent).toBe('Network');
+    expect($('#screen .page.fill .head h1')?.textContent).toBe('Computers');
     expect($('#screen .page.fill .head .sub')?.textContent).toBe('The computers agents run on, and who may start there.');
     expect($('.tools .count')?.textContent).toBe('1 computer');
     expect($('#screen input[type="search"]')?.getAttribute('placeholder')).toBe('Search 1 computer');

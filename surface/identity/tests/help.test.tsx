@@ -339,7 +339,7 @@ describe('the help registry', () => {
     expect(pageKeyOf('/access/drafts')).toBe('drafts');
     expect(pageKeyOf('/access/can')).toBe('access');
     expect(pageKeyOf('/apps/connect')).toBe('apps-connect');
-    expect(PAGES['apps-connect'].regions.map((region) => region.title)).toEqual(['The app', 'Where it sends people', 'The permissions it asks for', 'Approve or Decline', 'Known apps']);
+    expect(PAGES['apps-connect'].regions.map((region) => region.title)).toEqual(['The app', 'Where it sends people', 'The permissions it asks for', 'Approve or Decline']);
     for (const key of ['network', 'apps', 'secrets', 'settings', 'connections', 'me', 'canvas', 'graph', 'requests', 'reviews', 'roles']) expect(PAGES[pageKeyOf('/' + key)], key).toBeDefined();
   });
 });
