@@ -5,11 +5,13 @@ import type { GrantModel, ResourceRef } from '../../generated/grants';
 import type { PeopleView, MeView } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm } from '../people/RecordedForm';
+import type { Change } from '../people/RecordedForm';
 import { ErrorWords, STATUS } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { MODE_HINTS, MODES, modeWords } from './mode-words';
 import { resourceNames, resourceWords } from '../people/agent-resource-names';
-import { LevelPicker } from './LevelPicker';
+import { LEVEL_NAMES, LevelPicker } from './LevelPicker';
+import { actionWords } from './action-words';
 
 /** The resource choice that opens a box for an id Lys holds no grant on yet. */
 const BY_ID = '\u0000by-id';
@@ -74,6 +76,9 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
   const [level, setLevel] = useState('');
+  // What the last give did, said above a fresh form: a form left filled after a give invites a second, identical grant.
+  const [given, setGiven] = useState<{ holder: string; name: string; words: string } | null>(null);
+  const [round, setRound] = useState(0);
   const [which, setWhich] = useState('');
   const roles = rolesOf(kinds, kind);
   const names = resourceNames(people, [], null);
@@ -81,7 +86,30 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
     .sort((a, b) => a.words.localeCompare(b.words));
   // Nothing is chosen before a kind is; with none of the kind known to Lys, the only way to name one is by its id in its app.
   const chosenWhich = !kind ? '' : known.length ? which : BY_ID;
-  return <RecordedForm name="root-grant" title="Give access" submitLabel="Give access" drawn={{ symbol: 'add', word: 'Give access' }} done={done} change={(data) => {
+  /** What a give did, in words: who can now do what, on what. The holder's name and the thing's are the directory's, never an id where a name is known. */
+  const words = (asked: Change): string => {
+    const body = asked.body as { holder?: string; recipient?: string; resource: ResourceRef; relation: string };
+    const holder = body.holder ?? body.recipient ?? '';
+    const name = people.people.flatMap((person) => [person, ...person.agents]).find((each) => each.id === holder)?.display_name ?? 'They';
+    const thing = resourceWords(body.resource, names).words;
+    const app = rolesOf(kinds, body.resource.kind)[body.relation];
+    if (LEVEL_NAMES.includes(body.relation)) return `${name} can now ${({ viewer: 'view', editor: 'edit', owner: 'own' } as Record<string, string>)[body.relation]} ${thing}.`;
+    if (app) return `${name} now has the app's ${body.relation} role on ${thing}.`;
+    const words = actionWords(model, body.resource, (model.kinds?.[body.resource.kind]?.relations ?? model.relations)[body.relation] ?? [body.relation]);
+    // The model's sentences say "this agent" or "this resource": the thing given takes that place, so it is never named twice.
+    const sentence = words.charAt(0).toLowerCase() + words.slice(1);
+    return `${name} can now ${/\bthis [a-z]+/.test(sentence) ? sentence.replace(/\bthis [a-z]+/, thing) : sentence + ', on ' + thing}.`;
+  };
+  const said = (asked: Change): string => {
+    const sentence = words(asked);
+    const body = asked.body as { holder?: string; recipient?: string };
+    const holder = body.holder ?? body.recipient ?? '';
+    setGiven({ holder, name: people.people.flatMap((person) => [person, ...person.agents]).find((each) => each.id === holder)?.display_name ?? 'them', words: sentence });
+    setKind(''); setLevel(''); setRole(''); setWhich(''); setRound((value) => value + 1);
+    return sentence;
+  };
+  return <>{given ? <p className="next-step" role="status">{given.words} <a href={'#/file/' + encodeURIComponent(given.holder) + '/access'}>See what {given.name} can do now</a>, or give more access below.</p> : null}
+  <RecordedForm key={round} name="root-grant" title="Give access" submitLabel="Give access" drawn={{ symbol: 'add', word: 'Give access' }} done={done} success={said} change={(data) => {
     const relation = role || field(data, 'relation');
     const actions = role ? roles[role] : relations[relation];
     if (!actions) throw new Error(role ? 'Choose a role this kind names' : 'Choose what they may do');
@@ -125,7 +153,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
       <label className="field">Mode<select name="mode" required value={mode} onChange={(event) => setMode(event.target.value)}>{MODES.map((each) => <option key={each} value={each}>{modeWords(each)}</option>)}</select>
         <span className="hint">{MODE_HINTS[mode as keyof typeof MODE_HINTS] ?? ''}</span></label>
     </details>
-  </RecordedForm>;
+  </RecordedForm></>;
 }
 
 type AppRow = { id: string; name: string; state: string };

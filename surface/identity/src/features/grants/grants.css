@@ -211,3 +211,6 @@
 /* Check with Lys (StuckRecord): why sending paused, one button, and Lys's answer, close together. */
 .stuck-record { display: grid; gap: 6px; justify-items: start; margin-top: 10px; }
 .stuck-record > p { margin: 0; }
+
+/* What the last give did, with the next step as a link, above the fresh form. */
+.next-step { margin: 0 0 12px; }

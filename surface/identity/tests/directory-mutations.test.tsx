@@ -137,7 +137,7 @@ describe('Directory mutations', () => {
     await submit(page);
     expect(posted).toHaveLength(1);
     expect(posted[0]).toMatchObject({ path: '/grants/roots', body: { route: 'browser', holder: ADA, relation: 'viewer', resource: { kind: 'project', id: 'integration-check' }, pass_on: { kind: 'use_only' }, window: { starts_at: expect.any(Number), ends_at: null }, mode: 'outright' } });
-    expect(text()).toContain('grant-recorded');
+    expect(text()).toContain('Ada (test person) can now view a project, integration-check.');
   });
 });
 

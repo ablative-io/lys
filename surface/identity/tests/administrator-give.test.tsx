@@ -38,7 +38,8 @@ it('gives membership to an own active agent from standing, with its mode and pas
   await type(page.querySelector('input[name="resource_id"]'), 'ablative');
   await choose(page.querySelector('select[name="mode"]'), 'by_draft');
   await act(async () => { page.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); });
-  expect(page.textContent).toContain('Change recorded.');
+  expect(document.querySelector('.next-step')?.textContent).toBe('Scribe can now read, on a cambium workspace, ablative. See what Scribe can do now, or give more access below.');
+  expect(document.querySelector('.next-step a')?.getAttribute('href')).toBe('#/file/' + SCRIBE + '/access');
   expect(posted).toHaveLength(1);
   expect(posted[0]).toMatchObject({ path: '/grants', body: {
     source: 'administrator', recipient: SCRIBE, responsible: ADA, relation: 'member',
@@ -93,6 +94,6 @@ it('keeps an uncertain standing gift across reload and checks the original opera
   expect(next.posted).toHaveLength(0);
   await click(form().querySelector('button[aria-label="Check original change"]'));
   expect(next.posted).toEqual(first.posted);
-  expect(form().textContent).toContain('Change recorded.');
+  expect(document.querySelector('.next-step')?.textContent).toContain('Scribe can now read, on a cambium workspace, ablative.');
   expect(sessionStorage.getItem('lys.pending.root-grant')).toBeNull();
 });

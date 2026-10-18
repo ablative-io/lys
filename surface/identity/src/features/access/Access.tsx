@@ -1,6 +1,6 @@
 import { actionWords, resourceFromText } from '../grants/action-words';
 import { readTogether } from '../../reads';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useLoad } from '../../api';
 import { AccessTabs } from './AccessTabs';
@@ -149,7 +149,7 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
   const columns = [...grantColumns(w), { head: 'Change', cell: (g: Grant) => <ChangeButtons w={w} g={g} give open={(act, opener) => setActing({ grant: g, act, opener })} /> }];
   // Only the administrator (the root authority) is offered Give access; anyone else who opens its address is told so in words, with no form.
   const root = isRootAuthority(w.people);
-  const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
+  const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} done={reload} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
     : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
   return <div className="page fill">
     <div className="head">
@@ -187,5 +187,9 @@ export function Access() {
     w: readGrantWorld(),
     teams: readTeams().then((list) => ({ list, refused: '' }), (problem: unknown) => ({ list: [], refused: problemWords(problem) })),
   }), 'access:' + revision);
-  return <Gate load={load} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />;
+  // A re-read after a change keeps the last answer on screen until the new one arrives, so the panel the person is in, and what it says happened, stay put.
+  const last = useRef<(typeof load & { status: 'ok' })['data'] | null>(null);
+  if (load.status === 'ok') last.current = load.data;
+  const shown: typeof load = load.status === 'loading' && last.current ? { status: 'ok', data: last.current } : load;
+  return <Gate load={shown} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />;
 }
