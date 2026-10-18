@@ -28,6 +28,9 @@ export function reasonOf(failure: unknown): string {
   return String(failure);
 }
 
+/** Whether this page was opened by Sign out (features/me/SignOut.tsx), so it says why it is showing. */
+const justSignedOut = (): boolean => new URLSearchParams(location.hash.split('?')[1] ?? '').has('signed-out');
+
 /** A provider a person may sign in with: one button each. */
 interface Offered { id: string; name: string; provider: string | null }
 
@@ -151,6 +154,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
     <LysMark />
     <h1 ref={heading} tabIndex={-1}>Sign in</h1>
     <p className="sub">{waysIn(providers.offered)}</p>
+    {justSignedOut() ? <p role="status" className="note">You have signed out of Lys in this browser.</p> : null}
     <form className="recorded-form sign-in-form" aria-label="Sign in" onSubmit={submit} aria-busy={busy} noValidate>
       <div className="field">
         <label htmlFor="sign-in-email">Email</label>

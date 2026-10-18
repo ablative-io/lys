@@ -1,0 +1,4 @@
+/* The sign-out control: the person's name, then the act in words. */
+.sign-out { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sign-out-who { color: var(--text-secondary); }
+.sign-out > .why-not { flex-basis: 100%; margin: 0; }

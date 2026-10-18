@@ -10,6 +10,7 @@ import { OwnAccount } from '../people/Account';
 import { SessionList } from '../sessions/Sessions';
 import './you.css';
 import { PageHeader } from '../../shell/PageHeader';
+import { SignOut } from './SignOut';
 
 interface ActiveData {
   kind: 'active';
@@ -121,7 +122,7 @@ function Account({ data, reload }: { data: ActiveData; reload: () => void }) {
 function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
   return (
     <div className="page fill you-page">
-      <PageHeader title={data.me.person.display_name} subtitle="Your account, signed-in sessions and the access you hold." />
+      <PageHeader title={data.me.person.display_name} subtitle="Your account, signed-in sessions and the access you hold." actions={<SignOut />} />
       <Account data={data} reload={reload} />
     </div>
   );
@@ -130,7 +131,7 @@ function Page({ data, reload }: { data: ActiveData; reload: () => void }) {
 function Registered({ me }: { me: MeView }) {
   return (
     <div className="page fill">
-      <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." />
+      <PageHeader title={me.person.display_name} subtitle="Your account is waiting for activation by an administrator." actions={<SignOut />} />
       <div className="pane">
         <OwnAccount />
         <section className="card" aria-label="Your signed-in sessions">

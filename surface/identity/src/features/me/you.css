@@ -71,7 +71,8 @@
   width: 45%;
 }
 .you-sessions-scroll th:last-child {
-  width: 3.5rem;
+  /* Wide enough for the worded act ("Sign out", "End"): the word is what tells it from stopping an agent. */
+  width: 7.5rem;
 }
 .you-sessions-scroll td:first-child {
   min-width: 0;
@@ -79,15 +80,6 @@
 .you-sessions-scroll td .note {
   margin: 0;
   overflow-wrap: normal;
-}
-.you-sessions-scroll td .act {
-  width: 32px;
-  max-width: 100%;
-  box-sizing: border-box;
-  padding: 0;
-}
-.you-sessions-scroll td .act-word {
-  display: none;
 }
 .you-holds-pane {
   flex: 1;
