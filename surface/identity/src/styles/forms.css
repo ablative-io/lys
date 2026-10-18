@@ -1,18 +1,18 @@
 /* Every form control in Lys: text boxes, selects, text areas and their labels,
    drawn from the tokens, so no screen falls back to the browser's defaults. */
-.field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
 .field .hint { font-weight: 400; color: var(--text-muted); }
-.field label { font-size: 12px; color: var(--text-secondary); }
+.field label { font-size: var(--text-sm); color: var(--text-secondary); }
 .field textarea { min-height: 96px; resize: vertical; line-height: 1.5; }
 /* A form is laid out across the page: fields side by side in aligned columns, a field marked wide spanning them all. */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; align-items: start; }
 .form-grid > .wide, .form-grid > fieldset, .form-grid > table, .form-grid > p, .form-grid > h2, .form-grid > h3 { grid-column: 1 / -1; }
 .form-grid > .field { margin: 0 0 14px; }
 /* A tick and its words stand on one line, aligned with the fields around them. */
-label.tick { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 13px; color: var(--text-primary); }
+label.tick { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: var(--text-md); color: var(--text-primary); }
 /* The base weighs no more than an element (0,0,1, as `select` does), so any scoped rule (.palette input, .tools .search) wins over it. */
 input:where(:not([type=radio]):not([type=checkbox])), select, textarea {
-  font: inherit; font-size: 13px; color: var(--text-primary);
+  font: inherit; font-size: var(--text-md); color: var(--text-primary);
   background: var(--surface-base); border: 1px solid var(--border-default); border-radius: var(--radius-md);
   padding: 8px 11px; min-height: 36px; width: 100%;
   transition: border-color .12s ease, box-shadow .12s ease, background .12s ease;
@@ -28,21 +28,21 @@ select {
 }
 select option { background: var(--surface-default); color: var(--text-primary); }
 input[type=checkbox] { appearance: none; display: inline-grid; place-content: center; flex: none; width: 15px; height: 15px; padding: 0; border: 1px solid var(--text-muted); border-radius: 3px; background: var(--surface-code); cursor: pointer; }
-input[type=checkbox]::before { content: ''; width: 8px; height: 4px; border-left: 2px solid #17110b; border-bottom: 2px solid #17110b; transform: translateY(-1px) rotate(-45deg); visibility: hidden; }
+input[type=checkbox]::before { content: ''; width: 8px; height: 4px; border-left: 2px solid var(--on-accent); border-bottom: 2px solid var(--on-accent); transform: translateY(-1px) rotate(-45deg); visibility: hidden; }
 input[type=checkbox]:checked { background: var(--accent); border-color: var(--accent); }
 input[type=checkbox]:checked::before { visibility: visible; }
 input[type=checkbox]:indeterminate { background: var(--accent); border-color: var(--accent); }
-input[type=checkbox]:indeterminate::before { visibility: visible; height: 2px; border: 0; background: #17110b; transform: none; }
+input[type=checkbox]:indeterminate::before { visibility: visible; height: 2px; border: 0; background: var(--on-accent); transform: none; }
 input[type=checkbox]:disabled { cursor: not-allowed; }
 .permissions select { min-width: max-content; }
 /* The one pill: what the two earlier definitions drew together. */
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; margin: 2px 4px 2px 0; border: 1px solid var(--border-default); border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
-.pill.human { border-color: rgba(212,151,90,.4); color: var(--accent); text-decoration: none; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; margin: 2px 4px 2px 0; border: 1px solid var(--border-default); border-radius: 999px; font-size: var(--text-xs); font-weight: 600; background: var(--surface-hover); color: var(--text-secondary); }
+.pill.human { border-color: var(--accent-strong); color: var(--accent); text-decoration: none; }
 .pill.off { opacity: .45; text-decoration: line-through; }
 .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted-dot); }
 .pill.ok { background: var(--ok-glow); color: var(--ok); }
 .pill.ok::before { background: var(--ok); }
-.notice { padding: 10px 12px; border-radius: var(--radius-md); font-size: 12.5px; margin: 12px 0 0; }
+.notice { padding: 10px 12px; border-radius: var(--radius-md); font-size: var(--text-md); margin: 12px 0 0; }
 .notice.ok { background: var(--ok-glow); color: var(--ok); }
 .notice.bad { background: rgba(248,113,113,.1); color: var(--danger); }
 .card > :first-child { margin-top: 0; }
@@ -50,7 +50,7 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 .card p { margin: 0 0 10px; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: stretch; margin: 16px 0 22px; }
 .card-grid > .card { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.card-grid > .card h2 { margin: 0; font-size: 14px; }
+.card-grid > .card h2 { margin: 0; font-size: var(--text-lg); }
 .card-grid > .card p { margin: 0; color: var(--text-secondary); }
 .card-grid > .card .pill { align-self: flex-start; margin-top: auto; }
 .stack > * + * { margin-top: 18px; }
@@ -59,7 +59,7 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 /* Why an agent cannot start: the sentence open, its fix beside it, the refusal's name small at the end. */
 .cannot-start p { margin: 0 0 8px; }
 .cannot-start .btn { margin-right: 8px; }
-.refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 10.5px; }
+.refusal-name { color: var(--text-secondary); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: var(--text-xs); }
 .folder-chooser { margin: 8px 0; }
 /* The computer's own dialog first, its words beside it; the path can be typed instead on its own full-width line, its Open beside it. */
 .folder-chooser .folder-dialog { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 8px 0; }
@@ -86,7 +86,7 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 /* The remove inside a chosen pill: the control at the pill's own size. */
 .pill .act { min-width: 16px; min-height: 16px; padding: 0; border: 0; background: none; color: inherit; }
 .pill .act svg { width: 12px; height: 12px; }
-.folder-chooser .folder-browser { border: 1px solid var(--line, #d8d8d8); border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.folder-chooser .folder-browser { border: 1px solid var(--line); border-radius: var(--radius-md); padding: 10px 12px; margin: 8px 0; }
 .folder-chooser .folder-browser h4 { margin: 0 0 6px; }
 .folder-chooser .folder-path-parts { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
 .folder-chooser .folder-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; overflow-x: hidden; }
@@ -99,6 +99,6 @@ input[type=checkbox]:disabled { cursor: not-allowed; }
 /* On a phone or under a finger every field's text is 16 px, so the browser never zooms the page when a field is touched,
    whatever size a screen's own rule gives it; a tick is a 22 px target. */
 @media (max-width: 600px), (pointer: coarse) {
-  .screen input:not([type=checkbox]):not([type=radio]), .screen select, .screen textarea, .palette input { font-size: 16px; }
+  .screen input:not([type=checkbox]):not([type=radio]), .screen select, .screen textarea, .palette input { font-size: var(--text-xl); }
   input[type=checkbox] { width: 22px; height: 22px; }
 }

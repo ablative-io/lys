@@ -18,11 +18,22 @@
   --glass-bg: rgba(24,24,31,.9);
   --spring: cubic-bezier(.2,.9,.25,1.05);
   --rail: 48px; --rail-open: 196px;
+  /* The accent at the four strengths the surface uses, and what is written on it. */
+  --accent-hover: #e0a870; --on-accent: #17110b;
+  --accent-faint: rgba(212,151,90,.08); --accent-edge: rgba(212,151,90,.3); --accent-strong: rgba(212,151,90,.45);
+  /* The one line colour; features that ask for --line get the default border, never a light-theme grey. */
+  --line: var(--border-default);
+  /* The type scale: eight sizes, whole pixels. */
+  --text-2xs: 10px; --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 14px; --text-xl: 16px; --text-h2: 18px; --text-h1: 20px;
+  /* The two faces; features that ask for --font-mono (apps, proxy) get it. */
+  --font-sans: "DM Sans", system-ui, sans-serif; --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Lys is dark: the browser's own controls (scrollbars, pickers, select lists) are drawn dark too. */
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overscroll-behavior: none; }
-body { background: var(--background); color: var(--text-primary); font: 13px/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
-.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+body { background: var(--background); color: var(--text-primary); font: var(--text-md)/1.6 "DM Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: var(--text-sm); }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 a { color: inherit; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
