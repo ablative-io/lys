@@ -80,7 +80,7 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
   return <div aria-label={another ? 'Another app' : 'Known app ' + known.id}>
     <div className="row">
       {another ? <span><b>Another app</b> <span className="note">any app that connects to Lys, by its web address</span></span>
-        : <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{connected ? 'Connected' : state ? STATE_WORDS[state] : 'Not connected'}</span></span>}
+        : <span><b>{known.name}</b> <span className={'app-state app-' + (state ?? 'none')}>{state ? STATE_WORDS[state] : 'Not connected'}</span></span>}
       {asking ? null : <Act symbol="add" name={another ? 'Connect another app' : 'Connect ' + known.name} word={connected ? 'Connect again' : 'Connect'} tone={connected || another ? 'plain' : 'primary'} onClick={() => setAsking(true)} />}
     </div>
     {asking ? <div className="app-connect">
@@ -100,7 +100,7 @@ function KnownAppRow({ known, state }: { known: KnownApp; state: AppRecord['stat
 
 /** What connecting an already connected app costs, said before it is done: approval replaces its credentials at once. */
 function ReplacesCredentials({ name }: { name: string }) {
-  return <p className="app-replace" role="note">{name} is already connected. Connecting again ends the credentials the running {name} uses, so nobody can sign in to it until it finishes connecting again. Do this only when {name} says it has lost its connection to Lys, or to move to another {name}.</p>;
+  return <p className="app-replace" role="note">{name} is already approved and connected. Connecting again ends the credentials the running {name} uses, so nobody can sign in to it until it finishes connecting again. Do this only when {name} says it has lost its connection to Lys, or to move to another {name}.</p>;
 }
 
 /** The name a refusal gives the app: a known app's name when the link names its manifest, else "the app". */

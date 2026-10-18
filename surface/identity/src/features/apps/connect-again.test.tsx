@@ -24,7 +24,8 @@ it('rests a connected Cambium with no primary act, and says what connecting agai
   expect(warning()).toBeNull();
   await click(again);
   expect(warning()?.textContent).toContain('ends the credentials the running Cambium uses');
-  expect(document.querySelector('[aria-label="Known app cambium"] .app-state')?.textContent).toBe('Connected');
+  // One state, one word: the row says what the app's card below says.
+  expect(document.querySelector('[aria-label="Known app cambium"] .app-state')?.textContent).toBe('Approved');
   expect(document.querySelector('input[aria-label="Cambium web address"]')).not.toBeNull();
 });
 
