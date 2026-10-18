@@ -12,7 +12,7 @@ export type RailItem =
   };
 
 export const RAIL: RailItem[] = [
-  {"t": "a", "title": "Home (g d)", "label": "Home", "svg": "<path d=\"M4 11.5 12 5l8 6.5\"/><path d=\"M6 10v9.5h12V10\"/><path d=\"M10 19.5v-5h4v5\"/>", "href": "#/", "nav": "dashboard"},
+  {"t": "a", "title": "Dashboard (g d)", "label": "Dashboard", "svg": "<path d=\"M4 11.5 12 5l8 6.5\"/><path d=\"M6 10v9.5h12V10\"/><path d=\"M10 19.5v-5h4v5\"/>", "href": "#/", "nav": "dashboard"},
   {"t": "a", "title": "Waiting on you (g q)", "label": "Waiting on you", "svg": "<path d=\"M4 13.5 6.5 5h11l2.5 8.5V19H4z\"/><path d=\"M4 13.5h4.5l1 2h5l1-2H20\"/>", "href": "#/requests", "nav": "waiting"},
   {"t": "sep"},
   {"t": "a", "title": "People and agents (g p)", "label": "People and agents", "svg": "<circle cx=\"9\" cy=\"8\" r=\"3.2\"/><path d=\"M3.5 19c.8-3.2 3-5 5.5-5s4.7 1.8 5.5 5\"/><circle cx=\"17\" cy=\"9\" r=\"2.4\"/><path d=\"M15.5 14.2c2.3.2 4 1.8 4.6 4.8\"/>", "href": "#/people", "nav": "people"},

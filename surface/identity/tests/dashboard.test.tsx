@@ -47,8 +47,16 @@ const contextFigure = (figure: number | null, unavailable: string | null = null)
   context: { session: LIVE, read_at_ms: figure === null ? null : 1790000000000, reported_none: 0, model: 'test-model',
     context_tokens: figure === null ? null : figure * 1000, window_tokens: 100_000 },
 });
-/** One line of GET /waiting's answer. */
-const waits = (kind: string, id: string, about: string) => ({ kind, id, asked_by: { id: SCRIBE, name: 'Scribe' }, about, asked_at: '2026-10-18T01:00:00Z', can_decide: true });
+/** One line of GET /waiting's answer; a request or a draft entry carries its record as its own list answers it. */
+const waits = (kind: string, id: string, about: string, record: { request?: object; draft?: object } = {}) => ({ kind, id, asked_by: { id: SCRIBE, name: 'Scribe' }, about, asked_at: '2026-10-18T01:00:00Z', can_decide: true, ...record });
+/** Scribe's request as GET /requests answers it, Ada able to decide it. */
+const asked = (id: string, why: string) => ({ id, asked_by: SCRIBE, asked_by_name: 'Scribe', responsible: { id: ADA, display_name: 'Ada', state: 'active' }, resource: { kind: 'store', id: 's-1' },
+  relation: 'reader', actions: ['read'], ends_at: null, why, asked_at: 1790000000, state: 'waiting', approvers: [{ id: ADA, display_name: 'Ada', state: 'active' }], sources: [], can_issue_root: true, can_decide: true, held_by: null, decision: null });
+/** Scribe's draft as GET /drafts answers it. */
+const prepared = (id: string, note: string) => ({ id, agent: { id: SCRIBE, display_name: 'Scribe' }, responsible: { id: ADA, display_name: 'Ada', state: 'active' }, target: { kind: 'person', id: ADA, action: 'person.profile.set' },
+  method: 'POST', path: '/identities/' + ADA + '/profile', body: '{}', note, created_at: 1790000000, creation_hash: 'hash-' + id, state: 'waiting', execution: null });
+/** A row's acts: its link's word, or the decision acts in the row by name. */
+const actsOf = (tr: Element) => tr.querySelector('a.btn')?.textContent ?? [...tr.querySelectorAll('td.dash-decide button')].map((each) => each.getAttribute('aria-label')).join(' / ');
 const names = () => $$('tr[data-href]').map((tr) => tr.querySelector('td')?.textContent);
 const rowOf = (name: string) => $$('tr[data-href]').find((tr) => tr.querySelector('td')?.textContent === name) ?? null;
 /**
@@ -68,19 +76,20 @@ const folded = (element: Element | null | undefined): string => element?.querySe
 const cells = (name: string) => [...(rowOf(name)?.querySelectorAll('td') ?? [])].map(face);
 
 describe('The Dashboard is the front page', () => {
-  it('is the rail\'s first entry, Home, and #/ lands on it', async () => {
+  it('is the rail\'s first entry, Dashboard, and #/ lands on it', async () => {
     await mount('#/', routes);
-    // One PageHeader, titled as the rail names the page.
-    expect($$('.page .page-header h1').map((h1) => h1.textContent)).toEqual(['Home']);
+    // No heading of its own: the rail names the page, and nothing says Dashboard twice (Tom, 18 October 2026).
+    expect($$('.page .page-header')).toEqual([]);
+    expect($('.page.dash-page')).not.toBeNull();
     expect($('#rail a.on')?.dataset.nav).toBe('dashboard');
     // Home first, then what waits on you (CONSENSUS.md, 18 October 2026; it replaced Operations first, Tom, 4 October 2026).
     const [first, second] = $$('#rail a[data-nav]');
-    expect([first.dataset.nav, first.getAttribute('href'), first.title]).toEqual(['dashboard', '#/', 'Home (g d)']);
+    expect([first.dataset.nav, first.getAttribute('href'), first.title]).toEqual(['dashboard', '#/', 'Dashboard (g d)']);
     expect([second.dataset.nav, second.title]).toEqual(['waiting', 'Waiting on you (g q)']);
     await click($('#rail a[data-nav="people"]'));
     await click($('#rail a[data-nav="dashboard"]'));
     expect(location.hash).toBe('#/');
-    expect($('.page h1')?.textContent).toBe('Home');
+    expect($('.page.dash-page')).not.toBeNull();
   });
 
   it('shows no terminal until Watch is pressed, and resizes no session', async () => {
@@ -124,7 +133,8 @@ describe('The Dashboard is the front page', () => {
     for (const name of ['Courier', 'Archivist']) expect(rowOf(name)?.querySelectorAll('td')[2].textContent).not.toMatch(/\b0\b|No limit/);
     // One read: no agent's usage, goals or budgets is asked for on its own.
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
-    expect(requests.filter((path) => /\/usage|\/goals|\/budgets/.test(path))).toEqual([]);
+    // The person's own limit is the page's one other read; no agent's usage, goals or budgets is asked for on its own.
+    expect(requests.filter((path) => /\/usage|\/goals|\/budgets\/(agent|team)/.test(path))).toEqual([]);
   });
 
   it('names the compact budget and says not reported when no current context reading was supplied', async () => {
@@ -137,7 +147,7 @@ describe('The Dashboard is the front page', () => {
     // The compact level is the limit working, never a level used against a limit: no bar is drawn for it.
     expect(rowOf('Scribe')?.querySelector('td.you-budget meter')).toBeNull();
     expect(requests.filter((path) => path === '/dashboard')).toHaveLength(1);
-    expect(requests.filter((path) => /\/usage|\/budgets/.test(path))).toEqual([]);
+    expect(requests.filter((path) => /\/usage|\/budgets\/(agent|team)/.test(path))).toEqual([]);
   });
 
   it('shows current session context separately from the compact budget, using the reading rather than the budget-paired figure', async () => {
@@ -177,8 +187,8 @@ describe('The Dashboard is the front page', () => {
   // The canvas's own Requests, Drafts, Budget and Goals widgets are pinned in src/features/dashboard/canvas-parts.test.tsx.
   it('says what waits on the person item by item, what needs a look worst first, each limit and goal in its row, and a part that could not be read in words', async () => {
     await mount('#/', { ...routes, '/waiting': ok({ waiting: [
-      waits('request', 'r-1', 'Scribe asks for reader access to store s-1'),
-      waits('agent_draft', 'op-' + '9'.repeat(32), 'Scribe prepared something for you to approve: for the night shift'),
+      waits('request', 'r-1', 'Scribe asks for reader access to store s-1', { request: asked('r-1', 'to read the ward list') }),
+      waits('agent_draft', 'op-' + '9'.repeat(32), 'Scribe prepared something for you to approve: for the night shift', { draft: prepared('op-' + '9'.repeat(32), 'for the night shift') }),
     ] }), '/dashboard': ok(dashboard({
       [SCRIBE]: { budget: scribeBudget, usage: scribeUsage, goals: { goals: [goal('g-1', at(9), 'open'), goal('g-2', at(6), 'open'), goal('g-3', null, 'missed'), goal('g-4', null, 'met')] } },
       [COURIER]: { goals: { goals: [goal('g-5', null, 'missed')] } },
@@ -188,12 +198,14 @@ describe('The Dashboard is the front page', () => {
     // One request the person may decide and one draft, as GET /waiting answers them: the number is the list's own.
     expect(waiting?.querySelector('[data-waiting="count"]')?.textContent).toBe('2');
     const request = waiting?.querySelector('tr[data-waiting-entry="request"]');
-    expect([...(request?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe asks for reader access to store s-1', 'Decide']);
-    // Decide opens the request itself on Requests, beside the queue.
-    expect(request?.querySelector('a')?.getAttribute('href')).toBe('#/requests/r-1');
+    expect(request?.querySelector('td')?.textContent).toBe('Scribe asks for reader access to store s-1to read the ward list');
+    // Approve and Decline stand in the row itself; nothing is decided on another page (Tom, 18 October 2026).
+    expect([...(request?.querySelectorAll('td.dash-decide button') ?? [])].map((act) => act.getAttribute('aria-label'))).toEqual(['Approve access', 'Decline request']);
+    expect(request?.querySelector('a')).toBeNull();
     expect(waiting?.querySelectorAll('tr[data-waiting-entry="agent_draft"]')).toHaveLength(1);
-    expect([...(waiting?.querySelectorAll('tr[data-waiting-entry="agent_draft"] td') ?? [])].map((td) => td.textContent)).toEqual(['Scribe prepared something for you to approve: for the night shift', 'Decide']);
-    expect(waiting?.querySelector('tr[data-waiting-entry="agent_draft"] a')?.getAttribute('href')).toBe('#/access/drafts');
+    expect(waiting?.querySelector('tr[data-waiting-entry="agent_draft"] td')?.textContent).toBe('Scribe prepared something for you to approve: for the night shift');
+    expect([...(waiting?.querySelectorAll('tr[data-waiting-entry="agent_draft"] td.dash-decide button') ?? [])].map((act) => act.getAttribute('aria-label'))).toEqual(['Approve', 'Decline']);
+    expect(waiting?.querySelector('tr[data-waiting-entry="agent_draft"] a')).toBeNull();
     expect(waiting?.textContent).not.toMatch(/op-[0-9a-f]{32}/);
     // Needs a look: a missed goal before a limit near its end, each with Open to that agent's Limits and goals; nothing fine is listed.
     const look = $$('section[aria-label="Needs a look"] tr[data-exception]');
@@ -250,24 +262,36 @@ describe('The Dashboard is the front page', () => {
     expect([...line].sort()).toEqual([...page].sort());
   });
 
-  it('lists what waits for the person as GET /waiting answers it, each a link to its place, and counts what it lists', async () => {
-    await mount('#/', { ...routes, '/waiting': ok({ waiting: [
+  it('lists what waits for the person as GET /waiting answers it alone, decides a request and a draft in their rows, opens the rest, and counts what it lists', async () => {
+    const { requests } = await mount('#/', { ...routes, '/waiting': ok({ waiting: [
       waits('review', 'grant-1', 'Check the access Scribe holds: reader on store s-1'),
-      waits('request', 'r-1', 'Scribe asks for reader access to store s-1'),
-      waits('agent_draft', 'op-' + '1'.repeat(32), 'Scribe prepared something for you to approve'),
+      waits('request', 'r-1', 'Scribe asks for reader access to store s-1', { request: asked('r-1', '') }),
+      waits('agent_draft', 'op-' + '1'.repeat(32), 'Scribe prepared something for you to approve', { draft: prepared('op-' + '1'.repeat(32), '') }),
       waits('product_draft', 'op-' + '2'.repeat(32), 'Scribe asks to write notes 1 through notes'),
     ] }) });
     const rows = $$('section[aria-label="Waiting on you"] tbody tr');
-    expect(rows.map((tr) => [tr.querySelector('td')?.textContent, tr.querySelector('a.btn')?.textContent, tr.querySelector('a')?.getAttribute('href')])).toEqual([
+    expect(rows.map((tr) => [tr.querySelector('td')?.textContent, actsOf(tr), tr.querySelector('a')?.getAttribute('href') ?? null])).toEqual([
       ['Check the access Scribe holds: reader on store s-1', 'Open', '#/reviews'],
-      ['Scribe asks for reader access to store s-1', 'Decide', '#/requests/r-1'],
-      ['Scribe prepared something for you to approve', 'Decide', '#/access/drafts'],
-      ['Scribe asks to write notes 1 through notes', 'Decide', '#/access/drafts'],
+      ['Scribe asks for reader access to store s-1', 'Approve access / Decline request', null],
+      ['Scribe prepared something for you to approve', 'Approve / Decline', null],
+      ['Scribe asks to write notes 1 through notes', 'Open', '#/access/drafts'],
     ]);
+    // The word Decide is nowhere on the page.
+    expect($('.page.dash-page')?.textContent).not.toMatch(/Decide/);
     // Four lines, every one of them listed above, and the rail says the same number.
     expect($('section[aria-label="Waiting on you"] [data-waiting="count"]')?.textContent).toBe('4');
     expect($('#rail a[data-nav="waiting"] .cnt')?.textContent).toBe('4');
     expect(text()).not.toContain('Nothing is waiting on you.');
+    // What waits is read through GET /waiting alone. The rail decides its Requests and Drafts entries by reading those
+    // lists on every page (shell/NavigationAccess.tsx); the dashboard adds no read of either, so it reads each exactly as
+    // often as another page does, and the one read of each is the rail's.
+    expect(requests).toContain('/waiting');
+    const lists = (paths: string[]) => paths.filter((path) => /^\/(requests|drafts)\b/.test(path)).sort();
+    const here = lists(requests);
+    unmountAll();
+    const elsewhere = await mount('#/people', routes);
+    expect(here).toEqual(lists(elsewhere.requests));
+    expect(here).toEqual(['/drafts?state=waiting', '/requests']);
   });
 
   it('says once that nothing is waiting, and with nothing running offers no Stop, no Watch and no Stop all', async () => {

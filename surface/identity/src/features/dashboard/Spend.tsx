@@ -7,7 +7,8 @@
  */
 import { day } from '../file/time';
 import { money } from '../../shell/count';
-import type { Used } from '../usage/contract';
+import { Refused } from '../../api';
+import type { BudgetsView, Used } from '../usage/contract';
 import { refusedPart } from './contract';
 import type { DashboardAgent, PartRefused } from './contract';
 import { Unread } from './Unread';
@@ -79,8 +80,23 @@ function Figure({ week }: { week: Week }) {
   }
 }
 
+/** Under the total: the person's own limit on the whole week and the meter against it (the figure the service holds against that limit, else the agents' total), said once; or that no limit is set. */
+function Overall({ budgets, total }: { budgets: BudgetsView | Refused | undefined; total: number }) {
+  if (budgets === undefined) return null;
+  if (budgets instanceof Refused) return <p className="note dash-spend-overall" data-spend="overall"><Unread part={budgets} words="Your own limit could not be read" /></p>;
+  const index = budgets.limits.findIndex((limit) => limit.unit === 'dollars' && limit.period === 'week');
+  if (index < 0) return <p className="note dash-spend-overall" data-spend="overall">No limit on your whole week is set.</p>;
+  const limit = budgets.limits[index];
+  const used = budgets.used[index];
+  const figure = used && used.figure !== null ? used.figure : total;
+  return <p className="dash-spend-overall" data-spend="overall">
+    <span>of your {money(limit.amount)} a week</span>
+    <meter className="dash-meter" min={0} max={limit.amount} low={limit.amount * (budgets.warn_at ?? 0.8)} high={limit.amount * 0.999} value={Math.min(figure, limit.amount)} aria-label="Your week against your limit" />
+  </p>;
+}
+
 /** The panel: the week's total, each agent's line, and what the price means. */
-export function Spend({ rows }: { rows: DashboardAgent[] }) {
+export function Spend({ rows, budgets }: { rows: DashboardAgent[]; budgets?: BudgetsView | Refused }) {
   const lines = rows.map((row) => ({ row, week: weekSpend(row) })).sort((left, right) => known(right.week) - known(left.week));
   const start = since(rows);
   const plan = rows.some(onPlan);
@@ -91,6 +107,7 @@ export function Spend({ rows }: { rows: DashboardAgent[] }) {
       <span className="sec">{start === null ? ' so far this week' : ' since ' + day(Math.floor(start / 1000))}</span>
       {coverage(rows) ? <span className="note dash-spend-cover" data-spend="coverage">{coverage(rows)}</span> : null}
     </p>
+    <Overall budgets={budgets} total={weekTotal(rows).total} />
     <div className="you-scroll">
       {rows.length ? <table className="dash-table"><tbody>
         {lines.map(({ row, week }) => <tr key={row.agent.id} data-spend={row.agent.id}>

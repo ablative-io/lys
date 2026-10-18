@@ -154,3 +154,6 @@
   .you-tree td.you-goals::before { content: "Goals: "; color: var(--text-muted); }
   .dash-agents { flex: none; }
 }
+.dash-reconnect { flex: none; display: flex; justify-content: flex-end; margin: 0 0 8px; }
+.dash-spend-overall { margin: 0 0 8px; }
+.dash-spend-overall .dash-meter { max-width: none; }

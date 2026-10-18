@@ -29,7 +29,7 @@ describe('Nothing explained only in a tooltip', () => {
 
   it('draws the dashboard’s side panels with no title attribute', () => {
     const markup = renderToStaticMarkup(<>
-      <WaitingOnYou waiting={[{ kind: 'review', id: 'grant-1', asked_by: { id: 'agent-1', name: 'Helper' }, about: 'Check the access Helper holds: viewer on project logo', asked_at: '2026-10-18T01:00:00Z', can_decide: true }]} />
+      <WaitingOnYou waiting={[{ kind: 'review', id: 'grant-1', asked_by: { id: 'agent-1', name: 'Helper' }, about: 'Check the access Helper holds: viewer on project logo', asked_at: '2026-10-18T01:00:00Z', can_decide: true }]} me="person-ada" />
       <Exceptions rows={[agent]} /><Spend rows={[agent]} /></>);
     expect(markup).toContain('Needs a look');
     expect(markup).not.toMatch(/\btitle="/);

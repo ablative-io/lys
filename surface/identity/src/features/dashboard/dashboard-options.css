@@ -1,0 +1,31 @@
+/* The three dashboards under ?option=: the whole fits the screen, nothing scrolls top to bottom, every tile keeps one proportion and scrolls inside itself. */
+.dash-options { flex: none; display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 10px; border: 1px dashed var(--border-default); border-radius: var(--radius-md); }
+.dash-opt { flex: 1; min-height: 0; display: grid; gap: 16px; overflow: hidden; }
+.dash-opt-a { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.dash-opt-b { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+.dash-opt-c { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.dash-tile { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; }
+.dash-tile > .you-panel { flex: 1; min-height: 0; }
+.dash-tile .you-scroll { max-height: none; }
+.dash-tile .section-h { flex: none; display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; }
+.dash-tile .section-h a, .dash-tile .section-h .btn { margin-left: auto; font: inherit; letter-spacing: 0; text-transform: none; }
+/* B: one column, the waiting list first and what to look out for under it, as one scrolling list. */
+.dash-column { gap: 16px; overflow-y: auto; }
+.dash-column > .you-panel { flex: none; }
+.dash-column > .you-panel .you-scroll { overflow: visible; }
+.dash-strip { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: var(--surface-card); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.dash-strip .btn { margin-left: auto; }
+.dash-strip .btn + .btn, .dash-strip .btn + button { margin-left: 0; }
+.dash-nothing { margin: 4px 0; }
+.dash-security-line { margin-top: 10px; }
+.dash-security-line .card { padding: 0; border: 0; background: none; }
+.dash-security-line h2 { font-size: 13px; margin: 0 0 4px; }
+/* Narrow: the tiles stack and the page scrolls then, since a phone's height is the one thing that cannot be fitted. */
+@container (max-width: 850px) {
+  .dash-opt { display: flex; flex-direction: column; overflow-y: auto; }
+  .dash-tile { flex: none; max-height: 44vh; }
+}
+/* Decisions in the row: the two acts side by side, and the reason's form under them when one is pressed. */
+.dash-decide { white-space: nowrap; }
+.dash-decide > div { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.dash-decide form { white-space: normal; flex-basis: 100%; }

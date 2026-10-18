@@ -5,7 +5,7 @@
  */
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
-import { Refused, api, operationId, useLive } from '../../api';
+import { Refused, api, useLive } from '../../api';
 import type { PeopleView } from '../../generated';
 import type { GrantModel } from '../../generated/grants';
 import { refreshLive } from '../../live';
@@ -14,15 +14,14 @@ import { keyable } from '../../shell/keyable';
 import { AccessLayout } from '../access/AccessLayout';
 import { clock } from '../file/time';
 import { actionSentence } from '../grants/action-words';
-import { ChangeStatus } from '../roles/ChangeStatus';
-import { useRoleChange } from '../roles/useRoleChange';
 import { Gate } from '../signin/Gate';
 import { ErrorWords } from '../people/Words';
-import { confirms, readDrafts } from './contract';
+import { readDrafts } from './contract';
+import { DraftDecide } from './DraftDecide';
 import { ProductDrafts } from './ProductDrafts';
-import type { Draft, DraftAnswer, DraftFilter } from './contract';
+import type { Draft, DraftFilter } from './contract';
 import './drafts.css';
-import { APPROVE, DECLINE, DRAFT_STATE } from '../requests/decision-words';
+import { DRAFT_STATE } from '../requests/decision-words';
 import { Act } from '../../shell/Act';
 
 const COLUMNS = 5;
@@ -63,31 +62,6 @@ function Decided({ draft, listed }: { draft: Draft; listed: (id: string) => bool
       : 'Replaced by a corrected draft.'}</span> : null}</span>;
 }
 
-/** Approve and Decline in the draft's own row. Decline asks for the reason where it stands. Each is a kept change. */
-function Decide({ draft, person, changed }: { draft: Draft; person: string; changed: () => void }) {
-  const path = '/drafts/' + encodeURIComponent(draft.id);
-  const approve = useRoleChange<DraftAnswer>('lys.pending.draft-approve.' + person + '.' + draft.id, path + '/approve', confirms(draft.id), changed);
-  const refuse = useRoleChange<DraftAnswer>('lys.pending.draft-refuse.' + person + '.' + draft.id, path + '/refuse', confirms(draft.id), changed);
-  const [refusing, setRefusing] = useState(false);
-  const [reason, setReason] = useState('');
-  const blocked = approve.blocked || refuse.blocked;
-  return <div className="draft-decide">
-    {refusing && !refuse.pending && !refuse.done
-      ? <form aria-label={'Decline the draft of ' + agentOf(draft)} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), creation_hash: draft.creation_hash, reason: reason.trim() }); }}>
-        <label className="field draft-reason-field">Why you decline it<input aria-label="Why you decline it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The agent is told this reason.</span></label>
-        <Act symbol="decline" name={DECLINE} word={DECLINE} tone="danger" type="submit" data-act="refuse-confirm" disabled={blocked || !reason.trim()} />
-        <Act symbol="close" name="Cancel" word="Cancel" data-act="refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
-      </form>
-      : approve.done || refuse.done || approve.pending || refuse.pending ? null
-      : <>
-        <Act symbol="approve" name={APPROVE} word={APPROVE} tone="primary" data-act="approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), creation_hash: draft.creation_hash, application: operationId() })} />
-        <Act symbol="decline" name={DECLINE} word={DECLINE} data-act="refuse" disabled={blocked} onClick={() => setRefusing(true)} />
-      </>}
-    <ChangeStatus change={approve} />
-    <ChangeStatus change={refuse} />
-  </div>;
-}
-
 function Table({ drafts, show, model, names, person, changed }: { drafts: Draft[]; show: DraftFilter; model: GrantModel | Refused; names: Map<string, string>; person: string; changed: () => void }) {
   const asked = new URLSearchParams(useLocation().search).get('draft');
   const [open, setOpened] = useState<string | null>(asked);
@@ -108,7 +82,7 @@ function Table({ drafts, show, model, names, person, changed }: { drafts: Draft[
               <td data-label="Note" className="sec draft-note">{draft.note}</td>
               <td data-label="Asked" className="sec">{clock(draft.created_at)}</td>
               <td data-label="Decision" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                {draft.state === 'waiting' ? <Decide draft={draft} person={person} changed={changed} /> : <Decided draft={draft} listed={listed} />}
+                {draft.state === 'waiting' ? <DraftDecide draft={draft} person={person} changed={changed} /> : <Decided draft={draft} listed={listed} />}
               </td>
             </tr>
             {isOpen ? <tr className="draft-open"><td colSpan={COLUMNS}>

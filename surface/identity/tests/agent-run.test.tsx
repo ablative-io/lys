@@ -56,7 +56,7 @@ describe('An agent\'s run on People and agents', () => {
   it('has no page of its own: the Dashboard lists your agents, each with Start or Stop in its own row, and the agent\'s own page says where it runs with its acts, with no terminal and no side pane on People and agents', async () => {
     await mount('#/', routes);
     // Stop all sits in the Agents heading while something runs (Scribe does here).
-    expect($('section[aria-label="Agents"] .section-h')?.textContent).toBe('AgentsStop all');
+    expect($('section[aria-label="Agents"] .section-h')?.textContent).toBe('Agents');
     expect($('.team-screen')).toBeNull();
     expect($('a[href="#/team"]')).toBeNull();
     expect($$('tr[data-href]').find((row) => row.textContent?.includes('Scribe'))?.querySelector('[data-act="stop"]')).not.toBeNull();

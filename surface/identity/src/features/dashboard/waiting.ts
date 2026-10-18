@@ -1,8 +1,8 @@
 /**
  * What waits on the signed-in person, as `GET /waiting` answers it: one list, oldest first, of the requests they may
  * decide, their agents' drafts, the app actions waiting on their approval and the access due their check. A part the
- * service could not read stands in the list as its own line, never as nothing. The rail's count and Home's Waiting on
- * you both read this one answer, so they can never disagree.
+ * service could not read stands in the list as its own line, never as nothing. The rail's count and the Dashboard's Waiting
+ * on you both read this one answer, so they can never disagree.
  */
 import { request } from '../../api';
 import type { WaitingEntryView } from '../../generated';
@@ -35,10 +35,10 @@ export const UNREAD: Record<WaitingKind, string> = {
 /** The page each part stands for. */
 export const PLACE: Record<WaitingKind, string> = { request: '#/requests', agent_draft: '#/access/drafts', product_draft: '#/access/drafts', review: '#/reviews' };
 
-/** Where a line is decided, and the word on its button: a request opens itself on Requests. */
+/** The page a line opens and the word on its button, always Open: a request opens itself on Requests. */
 export function opens(line: WaitingEntry): { href: string; word: string } {
-  if (line.kind === 'request') return { href: PLACE.request + '/' + encodeURIComponent(line.id), word: 'Decide' };
-  return { href: PLACE[line.kind], word: line.kind === 'review' ? 'Open' : 'Decide' };
+  if (line.kind === 'request') return { href: PLACE.request + '/' + encodeURIComponent(line.id), word: 'Open' };
+  return { href: PLACE[line.kind], word: 'Open' };
 }
 
 /** Read `GET /waiting`, refusing an answer that is not a list, so nothing missing is shown as nothing. */
