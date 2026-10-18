@@ -6,3 +6,6 @@ __pycache__/
 
 # Each seat's registered git worktree, on its own branch, removed the day that branch lands.
 /worktrees/
+
+# vitest reporter output; never source (the dev-scripts test refuses a dirty surface)
+surface/identity/.vitest/
