@@ -9,14 +9,11 @@ import { Navigate } from 'react-router';
 import { Refused, api, request, useLive } from '../../api';
 import type { MeView } from '../../generated';
 import { refreshLive } from '../../live';
-import { readEveryPage, readTogether } from '../../reads';
+import { readTogether } from '../../reads';
 import type { Entry } from '../people/directory';
 import { agentsOf, buildTree } from '../people/tree';
 import type { Node } from '../people/tree';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
-import { readDrafts } from '../drafts/contract';
-import type { Draft } from '../drafts/contract';
-import type { AccessRequest } from '../requests/contract';
 import { Terminal } from '../runtime/Terminal';
 import '../runtime/terminal.css';
 import { Gate, SignIn } from '../signin/Gate';
@@ -33,6 +30,8 @@ import type { CordView } from './cord';
 import { CordLine, StopEverythingButton, StopEverythingRow, pullPending } from './StopEverything';
 import { Exceptions } from './Exceptions';
 import { WaitingOnYou } from './WaitingOnYou';
+import { readWaiting } from './waiting';
+import type { WaitingLine } from './waiting';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
@@ -40,26 +39,22 @@ import { Alarms } from './Alarms';
 import { Unread } from './Unread';
 import { Spend } from './Spend';
 
-interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; requests: AccessRequest[] | Refused; drafts: Draft[] | Refused }
+interface Ready { kind: 'active'; me: MeView; answer: DashboardAnswer; standing: Standing; teams: Team[] | Refused; cord: CordView | Refused; waiting: WaitingLine[] | Refused }
 
 type Read = Ready | { kind: 'registered' };
 
 async function readPage(): Promise<Read> {
   const me = await api.me();
   if (me.person.state === 'registered') return { kind: 'registered' };
-  const { answer, teams, cord, requests, drafts, standing } = await readTogether({
+  const { answer, teams, cord, waiting, standing } = await readTogether({
     standing: readStanding(),
-    // Every page, so the count of what waits on the person is the length of the list it shows.
-    requests: orRefused<AccessRequest[]>(readEveryPage<{ requests: AccessRequest[]; next?: string | null }>('/requests', (read, page) => {
-      if (!page || !Array.isArray(page.requests)) throw new Error('RequestsUnreadable: a later page did not answer a list of requests.');
-      return { ...read, requests: [...read.requests, ...page.requests] };
-    }).then((list) => list.requests), 'RequestsUnreadable'),
-    drafts: orRefused(readDrafts('waiting'), 'DraftsUnreadable'),
+    // One read for everything waiting on the person, the same the rail counts.
+    waiting: orRefused(readWaiting(), 'WaitingUnreadable'),
     cord: readCord(),
     answer: readDashboard(),
     teams: request<{ teams: Team[] }>('/teams').then((list) => list.teams, (problem: unknown) => problem instanceof Refused ? problem : new Refused(0, { refusal: 'TeamsUnreadable', reason: String(problem) })),
   });
-  return { kind: 'active', me, answer, teams, cord, requests, drafts, standing };
+  return { kind: 'active', me, answer, teams, cord, waiting, standing };
 }
 
 /**
@@ -111,7 +106,7 @@ function Page({ data, reload, watching, watch }: { data: Ready; reload: () => vo
       <div className="you-scroll"><AgentTree branches={treeOf(data.me, listedRows, teams).branches} context={context} /></div>
     </section>
     <div className="dash-side">
-      <WaitingOnYou requests={data.requests} drafts={data.drafts} waiting={data.answer.waiting} me={data.me.person.id} />
+      <WaitingOnYou waiting={data.waiting} />
       <Exceptions rows={rows} />
       <Spend rows={rows} />
     </div>

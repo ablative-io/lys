@@ -290,6 +290,9 @@ pub mod tree_views;
 pub mod variables_api;
 pub mod variables_state;
 pub mod variables_store;
+pub mod waiting_api;
+#[cfg(test)]
+mod waiting_api_tests;
 pub mod words_api;
 pub mod words_state;
 pub mod words_store;

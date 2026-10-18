@@ -387,3 +387,12 @@ pub(crate) fn open_count(state: &AppState, headers: &HeaderMap) -> Result<usize,
         .filter(|record| record.closed.is_none() && record.refused.is_none())
         .count())
 }
+
+/// The product drafts waiting on an approval the signed-in person may give
+/// now, each with its holder's display name, as `GET /waiting` lists them.
+pub(crate) fn waiting_on(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Vec<(ProductDraftRecord, Option<String>)>, ServerError> {
+    listing::deciding(state, headers)
+}

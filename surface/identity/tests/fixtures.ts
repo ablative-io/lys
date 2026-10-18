@@ -261,6 +261,7 @@ export const SERVICE: Record<string, Route> = {
     { kind: 'workspace', id: 'person-0123456789abcdef0123456789abcdef', standing: 1, ended: 0, holders: 1 },
   ] }),
   '/reviews': ok({ scope: 'personal', due: [], unanswered: [], revision: 0, judged_at: 1790000000 }),
+  '/waiting': ok({ waiting: [] }),
   '/runtime/found': ok({ sessions: [] }),
   '/runtime/sessions': ok({ sessions: [] }),
   '/service-accounts': ok({ scope: 'personal', service_accounts: [] }),

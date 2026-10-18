@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
-import { api, Refused, request, useLoad } from '../api';
+import { api, Refused, useLoad } from '../api';
+import { railWaiting, readWaiting } from '../features/dashboard/waiting';
 import { SignOut } from '../features/me/SignOut';
 import type { MeView } from '../generated';
-import { readTogether } from '../reads';
 import { Act } from './Act';
 import { RAIL } from './railItems';
 import { useShell } from './ShellContext';
@@ -27,25 +27,21 @@ type Waiting = { count: number; words: string } | { problem: string } | null;
 const waitingOf = (refused: Refused): Waiting => refused.status === 401 || refused.status === 403 ? null : { problem: refused.refusal.reason };
 
 /**
- * Who is signed in, and what waits on them: requests awaiting a decision and grants due a review, as the service
- * lists them. The person stays known when the waiting reads are refused, so Sign out is drawn for everyone.
+ * Who is signed in, and what waits on them: `GET /waiting`'s one list, the same Home's Waiting on you draws, so the
+ * number here is the number of lines there. A part the service could not read is named, never counted as nothing.
+ * The person stays known when the waiting read is refused, so Sign out is drawn for everyone.
  */
 function useWaiting(): { me: MeView | null; waiting: Waiting } {
   const load = useLoad(async () => {
     const me = await api.me();
-    const waiting = await readTogether({
-      requests: request<{ requests: { state: string }[] }>('/requests'),
-      reviews: request<{ due: unknown[] }>('/reviews'),
-    }).then((data) => ({ data }), (error: unknown) => ({ refused: error instanceof Refused ? error : new Refused(0, { refusal: 'WaitingUnread', reason: String(error) }) }));
+    const waiting = await readWaiting().then((lines) => ({ lines }), (error: unknown) => ({ refused: error instanceof Refused ? error : new Refused(0, { refusal: 'WaitingUnreadable', reason: String(error) }) }));
     return { me, waiting };
   }, 'rail-waiting');
   if (load.status === 'loading') return { me: null, waiting: null };
   if (load.status === 'refused') return { me: null, waiting: waitingOf(load.refused) };
   const { me, waiting: read } = load.data;
   if ('refused' in read) return { me, waiting: waitingOf(read.refused) };
-  const waiting = read.data.requests.requests.filter((entry) => entry.state === 'waiting').length;
-  const due = read.data.reviews.due.length;
-  return { me, waiting: { count: waiting + due, words: waiting + (waiting === 1 ? ' request waiting, ' : ' requests waiting, ') + due + (due === 1 ? ' grant to review' : ' grants to review') } };
+  return { me, waiting: railWaiting(read.lines) };
 }
 
 export function Rail() {

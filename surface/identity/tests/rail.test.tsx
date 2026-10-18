@@ -95,9 +95,10 @@ describe('rail and dock side (conformance 9.1)', () => {
   });
 
   it('Menu carries the count of what waits on the person while the drawer is shut', async () => {
-    await mount('#/people', { ...SERVICE, '/requests': ok({ requests: [{ state: 'waiting' }, { state: 'approved' }] }), '/reviews': ok({ scope: 'personal', due: [{}], unanswered: [], revision: 0, judged_at: 1 }) });
+    const line = (kind: string, id: string) => ({ kind, id, asked_by: { id: 'person-sam', name: 'Sam' }, about: 'Sam asks to edit project logo', asked_at: '2026-10-18T01:00:00Z', can_decide: true });
+    await mount('#/people', { ...SERVICE, '/waiting': ok({ waiting: [line('request', 'r1'), line('review', 'g1')] }) });
     expect($('#rail .menu .cnt')?.textContent).toBe('2');
-    expect($('#rail .menu .cnt')?.title).toBe('1 request waiting, 1 grant to review');
+    expect($('#rail .menu .cnt')?.title).toBe('2 things wait on you');
     expect($('#rail a[data-nav="waiting"] .cnt')?.textContent).toBe('2');
   });
 

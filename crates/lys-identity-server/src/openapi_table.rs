@@ -152,6 +152,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/drafts" "Record an agent's immutable draft" G [SIGNED_BODY, AGENT, &["NoPerson", "NotAdmitted", "DraftChangeInvalid", "OperationReused"]];
     GET "/drafts" "The drafts the signed-in person may decide" C [SIGNED, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
     GET "/dashboard" "The caller's own agents, how each is going, and what waits on the caller" C [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]];
+    GET "/waiting" "Everything waiting on the caller's decision, oldest first; a part the caller may not read is its refusal in place" C [SIGNED];
     POST "/drafts/{id}/approve" "Approve and carry out the prepared action through its admitted route" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/drafts/{id}/refuse" "Refuse one immutable draft" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];

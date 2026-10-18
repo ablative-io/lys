@@ -35,6 +35,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::drafts_api::routes())
         .merge(crate::product_drafts::routes())
         .merge(crate::dashboard_api::routes())
+        .merge(crate::waiting_api::routes())
         .merge(crate::canvas_api::routes())
         .merge(crate::grants::routes())
         .merge(crate::agent_grants_api::routes())
