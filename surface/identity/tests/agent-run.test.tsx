@@ -90,7 +90,7 @@ describe('An agent\'s run on People and agents', () => {
   it('stops a running agent from its row on the front page, after asking', async () => {
     const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
     await click($('button[data-act="stop"]'));
-    expect(text()).toContain('Stop Scribe? What it has not saved is lost. You can start it again afterwards.');
+    expect(text()).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost. You can start it again afterwards.');
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
     await click(button('Stop Scribe'));
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);
@@ -144,7 +144,7 @@ describe('An agent\'s run on People and agents', () => {
   it('restarts a running agent in place, after asking, with one request', async () => {
     const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /agents/' + SCRIBE + '/restart']: ok({}) });
     await click($('section[aria-label="Run"] [data-act="restart"]'));
-    expect(text()).toContain('Restart Scribe? This ends the run and starts it again in the same folder, on Lab.');
+    expect(text()).toContain('Restart Scribe? This ends its run and starts it again in the same folder, on Lab. What it has not saved is lost.');
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toEqual([]);
     await click(button('Restart Scribe'));
     expect(posted.filter((entry) => entry.path.endsWith('/restart'))).toMatchObject([{ path: '/agents/' + SCRIBE + '/restart', body: { session: LIVE } }]);
@@ -153,7 +153,7 @@ describe('An agent\'s run on People and agents', () => {
   it('stops a running agent by ending its run, after asking, and never by the emergency stop', async () => {
     const { posted } = await mount('#/file/' + SCRIBE, { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: receipt({ kind: 'ended' }) });
     await click($('section[aria-label="Run"] [data-act="stop"]'));
-    expect(text()).toContain('Stop Scribe? What it has not saved is lost. You can start it again afterwards.');
+    expect(text()).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost. You can start it again afterwards.');
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
     await click(button('Stop Scribe'));
     expect(posted.filter((entry) => entry.path.endsWith('/end')).map((entry) => entry.path)).toEqual(['/runtime/sessions/' + LIVE + '/end']);

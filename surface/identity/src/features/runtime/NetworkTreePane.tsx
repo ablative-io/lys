@@ -8,6 +8,7 @@ import { STATE_WORDS } from '../sessions/Seats';
 import { ErrorWords, problemWords } from '../people/Words';
 import './terminal.css';
 import { Act } from '../../shell/Act';
+import { RUN_WORDS, RunConfirm } from '../team/RunConfirm';
 
 interface Attached { seat: SeatView; session: string; cursor: number; ended: boolean; lines: { at: number; kind: string; text: string }[] }
 
@@ -51,12 +52,16 @@ export function NetworkTreePane({ seat, name, reason, change }: { seat: SeatView
   const [text, setText] = useState('');
   const [ended, setEnded] = useState<string | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
+  // Stop asks first, with the same question as on the agent's own page.
+  const [asking, setAsking] = useState(false);
   const running = online(seat) && !action.stopEnded;
   const end = (value: SessionEnd) => setEnded('Session ' + seat.session + ' ended: ' + value.how + (value.status === null ? '' : ', status ' + value.status) + (value.signal ? ', ' + value.signal : '') + '.');
   return <section className="terminal network-terminal" aria-label={'Terminal of ' + name}>
     <header className="terminal-head"><h2 title={name}>{name}</h2><span role="status">{STATE_WORDS[seat.state] ?? 'State not known'}</span>
-      {running && !ended ? <Act symbol="stop" name={'Stop ' + seat.name} word="Stop" className="small" disabled={action.busy} onClick={() => void action.run('stop')} /> : null}
+      {running && !ended ? <Act symbol="stop" name={RUN_WORDS.stop + ' ' + seat.name} word={RUN_WORDS.stop} className="small" disabled={action.busy} onClick={() => setAsking(true)} /> : null}
     </header>
+    {asking && running && !ended ? <RunConfirm className="terminal-stop" small doing="stop" name={name} where={null} busy={action.busy} refused={null}
+      confirm={() => { void action.run('stop').then(() => setAsking(false)); }} cancel={() => setAsking(false)} /> : null}
     {reason ? <p className="network-reason" role="status" title={reason}>{problemWords(reason)}</p> : null}
     {running ? <form className="seat-send" aria-label={'Send to ' + seat.name} onSubmit={(event) => {
       event.preventDefault(); if (!text.trim() || ended) return;

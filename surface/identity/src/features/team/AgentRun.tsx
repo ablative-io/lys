@@ -1,67 +1,27 @@
 /** An agent's run, on the agent's own page. Running: where, with Restart and Stop, and a link to its terminal on the canvas. Stopped: Start, in place, with one press. */
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Refused, api, operationId, request, useLoad } from '../../api';
+import { api, request, useLoad } from '../../api';
 import type { Entry } from '../people/directory';
 import type { RuntimeSession } from '../runtime/RuntimeSessions';
 import { Start } from './Start';
 import './team.css';
-import { answeredNo } from '../../kept';
 import { Act } from '../../shell/Act';
 import { ErrorWords } from '../people/Words';
 import { SeatProgramChange } from '../provisioning/SeatProgramChange';
+import { RUN_WORDS, RunConfirm, useRunActs } from './RunConfirm';
+import type { RunDoing } from './RunConfirm';
 
-const asRefused = (error: unknown): Refused =>
-  error instanceof Refused ? error : new Refused(0, { refusal: 'Unexpected', reason: String(error) });
-
-/** Stop ends the run on its computer and leaves the agent ready to start again. It is not the emergency stop, which pauses the agent. */
-export function Stop({ entry, session, changed, done }: { entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState<Refused | null>(null);
-  const stop = async () => {
-    setBusy(true); setRefused(null);
-    try {
-      await request('/runtime/sessions/' + encodeURIComponent(session.session) + '/end', {});
-      done();
-      changed();
-    } catch (error) { setRefused(asRefused(error)); }
-    setBusy(false);
-  };
-  return <div className="team-stop" role="alertdialog" aria-label={'Stop ' + entry.display_name}>
-    <p>Stop {entry.display_name}? What it has not saved is lost. You can start it again afterwards.</p>
-    {refused ? <ErrorWords problem={refused} /> : null}
-    <Act symbol="stop" name={'Stop ' + entry.display_name} word="Stop" tone="danger" disabled={busy} onClick={() => { void stop(); }} />
-    <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
-  </div>;
+/** Stop or Restart, asked first, on the agent's own page and on the dashboard: the one question and the one pair of requests. */
+function RunAsk({ doing, entry, session, changed, done }: { doing: RunDoing; entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
+  const acts = useRunActs(entry.id, session.session, () => { done(); changed(); });
+  return <RunConfirm className="team-stop" doing={doing} name={entry.display_name} where={session.machine_name ?? session.machine} busy={acts.busy} refused={acts.refused}
+    confirm={() => { void acts.act(doing); }} cancel={done} />;
 }
 
-/** Restart ends the run and starts it again in the same folder, on the same computer, from its approved settings. */
-function Restart({ entry, session, changed, done }: { entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [refused, setRefused] = useState<Refused | null>(null);
-  // One request, kept while this is shown, so a second press after no answer sends the same one.
-  const operation = useRef('');
-  const restart = async () => {
-    setBusy(true); setRefused(null);
-    try {
-      operation.current ||= operationId();
-      await request('/agents/' + encodeURIComponent(entry.id) + '/restart', { session: session.session, operation: operation.current });
-      operation.current = '';
-      done();
-      changed();
-    } catch (error) {
-      const refusal = asRefused(error);
-      if (answeredNo(refusal)) operation.current = '';
-      setRefused(refusal);
-    }
-    setBusy(false);
-  };
-  return <div className="team-stop" role="alertdialog" aria-label={'Restart ' + entry.display_name}>
-    <p>Restart {entry.display_name}? This ends the run and starts it again in the same folder, on {session.machine_name ?? session.machine}. What it has not saved is lost.</p>
-    {refused ? <ErrorWords problem={refused} /> : null}
-    <Act symbol="retry" name={'Restart ' + entry.display_name} word="Restart" tone="danger" disabled={busy} onClick={() => { void restart(); }} />
-    <Act symbol="close" name="Keep it running" word="Keep running" onClick={done} />
-  </div>;
+/** Stop ends the run on its computer and leaves the agent ready to start again. It is not the emergency stop, which pauses the agent. */
+export function Stop(props: { entry: Entry; session: RuntimeSession; changed: () => void; done: () => void }) {
+  return <RunAsk doing="stop" {...props} />;
 }
 
 export function AgentRun({ entry }: { entry: Entry }) {
@@ -86,12 +46,12 @@ export function AgentRun({ entry }: { entry: Entry }) {
       <span className="agent-run-words">{session.shown === 'running' && !silent ? entry.display_name + ' is running on ' + where + ', as its runner last reported.'
         : 'Whether ' + entry.display_name + ' is still running on ' + where + ' is not confirmed: its runner has not answered since its last report.'}</span>
       <a className="btn" data-act="watch" href={'#/canvas/' + encodeURIComponent(entry.id)}>Open its terminal</a>
-      <Act symbol="retry" name="Restart" word="Restart" data-act="restart" onClick={() => setAsking('restart')} />
-      <Act symbol="stop" name="Stop" word="Stop" tone="danger" data-act="stop" onClick={() => setAsking('stop')} />
+      <Act symbol="retry" name={RUN_WORDS.restart} word={RUN_WORDS.restart} data-act="restart" onClick={() => setAsking('restart')} />
+      <Act symbol="stop" name={RUN_WORDS.stop} word={RUN_WORDS.stop} tone="danger" data-act="stop" onClick={() => setAsking('stop')} />
     </div>
     {session.stop_asked_at && !session.stopped ? <p className="why-not">A stop was requested. The runner has not confirmed it ended.</p> : null}
     {session.seat_program ? <SeatProgramChange key={session.session + ':' + session.seat_program.provisioning_version} id={entry.id} evidence={session.seat_program} canReview={admin || entry.person?.id === me} changed={changed} /> : null}
     {asking === 'stop' ? <Stop entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
-    {asking === 'restart' ? <Restart entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
+    {asking === 'restart' ? <RunAsk doing="restart" entry={entry} session={session} changed={changed} done={() => setAsking(null)} /> : null}
   </section>;
 }

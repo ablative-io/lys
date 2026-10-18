@@ -59,6 +59,9 @@ it('C738 stops through the seat route and shows confirmed end without a terminal
   serve({ 'POST /seats/first/stop': ok({ seat: seat('first', 'offline'), session: 'session-first', ended: true }) }, posted);
   await render('first', 'online-idle', 'managed');
   await act(async () => { (document.querySelector('button[aria-label="Stop first"]') as HTMLElement).click(); });
+  // Stop asks first; nothing is sent until the question is answered.
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('What it has not saved is lost.');
+  await act(async () => { (document.querySelector('button[data-act="confirm-stop"]') as HTMLElement).click(); });
   expect(posted.find((each) => each.path === '/seats/first/stop')?.body).toEqual({ operation: expect.any(String), force: false });
   expect(document.querySelector('[role="status"]:not(.network-reason):not(.terminal-head [role="status"])')?.textContent).toBe('Stopped.');
   expect(document.querySelector('.terminal-screen')).toBeNull();
@@ -107,6 +110,9 @@ it('C738 keeps the terminal while stop is unconfirmed and never invents a missin
   serve({ 'POST /seats/first/stop': ok({ seat: seat('first', 'online-idle', 'managed'), session: 'session-first', ended: false }) });
   await render('first', 'online-idle', 'managed');
   await act(async () => { (document.querySelector('button[aria-label="Stop first"]') as HTMLElement).click(); });
+  // Stop asks first; nothing is sent until the question is answered.
+  expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('What it has not saved is lost.');
+  await act(async () => { (document.querySelector('button[data-act="confirm-stop"]') as HTMLElement).click(); });
   expect(document.body.textContent).toContain('Asked to stop. Its computer has not yet confirmed it stopped.');
   expect(document.querySelector('[role="log"]')).not.toBeNull();
   await render('second', 'online-idle', '');

@@ -266,7 +266,7 @@ describe('The Dashboard is the front page', () => {
   it('stops a running agent from Running now, after asking, in a row under it', async () => {
     const { posted } = await mount('#/', { ...routes, ['POST /runtime/sessions/' + LIVE + '/end']: ok({ session: LIVE, answer: { kind: 'ended' }, receipt: { index: 1 } }) });
     await click($('section[aria-label="Running now"] button[data-act="stop"]'));
-    expect($('section[aria-label="Running now"] .you-asked')?.textContent).toContain('Stop Scribe? What it has not saved is lost.');
+    expect($('section[aria-label="Running now"] .you-asked')?.textContent).toContain('Stop Scribe? This ends its run on Lab. What it has not saved is lost.');
     expect($('section[aria-label="Agents"] .you-asked')).toBeNull();
     expect(posted.filter((entry) => entry.path.endsWith('/end'))).toEqual([]);
     await click($$('section[aria-label="Running now"] .you-asked button').find((el) => (el.getAttribute('aria-label') ?? el.textContent) === 'Stop Scribe') ?? null);
