@@ -15,14 +15,8 @@ import { DirectoryGate as Gate } from '../people/Words';
 import { confirmsProduct, readProductDrafts } from './contract';
 import type { ProductDraft, ProductDraftAnswer } from './contract';
 import { Act } from '../../shell/Act';
+import { APPROVE, DECLINE, DRAFT_STATE } from '../requests/decision-words';
 
-const STATES: Record<string, string> = {
-  waiting: 'Waiting',
-  approved: 'Approved, not yet executed',
-  refused: 'Refused',
-  executed: 'Executed',
-  refused_on_execution: 'Refused on execution',
-};
 
 /** Who someone is, by name where the directory names them, else said plainly, never by identifier. */
 const nameOf = (names: Map<string, string>, id: string | undefined): string =>
@@ -37,15 +31,15 @@ function Decide({ draft, person, changed }: { draft: ProductDraft; person: strin
   const blocked = approve.blocked || refuse.blocked;
   return <div className="draft-decide">
     {refusing && !refuse.pending && !refuse.done
-      ? <form aria-label={'Refuse the ' + draft.app + ' draft'} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), request_digest: draft.request_digest, reason: reason.trim() }); }}>
-        <label className="field draft-reason-field">Why you refuse it<input aria-label="Why you refuse it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The product is told this reason.</span></label>
-        <Act symbol="decline" name="Refuse" word="Refuse" tone="danger" type="submit" data-act="product-refuse-confirm" disabled={blocked || !reason.trim()} />
+      ? <form aria-label={'Decline the ' + draft.app + ' draft'} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), request_digest: draft.request_digest, reason: reason.trim() }); }}>
+        <label className="field draft-reason-field">Why you decline it<input aria-label="Why you decline it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The product is told this reason.</span></label>
+        <Act symbol="decline" name={DECLINE} word={DECLINE} tone="danger" type="submit" data-act="product-refuse-confirm" disabled={blocked || !reason.trim()} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="product-refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
       </form>
       : approve.done || refuse.done || approve.pending || refuse.pending ? null
       : <>
-        <Act symbol="approve" name="Approve" word="Approve" tone="primary" data-act="product-approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), request_digest: draft.request_digest })} />
-        <Act symbol="decline" name="Refuse" word="Refuse" data-act="product-refuse" disabled={blocked} onClick={() => setRefusing(true)} />
+        <Act symbol="approve" name={APPROVE} word={APPROVE} tone="primary" data-act="product-approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), request_digest: draft.request_digest })} />
+        <Act symbol="decline" name={DECLINE} word={DECLINE} data-act="product-refuse" disabled={blocked} onClick={() => setRefusing(true)} />
       </>}
     <ChangeStatus change={approve} />
     <ChangeStatus change={refuse} />
@@ -55,7 +49,7 @@ function Decide({ draft, person, changed }: { draft: ProductDraft; person: strin
 /** The state as answered, with the product's own words for a refusal on execution. */
 function Closed({ draft }: { draft: ProductDraft }) {
   const execution = draft.execution;
-  return <span className="sec" data-state={draft.state ?? ''}>{draft.state ? STATES[draft.state] ?? 'State not recognised' : 'State not answered'}
+  return <span className="sec" data-state={draft.state ?? ''}>{draft.state ? DRAFT_STATE[draft.state] ?? 'State not recognised' : 'State not answered'}
     {execution?.state === 'refused_on_execution' ? <span className="draft-reason">The product said: {execution.reason || 'no reason given'}
       <details><summary>Error details</summary><small className="refusal-name">{execution.refusal}</small></details></span> : null}
   </span>;

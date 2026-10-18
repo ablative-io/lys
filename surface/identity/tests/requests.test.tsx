@@ -122,7 +122,7 @@ describe('Requests', () => {
     const asked: Ask = { operation: 'op-' + '1'.repeat(32), resource: { kind: 'project', id: 'Lys' }, relation: 'reader', ends_at: null, why: 'Review the release' };
     await mount('#/requests', { ...routes, '/requests': ok({ requests: [kept(asked)] }) });
     expect(text()).toContain(ME.person.display_name + ' · reader on Lys');
-    expect(text()).toContain('Awaiting a decision');
+    expect(text()).toContain('Waiting on a decision');
     expect(text()).toContain('Review the release');
     expect(text()).not.toContain('not built yet');
   });

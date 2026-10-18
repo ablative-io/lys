@@ -1,8 +1,10 @@
+import { TAKE_BACK } from '../requests/decision-words';
+import './grants.css';
 import { useRef, useState } from 'react';
 import { Refused, api, operationId } from '../../api';
 import type { Grant } from '../../generated/grants';
 import { useShell } from '../../shell/ShellContext';
-import { grantNo, nameOf, named, onText } from './model';
+import { nameOf, named, resourceName } from './model';
 import { PendingWords, RefusedWords } from './Outcome';
 import type { GrantWorld } from './model';
 import { Act } from '../../shell/Act';
@@ -45,7 +47,7 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
     try {
       await api.revoke(g.id, { operation: op.current, route: 'browser', reason: why });
       close();
-      shell.toast(`Revoked ${grantNo(g.id)}. Everything derived from it goes with it.`);
+      shell.toast(`Taken back from ${nameOf(w, g.holder)}. Everything given on from it goes with it.`);
       done();
     } catch (error) {
       const refused = error instanceof Refused ? error : new Refused(0, { refusal: 'Unanswered', reason: String(error) });
@@ -61,22 +63,22 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
   return (
     <>
       <div className="eyebrow">Access</div>
-      <h2 style={{ marginTop: 6, fontSize: 16 }}>Revoke {g.relation} of {onText(g)}</h2>
-      <p className="sub" style={{ marginTop: 6 }}>Everything that depends on this grant, before it goes.</p>
+      <h2 className="give-head">Take back {nameOf(w, g.holder)}’s access to {resourceName(w, g.resource)}</h2>
+      <p className="sub give-sub">Everything that depends on this grant, before it goes.</p>
       <div className="field">
         <label htmlFor="why">Reason <span className="hint">(kept with the record)</span></label>
-        <textarea id="why" style={{ minHeight: 60 }} value={why} disabled={outcome.at === 'sending'} onChange={(e) => setWhy(e.target.value)} />
+        <textarea id="why" className="take-back-why" value={why} disabled={outcome.at === 'sending'} onChange={(e) => setWhy(e.target.value)} />
       </div>
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card take-back-facts">
         <dl className="facts">
           <dt>Held by</dt>
           <dd><span className="pill">{nameOf(w, g.holder)}</span></dd>
-          <dt>Grants derived from it</dt>
+          <dt>Given on from it</dt>
           <dd id="derived">
             {derived.length ? (
               <>
                 {derived.map((x) => <span className="pill" key={x.id}>{nameOf(w, x.holder)} · {x.relation}</span>)}
-                <span className="note">revoked with it</span>
+                <span className="note">taken back with it</span>
               </>
             ) : <span className="dim">none</span>}
           </dd>
@@ -85,11 +87,11 @@ export function Revoke({ w, g, done, close }: { w: GrantWorld; g: Grant; done: (
       {outcome.at === 'refused' ? <RefusedWords w={w} id="rAnswer" refused={outcome.refused} /> : null}
       {outcome.at === 'pending' ? (
         <PendingWords id="rAnswer">
-          <div className="note">Lys has not confirmed the revoke ({named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, ''))}). Revoke again sends exactly the same request, so it is never done twice.</div>
+          <div className="note">Lys has not confirmed taking it back ({named(w, outcome.reason.replace(/^[A-Za-z_]+:\s*/, ''))}). Take back again sends exactly the same request, so it is never done twice.</div>
         </PendingWords>
       ) : null}
-      <div style={{ marginTop: 14, display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke} />
+      <div className="give-actions">
+        <Act symbol="revoke" name={TAKE_BACK} word={TAKE_BACK} tone="danger" data-act="revokedo" data-g={g.id} disabled={outcome.at === 'sending'} onClick={revoke} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="close" onClick={close} />
       </div>
     </>

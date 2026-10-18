@@ -21,6 +21,7 @@ import { confirms, readDrafts } from './contract';
 import { ProductDrafts } from './ProductDrafts';
 import type { Draft, DraftAnswer, DraftFilter } from './contract';
 import './drafts.css';
+import { APPROVE, DECLINE, DRAFT_STATE } from '../requests/decision-words';
 import { Act } from '../../shell/Act';
 
 const COLUMNS = 5;
@@ -50,7 +51,7 @@ const deciderOf = (decided: NonNullable<Draft['decided']>): string =>
   decided.by?.display_name ?? (RAW_ID.test(decided.login.subject) || !/[A-Za-z]/.test(decided.login.subject) || /^[0-9a-f-]{20,}$/i.test(decided.login.subject) ? 'someone outside your view' : decided.login.subject);
 
 function Decided({ draft, listed }: { draft: Draft; listed: (id: string) => boolean }) {
-  const said = draft.state === 'executed' ? 'Carried out' : draft.state === 'refused_on_execution' ? 'Refused when carried out' : draft.state === 'approved' ? 'Approved, not carried out' : draft.state === 'refused' ? 'Refused' : draft.state === 'corrected' ? 'Corrected' : draft.state;
+  const said = DRAFT_STATE[draft.state] ?? draft.state;
   const replacement = draft.decided?.replacement ?? null;
   return <span className="sec" role={draft.state === 'approved' ? 'alert' : undefined}>{said}{draft.decided ? ' by ' + deciderOf(draft.decided) + ', ' + clock(draft.decided.at) : ''}
     {draft.execution?.state === 'executed' && <span className="draft-reason"><a href={'/api/receipts/' + draft.execution.receipt_index}>View receipt</a></span>}
@@ -61,7 +62,7 @@ function Decided({ draft, listed }: { draft: Draft; listed: (id: string) => bool
       : 'Replaced by a corrected draft.'}</span> : null}</span>;
 }
 
-/** Approve and Refuse in the draft's own row. Refuse asks for the reason where it stands. Each is a kept change. */
+/** Approve and Decline in the draft's own row. Decline asks for the reason where it stands. Each is a kept change. */
 function Decide({ draft, person, changed }: { draft: Draft; person: string; changed: () => void }) {
   const path = '/drafts/' + encodeURIComponent(draft.id);
   const approve = useRoleChange<DraftAnswer>('lys.pending.draft-approve.' + person + '.' + draft.id, path + '/approve', confirms(draft.id), changed);
@@ -71,15 +72,15 @@ function Decide({ draft, person, changed }: { draft: Draft; person: string; chan
   const blocked = approve.blocked || refuse.blocked;
   return <div className="draft-decide">
     {refusing && !refuse.pending && !refuse.done
-      ? <form aria-label={'Refuse the draft of ' + agentOf(draft)} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), creation_hash: draft.creation_hash, reason: reason.trim() }); }}>
-        <label className="field draft-reason-field">Why you refuse it<input aria-label="Why you refuse it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The agent is told this reason.</span></label>
-        <Act symbol="decline" name="Refuse" word="Refuse" tone="danger" type="submit" data-act="refuse-confirm" disabled={blocked || !reason.trim()} />
+      ? <form aria-label={'Decline the draft of ' + agentOf(draft)} onSubmit={(event) => { event.preventDefault(); if (reason.trim()) refuse.submit({ operation: operationId(), creation_hash: draft.creation_hash, reason: reason.trim() }); }}>
+        <label className="field draft-reason-field">Why you decline it<input aria-label="Why you decline it" required value={reason} disabled={blocked} onChange={(event) => setReason(event.target.value)} /><span className="hint">The agent is told this reason.</span></label>
+        <Act symbol="decline" name={DECLINE} word={DECLINE} tone="danger" type="submit" data-act="refuse-confirm" disabled={blocked || !reason.trim()} />
         <Act symbol="close" name="Cancel" word="Cancel" data-act="refuse-cancel" disabled={refuse.busy} onClick={() => setRefusing(false)} />
       </form>
       : approve.done || refuse.done || approve.pending || refuse.pending ? null
       : <>
-        <Act symbol="approve" name="Approve" word="Approve" tone="primary" data-act="approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), creation_hash: draft.creation_hash, application: operationId() })} />
-        <Act symbol="decline" name="Refuse" word="Refuse" data-act="refuse" disabled={blocked} onClick={() => setRefusing(true)} />
+        <Act symbol="approve" name={APPROVE} word={APPROVE} tone="primary" data-act="approve" disabled={blocked} onClick={() => approve.submit({ operation: operationId(), creation_hash: draft.creation_hash, application: operationId() })} />
+        <Act symbol="decline" name={DECLINE} word={DECLINE} data-act="refuse" disabled={blocked} onClick={() => setRefusing(true)} />
       </>}
     <ChangeStatus change={approve} />
     <ChangeStatus change={refuse} />

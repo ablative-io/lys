@@ -22,6 +22,7 @@ import { Chain } from '../grants/Chain';
 import { chainOf, lastUsedText, mayText, nameOf, readGrantWorld, resourceName, resourceTitle, voidOf, whoTitle, windowText } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
 import '../grants/grants.css';
+import { TAKE_BACK } from '../requests/decision-words';
 import { KeepGrant } from './KeepGrant';
 import type { Kept } from './KeepGrant';
 import { IdentityName, ReadFailure } from '../signin/words';
@@ -52,7 +53,7 @@ export function Reviews() {
   const kept = (answer: Kept) => { setConfirmed((held) => ({ ...held, [answer.grant]: answer })); setNotice('Your decision to keep this access was recorded. It does not extend the grant or change its permissions.'); };
   return <div className="page fill reviews-page">
     <div className="head"><div><h1>Access</h1>
-      <p className="sub">Check what each agent can do, and withdraw access it no longer needs.</p></div></div>
+      <p className="sub">Check what each agent can do: approve the access it still needs, and take back the rest.</p></div></div>
     <AccessTabs on="reviews" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="agent access to review" renderError={(error) => <ReadFailure error={error} subject="agent access to review" />} ok={(data) => <Due {...data} confirmed={confirmed} kept={kept} revision={revision} reload={() => setRevision((value) => value + 1)} />} />
@@ -103,10 +104,10 @@ function Due({ model, view, me, people, teams, confirmed, kept, reload, revision
           </dl>}
         {last(open) ? <p className="note">Last kept by <IdentityName id={last(open)?.by ?? ''} people={people} />{last(open)?.note ? ': ' + last(open)?.note : '.'}</p> : null}
         <div className="grant-acts">
-          {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p className="note">This Lys does not record decisions to keep access, so only Revoke is offered.</p>}
-          {drawn && world.status === 'ok' && !drawn.revoked ? <Act symbol="revoke" name="Revoke" word="Revoke" tone="danger" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)} /> : null}
+          {view.decisions_recorded ? <KeepGrant key={open.grant.id} grant={open.grant.id} person={me.person.id} changed={kept} /> : <p className="note">This Lys does not record approvals of access, so only Take back is offered.</p>}
+          {drawn && world.status === 'ok' && !drawn.revoked ? <Act symbol="revoke" name={TAKE_BACK} word={TAKE_BACK} tone="danger" data-act="revoke" data-g={drawn.id} onClick={(event) => setRevoking(event.currentTarget)} /> : null}
         </div>
-        {revoking && drawn && world.status === 'ok' ? <ActPanel key={drawn.id} label="Revoke" opener={revoking} close={() => setRevoking(null)}>
+        {revoking && drawn && world.status === 'ok' ? <ActPanel key={drawn.id} label={TAKE_BACK} opener={revoking} close={() => setRevoking(null)}>
           <ActForm w={world.data} g={drawn} act="revoke" done={reload} close={() => setRevoking(null)} />
         </ActPanel> : null}
       </section> : null}</div>

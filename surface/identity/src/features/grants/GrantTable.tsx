@@ -12,6 +12,7 @@ import { Revoke } from './Revoke';
 import { modeWords } from './mode-words';
 import { actionSentence } from './action-words';
 import './grants.css';
+import { TAKE_BACK } from '../requests/decision-words';
 import { Act } from '../../shell/Act';
 
 /**
@@ -123,8 +124,8 @@ export function ChangeButtons({ w, g, give, open }: { w: GrantWorld; g: Grant; g
       {mayRevoke ? (
         <Act
           symbol="revoke"
-          name="Revoke"
-          word="Revoke"
+          name={TAKE_BACK}
+          word={TAKE_BACK}
           tone="danger"
           data-act="revoke"
           data-g={g.id}

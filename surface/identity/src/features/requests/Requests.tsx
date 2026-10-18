@@ -72,7 +72,7 @@ type Loaded = { people: { read: Awaited<ReturnType<typeof api.people>> | null; r
 type Choices = ReturnType<typeof useLoad<{ person: string; resources: { kind: string; id: string }[]; model: Awaited<ReturnType<typeof api.model>>; grants: Awaited<ReturnType<typeof api.grants>>['grants']; unlisted: string }>>;
 
 /** A request's state in words. */
-const STATE: Record<AccessRequest['state'], string> = { waiting: 'Awaiting a decision', approved: 'Approved', declined: 'Declined' };
+const STATE: Record<AccessRequest['state'], string> = { waiting: 'Waiting on a decision', approved: 'Approved', declined: 'Declined' };
 
 function Queue({ entries, data, choices, changed, wanted }: { entries: AccessRequest[]; data: Loaded; choices: Choices; changed: (answer: AccessRequest) => void; wanted: Wanted | undefined }) {
   const admin = data.people.read?.scope === 'directory';

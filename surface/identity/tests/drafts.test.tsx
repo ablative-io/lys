@@ -35,7 +35,7 @@ describe('Drafts under Access', () => {
     await mount('#/access/drafts', routes);
     expect($$('table.drafts thead th').map((th) => th.textContent)).toEqual(['Agent', 'Wants to', 'Note', 'Asked', 'Decision']);
     expect([...(row()?.querySelectorAll('td') ?? [])].map((td) => td.textContent)).toEqual([
-      'Scribe', 'Edit this resource · project identity', 'To fix the typo on the front page', clock(1790000000), 'ApproveRefuse',
+      'Scribe', 'Edit this resource · project identity', 'To fix the typo on the front page', clock(1790000000), 'ApproveDecline',
     ]);
     for (const id of [DRAFT, SCRIBE, ADA, HASH]) expect(text()).not.toContain(id);
   });
@@ -69,14 +69,14 @@ describe('Drafts under Access', () => {
     expect(row()).toBeNull();
     expect(text().split('Nothing is waiting.')).toHaveLength(2);
     await click(button('Decided'));
-    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Approved, not carried out by Ada (test person), ' + clock(1790000100));
+    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Approved, not yet carried out by Ada (test person), ' + clock(1790000100));
     expect(sessionStorage.length).toBe(0);
   });
 
   it('refuses with a reason asked for in the row itself', async () => {
     const { posted } = await mount('#/access/drafts', { ...routes, ['POST /drafts/' + DRAFT + '/refuse']: recorded });
-    await click(button('Refuse'));
-    const input = row()?.querySelector('input[aria-label="Why you refuse it"]') ?? null;
+    await click(button('Decline'));
+    const input = row()?.querySelector('input[aria-label="Why you decline it"]') ?? null;
     expect(input).not.toBeNull();
     expect(posted).toEqual([]);
     await type(input, 'Not this week');
@@ -90,11 +90,11 @@ describe('Drafts under Access', () => {
     await click(button('Approve'));
     expect(row()?.textContent).toContain('This change has no confirmed answer.');
     expect(button('Approve')).toBeNull();
-    expect(button('Refuse')).toBeNull();
+    expect(button('Decline')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
     const second = await mount('#/access/drafts', { ...service, ['POST /drafts/' + DRAFT + '/approve']: recorded });
     expect(button('Approve')).toBeNull();
-    expect(button('Refuse')).toBeNull();
+    expect(button('Decline')).toBeNull();
     await click(button('Check whether Lys saved it'));
     expect(second.posted).toEqual(first.posted);
     expect(second.posted).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('Drafts under Access', () => {
     expect($('table.drafts tbody tr.empty td')?.textContent).toBe('Nothing is waiting.');
     expect(text().split('Nothing is waiting.')).toHaveLength(2);
     await click(button('Decided'));
-    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Refused by Ada (test person), ' + clock(1790000200) + 'Not this week');
+    expect(row()?.querySelectorAll('td')[4].textContent).toBe('Declined by Ada (test person), ' + clock(1790000200) + 'Not this week');
     expect(row()?.querySelector('button')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
     await mount('#/access/drafts', SERVICE);
@@ -128,7 +128,7 @@ describe('Drafts under Access', () => {
     expect(row()?.querySelector('td')?.textContent).toBe('An agent outside your view');
     await click(button('Decided'));
     expect($(`tr[data-draft="${OTHER}"] td`)?.textContent).toBe('An agent outside your view');
-    expect($(`tr[data-draft="${OTHER}"]`)?.querySelectorAll('td')[4].textContent).toBe('Refused by someone outside your view, ' + clock(1790000100) + 'No');
+    expect($(`tr[data-draft="${OTHER}"]`)?.querySelectorAll('td')[4].textContent).toBe('Declined by someone outside your view, ' + clock(1790000100) + 'No');
     expect(row()?.querySelectorAll('td')[4].textContent).toBe('Corrected by ada@example.test, ' + clock(1790000100) + 'Wrong projectReplaced by a corrected draft.');
     for (const id of [SCRIBE, 'person-' + '3'.repeat(32), 'op-' + 'c'.repeat(32)]) expect(text()).not.toContain(id);
     expect(text()).not.toContain('administrator');

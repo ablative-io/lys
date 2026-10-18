@@ -383,7 +383,7 @@ describe('The grant table says each fact once, by name (walk of 4 Oct)', () => {
     ).toBe('Change');
     await click($(`[data-act="revoke"][data-g="${ROOT_G}"]`));
     expect(location.hash).toBe('#/access');
-    expect($('.act-panel h2')?.textContent).toBe('Revoke owner of project:identity');
+    expect($('.act-panel h2')?.textContent).toBe('Take back Ada (test person)’s access to project identity');
     expect(unreachable()).toEqual([]);
   });
 });
@@ -443,10 +443,10 @@ describe('Reviews shows the chosen grant whole (walk of 4 Oct)', () => {
     expect([...(panel?.querySelectorAll('dt') ?? [])].map((dt) => dt.textContent)).toEqual(['Holder', 'Allows', 'On', 'Access level', 'Path to a person', 'Window', 'Last used', 'Stands']);
     expect([...(panel?.querySelectorAll('.chain .pill') ?? [])].map((pill) => pill.textContent)).toEqual(['Ada (test person)', 'Scribe']);
     expect(panel?.textContent).toContain('27 Sep to 4 Oct');
-    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.getAttribute('aria-label'))).toEqual(['Keep access', 'Revoke']);
-    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual(['Keep', 'Revoke']);
+    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.getAttribute('aria-label'))).toEqual(['Approve: this access stays', 'Take back']);
+    expect([...(panel?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual(['Approve', 'Take back']);
     await click($(`section[aria-label="Grant to review"] [data-act="revoke"][data-g="${SCRIBE_G}"]`));
-    expect($('.act-panel h2')?.textContent).toBe('Revoke viewer of project:identity');
+    expect($('.act-panel h2')?.textContent).toBe('Take back Scribe’s access to project identity');
     expect(unreachable()).toEqual([]);
   });
 });

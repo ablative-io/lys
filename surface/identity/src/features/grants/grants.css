@@ -214,3 +214,7 @@
 
 /* What the last give did, with the next step as a link, above the fresh form. */
 .next-step { margin: 0 0 12px; }
+
+/* Take back (Revoke): the reason box and the facts card, as classes. */
+.take-back-why { min-height: 60px; }
+.take-back-facts { margin-top: 12px; }

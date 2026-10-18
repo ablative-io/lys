@@ -10,10 +10,10 @@ it('shows carried out with its receipt, execution refusal, and an uncarried appr
   }));
   await mount('#/access/drafts', { ...SERVICE, '/drafts?state=waiting': ok({ drafts: [] }), '/drafts?state=decided': ok({ drafts: rows }) });
   await click($$('button').find((button) => button.textContent === 'Decided') ?? null);
-  expect(text()).toContain('Carried out');
+  expect(text()).toContain('Approved and carried out');
   expect($('a[href="/api/receipts/7"]')?.textContent).toContain('receipt');
-  expect(text()).toContain('Refused when carried out');
+  expect(text()).toContain('Approved, but stopped when carried out');
   expect(text()).toContain('NotHeld');
   expect(text()).toContain('This scope is not held.');
-  expect($('[role="alert"]')?.textContent).toContain('Approved, not carried out');
+  expect($('[role="alert"]')?.textContent).toContain('Approved, not yet carried out');
 });

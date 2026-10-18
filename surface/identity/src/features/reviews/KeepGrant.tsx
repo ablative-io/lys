@@ -1,9 +1,10 @@
-/** Keeping access records the reviewer's exact decision; it never renews or widens the grant. */
+/** Approving access that is due a review records the reviewer's exact decision that it stays; it never renews or widens the grant. */
 import { useRef, useState } from 'react';
 import { operationId } from '../../api';
 import { ChangeStatus } from '../roles/ChangeStatus';
 import { useRoleChange } from '../roles/useRoleChange';
 import { Act } from '../../shell/Act';
+import { APPROVE } from '../requests/decision-words';
 export interface Kept { grant: string; kept_by: string; note: string; operation: string; at: number; revision: number }
 export function KeepGrant({ grant, person, changed }: { grant: string; person: string; changed: (answer: Kept) => void }) {
   const [open, setOpen] = useState(false);
@@ -15,10 +16,10 @@ export function KeepGrant({ grant, person, changed }: { grant: string; person: s
       if (matches) confirmed.current = answer;
       return matches;
     }, () => { if (confirmed.current) changed(confirmed.current); });
-  return <>{open ? null : <Act symbol="approve" name="Keep access" word="Keep" disabled={change.blocked} onClick={() => setOpen(true)} />}
-    {open ? <form aria-label="Keep this access" onSubmit={(event) => { event.preventDefault(); change.submit({ operation: operationId(), note: note.trim() }); }}>
-      <p>Record that this access is still needed. Its permissions and expiry stay the same.</p>
+  return <>{open ? null : <Act symbol="approve" name="Approve: this access stays" word={APPROVE} disabled={change.blocked} onClick={() => setOpen(true)} />}
+    {open ? <form aria-label="Approve this access" onSubmit={(event) => { event.preventDefault(); change.submit({ operation: operationId(), note: note.trim() }); }}>
+      <p>Approve that this access is still needed. What it allows and when it ends stay the same.</p>
       <label className="field">Review note (optional)<textarea value={note} disabled={change.blocked} onChange={(event) => setNote(event.target.value)} /></label>
-      <Act symbol="approve" name="Confirm keep" word="Confirm" tone="primary" type="submit" disabled={change.blocked} /><Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setOpen(false)} />
+      <Act symbol="approve" name="Confirm approval" word="Confirm" tone="primary" type="submit" disabled={change.blocked} /><Act symbol="close" name="Cancel" word="Cancel" disabled={change.busy} onClick={() => setOpen(false)} />
     </form> : null}<ChangeStatus change={change} /></>;
 }

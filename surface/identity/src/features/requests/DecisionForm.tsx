@@ -8,6 +8,7 @@ import { failureWords } from '../signin/words';
 import type { AccessRequest } from './contract';
 import { Act } from '../../shell/Act';
 import { StuckRecord } from '../grants/StuckRecord';
+import { APPROVE, DECLINE } from './decision-words';
 
 type Decision = { kind: 'approve'; operation: string; route: 'browser'; source: string | null; note: string }
   | { kind: 'decline'; note: string };
@@ -92,8 +93,8 @@ export function DecisionForm({ entry, person, canIssueRoot, changed, describe }:
         <label className="field">Reason for your decision<textarea name="note" required /></label>
         <Act symbol="approve" name={'Confirm ' + (action === 'approve' ? 'approval' : 'decline')} word="Confirm" tone="primary" type="submit" disabled={busy} />{' '}
         <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setAction(null)} />
-      </form> : <><Act symbol="approve" name="Approve access" word="Approve" tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}
-        <Act symbol="decline" name="Decline request" word="Decline" onClick={() => setAction('decline')} />
+      </form> : <><Act symbol="approve" name="Approve access" word={APPROVE} tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}
+        <Act symbol="decline" name="Decline request" word={DECLINE} onClick={() => setAction('decline')} />
         {!canIssueRoot && !entry.sources.length ? <p className="why-not">You cannot approve this: you hold no access you may pass on that covers it. You can still decline it.</p> : null}</>}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </div>;

@@ -43,9 +43,9 @@ describe('Revoke', () => {
   it('asks for the reason and shows everything derived from it before it goes', async () => {
     await open(revocable());
     expect($('.act-panel')).not.toBeNull();
-    expect($('.act-panel h2')?.textContent).toBe('Revoke owner of project:identity');
+    expect($('.act-panel h2')?.textContent).toBe('Take back Ada (test person)’s access to project identity');
     expect(document.activeElement?.id).toBe('why');
-    expect($('#derived')?.textContent).toBe("Scribe · viewerrevoked with it");
+    expect($('#derived')?.textContent).toBe("Scribe · viewertaken back with it");
     expect(unreachable()).toEqual([]);
   });
 
@@ -56,7 +56,7 @@ describe('Revoke', () => {
     expect(body.reason).toBe('No longer needed.');
     expect(body.route).toBe('browser');
     expect(body.operation).toMatch(/^op-[0-9a-f]{32}$/);
-    expect($('#toast')?.textContent).toBe(`Revoked G/${ROOT_G.slice(6, 14)}. Everything derived from it goes with it.`);
+    expect($('#toast')?.textContent).toBe('Taken back from Ada (test person). Everything given on from it goes with it.');
     expect($('.act-panel')).toBeNull();
     const card = $(`tr[data-grant="${ROOT_G}"]`);
     expect(card?.textContent).toContain('void');

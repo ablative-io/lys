@@ -102,9 +102,9 @@ describe('Drafts', () => {
   it('labels the reason for a refusal above its box, not as a placeholder', async () => {
     await mount('#/access/drafts', { ...SERVICE, '/drafts?state=waiting': ok({ drafts: [draft] }) });
     await click($('[data-act="refuse"]'));
-    const input = $('input[aria-label="Why you refuse it"]');
+    const input = $('input[aria-label="Why you decline it"]');
     expect(input?.getAttribute('placeholder')).toBeNull();
-    expect(input?.closest('label')?.textContent).toContain('Why you refuse it');
+    expect(input?.closest('label')?.textContent).toContain('Why you decline it');
   });
 });
 

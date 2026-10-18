@@ -41,9 +41,9 @@ describe('Product drafts on the Drafts screen', () => {
     expect(cells(WAITING).slice(0, 4)).toEqual([
       'notes', 'publish · Doc roadmap · by two approvals', 'Scribe · answered for by Ada (test person)', 'Ada (test person), ' + clock(1790000100),
     ]);
-    expect(cells(APPROVED)[4]).toBe('Approved, not yet executed');
+    expect(cells(APPROVED)[4]).toBe('Approved, not yet carried out');
     expect(cells(EXECUTED)[3]).toBe('No approval yet');
-    expect(cells(EXECUTED)[4]).toBe('Executed');
+    expect(cells(EXECUTED)[4]).toBe('Approved and carried out');
   });
 
   it('reads on through `next` until it is null: the second page shows, and nothing is asked after the last', async () => {
@@ -76,7 +76,7 @@ describe('Product drafts on the Drafts screen', () => {
   it('refuses a waiting one with a reason', async () => {
     const { posted } = await mount('#/access/drafts', { ...routes, ['POST /product-drafts/' + WAITING + '/refuse']: decided });
     await click(row(WAITING)?.querySelector('[data-act="product-refuse"]') ?? null);
-    await type(row(WAITING)?.querySelector('input[aria-label="Why you refuse it"]') ?? null, 'not before the release');
+    await type(row(WAITING)?.querySelector('input[aria-label="Why you decline it"]') ?? null, 'not before the release');
     await click(row(WAITING)?.querySelector('[data-act="product-refuse-confirm"]') ?? null);
     expect(posted.at(-1)?.path).toBe('/product-drafts/' + WAITING + '/refuse');
     expect(posted.at(-1)?.body).toEqual({ operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), request_digest: DIGEST, reason: 'not before the release' });
