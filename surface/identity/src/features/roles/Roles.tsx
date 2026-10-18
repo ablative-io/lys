@@ -1,3 +1,4 @@
+import { AccessTabs } from '../access/AccessTabs';
 import { readTogether } from '../../reads';
 /** Read versioned roles, publish deliberate changes and manage explicitly identified holdings. */
 import { useState } from 'react';
@@ -34,6 +35,7 @@ export function Roles() {
   const me = authority.status === 'ok' ? authority.data.me.person.id : '';
   const editor = editing && admin && authority.status === 'ok' ? <RoleEditor key={(role?.id ?? 'new') + ':' + (role?.latest ?? 0)} role={role} person={me} model={authority.data.model} changed={changed} cancel={() => setEditing(false)} /> : null;
   return <div className="page fill"><PageHeader title={role ? role.name : 'Roles'} breadcrumb={id ? <a href="#/roles">Roles</a> : undefined} subtitle={id ? undefined : 'Describe a job, assign it to people or agents, and review changes before updating their assigned version.'} actions={admin && (!id || role) ? <Act symbol={editing ? 'close' : 'add'} name={editing ? 'Close editor' : role ? 'New version' : 'Create a role'} word={editing ? 'Close' : role ? 'New version' : 'Create'} tone={editing ? 'plain' : 'primary'} onClick={() => setEditing((value) => !value)} /> : null} />
+    <AccessTabs on="roles" />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Roles" ok={() => {
       if (id && !role) return <div className="why-not"><p>This role is not among the roles Lys returned. It may have been removed, or the link may be wrong.</p><a className="btn" href="#/roles">All roles</a></div>;

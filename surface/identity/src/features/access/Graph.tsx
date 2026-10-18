@@ -13,6 +13,7 @@ import { installedOf } from './installed';
 import { counted } from '../../shell/count';
 import type { Installed } from './installed';
 import './graph.css';
+import { AccessTabs } from './AccessTabs';
 import { Act } from '../../shell/Act';
 import { visibleEntries } from '../people/directory';
 import { useGraphLabels } from './graph-labels';
@@ -112,7 +113,7 @@ function Shape({ node }: { node: Node }) {
 
 function Graphed({ world, installed, focus }: { world: GrantWorld; installed: Installed[]; focus: string | undefined }) {
   const reachLoad = useLoad(() => reachMap([...resourcesSeen(world).values()]), 'identity-graph-reach');
-  if (reachLoad.status === 'refused') return <Gate load={reachLoad} title="Graph" ok={() => null} />;
+  if (reachLoad.status === 'refused') return <Gate load={reachLoad} title="the access map" ok={() => null} />;
   return <Drawing world={world} installed={installed} focus={focus} reach={reachLoad.status === 'ok' ? reachLoad.data : new Map<string, Map<string, string[]>>()} />;
 }
 
@@ -244,9 +245,10 @@ export function Graph() {
   const { id } = useParams();
   const load = useLoad(readGraph, 'identity-graph');
   return <div className="page fill">
-    <div className="head"><div><h1>Graph</h1>
+    <div className="head"><div><h1>Access</h1>
       <p className="sub">Every person, agent and resource you may see, and the grants between them. Reading it does not use a grant.</p></div></div>
-    <Gate load={load} title="Graph" ok={({ world, installed }) => <>
+    <AccessTabs on="graph" />
+    <Gate load={load} title="the access map" ok={({ world, installed }) => <>
       <Graphed world={world} installed={installed} focus={id} />
     </>} />
   </div>;
