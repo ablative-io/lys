@@ -59,3 +59,17 @@ Recommendation: A. The canvas tint rule is in `features/runtime` (not mine): ask
 Second go. Looked at in headless Chrome with the app's own tokens: the three bands draw as accent, amber and red, the red at exactly the limit. Changed on reflection: the first go removed the old `.dash-bar` rules, which the canvas's usage widget (not mine) still draws, so they are back, marked as the canvas's; and the first go also put the bar's words in a `title`, a tooltip a phone never shows (06 #10), so the words are only the meter's accessible name and the cell's own text. Still wrong: Firefox not looked at; the canvas's tint rule still repaints its own span bars (asked).
 
 Item 1, a third look, after seeing it drawn in headless Chrome (item 4's way of looking): with one agent that never ran, the total read "At least US$4.95", which to Cherie sounds like a bill that may be bigger than she is told. It now reads "US$4.95 since 16 Oct" with a line under it, "from 2 of 3 agents in full", and the agent's own line still says "Nothing reported". Nothing missing is counted as zero, and nothing is said in a frightening way.
+
+## Item 5: usage totals across agents are added up in the browser
+
+The canvas Usage widget sums dollars and running time and takes the highest context and plan percentages across agents (`features/runtime/canvas-widgets.ts:106-125`, not one of my folders). The server keeps period totals (`budgets_totals.rs`) but serves none across agents. Since item 1, the dashboard also adds its agents' week figures, and says how many it covers.
+
+| Option | What Cherie sees | Mistake it avoids | Serves |
+|---|---|---|---|
+| A. Ask for the server summary in an exact shape, and keep the dashboard's one in-page sum (`weekTotal` in `Spend.tsx`) as the single place to replace when it is served; change nothing else. | What she sees today: one total, with how many agents it covers. | A figure computed two ways in two places (06 #5), and inventing a client for a route that does not exist. | Value: a total a rung-2 owner and a rung-5 sheet can trust. |
+| B. Write the client reader and types for `/usage/summary` now, unused. | Nothing. | none: code for a route nobody has built, which "agrees with itself" until it meets the real answer. | Nothing. |
+| C. Move the canvas's summing into my folder. | Nothing new. | A second copy, but it edits a file that is not mine. | Nothing. |
+
+Recommendation: A. The ask now carries the exact answer shape so the route and the page can be written against one contract. Nothing in my folders changes for this item; the commit is this page and the ask.
+
+Second go. Is A a dodge? The defect is that a total is computed in the page, and the only cure is the server; what I could do in my folders I did in item 1 (one sum, labelled by coverage, never a missing figure counted as zero). The honest cost: until the route exists, a rung-2 owner still cannot see other people's agents' spend, and the canvas widget still adds its own total a different way (it says "(n of m reporting)"; the dashboard says "from n of m agents in full"). I would rather the two wordings matched; the canvas is not mine, so it is in the ask.
