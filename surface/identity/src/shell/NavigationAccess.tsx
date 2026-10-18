@@ -147,9 +147,17 @@ const saysItsOwn = (pathname: string): boolean =>
   ['/access', '/access/can', '/model', '/resources', '/requests', '/reviews', '/access/drafts'].includes(pathname)
   || pathname.startsWith('/access/can/') || pathname.startsWith('/requests/');
 
-function ReadEntry({ place, own, children }: { place: Place; own: boolean; children: ReactNode }) {
+/**
+ * The approve page a connecting app sends the browser to opens when Lys could not say whether this person may approve
+ * apps (not 401, not 403): it reads /apps itself and says the replacement as an "if", and Decline still answers the waiting
+ * app. A person Lys says may not approve apps is told so in place of it (domain 04's item 1, kept beside 01's Apps read).
+ */
+const opensUnchecked = (pathname: string): boolean => pathname === '/apps/connect';
+
+function ReadEntry({ place, own, unchecked, children }: { place: Place; own: boolean; unchecked: boolean; children: ReactNode }) {
   const load = useLoad(() => decision(place), 'navigation-entry');
   if (own && load.status === 'refused' && load.refused.status !== 401) return <Entered>{children}</Entered>;
+  if (unchecked && load.status === 'refused' && load.refused.status !== 401 && load.refused.status !== 403) return <Entered>{children}</Entered>;
   // People and agents are refused in the directory's own words, as its pages refuse them.
   const words = place === 'people' ? (problem: Refused) => <ErrorWords problem={problem} /> : undefined;
   const gate = <Gate load={load} title={READS[place].title} ok={() => children} renderError={words} />;
@@ -160,5 +168,5 @@ function ReadEntry({ place, own, children }: { place: Place; own: boolean; child
 export function NavigationGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const place = placeOf(pathname);
-  return place ? <ReadEntry key={pathname} place={place} own={saysItsOwn(pathname)}>{children}</ReadEntry> : <Entered>{children}</Entered>;
+  return place ? <ReadEntry key={pathname} place={place} own={saysItsOwn(pathname)} unchecked={opensUnchecked(pathname)}>{children}</ReadEntry> : <Entered>{children}</Entered>;
 }

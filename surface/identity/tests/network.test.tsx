@@ -159,10 +159,10 @@ describe('Network', () => {
     const form = cells[0].querySelector('form[aria-label="Add a computer"]');
     expect(form?.querySelector('input[name="name"]')).not.toBeNull();
     expect(form?.querySelector('label')?.textContent).toContain('Add a computer');
-    // Which computer is a choice beside the name, this one first, and no part of the form's own inputs.
+    // Which computer is a choice beside the name; the page is open at localhost, so the computer Lys runs on is the one in hand and comes first.
     const choice = cells[0].querySelector('[role="group"][aria-label="Which computer"]');
     expect(form?.contains(choice ?? null)).toBe(false);
-    expect([...choice?.querySelectorAll('button') ?? []].map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['This computer', 'true'], ['Another computer', 'false']]);
+    expect([...choice?.querySelectorAll('button') ?? []].map((each) => [each.textContent, each.getAttribute('aria-pressed')])).toEqual([['The computer Lys runs on', 'true'], ['Another computer', 'false']]);
     expect(cells[0].querySelector('button[type="submit"]')?.getAttribute('form')).toBe(form?.id);
     expect($$('form[aria-label="Add a computer"]')).toHaveLength(1);
     expect($('.recorded-form')).toBeNull();

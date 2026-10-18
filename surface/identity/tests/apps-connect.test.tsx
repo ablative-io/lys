@@ -16,7 +16,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 it('shows Cambium as a known app with its state and a Connect button that asks for its address once', async () => {
   await mount('#/apps', { ...SERVICE, '/apps': () => ok({ apps: [] }) });
-  const card = document.querySelector('[aria-label="Known apps"]');
+  const card = document.querySelector('[aria-label="Connect an app"]');
   expect(card?.textContent).toContain('Cambium');
   expect(card?.textContent).toContain('Not connected');
   await click(button('Connect Cambium'));
@@ -101,10 +101,10 @@ it('says what to do next when the link is incomplete or Cambium cannot be reache
 
 it('names the address Lys could not reach and how to start again', async () => {
   const hash = '#/apps/connect?manifest=' + encodeURIComponent(MANIFEST) + '&return=' + encodeURIComponent(BACK) + '&state=s1';
-  // The browser's fetch rejects when nothing answers at the address.
+  // The browser's fetch rejects alike when nothing answers and when the answer may not be read (CORS).
   await mount(hash, { ...SERVICE, [MANIFEST]: () => { throw new TypeError('Failed to fetch'); } });
   await settle();
-  expect(document.querySelector('[role="alert"]')?.textContent).toBe('Lys could not reach Cambium at ' + ORIGIN + '. Check that Cambium is running and the address is right, then start again from Cambium.');
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe('Lys could not read Cambium’s manifest at ' + ORIGIN + ' from this page, so it cannot tell whether Cambium is not answering there or does not let this Lys read it.');
 });
 
 it('says a refused manifest by its status, not as an unreachable app', async () => {

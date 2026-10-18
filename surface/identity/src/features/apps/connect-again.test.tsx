@@ -59,3 +59,10 @@ it('says the replacement as an "if" when Lys could not say whether Cambium is co
   expect(warning()).toBeNull();
   expect(document.body.textContent).toContain('If Cambium is already connected, approving gives it new credentials');
 });
+
+it('tells a person Lys says may not approve apps so, in place of an Approve that could only fail', async () => {
+  await mount(HASH, { ...SERVICE, [MANIFEST]: () => ok(manifest), '/apps': () => refused(403, 'NotAdmitted', 'apps are approved by the administrator') });
+  await settle();
+  expect(button('Approve Cambium')).toBeNull();
+  expect(document.body.textContent).toContain('apps are approved by the administrator');
+});
