@@ -75,7 +75,7 @@
 ## An agent sets up and starts another agent under grants, from any device (AGENTS-015)
 
 - [x] **C774** — The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.
-- [ ] **C775** — An agent that registers an agent holds, under the person's agent.create grant and in the same durable operation, exactly the rights to set its profile, start, start-command, stop and restart it, withdrawn when that grant is revoked.
+- [ ] **C775** — An agent that registers an agent holds, under the person's agent.create grant, exactly the rights to set its profile, start, start-command, stop and restart it, withdrawn when that grant is revoked; the agent is registered and activated before its grants are appended, and the grant append is idempotent on retry, so a crash never leaves rights on an agent that does not exist (AGENTS-015 R2, ordered by AGENTS-016 R3).
 - [x] **C776** — lys mcp reaches Lys's MCP over verified https from any device, http only on loopback, and says a connection or TLS failure by name.
 - [x] **C782** — The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.
 
@@ -83,3 +83,5 @@
 
 - [ ] **C783** — On the computer that runs Lys, a launch matches the machine whose runner is the install's own through the runner key the view carries, and every advice sentence in launch_device names only labels the Computers page renders.
 - [ ] **C784** — An agent's file shows the complete claude mcp add and codex mcp add lines for this install and agent with a copy act each, and says which origin works now and which waits on AGENTS-015 R3.
+- [ ] **C785** — An agent holding agent.create issues the first certificate of an agent whose record names it as registrar, and only while that agent holds none; a second certificate, one for an agent it did not register, and every withdrawal are refused by name (certificate_not_first, agent_not_yours, not_permitted), and the certificate acts stay withheld from grants.
+- [ ] **C786** — GET /dashboard lists every agent an agent registered and every start an agent made for the signed-in person, and the dashboard shows them under one heading in plain words with Stop beside each, posting the agent's stop as the agent file does; no lines, no heading.

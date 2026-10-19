@@ -183,6 +183,17 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `surface/identity/src/features/file/AgentConnect.tsx` | the Connect section: the claude and codex lines for this install and agent (AGENTS-016 R2) | AGENTS-016 |
 | `surface/identity/src/features/file/agent-connect.test.tsx` | the lines, the copy act and the sentence on what works today (AGENTS-016 R2) | AGENTS-016 |
 | `surface/identity/src/features/file/tabs.ts` | Connect under Credentials (AGENTS-016 R2) | AGENTS-016 |
+| `crates/lys-identity-server/src/routes/identities_agent.rs` | the directory append first, then the five grants, idempotent on retry (AGENTS-016 R3) | AGENTS-016 |
+| `crates/lys-identity-server/src/agent_acts.rs` | actor and responsible on both appends (AGENTS-016 R3) | AGENTS-016 |
+| `crates/lys-identity/src/grants/created.rs` | the five grants appended only where not already standing (AGENTS-016 R3) | AGENTS-016 |
+| `crates/lys-identity-server/src/certificates_issue.rs` | admits the registrar's first certificate, refuses certificate_not_first and agent_not_yours (AGENTS-016 R4) | AGENTS-016 |
+| `crates/lys-identity-server/src/certificates_api.rs` | the agent branch of the issue route (AGENTS-016 R4) | AGENTS-016 |
+| `crates/lys-identity-server/tests/dashboard_acted_by_agents.rs` | the registered and started lines on GET /dashboard (AGENTS-016 R5) | AGENTS-016 |
+| `surface/identity/src/features/dashboard/dashboard-acted.test.tsx` | the lines, the heading and Stop (AGENTS-016 R5) | AGENTS-016 |
+| `surface/identity/src/features/dashboard/ActedByAgents.tsx` | the Acted for you by your agents list with Stop beside each (AGENTS-016 R5) | AGENTS-016 |
+| `crates/lys-identity-server/src/dashboard_api.rs` | acted_by_agents from the projection and the launch records (AGENTS-016 R5) | AGENTS-016 |
+| `surface/identity/src/features/dashboard/Dashboard.tsx` | draws the acted-by-agents list (AGENTS-016 R5) | AGENTS-016 |
+| `surface/identity/src/features/dashboard/contract.ts` | the acted_by_agents shape (AGENTS-016 R5) | AGENTS-016 |
 
 ## Inventory
 

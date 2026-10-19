@@ -59,3 +59,7 @@
 **S447.** As a person who trusts one of my agents to run my assistants, I give it the right to create agents for me, run them on my computer and set up their profiles with three plain choices on its file, once, instead of approving six steps for every assistant.
 
 **S448.** As a person on the computer that runs Lys, I start my agent here like on any other computer, and I copy the line that connects Claude Code or Codex to it from the agent's own page instead of assembling it from help text.
+
+**S449.** As a person whose agent registers agents for me, I want a crash in the middle to leave at most an agent with no rights that the next try finishes, never rights on an agent that does not exist, so that nothing invisible accumulates in my name.
+
+**S450.** As a person whose agent sets up an assistant for me, I want it to be able to start that assistant without me at a screen, and I want to see on my dashboard every agent it registered or started, with Stop beside each, so that nothing acts in my name that I cannot see and stop.
