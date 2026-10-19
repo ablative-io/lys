@@ -297,7 +297,7 @@
         {
           "id": "C784",
           "text": "An agent's file shows the complete claude mcp add and codex mcp add lines for this install and agent with a copy act each, and says which origin works now and which waits on AGENTS-015 R3.",
-          "done": false
+          "done": true
         },
         {
           "id": "C785",

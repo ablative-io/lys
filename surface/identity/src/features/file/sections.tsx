@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PersonalBudgets } from './PersonalBudgets';
 import { AgentUsage } from '../usage/Usage';
 import { AgentCertificates } from './AgentCertificates';
+import { AgentConnect } from './AgentConnect';
 import { StopHistory } from './StopHistory';
 import { TeamsOf } from './TeamsOf';
 import { RuntimeSessions } from '../runtime/RuntimeSessions';
@@ -301,6 +302,7 @@ export function TabBody({ tab, data, reload, giveQuery = '' }: { tab: string; da
         <>
           <AgentCredentials id={data.x.id} />
           <AgentCertificates id={data.x.id} />
+          <AgentConnect id={data.x.id} />
         </>
       );
     case 'sessions':

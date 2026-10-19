@@ -9,8 +9,8 @@ export const TABS: [string, string][] = [
 /** The sections of one file, by whose file it is. */
 export const tabsFor = (id: string): [string, string][] => (kindOf(id) === 'agent' ? TABS : TABS.filter(([key]) => key !== 'provisioning'));
 
-/** Addresses that were sections of their own and are now part of another: rules under Settings, memory under Sessions, certificates under Credentials. */
-export const MERGED: Record<string, string> = { policy: 'provisioning', memory: 'sessions', certificate: 'credentials' };
+/** Addresses that were sections of their own, or are parts of another: rules under Settings, memory under Sessions, certificates and an agent's Connect lines (AGENTS-016 R2) under Credentials. */
+export const MERGED: Record<string, string> = { policy: 'provisioning', memory: 'sessions', certificate: 'credentials', connect: 'credentials' };
 
 /** What each lifecycle state may move to, as the directory's transition table allows. */
 export const ACTIONS: Record<string, string[]> = {
