@@ -48,10 +48,10 @@ describe("An agent's file", () => {
     await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
     expect(posted).toEqual([]);
-    const reason = $('form[aria-label="Confirm pause"] input');
+    const reason = $('form[aria-label="Confirm withdraw"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Pause this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Withdraw this agent now') ?? null);
     expect(posted).toEqual([{ path: '/agents/' + SCRIBE + '/stop', body: { operation: expect.stringMatching(/^op-[0-9a-f]{32}$/), reason: 'leaked its key' } }]);
     expect(text()).toContain('The agent’s access is suspended.');
     expect(text()).toContain('The credential service did not confirm that credentials ended.');
@@ -65,10 +65,10 @@ describe("An agent's file", () => {
     const first = await mount('#/file/' + SCRIBE, { ...SERVICE, ['POST ' + path]: refused(503, 'StopsUnavailable', 'Outcome unknown') });
     await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
-    const reason = $('form[aria-label="Confirm pause"] input');
+    const reason = $('form[aria-label="Confirm withdraw"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'Key exposed'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Pause this agent now') ?? null);
+    await click([...document.querySelectorAll('button')].find((each) => (each.getAttribute('aria-label') ?? each.textContent) === 'Withdraw this agent now') ?? null);
     expect(first.posted).toHaveLength(1);
     unmountAll(); document.body.innerHTML = '';
     const later = await mount('#/file/' + SCRIBE, { ...SERVICE, ['/directory/agents/' + SCRIBE]: ok({ ...SCRIBE_VIEW, state: 'suspended' }), ['POST ' + path]: (body) => ok({ agent: SCRIBE, operation: (body as { operation: string }).operation, state: 'suspended', by: ADA, at: 1790000200, certificates_withdrawn: [], credentials_ended: null, credentials_refused: 'Broker unavailable', sessions_asked: [], reason: 'Key exposed' }) });
@@ -151,7 +151,7 @@ describe("An agent's file", () => {
     await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
     expect(location.hash).toBe('#/file/' + SCRIBE);
-    const form = $('.file form[aria-label="Confirm pause"]');
+    const form = $('.file form[aria-label="Confirm withdraw"]');
     expect(form).not.toBeNull();
     expect(form?.querySelector('input')).not.toBeNull();
     expect(form?.querySelector('[name="identity"]')).toBeNull();

@@ -118,6 +118,14 @@ async fn a_stop_suspends_withdraws_and_asks_and_is_kept_once() -> TestResult {
     assert_eq!(status, 200, "{stopped}");
     assert_eq!(stopped["state"], "suspended");
     assert_eq!(stopped["certificates_withdrawn"], json!([table.serial]));
+    // AGENTS-017 R2: the receipt says in one sentence that the act is final.
+    assert!(
+        stopped["final_words"]
+            .as_str()
+            .is_some_and(|words| words.contains("the agent that registered it cannot certify it again")
+                && words.contains("a person issues its next certificate")),
+        "{stopped}"
+    );
     assert_eq!(stopped["sessions_asked"], json!([table.session]));
     assert_eq!(stopped["credentials_ended"], Value::Null);
     assert!(

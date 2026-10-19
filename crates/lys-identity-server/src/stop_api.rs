@@ -96,7 +96,16 @@ pub struct StopView {
     pub sessions_refused: Vec<String>,
     /// Why, in the stopper's words.
     pub reason: String,
+    /// What the stop leaves final, in one sentence (AGENTS-017 R2): the agent
+    /// that registered this agent cannot certify it again, since a first
+    /// certificate is refused once any was issued, and a person issues the
+    /// next one.
+    pub final_words: String,
 }
+
+/// The sentence every stop's answer carries: withdrawn certificates count
+/// against the registrar's first certificate (`certificates_issue::first`).
+pub const FINAL_WORDS: &str = "Its certificates are withdrawn for good: the agent that registered it cannot certify it again, and a person issues its next certificate.";
 
 /// An asked session whose end its runtime confirmed, never inferred.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -125,6 +134,7 @@ impl From<Stop> for StopView {
             sessions_confirmed: Vec::new(),
             sessions_refused: Vec::new(),
             reason: stop.reason,
+            final_words: FINAL_WORDS.to_owned(),
         }
     }
 }

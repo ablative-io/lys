@@ -10,7 +10,19 @@ mod support;
 mod harness_description;
 
 use serde_json::{Value, json};
+use sha2::Digest;
 use support::{TestResult, World, key_for, operation, refused_as};
+
+/// Lowercase hex of `bytes`.
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    text
+}
 
 fn ok(answer: &(u16, Value)) -> Result<&Value, String> {
     if answer.0 == 200 {
@@ -133,9 +145,16 @@ async fn the_dashboard_lists_what_an_agent_registered_and_started_for_its_person
     assert_eq!(start["acting_agent"], world.creator.id.as_str(), "{start}");
     assert_eq!(start["agent"], agent.as_str(), "{start}");
     assert_eq!(start["at"], record["given_at"], "{start} {record}");
-    assert!(
-        start["session"].as_str().is_some_and(|s| !s.is_empty()),
-        "{start}"
+    // AGENTS-017 R2: the started line carries the session its launch record
+    // runs as, so the Dashboard's Stop has a run to end: the launch session
+    // derived from the record's id, as the runner sessions name it.
+    let record_id = record["id"].as_str().ok_or("the launch record has no id")?;
+    let digest = sha2::Sha256::digest(format!("lys-identity/launch-session/v1\n{record_id}"));
+    let expected = hex(&digest);
+    assert_eq!(
+        start["session"],
+        format!("op-{}", &expected[..32]).as_str(),
+        "{start} {record}"
     );
     assert_eq!(registration["kind"], "registered", "{lines:?}");
     assert_eq!(

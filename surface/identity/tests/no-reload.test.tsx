@@ -42,10 +42,10 @@ describe('No read-again buttons', () => {
     const readsBefore = requests.filter((entry) => entry === '/directory/agents/' + SCRIBE).length;
     await click($('.file .head [aria-label="More actions"]'));
     await click($('.file .head [data-act="suspend"]'));
-    const reason = $('form[aria-label="Confirm pause"] input');
+    const reason = $('form[aria-label="Confirm withdraw"] input');
     if (!(reason instanceof HTMLInputElement)) throw new Error('Reason field missing');
     await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(reason, 'leaked its key'); reason.dispatchEvent(new Event('input', { bubbles: true })); });
-    await click($$('form[aria-label="Confirm pause"] button[type="submit"]')[0] ?? null);
+    await click($$('form[aria-label="Confirm withdraw"] button[type="submit"]')[0] ?? null);
     expect(requests.filter((entry) => entry === '/directory/agents/' + SCRIBE)).toHaveLength(readsBefore);
     expect($('#state')?.textContent).toBe('Paused by this stop');
     expect($('[aria-label="Agent suspension recorded"]')).not.toBeNull();

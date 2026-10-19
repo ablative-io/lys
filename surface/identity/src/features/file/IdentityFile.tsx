@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'react-router';
 import { Refused, api, useLoad } from '../../api';
 import { kindOf } from '../../generated';
 import type { AgentSummary, AgentView, ReceiptAnswer } from '../../generated';
-import { EmergencyStop, StopReceipt } from './EmergencyStop';
+import { EmergencyStop, StopReceipt, WITHDRAW } from './EmergencyStop';
 import type { StopAnswer } from './EmergencyStop';
 import { DirectoryGate as Gate, ErrorWords, refusalWords, ACTION, ACTION_SHORT, STATUS } from '../people/Words';
 import type { Entry } from '../people/directory';
@@ -99,7 +99,7 @@ function File({ data, tab, reload, stop, stopped, notice, note, giveQuery }: { d
             {ACTIONS[x.state].includes('activate') ? <Act symbol="start" name={ACTION.activate} word={ACTION_SHORT.activate} tone="primary" data-act="activate" aria-pressed={changing === 'activate'} onClick={() => setChanging(changing === 'activate' ? null : 'activate')} /> : null}
             <span className={'state ' + x.state} id="state">{stop?.agent === x.id ? 'Paused by this stop' : STATUS[x.state]}</span>
             <HeadMenu chosen={changing} choose={(act) => setChanging(changing === act ? null : act)}
-              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: agent && a === 'suspend' ? 'Pause now' : ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
+              items={[...(agent ? [] : [{ act: 'name', label: 'Edit name', mark: 'rename' }]), ...ACTIONS[x.state].filter((a) => a !== 'activate').map((a) => ({ act: a, label: agent && a === 'suspend' ? WITHDRAW : ACTION_SHORT[a], danger: a === 'suspend' || a === 'retire' }))]} />
           </div>
         </div>
         {changing === 'name' ? <RecordedForm name="change-profile" title="Save name" heading="Edit name" description="Change the display name while keeping the same identity and audit history." done={reload}

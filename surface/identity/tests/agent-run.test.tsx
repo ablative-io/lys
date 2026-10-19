@@ -102,10 +102,10 @@ describe('An agent\'s run on People and agents', () => {
     expect($('.file .head [data-act="stop"]')).toBeNull();
     expect($('section[aria-label="Run"] [data-act="stop"]')?.getAttribute('aria-label')).toBe('Stop');
     await click($('.file .head [aria-label="More actions"]'));
-    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Pause now');
+    expect($('.file .head [data-act="suspend"]')?.textContent).toBe('Withdraw');
     await click($('.file .head [data-act="suspend"]'));
-    expect($('form[aria-label="Confirm pause"]')?.textContent).toContain('withdraws its certificates');
-    expect($('form[aria-label="Confirm pause"] button[type="submit"]')?.getAttribute('aria-label')).toBe('Pause this agent now');
+    expect($('form[aria-label="Confirm withdraw"]')?.textContent).toContain('withdraws its certificates');
+    expect($('form[aria-label="Confirm withdraw"] button[type="submit"]')?.getAttribute('aria-label')).toBe('Withdraw this agent now');
   });
 
   it('starts a stopped agent from its row on the front page with one press', async () => {

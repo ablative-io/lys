@@ -1,12 +1,15 @@
 /**
  * What the person's agents registered and started for them (AGENTS-016 R5), under one heading, newest first, each
- * line in plain words with Stop beside it. Stop opens the agent file's own confirmation (EmergencyStop) for the
- * registered or started agent and shows its receipt; nothing here posts without that confirmation. No lines, no heading.
+ * line in plain words. A started line carries the session its launch runs as and shows Stop, the ordinary Stop that
+ * ends that run and keeps the agent's certificate (AGENTS-017 R2). Every line shows Withdraw, the emergency act behind
+ * the agent file's own confirmation (EmergencyStop): final, its receipt saying the registrar cannot certify the agent
+ * again. Nothing here posts without a confirmation. No lines, no heading.
  */
 import { useState } from 'react';
 import { Act } from '../../shell/Act';
-import { EmergencyStop, StopReceipt } from '../file/EmergencyStop';
+import { EmergencyStop, StopReceipt, WITHDRAW } from '../file/EmergencyStop';
 import type { StopAnswer } from '../file/EmergencyStop';
+import { SessionStop } from '../run/SessionStop';
 import { clock } from '../file/time';
 import type { ActedLine, PartRefused } from './contract';
 import { refusedPart } from './contract';
@@ -20,7 +23,8 @@ function Line({ line, name, changed }: { line: ActedLine; name: (id: string) => 
   const [receipt, setReceipt] = useState<StopAnswer | null>(null);
   return <li data-acted-line={line.kind}>
     <span data-acted-words>{said(line, name)}</span>{' '}
-    {receipt ? null : <Act symbol="stop" name={`Stop ${name(line.agent)}`} word="Stop" tone="danger" data-act="stop" disabled={asking} onClick={() => setAsking(true)} />}
+    {line.kind === 'started' && line.session && !receipt ? <SessionStop agent={line.agent} session={line.session} name={name(line.agent)} where={null} /> : null}{' '}
+    {receipt ? null : <Act symbol="suspend" name={`${WITHDRAW} ${name(line.agent)}`} word={WITHDRAW} tone="danger" data-act="withdraw" disabled={asking} onClick={() => setAsking(true)} />}
     <EmergencyStop id={line.agent} active open={asking} cancel={() => setAsking(false)}
       stopped={(answer) => { setAsking(false); setReceipt(answer); changed(); }} />
     {receipt ? <StopReceipt answer={receipt} /> : null}
