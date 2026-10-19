@@ -128,8 +128,12 @@ fn an_incomplete_network_answer_refuses_without_echoing_response_values() -> Res
 
 #[test]
 fn agents_can_identify_a_disconnected_joined_machine_without_claiming_it_is_online() -> Result {
+    let device = super::Device {
+        machine: Some("this-key".to_owned()),
+        server: None,
+    };
     let selected = super::select(
-        "this-key",
+        &device,
         |path| {
             Ok(match path {
                 "/network" => json!({"machines":[{"id":"here","state":"in_use"}]}),
@@ -202,5 +206,109 @@ fn a_runner_view_carrying_lost_at_makes_machine_not_joined_end_with_the_computer
     .to_string();
     assert!(without.contains("machine_not_joined"));
     assert!(!without.contains("Lys lost"), "{without}");
+    Ok(())
+}
+
+/// The labels the surface renders, read from the one file that defines them.
+const LABELS: &str = include_str!("../../../../surface/identity/src/features/network/labels.ts");
+
+/// The string the surface exports as `name`, read from its `export const`.
+fn exported(name: &str) -> Option<&'static str> {
+    let from = LABELS.find(&format!("export const {name} = '"))? + name.len() + 17;
+    let rest = &LABELS[from..];
+    Some(&rest[..rest.find('\'')?])
+}
+
+/// The host runs no dialled runner: its machine names the install's own.
+fn host_view(
+    key: &str,
+) -> impl FnMut(&str) -> crate::commands::error::CliResult<serde_json::Value> {
+    let key = key.to_owned();
+    move |path| {
+        Ok(match path {
+            "/network" => json!({"machines":[{"id":"host","state":"in_use"}]}),
+            "/network/machines/host/runner" => {
+                json!({"machine":"host","runner":{"kind":"lys"},"runner_key":key,"answers":true})
+            }
+            _ => return Err(super::refused("fixture_route_unknown", path)),
+        })
+    }
+}
+
+#[test]
+fn the_computer_that_runs_lys_matches_its_machine_by_the_installs_runner_key() -> Result {
+    let device = super::Device {
+        machine: None,
+        server: Some("install-key".to_owned()),
+    };
+    assert_eq!(
+        super::select(&device, host_view("install-key"), true)?,
+        "host"
+    );
+    let error = super::select(&device, host_view("another-install"), true)
+        .err()
+        .ok_or("another install's runner accepted")?;
+    assert!(error.to_string().contains("machine_not_joined"), "{error}");
+    let joined = super::Device {
+        machine: Some("this-key".to_owned()),
+        server: None,
+    };
+    let error = super::select(&joined, host_view("install-key"), true)
+        .err()
+        .ok_or("a device without the install's key accepted")?;
+    assert!(error.to_string().contains("machine_not_joined"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn the_install_key_is_read_only_on_the_computer_that_holds_the_install() -> Result {
+    let root = tempfile::tempdir()?;
+    let layout = crate::identity::install::layout::Layout {
+        root: root.path().to_owned(),
+    };
+    // Nothing on the device: not joined, and nothing is made.
+    let error = super::device(root.path())
+        .err()
+        .ok_or("an empty device accepted")?;
+    assert!(error.to_string().contains("machine_not_joined"));
+    std::fs::create_dir_all(layout.run_dir())?;
+    std::fs::write(layout.run_dir().join("runner-server.pub"), "install-key\n")?;
+    let host = super::device(root.path())?;
+    assert_eq!(host.server.as_deref(), Some("install-key"));
+    assert_eq!(host.machine, None);
+    // A computer joined to a Lys keeps that server's key in the same file:
+    // it is that server's device by its own key, never the install's.
+    std::fs::write(layout.run_dir().join("runner-join.json"), "{}")?;
+    let error = super::device(root.path())
+        .err()
+        .ok_or("a joined device without its own key accepted")?;
+    assert!(error.to_string().contains("machine_not_joined"));
+    Ok(())
+}
+
+#[test]
+fn every_advice_names_only_labels_the_computers_page_renders() -> Result {
+    let computers = exported("COMPUTERS").ok_or("labels.ts exports no COMPUTERS")?;
+    let connect = exported("CONNECT").ok_or("labels.ts exports no CONNECT")?;
+    assert_eq!(computers, super::COMPUTERS);
+    assert_eq!(connect, super::CONNECT);
+    assert!(
+        LABELS
+            .contains("export const connectLabel = (name: string): string => `${CONNECT}${name}`;")
+    );
+    for advice in [
+        super::advice(None),
+        super::advice(Some("https://lys.example/#/network")),
+    ] {
+        assert!(advice.contains(computers), "{advice}");
+        assert!(advice.contains(&format!("{connect}<")), "{advice}");
+        assert!(!advice.contains("Network >"), "{advice}");
+        assert!(!advice.contains("> Connect"), "{advice}");
+    }
+    let unjoined = super::device(tempfile::tempdir()?.path())
+        .err()
+        .ok_or("an empty device accepted")?
+        .to_string();
+    assert!(unjoined.contains(&super::advice(None)), "{unjoined}");
     Ok(())
 }

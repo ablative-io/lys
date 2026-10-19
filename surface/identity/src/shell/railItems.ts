@@ -1,6 +1,8 @@
 // The rail in CONSENSUS.md's order (18 October 2026): what a person uses most sits first, the service's own pages
 // after, and the person's own things at the foot. Jobs and the access map are reached from Access, by key and by Search.
 
+import { COMPUTERS } from '../features/network/labels';
+
 export type RailItem =
   | { t: 'sep' }
   | { t: 'grow' }
@@ -19,7 +21,7 @@ export const RAIL: RailItem[] = [
   {"t": "a", "title": "Running agents (g c)", "label": "Running agents", "svg": "<circle cx=\"12\" cy=\"12\" r=\"8.5\"/><path d=\"M10 8.8v6.4l5.2-3.2z\"/>", "href": "#/canvas", "nav": "canvas"},
   {"t": "sep"},
   {"t": "a", "title": "Access (g a)", "label": "Access", "svg": "<circle cx=\"8\" cy=\"15\" r=\"3.5\"/><path d=\"M10.5 12.5 19 4M16 7l2.5 2.5M14 9l2 2\"/>", "href": "#/access", "nav": "access"},
-  {"t": "a", "title": "Computers (g t)", "label": "Computers", "svg": "<rect x=\"5\" y=\"5.5\" width=\"14\" height=\"9.5\" rx=\"1.2\"/><path d=\"M3 18.5h18\"/>", "href": "#/network", "nav": "network"},
+  {"t": "a", "title": `${COMPUTERS} (g t)`, "label": COMPUTERS, "svg": "<rect x=\"5\" y=\"5.5\" width=\"14\" height=\"9.5\" rx=\"1.2\"/><path d=\"M3 18.5h18\"/>", "href": "#/network", "nav": "network"},
   {"t": "a", "title": "Apps (g n)", "label": "Apps", "svg": "<rect x=\"4\" y=\"4\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><rect x=\"13.5\" y=\"4\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><rect x=\"4\" y=\"13.5\" width=\"6.5\" height=\"6.5\" rx=\"1.5\"/><path d=\"M16.75 13.5v6.5M13.5 16.75H20\"/>", "href": "#/apps", "nav": "apps"},
   {"t": "a", "title": "Secrets (g v)", "label": "Secrets", "svg": "<rect x=\"4\" y=\"10\" width=\"16\" height=\"10\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3\"/><circle cx=\"12\" cy=\"15\" r=\"1.3\"/>", "href": "#/secrets", "nav": "secrets"},
   {"t": "grow"},

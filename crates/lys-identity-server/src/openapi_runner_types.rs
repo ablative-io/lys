@@ -53,6 +53,12 @@ struct RunnerStatusView {
     /// (DIRECTORY-107 R4); absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     lost_at: Option<String>,
+    /// For this install's own runner (kind `lys`), the install's runner
+    /// public key as 64 hexadecimal characters: the key the computer that
+    /// runs Lys keeps in run/runner-server.pub (AGENTS-016 R1). Absent for
+    /// every other runner, whose record carries its own key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    runner_key: Option<String>,
 }
 
 /// The runner routes' entries.

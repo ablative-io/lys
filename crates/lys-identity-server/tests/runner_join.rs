@@ -341,3 +341,49 @@ async fn the_code_is_in_no_later_answer_no_kept_file_and_no_line_said() -> TestR
     );
     Ok(())
 }
+
+/// AGENTS-016 R1: the runner view of a computer whose runner is this
+/// install's own carries the install's runner key, so the computer that
+/// runs Lys is matched as a device like any other; a dialled runner's view
+/// carries its key in its record, as before, and no install key beside it.
+#[tokio::test]
+async fn the_view_of_the_installs_own_runner_carries_the_installs_runner_key() -> TestResult {
+    let heard = Heard::default();
+    let (service, _) = reachable(&heard).await?;
+    let ada = service.sign_in(login(ADMINISTRATOR)).await?;
+    let host = named(&service, &ada).await?;
+    let runner = format!("/network/machines/{host}/runner");
+    let (status, set) = service
+        .post(&runner, Some(&ada), &json!({ "runner": { "kind": "lys" } }))
+        .await?;
+    assert_eq!(status, 200, "{set}");
+    let (status, view) = service.get(&runner, Some(&ada)).await?;
+    assert_eq!(status, 200, "{view}");
+    assert_eq!(view["runner"], json!({ "kind": "lys" }), "{view}");
+    let server_key = Ed25519Identity::load(&service.dir.path().join("service.key"))?;
+    assert_eq!(
+        view["runner_key"],
+        hex(&server_key.public_key_bytes()),
+        "{view}"
+    );
+
+    let laptop = named(&service, &ada).await?;
+    let keys = tempfile::tempdir()?;
+    let computer = key(keys.path(), "computer.key")?;
+    let (_, given) = issued(&service, Some(&ada), &laptop, &operation()?).await?;
+    let code = given["code"]
+        .as_str()
+        .ok_or("no code was given")?
+        .to_owned();
+    let (status, answer) = joined(&service, &laptop, &code, &computer).await?;
+    assert_eq!(status, 200, "{answer}");
+    let (_, dialled) = service
+        .get(&format!("/network/machines/{laptop}/runner"), Some(&ada))
+        .await?;
+    assert_eq!(
+        dialled["runner"],
+        json!({ "kind": "dialled", "key": hex(&computer.public_key_bytes()) })
+    );
+    assert!(dialled.get("runner_key").is_none(), "{dialled}");
+    Ok(())
+}

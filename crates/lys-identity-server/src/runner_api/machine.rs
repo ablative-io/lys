@@ -19,12 +19,21 @@ pub(super) async fn runner(
         Ok(store.runner(&id).cloned())
     })?;
     let joining = crate::network_join::joining(&state, &id)?;
+    // The install's own runner is named by kind alone; its view carries the
+    // install's runner key, the key run/runner-server.pub holds on the
+    // computer that runs Lys, so that computer is matched as a device like
+    // any other (AGENTS-016 R1).
+    let own = matches!(runner, Some(RunnerRecord::Lys))
+        .then(|| lys_runner::protocol::hex(&state.runners.public_key()));
     // While the machines' records carry an accepted loss, every view says
     // when, so a computer whose join was lost is told to connect again
     // (DIRECTORY-107 R4).
     let lost = |mut view: Value| {
         if let Some(at) = state.stores.lost_at("network") {
             view["lost_at"] = json!(at);
+        }
+        if let Some(key) = &own {
+            view["runner_key"] = json!(key);
         }
         Json(view)
     };

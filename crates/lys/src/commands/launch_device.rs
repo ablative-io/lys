@@ -1,4 +1,16 @@
 //! A joined computer is selected by its key, never a host-name guess or list order.
+//!
+//! A device is known by one of two keys: the runner-machine key it joined
+//! with, matched against a dialled runner's record; or, on the computer that
+//! holds the install and has joined no other Lys, the install's runner key in
+//! run/runner-server.pub, matched against the key the view of the install's
+//! own runner carries (AGENTS-016 R1). A computer joined to a Lys keeps that
+//! server's key in the same file, so the file is read only where no saved
+//! join stands beside it.
+//!
+//! Advice names only what the screens show: the Computers page and the
+//! Connect group of a computer, the labels surface/identity's
+//! features/network/labels.ts defines and this crate's tests read.
 
 use std::path::Path;
 
@@ -24,10 +36,34 @@ struct Machine {
     state: String,
 }
 
+/// The Computers page's name in the rail (labels.ts `COMPUTERS`).
+pub(crate) const COMPUTERS: &str = "Computers";
+/// The start of a computer's Connect group's name (labels.ts `CONNECT`).
+pub(crate) const CONNECT: &str = "Connect ";
+
+/// Where a person connects this computer, in the screens' own words, with
+/// the Computers page's address when it is known.
+pub(crate) fn advice(page: Option<&str>) -> String {
+    let at = page.map_or_else(String::new, |page| format!(" at {page}"));
+    format!("open {COMPUTERS}{at} and use {CONNECT}<this computer's name>")
+}
+
+/// The keys this device is known by.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Device {
+    /// The public half of the runner-machine key it joined with, as hex.
+    pub(crate) machine: Option<String>,
+    /// The install's runner key, on the computer that holds the install.
+    pub(crate) server: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct RunnerView {
     machine: String,
     runner: Option<Record>,
+    /// For the install's own runner, the install's runner key.
+    #[serde(default)]
+    runner_key: Option<String>,
     answers: Option<bool>,
     refusal: Option<String>,
     reason: Option<String>,
@@ -64,7 +100,10 @@ fn key_at(path: &Path) -> CliResult<Option<String>> {
     let seed = Zeroizing::new(<[u8; 32]>::try_from(bytes.as_slice()).map_err(|error| {
         refused(
             "runner_key_invalid",
-            format!("this device's private runner key is not 32 bytes: {error}; use Network > Computer > Connect"),
+            format!(
+                "this device's private runner key is not 32 bytes: {error}; {}",
+                advice(None)
+            ),
         )
     })?);
     Ok(Some(lys_runner::protocol::hex(
@@ -78,6 +117,49 @@ fn key_at(path: &Path) -> CliResult<Option<String>> {
 /// # Errors
 /// Names unreadable keys, conflicting layouts and devices that have not joined.
 pub fn public_key(root: &Path) -> CliResult<String> {
+    machine_key(root)?.ok_or_else(|| {
+        refused(
+            "machine_not_joined",
+            format!("this device has not joined; {}", advice(None)),
+        )
+    })
+}
+
+/// The keys this device is known by: its runner-machine key, and the
+/// install's runner key when it holds the install and has joined no other
+/// Lys. Nothing is generated or moved.
+///
+/// # Errors
+/// Names unreadable keys, conflicting layouts and a device known by neither.
+pub(crate) fn device(root: &Path) -> CliResult<Device> {
+    let layout = Layout {
+        root: root.to_owned(),
+    };
+    let machine = machine_key(root)?;
+    let server = if layout.run_dir().join("runner-join.json").exists() {
+        None
+    } else {
+        std::fs::read_to_string(layout.run_dir().join("runner-server.pub"))
+            .map(|key| Some(key.trim().to_owned()))
+            .or_else(|error| match error.kind() {
+                std::io::ErrorKind::NotFound => Ok(None),
+                _ => Err(refused(
+                    "runner_server_key_unreadable",
+                    format!("this device's run/runner-server.pub cannot be read: {error}"),
+                )),
+            })?
+            .filter(|key| !key.is_empty())
+    };
+    if machine.is_none() && server.is_none() {
+        return Err(refused(
+            "machine_not_joined",
+            format!("this device has not joined; {}", advice(None)),
+        ));
+    }
+    Ok(Device { machine, server })
+}
+
+fn machine_key(root: &Path) -> CliResult<Option<String>> {
     let layout = Layout {
         root: root.to_owned(),
     };
@@ -90,13 +172,10 @@ pub fn public_key(root: &Path) -> CliResult<String> {
     match (current, older) {
         (Some(current), Some(older)) if current != older => Err(refused(
             "runner_machine_key_conflict",
-            "the installed and old join keys name different devices; resolve the key conflict in Network before launching",
+            "the installed and old join keys name different devices; resolve the key conflict on the Computers page before launching",
         )),
-        (Some(key), _) | (None, Some(key)) => Ok(key),
-        (None, None) => Err(refused(
-            "machine_not_joined",
-            "this device has not joined; use Network > Computer > Connect",
-        )),
+        (Some(key), _) | (None, Some(key)) => Ok(Some(key)),
+        (None, None) => Ok(None),
     }
 }
 
@@ -117,29 +196,30 @@ pub fn listed(server: &Server, root: &Path, base: &str) -> CliResult<String> {
 }
 
 fn find_with(server: &Server, root: &Path, base: &str, online: bool) -> CliResult<String> {
-    let key = public_key(root)?;
-    select(&key, |path| server.get(path), online).map_err(|error| {
+    let device = device(root)?;
+    select(&device, |path| server.get(path), online).map_err(|error| {
         let name = match &error {
             crate::commands::error::CliError::Runner(error) => error.name(),
             _ => "machine_unavailable".to_owned(),
         };
         refused(
             &name,
-            format!(
-                "{error}; open {} > Computer > Connect",
-                surface(base, "network")
-            ),
+            format!("{error}; {}", advice(Some(&surface(base, "network")))),
         )
     })
 }
 
 #[cfg(test)]
 fn select_with(key: &str, get: impl FnMut(&str) -> CliResult<Value>) -> CliResult<String> {
-    select(key, get, true)
+    let device = Device {
+        machine: Some(key.to_owned()),
+        server: None,
+    };
+    select(&device, get, true)
 }
 
 fn select(
-    key: &str,
+    device: &Device,
     mut get: impl FnMut(&str) -> CliResult<Value>,
     online: bool,
 ) -> CliResult<String> {
@@ -165,11 +245,15 @@ fn select(
         if record.lost_at.is_some() {
             lost_at.clone_from(&record.lost_at);
         }
-        if record
+        let this = record
             .runner
             .as_ref()
-            .is_some_and(|runner| runner.kind == "dialled" && runner.key.as_deref() == Some(key))
-        {
+            .is_some_and(|runner| match runner.kind.as_str() {
+                "dialled" => device.machine.is_some() && runner.key == device.machine,
+                "lys" => device.server.is_some() && record.runner_key == device.server,
+                _ => false,
+            });
+        if this {
             if machine.state == "retired" {
                 retired = true;
             } else {
@@ -180,7 +264,7 @@ fn select(
     if matched.len() > 1 {
         return Err(refused(
             "machine_identity_ambiguous",
-            "this device's key names multiple server machines; retire the duplicate machine in Network",
+            "this device's key names multiple server machines; retire the duplicate machine on the Computers page",
         ));
     }
     let (machine, record) = matched.pop().ok_or_else(|| {

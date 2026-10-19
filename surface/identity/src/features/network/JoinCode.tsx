@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Refused, operationId, request } from '../../api';
 import { isRecord } from './contract';
+import { connectLabel } from './labels';
 import { Act } from '../../shell/Act';
 import { problemWords } from '../people/Words';
 
@@ -75,7 +76,7 @@ export function Copy({ text, what }: { text: string; what: string }) {
 
 /** The command and the code, each with its Copy button, shown until the person is done with them. */
 export function JoinShown({ name, given, kind, done }: { name: string; given: JoinCode; kind: InstallerKind | ''; done: () => void }) {
-  return <div className="join-code" role="group" aria-label={'Connect ' + name}>
+  return <div className="join-code" role="group" aria-label={connectLabel(name)}>
     <ClientDownload kind={kind} name={name} />
     <p>Run this on that computer. The code works once and is not shown again.</p>
     <p className="sec">The command asks for the code: paste it there.</p>
@@ -179,7 +180,7 @@ export function ConnectingNow({ connecting, connect, renew, busy, done }: { conn
     finally { working.current = false; if (current.current) setDownloading(false); }
   };
   const filename = downloaded && downloaded.platform === kind ? downloaded.filename : null;
-  return <div className="join-code" role="group" aria-label={'Connect ' + connecting.name}>
+  return <div className="join-code" role="group" aria-label={connectLabel(connecting.name)}>
     <label className="field">What kind of computer is {connecting.name}?
       <select aria-label={'What kind of computer is ' + connecting.name + '?'} value={kind} disabled={busy || downloading} onChange={(event) => {
         const value = event.target.value;
