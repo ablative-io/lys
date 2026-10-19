@@ -194,6 +194,13 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys-identity-server/src/dashboard_api.rs` | acted_by_agents from the projection and the launch records (AGENTS-016 R5) | AGENTS-016 |
 | `surface/identity/src/features/dashboard/Dashboard.tsx` | draws the acted-by-agents list (AGENTS-016 R5) | AGENTS-016 |
 | `surface/identity/src/features/dashboard/contract.ts` | the acted_by_agents shape (AGENTS-016 R5) | AGENTS-016 |
+| `crates/lys/src/commands/enrol.rs` | lys agent enrol: key, request, certificate and seat file in one act where the agent runs | AGENTS-017 |
+| `crates/lys/src/commands/enrol_tests.rs` | enrol's reds: 0600 seat file the bridge reads; seat_file_exists; the Cambium shape | AGENTS-017 |
+| `crates/lys-core/src/seat_file.rs` | the one seat file shape read by the bridge, the enrol command and the runner's seat program | AGENTS-017 |
+| `surface/identity/src/features/file/EmergencyStop.tsx` | the emergency act, renamed Withdraw, final, with its receipt sentence | AGENTS-017 |
+| `crates/lys/src/identity/install/command.rs` | install and upgrade name the computer Lys runs on, idempotently | AGENTS-017 |
+| `crates/lys/src/identity/install/runner_machine_record/own_machine.rs` | the install's read of its own machine, now finding the one it named | AGENTS-017 |
+| `crates/lys-core/src/lib.rs` | exports the seat file reader and writer | AGENTS-017 |
 
 ## Inventory
 

@@ -1,0 +1,201 @@
+{
+  "id": "AGENTS-017",
+  "cluster": "agents",
+  "title": "An agent is enrolled in one act, stopped without being destroyed, started on a reviewed profile without a second review, given its roots in one choice, and seated in Cambium with a key born where it runs",
+  "depends_on": [
+    "AGENTS-016"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C787",
+    "C788",
+    "C789",
+    "C790",
+    "C791"
+  ],
+  "stories": [
+    "S451",
+    "S452",
+    "S453"
+  ],
+  "design_anchor": [
+    "ADR-125",
+    "ADR-137"
+  ],
+  "purpose": "Tom, 19 October 2026, on the installed Lys: too difficult and not complete enough to use. The morning walk (docs/walks/MORNING-WALK-09789c70-2026-10-20.md, Lys a31cc5fb) read the code at 09789c70 and marked every place the walk needs a person for more than one click. Waffles' rulings of 19 October 23:5x turn those marks into this brief, each with its reason. (a) Nothing in Lys makes a new agent's key or request: lys key generate writes a raw 32-byte seed (crates/lys/src/cli.rs:343-351), lys ca request writes a PEM request (cli/ca.rs:18-33, commands/pem.rs), POST /agents/{id}/certificates takes the request as standard base64 DER (certificates_issue.rs:54-58, :247-251), lys mcp --key-file reads a PEM or a seat JSON with privateKeyPem and not a seed (commands/mcp_bridge.rs:236-275), and the runner starts a seat program only from a seat file at the reviewed profile's path, mode 0600 (lys-home/src/harness/seat_program.rs:40-42; lys-runner harness_control/seat_program/launch.rs:27, :89). A private key that stays wherever it was made is both unusable and unsafe. (b) The only Stop on the dashboard is the emergency act: ActedByAgents.tsx:23-24 opens EmergencyStop, which posts POST /agents/{id}/stop, suspend, withdraw every certificate, end every session (openapi_table.rs:247; EmergencyStop.tsx:9-18); the ordinary POST /runtime/sessions/{id}/end exists (openapi_table.rs:267; runner_api.rs:127) and no screen posts it. A Stop that destroys the agent is a Stop nobody presses: too tight to use. (c) A profile and its review are per agent: one file holds every version for each agent (provisioning_store.rs:1-3, :322-354), a review is {operation, by, at} on one version (provisioning_store/profile.rs:202-212), a start needs that version's own review (start_checks.rs:108-115; launch_api.rs:461) and an agent never reviews a version it set (provisioning_review.rs:51-52, :142-143). Read for Waffles' question: this is not already the code, so the row stays. The review is about what runs; the same content needs no second look. (d) The root grant is four clicks on one screen with a prerequisite on another: Let me give agents access (sections.tsx:123-131, POST /grants/agent-roots, agent_roots.rs:124-137), then Give on three standing choices (GiveAccess.tsx:85-96; the profiles choice posts two grants), and the computer select lists only a computer the person named, in use, with machine.agent.set to pass on (GiveAccess.tsx:81-85). AGENTS-016 R1 made the computer Lys runs on a device once it is named (runner_api/machine.rs:22-27), and nothing names it: the install reads the network file for a machine whose runner is lys (crates/lys/src/identity/install/runner_machine_record/own_machine.rs:14-30) and never writes one; a person adds it on Network (AddMachine.tsx:21-30: POST /network/machines, then POST /network/machines/{id}/runner with kind lys). Four clicks plus a prerequisite on another page is how a person gets it wrong at 7 a.m. (e) Scott as an AI seat, re-walked on Cambium: a signed-in person founds the seat at POST /identity/agent-seat (cambium-door http/agent_seat.rs:34-100); the door lists the person's Lys agents through GET /apps/me/agents with their app pass (lys_agents.rs:86; openapi_table.rs:302) or names a new one (agent_seat.rs:280); the door makes the seat's Ed25519 key on its own host (agent_seat.rs:281) and has Lys certify it with the person's pass at POST /agents/{id}/certificates (lys_agents.rs:192; APP_PERSON, openapi_table.rs:386); the seat file (version, doorUrl, handle, device, privateKeyPem, lysUrl, lysAgentId: cambium-door contract/agent_seat.rs:45-62) is written to ~/.cambium/<handle>.seat.json only when the page is on this box (agent_seat/launch.rs:83-93; host.rs:106-108, a loopback page), which the installed https://cambium.ablative.com.au never is, so every production founding hands the seat file back to be placed by hand, with a launcher block to paste (launch.rs:227-236; the registration script is CORE-059 R2 on the Cambium side). lys-app.credential and lys-keys.json are the door's own, read at sign-in admission (oidc_admission.rs:31) and by the mailbox (cambium.toml:29-34), set once per install: they are not in Scott's path. What remains hand-made in Scott's path: a key born on the door's host instead of Scott's computer, the seat file carried by hand, and the launcher pasted by hand.",
+  "task": "Add one command, lys agent enrol, that on the computer the agent will run on generates its key, requests and receives its certificate from Lys, and writes the seat file at the reviewed profile's path, mode 0600, with the server taking the request in the form the CLI writes; split the dashboard's Stop into Stop, which ends the run and keeps the certificate, and Withdraw, the final emergency act behind its confirmation; carry a person's review of a profile's content to every agent of theirs that starts the same content; make the root grant one choice that gives the four grants together and have the install name the computer Lys runs on; and make the Cambium seat's key be born where Scott runs, with the seat file shape shared by both readers.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "One act enrols an agent: key, request, certificate and seat file, where it will run",
+      "spec": "Behavioural. A new subcommand, lys agent enrol --url <lys origin> --agent <new agent id> --as <the registering agent's seat or key file> --out <seat file path>, in crates/lys/src/commands/enrol.rs, run on the computer the new agent will run on. It generates an Ed25519 key in memory (Zeroizing, as mcp_bridge.rs:19 and :246 hold key text), builds the PKCS#10 request with lys-core's request builder (crates/lys-core/src/ca/request.rs, the same the CLI's ca request uses), posts POST /agents/<id>/certificates {operation, request} through the registering agent's signature exactly as the MCP bridge signs (mcp_bridge.rs:100-115 relay, :167-169 signature, header lys-agent-signature), with request as the PEM the CLI writes (commands/pem.rs, CERTIFICATE REQUEST), receives the certificate, and writes --out whole, mode 0600, as the seat JSON the bridge already reads (mcp_bridge.rs:252-266: privateKeyPem; the file also carries certificatePem, lysUrl, agent, and the serial), then prints the path, the agent id and the serial, never key material. --out that already exists is refused seat_file_exists naming the path, never overwritten; a refusal from Lys is printed as Lys answered it (agent_not_yours, agent_create_revoked, certificate_not_first, not_permitted) with the route. The server side: certificates_issue.rs asked (:242-251) accepts request as PEM (RFC 7468 CERTIFICATE REQUEST framing, decoded to the same DER verify_certificate_request takes at lys-core/src/ca/request.rs:236) or as the standard base64 DER it takes today, and the answer carries the certificate as PEM beside the DER it answers now (certificates_api.rs CertificatesView). The agent's Connect section (AgentConnect.tsx, connectLines.ts:8) shows the enrol line first, with --out being the path the reviewed profile names as its seat file (lys-home/src/harness/seat_program.rs:40), and the two mcp add lines name that same path in place of the placeholder. --as is the registering agent for AGENTS-016 R4's first certificate; the same command with --pass <person app pass file> is the person's issue of any later certificate through the same route (openapi_table.rs:386 APP_PERSON), so one command serves both.",
+      "acceptance": [
+        "Red first, crates/lys/src/commands/enrol_tests.rs (new): against the fixture identity server, lys agent enrol writes --out with mode 0600 that mcp_bridge::read_key reads and whose certificatePem's subject key is the key the file holds; a second run with the same --out is refused seat_file_exists naming the path and the file's bytes are unchanged; a Lys refusal is printed with its name and route. Fails today: clap answers unrecognized subcommand 'agent'.",
+        "Red first, crates/lys-identity-server/tests/certificates_issue.rs: POST /agents/{id}/certificates with request as PEM answers 200 and the same serial as the DER form of the same request; a request that is neither is refused with 'request is neither PEM nor standard base64'. Fails today: 'request is not standard base64'.",
+        "Red first, surface/identity/src/features/file/agent-connect.test.tsx: the Connect section's first line is the enrol line with --out the profile's seat_file path, and no line carries the placeholder text. Fails today: KEY_FILE placeholder rendered.",
+        "Handback: the red record for each of the three, then green; the seat JSON's fields listed once in docs/design/agents/DESIGN.md (R5 shares them)."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/commands/enrol.rs",
+          "crates/lys/src/commands/enrol_tests.rs"
+        ],
+        "modify": [
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/main.rs",
+          "crates/lys/src/commands/mod.rs",
+          "crates/lys/src/commands/mcp_bridge.rs",
+          "crates/lys-identity-server/src/certificates_issue.rs",
+          "crates/lys-identity-server/src/certificates_api.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/tests/certificates_issue.rs",
+          "surface/identity/src/features/network/connectLines.ts",
+          "surface/identity/src/features/file/AgentConnect.tsx",
+          "surface/identity/src/features/file/agent-connect.test.tsx",
+          "docs/design/agents/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C787"
+      ],
+      "stories": [
+        "S451"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "Stop ends a run and keeps the certificate; Withdraw is the emergency act and stays final",
+      "spec": "Behavioural. On the dashboard's acted lines (ActedByAgents.tsx; contract.ts:34 ActedLine already carries an optional session), a started line shows Stop, which posts POST /runtime/sessions/<session>/end {operation} (openapi_table.rs:267; runner_api.rs:127 end) and shows the runtime's receipt in words (ended, or the refusal RuntimeSessionUnknown, not_permitted, AgentNotVisible as answered); the agent's certificates are untouched, so the agent starts again from the same seat file. Withdraw, on every acted line and on the agent's file, is today's emergency act (EmergencyStop.tsx, POST /agents/{id}/stop: suspend, withdraw certificates, end sessions) behind its confirmation and its Why field, renamed Withdraw in its act and heading, and its receipt says in one sentence that the registrar cannot certify this agent again (certificates_issue.rs:346 counts withdrawn certificates) and that a person issues the next certificate. The dashboard's acted started line carries the session id of the launch record it was read from (dashboard_api.rs:16-20, :442-449 acted; the launch records' session field), so Stop has a session to end; a registered line, with no session, shows Withdraw alone. The agent's file (sections.tsx, EmergencyStop) gains the same Stop beside each live session on its Sessions tab, one route, one receipt.",
+      "acceptance": [
+        "Red first, surface/identity/src/features/dashboard/dashboard-acted.test.tsx: a started line's Stop posts /runtime/sessions/<session>/end and never /agents/<id>/stop; the receipt reads 'ended'; a registered line shows Withdraw and no Stop; Withdraw's confirmation heading reads Withdraw. Fails today: Stop opens the suspension form.",
+        "Red first, crates/lys-identity-server/tests/dashboard_acted_by_agents.rs: a started line carries the launch's session id. The lane records whether this is already green at the landing commit and, if so, says so and keeps the test as the guard.",
+        "Red first, crates/lys-identity-server/tests/emergency_stop.rs: the receipt of POST /agents/{id}/stop names that the registrar cannot certify again. Fails today: no such sentence."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+          "surface/identity/src/features/dashboard/contract.ts",
+          "surface/identity/src/features/dashboard/dashboard-acted.test.tsx",
+          "surface/identity/src/features/file/EmergencyStop.tsx",
+          "surface/identity/src/features/file/sections.tsx",
+          "crates/lys-identity-server/src/dashboard_api.rs",
+          "crates/lys-identity-server/src/agent_stop_api.rs",
+          "crates/lys-identity-server/tests/dashboard_acted_by_agents.rs",
+          "crates/lys-identity-server/tests/emergency_stop.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C788"
+      ],
+      "stories": [
+        "S452"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "A person's review carries by content: the same profile content starts on any agent of theirs without a second review",
+      "spec": "Behavioural. Read first, for Waffles' question: a profile is per agent and a review is on one version of it (provisioning_store.rs:1-3, :322-354; provisioning_store/profile.rs:186-212), and a start admits only a version with its own review (start_checks.rs:108-115, called at launch_api.rs:461), so this is not the code today. From this brief: a Version carries settings_sha256, the SHA-256 of its settings serialised canonically (sorted keys, no whitespace), written when the version is set and recomputed for versions kept before this brief when the file is read (provisioning_store.rs read path), never trusted from the file alone. start_checks::reviewed takes the version and the agent's responsible person: a version with its own review passes as today; a version without one passes when that person, or the administrator, reviewed a version with the same settings_sha256 on any agent answering to that person, and the start's answer names the review that carried (agent, version number, by, at) in a field carried_review; a version whose settings_sha256 matches no such review is refused ProfileNotReviewed as today. A changed settings digest needs review again. An agent never reviews a version it set (provisioning_review.rs:51-52, :142-143 own_version, unchanged) and never carries a review it made itself: carried reviews are a person's or the administrator's. GET /agents/{id}/provisioning says per version whether it is reviewed itself, carried (naming the review), or neither.",
+      "acceptance": [
+        "Red first, crates/lys-identity-server/tests/provisioning_latest_review.rs: two agents answering to one person, the same settings set on both, one review by that person on the first; POST /agents/<second>/start-command passes reviewed and the answer's carried_review names the first agent's version and reviewer; a third agent with one setting changed is refused ProfileNotReviewed. Fails today: ProfileNotReviewed on the second.",
+        "Red first, same file: a review made by an agent on a version a person set carries to no other agent. Fails today only if the carrying is written without the person check; written red first regardless.",
+        "Red first, crates/lys-identity-server/tests/provisioning.rs: GET /agents/{id}/provisioning answers reviewed: 'carried' with the review named for the second agent's version."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/provisioning_store/profile.rs",
+          "crates/lys-identity-server/src/provisioning_store.rs",
+          "crates/lys-identity-server/src/start_checks.rs",
+          "crates/lys-identity-server/src/launch_api.rs",
+          "crates/lys-identity-server/src/provisioning_api.rs",
+          "crates/lys-identity-server/src/provisioning_review.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs",
+          "crates/lys-identity-server/tests/provisioning_latest_review.rs",
+          "crates/lys-identity-server/tests/provisioning.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C789"
+      ],
+      "stories": [
+        "S453"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "One choice gives an agent its roots, and the install names the computer Lys runs on",
+      "spec": "Behavioural. Two halves. (i) lys identity install and upgrade (crates/lys/src/identity/install/command.rs) name the computer Lys runs on in the network store as a machine named by the configured administrator, kind Computer, runtime lys-runner, with its runner RunnerRecord::Lys (network_store.rs:324 name, :340-360 name_runner), under an operation id derived from the install's runner-server public key so a second install or upgrade finds the same machine and writes nothing (the own_machine.rs:14-30 read then finds it); the machine's name is the host's name as JoinCode.tsx names computers. A network store that already names a live machine with the lys runner is left alone (runner_lys_taken is never raised by the install). (ii) GiveAccess.tsx's three standing choices become one, data-standing-choice=\"all\", titled 'Let <agent> set up and run agents on <computer>', with the computer select kept for a person with more than one computer and preselected to the one whose runner is lys. Its Give posts, in order and each kept before it is sent as the pickers keep theirs (GiveAccess.tsx:98-130): POST /grants/agent-roots first when the person is the administrator and holds no passable root (the sections.tsx:123-131 hint and button go), then agent.create on the person, machine.agent.set on the computer, agent.provisioning.set and agent.provisioning.review on the person, four POST /grants with use_only pass-on. One receipt names the four grant ids; a refusal names the step that refused and leaves the earlier grants given (each is idempotent by its operation, so pressing Give again finishes what is left). The sentence under the choice says what the four give, in the words GiveAccess.tsx:86-96 use today, joined.",
+      "acceptance": [
+        "Red first, surface/identity/src/features/file/give-standing.test.tsx: one standing choice renders; its Give posts /grants/agent-roots (administrator without roots) then four /grants bodies in the order agent.create, machine.agent.set, agent.provisioning.set, agent.provisioning.review; a refusal on the third leaves two given and names the third; a non-administrator never posts agent-roots. Fails today: three choices, no agent-roots post from the choice.",
+        "Red first, crates/lys/src/identity/install tests (install/command tests beside command.rs): after install the network file names this computer, named_by the administrator, runner kind lys; a second install writes nothing and the operation id is the same. Fails today: no machine written.",
+        "Red first, crates/lys-identity-server/tests/agent_roots.rs: a standing give by the administrator with no passable roots that posts agent-roots first ends with four grants held by the agent, read back on GET /agent/grants."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "surface/identity/src/features/file/GiveAccess.tsx",
+          "surface/identity/src/features/file/sections.tsx",
+          "surface/identity/src/features/file/give-standing.test.tsx",
+          "crates/lys/src/identity/install/command.rs",
+          "crates/lys/src/identity/install/runner_machine_record/own_machine.rs",
+          "crates/lys-identity-server/src/network_store.rs",
+          "crates/lys-identity-server/tests/agent_roots.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C790"
+      ],
+      "stories": [
+        "S453"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "A Cambium seat's key is born where Scott runs: the enrol command writes the seat file both readers share",
+      "spec": "Behavioural. R1's command takes --door <door url> --handle <registry handle> --device <label> and writes the seat file in the one shape both readers read: version (SEAT_FILE_VERSION), doorUrl, handle, device, privateKeyPem, lysUrl, lysAgentId, and R1's certificatePem and serial (cambium-door contract/agent_seat.rs:45-62 is the shape; mcp_bridge.rs:252-266 reads privateKeyPem from it today). With --pass <the person's app pass file> the certificate is issued as the person (openapi_table.rs:386 APP_PERSON), which is how Scott's responsible person enrols him from Scott's own computer; with --as it is the registering agent's first certificate as R1. The shape is written once in docs/design/agents/DESIGN.md with each field's writer and reader, and lys-core gains the seat file's reader and writer (crates/lys-core/src/seat_file.rs) so the bridge, the enrol command and the runner's seat program read one code path. Boundary, for Cambium's own brief (the next free CORE id, depends on this row): POST /identity/agent-seat on a page that is not on this box stops generating the key on the door's host (agent_seat.rs:281) and answers the enrol line with the door's fields filled, so the seat file is never carried by hand; CORE-059 R2 keeps the launcher registration. Read for Waffles' question: lys-app.credential and lys-keys.json are the door's own (oidc_admission.rs:31; cambium.toml:29-34), set once per install, and are not in Scott's path.",
+      "acceptance": [
+        "Red first, crates/lys/src/commands/enrol_tests.rs: with --door, --handle and --device the written file parses with the Cambium SeatFile field names (version, doorUrl, handle, device, privateKeyPem, lysUrl, lysAgentId) and mcp_bridge::read_key reads the same file. Fails today with R1's red.",
+        "Red first, crates/lys-core tests beside seat_file.rs: a file written by the writer is read back whole by the reader; a file with an unknown version is refused naming the version.",
+        "Handback: the field table in DESIGN.md and the Cambium brief id named for the door's half."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-core/src/seat_file.rs"
+        ],
+        "modify": [
+          "crates/lys/src/commands/enrol.rs",
+          "crates/lys/src/commands/enrol_tests.rs",
+          "crates/lys/src/commands/mcp_bridge.rs",
+          "crates/lys-core/src/lib.rs",
+          "docs/design/agents/DESIGN.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C791"
+      ],
+      "stories": [
+        "S451"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No new store or log: R3 reads reviews already recorded and adds one digest per version; R2 posts a route that exists",
+    "Cambium's door is not changed by this brief: R5 names the door's half for a Cambium brief that depends on it",
+    "The emergency act keeps its route, its body and its finality; only its name and its receipt sentence change (R2)",
+    "No fixed waits anywhere: a start, an end and an enrol end on their answers (Tom, 15 October)",
+    "The install never overwrites a machine a person named (R4 i); a second install writes nothing"
+  ],
+  "verification": [
+    "gate -stages nextest -crates lys,lys-core,lys-identity-server -test 'package(lys) | package(lys-core) | package(lys-identity-server)'",
+    "surface/identity: bun run typecheck, biome check, vitest (give-standing.test.tsx, dashboard-acted.test.tsx, agent-connect.test.tsx counts in the report)",
+    "gate -stages clippy, then the whole declared gate at the landing commit, nextest included (a subset never lands: Waffles, 19 October 23:3x)",
+    "python3 scripts/design/validate.py docs/design/agents and python3 scripts/design/check-coverage.py docs/design/agents: failures parsed from the output, never the exit code"
+  ],
+  "amendments": []
+}

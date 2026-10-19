@@ -455,57 +455,296 @@
       "note": "the browser-kept add-and-run walk; deleted by AGENTS-013 (one request replaces it)",
       "brief": "AGENTS-013"
     },
-    {"path": "crates/lys-runner/tests/ends_with_fd.rs", "note": "red first: a runner and its owner exit when the lifeline's write end closes (AGENTS-014 R1, R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys/src/commands/runner.rs", "note": "carries the descriptor into the runner's Options and the owner's OwnerServe (AGENTS-014 R1)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/src/socket.rs", "note": "Options gains ends_with; the runner reads the lifeline and ends on its end of file (AGENTS-014 R1)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/src/seat_owner/spawn.rs", "note": "OwnerSpawn gains ends_with; start() passes the inheritable descriptor to the owner (AGENTS-014 R1)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/src/seat_owner/process.rs", "note": "the owner reads the lifeline and ends its managed session on end of file (AGENTS-014 R1)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/src/seat_owner/exit_wait.rs", "note": "the kernel's process-exit notice, read by the new test (AGENTS-014 R1)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_survival.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_survival_faults.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_cost.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_conversation.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_owner_socket.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-runner/tests/seat_restart.rs", "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)", "brief": "AGENTS-014"},
-    {"path": "crates/lys-identity-server/tests/agent_starts_agent.rs", "note": "an agent registers, sets up, has reviewed and starts another agent under grants (AGENTS-015 R1, R2)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/signed_first.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/routes/identities.rs", "note": "an agent registers an agent for its person, and holds the five set-up rights under the person's chain (AGENTS-015 R1, R2)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/provisioning_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/start.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/seats_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/runner_api.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/grants.rs", "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys/src/commands/mcp_bridge.rs", "note": "reaches Lys over verified https from any device (AGENTS-015 R3)", "brief": "AGENTS-015"},
-    {"path": "crates/lys/src/commands/mcp_bridge_tests.rs", "note": "the https and loopback URL rules (AGENTS-015 R3)", "brief": "AGENTS-015"},
-    {"path": "crates/lys/src/identity/loopback_http.rs", "note": "carries the bridge's https exchange beside loopback (AGENTS-015 R3)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity/src/grants/shipped.rs", "note": "WITHHELD_FROM_AGENTS loses the five acts a person's standing grant covers (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity/src/start/authority.rs", "note": "a live agent.start grant on the agent admits a start (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/start_directory.rs", "note": "reads the grant-admitted start (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/src/network_api/writes.rs", "note": "machine agents admit an agent holding machine.agent.set from the machine's owner (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "crates/lys-identity-server/tests/agent_roots.rs", "note": "the withheld list names exactly what stays withheld (AGENTS-015 R1)", "brief": "AGENTS-015"},
-    {"path": "surface/identity/src/features/file/give-standing.test.tsx", "note": "the standing grants render, post exactly their grant and are absent where there is nothing to give (AGENTS-015 R4)", "brief": "AGENTS-015"},
-    {"path": "surface/identity/src/features/file/GiveAccess.tsx", "note": "the three standing grants, one choice each (AGENTS-015 R4)", "brief": "AGENTS-015"},
-    {"path": "surface/identity/src/features/network/labels.ts", "note": "the Computers and Connect labels, once, read by the screens and by launch_device's test (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "crates/lys/src/commands/launch_device.rs", "note": "a kind lys runner matches the device holding the install's runner key; advice names only rendered labels (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "crates/lys/src/commands/launch_device_tests.rs", "note": "the host match and the advice labels (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/openapi_runner_types.rs", "note": "the key on a kind lys runner view (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/tests/runner_join.rs", "note": "the runner view's key for the install's own runner (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/shell/railItems.ts", "note": "imports the Computers label (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/network/JoinCode.tsx", "note": "imports the Connect label (AGENTS-016 R1)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/file/AgentConnect.tsx", "note": "the Connect section: the claude and codex lines for this install and agent (AGENTS-016 R2)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/file/agent-connect.test.tsx", "note": "the lines, the copy act and the sentence on what works today (AGENTS-016 R2)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/file/tabs.ts", "note": "Connect under Credentials (AGENTS-016 R2)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/routes/identities_agent.rs", "note": "the directory append first, then the five grants, idempotent on retry (AGENTS-016 R3)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/agent_acts.rs", "note": "actor and responsible on both appends (AGENTS-016 R3)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity/src/grants/created.rs", "note": "the five grants appended only where not already standing (AGENTS-016 R3)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/certificates_issue.rs", "note": "admits the registrar's first certificate, refuses certificate_not_first and agent_not_yours (AGENTS-016 R4)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/certificates_api.rs", "note": "the agent branch of the issue route (AGENTS-016 R4)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/tests/dashboard_acted_by_agents.rs", "note": "the registered and started lines on GET /dashboard (AGENTS-016 R5)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-acted.test.tsx", "note": "the lines, the heading and Stop (AGENTS-016 R5)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/dashboard/ActedByAgents.tsx", "note": "the Acted for you by your agents list with Stop beside each (AGENTS-016 R5)", "brief": "AGENTS-016"},
-    {"path": "crates/lys-identity-server/src/dashboard_api.rs", "note": "acted_by_agents from the projection and the launch records (AGENTS-016 R5)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/dashboard/Dashboard.tsx", "note": "draws the acted-by-agents list (AGENTS-016 R5)", "brief": "AGENTS-016"},
-    {"path": "surface/identity/src/features/dashboard/contract.ts", "note": "the acted_by_agents shape (AGENTS-016 R5)", "brief": "AGENTS-016"}
+    {
+      "path": "crates/lys-runner/tests/ends_with_fd.rs",
+      "note": "red first: a runner and its owner exit when the lifeline's write end closes (AGENTS-014 R1, R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys/src/commands/runner.rs",
+      "note": "carries the descriptor into the runner's Options and the owner's OwnerServe (AGENTS-014 R1)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/src/socket.rs",
+      "note": "Options gains ends_with; the runner reads the lifeline and ends on its end of file (AGENTS-014 R1)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/src/seat_owner/spawn.rs",
+      "note": "OwnerSpawn gains ends_with; start() passes the inheritable descriptor to the owner (AGENTS-014 R1)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/src/seat_owner/process.rs",
+      "note": "the owner reads the lifeline and ends its managed session on end of file (AGENTS-014 R1)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/src/seat_owner/exit_wait.rs",
+      "note": "the kernel's process-exit notice, read by the new test (AGENTS-014 R1)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_survival.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_survival_faults.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_cost.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_conversation.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_owner_socket.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-runner/tests/seat_restart.rs",
+      "note": "starts its runner on a lifeline the test holds (AGENTS-014 R2)",
+      "brief": "AGENTS-014"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_starts_agent.rs",
+      "note": "an agent registers, sets up, has reviewed and starts another agent under grants (AGENTS-015 R1, R2)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/signed_first.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes/identities.rs",
+      "note": "an agent registers an agent for its person, and holds the five set-up rights under the person's chain (AGENTS-015 R1, R2)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/provisioning_api.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/start.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/seats_api.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_api.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants.rs",
+      "note": "admits an agent's signed call under its own grants (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys/src/commands/mcp_bridge.rs",
+      "note": "reaches Lys over verified https from any device (AGENTS-015 R3)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys/src/commands/mcp_bridge_tests.rs",
+      "note": "the https and loopback URL rules (AGENTS-015 R3)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys/src/identity/loopback_http.rs",
+      "note": "carries the bridge's https exchange beside loopback (AGENTS-015 R3)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/shipped.rs",
+      "note": "WITHHELD_FROM_AGENTS loses the five acts a person's standing grant covers (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity/src/start/authority.rs",
+      "note": "a live agent.start grant on the agent admits a start (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/start_directory.rs",
+      "note": "reads the grant-admitted start (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/src/network_api/writes.rs",
+      "note": "machine agents admit an agent holding machine.agent.set from the machine's owner (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_roots.rs",
+      "note": "the withheld list names exactly what stays withheld (AGENTS-015 R1)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "surface/identity/src/features/file/give-standing.test.tsx",
+      "note": "the standing grants render, post exactly their grant and are absent where there is nothing to give (AGENTS-015 R4)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "surface/identity/src/features/file/GiveAccess.tsx",
+      "note": "the three standing grants, one choice each (AGENTS-015 R4)",
+      "brief": "AGENTS-015"
+    },
+    {
+      "path": "surface/identity/src/features/network/labels.ts",
+      "note": "the Computers and Connect labels, once, read by the screens and by launch_device's test (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys/src/commands/launch_device.rs",
+      "note": "a kind lys runner matches the device holding the install's runner key; advice names only rendered labels (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys/src/commands/launch_device_tests.rs",
+      "note": "the host match and the advice labels (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/openapi_runner_types.rs",
+      "note": "the key on a kind lys runner view (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/runner_join.rs",
+      "note": "the runner view's key for the install's own runner (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/shell/railItems.ts",
+      "note": "imports the Computers label (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/network/JoinCode.tsx",
+      "note": "imports the Connect label (AGENTS-016 R1)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentConnect.tsx",
+      "note": "the Connect section: the claude and codex lines for this install and agent (AGENTS-016 R2)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/file/agent-connect.test.tsx",
+      "note": "the lines, the copy act and the sentence on what works today (AGENTS-016 R2)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/file/tabs.ts",
+      "note": "Connect under Credentials (AGENTS-016 R2)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/routes/identities_agent.rs",
+      "note": "the directory append first, then the five grants, idempotent on retry (AGENTS-016 R3)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/agent_acts.rs",
+      "note": "actor and responsible on both appends (AGENTS-016 R3)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/created.rs",
+      "note": "the five grants appended only where not already standing (AGENTS-016 R3)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificates_issue.rs",
+      "note": "admits the registrar's first certificate, refuses certificate_not_first and agent_not_yours (AGENTS-016 R4)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/certificates_api.rs",
+      "note": "the agent branch of the issue route (AGENTS-016 R4)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/dashboard_acted_by_agents.rs",
+      "note": "the registered and started lines on GET /dashboard (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-acted.test.tsx",
+      "note": "the lines, the heading and Stop (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+      "note": "the Acted for you by your agents list with Stop beside each (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys-identity-server/src/dashboard_api.rs",
+      "note": "acted_by_agents from the projection and the launch records (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/Dashboard.tsx",
+      "note": "draws the acted-by-agents list (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/contract.ts",
+      "note": "the acted_by_agents shape (AGENTS-016 R5)",
+      "brief": "AGENTS-016"
+    },
+    {
+      "path": "crates/lys/src/commands/enrol.rs",
+      "note": "lys agent enrol: key, request, certificate and seat file in one act where the agent runs",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys/src/commands/enrol_tests.rs",
+      "note": "enrol's reds: 0600 seat file the bridge reads; seat_file_exists; the Cambium shape",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-core/src/seat_file.rs",
+      "note": "the one seat file shape read by the bridge, the enrol command and the runner's seat program",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "surface/identity/src/features/file/EmergencyStop.tsx",
+      "note": "the emergency act, renamed Withdraw, final, with its receipt sentence",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys/src/identity/install/command.rs",
+      "note": "install and upgrade name the computer Lys runs on, idempotently",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys/src/identity/install/runner_machine_record/own_machine.rs",
+      "note": "the install's read of its own machine, now finding the one it named",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-core/src/lib.rs",
+      "note": "exports the seat file reader and writer",
+      "brief": "AGENTS-017"
+    }
   ],
   "principles": [
     {

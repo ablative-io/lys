@@ -16,6 +16,12 @@
 
 **S441.** As a person adding an agent, I fill one form and press once, and the agent is added, turned on, allowed on the computer I named and started in its folder, or I am told exactly which step was refused and what was done before it.
 
+**S451.** As the owner, I want one command that gives a new agent its key and certificate on the computer it runs on and leaves the seat file where the profile expects it, so that no private key is made by hand or carried anywhere.
+
+**S452.** As the owner, I want Stop to end a run and leave the agent able to start again, and the act that withdraws its certificate to be a separate, named, final one, so that I press Stop without fear.
+
+**S453.** As the owner, I want to give an agent its roots in one choice and to review a profile's content once for all my agents, so that setting up a second agent is minutes, not a morning.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.

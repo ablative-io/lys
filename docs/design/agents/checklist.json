@@ -310,6 +310,36 @@
           "done": true
         }
       ]
+    },
+    {
+      "name": "An agent is enrolled in one act, stopped without harm, started without a second review, rooted in one choice, seated where it runs (AGENTS-017)",
+      "items": [
+        {
+          "id": "C787",
+          "text": "lys agent enrol, run where the agent will run, generates its key, posts the request as the PEM the CLI writes, receives the certificate and writes the seat file at the reviewed profile's path, mode 0600, never overwriting one that exists.",
+          "done": false
+        },
+        {
+          "id": "C788",
+          "text": "The dashboard's Stop beside a started line ends that run through POST /runtime/sessions/{id}/end and keeps the certificate; Withdraw is the emergency act behind its confirmation, final, and its receipt says the registrar cannot certify again.",
+          "done": false
+        },
+        {
+          "id": "C789",
+          "text": "A profile version without its own review starts when its responsible person or the administrator reviewed the same settings content on any agent of theirs, the answer naming the carried review; a changed digest needs review again; an agent never carries a review it made.",
+          "done": false
+        },
+        {
+          "id": "C790",
+          "text": "One standing choice gives an agent its roots, agent-roots first for an administrator without them, then four grants in order with one receipt; the install names the computer Lys runs on, by the administrator with the lys runner, idempotently.",
+          "done": false
+        },
+        {
+          "id": "C791",
+          "text": "The enrol command writes the one seat file shape both Lys's bridge and Cambium's door read, with the door's fields when asked, so a Cambium seat's key is born on the computer it runs on and no seat file is carried by hand.",
+          "done": false
+        }
+      ]
     }
   ]
 }
