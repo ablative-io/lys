@@ -17,8 +17,10 @@ title: An agent sets up and starts another agent under the grants a person gave 
 > - C774 — The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.
 > - C775 — An agent that registers an agent holds, under the person's agent.create grant and in the same durable operation, exactly the rights to set its profile, start, start-command, stop and restart it, withdrawn when that grant is revoked.
 > - C776 — lys mcp reaches Lys's MCP over verified https from any device, http only on loopback, and says a connection or TLS failure by name.
+> - C782 — The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.
 > **Stories:**
 > - S444 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person running agents on several computers, I give one of my agents the right to set up and start my assistants once, and it does so on any of my computers without me at a screen, every act on the record as the agent's and every right one I can take back.
+> - S447 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person who trusts one of my agents to run my assistants, I give it the right to create agents for me, run them on my computer and set up their profiles with three plain choices on its file, once, instead of approving six steps for every assistant.
 
 ## Purpose
 
@@ -32,12 +34,15 @@ Admit an agent's signed call on the agent, seat and machine-runner routes, held 
 
 ### R1: An agent's signed call may set up, review, start and stop agents and seats, held to its own live grants
 
-Behavioural. These routes admit an agent's signed request beside a person's session and the operator, the door set G that GET and POST /agents/{id}/variables already use (openapi_table.rs): POST /agents (agent.create), POST /agents/{id}/provisioning (agent.provisioning.set), POST /agents/{id}/provisioning/{version}/review and /seat-program-review (agent.provisioning.review), POST /agents/{id}/start (agent.start), POST /agents/{id}/start-command (agent.start-command), POST /agents/{id}/restart (agent.restart), POST /agents/{id}/stop (agent.stop), POST /seats and POST /seats/{name}/version, /start, /stop and /restart (their seat actions as the table's scope names them; where a seat route names no action, the lane names the shipped action it checks in the report), POST /network/machines/{id}/runner (machine.runner.set), and POST /grants (grant.delegate: an agent passes on part of a grant it holds, within that grant's own pass-on rules exactly as a person does today; POST /grants/roots and /grants/agent-roots stay a person's, since a root has no holder above it). When the caller is an agent, the handler admits the call only where that agent's own live grants reach the route's action on the route's resource, by the same grant check the variables route makes, and refuses it by name otherwise (not_permitted, naming the action and the resource, never the grants it could not see). An agent never acts as a person: every record the call writes names the agent as the actor and the person it answers to as responsible; an agent's POST /agents registers a new agent that answers to the person the calling agent answers to, never to the calling agent, and an agent may not register itself again. agent.provisioning.review is refused to an agent on a version that same agent set (refusal provisioning_review_own_version): the one who posts a profile never approves it. A person's session and the operator are judged exactly as today. The budget gate on start (START_BUDGET) and every refusal the routes name today apply to an agent caller unchanged.
+Behavioural. These routes admit an agent's signed request beside a person's session and the operator, the door set G that GET and POST /agents/{id}/variables already use (openapi_table.rs): POST /agents (agent.create), POST /agents/{id}/provisioning (agent.provisioning.set), POST /agents/{id}/provisioning/{version}/review and /seat-program-review (agent.provisioning.review), POST /agents/{id}/start (agent.start), POST /agents/{id}/start-command (agent.start-command), POST /agents/{id}/restart (agent.restart), POST /agents/{id}/stop (agent.stop), POST /seats and POST /seats/{name}/version, /start, /stop and /restart (their seat actions as the table's scope names them; where a seat route names no action, the lane names the shipped action it checks in the report), POST /network/machines/{id}/runner (machine.runner.set), POST /network/machines/{id}/join-code and POST /network/machines/{id}/installer/{kind} (machine.runner.set, so an agent holding it may connect a computer for its person), POST /network/machines/{id}/agents (machine.agent.set: per machine, granted by that machine's owner; network_api/writes.rs:156 today admits only a person), POST /grants (grant.delegate: an agent passes on part of a grant it holds, narrowing only, within that grant's own pass-on rules exactly as a person does today; POST /grants/roots and /grants/agent-roots stay a person's, since a root has no holder above it), and POST /grants/{id}/revoke (grant.revoke) only for a grant the calling agent itself passed on. WITHHELD_FROM_AGENTS (crates/lys-identity/src/grants/shipped.rs:108-135) loses agent.provisioning.set, agent.provisioning.review, machine.agent.set, grant.delegate and grant.revoke; agent.certificate.issue and .withdraw, agent.policy.set, budget.set, configuration.zone.set, grant, identity.transition, the person.* acts, request.approve and .decline, the role.* acts, runtime.stop-everything and the secret acts stay withheld. When the caller is an agent, the handler admits the call only where that agent's own live grants reach the route's action on the route's resource, by the same grant check the variables route makes, and refuses it by name otherwise (not_permitted, naming the action and the resource, never the grants it could not see). An agent never acts as a person: every record the call writes names the agent as the actor and the person it answers to as responsible; an agent's POST /agents registers a new agent that answers to the person the calling agent answers to, never to the calling agent, and registers it active, with no separate transition; an agent may not register itself again. agent.provisioning.review is refused to an agent on a version that same agent set (refusal provisioning_review_own_version): the one who posts a profile never approves it. Start admission (crates/lys-identity/src/start/authority.rs:6-10, read by start_directory.rs:73-75) admits a caller holding a live agent.start grant on that agent beside the responsible person and the administrator; start_right_missing stays the refusal for everyone else. A person's session and the operator are judged exactly as today. The budget gate on start (START_BUDGET) and every refusal the routes name today apply to an agent caller unchanged.
 
 **Acceptance:**
 - Red first, in a new crates/lys-identity-server/tests/agent_starts_agent.rs, against the crate's own server fixture: an agent holding agent.create from its person registers a new agent, which answers to that person; holding agent.provisioning.set on it, posts its profile; a second agent holding agent.provisioning.review approves that version, and the first agent's own review of it is refused provisioning_review_own_version; holding agent.start, starts it, and the start record names the calling agent as actor and the person as responsible
 - In the same file: each route above, called by an agent holding no grant on the resource, is refused not_permitted naming the action; a person's session gets today's answer on every one of them
 - In the same file: an agent holding a grant it may pass on gives part of it to another agent through POST /grants, the new grant in that grant's chain; an agent asking to pass on more than it holds, or a grant marked use-only, is refused by the route's own refusals; an agent calling POST /grants/roots is refused
+- In the same file: an agent holding machine.agent.set on a machine from that machine's owner allows its person's agent on it through POST /network/machines/{id}/agents, and the record names the agent as actor; an agent holding machine.runner.set draws a join code and an installer for an own computer; each is refused not_permitted without the grant
+- In the same file: an agent revokes a grant it passed on through POST /grants/{id}/revoke, and is refused revoking a grant it did not pass on; the start of an agent by a caller holding only agent.start on it is admitted by start/authority.rs, and a caller holding nothing is refused start_right_missing as today
+- In crates/lys-identity-server/tests/agent_roots.rs, which already reads WITHHELD_FROM_AGENTS: the list names exactly the acts this requirement keeps withheld, and none of the five it releases
 - gate -stages nextest -crates lys-identity-server -test 'package(lys-identity-server)' green, counts in the report
 
 **Files:**
@@ -50,6 +55,11 @@ Behavioural. These routes admit an agent's signed request beside a person's sess
 - modify: crates/lys-identity-server/src/seats_api.rs
 - modify: crates/lys-identity-server/src/runner_api.rs
 - modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity/src/grants/shipped.rs
+- modify: crates/lys-identity/src/start/authority.rs
+- modify: crates/lys-identity-server/src/start_directory.rs
+- modify: crates/lys-identity-server/src/network_api/writes.rs
+- modify: crates/lys-identity-server/tests/agent_roots.rs
 
 **Checklist:**
 - C774 — The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.
@@ -95,10 +105,29 @@ Behavioural. lys mcp (crates/lys/src/commands/mcp_bridge.rs) accepts an https://
 **Stories:**
 - S444 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person running agents on several computers, I give one of my agents the right to set up and start my assistants once, and it does so on any of my computers without me at a screen, every act on the record as the agent's and every right one I can take back.
 
+### R4: The agent's file offers the three standing grants in plain words, one choice each
+
+Behavioural. On an agent's file, the Give form (surface/identity/src/features/file/GiveAccess.tsx) offers, above the resource and action pickers, three standing grants a person gives once, each one choice with a plain sentence and nothing to configure: "Create agents for me" (agent.create on the person, which R2 then extends to each new agent's profile, start, start-command, stop and restart), "Run my agents on this computer" (machine.agent.set on one of the person's computers, picked by name from GET /network; absent when the person owns none, with that said), and "Set up and review this kind of profile" (agent.provisioning.set and agent.provisioning.review on the person's agents, with the words that this agent's own versions are reviewed by someone else). Choosing one posts the grant through POST /grants exactly as the pickers do today, and the receipt line names it in the same words. The form says, once, why these are one choice each: six approvals per agent is security too awkward to use, and the standing grant is the consent, every act under it on the record as the agent's. The pickers below stay as they are. If starting an agent needs a certificate the new agent does not hold, the lane says so in its report and stops there; it never issues one (agent.certificate.issue stays a person's).
+
+**Acceptance:**
+- Red first, in a new surface/identity/src/features/file/give-standing.test.tsx: the three choices render with their sentences for an agent the signed-in person answers for; choosing each posts one POST /grants with exactly the actions named (read from the request body in the test), and the receipt line repeats the sentence
+- In the same file: with no owned computer, the second choice is absent and the words say so; for an agent the person does not answer for, none of the three renders
+- surface/identity typecheck and biome 0; vitest counts in the report
+
+**Files:**
+- create: surface/identity/src/features/file/give-standing.test.tsx
+- modify: surface/identity/src/features/file/GiveAccess.tsx
+
+**Checklist:**
+- C782 — The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.
+
+**Stories:**
+- S447 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person who trusts one of my agents to run my assistants, I give it the right to create agents for me, run them on my computer and set up their profiles with three plain choices on its file, once, instead of approving six steps for every assistant.
+
 ## Boundaries
 
 - No person's credential is held, copied or used by any agent: an agent acts only by its own signature and its own grants
-- No new action, relation kind or door type: the shipped actions and the existing G door set are used as they are
+- No new action, relation kind or door type: the shipped actions and the existing G door set are used as they are; off WITHHELD_FROM_AGENTS go agent.provisioning.set, agent.provisioning.review (never on a version the same agent set), machine.agent.set (per machine, from that machine's owner), grant.delegate (narrowing only, within pass-on rules) and grant.revoke (only a grant the agent itself passed on); certificate issue and withdrawal, roots, policy, secrets, the person acts, roles, budgets and stop-everything stay withheld
 - An agent never approves a profile version it set, and never acts as the person it answers to
 - TLS is always verified; no option turns verification off, in code, config or test
 - No timer, no fixed wait, no poll and no deadline anywhere, in code or test
@@ -108,5 +137,15 @@ Behavioural. lys mcp (crates/lys/src/commands/mcp_bridge.rs) accepts an https://
 
 - gate -stages nextest -crates lys-identity-server -test 'package(lys-identity-server)'
 - gate -stages nextest -crates lys -test 'package(lys)'
+- surface/identity: bun run typecheck, biome check, vitest (give-standing.test.tsx counts in the report)
 - gate -stages clippy, then the whole declared gate
 - python3 scripts/design/validate.py docs/design/agents and python3 scripts/design/check-coverage.py docs/design/agents read for FAIL lines
+
+## Amendments
+
+### Amendment 1: Which acts leave WITHHELD_FROM_AGENTS; start admission by grant; the agent file's standing grants
+
+- **Date:** 2026-10-19
+- **By:** Waffles (the decisions) and Flapjack (the text), under Tom's direction of 12:04 that Lys is fixed first
+
+Six approvals per agent is security too awkward to use, and people route around security they cannot use; the person's standing grant is the consent, and every act under it is on the record as the agent's. So agent.provisioning.set, agent.provisioning.review (never on the agent's own version), machine.agent.set (per machine, from its owner), grant.delegate (narrowing only) and grant.revoke (own pass-ons only) leave the withheld list; certificate issue and withdrawal, roots, policy, secrets, the person acts, roles, budgets and stop-everything stay. start/authority.rs admits a live agent.start grant on the agent. An agent's POST /agents registers the new agent active, answering to the person. R1 gains POST /network/machines/{id}/agents, /join-code and /installer/{kind}; R4 gives the agent file's Give form the three standing grants, one choice each. If a start needs a certificate for the new agent, the lane says so and stops; it never issues one.

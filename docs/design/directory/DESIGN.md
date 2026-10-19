@@ -1417,6 +1417,21 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/shell/help/concepts/types.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
 | `surface/identity/src/shell/help/url.ts` | names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1) | DIRECTORY-106 |
 | `crates/lys-identity-server/src/seat_import_profiles/servers.rs` | the seat import excludes no server by a product word (DIRECTORY-106 R2) | DIRECTORY-106 |
+| `crates/lys-identity/src/stores_receipt.rs` | the receipt of every store's count and digest, one shape for the server and the lys binary (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys-identity/src/stores_receipt_tests.rs` | the receipt round-trips, writes by one rename and names every store opened at startup (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/stores_receipt.rs` | the boot check against the receipt by each store's own comparison and class, the acceptance read, the loss epochs, the removal function and the receipt writes at boot, after removals and at clean stop (DIRECTORY-107 R2, R4) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/boot_refused.rs` | the two-route server a refused boot serves: /health refused_to_start and the sign-in page, every other route 503 with the same words (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys-identity-server/tests/stores_receipt.rs` | boot refuses a lost whole store by name and serves only /health and sign-in saying why; an own store's loss refuses only its routes; honest shrinks and recorded removals boot; a projection behind is re-projected, foreign is refused; acceptance serves; refusals carry the loss; the stream resets an old epoch (DIRECTORY-107 R2, R4) | DIRECTORY-107 |
+| `crates/lys/src/identity/accept_loss.rs` | lys identity accept-loss: the recorded operator act naming each store (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys/src/identity/upgrade/stores_receipt_tests.rs` | install and upgrade refuse by store name against the receipt; accept-loss records exactly the named stores (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/network_store/journal.rs` | no empty machines file unless the receipt allows it (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/grant_changes/identity.rs` | no minted identity for a counted log; reset on an accepted loss (DIRECTORY-107 R2, R4) | DIRECTORY-107 |
+| `crates/lys/src/identity/install/server_config/rendering.rs` | renders the receipt and acceptance file keys (DIRECTORY-107 R2) | DIRECTORY-107 |
+| `crates/lys/src/identity/install/runner_join_guard_tests.rs` | install under a saved join is refused and changes nothing; no key minted for a counted one (DIRECTORY-107 R3) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/runner_dial.rs` | the runner refusal carries the machines loss (DIRECTORY-107 R4) | DIRECTORY-107 |
+| `crates/lys-identity-server/src/grant_changes/stream.rs` | Reset{Rollback} for an earlier epoch of the same log, whatever the cursor (DIRECTORY-107 R4) | DIRECTORY-107 |
+| `crates/lys/src/commands/launch_device.rs` | machine_not_joined carries the computer loss when the view does (DIRECTORY-107 R4) | DIRECTORY-107 |
+| `crates/lys/src/commands/launch_device_tests.rs` | the loss sentence on machine_not_joined (DIRECTORY-107 R4) | DIRECTORY-107 |
 
 ## Inventory
 

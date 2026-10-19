@@ -166,6 +166,23 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys/src/commands/mcp_bridge.rs` | reaches Lys over verified https from any device (AGENTS-015 R3) | AGENTS-015 |
 | `crates/lys/src/commands/mcp_bridge_tests.rs` | the https and loopback URL rules (AGENTS-015 R3) | AGENTS-015 |
 | `crates/lys/src/identity/loopback_http.rs` | carries the bridge's https exchange beside loopback (AGENTS-015 R3) | AGENTS-015 |
+| `crates/lys-identity/src/grants/shipped.rs` | WITHHELD_FROM_AGENTS loses the five acts a person's standing grant covers (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity/src/start/authority.rs` | a live agent.start grant on the agent admits a start (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/start_directory.rs` | reads the grant-admitted start (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/src/network_api/writes.rs` | machine agents admit an agent holding machine.agent.set from the machine's owner (AGENTS-015 R1) | AGENTS-015 |
+| `crates/lys-identity-server/tests/agent_roots.rs` | the withheld list names exactly what stays withheld (AGENTS-015 R1) | AGENTS-015 |
+| `surface/identity/src/features/file/give-standing.test.tsx` | the standing grants render, post exactly their grant and are absent where there is nothing to give (AGENTS-015 R4) | AGENTS-015 |
+| `surface/identity/src/features/file/GiveAccess.tsx` | the three standing grants, one choice each (AGENTS-015 R4) | AGENTS-015 |
+| `surface/identity/src/features/network/labels.ts` | the Computers and Connect labels, once, read by the screens and by launch_device's test (AGENTS-016 R1) | AGENTS-016 |
+| `crates/lys/src/commands/launch_device.rs` | a kind lys runner matches the device holding the install's runner key; advice names only rendered labels (AGENTS-016 R1) | AGENTS-016 |
+| `crates/lys/src/commands/launch_device_tests.rs` | the host match and the advice labels (AGENTS-016 R1) | AGENTS-016 |
+| `crates/lys-identity-server/src/openapi_runner_types.rs` | the key on a kind lys runner view (AGENTS-016 R1) | AGENTS-016 |
+| `crates/lys-identity-server/tests/runner_join.rs` | the runner view's key for the install's own runner (AGENTS-016 R1) | AGENTS-016 |
+| `surface/identity/src/shell/railItems.ts` | imports the Computers label (AGENTS-016 R1) | AGENTS-016 |
+| `surface/identity/src/features/network/JoinCode.tsx` | imports the Connect label (AGENTS-016 R1) | AGENTS-016 |
+| `surface/identity/src/features/file/AgentConnect.tsx` | the Connect section: the claude and codex lines for this install and agent (AGENTS-016 R2) | AGENTS-016 |
+| `surface/identity/src/features/file/agent-connect.test.tsx` | the lines, the copy act and the sentence on what works today (AGENTS-016 R2) | AGENTS-016 |
+| `surface/identity/src/features/file/tabs.ts` | Connect under Credentials (AGENTS-016 R2) | AGENTS-016 |
 
 ## Inventory
 

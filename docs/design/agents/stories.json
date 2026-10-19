@@ -118,6 +118,14 @@
         {
           "id": "S444",
           "text": "As a person running agents on several computers, I give one of my agents the right to set up and start my assistants once, and it does so on any of my computers without me at a screen, every act on the record as the agent's and every right one I can take back."
+        },
+        {
+          "id": "S447",
+          "text": "As a person who trusts one of my agents to run my assistants, I give it the right to create agents for me, run them on my computer and set up their profiles with three plain choices on its file, once, instead of approving six steps for every assistant."
+        },
+        {
+          "id": "S448",
+          "text": "As a person on the computer that runs Lys, I start my agent here like on any other computer, and I copy the line that connects Claude Code or Codex to it from the agent's own page instead of assembling it from help text."
         }
       ]
     }

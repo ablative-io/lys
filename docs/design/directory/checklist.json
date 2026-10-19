@@ -2400,6 +2400,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "No Lys store is ever lost or emptied silently (DIRECTORY-107)",
+      "items": [
+        {
+          "id": "C777",
+          "text": "install/stores.json records every store the server opens, the SpiceDB projection and the install's keys and join files, each by the head it is honestly compared by (append-only logs by origin and head index, one-file stores by journal head, SpiceDB by projected grant revision, keys and join files by digest and presence) and by its class (whole or own), written by the server after its boot check, after every recorded removal and at clean stop in one durable write; a test fails when a store opened at startup has no entry or class.",
+          "done": false
+        },
+        {
+          "id": "C778",
+          "text": "Every boot and identity act compares the stores to the receipt before serving or changing anything: a lost whole store (directory log, grant log and identity, certificates, organisation configuration, service key, foreign SpiceDB projection) refuses the boot and the server serves only /health and the sign-in page saying refused_to_start with the store, both heads, the exact accept-loss command and the computer; a lost own store refuses only its routes with the loss sentence; a projection behind the log is re-projected; an honest shrink (revoke, a removal through the receipt's function) boots; a counted store is never created empty; the only way past a loss is lys identity accept-loss naming the store, recorded in install/stores.accepted.json.",
+          "done": false
+        },
+        {
+          "id": "C779",
+          "text": "keys/service.key, run/runner-server.pub, keys/runner-machine.key, run/runner-join.json, network.json, network.joins.json and data/runner/ are kept, moved and restored as one set by keep and put-back; install refuses runner_join_present rather than overwrite run/runner-server.pub under a saved join, and never mints a service key the receipt counts.",
+          "done": false
+        },
+        {
+          "id": "C780",
+          "text": "While a store has an accepted loss, NotHeld, the agent signature refusal, the runner refusals and machine_not_joined carry 'Lys lost its ... records at <rfc3339>' and what to do again; an accepted loss on the grant log advances its identity's epoch and the grant stream answers an old-epoch cursor Reset{Rollback} even after the head has grown.",
+          "done": false
+        },
+        {
+          "id": "C781",
+          "text": "ADR-114's decision says data is kept in data.previous, a put-back moves the window's data to data.rolled-back and removes nothing, and a shrunk store is refused by name until accepted; DESIGN.md renders the same.",
+          "done": false
+        }
+      ]
     }
   ]
 }

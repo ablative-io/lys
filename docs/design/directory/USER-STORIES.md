@@ -80,6 +80,10 @@
 
 **S417.** As an operator, I want every warning the identity server raises written in its log with where it came from, so that a failure the service noticed is never silent.
 
+**S445.** As the operator of a Lys install, I want every grant, certificate and computer join to survive every install, upgrade and put-back, or Lys to refuse to start and name the store that is short, so that I never again learn of a loss from the people it refused.
+
+**S446.** As the operator of a Lys install that did lose records, I want every refusal that loss causes to say so, with when and what to do again, and every connected agent to be told its grant log was rolled back, so that nobody is sent to re-check grants, certificates or joins that Lys itself dropped.
+
 ## Verifier — Checks a recorded identity change without the operator's cooperation
 
 **S7.** As a verifier, I want to check a recorded identity change against a checkpoint and key with standard tooling, so that the directory's history does not rest on the operator's word.

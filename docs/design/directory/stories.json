@@ -164,6 +164,14 @@
         {
           "id": "S417",
           "text": "As an operator, I want every warning the identity server raises written in its log with where it came from, so that a failure the service noticed is never silent."
+        },
+        {
+          "id": "S445",
+          "text": "As the operator of a Lys install, I want every grant, certificate and computer join to survive every install, upgrade and put-back, or Lys to refuse to start and name the store that is short, so that I never again learn of a loss from the people it refused."
+        },
+        {
+          "id": "S446",
+          "text": "As the operator of a Lys install that did lose records, I want every refusal that loss causes to say so, with when and what to do again, and every connected agent to be told its grant log was rolled back, so that nobody is sent to re-check grants, certificates or joins that Lys itself dropped."
         }
       ]
     },
