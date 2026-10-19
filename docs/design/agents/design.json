@@ -3,7 +3,7 @@
   "title": "Lys runs and watches its agents: what Argus and herdr do today, done in Lys",
   "intention": "Every seat is started by Lys through its own runner and proxy, watched by Lys's own hooks and status line, warned, compacted, reminded and scheduled by Lys through the harness's control channel, with its words, variables, countdowns and schedules held in Lys beside its goals, so Argus and herdr can be switched off one seat at a time and nothing a seat needs is typed into a terminal.",
   "problem": "On 6 October 2026 every seat is started through herdr (a third-party terminal workspace binary with a socket API) and watched by Argus: Claude Code hooks and the status line forward every event to Argus (tools/argus/plugin/hooks/hooks.json, scripts/argus-statusline.sh); the context warning, the preparation note and /compact are typed into the pane as user turns (scripts/context-text-inject.sh via `herdr agent prompt`), which herdr cannot receipt (docs/herdr-compaction-permission-20260925.md); Argus holds the five prompt messages in four layers with templates, the agent variables ({{vars.key | fallback}}), the goals placeholder and the scheduled messages (docs/agent-prompts.md, docs/scheduled-messages-20260907.md). Lys already starts agents (DIRECTORY-050), tracks them through its own hooks, status line and proxy usage file, and holds budgets and goals with reminders (DIRECTORY-051); DIRECTORY-064 moves delivery from the terminal to the harness's control channel and has no commits. What has no owner in Lys: the prompt words and their layers, the variables with their substitutions and countdowns, the schedules, the seat registry with liveness, attaching to a seat's terminal, and the move itself.",
-  "solution": "Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt words in four layers with templates, variables per agent and session with revision and expiry, countdown and goal substitutions rendered at delivery with the contributing revisions captured, and schedules with interval and occurrence bounds, all delivered through 064's dispatcher and shown on the Usage screen; the agent reads and sets its own variables through lys and the Lys MCP server. AGENTS-002: a seat is a Lys record launched by the runner through the proxy with the profile HOME-037 carries, a registry with liveness (online, not seen, seen but unregistered), start, stop and restart as deliberate acts under Lys rights, an attach command that shows a seat's terminal, and the move of a seat off herdr and Argus one at a time, proved by the first warning arriving from Lys. ADR-137 settles where the data lives: in Lys beside goals, rendered at delivery; no shared library (Lodestone is a read-only query engine; haematite is already the store under Lys); alarms, rules and launches go to liminal services and aion per ADR-136 section 3.",
+  "solution": "Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt words in four layers with templates, variables per agent and session with revision and expiry, countdown and goal substitutions rendered at delivery with the contributing revisions captured, and schedules with interval and occurrence bounds, all delivered through 064's dispatcher and shown on the Usage screen; the agent reads and sets its own variables through lys and the Lys MCP server. AGENTS-002: a seat is a Lys record launched by the runner through the proxy with the profile HOME-037 carries, a registry with liveness (online, not seen, seen but unregistered), start, stop and restart as deliberate acts under Lys rights, an attach command that shows a seat's terminal, and the move of a seat off herdr and Argus one at a time, proved by the first warning arriving from Lys. ADR-137 settles where the data lives: in Lys beside goals, rendered at delivery; no shared library (Lodestone is a read-only query engine; haematite is already the store under Lys); alarms, rules and launches go to liminal services and aion per ADR-136 section 3.\n\nThe seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path the agent's reviewed profile names as its seat file, written once by `lys agent enrol` on the computer the agent runs on and never replaced. One reader and writer in lys-core (`seat_file`) serve the `lys mcp` bridge and the enrol command; Cambium's door reads the same members by the same spellings. A reader refuses any version but 1, naming the version it found.\n\n| Member | Written by | Read by | What it holds |\n|---|---|---|---|\n| `version` | enrol; Cambium's door | the bridge; the door; the seat tool | always 1 |\n| `doorUrl` | enrol with `--door`; the door | the door; the seat tool | the Cambium door the seat answers at |\n| `handle` | enrol with `--handle`; the door | the door; the seat tool | the registry handle |\n| `device` | enrol with `--device`; the door | the door; the seat tool | the device label on the seat's session |\n| `privateKeyPem` | enrol; the door (a seat founded beside it) | the bridge; the seat tool | the Ed25519 key, PKCS#8 PEM, made where the agent runs, never printed |\n| `lysUrl` | enrol; the door | the door; the seat tool | the Lys API that certified the key |\n| `lysAgentId` | enrol; the door | the bridge (`--as`); the door; the seat tool | the Lys agent the certificate names |\n| `certificatePem` | enrol | a reader that verifies the key | the certificate Lys issued over the key |\n| `serial` | enrol | a person reading the file | the certificate's serial in Lys's certificate log |",
   "structure": [
     {
       "path": "docs/design/agents/",
@@ -731,18 +731,48 @@
       "brief": "AGENTS-017"
     },
     {
-      "path": "crates/lys/src/identity/install/command.rs",
-      "note": "install and upgrade name the computer Lys runs on, idempotently",
-      "brief": "AGENTS-017"
-    },
-    {
-      "path": "crates/lys/src/identity/install/runner_machine_record/own_machine.rs",
-      "note": "the install's read of its own machine, now finding the one it named",
-      "brief": "AGENTS-017"
-    },
-    {
       "path": "crates/lys-core/src/lib.rs",
       "note": "exports the seat file reader and writer",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-identity-server/src/own_computer.rs",
+      "note": "names the computer Lys runs on for the administrator, once, at setup and at agent-roots",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "surface/identity/src/features/run/SessionStop.tsx",
+      "note": "Stop for one run: ends the session, keeps the certificate",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys/src/cli/enrol.rs",
+      "note": "lys agent enrol's arguments",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-core/src/seat_file_tests.rs",
+      "note": "the seat file's reds: written back whole in the door's names, other versions and none refused, the key never shown",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/agent_roots/unnamed_at_setup.rs",
+      "note": "a computer setup could not name is named by agent-roots, and a start on it is admitted",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys/Cargo.toml",
+      "note": "the lys crate's test dependencies on the identity contract harness and the server, for enrol's reds",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "surface/identity/src/features/file/IdentityFile.tsx",
+      "note": "the agent file's head menu names the emergency act Withdraw",
+      "brief": "AGENTS-017"
+    },
+    {
+      "path": "crates/lys-core/Cargo.toml",
+      "note": "serde_json for the seat file reader and writer",
       "brief": "AGENTS-017"
     }
   ],

@@ -44,6 +44,8 @@ pub mod merkle;
 #[cfg(feature = "unstable-anchor")]
 pub mod receipt;
 pub mod seal;
+// The seat file every reader of an agent's seat reads (AGENTS-017 R5).
+pub mod seat_file;
 pub mod tlog;
 
 pub use error::{TrustError, TrustResult};

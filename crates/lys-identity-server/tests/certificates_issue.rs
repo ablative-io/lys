@@ -238,3 +238,84 @@ async fn a_certificate_is_withdrawn_beside_its_issuance() -> TestResult {
     refused(&answer, 409, "CertificateWithdrawn");
     Ok(())
 }
+
+/// `der` framed as RFC 7468 `label` PEM, wrapped at 64, written out here
+/// rather than through any encoder of Lys's.
+fn pem(label: &str, der: &[u8]) -> String {
+    let body = STANDARD.encode(der);
+    let lines: Vec<&str> = body
+        .as_bytes()
+        .chunks(64)
+        .map(|chunk| std::str::from_utf8(chunk).unwrap_or(""))
+        .collect();
+    format!(
+        "-----BEGIN {label}-----\n{}\n-----END {label}-----\n",
+        lines.join("\n")
+    )
+}
+
+/// AGENTS-017 R1: the request is taken as the PEM `lys ca request` writes, as
+/// the same certificate the DER form issues, and the answer carries the
+/// certificate as PEM beside its DER; a request that is neither is refused
+/// naming both forms.
+#[tokio::test]
+async fn a_request_given_as_pem_issues_what_its_der_issues() -> TestResult {
+    let table = Table::set().await?;
+    let agent = table.agent(1);
+    let request = create_certificate_request(&table.key, &agent)?;
+    let operation = OperationId::generate()?.to_string();
+    let as_der = json!({"operation": operation, "request": STANDARD.encode(&request)});
+    let (status, by_der) = table
+        .service
+        .post(&table.route(1), Some(&table.bea), &as_der)
+        .await?;
+    assert_eq!(status, 200, "{by_der}");
+    let as_pem = json!({"operation": operation, "request": pem("CERTIFICATE REQUEST", &request)});
+    let (status, by_pem) = table
+        .service
+        .post(&table.route(1), Some(&table.bea), &as_pem)
+        .await?;
+    assert_eq!(status, 200, "{by_pem}");
+    assert_eq!(by_pem["recorded"], json!(operation), "{by_pem}");
+    assert_eq!(by_pem, by_der, "the PEM is the same request: the same serial, entered once");
+
+    // A PEM-only first issue under a new operation is a certificate over the same key.
+    let fresh = json!({"operation": OperationId::generate()?.to_string(), "request": pem("CERTIFICATE REQUEST", &request)});
+    let (status, issued) = table
+        .service
+        .post(&table.route(1), Some(&table.bea), &fresh)
+        .await?;
+    assert_eq!(status, 200, "{issued}");
+    let certificates = issued["certificates"].as_array().ok_or("no certificates")?;
+    assert_eq!(certificates.len(), 2, "{issued}");
+    for certificate in certificates {
+        let der = STANDARD.decode(certificate["der"].as_str().ok_or("no der")?)?;
+        assert_eq!(certificate_subject_public_key(&der)?, table.key.public_key_bytes());
+        assert_eq!(
+            certificate["pem"],
+            json!(pem("CERTIFICATE", &der)),
+            "the answer's PEM is its DER"
+        );
+    }
+
+    for neither in [
+        "not a request".to_owned(),
+        pem("CERTIFICATE", &request),
+        "-----BEGIN CERTIFICATE REQUEST-----\n!!!\n-----END CERTIFICATE REQUEST-----\n".to_owned(),
+    ] {
+        let body = json!({"operation": OperationId::generate()?.to_string(), "request": neither});
+        let answer = table
+            .service
+            .post(&table.route(1), Some(&table.bea), &body)
+            .await?;
+        refused(&answer, 400, "RequestMalformed");
+        assert!(
+            answer.1["reason"]
+                .as_str()
+                .is_some_and(|reason| reason.contains("request is neither PEM nor standard base64")),
+            "{}",
+            answer.1
+        );
+    }
+    Ok(())
+}

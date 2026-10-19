@@ -16,15 +16,18 @@
 //! to the MCP client as a JSON-RPC error for that message.
 //!
 //! The key is read once at start from a PEM file or a seat file's `privateKeyPem`, held
-//! in memory that is wiped when dropped, and never printed; neither is a signature.
+//! in memory that is wiped when dropped, and never printed; neither is a signature. A
+//! seat file is read by `lys_core::seat_file`, the one reader `lys agent enrol` writes
+//! for and an app's door shares (AGENTS-017 R5). `lys agent enrol` signs and posts
+//! through the same endpoint, signature and transport as this bridge.
 
 use std::io::{BufRead, Write};
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::Engine;
 use lys_core::attestation::sign_attestation;
 use lys_core::keys::Ed25519Identity;
+use lys_core::seat_file::{SeatFile, identity_from_pem};
 use rand::RngCore;
 use sha2::{Digest, Sha256};
 use zeroize::Zeroizing;
@@ -34,16 +37,12 @@ use crate::commands::seat_client::refused;
 use crate::identity::loopback_http::{Authority, Failure, Request};
 
 #[path = "mcp_bridge_tls.rs"]
-mod tls;
+pub(crate) mod tls;
 
 use tls::{Transport, TrustPath, Unanswered, post};
 
 /// The domain every agent request signature is made under (Lys `agent_signature`).
 const DOMAIN: &str = "lys-identity/agent-request/v1";
-/// PKCS#8 v1 DER for an ed25519 private key, before its 32-byte seed.
-const PKCS8_ED25519_PREFIX: [u8; 16] = [
-    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
-];
 /// The most bytes read from a key file.
 const KEY_FILE_BYTES: usize = 65_536;
 /// The port of an `https://` URL that names none.
@@ -52,15 +51,15 @@ const HTTPS_DEFAULT_PORT: u16 = 443;
 const HTTP_DEFAULT_PORT: u16 = 80;
 
 /// Where the bridge posts: Lys's MCP route, as the URL names it.
-struct Endpoint {
+pub(crate) struct Endpoint {
     /// The host and port.
-    authority: Authority,
+    pub(crate) authority: Authority,
     /// The path posted to, as the URL names it.
-    path: String,
+    pub(crate) path: String,
     /// The path the signature is made over: the router's path, `/api` stripped.
-    signed_path: String,
+    pub(crate) signed_path: String,
     /// Whether the URL is `https://`, reached over verified TLS.
-    secure: bool,
+    pub(crate) secure: bool,
 }
 
 /// Run the bridge until stdin closes.
@@ -142,7 +141,7 @@ fn relay(
 
 /// The failure, by name: `mcp_tls_refused`, `mcp_unreachable`, `mcp_answer_lost` or
 /// `mcp_answer_malformed`, with its detail (an empty answer is `mcp_answer_empty`).
-fn named(unanswered: &Unanswered) -> String {
+pub(crate) fn named(unanswered: &Unanswered) -> String {
     match unanswered {
         Unanswered::TlsRefused(detail) => format!("mcp_tls_refused: {detail}"),
         Unanswered::Exchange(Failure::Unreachable(detail)) => {
@@ -166,7 +165,12 @@ fn failure(id: &serde_json::Value, reason: &str) -> String {
 
 /// The `lys-agent-signature` header for `POST path` with `body`:
 /// `{agent} {millis} {nonce} {attestation hex}`.
-fn signature(identity: &Ed25519Identity, agent: &str, path: &str, body: &[u8]) -> String {
+pub(crate) fn signature(
+    identity: &Ed25519Identity,
+    agent: &str,
+    path: &str,
+    body: &[u8],
+) -> String {
     let millis = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| {
@@ -185,7 +189,7 @@ fn signature(identity: &Ed25519Identity, agent: &str, path: &str, body: &[u8]) -
 
 /// Lys's MCP route as `url` names it: `https://` on any host, or `http://` on a
 /// numeric loopback address.
-fn endpoint(url: &str) -> CliResult<Endpoint> {
+pub(crate) fn endpoint(url: &str) -> CliResult<Endpoint> {
     let (secure, rest) = if let Some(rest) = url.strip_prefix("https://") {
         (true, rest)
     } else if let Some(rest) = url.strip_prefix("http://") {
@@ -233,7 +237,7 @@ fn endpoint(url: &str) -> CliResult<Endpoint> {
 }
 
 /// The agent's key, from a PEM file or a seat file whose `privateKeyPem` holds the PEM.
-fn read_key(path: &Path) -> CliResult<Ed25519Identity> {
+pub(crate) fn read_key(path: &Path) -> CliResult<Ed25519Identity> {
     let unreadable = |why: &str| {
         refused(
             "mcp_key_unreadable",
@@ -249,38 +253,14 @@ fn read_key(path: &Path) -> CliResult<Ed25519Identity> {
     if text.len() > KEY_FILE_BYTES {
         return Err(unreadable("the file is too large"));
     }
-    let pem = if text.trim_start().starts_with('{') {
-        let seat: serde_json::Value = serde_json::from_str(&text).map_err(|error| {
-            unreadable(&format!(
-                "the seat file is not JSON at line {}",
-                error.line()
-            ))
-        })?;
-        Zeroizing::new(
-            seat.get("privateKeyPem")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| unreadable("the seat file has no privateKeyPem"))?
-                .to_owned(),
-        )
+    let read = if text.trim_start().starts_with('{') {
+        SeatFile::from_json(&text)
+            .and_then(|seat| seat.identity())
+            .map_err(|refusal| unreadable(&refusal.to_string()))?
     } else {
-        text
+        identity_from_pem(&text).map_err(|refusal| unreadable(&refusal.to_string()))?
     };
-    let body: Zeroizing<String> = Zeroizing::new(
-        pem.lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with("-----"))
-            .collect(),
-    );
-    let der = Zeroizing::new(
-        base64::engine::general_purpose::STANDARD
-            .decode(body.as_bytes())
-            .map_err(|_not_pem| unreadable("the key is not PEM"))?,
-    );
-    let seed = der
-        .strip_prefix(&PKCS8_ED25519_PREFIX)
-        .and_then(|seed| <[u8; 32]>::try_from(seed).ok())
-        .ok_or_else(|| unreadable("the key is not a PKCS#8 ed25519 private key"))?;
-    Ok(Ed25519Identity::from_seed(&Zeroizing::new(seed)))
+    Ok(read)
 }
 
 fn hex(bytes: &[u8]) -> String {

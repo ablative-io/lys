@@ -35,6 +35,7 @@ pub const GRANT_CREDENTIAL_HEADER: &str = "lys-grant-token";
 /// own refusals.
 pub fn run(args: AgentArgs, json: bool) -> CliResult<()> {
     match args.command {
+        AgentCommand::Enrol(enrol) => crate::commands::enrol::run(&enrol, json),
         AgentCommand::Pass {
             agent,
             audience,
@@ -63,9 +64,9 @@ pub fn run(args: AgentArgs, json: bool) -> CliResult<()> {
             emitter.field("pass file", "pass_file", out.display().to_string());
             emitter.field("pass file was", "written", written.word());
             emitter.finish();
+            Ok(())
         }
     }
-    Ok(())
 }
 
 /// The grant credential in `path`, one line of text in an owner-only file.

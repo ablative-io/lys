@@ -7,7 +7,11 @@ use zeroize::Zeroizing;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const PKCS8_PREFIX: [u8; 16] = super::PKCS8_ED25519_PREFIX;
+/// PKCS#8 v1 DER for an ed25519 private key, before its seed (RFC 8410 section 7),
+/// written out here so the reader is checked against the RFC, not against itself.
+const PKCS8_PREFIX: [u8; 16] = [
+    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20,
+];
 
 fn pem(seed: [u8; 32]) -> String {
     let mut der = PKCS8_PREFIX.to_vec();
@@ -64,7 +68,7 @@ fn the_key_is_read_from_a_seat_file_or_a_pem() -> TestResult {
     let seat = dir.join("seat.json");
     std::fs::write(
         &seat,
-        serde_json::json!({"handle":"h","privateKeyPem":pem([9; 32])}).to_string(),
+        serde_json::json!({"version":1,"handle":"h","privateKeyPem":pem([9; 32])}).to_string(),
     )?;
     let bare = dir.join("key.pem");
     std::fs::write(&bare, pem([9; 32]))?;
@@ -81,6 +85,51 @@ fn the_key_is_read_from_a_seat_file_or_a_pem() -> TestResult {
         "{refused}"
     );
     std::fs::remove_dir_all(&dir)?;
+    Ok(())
+}
+
+/// AGENTS-017 R5 guard: a bare PEM key file, no JSON, is still read by the
+/// bridge after the seat file reader moved to lys-core.
+#[test]
+fn a_bare_pem_key_file_is_still_read_by_the_bridge() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let bare = dir.path().join("agent.pem");
+    std::fs::write(&bare, pem([11; 32]))?;
+    let expected = Ed25519Identity::from_seed(&Zeroizing::new([11; 32])).public_key_bytes();
+    assert_eq!(read_key(&bare)?.public_key_bytes(), expected);
+    Ok(())
+}
+
+/// AGENTS-017 R5: a JSON seat file with no `version` is refused, naming
+/// `seat_file_version_unknown` and the version this lys reads; a file that is
+/// not JSON at all after its brace stays a refusal.
+#[test]
+fn a_json_seat_file_without_version_is_refused_naming_the_version_wanted() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let versionless = dir.path().join("old.seat.json");
+    std::fs::write(
+        &versionless,
+        serde_json::json!({"handle":"h","privateKeyPem":pem([12; 32])}).to_string(),
+    )?;
+    let refused = read_key(&versionless)
+        .err()
+        .ok_or("a seat file without version was read")?
+        .to_string();
+    assert!(refused.contains("seat_file_version_unknown"), "{refused}");
+    assert!(
+        refused.contains(&format!(
+            "reads version {}",
+            lys_core::seat_file::SEAT_FILE_VERSION
+        )),
+        "{refused}"
+    );
+    let torn = dir.path().join("torn.seat.json");
+    std::fs::write(&torn, "{\"version\": 1, \"privateKeyPem\": ")?;
+    let unparsed = read_key(&torn)
+        .err()
+        .ok_or("an unparseable seat file was read")?
+        .to_string();
+    assert!(unparsed.contains("seat_file_unreadable"), "{unparsed}");
     Ok(())
 }
 

@@ -67,6 +67,9 @@ rustix = { workspace = true, features = ["termios"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+# `lys agent enrol` is proved against the fixture identity server (AGENTS-017 R1).
+identity-contract = { path = "../../tests/identity_contract" }
+lys-identity-server.workspace = true
 # The https bridge test issues its own root and server certificate (AGENTS-015 R3).
 rcgen.workspace = true
 

@@ -184,6 +184,38 @@ fn certificate(
         .map_err(|error| malformed(format!("the request was refused: {error}")))
 }
 
+/// The RFC 7468 boundaries of a PKCS#10 request, as `lys ca request` writes it.
+const REQUEST_BEGIN: &str = "-----BEGIN CERTIFICATE REQUEST-----";
+const REQUEST_END: &str = "-----END CERTIFICATE REQUEST-----";
+
+/// The DER of `text`: a PKCS#10 request as the PEM the CLI writes, or as the
+/// standard base64 DER taken before AGENTS-017 R1. Both decode to the same
+/// bytes `verify_certificate_request` reads; anything else is refused naming
+/// both forms.
+fn request_der(text: &str) -> Result<Vec<u8>, ServerError> {
+    let neither = |why: String| malformed(format!("request is neither PEM nor standard base64: {why}"));
+    let trimmed = text.trim();
+    if !trimmed.starts_with("-----") {
+        return STANDARD.decode(trimmed).map_err(|error| neither(error.to_string()));
+    }
+    let lines: Vec<&str> = trimmed
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    let (Some(&first), Some(&last)) = (lines.first(), lines.last()) else {
+        return Err(neither("the PEM is empty".to_owned()));
+    };
+    if first != REQUEST_BEGIN || last != REQUEST_END || lines.len() < 3 {
+        return Err(neither(format!(
+            "a PEM request is framed by {REQUEST_BEGIN} and {REQUEST_END}"
+        )));
+    }
+    STANDARD
+        .decode(lines[1..lines.len() - 1].concat())
+        .map_err(|error| neither(format!("the PEM body is not base64: {error}")))
+}
+
 /// Issue a certificate for the agent over the key its request proves.
 pub(crate) async fn issue(
     State(state): State<Arc<AppState>>,
@@ -244,9 +276,7 @@ fn asked(
 ) -> Result<Asked, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let serial = OperationId::from_str(&body.operation)?.to_string();
-    let request = STANDARD
-        .decode(body.request.trim())
-        .map_err(|error| malformed(format!("request is not standard base64: {error}")))?;
+    let request = request_der(&body.request)?;
     let proved = verify_certificate_request(&request)
         .map_err(|error| malformed(format!("the request was refused: {error}")))?;
     let agent = seen.agent.to_string();

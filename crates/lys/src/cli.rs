@@ -40,6 +40,9 @@ pub use sign_in::SignInArgs;
 
 #[path = "cli/launch.rs"]
 mod launch;
+#[path = "cli/enrol.rs"]
+mod enrol;
+pub use enrol::EnrolArgs;
 pub use launch::{AgentsArgs, HarnessArgs, LaunchOptions, RunArgs};
 
 /// `lys seat import`: what to do.
@@ -434,6 +437,12 @@ pub enum AgentCommand {
         #[arg(long, value_name = "PATH")]
         out: PathBuf,
     },
+
+    /// Make a new agent's key on the computer it will run on, have Lys certify
+    /// it, and write its seat file where its reviewed profile expects it,
+    /// mode 0600, never replacing one (AGENTS-017 R1). Prints the path, the
+    /// agent and the serial; never key material.
+    Enrol(EnrolArgs),
 }
 
 #[cfg(test)]

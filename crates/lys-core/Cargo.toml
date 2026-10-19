@@ -69,6 +69,8 @@ postcard.workspace = true
 rand.workspace = true
 rcgen.workspace = true
 serde.workspace = true
+# The seat file's reader and writer (AGENTS-017 R5).
+serde_json.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 time.workspace = true

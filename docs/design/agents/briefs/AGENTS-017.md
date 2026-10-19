@@ -46,8 +46,8 @@ Behavioural. A new subcommand, lys agent enrol --url <lys origin> --agent <new a
 **Files:**
 - create: crates/lys/src/commands/enrol.rs
 - create: crates/lys/src/commands/enrol_tests.rs
+- create: crates/lys/src/cli/enrol.rs
 - modify: crates/lys/src/cli.rs
-- modify: crates/lys/src/main.rs
 - modify: crates/lys/src/commands/mod.rs
 - modify: crates/lys/src/commands/mcp_bridge.rs
 - modify: crates/lys-identity-server/src/certificates_issue.rs
@@ -57,7 +57,10 @@ Behavioural. A new subcommand, lys agent enrol --url <lys origin> --agent <new a
 - modify: surface/identity/src/features/network/connectLines.ts
 - modify: surface/identity/src/features/file/AgentConnect.tsx
 - modify: surface/identity/src/features/file/agent-connect.test.tsx
-- modify: docs/design/agents/DESIGN.md
+- modify: crates/lys/src/commands/agent_pass.rs
+- modify: crates/lys/Cargo.toml
+- modify: crates/lys/src/commands/mcp_bridge_tests.rs
+- modify: docs/design/agents/design.json
 
 **Checklist:**
 - C787 — lys agent enrol, run where the agent will run, generates its key, posts the request as the PEM the CLI writes, receives the certificate and writes the seat file at the reviewed profile's path, mode 0600, never overwriting one that exists.
@@ -67,7 +70,7 @@ Behavioural. A new subcommand, lys agent enrol --url <lys origin> --agent <new a
 
 ### R2: Stop ends a run and keeps the certificate; Withdraw is the emergency act and stays final
 
-Behavioural. On the dashboard's acted lines (ActedByAgents.tsx; contract.ts:34 ActedLine already carries an optional session), a started line shows Stop, which posts POST /runtime/sessions/<session>/end {operation} (openapi_table.rs:267; runner_api.rs:127 end) and shows the runtime's receipt in words (ended, or the refusal RuntimeSessionUnknown, not_permitted, AgentNotVisible as answered); the agent's certificates are untouched, so the agent starts again from the same seat file. Withdraw, on every acted line and on the agent's file, is today's emergency act (EmergencyStop.tsx, POST /agents/{id}/stop: suspend, withdraw certificates, end sessions) behind its confirmation and its Why field, renamed Withdraw in its act and heading, and its receipt says in one sentence that the registrar cannot certify this agent again (certificates_issue.rs:346 counts withdrawn certificates) and that a person issues the next certificate. The dashboard's acted started line carries the session id of the launch record it was read from (dashboard_api.rs:16-20, :442-449 acted; the launch records' session field), so Stop has a session to end; a registered line, with no session, shows Withdraw alone. The agent's file (sections.tsx, EmergencyStop) gains the same Stop beside each live session on its Sessions tab, one route, one receipt.
+Behavioural. On the dashboard's acted lines (ActedByAgents.tsx; contract.ts:34 ActedLine already carries an optional session), a started line shows Stop, which posts POST /runtime/sessions/<session>/end {} (the route takes an empty body and refuses unknown fields: runner_api.rs:102-104 Empty, deny_unknown_fields, read at runner_api.rs:370-372) (openapi_table.rs:267; runner_api.rs:127 end) and shows the runtime's receipt in words (ended, or the refusal RuntimeSessionUnknown, not_permitted, AgentNotVisible as answered); the agent's certificates are untouched, so the agent starts again from the same seat file. Withdraw, on every acted line and on the agent's file, is today's emergency act (EmergencyStop.tsx, POST /agents/{id}/stop: suspend, withdraw certificates, end sessions) behind its confirmation and its Why field, renamed Withdraw in its act and heading, and its receipt says in one sentence that the registrar cannot certify this agent again (certificates_issue.rs:346 counts withdrawn certificates) and that a person issues the next certificate. The dashboard's acted started line carries the session id of the launch record it was read from (dashboard_api.rs:16-20, :442-449 acted; the launch records' session field), so Stop has a session to end; a registered line, with no session, shows Withdraw alone. The agent's file (RuntimeSessions.tsx, the Sessions tab; EmergencyStop) gains the same Stop beside each live session on its Sessions tab, one route, one receipt.
 
 **Acceptance:**
 - Red first, surface/identity/src/features/dashboard/dashboard-acted.test.tsx: a started line's Stop posts /runtime/sessions/<session>/end and never /agents/<id>/stop; the receipt reads 'ended'; a registered line shows Withdraw and no Stop; Withdraw's confirmation heading reads Withdraw. Fails today: Stop opens the suspension form.
@@ -75,15 +78,21 @@ Behavioural. On the dashboard's acted lines (ActedByAgents.tsx; contract.ts:34 A
 - Red first, crates/lys-identity-server/tests/emergency_stop.rs: the receipt of POST /agents/{id}/stop names that the registrar cannot certify again. Fails today: no such sentence.
 
 **Files:**
+- create: surface/identity/src/features/run/SessionStop.tsx
 - modify: surface/identity/src/features/dashboard/ActedByAgents.tsx
 - modify: surface/identity/src/features/dashboard/contract.ts
 - modify: surface/identity/src/features/dashboard/dashboard-acted.test.tsx
 - modify: surface/identity/src/features/file/EmergencyStop.tsx
-- modify: surface/identity/src/features/file/sections.tsx
+- modify: surface/identity/src/features/runtime/RuntimeSessions.tsx
 - modify: crates/lys-identity-server/src/dashboard_api.rs
-- modify: crates/lys-identity-server/src/agent_stop_api.rs
+- modify: crates/lys-identity-server/src/stop_api.rs
 - modify: crates/lys-identity-server/tests/dashboard_acted_by_agents.rs
 - modify: crates/lys-identity-server/tests/emergency_stop.rs
+- modify: surface/identity/src/features/file/IdentityFile.tsx
+- modify: surface/identity/tests/file.test.tsx
+- modify: surface/identity/tests/agent-run.test.tsx
+- modify: surface/identity/tests/no-reload.test.tsx
+- modify: surface/identity/tests/agent-overview.test.tsx
 
 **Checklist:**
 - C788 — The dashboard's Stop beside a started line ends that run through POST /runtime/sessions/{id}/end and keeps the certificate; Withdraw is the emergency act behind its confirmation, final, and its receipt says the registrar cannot certify again.
@@ -110,6 +119,13 @@ Behavioural. Read first, for Waffles' question: a profile is per agent and a rev
 - modify: crates/lys-identity-server/src/openapi_typed.rs
 - modify: crates/lys-identity-server/tests/provisioning_latest_review.rs
 - modify: crates/lys-identity-server/tests/provisioning.rs
+- modify: crates/lys-identity-server/src/provisioning_index.rs
+- modify: crates/lys-identity-server/src/launch_api/ordinary.rs
+- modify: crates/lys-identity-server/src/launch_api/kept.rs
+- modify: crates/lys-identity-server/src/seats_api.rs
+- modify: crates/lys-identity-server/src/seats_edit.rs
+- modify: crates/lys-identity-server/src/seats_run/agent.rs
+- modify: crates/lys-identity-server/src/runner_sessions/starting.rs
 
 **Checklist:**
 - C789 — A profile version without its own review starts when its responsible person or the administrator reviewed the same settings content on any agent of theirs, the answer naming the carried review; a changed digest needs review again; an agent never carries a review it made.
@@ -117,23 +133,36 @@ Behavioural. Read first, for Waffles' question: a profile is per agent and a rev
 **Stories:**
 - S453 (Tom, owner) — As the owner, I want to give an agent its roots in one choice and to review a profile's content once for all my agents, so that setting up a second agent is minutes, not a morning.
 
-### R4: One choice gives an agent its roots, and the install names the computer Lys runs on
+### R4: One choice gives an agent its roots, and setup names the computer Lys runs on
 
-Behavioural. Two halves. (i) lys identity install and upgrade (crates/lys/src/identity/install/command.rs) name the computer Lys runs on in the network store as a machine named by the configured administrator, kind Computer, runtime lys-runner, with its runner RunnerRecord::Lys (network_store.rs:324 name, :340-360 name_runner), under an operation id derived from the install's runner-server public key so a second install or upgrade finds the same machine and writes nothing (the own_machine.rs:14-30 read then finds it); the machine's name is the host's name as JoinCode.tsx names computers. A network store that already names a live machine with the lys runner is left alone (runner_lys_taken is never raised by the install). (ii) GiveAccess.tsx's three standing choices become one, data-standing-choice="all", titled 'Let <agent> set up and run agents on <computer>', with the computer select kept for a person with more than one computer and preselected to the one whose runner is lys. Its Give posts, in order and each kept before it is sent as the pickers keep theirs (GiveAccess.tsx:98-130): POST /grants/agent-roots first when the person is the administrator and holds no passable root (the sections.tsx:123-131 hint and button go), then agent.create on the person, machine.agent.set on the computer, agent.provisioning.set and agent.provisioning.review on the person, four POST /grants with use_only pass-on. One receipt names the four grant ids; a refusal names the step that refused and leaves the earlier grants given (each is idempotent by its operation, so pressing Give again finishes what is left). The sentence under the choice says what the four give, in the words GiveAccess.tsx:86-96 use today, joined.
+Behavioural. Two halves. (i) First-run setup (setup.rs, both setup routes, through agent_roots.rs at_setup) and every POST /grants/agent-roots name the computer Lys runs on in the network store (own_computer.rs) as a machine named by the configured administrator, kind Computer, runtime lys-runner, with its runner RunnerRecord::Lys (network_store.rs name, name_runner), under an operation id derived from the install's runner-server public key so a second setup or agent-roots post finds the same machine and writes nothing; the machine's name is the host's name as JoinCode.tsx names computers. A network store that already names a live machine with the lys runner is left alone (runner_lys_taken is never raised), and a machine of that id a person retired stays retired. When setup cannot name it, setup still finishes and its answer says own_computer_unnamed and why (PersonRegistered.own_computer_unnamed); agent-roots names it before it gives any root, so the standing choice reaches it. (ii) GiveAccess.tsx's three standing choices become one, data-standing-choice="all", titled 'Let <agent> set up and run agents on <computer>', with the computer select kept for a person with more than one computer and preselected to the one whose runner is lys. Its Give posts, in order and each kept before it is sent as the pickers keep theirs (GiveAccess.tsx:98-130): POST /grants/agent-roots first when the person is the administrator and holds no passable root (the sections.tsx:123-131 hint and button go), then agent.create on the person, machine.agent.set on the computer, agent.provisioning.set and agent.provisioning.review on the person, four POST /grants with use_only pass-on. One receipt names the four grant ids; a refusal names the step that refused and leaves the earlier grants given (each is idempotent by its operation, so pressing Give again finishes what is left). The sentence under the choice says what the four give, in the words GiveAccess.tsx:86-96 use today, joined.
 
 **Acceptance:**
 - Red first, surface/identity/src/features/file/give-standing.test.tsx: one standing choice renders; its Give posts /grants/agent-roots (administrator without roots) then four /grants bodies in the order agent.create, machine.agent.set, agent.provisioning.set, agent.provisioning.review; a refusal on the third leaves two given and names the third; a non-administrator never posts agent-roots. Fails today: three choices, no agent-roots post from the choice.
-- Red first, crates/lys/src/identity/install tests (install/command tests beside command.rs): after install the network file names this computer, named_by the administrator, runner kind lys; a second install writes nothing and the operation id is the same. Fails today: no machine written.
+- Red first, crates/lys-identity-server/tests/agent_roots.rs: after setup the network file names this computer, named_by the administrator, runner kind lys; a second setup or agent-roots post writes nothing and the operation id (the machine id) is the same. And, in the same binary (agent_roots/unnamed_at_setup.rs), a setup whose naming write fails answers own_computer_unnamed by name, then the standing give posts agent-roots, which names the computer, gives the four grants, and a start on that computer is admitted.
 - Red first, crates/lys-identity-server/tests/agent_roots.rs: a standing give by the administrator with no passable roots that posts agent-roots first ends with four grants held by the agent, read back on GET /agent/grants.
 
 **Files:**
+- create: crates/lys-identity-server/src/own_computer.rs
+- create: crates/lys-identity-server/tests/agent_roots/unnamed_at_setup.rs
 - modify: surface/identity/src/features/file/GiveAccess.tsx
 - modify: surface/identity/src/features/file/sections.tsx
 - modify: surface/identity/src/features/file/give-standing.test.tsx
-- modify: crates/lys/src/identity/install/command.rs
-- modify: crates/lys/src/identity/install/runner_machine_record/own_machine.rs
 - modify: crates/lys-identity-server/src/network_store.rs
 - modify: crates/lys-identity-server/tests/agent_roots.rs
+- modify: crates/lys-identity-server/src/agent_roots.rs
+- modify: crates/lys-identity-server/src/setup.rs
+- modify: crates/lys-identity-server/src/directory_views.rs
+- modify: crates/lys-identity-server/src/routes/identities.rs
+- modify: crates/lys-identity-server/src/network_api.rs
+- modify: crates/lys-identity-server/src/network_api/host_name.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/tests/support/runner_start.rs
+- modify: surface/identity/src/shell/help/pages.ts
+- modify: surface/identity/src/shell/help/concepts/access.ts
+- modify: surface/identity/src/shell/help/concepts/start.ts
+- modify: surface/identity/src/shell/help/concepts/trouble.ts
+- modify: surface/identity/tests/give-chooser.test.tsx
 
 **Checklist:**
 - C790 — One standing choice gives an agent its roots, agent-roots first for an administrator without them, then four grants in order with one receipt; the install names the computer Lys runs on, by the administrator with the lys runner, idempotently.
@@ -152,11 +181,14 @@ Behavioural. R1's command takes --door <door url> --handle <registry handle> --d
 
 **Files:**
 - create: crates/lys-core/src/seat_file.rs
+- create: crates/lys-core/src/seat_file_tests.rs
 - modify: crates/lys/src/commands/enrol.rs
 - modify: crates/lys/src/commands/enrol_tests.rs
 - modify: crates/lys/src/commands/mcp_bridge.rs
 - modify: crates/lys-core/src/lib.rs
-- modify: docs/design/agents/DESIGN.md
+- modify: docs/design/agents/design.json
+- modify: crates/lys-core/Cargo.toml
+- modify: crates/lys/src/commands/mcp_bridge_tests.rs
 
 **Checklist:**
 - C791 — The enrol command writes the one seat file shape both Lys's bridge and Cambium's door read, with the door's fields when asked, so a Cambium seat's key is born on the computer it runs on and no seat file is carried by hand.
@@ -178,3 +210,12 @@ Behavioural. R1's command takes --door <door url> --handle <registry handle> --d
 - surface/identity: bun run typecheck, biome check, vitest (give-standing.test.tsx, dashboard-acted.test.tsx, agent-connect.test.tsx counts in the report)
 - gate -stages clippy, then the whole declared gate at the landing commit, nextest included (a subset never lands: Waffles, 19 October 23:3x)
 - python3 scripts/design/validate.py docs/design/agents and python3 scripts/design/check-coverage.py docs/design/agents: failures parsed from the output, never the exit code
+
+## Amendments
+
+### Amendment 1: R4 names the computer at setup and at agent-roots, not at install; R2's Stop posts {}; file lists as built
+
+- **Date:** 2026-10-20
+- **By:** Flapjack, coordinator, on Waffles' word, from the AGENTS-017 lane's handback
+
+R4(i) moves from lys identity install and upgrade to setup and POST /grants/agent-roots. install/command.rs:61 only asks setup_code::has_administrator and issues the setup code, so a fresh install has no administrator person to name the computer for until setup; and the network file is written only by the running service through its one NetworkStore (file_stores.rs:30 opens it into AppState; network_api.rs:237 with_network is the one writer), so an install writing it beside a running service would race the store. The computer is therefore named in crates/lys-identity-server/src/own_computer.rs at setup and at every agent-roots post; a naming failure at setup is said in the setup answer as own_computer_unnamed and never swallowed, and agent-roots names it again before giving any root (tests/agent_roots/unnamed_at_setup.rs). R2's Stop posts {} because POST /runtime/sessions/{id}/end takes runner_api.rs:102-104 Empty with deny_unknown_fields (read at runner_api.rs:370-372); an {operation} member would be refused. R3's settings digest is computed on read and never stored, so the previous build still reads the provisioning file. R5's reader refuses a JSON seat file without version as seat_file_version_unknown naming the version it reads; Cambium's writer (cambium-door contract/agent_seat.rs:45-47) carries version, and no seat file on this Mac lacks it. File lists now name the files as built: stop_api.rs (agent_stop_api.rs does not exist), RuntimeSessions.tsx for the Sessions tab's Stop, agent_pass.rs for the enrol dispatch (main.rs unchanged), design.json (DESIGN.md is rendered from it), and the new files cli/enrol.rs, SessionStop.tsx, own_computer.rs, seat_file_tests.rs and tests/agent_roots/unnamed_at_setup.rs.

@@ -20,6 +20,20 @@ On 6 October 2026 every seat is started through herdr (a third-party terminal wo
 
 Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt words in four layers with templates, variables per agent and session with revision and expiry, countdown and goal substitutions rendered at delivery with the contributing revisions captured, and schedules with interval and occurrence bounds, all delivered through 064's dispatcher and shown on the Usage screen; the agent reads and sets its own variables through lys and the Lys MCP server. AGENTS-002: a seat is a Lys record launched by the runner through the proxy with the profile HOME-037 carries, a registry with liveness (online, not seen, seen but unregistered), start, stop and restart as deliberate acts under Lys rights, an attach command that shows a seat's terminal, and the move of a seat off herdr and Argus one at a time, proved by the first warning arriving from Lys. ADR-137 settles where the data lives: in Lys beside goals, rendered at delivery; no shared library (Lodestone is a read-only query engine; haematite is already the store under Lys); alarms, rules and launches go to liminal services and aion per ADR-136 section 3.
 
+The seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path the agent's reviewed profile names as its seat file, written once by `lys agent enrol` on the computer the agent runs on and never replaced. One reader and writer in lys-core (`seat_file`) serve the `lys mcp` bridge and the enrol command; Cambium's door reads the same members by the same spellings. A reader refuses any version but 1, naming the version it found.
+
+| Member | Written by | Read by | What it holds |
+|---|---|---|---|
+| `version` | enrol; Cambium's door | the bridge; the door; the seat tool | always 1 |
+| `doorUrl` | enrol with `--door`; the door | the door; the seat tool | the Cambium door the seat answers at |
+| `handle` | enrol with `--handle`; the door | the door; the seat tool | the registry handle |
+| `device` | enrol with `--device`; the door | the door; the seat tool | the device label on the seat's session |
+| `privateKeyPem` | enrol; the door (a seat founded beside it) | the bridge; the seat tool | the Ed25519 key, PKCS#8 PEM, made where the agent runs, never printed |
+| `lysUrl` | enrol; the door | the door; the seat tool | the Lys API that certified the key |
+| `lysAgentId` | enrol; the door | the bridge (`--as`); the door; the seat tool | the Lys agent the certificate names |
+| `certificatePem` | enrol | a reader that verifies the key | the certificate Lys issued over the key |
+| `serial` | enrol | a person reading the file | the certificate's serial in Lys's certificate log |
+
 ## Principles
 
 - **P1** — Nothing a seat needs is typed into a terminal: warnings, compaction, reminders and stops go through the harness's control channel and the runner (ADR-130).
@@ -198,9 +212,15 @@ Two briefs over the landed 050 and 051 and the written 064. AGENTS-001: prompt w
 | `crates/lys/src/commands/enrol_tests.rs` | enrol's reds: 0600 seat file the bridge reads; seat_file_exists; the Cambium shape | AGENTS-017 |
 | `crates/lys-core/src/seat_file.rs` | the one seat file shape read by the bridge, the enrol command and the runner's seat program | AGENTS-017 |
 | `surface/identity/src/features/file/EmergencyStop.tsx` | the emergency act, renamed Withdraw, final, with its receipt sentence | AGENTS-017 |
-| `crates/lys/src/identity/install/command.rs` | install and upgrade name the computer Lys runs on, idempotently | AGENTS-017 |
-| `crates/lys/src/identity/install/runner_machine_record/own_machine.rs` | the install's read of its own machine, now finding the one it named | AGENTS-017 |
 | `crates/lys-core/src/lib.rs` | exports the seat file reader and writer | AGENTS-017 |
+| `crates/lys-identity-server/src/own_computer.rs` | names the computer Lys runs on for the administrator, once, at setup and at agent-roots | AGENTS-017 |
+| `surface/identity/src/features/run/SessionStop.tsx` | Stop for one run: ends the session, keeps the certificate | AGENTS-017 |
+| `crates/lys/src/cli/enrol.rs` | lys agent enrol's arguments | AGENTS-017 |
+| `crates/lys-core/src/seat_file_tests.rs` | the seat file's reds: written back whole in the door's names, other versions and none refused, the key never shown | AGENTS-017 |
+| `crates/lys-identity-server/tests/agent_roots/unnamed_at_setup.rs` | a computer setup could not name is named by agent-roots, and a start on it is admitted | AGENTS-017 |
+| `crates/lys/Cargo.toml` | the lys crate's test dependencies on the identity contract harness and the server, for enrol's reds | AGENTS-017 |
+| `surface/identity/src/features/file/IdentityFile.tsx` | the agent file's head menu names the emergency act Withdraw | AGENTS-017 |
+| `crates/lys-core/Cargo.toml` | serde_json for the seat file reader and writer | AGENTS-017 |
 
 ## Inventory
 

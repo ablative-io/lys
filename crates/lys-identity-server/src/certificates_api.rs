@@ -7,6 +7,9 @@
 //! are never the grants as they stand now, and the answer says so in
 //! `claims_are_live`.
 //!
+//! Each certificate is answered as DER in standard base64 and as the same
+//! bytes in a `CERTIFICATE` PEM, the form a seat file keeps (AGENTS-017 R1).
+//!
 //! Issuing and withdrawing are in `certificates_issue`; their answers are
 //! this same view, with the serial the act was recorded under. An agent's
 //! own signed call issues only the first certificate of an agent it
@@ -53,6 +56,9 @@ pub struct CertificateView {
     pub claims: Value,
     /// The certificate, DER, standard base64.
     pub der: String,
+    /// The same certificate as an RFC 7468 `CERTIFICATE` PEM, the form a
+    /// seat file keeps (AGENTS-017 R1).
+    pub pem: String,
     /// When it was issued, in seconds since the Unix epoch.
     pub issued_at: u64,
     /// Its withdrawal, null while it stands.
@@ -114,6 +120,7 @@ fn view(proven: Proven) -> CertificateView {
         serial: issued.serial,
         person: issued.person,
         claims: issued.claims,
+        pem: certificate_pem(&issued.der),
         der: issued.der,
         issued_at: issued.issued_at,
         withdrawn: proven.entered.withdrawn,
@@ -125,6 +132,21 @@ fn view(proven: Proven) -> CertificateView {
             proof: hex(proven.proof.as_bytes()),
         },
     }
+}
+
+/// `der`, standard base64 as the store keeps it, framed as a PEM `CERTIFICATE`
+/// wrapped at 64 characters: the same base64, so no bytes are decoded here.
+fn certificate_pem(der: &str) -> String {
+    let mut pem = String::with_capacity(der.len() + der.len() / 64 + 64);
+    pem.push_str("-----BEGIN CERTIFICATE-----\n");
+    for (index, character) in der.chars().enumerate() {
+        if index > 0 && index % 64 == 0 {
+            pem.push('\n');
+        }
+        pem.push(character);
+    }
+    pem.push_str("\n-----END CERTIFICATE-----\n");
+    pem
 }
 
 /// The certificates of `agent` as they stand, with what `recorded` names.
