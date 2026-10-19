@@ -271,6 +271,12 @@ fn grants_and_reviews(api: &mut Api) -> Vec<Entry> {
         (POST, "/grants/who", Some(who), Some(page)),
         (
             POST,
+            "/grants/held",
+            Some(api.schema::<crate::grant_contract::ActionBody>()),
+            Some(api.schema::<crate::grants::held::HeldAnswer>()),
+        ),
+        (
+            POST,
             "/grants/reach",
             Some(api.schema::<ReachBody>()),
             Some(api.schema::<ReachAnswer>()),

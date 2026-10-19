@@ -58,6 +58,7 @@ use crate::spicedb::{Relationships, SpiceDb, SpiceDbEngine};
 mod administrator;
 mod decisions;
 mod handlers;
+pub(crate) mod held;
 pub(crate) use decisions::{Decision, decide, decide_as};
 use handlers::{cannot_give, check, list, model, read, revoke, who, why};
 pub(crate) use handlers::{delegate, issue_root};
@@ -315,6 +316,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         )
         .route("/grants/why", post(why))
         .route("/grants/who", post(who))
+        .route("/grants/held", post(held::held))
         .route("/grants/reach", post(crate::grants_reach::reach))
         .route("/grants/cannot-give", get(cannot_give))
         .route("/grants/{id}", get(read))

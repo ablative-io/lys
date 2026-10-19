@@ -181,6 +181,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/grants/check" "Check, and record, an exercise" S [GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked"]] scope("grant", "grant.check", []);
     POST "/grants/why" "Why the caller may act" S [GRANT_ASKED, UNANSWERED, &["NotHeld"]] scope("grant", "grant.why", []);
     POST "/grants/who" "Who may act on a resource" S [GRANT_ASKED, UNANSWERED] scope("grant", "grant.who", []);
+    POST "/grants/held" "Whether anyone may act on a resource, naming no one" S [GRANT_ASKED, UNANSWERED] scope("grant", "grant.who", []);
     POST "/grants/reach" "Who may act on each of many resources" S [GRANT_ASKED, UNANSWERED] scope("grant", "grant.reach", []);
     GET "/grants/cannot-give" "What the caller cannot pass on" S [GRANT_READ, &["IdentityUnknown", "NotHolder", "IdentityNotActive"]] scope("grant", "read", []);
     GET "/grants/{id}" "One grant the caller may see" S [GRANT_READ, &["GrantIdMalformed"]] scope("grant", "read", ["id"]);
