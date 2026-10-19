@@ -163,6 +163,9 @@ Behavioural. Two halves. (i) First-run setup (setup.rs, both setup routes, throu
 - modify: surface/identity/src/shell/help/concepts/start.ts
 - modify: surface/identity/src/shell/help/concepts/trouble.ts
 - modify: surface/identity/tests/give-chooser.test.tsx
+- modify: surface/identity/src/shell/help/concepts/apps.ts
+- modify: surface/identity/src/shell/help/concepts/people.ts
+- modify: surface/identity/tests/help.test.tsx
 
 **Checklist:**
 - C790 — One standing choice gives an agent its roots, agent-roots first for an administrator without them, then four grants in order with one receipt; the install names the computer Lys runs on, by the administrator with the lys runner, idempotently.
@@ -219,3 +222,10 @@ Behavioural. R1's command takes --door <door url> --handle <registry handle> --d
 - **By:** Flapjack, coordinator, on Waffles' word, from the AGENTS-017 lane's handback
 
 R4(i) moves from lys identity install and upgrade to setup and POST /grants/agent-roots. install/command.rs:61 only asks setup_code::has_administrator and issues the setup code, so a fresh install has no administrator person to name the computer for until setup; and the network file is written only by the running service through its one NetworkStore (file_stores.rs:30 opens it into AppState; network_api.rs:237 with_network is the one writer), so an install writing it beside a running service would race the store. The computer is therefore named in crates/lys-identity-server/src/own_computer.rs at setup and at every agent-roots post; a naming failure at setup is said in the setup answer as own_computer_unnamed and never swallowed, and agent-roots names it again before giving any root (tests/agent_roots/unnamed_at_setup.rs). R2's Stop posts {} because POST /runtime/sessions/{id}/end takes runner_api.rs:102-104 Empty with deny_unknown_fields (read at runner_api.rs:370-372); an {operation} member would be refused. R3's settings digest is computed on read and never stored, so the previous build still reads the provisioning file. R5's reader refuses a JSON seat file without version as seat_file_version_unknown naming the version it reads; Cambium's writer (cambium-door contract/agent_seat.rs:45-47) carries version, and no seat file on this Mac lacks it. File lists now name the files as built: stop_api.rs (agent_stop_api.rs does not exist), RuntimeSessions.tsx for the Sessions tab's Stop, agent_pass.rs for the enrol dispatch (main.rs unchanged), design.json (DESIGN.md is rendered from it), and the new files cli/enrol.rs, SessionStop.tsx, own_computer.rs, seat_file_tests.rs and tests/agent_roots/unnamed_at_setup.rs.
+
+### Amendment 2: R4's touched files follow DIRECTORY-106 (Lys names no app); CambiumFirst kept; one named exception for sections.tsx
+
+- **Date:** 2026-10-20
+- **By:** Waffles, Lys owner, relayed by Flapjack (00:2x 20 Oct), from the AGENTS-017 lane
+
+The help ids start.cambium, access.cambium-channels and trouble.cambium-missing become start.app, access.app-channels and trouble.app-missing, with every reference following (apps.ts, people.ts, tests/help.test.tsx); the touched help texts use app-neutral words, because the static help registry cannot take an app's registered name without a HelpDock.tsx change, which is R7's. The page help region for [data-cambium-first] is removed from pages.ts, since its selector names the app; R7 restores a region once the notice's attribute is app-neutral. The gone agent-roots button (sections.tsx:123-131 on 9b9a6e6b) stays gone; CambiumFirst, a separate working notice with seven tests in tests/file.test.tsx, stays. Its import and render in sections.tsx (lines 29 and 115) are three identifier hits of no-app-names-tsx that predate 9b9a6e6b; R4 lands with exactly those three as a one-time exception named by Waffles, not a precedent, and the R7 lane takes them first, with the 273 Cambium mentions in 18 non-test surface files (DIRECTORY-048 R7, C368).

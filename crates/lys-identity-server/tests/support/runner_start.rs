@@ -53,6 +53,16 @@ pub fn operation() -> Result<String, Box<dyn Error>> {
     Ok(OperationId::generate()?.to_string())
 }
 
+/// Who the directory holds before the service starts.
+enum Seeding<'a> {
+    /// The configured administrator and bea, each with their agents.
+    Configured,
+    /// The command scenarios' people, with a second subject when named.
+    Commands(Option<&'a str>),
+    /// Nobody: first-run setup is the scenario's own.
+    Nobody,
+}
+
 /// One service, broker and real runner shared by a scenario.
 pub struct Table {
     /// The directory service.
@@ -138,6 +148,26 @@ impl Table {
         commands_only: bool,
         other_subject: Option<&str>,
     ) -> Result<Self, Box<dyn Error>> {
+        let seeding = if commands_only {
+            Seeding::Commands(other_subject)
+        } else {
+            Seeding::Configured
+        };
+        Self::open(model, seeding).await
+    }
+
+    /// A table whose directory holds nobody yet, judging grants by `model`:
+    /// the configured administrator signs in and finishes first-run setup
+    /// themselves. [`Table::agent`] and [`Table::person`] name nobody here.
+    ///
+    /// # Errors
+    /// Propagates failed fixture setup, transport errors or a service refusal.
+    pub async fn unseeded(model: &str) -> Result<Self, Box<dyn Error>> {
+        Self::open(model, Seeding::Nobody).await
+    }
+
+    async fn open(model: &str, seeding: Seeding<'_>) -> Result<Self, Box<dyn Error>> {
+        let commands_only = matches!(seeding, Seeding::Commands(_));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let address = listener.local_addr()?;
         tokio::spawn(async move { axum::serve(listener, Router::new().fallback(broker)).await });
@@ -172,10 +202,13 @@ impl Table {
                 }
             },
             move |config| {
-                let seeded = if commands_only {
-                    command_seed(config, other_subject)?
-                } else {
-                    seed_configured(config, [ADMINISTRATOR, "bea-subject"])?
+                let seeded = match seeding {
+                    Seeding::Commands(other_subject) => command_seed(config, other_subject)?,
+                    Seeding::Configured => seed_configured(config, [ADMINISTRATOR, "bea-subject"])?,
+                    Seeding::Nobody => Seeded {
+                        people: Vec::new(),
+                        tree_size: 0,
+                    },
                 };
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);
                 let runner = Runner::open(&Options {

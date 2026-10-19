@@ -1,5 +1,5 @@
 import { useContext, useMemo, useState } from 'react';
-import { Refused, api, operationId, useLoad } from '../../api';
+import { Refused, api, operationId, request, useLoad } from '../../api';
 import type { DelegateBody, Grant, Recorded, ResourceRef } from '../../generated/grants';
 import { keptSend } from '../../kept';
 import { Act } from '../../shell/Act';
@@ -10,6 +10,7 @@ import { ActPanel } from '../grants/GrantTable';
 import { givesTo, grantNo, onText, passesToAgents, withinPassOn, type GrantWorld } from '../grants/model';
 import { pendingGrantKey, readPendingGrant, readPendingRest } from '../grants/pendingGrant';
 import { readableMachine } from '../network/contract';
+import type { Machine, NetworkView } from '../network/contract';
 import { NetworkRead } from '../network/shared-read';
 import type { Entry } from '../people/directory';
 import { giveLink } from './giveLink';
@@ -27,19 +28,25 @@ export function MissingGive({ id, reason }: { id: string; reason: string }) {
   ) : null;
 }
 
-/** One grant a standing choice posts: the act, the relation carrying it alone, and the held grant it is given from. */
+/** One grant the standing choice posts: the act, the relation carrying it alone, and the held grant it is given from. */
 interface Step { action: string; relation: string; source: Grant }
 
-/** A standing choice as drawn: its steps when the person can give it, else the words for why not. */
+/** A plan for one act as drawn: its step when the person can give it, else the words for why not. */
 type Plan = { at: 'ready'; steps: Step[] } | { at: 'none'; why: string };
-
-type Standing = 'create' | 'machine' | 'profiles';
 
 type Outcome =
   | { at: 'idle' }
-  | { at: 'sending'; which: Standing }
+  | { at: 'sending' }
   | { at: 'given'; words: string }
   | { at: 'refused'; words: string };
+
+/** The four grants of the one standing choice, in the order they are given (AGENTS-017 R4). */
+const ACTS: { action: string; on: 'person' | 'computer' }[] = [
+  { action: 'agent.create', on: 'person' },
+  { action: 'machine.agent.set', on: 'computer' },
+  { action: 'agent.provisioning.set', on: 'person' },
+  { action: 'agent.provisioning.review', on: 'person' },
+];
 
 /**
  * The person's grants a standing choice is given from, one per act: their own, standing, passable to an agent, on
@@ -48,7 +55,7 @@ type Outcome =
  * of, is said, never offered.
  */
 function planFor(w: GrantWorld, resource: ResourceRef | null, actions: string[]): Plan {
-  if (resource === null) return { at: 'none', why: '' };
+  if (resource === null) return { at: 'none', why: 'You have no computer of your own to give.' };
   if (!agentMayHold(w.model, resource.kind, actions)) return { at: 'none', why: 'Lys does not let an agent hold this yet.' };
   const carriers = singleActionCarriers(w.model, resource.kind);
   const steps: Step[] = [];
@@ -67,92 +74,129 @@ function planFor(w: GrantWorld, resource: ResourceRef | null, actions: string[])
   return { at: 'ready', steps };
 }
 
+/** The person's own computers in use, from a read of the network. */
+const ownComputers = (network: NetworkView | null, me: string): Machine[] =>
+  network && Array.isArray(network.machines)
+    ? network.machines.filter((machine) => readableMachine(machine) && machine.named_by === me && machine.state === 'in_use')
+    : [];
+
+/** The computer the choice gives on: the one chosen, else the one Lys runs on, else the first. */
+const chosenOf = (computers: Machine[], chosen: string): Machine | undefined =>
+  computers.find((machine) => machine.id === chosen) ?? computers.find((machine) => machine.runtime === 'lys-runner') ?? computers[0];
+
+/** Each act's plan, in order, on the person and the computer. */
+const plansFor = (w: GrantWorld, computer: Machine | undefined): { action: string; plan: Plan }[] =>
+  ACTS.map(({ action, on }) => ({
+    action,
+    plan: planFor(w, on === 'person' ? { kind: 'person', id: w.me.person.id } : computer ? { kind: 'machine', id: computer.id } : null, [action]),
+  }));
+
 /**
- * The three grants a person gives an agent once (AGENTS-015 R4), each one choice in plain words, posted through
- * POST /grants exactly as the pickers below post theirs: same body, same kept request, same confirmation.
+ * The one standing choice a person gives an agent once (AGENTS-015 R4, AGENTS-017 R4): let it set up and run agents
+ * on a computer of theirs. Its Give posts four grants in order, agent.create, machine.agent.set,
+ * agent.provisioning.set and agent.provisioning.review, through POST /grants exactly as the pickers below post theirs:
+ * same body, same kept request, same confirmation, use only. The administrator who holds nothing to give one of them
+ * from has Lys record their roots first (POST /grants/agent-roots), which also names the computer Lys runs on; the
+ * grants and computers are read again before the four are planned. One receipt names the four grants; a refusal names
+ * the step that refused and leaves the earlier grants given, so pressing Give again finishes what is left.
  */
 function StandingGrants({ x, w, reload }: { x: Entry; w: GrantWorld; reload: () => void }) {
   const me = w.me.person.id;
   const name = x.display_name;
+  const administrator = w.people.scope === 'directory';
   const readNetwork = useContext(NetworkRead);
   const network = useLoad(readNetwork, 'standing-computers:' + x.id);
   const [computer, setComputer] = useState('');
   const [outcome, setOutcome] = useState<Outcome>({ at: 'idle' });
-  const own = network.status === 'ok' && Array.isArray(network.data.machines)
-    ? network.data.machines.filter((machine) => readableMachine(machine) && machine.named_by === me && machine.state === 'in_use')
-    : [];
-  const offered = own.filter((machine) => planFor(w, { kind: 'machine', id: machine.id }, ['machine.agent.set']).at === 'ready');
-  const chosen = offered.find((machine) => machine.id === computer) ?? offered[0];
-  const choices: { id: Standing; title: string; sentence: string; plan: Plan; absent?: string }[] = [
-    { id: 'create', title: 'Create agents for me', plan: planFor(w, { kind: 'person', id: me }, ['agent.create']),
-      sentence: `Lets ${name} register agents that answer to you; it then may set up, start, stop and restart each agent it creates.` },
-    { id: 'machine', title: 'Run my agents on this computer', plan: planFor(w, chosen ? { kind: 'machine', id: chosen.id } : null, ['machine.agent.set']),
-      sentence: chosen ? `Lets ${name} allow your agents to run on ${chosen.name}.` : `Lets ${name} allow your agents to run on a computer of yours.`,
-      absent: network.status === 'loading' ? 'Reading your computers…'
-        : network.status === 'refused' ? 'Your computers could not be read: ' + network.refused.refusal.reason
-          : own.length === 0 ? 'You have no computer of your own to give.'
-            : offered.length === 0 ? 'You hold nothing for your computers that you may pass on to an agent.' : undefined },
-    { id: 'profiles', title: 'Set up and review this kind of profile', plan: planFor(w, { kind: 'person', id: me }, ['agent.provisioning.set', 'agent.provisioning.review']),
-      sentence: `Lets ${name} set up and review your agents’ profiles; a version ${name} sets itself is reviewed by someone else.` },
-  ];
+  const computers = ownComputers(network.status === 'ok' ? network.data : null, me);
+  const chosen = chosenOf(computers, computer);
+  const plans = plansFor(w, chosen);
+  const missing = plans.find(({ plan }) => plan.at === 'none');
+  const where = chosen?.name ?? 'a computer of yours';
+  const title = `Let ${name} set up and run agents on ${chosen?.name ?? 'your computer'}`;
+  const sentence = `Lets ${name} register agents that answer to you; it then may set up, start, stop and restart each agent it creates. `
+    + `Lets ${name} allow your agents to run on ${where}. `
+    + `Lets ${name} set up and review your agents’ profiles; a version ${name} sets itself is reviewed by someone else.`;
 
-  /** Each step's grant in turn, kept before it is sent and released only on Lys's confirmation, as the pickers send theirs. */
-  const give = async (which: Standing, title: string, sentence: string, steps: Step[]) => {
+  /** The roots first when the administrator lacks a source, then each step's grant in turn, kept before it is sent. */
+  const give = async () => {
     if (outcome.at === 'sending') return;
-    setOutcome({ at: 'sending', which });
+    setOutcome({ at: 'sending' });
     const given: string[] = [];
+    let world = w;
+    let on = chosen;
+    if (missing && administrator) {
+      try {
+        await request<unknown>('/grants/agent-roots', {});
+        const [list, read] = await Promise.all([api.grants(), readNetwork()]);
+        world = { ...w, list, byId: new Map(list.grants.map((grant) => [grant.id, grant])) };
+        on = chosenOf(ownComputers(read, me), computer);
+      } catch (error) {
+        const reason = error instanceof Refused ? error.refusal.reason : String(error);
+        setOutcome({ at: 'refused', words: `Not given: ${title}. Lys refused to record your roots for giving agents access: ${reason}.` });
+        return;
+      }
+    }
     const now = Math.floor(Date.now() / 1000);
-    for (const step of steps) {
-      const body: DelegateBody = {
-        operation: operationId(), route: 'browser', source: step.source.id, recipient: x.id, responsible: me,
-        resource: step.source.resource, relation: step.relation, pass_on: { kind: 'use_only' },
-        window: { starts_at: now, ends_at: step.source.window.ends_at },
-      };
-      const kept = await keptSend<Recorded>(pendingGrantKey(me, step.source.id), body, async () => {
-        const answer = await api.delegate(body);
-        if (answer.operation !== body.operation || answer.receipt?.caller !== me || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
-          throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'Lys did not confirm this grant operation.' });
-        }
-        return answer;
-      }, true);
-      if (kept.at !== 'confirmed') {
-        const reason = kept.error instanceof Refused ? kept.error.refusal.reason : String(kept.error);
-        const before = given.length ? ` Given before it: ${given.join(', ')}.` : '';
-        setOutcome({ at: 'refused', words: kept.at === 'refused' ? `Not given: ${title}. Lys refused ${step.action}: ${reason}.${before}`
-          : kept.at === 'unkept' ? `Nothing more was sent: this browser could not keep the request for ${step.action} (${reason}).${before}`
-            : `Lys has not confirmed ${step.action} (${reason}). The request is kept in this browser; choose its access under Access to give below to check it, never giving it twice.${before}` });
+    for (const { action, plan } of plansFor(world, on)) {
+      const before = given.length ? ` Given before it: ${given.join(', ')}.` : '';
+      if (plan.at === 'none') {
+        setOutcome({ at: 'refused', words: `Not given: ${title}. ${action}: ${plan.why}${before}` });
         if (given.length) reload();
         return;
       }
-      given.push(`${step.action} (${grantNo(kept.answer.grant)})`);
+      for (const step of plan.steps) {
+        const body: DelegateBody = {
+          operation: operationId(), route: 'browser', source: step.source.id, recipient: x.id, responsible: me,
+          resource: step.source.resource, relation: step.relation, pass_on: { kind: 'use_only' },
+          window: { starts_at: now, ends_at: step.source.window.ends_at },
+        };
+        const kept = await keptSend<Recorded>(pendingGrantKey(me, step.source.id), body, async () => {
+          const answer = await api.delegate(body);
+          if (answer.operation !== body.operation || answer.receipt?.caller !== me || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
+            throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'Lys did not confirm this grant operation.' });
+          }
+          return answer;
+        }, true);
+        if (kept.at !== 'confirmed') {
+          const reason = kept.error instanceof Refused ? kept.error.refusal.reason : String(kept.error);
+          setOutcome({ at: 'refused', words: kept.at === 'refused' ? `Not given: ${title}. Lys refused ${step.action}: ${reason}.${before}`
+            : kept.at === 'unkept' ? `Nothing more was sent: this browser could not keep the request for ${step.action} (${reason}).${before}`
+              : `Lys has not confirmed ${step.action} (${reason}). The request is kept in this browser; choose its access under Access to give below to check it, never giving it twice.${before}` });
+          if (given.length) reload();
+          return;
+        }
+        given.push(`${step.action} (${grantNo(kept.answer.grant)})`);
+      }
     }
     setOutcome({ at: 'given', words: `Given: ${title}. ${sentence} ${given.join(', ')}.` });
     reload();
   };
 
+  const reading = network.status === 'loading';
+  const offer = !reading && (missing === undefined || administrator);
   return (
     <div className="field" data-standing>
       <div className="eyebrow">Give once</div>
       <p className="note">
-        Each of these is one choice, given once. Six approvals for every agent is security too awkward to use, so the standing grant is your
-        consent, and every act under it is on the record as {name}’s. Each can be revoked from the grants below.
+        This is one choice, given once. Six approvals for every agent is security too awkward to use, so the standing grant is your
+        consent, and every act under it is on the record as {name}’s. Each grant can be revoked from the grants below.
       </p>
-      {choices.map(({ id, title, sentence, plan, absent }) => (
-        <div key={id} className="field" data-standing-choice={id}>
-          <strong>{title}</strong>
-          {absent === undefined ? <p className="note">{sentence}</p> : null}
-          {id === 'machine' && offered.length > 0 ? (
-            <select aria-label="Computer to give" value={chosen?.id ?? ''} onChange={(event) => setComputer(event.target.value)}>
-              {offered.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}
-            </select>
-          ) : null}
-          {absent !== undefined ? <p className="note" {...(network.status === 'loading' ? { 'data-standing-reading': '' } : {})}>{absent}</p>
-            : plan.at === 'ready' ? (
-              <Act symbol="send" name={title + ' for ' + name} word="Give" data-act={'standing-' + id} disabled={outcome.at === 'sending'}
-                onClick={() => { void give(id, title, sentence, plan.steps); }} />
-            ) : <p className="note">{plan.why}</p>}
-        </div>
-      ))}
+      <div className="field" data-standing-choice="all">
+        <strong>{title}</strong>
+        <p className="note">{sentence}</p>
+        {computers.length > 1 ? (
+          <select aria-label="Computer to give" value={chosen?.id ?? ''} onChange={(event) => setComputer(event.target.value)}>
+            {computers.map((machine) => <option key={machine.id} value={machine.id}>{machine.name}</option>)}
+          </select>
+        ) : null}
+        {reading ? <p className="note" data-standing-reading>Reading your computers…</p>
+          : network.status === 'refused' ? <p className="note">Your computers could not be read: {network.refused.refusal.reason}</p> : null}
+        {offer ? (
+          <Act symbol="send" name={title} word="Give" data-act="standing-all" disabled={outcome.at === 'sending'}
+            onClick={() => { void give(); }} />
+        ) : !reading && missing?.plan.at === 'none' ? <p className="note">{missing.action}: {missing.plan.why}</p> : null}
+      </div>
       {outcome.at === 'given' ? <p role="status" data-standing-receipt>{outcome.words}</p> : null}
       {outcome.at === 'refused' ? <p role="alert" data-standing-refused>{outcome.words}</p> : null}
     </div>
@@ -182,7 +226,7 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
             word="Give"
             data-act="grant"
             onClick={(event) => {
-              if (mineToGive && passable.length) {
+              if (mineToGive && (passable.length || (x.kind === 'agent' && w.people.scope === 'directory'))) {
                 setSourceId('');
                 setFromLink(false);
                 setOpener(event.currentTarget);
@@ -192,7 +236,7 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
                   x.kind === 'person'
                     ? 'You hold no access you may pass on to people. Ask for it on Requests, or ask whoever gave you yours to let it be passed on.'
                     : mineToGive
-                      ? 'You hold no access you can give an agent. The button below records directory access only; Cambium needs a separate grant.'
+                      ? 'You hold no access you can give an agent. Ask for it on Requests, or ask whoever gave you yours to let it be passed on to agents.'
                       : `Only ${x.display_name}’s responsible person can give it access.`
                 );
             }}

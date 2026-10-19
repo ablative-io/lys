@@ -2,8 +2,8 @@ import type { Seed } from './types';
 
 /**
  * Getting started, in the order a person sets up a new Lys: the setup page first, then the dashboard's own Getting
- * started list (features/dashboard/GettingStarted.tsx) in its order (where agents run, Google, Cambium, the first
- * agent), then what follows. These sheets say what each step is for.
+ * started list (features/dashboard/GettingStarted.tsx) in its order (where agents run, Google, an app to connect,
+ * the first agent), then what follows. These sheets say what each step is for.
  */
 export const START: Seed[] = [
   {
@@ -84,20 +84,20 @@ export const START: Seed[] = [
     related: ['start.sign-in', 'start.person', 'trouble.signin'],
   },
   {
-    id: 'start.cambium',
-    title: 'Connect Cambium',
-    summary: 'Cambium is the team chat; connecting it lets you give agents its channels.',
+    id: 'start.app',
+    title: 'Connect an app',
+    summary: 'Connecting an app, such as your team’s chat, lets you give agents its channels.',
     body: [
-      'Apps, under Settings, lists the apps Lys knows how to connect, Cambium among them, each with Connect. Connect asks once for Cambium’s web address; Continue to Cambium sends your browser there, and Cambium brings you back to Lys to approve what it asks for.',
-      'Nothing an app asks for takes effect until you approve it on Apps. If Cambium has already asked, the dashboard says so: review what it asks for and approve it.',
-      'Until Cambium is approved, an agent’s Access tab says "Connect Cambium on Apps first; its channels appear here once it is approved."',
+      'Apps, under Settings, lists the apps Lys knows how to connect, each with Connect. Connect asks once for the app’s web address; Continue sends your browser there, and the app brings you back to Lys to approve what it asks for.',
+      'Nothing an app asks for takes effect until you approve it on Apps. If an app has already asked, the dashboard says so: review what it asks for and approve it.',
+      'Until the app is approved, an agent’s Access tab says to connect it on Apps first; its channels appear there once it is approved.',
     ],
     steps: [
-      { text: 'Open Apps under Settings and press Connect beside Cambium.', href: '#/apps', link: 'Open Apps' },
-      { text: 'Give Cambium’s web address, such as https://cambium.example.com.' },
+      { text: 'Open Apps under Settings and press Connect beside the app.', href: '#/apps', link: 'Open Apps' },
+      { text: 'Give the app’s web address.' },
       { text: 'Review the permissions it asks for, then approve it.' }
     ],
-    related: ['apps.apps', 'access.cambium-channels', 'trouble.cambium-missing'],
+    related: ['apps.apps', 'access.app-channels', 'trouble.app-missing'],
   },
   {
     id: 'start.agent',
@@ -118,20 +118,20 @@ export const START: Seed[] = [
   },
   {
     id: 'start.channels',
-    title: 'Give an agent Cambium channels',
-    summary: 'An agent reaches a Cambium channel only through a grant you give it.',
+    title: 'Give an agent an app’s channels',
+    summary: 'An agent reaches an app’s channel only through a grant you give it.',
     body: [
-      'Once Cambium is connected, its channels are places in Lys you can give access to.',
+      'Once an app is connected, its channels are places in Lys you can give access to.',
       'On the agent’s page, open Access and press Give. You can pass on only access you hold yourself and are allowed to pass to agents.',
-      'Cambium channel access comes from a grant on a Cambium resource that you hold and may pass to agents. "Let me give agents access" records the administrator’s grants on the agents and apps directories only; it gives no Cambium access.',
+      'Access to an app’s channel comes from a grant on that app’s resource that you hold and may pass to agents. The one standing choice, "set up and run agents", records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the four grants. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
     ],
     steps: [
-      { text: 'Connect Cambium first.', href: '#/apps', link: 'Open Apps' },
-      { text: 'First hold a grant on the Cambium channel that permits passing its actions to agents.' },
+      { text: 'Connect the app first.', href: '#/apps', link: 'Open Apps' },
+      { text: 'First hold a grant on the app’s channel that permits passing its actions to agents.' },
       { text: 'Open the agent’s page, then its Access tab, and press Give.' },
       { text: 'Choose the channel and what the agent may do there.' }
     ],
-    related: ['access.give', 'start.cambium', 'access.restricted'],
+    related: ['access.give', 'start.app', 'access.restricted'],
   },
   {
     id: 'start.limit',

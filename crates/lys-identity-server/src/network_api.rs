@@ -15,7 +15,7 @@ use std::ops::Bound;
 #[path = "network_api/access.rs"]
 mod access;
 #[path = "network_api/host_name.rs"]
-mod host_name;
+pub(crate) mod host_name;
 
 /// This computer's own name, read once (`host_name`); the stores receipt's
 /// refusals name it as the computer to run `accept-loss` on.

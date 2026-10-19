@@ -66,6 +66,7 @@ pub(crate) async fn register_person(
         Ok(Json(PersonRegistered {
             person: id.to_string(),
             receipt: receipt_view(&receipt),
+            own_computer_unnamed: None,
         }))
     })
 }

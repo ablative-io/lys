@@ -4,6 +4,14 @@
 //! `POST /grants/agent-roots`, never at a start. They pass on every act the
 //! model's `editor` carries that an agent may hold, so nothing withheld
 //! from agents can ever be passed through them.
+//!
+//! Beside the directory roots are the two the one standing choice on an
+//! agent's Access tab gives from (AGENTS-017 R4): one on the administrator's
+//! own person passing `agent.create`, `agent.provisioning.set` and
+//! `agent.provisioning.review` to agents, and one on the computer Lys runs
+//! on, which is named first (`own_computer`), passing `machine.agent.set`.
+//! A grant is given only on its source's resource, so a directory root alone
+//! could not give an agent any of those four.
 
 use lys_identity::grants::{
     Action, GrantError, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
@@ -38,6 +46,25 @@ fn operation(owner: PersonId, label: &str) -> OperationId {
 /// is refused `RelationUnknown`, and one whose `editor` carries nothing an
 /// agent may hold is refused `WithheldFromAgents`, by name.
 pub(crate) fn issue(state: &AppState, owner: PersonId) -> Result<Vec<String>, ServerError> {
+    let computer = crate::own_computer::name(state, owner)?;
+    issue_with(state, owner, computer.as_deref())
+}
+
+/// The acts the root on the administrator's own person passes to agents.
+const PERSON_ACTS: [&str; 3] = [
+    "agent.create",
+    "agent.provisioning.review",
+    "agent.provisioning.set",
+];
+/// The act the root on the computer Lys runs on passes to agents.
+const MACHINE_ACTS: [&str; 1] = ["machine.agent.set"];
+
+/// [`issue`], with the computer Lys runs on already named, or none.
+fn issue_with(
+    state: &AppState,
+    owner: PersonId,
+    computer: Option<&str>,
+) -> Result<Vec<String>, ServerError> {
     crate::grants::with_grants(state, |judged| {
         let editor = Relation::new("editor")?;
         let model = judged.grants.model();
@@ -59,21 +86,54 @@ pub(crate) fn issue(state: &AppState, owner: PersonId) -> Result<Vec<String>, Se
             }
             .into());
         }
-        let mut roots = Vec::new();
+        let mut wanted = Vec::new();
         for collection in COLLECTIONS {
+            wanted.push((
+                Resource::new("directory", collection)?,
+                passable.clone(),
+                format!("{collection}/v{version}"),
+            ));
+        }
+        let own = |kind: &str, acts: &[&str]| -> std::collections::BTreeSet<Action> {
+            carried
+                .iter()
+                .filter(|action| acts.contains(&action.as_str()) && agent_may_hold(kind, action.as_str()))
+                .cloned()
+                .collect()
+        };
+        let person = own("person", &PERSON_ACTS);
+        if !person.is_empty() {
+            wanted.push((
+                Resource::new("person", &owner.to_string())?,
+                person,
+                format!("person/v{version}"),
+            ));
+        }
+        if let Some(machine) = computer {
+            let acts = own("machine", &MACHINE_ACTS);
+            if !acts.is_empty() {
+                wanted.push((
+                    Resource::new("machine", machine)?,
+                    acts,
+                    format!("machine/{machine}/v{version}"),
+                ));
+            }
+        }
+        let mut roots = Vec::new();
+        for (resource, acts, label) in wanted {
             let root = judged
                 .grants
                 .issue_root(
                     judged.directory,
                     &RootRequest {
-                        operation: operation(owner, &format!("{collection}/v{version}")),
+                        operation: operation(owner, &label),
                         caller: IdentityId::Person(owner),
                         route: Route::Api,
                         holder: owner,
-                        resource: Resource::new("directory", collection)?,
+                        resource,
                         relation: editor.clone(),
                         pass_on: PassOn::to(
-                            passable.clone(),
+                            acts,
                             [RecipientKind::Person, RecipientKind::Agent].into(),
                         )?,
                         window: Window::new(0, None)?,
@@ -101,15 +161,30 @@ pub(crate) fn administrator(state: &AppState) -> Result<Option<PersonId>, Server
 /// First-run setup's roots for its administrator. A model that cannot give
 /// agents access through `editor` records none at setup, deliberately: setup
 /// finishes, and the explicit `POST /grants/agent-roots` names the refusal.
-pub(crate) fn at_setup(state: &AppState) -> Result<(), ServerError> {
+/// Answers `own_computer_unnamed` and why when the computer Lys runs on could
+/// not be named now, for the setup answer to say.
+pub(crate) fn at_setup(state: &AppState) -> Result<Option<String>, ServerError> {
     let Some(owner) = administrator(state)? else {
-        return Ok(());
+        return Ok(None);
     };
-    match issue(state, owner) {
+    // Setup finishes even when the computer cannot be named now: the setup
+    // answer says so by name, and the administrator's next
+    // `POST /grants/agent-roots` names it before it gives any root.
+    let (computer, unnamed) = match crate::own_computer::name(state, owner) {
+        Ok(computer) => (computer, None),
+        Err(error) => {
+            let words = format!(
+                "own_computer_unnamed: the computer Lys runs on was not named at setup: {error}"
+            );
+            (state.say)(&words);
+            (None, Some(words))
+        }
+    };
+    match issue_with(state, owner, computer.as_deref()) {
         Ok(_)
         | Err(ServerError::Grant(
             GrantError::RelationUnknown { .. } | GrantError::WithheldFromAgents { .. },
-        )) => Ok(()),
+        )) => Ok(unnamed),
         Err(other) => Err(other),
     }
 }

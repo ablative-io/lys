@@ -7,12 +7,12 @@ export const APPS: Seed[] = [
     title: 'Apps',
     summary: 'Every app that signs in with Lys and has its permissions checked here.',
     body: [
-      'Apps has its own place in the menu. Connect an app lists Cambium, then Another app for any app that connects to Lys by its web address, each with Connect. Each app shows its state; nothing an app registers takes effect until you approve it here.',
+      'Apps has its own place in the menu. Connect an app lists the apps Lys knows how to connect, then Another app for any app that connects to Lys by its web address, each with Connect. Each app shows its state; nothing an app registers takes effect until you approve it here.',
       'Approving an app approves the permissions it asks for and the return addresses its sign-in may send a person back to. Declining sends you back to the app, which is told no; nothing it asked for takes effect.',
       'Add your own app (for developers) registers an app by name and id and builds its permission template.',
     ],
     steps: [{ text: 'Open Apps.', href: '#/apps', link: 'Open Apps' }],
-    related: ['start.cambium', 'apps.changes', 'apps.configuration'],
+    related: ['start.app', 'apps.changes', 'apps.configuration'],
   },
   {
     id: 'apps.changes',

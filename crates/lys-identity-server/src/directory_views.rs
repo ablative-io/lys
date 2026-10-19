@@ -172,6 +172,11 @@ pub struct PersonRegistered {
     pub person: String,
     /// The receipt the registration was recorded under.
     pub receipt: DirectoryReceiptView,
+    /// At setup only, when the computer Lys runs on could not be named now:
+    /// `own_computer_unnamed` and why. Setup stands; the administrator's next
+    /// `POST /grants/agent-roots` names it (AGENTS-017 R4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_computer_unnamed: Option<String>,
 }
 
 /// An agent registered, under the person answering for it.

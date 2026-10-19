@@ -19,6 +19,8 @@ mod agent_seat;
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_roots;
+/// The computer Lys runs on, named once by its administrator (AGENTS-017 R4).
+mod own_computer;
 mod agent_sight;
 pub mod agent_signature;
 /// The agents cluster's records (AGENTS-001): one fold-and-snapshot engine, then the words, variables and schedules on it.

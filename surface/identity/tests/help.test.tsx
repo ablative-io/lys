@@ -285,7 +285,7 @@ describe('the full help', () => {
 
 describe('the help address', () => {
   it('round-trips, keeping every other member', () => {
-    const states = [CLOSED_HELP, { page: true, topic: null }, { page: false, topic: 'index' }, { page: true, topic: 'start.cambium' }];
+    const states = [CLOSED_HELP, { page: true, topic: null }, { page: false, topic: 'index' }, { page: true, topic: 'start.app' }];
     for (const state of states) {
       const params = withHelpState(new URLSearchParams('x=1'), state);
       expect(helpStateFromParams(params)).toEqual(state);

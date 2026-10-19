@@ -30,21 +30,21 @@ export const ACCESS: Seed[] = [
     summary: 'Pass on access you hold to an agent that answers to you.',
     body: [
       'On the agent’s Access tab, Give passes on one of your own grants that may be passed to agents. Only the agent’s responsible person can give it access.',
-      'If you hold nothing you can give, the tab says so. The administrator can press "Let me give agents access" to record grants on the agents and apps directories only. It gives no access to Cambium channels; those need a separate grant you hold and may pass to agents.',
+      'If you hold nothing you can give, the tab says so. The administrator can still give their agent the one standing choice, "set up and run agents": Give records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the four grants. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
       'Beside the grants, "What it can reach" sums them up, and the check box answers whether it can do one thing.',
     ],
     steps: [{ text: 'Open the agent’s page, then Access.' }, { text: 'Press Give and choose what to pass on.' }],
     related: ['access.grant', 'start.channels', 'trouble.no-access-to-give'],
   },
   {
-    id: 'access.cambium-channels',
-    title: 'Cambium channels',
-    summary: 'Once Cambium is approved, its channels are places you can grant.',
+    id: 'access.app-channels',
+    title: 'An app’s channels',
+    summary: 'Once an app is approved, its channels are places you can grant.',
     body: [
-      'Until Cambium is connected and approved on Apps, no channel can be given, and Access says to connect Cambium first.'
+      'Until the app is connected and approved on Apps, none of its channels can be given, and Access says to connect it first.'
     ],
-    steps: [{ text: 'Connect Cambium on Apps.', href: '#/apps', link: 'Open Apps' }],
-    related: ['start.cambium', 'start.channels'],
+    steps: [{ text: 'Connect the app on Apps.', href: '#/apps', link: 'Open Apps' }],
+    related: ['start.app', 'start.channels'],
   },
   {
     id: 'access.restricted',

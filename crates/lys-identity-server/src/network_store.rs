@@ -459,6 +459,18 @@ impl NetworkStore {
         self.kept.runners.get(id)
     }
 
+    /// The live machine whose runner is this install's own (`lys`), when one
+    /// names it: the computer Lys runs on (AGENTS-017 R4).
+    #[must_use]
+    pub fn lys_runner_machine(&self) -> Option<&Machine> {
+        self.kept.runners.iter().find_map(|(id, record)| {
+            (*record == RunnerRecord::Lys)
+                .then(|| self.machine(id))
+                .flatten()
+                .filter(|machine| machine.retired.is_none())
+        })
+    }
+
     /// Name `runner` as the machine `id`'s runner, or none. A retired
     /// machine takes no runner, and this install's own runner is named by
     /// one live machine only (AGENTS-002 D3): naming it for a second is

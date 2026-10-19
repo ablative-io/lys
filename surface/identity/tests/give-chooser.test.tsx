@@ -119,11 +119,11 @@ it('resets action choices when the person chooses another source grant', async (
 });
 
 it.each([
-  ['access concept', ACCESS.find((entry) => entry.id === 'access.give')?.body.find((words) => words.includes('Let me give agents access'))],
-  ['start concept', START.find((entry) => entry.id === 'start.channels')?.body.find((words) => words.includes('Let me give agents access'))],
-  ['trouble concept', TROUBLE.find((entry) => entry.id === 'trouble.no-access-to-give')?.body.find((words) => words.includes('Let me give agents access'))],
-  ['page help', PAGES['file:access'].regions.find((region) => region.sel === '[data-act="agent-roots"]')?.text],
-])('limits the agent-roots button to directory access in %s', (_label, words) => {
-  expect(words).toContain('agents and apps directories only');
-  expect(words).toContain('Cambium');
+  ['access concept', ACCESS.find((entry) => entry.id === 'access.give')?.body.find((words) => words.includes('set up and run agents'))],
+  ['start concept', START.find((entry) => entry.id === 'start.channels')?.body.find((words) => words.includes('set up and run agents'))],
+  ['trouble concept', TROUBLE.find((entry) => entry.id === 'trouble.no-access-to-give')?.body.find((words) => words.includes('set up and run agents'))],
+  ['page help', PAGES['file:access'].regions.find((region) => region.sel === '[data-standing-choice="all"]')?.text],
+])('says the standing choice records directory, person and computer roots and no access to an app’s channels in %s', (_label, words) => {
+  expect(words).toContain('the agents and apps directories, their own person record and the computer Lys runs on');
+  expect(words).toContain('It gives no access to an app’s channels');
 });

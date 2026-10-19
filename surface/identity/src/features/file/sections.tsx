@@ -12,22 +12,20 @@ import { AgentCredentials } from './AgentCredentials';
 import { Provisioning } from '../provisioning/Provisioning';
 import { PersonCredentials, PersonSessions } from './PersonSecurity';
 import { AssignedRoles } from '../roles/AssignedRoles';
-import { api, Refused, request, useLoad } from '../../api';
+import { api, useLoad } from '../../api';
 import type { MeView, ReceiptAnswer } from '../../generated';
 import { IdentityName, STATUS } from '../people/Words';
 import { DirectoryGate as Gate } from '../people/Words';
-import { useShell } from '../../shell/ShellContext';
 import { CheckBox } from '../grants/CheckBox';
 import { GiveAccess } from './GiveAccess';
 import { GrantTable } from '../grants/GrantTable';
-import { onText, passesToAgents } from '../grants/model';
+import { onText } from '../grants/model';
 import { changeWords } from './receipt-words';
 import { Pill } from '../people/Pill';
 import { calledBy, firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
 import './file.css';
-import { Act } from '../../shell/Act';
 import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
 
 function Profile({ data }: { data: FileData }) {
@@ -101,7 +99,6 @@ function AgentsOf({ name, agents }: { name: string; agents: FileData['agents'] }
 }
 
 function Access({ data, reload, giveQuery }: { data: FileData; reload: () => void; giveQuery: string }) {
-  const shell = useShell();
   const { x, grants: w } = data;
   const name = calledBy(x.id, x.display_name);
   const held = w.list.grants.filter((g) => g.holder === x.id);
@@ -111,27 +108,11 @@ function Access({ data, reload, giveQuery }: { data: FileData; reload: () => voi
     const key = onText(g);
     reach.set(key, [...new Set([...(reach.get(key) ?? []), ...g.actions])]);
   }
-  const passable = w.list.grants.filter((g) => g.holder === w.me.person.id && g.standing.stands && passesToAgents(g.pass_on));
-  const mineToGive = x.kind === 'agent' && x.person?.id === w.me.person.id && x.state !== 'retired';
   return (
     <>
       <GiveAccess key={x.id + giveQuery} x={x} w={w} query={giveQuery} reload={reload} />
       <GrantTable w={w} grants={held} done={reload} give={false} />
       {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <CambiumFirst /> : null}
-      {mineToGive && !passable.length ? (
-        <div style={{ marginTop: 12 }}>
-          <p className="hint">You hold no access you can give an agent yet. Lys's administrator can record access to the agents and apps directories below. Cambium needs a separate grant.</p>
-          <Act
-            symbol="add"
-            name="Let me give agents access"
-            word="Let me give agents access"
-            data-act="agent-roots"
-            onClick={() => {
-              request<unknown>('/grants/agent-roots', {}).then(reload, (problem: unknown) => shell.toast(problem instanceof Refused ? problem.refusal.reason : 'Lys could not record access you can give agents.'));
-            }}
-          />
-        </div>
-      ) : null}
       {/* After the grant table, the two panels share the width as two halves. */}
       <div className="access-halves">
         <div>

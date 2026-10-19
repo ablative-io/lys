@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 static NAME: OnceLock<Option<String>> = OnceLock::new();
 
 /// This computer's own name, or `None` when the system names none.
-pub(super) fn read() -> Option<String> {
+pub(crate) fn read() -> Option<String> {
     NAME.get_or_init(|| {
         let computer = if cfg!(target_os = "macos") {
             output("scutil", &["--get", "ComputerName"])
