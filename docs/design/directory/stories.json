@@ -688,6 +688,10 @@
         {
           "id": "S438",
           "text": "As the developer of an app, my app registers itself with Lys and appears on Apps under its own name, and Lys never has to know my app's name in advance."
+        },
+        {
+          "id": "S454",
+          "text": "As the developer of an app that holds its permissions in Lys, I want to ask whether anyone may administer my app's own resource, so that my app can tell its operator the resource has no root before a person is refused, without my app seeing whom anyone granted."
         }
       ]
     },

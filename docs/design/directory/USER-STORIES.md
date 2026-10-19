@@ -314,6 +314,8 @@
 
 **S438.** As the developer of an app, my app registers itself with Lys and appears on Apps under its own name, and Lys never has to know my app's name in advance.
 
+**S454.** As the developer of an app that holds its permissions in Lys, I want to ask whether anyone may administer my app's own resource, so that my app can tell its operator the resource has no root before a person is refused, without my app seeing whom anyone granted.
+
 ## Person or agent using Lys through an AI assistant — Reads and changes Lys through an MCP client, with only their own rights
 
 **S153.** As a person or an agent using an AI assistant, I want the assistant to reach Lys with my own identity and nothing more, so that it can never see a secret or do what I could not.

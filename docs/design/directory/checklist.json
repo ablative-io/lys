@@ -2430,6 +2430,26 @@
           "done": true
         }
       ]
+    },
+    {
+      "name": "An app asks whether its own resource has a holder (DIRECTORY-108)",
+      "items": [
+        {
+          "id": "C792",
+          "text": "POST /grants/held answers an approved app held or none for an action on a resource of its own kind, judged from the whole book regardless of the caller's sight, naming no holder.",
+          "done": false
+        },
+        {
+          "id": "C793",
+          "text": "A held question outside the app's own kinds, with an unknown action, or without a known credential is refused by its existing name and answers nothing.",
+          "done": false
+        },
+        {
+          "id": "C794",
+          "text": "The OpenAPI document lists POST /grants/held and the grants reference says what held discloses and how it differs from who.",
+          "done": false
+        }
+      ]
     }
   ]
 }

@@ -655,3 +655,9 @@
 - [x] **C779** — keys/service.key, run/runner-server.pub, keys/runner-machine.key, run/runner-join.json, network.json, network.joins.json and data/runner/ are kept, moved and restored as one set by keep and put-back; install refuses runner_join_present rather than overwrite run/runner-server.pub under a saved join, and never mints a service key the receipt counts.
 - [x] **C780** — While a store has an accepted loss, NotHeld, the agent signature refusal, the runner refusals and machine_not_joined carry 'Lys lost its ... records at <rfc3339>' and what to do again; an accepted loss on the grant log advances its identity's epoch and the grant stream answers an old-epoch cursor Reset{Rollback} even after the head has grown.
 - [x] **C781** — ADR-114's decision says data is kept in data.previous, a put-back moves the window's data to data.rolled-back and removes nothing, and a shrunk store is refused by name until accepted; DESIGN.md renders the same.
+
+## An app asks whether its own resource has a holder (DIRECTORY-108)
+
+- [ ] **C792** — POST /grants/held answers an approved app held or none for an action on a resource of its own kind, judged from the whole book regardless of the caller's sight, naming no holder.
+- [ ] **C793** — A held question outside the app's own kinds, with an unknown action, or without a known credential is refused by its existing name and answers nothing.
+- [ ] **C794** — The OpenAPI document lists POST /grants/held and the grants reference says what held discloses and how it differs from who.
