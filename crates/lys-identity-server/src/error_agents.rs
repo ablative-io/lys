@@ -8,6 +8,7 @@
 use axum::http::StatusCode;
 
 use crate::error::ServerError;
+use crate::error_agent_acts::AgentActsError;
 use crate::error_app_pass::AppPassError;
 use crate::error_budget::BudgetError;
 use crate::error_seat::SeatError;
@@ -44,6 +45,9 @@ pub enum AgentsError {
     /// An agent's pass to an app refused (AGENTS-006).
     #[error(transparent)]
     AppPass(#[from] AppPassError),
+    /// An agent's own act on agents refused (AGENTS-015).
+    #[error(transparent)]
+    AgentActs(#[from] AgentActsError),
 }
 
 impl AgentsError {
@@ -58,6 +62,7 @@ impl AgentsError {
             Self::Seat(error) => error.status(),
             Self::SeatImport(error) => error.status(),
             Self::AppPass(error) => error.status(),
+            Self::AgentActs(error) => error.status(),
         }
     }
 }
@@ -81,4 +86,5 @@ lands! {
     SeatError => Seat,
     SeatImportError => SeatImport,
     AppPassError => AppPass,
+    AgentActsError => AgentActs,
 }

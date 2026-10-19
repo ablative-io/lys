@@ -210,6 +210,10 @@ fn a_grant_not_passable_to_machines_is_refused_naming_the_machine_kind() -> Outc
 fn a_machine_never_holds_a_responsibility_a_person_keeps_but_may_hold_an_apps_act() {
     for kept in [
         "grant.delegate",
+        "grant.revoke",
+        "agent.provisioning.review",
+        "agent.provisioning.set",
+        "machine.agent.set",
         "request.approve",
         "secret.add",
         "role.create",

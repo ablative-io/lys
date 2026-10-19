@@ -9,6 +9,12 @@
 //! stdin, signs it with the agent's key, posts it, and writes the answer a line on stdout.
 //! It grants nothing: what a call may do is decided by the route, exactly as over HTTP.
 //!
+//! Lys is reached from any device over `https://`, its certificate verified against
+//! this system's trust roots with nothing that turns the check off, or over `http://`
+//! on a numeric loopback address (AGENTS-015 R3). A message Lys does not answer, a TLS
+//! refusal or an address that cannot be reached, is said on stderr by name and answered
+//! to the MCP client as a JSON-RPC error for that message.
+//!
 //! The key is read once at start from a PEM file or a seat file's `privateKeyPem`, held
 //! in memory that is wiped when dropped, and never printed; neither is a signature.
 
@@ -25,7 +31,12 @@ use zeroize::Zeroizing;
 
 use crate::commands::error::CliResult;
 use crate::commands::seat_client::refused;
-use crate::identity::loopback_http::{Authority, Request, exchange};
+use crate::identity::loopback_http::{Authority, Failure, Request};
+
+#[path = "mcp_bridge_tls.rs"]
+mod tls;
+
+use tls::{Transport, TrustPath, Unanswered, post};
 
 /// The domain every agent request signature is made under (Lys `agent_signature`).
 const DOMAIN: &str = "lys-identity/agent-request/v1";
@@ -35,18 +46,38 @@ const PKCS8_ED25519_PREFIX: [u8; 16] = [
 ];
 /// The most bytes read from a key file.
 const KEY_FILE_BYTES: usize = 65_536;
+/// The port of an `https://` URL that names none.
+const HTTPS_DEFAULT_PORT: u16 = 443;
+/// The port of an `http://` URL that names none.
+const HTTP_DEFAULT_PORT: u16 = 80;
+
+/// Where the bridge posts: Lys's MCP route, as the URL names it.
+struct Endpoint {
+    /// The host and port.
+    authority: Authority,
+    /// The path posted to, as the URL names it.
+    path: String,
+    /// The path the signature is made over: the router's path, `/api` stripped.
+    signed_path: String,
+    /// Whether the URL is `https://`, reached over verified TLS.
+    secure: bool,
+}
 
 /// Run the bridge until stdin closes.
 ///
 /// # Errors
-/// Refuses by name when the URL is not a loopback HTTP URL or the key cannot be read;
-/// a message Lys does not answer is answered on stdout as a JSON-RPC error.
+/// Refuses by name when the URL is neither `https://` nor `http://` on a loopback
+/// address (`mcp_url_invalid`, `mcp_url_insecure`), when the system's trust roots
+/// cannot be read (`mcp_trust_roots_unreadable`), or when the key cannot be read; a
+/// message Lys does not answer is answered on stdout as a JSON-RPC error.
 pub fn run(url: &str, agent: &str, key_file: &Path) -> CliResult<()> {
-    let (authority, path) = endpoint(url)?;
+    let endpoint = endpoint(url)?;
     let identity = read_key(key_file)?;
-    // The route verifies the signature over the path the router sees, under `/api`
-    // when Lys serves its screens.
-    let signed_path = path.strip_prefix("/api").unwrap_or(&path).to_owned();
+    let transport = if endpoint.secure {
+        Transport::Tls(TrustPath::system()?)
+    } else {
+        Transport::Loopback
+    };
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
     for line in stdin.lock().lines() {
@@ -54,7 +85,7 @@ pub fn run(url: &str, agent: &str, key_file: &Path) -> CliResult<()> {
         if line.trim().is_empty() {
             continue;
         }
-        if let Some(answer) = relay(&authority, (&path, &signed_path), agent, &identity, &line) {
+        if let Some(answer) = relay(&endpoint, &transport, agent, &identity, &line) {
             writeln!(stdout, "{answer}")
                 .and_then(|()| stdout.flush())
                 .map_err(|error| refused("mcp_stdout_unwritable", error.to_string()))?;
@@ -64,9 +95,11 @@ pub fn run(url: &str, agent: &str, key_file: &Path) -> CliResult<()> {
 }
 
 /// Sign and post one message; the line to answer on stdout, none for a notification.
+/// A failure is said on stderr by name, and answered as a JSON-RPC error when the
+/// message has an id.
 fn relay(
-    authority: &Authority,
-    (path, signed_path): (&str, &str),
+    endpoint: &Endpoint,
+    transport: &Transport,
     agent: &str,
     identity: &Ed25519Identity,
     message: &str,
@@ -75,30 +108,54 @@ fn relay(
         .ok()
         .and_then(|value| value.get("id").cloned());
     let body = message.as_bytes();
-    let header = signature(identity, agent, signed_path, body);
+    let header = signature(identity, agent, &endpoint.signed_path, body);
     let headers: [(&str, &[u8]); 3] = [
         ("content-type", b"application/json"),
         ("accept", b"application/json, text/event-stream"),
         ("lys-agent-signature", header.as_bytes()),
     ];
-    let answered = exchange(
-        authority,
+    let answered = post(
+        transport,
+        &endpoint.authority,
         &Request {
             method: "POST",
-            path,
+            path: &endpoint.path,
             headers: &headers,
             body,
         },
     );
-    match answered {
-        Ok(response) if response.body.is_empty() => id.map(|id| {
-            failure(
-                &id,
-                &format!("Lys answered {} with no body", response.status),
+    let reason = match answered {
+        Ok(response) if response.body.is_empty() => {
+            // A notification is accepted with no body; a request with an id is owed one.
+            id.as_ref()?;
+            format!(
+                "mcp_answer_empty: Lys answered {} with no body",
+                response.status
             )
-        }),
-        Ok(response) => Some(String::from_utf8_lossy(&response.body).trim().to_owned()),
-        Err(error) => id.map(|id| failure(&id, &format!("Lys was not reached: {error:?}"))),
+        }
+        Ok(response) => return Some(String::from_utf8_lossy(&response.body).trim().to_owned()),
+        Err(unanswered) => named(&unanswered),
+    };
+    eprintln!("{reason}");
+    id.map(|id| failure(&id, &reason))
+}
+
+/// The failure, by name: `mcp_tls_refused`, `mcp_unreachable`, `mcp_answer_lost` or
+/// `mcp_answer_malformed`, with its detail (an empty answer is `mcp_answer_empty`).
+fn named(unanswered: &Unanswered) -> String {
+    match unanswered {
+        Unanswered::TlsRefused(detail) => format!("mcp_tls_refused: {detail}"),
+        Unanswered::Exchange(Failure::Unreachable(detail)) => {
+            format!("mcp_unreachable: {detail}")
+        }
+        Unanswered::Exchange(Failure::Uncertain(detail)) => {
+            format!(
+                "mcp_answer_lost: the message may have reached Lys and no whole answer came back: {detail}"
+            )
+        }
+        Unanswered::Exchange(Failure::Malformed(detail)) => {
+            format!("mcp_answer_malformed: {detail}")
+        }
     }
 }
 
@@ -126,27 +183,37 @@ fn signature(identity: &Ed25519Identity, agent: &str, path: &str, body: &[u8]) -
     format!("{agent} {millis} {nonce} {}", hex(&attestation))
 }
 
-/// The loopback authority and path of `url`.
-fn endpoint(url: &str) -> CliResult<(Authority, String)> {
-    let rest = url.strip_prefix("http://").ok_or_else(|| {
-        refused(
+/// Lys's MCP route as `url` names it: `https://` on any host, or `http://` on a
+/// numeric loopback address.
+fn endpoint(url: &str) -> CliResult<Endpoint> {
+    let (secure, rest) = if let Some(rest) = url.strip_prefix("https://") {
+        (true, rest)
+    } else if let Some(rest) = url.strip_prefix("http://") {
+        (false, rest)
+    } else {
+        return Err(refused(
             "mcp_url_invalid",
-            "the Lys MCP URL must be http:// on loopback",
-        )
-    })?;
+            "the Lys MCP URL must be https://<lys host>/api/mcp, or http:// on a loopback address",
+        ));
+    };
     let (host, path) = rest
         .split_once('/')
         .map_or((rest, "/"), |(host, path)| (host, path));
-    let authority =
-        Authority::parse(host, Some(80)).map_err(|reason| refused("mcp_url_invalid", reason))?;
-    let numeric = authority
+    let default_port = if secure {
+        HTTPS_DEFAULT_PORT
+    } else {
+        HTTP_DEFAULT_PORT
+    };
+    let authority = Authority::parse(host, Some(default_port))
+        .map_err(|reason| refused("mcp_url_invalid", reason))?;
+    let loopback = authority
         .host
-        .trim_matches(['[', ']'])
-        .parse::<std::net::IpAddr>();
-    if !numeric.is_ok_and(|address| address.is_loopback()) {
+        .parse::<std::net::IpAddr>()
+        .is_ok_and(|address| address.is_loopback());
+    if !secure && !loopback {
         return Err(refused(
-            "mcp_url_invalid",
-            "the Lys MCP URL must name a numeric loopback address",
+            "mcp_url_insecure",
+            "the Lys MCP URL must be https:// off this machine; http:// is only for a numeric loopback address such as 127.0.0.1",
         ));
     }
     let path = if path == "/" {
@@ -154,7 +221,15 @@ fn endpoint(url: &str) -> CliResult<(Authority, String)> {
     } else {
         format!("/{path}")
     };
-    Ok((authority, path))
+    // The route verifies the signature over the path the router sees, under `/api`
+    // when Lys serves its screens.
+    let signed_path = path.strip_prefix("/api").unwrap_or(&path).to_owned();
+    Ok(Endpoint {
+        authority,
+        path,
+        signed_path,
+        secure,
+    })
 }
 
 /// The agent's key, from a PEM file or a seat file whose `privateKeyPem` holds the PEM.

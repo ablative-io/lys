@@ -368,7 +368,11 @@ async fn set(
     body: Result<Json<SetBody>, JsonRejection>,
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    crate::routes::responsible_or_administrator(&state, &headers, &id)?;
+    // An agent admitted at the door holds agent.provisioning.set on it.
+    let acting = crate::agent_acts::admitted().map(|admitted| admitted.agent);
+    if acting.is_none() {
+        crate::routes::responsible_or_administrator(&state, &headers, &id)?;
+    }
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let agent = AgentId::from_str(&id).map_err(|_unread| ServerError::AgentNotVisible)?;
     if let Some(machine) = &body.runs_on
@@ -391,7 +395,10 @@ async fn set(
             number: 0,
             operation: OperationId::from_str(&body.operation)?.to_string(),
             settings: settings(body)?,
-            set_by: own_person(directory, &actor)?.to_string(),
+            set_by: match acting {
+                Some(agent) => agent.to_string(),
+                None => own_person(directory, &actor)?.to_string(),
+            },
             set_at: now(),
             reviewed: None,
         };

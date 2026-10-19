@@ -149,15 +149,29 @@ pub(super) async fn change_agent(
         .map_err(|error| malformed(format!("operation does not read: {error}")))?
         .to_string();
     let agent = AgentId::from_str(&body.agent)?;
+    // An agent admitted at the door holds machine.agent.set on this computer;
+    // it allows only its own person's agents, on a computer whose owner gave
+    // that grant, and the record names the agent (AGENTS-015 R1).
+    let acting = crate::agent_acts::admitted();
     // The directory and the network are never locked together: the network write
     // syncs to disk, and no directory reader may wait on that flush.
-    let by = with_directory(&state, |directory| {
+    let (by, owner) = with_directory(&state, |directory| {
         let directory = directory.projection()?;
-        let person = own_person(directory, &actor)?;
-        let by = person.to_string();
-        if !administrator {
+        let (by, owner) = if let Some(admitted) = acting {
+            let person = directory
+                .record(IdentityId::Agent(admitted.agent))
+                .and_then(lys_identity::projection::Record::responsible)
+                .ok_or(ServerError::NoPerson)?;
             personal::own_agents(directory, person, &[agent.to_string()], &[])?;
-        }
+            let owner = admitted.root.ok_or(ServerError::NoPerson)?;
+            (admitted.agent.to_string(), owner.to_string())
+        } else {
+            let person = own_person(directory, &actor)?;
+            if !administrator {
+                personal::own_agents(directory, person, &[agent.to_string()], &[])?;
+            }
+            (person.to_string(), person.to_string())
+        };
         let record = directory
             .record(IdentityId::Agent(agent))
             .ok_or(ServerError::AgentNotVisible)?;
@@ -167,12 +181,15 @@ pub(super) async fn change_agent(
                 state: record.state(),
             });
         }
-        Ok(by)
+        Ok((by, owner))
     })?;
     let last = last_reports(&state)?;
     let (recorded, machine) = with_network(&state, |store| {
-        if !administrator {
-            personal::owns(store.machine(&id).ok_or(ServerError::MachineUnknown)?, &by)?;
+        if !administrator || acting.is_some() {
+            personal::owns(
+                store.machine(&id).ok_or(ServerError::MachineUnknown)?,
+                &owner,
+            )?;
         }
         let recorded = store.change_agent(AgentsRecorded {
             operation,

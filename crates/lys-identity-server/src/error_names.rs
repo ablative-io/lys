@@ -335,6 +335,7 @@ fn agents(error: &AgentsError) -> &str {
         AgentsError::Seat(error) => error.name(),
         AgentsError::SeatImport(error) => error.name(),
         AgentsError::AppPass(error) => error.name(),
+        AgentsError::AgentActs(error) => error.name(),
     }
 }
 

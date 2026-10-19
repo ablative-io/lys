@@ -55,11 +55,54 @@ pub(super) fn is_agent(identity: IdentityId) -> bool {
     }
 }
 
-/// Refuse `grant` unless it lies within what `source` let be passed on.
+/// The rights an agent holds on an agent it registered under a grant of
+/// `agent.create` (AGENTS-015 R2): to set its profile, start it, be given
+/// its start command, stop it and restart it, and nothing beside.
+pub const CREATED_RIGHTS: [&str; 5] = [
+    "agent.provisioning.set",
+    "agent.restart",
+    "agent.start",
+    "agent.start-command",
+    "agent.stop",
+];
+
+/// The act whose grant the rights in [`CREATED_RIGHTS`] stand under.
+pub const CREATE: &str = "agent.create";
+
+/// Whether `grant` is one of the rights `source`'s holder, an agent, holds
+/// on an agent it registered: issued by the person answering for it, held by
+/// the same agent, on an agent, use-only, and carrying nothing outside
+/// [`CREATED_RIGHTS`]. Such a grant stands in the chain of the `agent.create`
+/// grant it was recorded under, so revoking that grant withdraws it.
+#[must_use]
+pub fn created_hop(grant: &Grant, source: &Grant) -> bool {
+    let parts = grant.parts();
+    is_agent(source.holder())
+        && source
+            .actions()
+            .iter()
+            .any(|action| action.as_str() == CREATE)
+        && grant.holder() == source.holder()
+        && parts.issuer == IdentityId::Person(source.responsible())
+        && grant.responsible() == source.responsible()
+        && grant.resource().kind() == "agent"
+        && matches!(grant.pass_on(), PassOn::UseOnly)
+        && grant
+            .actions()
+            .iter()
+            .all(|action| CREATED_RIGHTS.contains(&action.as_str()))
+}
+
+/// Refuse `grant` unless it lies within what `source` let be passed on, or
+/// is one of the rights an agent holds on an agent it registered under
+/// `source` ([`created_hop`]), ending no later than `source`.
 ///
 /// # Errors
 /// Refuses an issuer, resource, action, recipient or expiry outside the source.
 pub fn check_hop(grant: &Grant, source: &Grant) -> Result<(), GrantError> {
+    if created_hop(grant, source) {
+        return check_end(grant.window().ends_at(), source);
+    }
     let parts = grant.parts();
     let responsible_pass = is_agent(source.holder())
         && is_agent(grant.holder())

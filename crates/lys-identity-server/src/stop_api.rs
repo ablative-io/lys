@@ -153,6 +153,16 @@ fn admitted(
     id: &str,
 ) -> Result<(AgentId, String, LifecycleState), ServerError> {
     let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
+    // An agent admitted at the door holds agent.stop on it (AGENTS-015 R1).
+    if let Some(admitted) = crate::agent_acts::admitted() {
+        return with_directory(state, |directory| {
+            let record = directory
+                .projection()?
+                .record(IdentityId::Agent(agent))
+                .ok_or(ServerError::AgentNotVisible)?;
+            Ok((agent, admitted.agent.to_string(), record.state()))
+        });
+    }
     let administrator = crate::routes::is_administrator(state, actor)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -240,9 +250,10 @@ async fn stop(
         credentials_refused: None,
         done: false,
     };
+    let recorded = crate::agent_acts::recorded(&state, actor.clone())?;
     let suspended = with_directory(&state, |directory| {
         Ok(directory.transition(
-            actor.clone(),
+            recorded,
             operation,
             IdentityId::Agent(agent),
             Transition::Suspend,

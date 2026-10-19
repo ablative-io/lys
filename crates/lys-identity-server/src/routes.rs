@@ -455,6 +455,7 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
 }
 
 mod identities;
+mod identities_agent;
 pub(crate) use identities::{
     AgentRegistration, Bound, Moved, Named, bind_login, change_profile, list, read, register_agent,
     register_person, transition,

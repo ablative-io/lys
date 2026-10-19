@@ -84,12 +84,92 @@ fn the_key_is_read_from_a_seat_file_or_a_pem() -> TestResult {
     Ok(())
 }
 
-/// The bridge posts only to a numeric loopback address, at the path the URL names.
+/// An https URL to Lys's MCP route is accepted on any host, by name or address
+/// (AGENTS-015 R3): a seat reaches Lys from any device.
 #[test]
-fn only_a_loopback_url_is_reached() -> TestResult {
-    let (authority, path) = endpoint("http://127.0.0.1:8490/api/mcp")?;
-    assert_eq!((authority.port, path.as_str()), (8490, "/api/mcp"));
-    assert!(endpoint("https://lys.example/mcp").is_err());
-    assert!(endpoint("http://lys.example/mcp").is_err());
+fn an_https_url_on_any_host_is_accepted() {
+    for url in [
+        "https://lys.example.test/api/mcp",
+        "https://203.0.113.7:8443/mcp",
+        "https://[2001:db8::1]/api/mcp",
+    ] {
+        let checked = endpoint(url);
+        assert!(
+            checked.is_ok(),
+            "{url} was refused: {:?}",
+            checked.err().map(|refusal| refusal.to_string())
+        );
+    }
+}
+
+/// A plain http URL off loopback is refused, and the refusal says to use https.
+#[test]
+fn an_http_url_off_loopback_is_refused_naming_https() -> TestResult {
+    for url in [
+        "http://lys.example.test/api/mcp",
+        "http://203.0.113.7:8490/api/mcp",
+        "http://localhost:8490/api/mcp",
+    ] {
+        let refusal = endpoint(url)
+            .err()
+            .ok_or(format!("{url} was accepted"))?
+            .to_string();
+        assert!(refusal.contains("https://"), "{url}: {refusal}");
+    }
     Ok(())
 }
+
+/// An http URL on a numeric loopback address is accepted, as before R3.
+#[test]
+fn an_http_loopback_url_is_accepted_as_today() {
+    for url in ["http://127.0.0.1:8490/api/mcp", "http://[::1]:8490/api/mcp"] {
+        let checked = endpoint(url);
+        assert!(
+            checked.is_ok(),
+            "{url} was refused: {:?}",
+            checked.err().map(|refusal| refusal.to_string())
+        );
+    }
+}
+
+/// The URL's host, port and path are the ones posted to; the signature is made over
+/// the router's path, `/api` stripped; https names port 443 when none is written and
+/// is reached over TLS, http over loopback.
+#[test]
+fn the_endpoint_carries_the_port_path_and_signed_path() -> TestResult {
+    let loopback = endpoint("http://127.0.0.1:8490/api/mcp")?;
+    assert_eq!(
+        (
+            loopback.authority.port,
+            loopback.path.as_str(),
+            loopback.signed_path.as_str(),
+            loopback.secure
+        ),
+        (8490, "/api/mcp", "/mcp", false)
+    );
+    let remote = endpoint("https://lys.example.test/api/mcp")?;
+    assert_eq!(
+        (
+            remote.authority.host.as_str(),
+            remote.authority.port,
+            remote.path.as_str(),
+            remote.signed_path.as_str(),
+            remote.secure
+        ),
+        ("lys.example.test", 443, "/api/mcp", "/mcp", true)
+    );
+    let refusal = endpoint("ftp://lys.example.test/api/mcp")
+        .err()
+        .ok_or("an ftp URL was accepted")?
+        .to_string();
+    assert!(refusal.contains("mcp_url_invalid"), "{refusal}");
+    let insecure = endpoint("http://lys.example.test/api/mcp")
+        .err()
+        .ok_or("an http URL off loopback was accepted")?
+        .to_string();
+    assert!(insecure.contains("mcp_url_insecure"), "{insecure}");
+    Ok(())
+}
+
+#[path = "mcp_bridge_tls_tests.rs"]
+mod tls;

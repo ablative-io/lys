@@ -196,6 +196,23 @@ pub(super) async fn revoke(
                 grant: id.to_string(),
             },
         )?;
+        // An agent takes back only a grant it passed on itself (AGENTS-015 R1).
+        if matches!(caller, IdentityId::Agent(_))
+            && judged
+                .grants
+                .book()
+                .grant(id)
+                .is_some_and(|grant| grant.parts().issuer != caller)
+        {
+            return Err(as_seen_by(
+                &judged,
+                caller,
+                GrantError::RevokeRefused {
+                    caller: caller.to_string(),
+                    grant: id.to_string(),
+                },
+            ));
+        }
         match judged.grants.revoke(&request, now()) {
             Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),

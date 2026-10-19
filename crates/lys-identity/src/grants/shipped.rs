@@ -105,21 +105,20 @@ pub const ACTIONS: &[&str] = &[
 
 /// The acts no agent may be given, whatever grant they come from: each
 /// hands out authority, changes an agent's confinement, mints an identity
-/// or decides on access. Every other shipped action is one an agent may
-/// hold; an act Lys does not ship is never one.
+/// or decides on access. Setting up and reviewing a profile (never one's
+/// own version), allowing agents on a computer, and passing on or taking
+/// back part of a grant held are an agent's to hold when a person gives
+/// them (AGENTS-015 R1): each is held to the giver's own chain. Every
+/// other shipped action is one an agent may hold; an act Lys does not ship
+/// is never one.
 pub const WITHHELD_FROM_AGENTS: &[&str] = &[
     "agent.certificate.issue",
     "agent.certificate.withdraw",
     "agent.policy.set",
-    "agent.provisioning.review",
-    "agent.provisioning.set",
     "budget.set",
     "configuration.zone.set",
     "grant",
-    "grant.delegate",
-    "grant.revoke",
     "identity.transition",
-    "machine.agent.set",
     "person.email.set",
     "person.login.bind",
     "person.password.set",
@@ -151,6 +150,8 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "agent.create",
     "agent.mcp-request.approve",
     "agent.mcp-request.create",
+    "agent.provisioning.review",
+    "agent.provisioning.set",
     "agent.reports-to.set",
     "agent.restart",
     "agent.runtime.report",
@@ -161,11 +162,14 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "agent.wake",
     "edit",
     "grant.check",
+    "grant.delegate",
     "grant.reach",
+    "grant.revoke",
     "grant.who",
     "grant.why",
     "launch-record.start-again",
     "launch-record.withdraw",
+    "machine.agent.set",
     "machine.create",
     "machine.retire",
     "machine.runner.set",
@@ -211,14 +215,28 @@ pub fn agent_may_hold(kind: &str, action: &str) -> bool {
     !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)
 }
 
+/// The acts a person may give an agent but never a machine (AGENTS-015 R1):
+/// they left [`WITHHELD_FROM_AGENTS`] so an agent can set up, review and
+/// start agents for its person, and they stay a responsibility no machine
+/// holds, as before.
+pub const AGENTS_NOT_MACHINES: &[&str] = &[
+    "agent.provisioning.review",
+    "agent.provisioning.set",
+    "grant.delegate",
+    "grant.revoke",
+    "machine.agent.set",
+];
+
 /// Whether a machine may hold `action` on an object of `kind` (ACCESS-005
 /// R1). A machine never holds a responsibility a person keeps: on Lys's own
-/// kinds, every act in [`WITHHELD_FROM_AGENTS`]. An approved app's kind,
-/// `{app}.{kind}`, is the app's own, and its acts, such as a liminal link's
-/// export and import, are a machine's to hold when granted.
+/// kinds, every act in [`WITHHELD_FROM_AGENTS`] and in
+/// [`AGENTS_NOT_MACHINES`]. An approved app's kind, `{app}.{kind}`, is the
+/// app's own, and its acts, such as a liminal link's export and import, are
+/// a machine's to hold when granted.
 #[must_use]
 pub fn machine_may_hold(kind: &str, action: &str) -> bool {
-    kind.contains('.') || !WITHHELD_FROM_AGENTS.contains(&action)
+    kind.contains('.')
+        || !(WITHHELD_FROM_AGENTS.contains(&action) || AGENTS_NOT_MACHINES.contains(&action))
 }
 
 /// Plain sentences for shipped actions, served separately from the stored model.
@@ -446,7 +464,7 @@ mod tests {
                 "{allowed} is not shipped"
             );
         }
-        for authority in ["grant", "grant.delegate", "role.create", "secret.scope"] {
+        for authority in ["grant", "role.create", "secret.scope"] {
             assert!(!agent_may_hold("directory", authority));
         }
         for read_only in [

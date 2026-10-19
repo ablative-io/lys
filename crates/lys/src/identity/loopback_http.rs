@@ -1,5 +1,7 @@
 //! One HTTP/1.1 exchange with a service on this machine, shared by the
-//! Rauthy admin client and the readiness checks.
+//! Rauthy admin client and the readiness checks. The same exchange runs over
+//! any connected stream through [`exchange_over`], so `lys mcp` speaks it over
+//! a verified TLS stream to Lys on another host (AGENTS-015 R3).
 //!
 //! An address is `host:port` or `http://host[:port]`, with an IPv6 host in
 //! brackets; the port is the scheme's default only when it is absent. Every
@@ -167,6 +169,22 @@ pub enum Failure {
 /// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response, Failure> {
     let mut stream = authority.connect().map_err(Failure::Unreachable)?;
+    exchange_over(&mut stream, authority, request)
+}
+
+/// Sends `request` over `stream`, already connected to `authority`, and reads the
+/// whole response. A stream that ends with an unexpected end of input (a TLS peer
+/// that closes without `close_notify`) is answered only when what arrived is whole
+/// by its own declared length or chunked end; anything shorter is an error.
+///
+/// # Errors
+/// Fails when the request cannot be written, the response cannot be read, or the
+/// answer is not a whole HTTP/1.x response.
+pub fn exchange_over<S: Read + Write>(
+    stream: &mut S,
+    authority: &Authority,
+    request: &Request<'_>,
+) -> Result<Response, Failure> {
     let mut raw = Zeroizing::new(Vec::new());
     raw.extend_from_slice(
         format!(
@@ -190,11 +208,17 @@ pub fn exchange(authority: &Authority, request: &Request<'_>) -> Result<Response
     let mut answer = Vec::new();
     let read = stream.read_to_end(&mut answer);
     let arrived = answer.len();
-    read.map_err(|error| {
-        Failure::Uncertain(format!(
-            "reading the response after {arrived} bytes: {error}"
-        ))
-    })?;
+    if let Err(error) = read {
+        let framed = (error.kind() == std::io::ErrorKind::UnexpectedEof)
+            .then(|| parse_framed(&answer).ok())
+            .flatten()
+            .filter(|(_, whole)| *whole);
+        return framed.map(|(response, _)| response).ok_or_else(|| {
+            Failure::Uncertain(format!(
+                "reading the response after {arrived} bytes: {error}"
+            ))
+        });
+    }
     parse_response(&answer).map_err(|detail| {
         Failure::Malformed(format!("{detail}: the peer closed after {arrived} bytes"))
     })
@@ -228,6 +252,12 @@ pub fn parse_status_line(line: &str) -> Result<u16, &'static str> {
 /// # Errors
 /// Refuses malformed HTTP addresses or answers, and propagates connection and exchange failures.
 pub fn parse_response(raw: &[u8]) -> Result<Response, &'static str> {
+    parse_framed(raw).map(|(response, _)| response)
+}
+
+/// A whole response, and whether its body is delimited by its declared length or
+/// chunked end rather than by the peer closing.
+fn parse_framed(raw: &[u8]) -> Result<(Response, bool), &'static str> {
     let split = raw
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
@@ -261,7 +291,7 @@ pub fn parse_response(raw: &[u8]) -> Result<Response, &'static str> {
     } else {
         rest.to_vec()
     };
-    Ok(Response { status, body })
+    Ok((Response { status, body }, chunked || length.is_some()))
 }
 
 fn dechunk(mut rest: &[u8]) -> Option<Vec<u8>> {

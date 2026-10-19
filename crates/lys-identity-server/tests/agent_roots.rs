@@ -202,3 +202,52 @@ async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
     );
     Ok(())
 }
+
+/// AGENTS-015 R1: an agent may be given what it needs to set up, review and
+/// start agents, allow them on a computer and pass on or take back what it
+/// gave; every act that hands out authority, mints an identity or decides on
+/// access stays withheld.
+#[test]
+fn the_withheld_list_keeps_exactly_the_acts_an_agent_never_holds() {
+    let kept = [
+        "agent.certificate.issue",
+        "agent.certificate.withdraw",
+        "agent.policy.set",
+        "budget.set",
+        "configuration.zone.set",
+        "grant",
+        "identity.transition",
+        "person.email.set",
+        "person.login.bind",
+        "person.password.set",
+        "person.sign-in.set",
+        "request.approve",
+        "request.decline",
+        "role.create",
+        "role.holder.assign",
+        "role.holder.end",
+        "role.holder.move",
+        "role.revise",
+        "runtime.stop-everything",
+        "secret.add",
+        "secret.drop",
+        "secret.recipients",
+        "secret.replace",
+        "secret.retire",
+        "secret.scope",
+        "service-account.create",
+        "service-account.retire",
+        "team.budget.set",
+        "seat.import",
+    ];
+    assert_eq!(WITHHELD_FROM_AGENTS, kept);
+    for released in [
+        "agent.provisioning.set",
+        "agent.provisioning.review",
+        "machine.agent.set",
+        "grant.delegate",
+        "grant.revoke",
+    ] {
+        assert!(!WITHHELD_FROM_AGENTS.contains(&released), "{released}");
+    }
+}

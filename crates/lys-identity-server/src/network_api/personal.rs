@@ -87,6 +87,20 @@ pub(crate) fn computer_owner(
     actor: &lys_identity::Actor,
     id: &str,
 ) -> Result<String, ServerError> {
+    // An agent admitted at the door acts on a computer its person owns, and
+    // the record names the agent (AGENTS-015 R1).
+    if let Some(admitted) = crate::agent_acts::admitted() {
+        let person = crate::agent_acts::person_of(state, admitted.agent)?.to_string();
+        with_network(state, |store| {
+            let machine = store.machine(id).ok_or(ServerError::MachineUnknown)?;
+            owns(machine, &person)?;
+            if machine.retired.is_some() {
+                return Err(ServerError::MachineRetired);
+            }
+            Ok(())
+        })?;
+        return Ok(admitted.agent.to_string());
+    }
     let (administrator, by) = with_directory(state, |directory| {
         let projection = directory.projection()?;
         let administrator = state.admission.is_administrator(projection, actor)?;

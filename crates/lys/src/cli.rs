@@ -131,9 +131,14 @@ pub enum Command {
     /// on stdin is signed with the agent's key (`lys-agent-signature`) and posted to
     /// Lys's MCP route, and the answer written on stdout. Calls carry the agent's own
     /// grants and meet Lys's own refusals; the bridge grants nothing. The key is never
-    /// printed.
+    /// printed. A seat on any device runs:
+    /// `lys mcp --url https://<lys host>/api/mcp --agent <id> --key-file <seat file>`.
+    /// A TLS refusal or an unreachable Lys is said on stderr by name and answered to
+    /// the MCP client as a JSON-RPC error.
     Mcp {
-        /// Lys's MCP route on loopback, e.g. `http://127.0.0.1:8490/api/mcp`.
+        /// Lys's MCP route: `https://<lys host>/api/mcp` from any device, its
+        /// certificate always verified against this system's trust roots; `http://`
+        /// only on a loopback address, e.g. `http://127.0.0.1:8490/api/mcp`.
         #[arg(long)]
         url: String,
 

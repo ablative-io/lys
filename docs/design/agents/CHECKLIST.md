@@ -74,10 +74,10 @@
 
 ## An agent sets up and starts another agent under grants, from any device (AGENTS-015)
 
-- [ ] **C774** — The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.
+- [x] **C774** — The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.
 - [ ] **C775** — An agent that registers an agent holds, under the person's agent.create grant and in the same durable operation, exactly the rights to set its profile, start, start-command, stop and restart it, withdrawn when that grant is revoked.
-- [ ] **C776** — lys mcp reaches Lys's MCP over verified https from any device, http only on loopback, and says a connection or TLS failure by name.
-- [ ] **C782** — The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.
+- [x] **C776** — lys mcp reaches Lys's MCP over verified https from any device, http only on loopback, and says a connection or TLS failure by name.
+- [x] **C782** — The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.
 
 ## The Lys computer is a device, and the agent's file shows its connection lines (AGENTS-016)
 

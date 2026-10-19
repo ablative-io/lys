@@ -9,6 +9,7 @@
 
 pub mod accounts;
 pub mod admission;
+mod agent_acts;
 mod agent_grants_api;
 pub mod agent_pass;
 mod agent_pass_recovery;
@@ -99,6 +100,7 @@ mod drafts_api_tests;
 pub mod drafts_apply;
 pub mod drafts_list;
 pub mod error;
+pub mod error_agent_acts;
 pub mod error_agents;
 pub mod error_budget;
 pub mod error_call;

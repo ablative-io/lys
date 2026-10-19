@@ -75,6 +75,10 @@ pub(crate) async fn register_agent(
     headers: HeaderMap,
     Json(body): Json<AgentRegistration>,
 ) -> Result<Json<AgentRegistered>, ServerError> {
+    // An agent's own signed call, admitted at the door (AGENTS-015 R1).
+    if let Some(admitted) = crate::agent_acts::admitted() {
+        return super::identities_agent::register(&state, admitted.agent, &body).map(Json);
+    }
     let app_actor = crate::provider::app_person_actor(&state, &headers)?;
     if app_actor.is_some()
         || !headers.contains_key(axum::http::header::AUTHORIZATION)

@@ -393,6 +393,36 @@ impl<S: LeafStore> GrantLedger<S> {
         })
     }
 
+    /// Append `events` as leaves in one durable act, one flush and one pin,
+    /// answering each one's coordinate. An empty batch writes nothing. A failed
+    /// batch is held uncertain at its first event, as a failed append is, and
+    /// [`GrantLedger::reconcile`] adopts whatever of it the store kept.
+    ///
+    /// # Errors
+    /// - `GrantError::OperationUnresolved` while an earlier append remains uncertain.
+    /// - `GrantError::LogUnavailable` if appending or pinning the batch fails; it is then held uncertain.
+    pub fn append_batch(
+        &mut self,
+        events: &[SignedGrantEvent],
+    ) -> Result<Vec<Coordinate>, GrantError> {
+        let index = self.certain()?.len();
+        let Some(first) = events.first() else {
+            return Ok(Vec::new());
+        };
+        let bytes: Vec<&[u8]> = events.iter().map(SignedGrantEvent::bytes).collect();
+        self.ledger.append_batch(&bytes).map_err(|failure| {
+            self.uncertain = Some(Uncertain {
+                index,
+                operation: first.event().operation(),
+                grant: first.event().grant(),
+                event: first.event().clone(),
+            });
+            GrantError::LogUnavailable {
+                reason: failure.to_string(),
+            }
+        })
+    }
+
     /// Resolve a held uncertain append from a fresh open of the store, reading
     /// only the leaves from its index on, and answer every one of them.
     /// Answers `None` when nothing was held. The hold stays until every step

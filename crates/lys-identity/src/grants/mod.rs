@@ -13,6 +13,7 @@ pub mod channel_membership_index;
 mod checkpoint_reset;
 pub mod codec;
 mod commit;
+pub mod created;
 mod decision;
 pub mod delegation;
 pub mod error;
@@ -54,6 +55,7 @@ pub use cannot_give::{
 pub use channel_membership::{identity_kind, placed_within};
 pub use checkpoint_reset::refusal_name;
 pub use codec::{GRANT_ENVELOPE, MEMBERS, decode_grant, encode_grant};
+pub use created::CreatedRequest;
 pub use delegation::{ADMINISTRATOR, PassOnRequest};
 pub use error::GrantError;
 pub use events::{
@@ -61,7 +63,7 @@ pub use events::{
     sign_grant_event, verify_grant_event,
 };
 pub use frame::Frame;
-pub use lineage::Lineage;
+pub use lineage::{CREATED_RIGHTS, Lineage};
 pub use model::{KindModel, Model, Within};
 pub use permission::{
     MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA, parent_relation,
@@ -75,7 +77,8 @@ pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, 
 pub use schema_diff::{Named, RoleChange, SchemaDiff, Standing, diff, stranded};
 pub use settlement::ProjectionDegraded;
 pub use shipped::{
-    SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold, shipped_model,
+    AGENTS_NOT_MACHINES, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold,
+    shipped_model,
 };
 pub use tail_witness::{TailAuthority, TailBearing, TailEffect, TailEffectAt};
 pub use types::{

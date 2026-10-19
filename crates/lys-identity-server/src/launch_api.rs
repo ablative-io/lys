@@ -349,6 +349,20 @@ pub(crate) fn start_caller(
     actor: &Actor,
     agent: &str,
 ) -> Result<String, ServerError> {
+    // An agent admitted at the door holds its route's act on this agent; a
+    // route whose handler judges it (a seat named for the agent) asks for
+    // agent.start on it here (AGENTS-015 R1).
+    if let Some(admitted) = crate::agent_acts::admitted() {
+        if admitted.judged == crate::agent_acts::Judged::Handler {
+            crate::agent_acts::require(
+                state,
+                admitted.agent,
+                &lys_identity::grants::Resource::new("agent", agent)?,
+                &lys_identity::grants::Action::new("agent.start")?,
+            )?;
+        }
+        return Ok(admitted.agent.to_string());
+    }
     with_directory(state, |directory| {
         let directory = directory.projection()?;
         let admitted_by = caller(state, headers, directory)?.to_string();

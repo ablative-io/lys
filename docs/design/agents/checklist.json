@@ -267,7 +267,7 @@
         {
           "id": "C774",
           "text": "The agent, seat, machine-runner and grant pass-on routes admit an agent's signed call held to its own live grants, refused not_permitted by name otherwise; an agent's new agent answers to the agent's person; no agent approves a profile version it set.",
-          "done": false
+          "done": true
         },
         {
           "id": "C775",
@@ -277,12 +277,12 @@
         {
           "id": "C776",
           "text": "lys mcp reaches Lys's MCP over verified https from any device, http only on loopback, and says a connection or TLS failure by name.",
-          "done": false
+          "done": true
         },
         {
           "id": "C782",
           "text": "The agent file's Give form offers 'Create agents for me', 'Run my agents on this computer' and 'Set up and review this kind of profile' as one choice each in plain words, each posting exactly its grant, absent where the person has nothing to give.",
-          "done": false
+          "done": true
         }
       ]
     },

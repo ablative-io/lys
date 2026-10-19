@@ -194,6 +194,35 @@ pub fn delegation_authority(
     Ok(())
 }
 
+/// Admit a right an agent holds on an agent it registered (AGENTS-015 R2):
+/// its issuer is an active person who answers for the agent it is on, so it
+/// stands only while that agent answers to the person who gave it.
+///
+/// # Errors
+/// Refuses an inactive issuer, or an agent that is absent or answers to
+/// someone else.
+fn created_authority(
+    directory: &Projection,
+    held: &Grant,
+    source: &Grant,
+) -> Result<(), GrantError> {
+    active(directory, held.parts().issuer)?;
+    let answers = held
+        .resource()
+        .id()
+        .parse::<crate::id::AgentId>()
+        .ok()
+        .and_then(|agent| directory.record(IdentityId::Agent(agent)))
+        .and_then(crate::projection::Record::responsible);
+    if answers != Some(held.responsible()) {
+        return Err(GrantError::NotHolder {
+            caller: held.parts().issuer.to_string(),
+            grant: source.id().to_string(),
+        });
+    }
+    Ok(())
+}
+
 /// The checked ancestry of `grant`, refused unless every grant on it is
 /// unrevoked, started and unended at `at`, held by an active identity and
 /// answered for by the person the directory records.
@@ -224,7 +253,9 @@ pub fn effective(
                 .ok_or_else(|| GrantError::SourceUnknown {
                     grant: source.to_string(),
                 })?;
-            if held.parts().issuer != source.holder() {
+            if super::lineage::created_hop(held, source) {
+                created_authority(directory, held, source)?;
+            } else if held.parts().issuer != source.holder() {
                 delegation_authority(directory, source, held.parts().issuer, held.holder())?;
             }
         }

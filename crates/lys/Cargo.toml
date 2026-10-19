@@ -51,6 +51,13 @@ tokio.workspace = true
 x509-parser.workspace = true
 # Generated deployment credentials are wiped from memory when dropped.
 zeroize.workspace = true
+# `lys mcp` over https (AGENTS-015 R3): the rustls lys-home and lys-runner already
+# carry, pinned the same, with ring; verification is rustls-webpki's, never off.
+rustls = { version = "=0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+# The system's trust roots for that check, read once from the platform store: the
+# root loader of the rustls project, a source of roots for the present stack, not a
+# TLS stack of its own.
+rustls-native-certs = "=0.8.4"
 
 # `lys identity install` waits on events: a service's log through kqueue or
 # inotify, and its exit through the release of the lock it holds.
@@ -60,6 +67,8 @@ rustix = { workspace = true, features = ["termios"] }
 
 [dev-dependencies]
 tempfile.workspace = true
+# The https bridge test issues its own root and server certificate (AGENTS-015 R3).
+rcgen.workspace = true
 
 [target.'cfg(unix)'.dev-dependencies]
 nix = { version = "0.28", features = ["event", "fs", "time", "user"] }

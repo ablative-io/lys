@@ -5,10 +5,11 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::http::HeaderMap;
+use lys_identity::grants::{Action, ExerciseRequest, Resource, Route};
 use lys_identity::start::active::Lifecycles;
 use lys_identity::start::authority::Admission;
 use lys_identity::start::request::{AgentRecord, AgentRecords};
-use lys_identity::{AgentId, IdentityId, LifecycleState, LoginBinding};
+use lys_identity::{AgentId, IdentityId, LifecycleState, LoginBinding, PersonId};
 
 use super::Callers;
 use crate::error::ServerError;
@@ -54,6 +55,10 @@ impl Callers for Directory {
     }
 
     fn caller(&self, headers: &HeaderMap) -> Option<String> {
+        // An agent admitted at the door is the caller its records name.
+        if let Some(admitted) = crate::agent_acts::admitted() {
+            return Some(admitted.agent.to_string());
+        }
         let actor = signed_in(&self.0, headers).ok()?;
         Some(self.caller_of(actor.binding()))
     }
@@ -73,6 +78,45 @@ impl Admission for Directory {
     /// Step 1 admits the configured administrator alone.
     fn admits(&self, caller: &str) -> bool {
         self.is_administrator(caller)
+    }
+
+    /// Whether `caller`, a person or an agent, holds a live grant of
+    /// `agent.start` on `agent` (AGENTS-015 R1); a grants read that fails is
+    /// no grant, said in the log.
+    fn holds_start(&self, caller: &str, agent: &str) -> bool {
+        let Some(caller) = PersonId::from_str(caller)
+            .map(IdentityId::Person)
+            .ok()
+            .or_else(|| AgentId::from_str(caller).ok().map(IdentityId::Agent))
+        else {
+            return false;
+        };
+        let asked = || -> Result<ExerciseRequest, ServerError> {
+            Ok(ExerciseRequest {
+                caller,
+                route: Route::Api,
+                resource: Resource::new("agent", agent)?,
+                action: Action::new("agent.start")?,
+            })
+        };
+        let held = crate::grants_reads::with_read_grants(
+            &self.0,
+            None,
+            crate::session::now(),
+            |_| Ok(vec![asked()?]),
+            |judged| {
+                Ok(crate::grants::allowed(judged.grants.explain(
+                    judged.directory,
+                    &asked()?,
+                    crate::session::now(),
+                    None,
+                ))?)
+            },
+        );
+        held.unwrap_or_else(|error| {
+            tracing::error!(agent, "the start grants could not be read: {error}");
+            false
+        })
     }
 }
 

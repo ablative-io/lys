@@ -96,6 +96,24 @@ async fn check(
         // The pass, its seat and its grant are judged before the body.
         return next.run(request).await;
     }
+    // An agent's own call on a route it may set up, start or allow agents
+    // through (AGENTS-015 R1): signed here or relayed from its MCP message,
+    // and held to its own grants before the handler runs.
+    if let Some(judged) = matched
+        .as_ref()
+        .and_then(|matched| crate::agent_acts::listed(request.method(), matched.as_str()))
+        && (request
+            .headers()
+            .contains_key(crate::agent_signature::HEADER)
+            || crate::agent_signature::relayed_agent().is_some())
+        && request
+            .extensions()
+            .get::<crate::agent_signature::TokenPrincipal>()
+            .is_none()
+        && !request.headers().contains_key(crate::agent_pass::HEADER)
+    {
+        return crate::agent_acts::serve(&doors.state, judged, request, next).await;
+    }
     // A call relayed from an MCP message: its body is the message's, read
     // already under the guard its own caller was given. A route whose door
     // takes no agent signature knew only a person's session, and an agent's
@@ -227,7 +245,7 @@ async fn unverified(request: Request, next: Next) -> Response {
 /// was read is dropped, and the rest of the body is [`drained`], so the
 /// caller receives the refusal. A frame that is not data, a trailer, is not
 /// kept: no route reads one.
-async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
+pub(crate) async fn bounded(mut body: Body) -> Result<Bytes, ServerError> {
     let mut read = Vec::new();
     while let Some(frame) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {
         let frame = frame.map_err(|error| ServerError::RequestMalformed {
