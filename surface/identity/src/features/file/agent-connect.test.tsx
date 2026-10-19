@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AgentConnect } from './AgentConnect';
+import { KEY_FILE, connectLines } from '../network/connectLines';
 import { ShellProvider } from '../../shell/ShellContext';
 
 const hex = (n: number) => n.toString(16).padStart(32, '0');
@@ -50,6 +51,16 @@ async function drawn(id: string, origin?: string) {
 }
 
 const lines = (container: HTMLElement) => [...container.querySelectorAll('[data-connect-line]')].map((line) => line.textContent);
+
+describe('The connect lines, built in one place', () => {
+  it('builds the Claude Code and Codex lines from the agent’s id, the origin and the key path', () => {
+    expect(KEY_FILE).toBe(KEY);
+    expect(connectLines({ id: AGENT, origin: 'https://lys.example.test', keyFile: '/home/bea/assistant.pem' })).toEqual([
+      { what: 'The Claude Code line', line: `claude mcp add --transport stdio lys -- lys mcp --url https://lys.example.test/api/mcp --agent ${AGENT} --key-file /home/bea/assistant.pem` },
+      { what: 'The Codex line', line: `codex mcp add lys -- lys mcp --url https://lys.example.test/api/mcp --agent ${AGENT} --key-file /home/bea/assistant.pem` },
+    ]);
+  });
+});
 
 describe('Connect on an agent’s file', () => {
   it('shows both lines with the page’s origin, /api/mcp and the agent’s id, and each copy act copies its exact line', async () => {
