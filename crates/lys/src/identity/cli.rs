@@ -156,6 +156,21 @@ pub enum IdentityCommand {
         root: Option<PathBuf>,
     },
 
+    /// Accept the loss of each named store at what is found now: the
+    /// recorded operator act, and the only way past a store Lys refused to
+    /// start or serve because it found it short of its receipt. Each store
+    /// is named with its own --store; one not named is not accepted. The
+    /// next start serves each at what was found, and every refusal the loss
+    /// causes says when it was lost.
+    AcceptLoss {
+        /// A store to accept, as Lys's refusal names it (repeat for more).
+        #[arg(long, required = true)]
+        store: Vec<String>,
+        /// The data root; the platform's application data path when absent.
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
+
     /// Write a fresh one-time setup code and open the setup page with it, so
     /// the administrator sets a new password; or, before first-run setup
     /// has finished, a fresh first-run code. Requires a macOS Touch ID or

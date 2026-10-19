@@ -44,7 +44,8 @@ mod identity;
 mod placements;
 mod stream;
 
-pub use identity::{Reset, reset};
+pub(crate) use identity::recorded;
+pub use identity::{Reset, reset, rolled_back};
 
 /// The grant log's served identity, its commit signal and its placement
 /// signal.
@@ -52,14 +53,27 @@ pub struct GrantChanges {
     identity: Mutex<Option<LogName>>,
     revision: watch::Sender<u64>,
     placements: watch::Sender<u64>,
+    /// Whether the stores receipt counts the identity, so its absence is a
+    /// loss and never a fresh identity (DIRECTORY-107 R2).
+    counted: bool,
 }
 
 impl Default for GrantChanges {
     fn default() -> Self {
+        Self::counted(false)
+    }
+}
+
+impl GrantChanges {
+    /// The changes of a grant log whose identity the stores receipt counts
+    /// when `counted`.
+    #[must_use]
+    pub fn counted(counted: bool) -> Self {
         Self {
             identity: Mutex::new(None),
             revision: watch::channel(0).0,
             placements: watch::channel(0).0,
+            counted,
         }
     }
 }
@@ -80,9 +94,14 @@ impl GrantChanges {
         if let Some(name) = &*held {
             return Ok(name.clone());
         }
-        let name = identity::establish(log_dir, origin)?;
+        let name = identity::establish(log_dir, origin, self.counted)?;
         *held = Some(name.clone());
         Ok(name)
+    }
+
+    /// Whether the stores receipt counts the grant log and its identity.
+    pub(crate) fn is_counted(&self) -> bool {
+        self.counted
     }
 
     /// Signal the grants' revision after a hold of them ends: waiting

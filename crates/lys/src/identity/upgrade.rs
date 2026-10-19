@@ -240,14 +240,49 @@ pub fn launch(layout: &Layout, unit: &Unit, replace: bool) -> IdentityResult<boo
             .unwrap_or(0)
     };
     let mut cursor = LogCursor::at(&unit.log, from);
+    // A service that refused to start for a lost store stays up to say so
+    // and never says it is listening: its refusal ends the wait as a
+    // failure, in its own words (DIRECTORY-107 R2).
+    let mut refusal = LogCursor::at(&unit.log, from);
+    let mut refused = false;
     let ready = &unit.ready;
     log_wait::wait_until(unit.binary, &unit.log, &unit.pid, &mut || {
-        cursor.says(&ready.says)
-            && ready
-                .answers
-                .is_none_or(|(port, path)| services::answers(port, path))
+        refused = refusal.says(REFUSED_TO_START);
+        refused
+            || cursor.says(&ready.says)
+                && ready
+                    .answers
+                    .is_none_or(|(port, path)| services::answers(port, path))
     })?;
+    if refused {
+        return Err(refuse(
+            ErrorKind::StoreLost,
+            "start",
+            unit.binary,
+            refused_line(&unit.log, from),
+        )
+        .at(&unit.log));
+    }
     Ok(started)
+}
+
+/// The words a service refused to start with, in its log.
+const REFUSED_TO_START: &str = "refused_to_start: Lys refused to start";
+
+/// The line of `log` after `from` that says the start was refused.
+fn refused_line(log: &Path, from: u64) -> String {
+    let text = std::fs::read(log).unwrap_or_default();
+    let after = usize::try_from(from)
+        .ok()
+        .and_then(|from| text.get(from..))
+        .unwrap_or_default();
+    String::from_utf8_lossy(after)
+        .lines()
+        .find(|line| line.contains(REFUSED_TO_START))
+        .map_or_else(
+            || format!("it refused to start; its words are in {}", log.display()),
+            |line| line.trim().to_owned(),
+        )
 }
 
 /// Runs `program --version`, reads `name VERSION (COMMIT)` and answers what
@@ -329,6 +364,7 @@ pub fn upgrade(
     parts: &mut Parts<'_>,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<BuildRecord> {
+    super::accept_loss::check_before(layout, "upgrade")?;
     if parts.runner.is_some() {
         companion::check(layout, from)?;
     }
@@ -433,6 +469,10 @@ pub fn upgrade(
 #[cfg(test)]
 #[path = "upgrade/scratch_tests.rs"]
 mod scratch;
+
+#[cfg(test)]
+#[path = "upgrade/stores_receipt_tests.rs"]
+mod stores_receipt_tests;
 
 #[cfg(test)]
 #[path = "upgrade_tests.rs"]

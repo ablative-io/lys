@@ -117,7 +117,9 @@ macro_rules! budgets_feed_entries {
                 "redirect_url":"http://127.0.0.1/callback", "session_seconds":300, "secure_cookie":false,
                 "link_audit_source":{"issuer":issuer,"subject":"audit"},
                 "grant_log_dir":path.join("grants"), "grant_log_origin":"example.test/lys/grants",
-                "grant_model_file":path.join("model.json")
+                "grant_model_file":path.join("model.json"),
+                "stores_receipt_file":path.join("install").join("stores.json"),
+                "stores_accepted_file":path.join("install").join("stores.accepted.json")
             }))?;
             std::fs::write(&config.client_secret_file, b"synthetic-feed-test")?;
             std::fs::write(&config.grant_model_file, br#"{"version":1,"relations":{"read":["read"]}}"#)?;
@@ -184,6 +186,7 @@ macro_rules! budgets_feed_entries {
             }
             let state = Arc::new(AppState {
         draft_execution:Default::default(),
+                stores: $crate::stores_receipt::Held::default(),
                 changes: $crate::changes::Changes::new()?,
                 directory: Mutex::new(directory), oidc,
                 sign_in: $crate::sign_in::IssuerSignIn::configured(&config)?,

@@ -212,6 +212,27 @@ impl CertificateStore<FileLeafStore> {
         Ok(store)
     }
 
+    /// As `opened`, except that a log the stores receipt counts (`counted`)
+    /// is never made anew empty: its absence is a loss (DIRECTORY-107 R2).
+    ///
+    /// # Errors
+    /// `CertificatesUnavailable` naming the absent counted log, and the
+    /// failures of `opened`.
+    pub fn counted(
+        dir: &Path,
+        key: Arc<Ed25519Identity>,
+        counted: bool,
+        say: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<Self, ServerError> {
+        if counted && !dir.exists() {
+            return Err(unavailable(format!(
+                "store_lost: the certificate log {} is counted by the stores receipt and is absent; it is never made anew",
+                dir.display()
+            )));
+        }
+        Self::opened(dir, key, say)
+    }
+
     /// As `open`, saying through `say` how the log was started and how many
     /// certificates it holds.
     ///

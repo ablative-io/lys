@@ -19,8 +19,17 @@ pub(super) async fn runner(
         Ok(store.runner(&id).cloned())
     })?;
     let joining = crate::network_join::joining(&state, &id)?;
+    // While the machines' records carry an accepted loss, every view says
+    // when, so a computer whose join was lost is told to connect again
+    // (DIRECTORY-107 R4).
+    let lost = |mut view: Value| {
+        if let Some(at) = state.stores.lost_at("network") {
+            view["lost_at"] = json!(at);
+        }
+        Json(view)
+    };
     let Some(record) = runner.clone() else {
-        return Ok(Json(
+        return Ok(lost(
             json!({ "machine": id, "runner": runner, "answers": null, "joining": joining }),
         ));
     };
@@ -35,7 +44,7 @@ pub(super) async fn runner(
                 .await
                 .map(drop)
         };
-    Ok(Json(match asked {
+    Ok(lost(match asked {
         Ok(()) => json!({ "machine": id, "runner": runner, "answers": true, "joining": joining }),
         Err(refused) => {
             let reason = match &refused {

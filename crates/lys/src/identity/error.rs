@@ -86,6 +86,19 @@ pub enum ErrorKind {
     /// A stop of everything did some of its parts and not others; each
     /// failed part is named.
     StopIncomplete,
+    /// A store the receipt counts is short, of another origin or identity,
+    /// or absent, and no operator accepted the loss (DIRECTORY-107 R2).
+    StoreLost,
+    /// A store the receipt counts is absent where an act would make it
+    /// anew, so it is not made (DIRECTORY-107 R3).
+    StoreMissing,
+    /// The receipt or the acceptance file is there and does not read.
+    StoresReceiptUnreadable,
+    /// A put-back's folder under `data.rolled-back/` is already taken.
+    RolledBackNameTaken,
+    /// This computer keeps a saved join to another Lys, which an install
+    /// would overwrite (DIRECTORY-107 R3).
+    RunnerJoinPresent,
 }
 
 impl ErrorKind {
@@ -129,6 +142,11 @@ impl ErrorKind {
             Self::InstallBuildDiffers => "install_build_differs",
             Self::UpgradeBuildDiffers => "upgrade_build_differs",
             Self::StopIncomplete => "stop_incomplete",
+            Self::StoreLost => "store_lost",
+            Self::StoreMissing => "store_missing",
+            Self::StoresReceiptUnreadable => "stores_receipt_unreadable",
+            Self::RolledBackNameTaken => "rolled_back_name_taken",
+            Self::RunnerJoinPresent => "runner_join_present",
         }
     }
 

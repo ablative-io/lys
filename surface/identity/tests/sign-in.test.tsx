@@ -70,6 +70,43 @@ describe('Lys sign-in page', () => {
   });
 });
 
+describe('Lys sign-in page when Lys refused to start (DIRECTORY-107 R2)', () => {
+  /** GET /health as a refused start answers it: the stores short of their receipt, the command and the computer. */
+  const REFUSED = {
+    status: 503,
+    body: {
+      service: 'lys-identity-server',
+      version: '0.3.1',
+      refusal: 'refused_to_start',
+      reason: 'refused_to_start: Lys refused to start: grant-log is short of its receipt (the receipt holds head 9 of origin 3fa2c1d09e8b; found head 8 of origin 3fa2c1d09e8b). Run `lys identity accept-loss --store grant-log` on Ward Mac to start Lys at what was found.',
+      stores: [{ store: 'grant-log', refusal: 'store_lost', held: 'head 9 of origin 3fa2c1d09e8b', found: 'head 8 of origin 3fa2c1d09e8b' }],
+      command: 'lys identity accept-loss --store grant-log',
+      computer: 'Ward Mac',
+    },
+  };
+
+  it('shows the store, both heads, the command and the computer instead of the form', async () => {
+    await mount('#/sign-in', { ...SERVICE, '/health': REFUSED });
+    expect($('form[aria-label="Sign in"]')).toBeNull();
+    expect($('.page.sign-in h1')?.textContent).toBe('Lys did not start');
+    expect($('[role="alert"]')?.textContent).toBe(REFUSED.body.reason.replace('refused_to_start: ', ''));
+    expect(text()).toContain('grant-log: its receipt holds head 9 of origin 3fa2c1d09e8b; Lys found head 8 of origin 3fa2c1d09e8b.');
+    expect(text()).toContain('by running this on Ward Mac');
+    expect($('pre code')?.textContent).toBe('lys identity accept-loss --store grant-log');
+  });
+
+  it('says the same on any page a person opens, since every route answers with the same words', async () => {
+    await mount('#/', { ...SERVICE, '/health': REFUSED, '/me': REFUSED });
+    expect($('h1')?.textContent).toBe('Lys did not start');
+    expect($('pre code')?.textContent).toBe('lys identity accept-loss --store grant-log');
+  });
+
+  it('shows the form when Lys answers its health', async () => {
+    await mount('#/sign-in', { ...SERVICE, '/health': ok({ service: 'lys-identity-server', version: '0.3.1' }) });
+    expect($('form[aria-label="Sign in"]')).not.toBeNull();
+  });
+});
+
 describe('Lys setup page', () => {
   it('takes the code from the address once and leaves it out of the address', () => {
     forgetSetupCode();

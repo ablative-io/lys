@@ -175,3 +175,32 @@ fn only_retired_key_matches_name_the_retirement_instead_of_inventing_a_join() ->
     assert!(error.to_string().contains("MachineRetired"));
     Ok(())
 }
+
+#[test]
+fn a_runner_view_carrying_lost_at_makes_machine_not_joined_end_with_the_computer_loss_sentence()
+-> Result {
+    let error = select_with("this-key", |path| Ok(match path {
+        "/network" => json!({"machines":[{"id":"other","state":"in_use"}]}),
+        "/network/machines/other/runner" => json!({"machine":"other","runner":null,"answers":null,"lost_at":"2026-10-19T02:00:00.000000Z"}),
+        _ => return Err(super::refused("fixture_route_unknown", path)),
+    })).err().ok_or("a lost join accepted")?.to_string();
+    assert!(error.contains("machine_not_joined"));
+    assert!(error.ends_with(
+        "Lys lost its computer records at 2026-10-19T02:00:00.000000Z; connect this computer again"
+    ), "{error}");
+    let without = select_with("this-key", |path| {
+        Ok(match path {
+            "/network" => json!({"machines":[{"id":"other","state":"in_use"}]}),
+            "/network/machines/other/runner" => {
+                json!({"machine":"other","runner":null,"answers":null})
+            }
+            _ => return Err(super::refused("fixture_route_unknown", path)),
+        })
+    })
+    .err()
+    .ok_or("an unjoined device accepted")?
+    .to_string();
+    assert!(without.contains("machine_not_joined"));
+    assert!(!without.contains("Lys lost"), "{without}");
+    Ok(())
+}

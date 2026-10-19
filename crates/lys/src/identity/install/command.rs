@@ -11,6 +11,12 @@ use lys_core::Ed25519Identity;
 use std::path::Path;
 use std::sync::Arc;
 pub(super) fn install(options: &Options, json: bool) -> IdentityResult<()> {
+    let layout = match &options.root {
+        Some(root) => Layout::at(root.clone()),
+        None => Layout::discover()?,
+    };
+    // Before anything is read from a build or changed (DIRECTORY-107 R2).
+    super::super::accept_loss::check_before(&layout, "install")?;
     let sibling = |name: &str| sibling_binary(options, name);
     let client_program = sibling("lys")?;
     let client_folder = client_program.parent().ok_or_else(|| {
@@ -26,10 +32,6 @@ pub(super) fn install(options: &Options, json: bool) -> IdentityResult<()> {
         client_folder,
         &upgrade::version(&client_program, "lys")?,
     )?;
-    let layout = match &options.root {
-        Some(root) => Layout::at(root.clone()),
-        None => Layout::discover()?,
-    };
     let mut emitter = Emitter::new(json);
     let ports = ports::Ports::load(&layout)?.chosen(
         options.service_port,

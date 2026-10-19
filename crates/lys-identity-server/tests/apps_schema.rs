@@ -276,6 +276,8 @@ fn config(dir: &Path, model: &str) -> Result<Config, Box<dyn Error>> {
         "grant_log_dir": dir.join("grant-log"),
         "grant_log_origin": "example.test/lys/grants",
         "grant_model_file": dir.join("grant-model.json"),
+        "stores_receipt_file": dir.join("install").join("stores.json"),
+        "stores_accepted_file": dir.join("install").join("stores.accepted.json"),
     }))?;
     Ok(config)
 }

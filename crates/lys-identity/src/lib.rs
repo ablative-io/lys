@@ -36,6 +36,7 @@ pub mod revocation;
 pub mod signer;
 pub mod start;
 mod state_value;
+pub mod stores_receipt;
 
 pub use binding::LoginBinding;
 pub use directory::Directory;

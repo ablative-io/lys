@@ -126,23 +126,47 @@ fn sync_parent(path: &Path) -> Result<(), GrantStreamError> {
         })
 }
 
-/// The identity of the grant log kept at `log_dir`, recorded now, from the
-/// log's `origin`, when it was never recorded.
+/// The identity recorded for the grant log kept at `log_dir`, read without
+/// recording one; none when none was ever recorded.
 ///
 /// # Errors
-/// `grant_log_identity_unavailable` when the file cannot be read, or the
-/// new identity cannot be made durable; no identity is answered then.
-pub(crate) fn establish(log_dir: &Path, origin: &str) -> Result<LogName, GrantStreamError> {
+/// `grant_log_identity_unavailable` when the file is there and cannot be
+/// read.
+pub(crate) fn recorded(log_dir: &Path) -> Result<Option<LogName>, GrantStreamError> {
     let path = path_for(log_dir)?;
     match std::fs::read(&path) {
-        Ok(bytes) => return read(&path, &bytes),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(error) => {
-            return Err(unavailable(format!(
-                "the grant log identity {} cannot be read: {error}",
-                path.display()
-            )));
-        }
+        Ok(bytes) => read(&path, &bytes).map(Some),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(unavailable(format!(
+            "the grant log identity {} cannot be read: {error}",
+            path.display()
+        ))),
+    }
+}
+
+/// The identity of the grant log kept at `log_dir`, recorded now, from the
+/// log's `origin`, when it was never recorded. One the stores receipt
+/// counts (`counted`) is never minted anew at epoch 0: its absence is a
+/// loss the boot refuses until an operator accepts it (DIRECTORY-107 R2).
+///
+/// # Errors
+/// `grant_log_identity_unavailable` when the file cannot be read, when a
+/// counted identity is absent, or when the new identity cannot be made
+/// durable; no identity is answered then.
+pub(crate) fn establish(
+    log_dir: &Path,
+    origin: &str,
+    counted: bool,
+) -> Result<LogName, GrantStreamError> {
+    let path = path_for(log_dir)?;
+    if let Some(name) = recorded(log_dir)? {
+        return Ok(name);
+    }
+    if counted {
+        return Err(unavailable(format!(
+            "the grant log identity {} is counted by the stores receipt and is absent; it is never recorded anew",
+            path.display()
+        )));
     }
     let recorded = Recorded {
         version: IDENTITY_VERSION,
@@ -180,6 +204,53 @@ pub(crate) fn establish(log_dir: &Path, origin: &str) -> Result<LogName, GrantSt
     Ok(LogName {
         identity: recorded.identity,
         epoch: recorded.epoch,
+    })
+}
+
+/// Advance the grant log kept at `log_dir` past an accepted loss
+/// (DIRECTORY-107 R4): the same identity as `held`, the one the stores
+/// receipt holds, at the next epoch after it or after the one recorded
+/// beside the log, whichever is later, naming the one it replaces. A
+/// consumer that read the log at an earlier epoch is answered a rollback.
+///
+/// # Errors
+/// `grant_log_identity_unavailable` when the recorded identity cannot be
+/// read or the advance cannot be made durable.
+pub fn rolled_back(
+    log_dir: &Path,
+    origin: &str,
+    held: &LogName,
+) -> Result<Reset, GrantStreamError> {
+    let path = path_for(log_dir)?;
+    let old = match recorded(log_dir)? {
+        Some(found) if found.identity == held.identity && found.epoch > held.epoch => found,
+        _ => held.clone(),
+    };
+    let epoch = old
+        .epoch
+        .checked_add(1)
+        .ok_or_else(|| unavailable("the reset epoch cannot move past its last value"))?;
+    let recorded = Recorded {
+        version: IDENTITY_VERSION,
+        origin: origin.to_owned(),
+        identity: old.identity.clone(),
+        epoch,
+        replaces: Some(old.clone()),
+    };
+    let temporary = written(&path, &recorded)?;
+    std::fs::rename(&temporary, &path).map_err(|error| {
+        unavailable(format!(
+            "the grant log identity {} could not be advanced: {error}",
+            path.display()
+        ))
+    })?;
+    sync_parent(&path)?;
+    Ok(Reset {
+        old,
+        new: LogName {
+            identity: recorded.identity,
+            epoch,
+        },
     })
 }
 
@@ -228,7 +299,7 @@ pub fn reset(log_dir: &Path, origin: &str) -> Result<Reset, GrantStreamError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{establish, path_for, reset};
+    use super::{LogName, establish, path_for, reset, rolled_back};
 
     /// An install with no identity records one once; reopening answers the
     /// same; a reset names the old and the new and moves the epoch; an
@@ -239,11 +310,11 @@ mod tests {
         let home = tempfile::tempdir()?;
         let log_dir = home.path().join("grants");
         std::fs::create_dir(&log_dir)?;
-        let first = establish(&log_dir, "example.test/lys/grants")?;
+        let first = establish(&log_dir, "example.test/lys/grants", false)?;
         assert_eq!(first.epoch, 0);
         assert!(first.identity.starts_with("example.test/lys/grants#"));
         for _ in 0..2 {
-            assert_eq!(establish(&log_dir, "example.test/lys/grants")?, first);
+            assert_eq!(establish(&log_dir, "example.test/lys/grants", true)?, first);
         }
         let leftovers = std::fs::read_dir(home.path())?.count();
         assert_eq!(
@@ -256,16 +327,49 @@ mod tests {
         assert_eq!(replaced.new.epoch, 1);
         assert_ne!(replaced.new.identity, first.identity);
         assert_eq!(
-            establish(&log_dir, "example.test/lys/grants")?,
+            establish(&log_dir, "example.test/lys/grants", true)?,
             replaced.new
         );
 
         std::fs::write(path_for(&log_dir)?, b"not json")?;
-        let refused = establish(&log_dir, "example.test/lys/grants")
+        let refused = establish(&log_dir, "example.test/lys/grants", false)
             .err()
             .ok_or("an unreadable identity was answered")?;
         assert_eq!(refused.name(), "grant_log_identity_unavailable");
         assert_eq!(std::fs::read(path_for(&log_dir)?)?, b"not json");
+        Ok(())
+    }
+
+    /// A counted identity that is absent is never minted anew; an accepted
+    /// loss advances the same identity to the next epoch, past the one held
+    /// or the one recorded, whichever is later (DIRECTORY-107 R2, R4).
+    #[test]
+    fn a_counted_identity_is_never_minted_and_a_rollback_keeps_it_at_the_next_epoch()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let home = tempfile::tempdir()?;
+        let log_dir = home.path().join("grants");
+        let refused = establish(&log_dir, "example.test/lys/grants", true)
+            .err()
+            .ok_or("a counted identity was minted anew")?;
+        assert_eq!(refused.name(), "grant_log_identity_unavailable");
+        assert!(!path_for(&log_dir)?.exists());
+        let held = LogName {
+            identity: "example.test/lys/grants#held".to_owned(),
+            epoch: 2,
+        };
+        let advanced = rolled_back(&log_dir, "example.test/lys/grants", &held)?;
+        assert_eq!(advanced.old, held);
+        assert_eq!(advanced.new.identity, held.identity);
+        assert_eq!(advanced.new.epoch, 3);
+        assert_eq!(
+            establish(&log_dir, "example.test/lys/grants", true)?,
+            advanced.new
+        );
+        let again = rolled_back(&log_dir, "example.test/lys/grants", &held)?;
+        assert_eq!(
+            again.new.epoch, 4,
+            "past the recorded epoch, never back to it"
+        );
         Ok(())
     }
 }

@@ -40,5 +40,6 @@ it('does not invent an email when the issuer did not supply one', async () => {
 it('names the same contact on a page that met sign-in in place, without requiring a session', async () => {
   const requests = await open('', null, true);
   expect(document.querySelector('.account-help')?.textContent).toBe('No account yet, or cannot get in? Ask Ada (ada@example.test).');
-  expect([...requests].sort()).toEqual(['/sign-in/help', '/sign-in/providers']);
+  // The page also reads /health, to show a refused start in place of the form (DIRECTORY-107 R2).
+  expect([...requests].sort()).toEqual(['/health', '/sign-in/help', '/sign-in/providers']);
 });

@@ -8,7 +8,7 @@ use std::time::Instant;
 mod planned_stop;
 
 use lys_identity_server::read_api::BUILD;
-use lys_identity_server::{Config, ServerError, service_saying};
+use lys_identity_server::{Config, ServerError, started_saying_with_clock};
 
 /// What `--version` and `-V` print: the name, the crate version and the
 /// commit this binary was built from.
@@ -41,7 +41,13 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
         }
     })?;
     let service_began = Instant::now();
-    let app = service_saying(&config, say).await?;
+    let started = started_saying_with_clock(
+        &config,
+        Arc::clone(&say),
+        lys_core::clock::ClockSource::System,
+    )
+    .await?;
+    let app = started.router;
     let service = ms(service_began);
     let stop = planned_stop::PlannedStop::new();
     let signals = planned_stop::Signals::open()?;
@@ -52,12 +58,20 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
         .map_err(|error| ServerError::ConfigInvalid {
             reason: format!("{} could not be bound: {error}", config.listen),
         })?;
-    println!(
-        "lys-identity-server listening on {}, ready in {} ms (configuration {configured} ms, service {service} ms, bind {} ms)",
-        config.listen,
-        ms(began),
-        ms(bind_began)
-    );
+    match &started.refused {
+        // A refused start never says it is listening: the installer's wait
+        // ends on this line as a failure, naming the stores (DIRECTORY-107 R2).
+        Some(refused) => println!(
+            "lys-identity-server {refused} Serving only /health and the sign-in page on {}.",
+            config.listen
+        ),
+        None => println!(
+            "lys-identity-server listening on {}, ready in {} ms (configuration {configured} ms, service {service} ms, bind {} ms)",
+            config.listen,
+            ms(began),
+            ms(bind_began)
+        ),
+    }
     // The connection's address is the person's own, carried to the issuer
     // so its failed sign-in count is per person.
     let (finished, stopped) = tokio::sync::oneshot::channel();
@@ -75,9 +89,14 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
     .map_err(|error| ServerError::DirectoryUnavailable {
         reason: error.to_string(),
     })?;
-    stopped.await.map_err(|error| ServerError::ConfigInvalid {
+    let outcome = stopped.await.map_err(|error| ServerError::ConfigInvalid {
         reason: format!("planned_stop_result_lost: {error}"),
-    })?
+    })?;
+    // A clean stop writes the stores receipt from every store as it stands.
+    if let Some(at_stop) = &started.at_stop {
+        at_stop.write()?;
+    }
+    outcome
 }
 
 #[tokio::main]

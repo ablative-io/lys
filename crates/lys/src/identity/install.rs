@@ -113,6 +113,17 @@ fn write_model(path: &Path) -> IdentityResult<bool> {
 
 pub(super) fn service_key(layout: &Layout) -> IdentityResult<Ed25519Identity> {
     let path = layout.service_key();
+    // Every joined computer's saved server key names this one: one the
+    // stores receipt counts is never minted anew (DIRECTORY-107 R3).
+    if !path.exists() && super::accept_loss::counts(layout, "service-key")? {
+        return Err(IdentityError::new(
+            ErrorKind::StoreMissing,
+            "generate service key",
+            "keys/service.key",
+            "the stores receipt counts this key and it is absent, so no new key was made; every joined computer names the old one. Put the key back, or run `lys identity accept-loss --store service-key` to start at a new one",
+        )
+        .at(&path));
+    }
     if let Some(parent) = path.parent() {
         private_files::ensure_dir(parent)?;
     }
@@ -165,12 +176,53 @@ pub(super) fn place_runner(
     Ok(false)
 }
 
+/// A computer that joined another Lys keeps its saved join in the run
+/// folder: an install here would write this install's server key over the
+/// joined server's, so it is refused by name and nothing is changed
+/// (DIRECTORY-107 R3). A join to this install itself, whose saved server
+/// key is this install's own, is not another Lys and is left as it is.
+fn refuse_saved_join(layout: &Layout, own: &str) -> IdentityResult<()> {
+    let saved = layout.run_dir().join("runner-join.json");
+    let trusted = std::fs::read_to_string(layout.run_dir().join("runner-server.pub")).ok();
+    if trusted.is_some_and(|key| key.trim() == own) {
+        return Ok(());
+    }
+    let bytes = match std::fs::read(&saved) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(IdentityError::new(
+                ErrorKind::PrivateFileIo,
+                "read saved join",
+                "runner-join.json",
+                error.to_string(),
+            )
+            .at(&saved));
+        }
+    };
+    let server = serde_json::from_slice::<serde_json::Value>(&bytes)
+        .ok()
+        .and_then(|join| join["server"].as_str().map(str::to_owned))
+        .unwrap_or_else(|| "a server it does not name readably".to_owned());
+    Err(IdentityError::new(
+        ErrorKind::RunnerJoinPresent,
+        "start runner",
+        "runner-join.json",
+        format!(
+            "this computer keeps a saved join to {server} in {}; installing Lys here would turn it into a server of its own, so nothing was changed",
+            saved.display()
+        ),
+    )
+    .at(&saved))
+}
+
 pub(super) fn start_runner(
     layout: &Layout,
     key: &Arc<Ed25519Identity>,
     program: &Path,
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<()> {
+    refuse_saved_join(layout, &lys_runner::protocol::hex(&key.public_key_bytes()))?;
     for directory in [layout.run_dir(), layout.logs_dir(), layout.data_dir()] {
         private_files::ensure_dir(&directory)?;
     }
@@ -239,6 +291,7 @@ pub fn start_installed(
     units: &[upgrade::Unit],
     say: &mut dyn FnMut(&str),
 ) -> IdentityResult<()> {
+    super::accept_loss::check_before(layout, "start")?;
     swap::recover(layout, units, &mut Compose, say)?;
     services::require_docker(Path::new("docker"))?;
     let config = DeploymentConfig::load_install(&layout.deployment_config())?;
@@ -308,3 +361,7 @@ mod tests;
 #[cfg(test)]
 #[path = "install/presence_tests.rs"]
 mod presence_tests;
+
+#[cfg(test)]
+#[path = "install/runner_join_guard_tests.rs"]
+mod runner_join_guard_tests;

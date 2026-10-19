@@ -18,17 +18,31 @@ use crate::session::Sessions;
 #[path = "issuer_admin.rs"]
 mod issuer_admin;
 
-pub(crate) async fn service_saying_with_clock(
+/// Every store is compared with its receipt before anything is opened
+/// (DIRECTORY-107 R2): a lost whole store refuses the boot, and the service
+/// serves its health and the sign-in page alone (`boot_refused`); a lost own
+/// store is left out of what is opened.
+pub(crate) async fn started_with_clock(
     config: &Config,
     say: Say,
     clock: lys_core::clock::ClockSource,
-) -> Result<Router, ServerError> {
-    let primary = open_primary(config, &say)?;
+) -> Result<crate::stores_receipt::Started, ServerError> {
+    let mut checked = crate::stores_receipt::Checked::before_open(config, &say)?;
+    if !checked.refused.is_empty() {
+        return crate::boot_refused::refused(config, checked.refused);
+    }
+    let config = &checked.opened(config, &say)?;
+    let primary = open_primary(config, &say, &mut checked)?;
     let catalogue = Arc::clone(&primary.catalogue);
     let auxiliary = open_auxiliary(config, &primary.key, &say)?;
-    let state = Box::pin(make_state(config, say, clock, primary, auxiliary)).await?;
+    let state = Box::pin(make_state(config, say, clock, primary, auxiliary, &checked)).await?;
     recover(&state)?;
-    served_routes(config, state, catalogue)
+    let at_stop = crate::stores_receipt::after_boot(config, &state, checked)?;
+    Ok(crate::stores_receipt::Started {
+        router: served_routes(config, state, catalogue)?,
+        at_stop: Some(at_stop),
+        refused: None,
+    })
 }
 
 /// The start route's service over the directory `state` holds. The route
@@ -82,7 +96,11 @@ struct Auxiliary {
     apps: crate::apps_store::AppStore,
 }
 
-fn open_primary(config: &Config, say: &Say) -> Result<Primary, ServerError> {
+fn open_primary(
+    config: &Config,
+    say: &Say,
+    checked: &mut crate::stores_receipt::Checked,
+) -> Result<Primary, ServerError> {
     let kept_responsibilities = crate::kept_responsibilities::Kept::load(
         &config.log_dir.with_file_name("kept-responsibilities.json"),
     )?;
@@ -109,10 +127,16 @@ fn open_primary(config: &Config, say: &Say) -> Result<Primary, ServerError> {
         .certificates_dir
         .as_deref()
         .map(|dir| {
-            crate::certificates_store::CertificateStore::opened(dir, Arc::clone(&key), &**say)
+            crate::certificates_store::CertificateStore::counted(
+                dir,
+                Arc::clone(&key),
+                checked.counts("certificates"),
+                &**say,
+            )
         })
         .transpose()?;
-    let (network, roles, provisioning) = crate::file_stores::opened(config, &**say)?;
+    let (network, roles, provisioning) =
+        checked.file_stores(crate::file_stores::opened(config, &**say)?, say);
     let mut runtime = crate::runtime_store::RuntimeStore::configured(config, say)?;
     let service_accounts = ServiceAccountStore::configured(config, Arc::clone(&key), say)?;
     let reviews = ReviewStore::configured(config, Arc::clone(&key), &**say)?;
@@ -213,6 +237,7 @@ async fn make_state(
     clock: lys_core::clock::ClockSource,
     primary: Primary,
     auxiliary: Auxiliary,
+    checked: &crate::stores_receipt::Checked,
 ) -> Result<Shared, ServerError> {
     let model = auxiliary.apps.model()?;
     let spicedb = config
@@ -247,7 +272,8 @@ async fn make_state(
         ),
         grants: Mutex::new(None),
         rights_cache: Mutex::default(),
-        grant_setup: grant_setup(config, &auxiliary.apps, model, spicedb),
+        grant_setup: grant_setup(config, &auxiliary.apps, model, spicedb, checked),
+        stores: checked.held(),
         secrets: config
             .secrets
             .as_ref()
@@ -348,6 +374,7 @@ fn grant_setup(
     apps: &crate::apps_store::AppStore,
     model: lys_identity::grants::Model,
     spicedb: Option<crate::spicedb::SpiceDbEngine>,
+    checked: &crate::stores_receipt::Checked,
 ) -> GrantSetup {
     GrantSetup {
         log_dir: config.grant_log_dir.clone(),
@@ -356,7 +383,7 @@ fn grant_setup(
         model: std::sync::RwLock::new(model),
         model_revision: std::sync::atomic::AtomicU64::new(apps.model_revision()),
         refresh: Mutex::new(()),
-        changes: crate::grant_changes::GrantChanges::default(),
+        changes: crate::grant_changes::GrantChanges::counted(checked.counts("grant-log")),
         spicedb,
     }
 }
@@ -493,7 +520,12 @@ fn served_routes(
         // Outermost: a keyed model call from a run on a dialled-in computer
         // is admitted by its run key at the proxy, never by a Lys session.
         .layer(axum::middleware::from_fn_with_state(
-            state,
+            Arc::clone(&state),
             crate::model_proxy_route::carry,
+        ))
+        // Every refusal a lost store caused says so (DIRECTORY-107 R4).
+        .layer(axum::middleware::from_fn_with_state(
+            state,
+            crate::stores_receipt::words::said,
         )))
 }

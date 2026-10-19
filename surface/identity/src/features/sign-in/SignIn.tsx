@@ -138,6 +138,58 @@ export function continuation(): string | null {
   return allowed.some((start) => target.startsWith(start)) ? target : null;
 }
 
+/** One store a Lys that refused to start found short, as `GET /health` names it. */
+interface ShortStore { store: string; held: string; found: string }
+
+/**
+ * What a Lys that refused to start says on `GET /health` (DIRECTORY-107 R2): the stores it found short of their
+ * receipt, what each holds and what was found, the one command that starts it at what was found, and the computer
+ * to run it on. Null while Lys starts as it should, or when its health cannot be read.
+ */
+export interface RefusedStart { words: string; stores: ShortStore[]; command: string; computer: string }
+
+/** The refused start a `/health` refusal names, or null for any other answer. */
+export function refusedStart(failure: unknown): RefusedStart | null {
+  if (!(failure instanceof Refused) || failure.refusal.refusal !== 'refused_to_start') return null;
+  const answer = (failure.answer ?? {}) as { stores?: unknown; command?: unknown; computer?: unknown };
+  const stores = Array.isArray(answer.stores)
+    ? answer.stores.filter((entry): entry is ShortStore => typeof entry?.store === 'string' && typeof entry?.held === 'string' && typeof entry?.found === 'string')
+    : [];
+  return {
+    words: failure.refusal.reason.replace(/^refused_to_start: /, ''),
+    stores,
+    command: typeof answer.command === 'string' ? answer.command : '',
+    computer: typeof answer.computer === 'string' ? answer.computer : 'the computer Lys runs on',
+  };
+}
+
+function useRefusedStart(): RefusedStart | null {
+  const [refused, setRefused] = useState<RefusedStart | null>(null);
+  useEffect(() => {
+    let live = true;
+    request<unknown>('/health').then(
+      () => { if (live) setRefused(null); },
+      (failure) => { if (live) setRefused(refusedStart(failure)); },
+    );
+    return () => { live = false; };
+  }, []);
+  return refused;
+}
+
+/** In place of the form while Lys refuses to start: what it lost, and the one way past it. */
+export function RefusedToStart({ refused }: { refused: RefusedStart }) {
+  return <div className="page sign-in" aria-label="Lys did not start">
+    <LysMark />
+    <h1 tabIndex={-1}>Lys did not start</h1>
+    <p role="alert" className="why-not">{refused.words}</p>
+    <ul className="note">
+      {refused.stores.map((entry) => <li key={entry.store}>{entry.store}: its receipt holds {entry.held}; Lys found {entry.found}.</li>)}
+    </ul>
+    <p className="note">Nobody can sign in until this is settled. If what was found is all there is, start Lys at it by running this on {refused.computer}:</p>
+    <pre><code>{refused.command}</code></pre>
+  </div>;
+}
+
 /** The sign-in form, on its own or inside a screen that needs a session. */
 export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signedIn?: () => void }) {
   const [busy, setBusy] = useState(false);
@@ -146,6 +198,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
   const providers = useProviders();
   const providerError = refusedInAddress(administratorWords(help.administrator));
   const [providerDismissed, setProviderDismissed] = useState(false);
+  const stopped = useRefusedStart();
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
@@ -178,6 +231,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
     }
   }
 
+  if (stopped) return <RefusedToStart refused={stopped} />;
   return <div className="page sign-in">
     <LysMark />
     <h1 ref={heading} tabIndex={-1}>Sign in</h1>

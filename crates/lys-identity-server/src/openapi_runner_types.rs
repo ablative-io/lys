@@ -49,6 +49,10 @@ struct RunnerStatusView {
     refusal: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     reason: Option<String>,
+    /// When Lys lost its computer records, while that loss stands accepted
+    /// (DIRECTORY-107 R4); absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lost_at: Option<String>,
 }
 
 /// The runner routes' entries.

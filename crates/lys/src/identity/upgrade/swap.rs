@@ -14,8 +14,10 @@
 //! name, read back and its SHA-256 compared with its source's, and only then
 //! renamed over the old one; a copy that differs is removed and refused by
 //! name, and nothing old is removed. `data/` and every credential are never
-//! written. Putting back may run again after it was cut short: each of its
-//! steps finds what it already did and does not undo it.
+//! written forward; putting back moves the window's `data/` and join files
+//! aside under `data.rolled-back/` and removes none of them
+//! (`data_kept`). Putting back may run again after it was cut short: each of
+//! its steps finds what it already did and does not undo it.
 
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -372,6 +374,9 @@ fn swap_in(
 ) -> IdentityResult<()> {
     stop_all(units, say)?;
     intent.done(layout, Step::Stopped)?;
+    // The service's clean stop has just written its receipt: no store is
+    // kept for a put-back while one is already short of it (DIRECTORY-107 R2).
+    super::super::accept_loss::check_before(layout, "keep data")?;
     data_kept::keep(layout, intent)?;
     keep_binaries(layout, intent)?;
     place_binaries(layout, plan.from, plan.names, intent)?;

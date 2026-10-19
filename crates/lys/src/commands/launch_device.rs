@@ -31,6 +31,10 @@ struct RunnerView {
     answers: Option<bool>,
     refusal: Option<String>,
     reason: Option<String>,
+    /// When Lys lost its computer records, while that loss is accepted
+    /// (DIRECTORY-107 R4).
+    #[serde(default)]
+    lost_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -142,6 +146,7 @@ fn select(
     let network: Network = decode(get("/network")?)?;
     let mut matched = Vec::new();
     let mut retired = false;
+    let mut lost_at = None;
     for machine in network.machines {
         segment("machine_id_invalid", "the machine id", &machine.id)?;
         if !matches!(machine.state.as_str(), "in_use" | "retired") {
@@ -156,6 +161,9 @@ fn select(
                 "machine_answer_unreadable",
                 "the runner answer names another machine",
             ));
+        }
+        if record.lost_at.is_some() {
+            lost_at.clone_from(&record.lost_at);
         }
         if record
             .runner
@@ -182,10 +190,14 @@ fn select(
                 "every joined machine for this device's key is retired",
             )
         } else {
-            refused(
-                "machine_not_joined",
-                "Lys's visible runner records do not identify a joined machine for this device's key",
-            )
+            let words = "Lys's visible runner records do not identify a joined machine for this device's key";
+            match &lost_at {
+                Some(at) => refused(
+                    "machine_not_joined",
+                    format!("{words}; Lys lost its computer records at {at}; connect this computer again"),
+                ),
+                None => refused("machine_not_joined", words),
+            }
         }
     })?;
     if online && record.answers != Some(true) {

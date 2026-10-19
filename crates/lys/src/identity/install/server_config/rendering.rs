@@ -140,5 +140,9 @@ fn base_configuration(layout: &Layout, config: &DeploymentConfig, carried: &Carr
         ("schedules_dir", json!(dir("schedules"))),
         ("reviews_dir", json!(dir("reviews"))),
         ("runner_socket", json!(layout.runner_socket().display().to_string())),
+        // The stores receipt beside the build record, outside data/, and the
+        // operator's acceptances beside it (DIRECTORY-107 R2).
+        ("stores_receipt_file", json!(layout.stores_receipt().display().to_string())),
+        ("stores_accepted_file", json!(layout.stores_accepted().display().to_string())),
     ].into_iter().map(|(key, value)| (key.to_owned(), value)).collect())
 }

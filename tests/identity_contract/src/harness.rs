@@ -308,6 +308,9 @@ pub struct Service {
     clock: ClockSource,
     drop_config: DropMarker,
     server: crate::harness_serve::Serving,
+    /// Writes the stores receipt when the service stops cleanly, as the
+    /// service's own stop does (DIRECTORY-107 R2).
+    at_stop: Option<lys_identity_server::stores_receipt::AtStop>,
     drop_server: DropMarker,
 }
 

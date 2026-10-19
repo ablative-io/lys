@@ -259,7 +259,7 @@ impl Service {
         crate::service_template::restore(&config)?;
         drop(stage);
         let before = lys_log_store::process_flush_count();
-        let (server, client) = serve(listener, &config, say, &clock).await?;
+        let (server, client, at_stop) = serve(listener, &config, say, &clock).await?;
         let startup_flushes = lys_log_store::process_flush_count() - before;
         drop(timing);
         Ok((
@@ -277,6 +277,7 @@ impl Service {
                 clock,
                 drop_config: DropMarker::new("service.config_dropped"),
                 server,
+                at_stop,
                 drop_server: DropMarker::new("service.fields_end"),
             },
             prepared,
@@ -354,6 +355,8 @@ fn configured_service(
         proxy_dir: None,
         surface_dir: None,
         runner_socket: None,
+        stores_receipt_file: dir.path().join("install").join("stores.json"),
+        stores_accepted_file: dir.path().join("install").join("stores.accepted.json"),
         membership: Some(lys_identity_server::config::MembershipSettings {
             page_rows_max: MEMBERSHIP_PAGE_ROWS_MAX,
             page_bytes_max: MEMBERSHIP_PAGE_BYTES_MAX,

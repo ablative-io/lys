@@ -2,6 +2,7 @@
 //! product's dependencies — the maintained Rauthy, `SpiceDB` and one
 //! `PostgreSQL` database. Declarations and re-exports only.
 
+pub mod accept_loss;
 pub mod cli;
 pub mod config;
 pub mod configure;

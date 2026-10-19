@@ -135,8 +135,16 @@ pub(super) fn page<S: LeafStore>(
     if let Some(asked) = &request.log
         && asked != served
     {
+        // The same log at an earlier epoch was rolled back past an accepted
+        // loss (DIRECTORY-107 R4): whatever its cursor, and however far the
+        // head has since grown, it is not the log the consumer read.
+        let reason = if asked.identity == served.identity && asked.epoch < served.epoch {
+            ResetReason::Rollback
+        } else {
+            ResetReason::OtherLog
+        };
         let reset = ChangeFrame::Reset {
-            reason: ResetReason::OtherLog,
+            reason,
             from: Some(asked.clone()),
         };
         return Ok(answer(vec![reset], false));

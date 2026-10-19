@@ -26,8 +26,28 @@ impl Service {
     /// # Errors
     /// Propagates the service, transport or decoding failure for this fixture step.
     pub async fn restart_saying(&mut self, say: Option<Say>) -> Result<(), Box<dyn Error>> {
+        Box::pin(self.restart_between(say, |_| Ok(()))).await
+    }
+
+    /// Restart as [`Service::restart_saying`] does, running `between` on the
+    /// configuration once the service has stopped cleanly and written its
+    /// stores receipt, and before it starts again: what a person or a tool
+    /// does to the stores while Lys is stopped (DIRECTORY-107 R2).
+    ///
+    /// # Errors
+    /// Propagates `between`'s failure and the service, transport or
+    /// decoding failure for this fixture step.
+    pub async fn restart_between(
+        &mut self,
+        say: Option<Say>,
+        between: impl FnOnce(&Config) -> Result<(), Box<dyn Error>>,
+    ) -> Result<(), Box<dyn Error>> {
         let timing = StageTimer::new("fixture.restart");
         self.server.stop()?;
+        if let Some(at_stop) = self.at_stop.take() {
+            at_stop.write()?;
+        }
+        between(&self.config)?;
         let stage = StageTimer::new("fixture.restart_rebind");
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let listen = listener.local_addr()?;
@@ -35,8 +55,9 @@ impl Service {
         self.config.listen = listen;
         self.config.redirect_url = format!("{}/callback", self.base);
         drop(stage);
-        let (server, client) = serve(listener, &self.config, say, &self.clock).await?;
+        let (server, client, at_stop) = serve(listener, &self.config, say, &self.clock).await?;
         self.server = server;
+        self.at_stop = at_stop;
         self.client = client;
         drop(timing);
         Ok(())

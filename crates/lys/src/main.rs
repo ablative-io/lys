@@ -162,6 +162,9 @@ fn dispatch_identity(
         identity::IdentityCommand::Start { root } => {
             identity::stop::start(&identity::stop::StartOptions { root }, json)
         }
+        identity::IdentityCommand::AcceptLoss { store, root } => {
+            identity::accept_loss::run(root, &store, json)
+        }
         identity::IdentityCommand::Install {
             from,
             clients,

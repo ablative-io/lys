@@ -162,6 +162,9 @@ pub struct AppState {
     /// The seats' imports (AGENTS-003), kept beside the directory log:
     /// always open, as the seats are.
     pub seat_imports: crate::seat_import_store::SeatImports,
+    /// Each store's loss epoch and each own store still lost
+    /// (DIRECTORY-107 R4), said in the refusals they cause.
+    pub stores: crate::stores_receipt::Held,
 }
 
 /// Where the service says how a thing it keeps was started.
@@ -223,7 +226,23 @@ pub async fn service_saying_with_clock(
     say: Say,
     clock: lys_core::clock::ClockSource,
 ) -> Result<Router, ServerError> {
-    Box::pin(crate::routes_startup::service_saying_with_clock(
+    Ok(Box::pin(started_saying_with_clock(config, say, clock))
+        .await?
+        .router)
+}
+
+/// The service as it started: its routes, the stores receipt's writer for a
+/// clean stop, and the words of a start refused by a lost store
+/// (DIRECTORY-107 R2), which then serves its health and screens alone.
+///
+/// # Errors
+/// Propagates clock, configuration and store startup failures.
+pub async fn started_saying_with_clock(
+    config: &Config,
+    say: Say,
+    clock: lys_core::clock::ClockSource,
+) -> Result<crate::stores_receipt::Started, ServerError> {
+    Box::pin(crate::routes_startup::started_with_clock(
         config, say, clock,
     ))
     .await

@@ -185,6 +185,7 @@ fn fixture_state(
     let model_revision = apps.model_revision();
     Ok(AppState {
         draft_execution: crate::drafts_apply::Executor::default(),
+        stores: crate::stores_receipt::Held::default(),
         changes: crate::changes::Changes::new()?,
         directory: Mutex::new(directory),
         oidc,

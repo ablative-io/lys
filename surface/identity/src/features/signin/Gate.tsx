@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { api, Refused } from '../../api';
 import type { Load } from '../../api';
 import { useSignedOutScreen } from '../../shell/ShellContext';
-import { SignIn as SignInForm } from '../sign-in/SignIn';
+import { RefusedToStart, SignIn as SignInForm, refusedStart } from '../sign-in/SignIn';
 import { ErrorWords } from '../people/Words';
 import { keepAcrossSignIn, takeFileReturn } from './fileReturn';
 
@@ -56,6 +56,9 @@ function NotAnswering({ refused }: { refused: Refused }) {
  */
 export function RefusedPage({ refused, title }: { refused: Refused; title: string }) {
   if (refused.status === 401) return <SignIn />;
+  // Lys refused to start (DIRECTORY-107 R2): every page says what it lost and the one way past it, never a riddle.
+  const stopped = refusedStart(refused);
+  if (stopped) return <RefusedToStart refused={stopped} />;
   if (refused.status === 0) return <div className="page"><div className="eyebrow">{title}</div><NotAnswering refused={refused} /></div>;
   return (
     <div className="page">

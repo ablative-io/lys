@@ -308,7 +308,14 @@ mod signed_json;
 pub use error::ServerError;
 pub use routes::{
     AppState, Say, router, service, service_saying, service_saying_with_clock, service_with_clock,
+    started_saying_with_clock,
 };
+
+/// A boot a lost whole store refused: health and the screens alone
+/// (DIRECTORY-107 R2).
+mod boot_refused;
+/// Every store held against its receipt (DIRECTORY-107 R2, R4).
+pub mod stores_receipt;
 
 mod provider_browser;
 

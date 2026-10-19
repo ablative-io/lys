@@ -134,6 +134,16 @@ impl GrantSetup {
         model: Model,
         say: &dyn Fn(&str),
     ) -> Result<GrantState, ServerError> {
+        // A grant log the stores receipt counts is never made anew empty:
+        // its absence is a loss (DIRECTORY-107 R2).
+        if !self.log_dir.exists() && self.changes.is_counted() {
+            return Err(ServerError::ConfigInvalid {
+                reason: format!(
+                    "store_lost: the grant log {} is counted by the stores receipt and is absent; it is never made anew",
+                    self.log_dir.display()
+                ),
+            });
+        }
         if !self.log_dir.exists() {
             FileLeafStore::create(&self.log_dir, &self.log_origin).map_err(|error| {
                 ServerError::ConfigInvalid {
@@ -404,8 +414,10 @@ fn with_directory_grants_model<A, T>(
         let grants = if let Some(grants) = &mut *slot {
             grants
         } else {
-            let opened = state.grant_setup.open(root, apps.model()?, &*state.say)?;
+            let mut opened = state.grant_setup.open(root, apps.model()?, &*state.say)?;
             (state.say)(&format!("grant log {}", opened.ledger().start()));
+            // The engine is first reached here, never at boot (DIRECTORY-107 R2).
+            crate::stores_receipt::projection(state, &mut opened)?;
             slot.insert(opened)
         };
         let authorized = judge(Judged {

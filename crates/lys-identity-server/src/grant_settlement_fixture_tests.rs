@@ -168,6 +168,8 @@ impl Table {
             "link_audit_source": {"issuer": issuer, "subject": "audit"},
             "grant_log_dir": path.join("grants"), "grant_log_origin": "example.test/lys/grants",
             "grant_model_file": model_file,
+            "stores_receipt_file": path.join("install").join("stores.json"),
+            "stores_accepted_file": path.join("install").join("stores.accepted.json"),
         }))?;
         std::fs::write(&config.client_secret_file, b"synthetic-test-credential")?;
         let oidc = discover(&config, listener).await?;

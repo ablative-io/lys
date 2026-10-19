@@ -170,6 +170,8 @@ impl PublicSignIn {
                 "session_seconds": 60, "secure_cookie": false,
                 "grant_log_dir": directory.path().join("grants"), "grant_log_origin": "test",
                 "grant_model_file": model,
+                "stores_receipt_file": directory.path().join("install").join("stores.json"),
+                "stores_accepted_file": directory.path().join("install").join("stores.accepted.json"),
             }))?;
             config.validate()?;
             Ok::<_, Failure>(lys_identity_server::service(&config).await?)

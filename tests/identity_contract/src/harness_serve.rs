@@ -7,9 +7,8 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use lys_core::clock::ClockSource;
-use lys_identity_server::{
-    Config, Say, service, service_saying, service_saying_with_clock, service_with_clock,
-};
+use lys_identity_server::stores_receipt::AtStop;
+use lys_identity_server::{Config, Say, started_saying_with_clock};
 
 /// Records a named elapsed interval for temporary fixture diagnosis.
 pub struct StageTimer {
@@ -169,29 +168,27 @@ impl Drop for Serving {
     }
 }
 
-/// The service `config` describes, answering on `listener`, and a client
-/// that follows no redirect.
+/// The service `config` describes, answering on `listener`, a client
+/// that follows no redirect, and the stores receipt's writer for a clean
+/// stop, none when the start was refused (DIRECTORY-107 R2).
 pub(crate) async fn serve(
     listener: tokio::net::TcpListener,
     config: &Config,
     say: Option<Say>,
     clock: &ClockSource,
-) -> Result<(Serving, reqwest::Client), Box<dyn Error>> {
+) -> Result<(Serving, reqwest::Client, Option<AtStop>), Box<dyn Error>> {
     let timing = StageTimer::new("serve.total");
     let stage = StageTimer::new("serve.refusals_inventory");
     let documented = crate::refusals::listed();
     drop(stage);
     let stage = StageTimer::new("serve.service_open");
-    let app = match (clock, say) {
-        (ClockSource::System, Some(say)) => service_saying(config, say).await?,
-        (ClockSource::System, None) => service(config).await?,
-        (ClockSource::Supplied(clock), Some(say)) => {
-            service_saying_with_clock(config, say, ClockSource::Supplied(Arc::clone(clock))).await?
-        }
-        (ClockSource::Supplied(clock), None) => {
-            service_with_clock(config, ClockSource::Supplied(Arc::clone(clock))).await?
-        }
+    let say = say.unwrap_or_else(|| Arc::new(|_| {}));
+    let clock = match clock {
+        ClockSource::System => ClockSource::System,
+        ClockSource::Supplied(clock) => ClockSource::Supplied(Arc::clone(clock)),
     };
+    let started = started_saying_with_clock(config, say, clock).await?;
+    let (app, at_stop) = (started.router, started.at_stop);
     drop(stage);
     let stage = StageTimer::new("serve.middleware");
     let app = app.layer(axum::middleware::from_fn(move |request, next| {
@@ -213,5 +210,5 @@ pub(crate) async fn serve(
     let server = Serving::start(vec![(listener, app)]).await?;
     drop(stage);
     drop(timing);
-    Ok((server, client))
+    Ok((server, client, at_stop))
 }

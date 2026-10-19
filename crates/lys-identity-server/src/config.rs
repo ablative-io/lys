@@ -252,6 +252,13 @@ pub struct Config {
     /// Message reads from the message service use the caller's session cookie and explicit identity bindings.
     #[serde(default)]
     pub message_service: Option<crate::message_edges::Settings>,
+    /// The receipt of every store's head, `install/stores.json` beside the
+    /// install's build record, outside `data/` (DIRECTORY-107 R2). Required:
+    /// a configuration without it has it written in by [`Config::load`].
+    pub stores_receipt_file: PathBuf,
+    /// The operator's acceptances of a loss, `install/stores.accepted.json`,
+    /// written by `lys identity accept-loss`. Required, as the receipt is.
+    pub stores_accepted_file: PathBuf,
     /// The operator's bounds on channel membership pages (ACCESS-006 R3,
     /// R5). Every member is required and none has a default. Without it the
     /// membership page routes refuse every page `membership_pages_unconfigured`;
@@ -307,6 +314,45 @@ struct ModelFile {
     relations: std::collections::BTreeMap<String, Vec<String>>,
 }
 
+/// `text` with the stores receipt keys written in where it lacks them, and
+/// whether any was: each names its file under `install/` in the folder the
+/// configuration at `path` is kept in, where the installer keeps them. The
+/// keys are written into the file, never defaulted in code (Tom, 12 October
+/// 2026).
+fn stores_keys_written(text: &str, path: &Path) -> Result<(String, bool), ServerError> {
+    let mut value: serde_json::Value = serde_json::from_str(text).map_err(|error| {
+        invalid(format!(
+            "{} is not a configuration: {error}",
+            path.display()
+        ))
+    })?;
+    let Some(object) = value.as_object_mut() else {
+        return Ok((text.to_owned(), false));
+    };
+    let install = path
+        .parent()
+        .ok_or_else(|| invalid(format!("{} has no folder", path.display())))?
+        .join("install");
+    let mut written = false;
+    for (key, file) in [
+        ("stores_receipt_file", "stores.json"),
+        ("stores_accepted_file", "stores.accepted.json"),
+    ] {
+        if !object.contains_key(key) {
+            let named = install.join(file).display().to_string();
+            object.insert(key.to_owned(), serde_json::Value::String(named));
+            written = true;
+        }
+    }
+    if !written {
+        return Ok((text.to_owned(), false));
+    }
+    let mut text = serde_json::to_string_pretty(&value)
+        .map_err(|error| invalid(format!("{}: {error}", path.display())))?;
+    text.push('\n');
+    Ok((text, true))
+}
+
 fn invalid(reason: impl Into<String>) -> ServerError {
     ServerError::ConfigInvalid {
         reason: reason.into(),
@@ -323,6 +369,7 @@ impl Config {
         let text = std::fs::read_to_string(path)
             .map_err(|error| invalid(format!("{} could not be read: {error}", path.display())))?;
         retired::refuse(&text, path)?;
+        let (text, written) = stores_keys_written(&text, path)?;
         let config: Self = serde_json::from_str(&text).map_err(|error| {
             if error
                 .to_string()
@@ -340,6 +387,16 @@ impl Config {
             ))
         })?;
         config.validate()?;
+        if written {
+            lys_identity::stores_receipt::write_durably(path, text.as_bytes()).map_err(
+                |error| {
+                    invalid(format!(
+                        "{}: the stores receipt keys could not be written in: {error}",
+                        path.display()
+                    ))
+                },
+            )?;
+        }
         Ok(config)
     }
 

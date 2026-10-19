@@ -149,6 +149,19 @@ impl Layout {
         self.install_dir().join("build.json")
     }
 
+    /// The receipt of every store's head, written by the service alone
+    /// (DIRECTORY-107 R2).
+    #[must_use]
+    pub fn stores_receipt(&self) -> PathBuf {
+        self.install_dir().join("stores.json")
+    }
+
+    /// The operator's acceptances of a lost store, beside the receipt.
+    #[must_use]
+    pub fn stores_accepted(&self) -> PathBuf {
+        self.install_dir().join("stores.accepted.json")
+    }
+
     /// An upgrade under way: its builds and each step as it completes.
     #[must_use]
     pub fn upgrade_intent(&self) -> PathBuf {
