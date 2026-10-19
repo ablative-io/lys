@@ -6,16 +6,19 @@
 //! the same for the same caller and operation, so a registration asked again
 //! is answered, never registered twice.
 //!
-//! The creator's five rights on the new agent are recorded first, in one
-//! append to the grant log under the exercised `agent.create` grant; the
-//! agent and its activation follow in one append to the directory. A grant
-//! log that refuses the rights leaves nothing registered. A crash after the
-//! rights and before the directory leaves them on an id no agent holds, and
-//! the same registration asked again completes it.
+//! The agent exists before its rights do (AGENTS-016 R3): the agent and its
+//! activation are recorded first, in one append to the directory; only then
+//! are the creator's five rights on it and the use of the `agent.create`
+//! grant that admitted it recorded, in one append to the grant log. No file
+//! log pair writes both at once, so the order is the guarantee: a crash
+//! between the two leaves an agent with no rights, on the person's
+//! dashboard, which the same registration asked again finishes by writing
+//! only the rights not already standing; never rights on an agent nobody
+//! holds.
 
 use std::str::FromStr;
 
-use lys_identity::grants::{Action, CreatedRequest, Resource};
+use lys_identity::grants::{Action, CreatedRequest, Resource, Route};
 use lys_identity::{
     AgentId, Change, IdentityEvent, IdentityId, LifecycleState, OperationId, PersonId, Profile,
     Transition,
@@ -58,7 +61,7 @@ pub(super) fn register(
             reason: "an agent registers an agent only to answer to the person it answers to",
         });
     }
-    let exercised = crate::agent_acts::require(
+    let admitting = crate::agent_acts::admitting(
         state,
         creator,
         &Resource::new("person", &person.to_string())?,
@@ -66,26 +69,28 @@ pub(super) fn register(
     )?;
     let agent = new_agent(creator, operation);
     let at = now();
+    let answer = crate::routes::with_directory(state, |directory| {
+        let actor = crate::agent_acts::actor_of(directory.projection()?, creator)?;
+        registered(directory, (actor, operation), agent, person, profile, at)
+    })?;
+    crate::agent_policy_api::with_policies(state, |policies| {
+        policies.ensure_default(&agent.to_string())
+    })?;
     crate::grants::with_directory_grants(
         state,
         |judged| {
             let request = CreatedRequest {
                 operation,
-                source: exercised.grant,
+                source: admitting.grant,
                 agent,
+                route: Route::Api,
             };
             judged
                 .grants
                 .record_created(judged.directory, &request, at)?;
-            crate::agent_acts::actor_of(judged.directory, creator)
+            Ok(())
         },
-        |directory, actor| {
-            let answer = registered(directory, (actor, operation), agent, person, profile, at)?;
-            crate::agent_policy_api::with_policies(state, |policies| {
-                policies.ensure_default(&agent.to_string())
-            })?;
-            Ok(answer)
-        },
+        |_, ()| Ok(answer),
     )
 }
 

@@ -272,7 +272,7 @@
         {
           "id": "C775",
           "text": "An agent that registers an agent holds, under the person's agent.create grant, exactly the rights to set its profile, start, start-command, stop and restart it, withdrawn when that grant is revoked; the agent is registered and activated before its grants are appended, and the grant append is idempotent on retry, so a crash never leaves rights on an agent that does not exist (AGENTS-015 R2, ordered by AGENTS-016 R3).",
-          "done": false
+          "done": true
         },
         {
           "id": "C776",

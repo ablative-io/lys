@@ -3,8 +3,8 @@
 //! grants and refused `not_permitted` by name without them; the agent it
 //! registers answers to its person and is active at once; it holds exactly
 //! the five rights to set that agent up and start it, under the person's
-//! `agent.create` grant and withdrawn with it; no agent approves a version it
-//! set; and a registration whose grants cannot be written leaves nothing.
+//! `agent.create` grant and withdrawn with it; and no agent approves a
+//! version it set. AGENTS-016 R3 and R4 are in the modules beside it.
 
 #[path = "support/agent_starts_agent.rs"]
 mod support;
@@ -15,8 +15,11 @@ mod mcp_answer;
 #[path = "support/harness_description.rs"]
 mod harness_description;
 
+/// AGENTS-016 R3: the agent first, its rights second, idempotent on retry.
+#[path = "agent_starts_agent/ordering.rs"]
+mod ordering;
+
 use std::collections::BTreeSet;
-use std::os::unix::fs::PermissionsExt;
 
 use serde_json::{Value, json};
 use support::{Answer, TestResult, World, operation, refused_as};
@@ -471,65 +474,5 @@ async fn revoking_the_create_grant_withdraws_the_five() -> TestResult {
         )
         .await?;
     not_permitted(&started, "agent.start");
-    Ok(())
-}
-
-/// Gives or takes write permission on the grant log's segments, so its next
-/// append is refused by the filesystem (the fault `tests/grants.rs` injects).
-fn grant_log_writable(world: &World, writable: bool) -> TestResult {
-    let segments = world
-        .service
-        .dir
-        .path()
-        .join("grant-log")
-        .join("leaves")
-        .join("segments");
-    let (file, dir) = if writable {
-        (0o644, 0o755)
-    } else {
-        (0o444, 0o555)
-    };
-    for entry in std::fs::read_dir(&segments)? {
-        std::fs::set_permissions(entry?.path(), std::fs::Permissions::from_mode(file))?;
-    }
-    std::fs::set_permissions(&segments, std::fs::Permissions::from_mode(dir))?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn a_registration_whose_grants_cannot_be_written_leaves_neither() -> TestResult {
-    let world = World::new().await?;
-    world
-        .give(
-            &world.creator.id,
-            &world.bea_resource(),
-            "agent.create",
-            false,
-        )
-        .await?;
-    let body = json!({"operation": operation()?, "display_name": "Unwritten"});
-    let before = world.service.log_size().await?;
-    grant_log_writable(&world, false)?;
-    let failed = world.signed(&world.creator, "/agents", &body).await;
-    grant_log_writable(&world, true)?;
-    let failed = failed?;
-    assert_ne!(failed.0, 200, "{}", failed.1);
-    assert_eq!(
-        world.service.log_size().await?,
-        before,
-        "no agent was registered"
-    );
-    let (_, listed) = world.service.get("/identities", Some(&world.ada)).await?;
-    assert!(!listed.to_string().contains("Unwritten"), "{listed}");
-    // Asked again once the log takes writes, it registers the agent and its grants.
-    let again = world.signed(&world.creator, "/agents", &body).await?;
-    let agent = ok(&again)?["agent"].as_str().ok_or("no agent")?.to_owned();
-    let held = world
-        .beas_grants()
-        .await?
-        .into_iter()
-        .filter(|grant| grant["resource"]["id"] == agent.as_str())
-        .count();
-    assert_eq!(held, CREATED.len());
     Ok(())
 }

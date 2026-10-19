@@ -242,7 +242,34 @@ pub(crate) fn require(
     resource: &Resource,
     action: &Action,
 ) -> Result<Exercised, ServerError> {
-    if let Some(found) = exercised(state, agent, resource, action)? {
+    reach(state, agent, resource, action, Decision::Exercise)
+}
+
+/// [`require`] with nothing recorded: the grant that admits the act, whose
+/// use the act records itself in its own append (an agent registering an
+/// agent records the use of `agent.create` with the rights it gives, after
+/// the agent exists, AGENTS-016 R3).
+///
+/// # Errors
+/// `not_permitted` when nothing admits it; the grants' own refusal when they
+/// cannot be read.
+pub(crate) fn admitting(
+    state: &AppState,
+    agent: AgentId,
+    resource: &Resource,
+    action: &Action,
+) -> Result<Exercised, ServerError> {
+    reach(state, agent, resource, action, Decision::Explain)
+}
+
+fn reach(
+    state: &AppState,
+    agent: AgentId,
+    resource: &Resource,
+    action: &Action,
+    decision: Decision,
+) -> Result<Exercised, ServerError> {
+    if let Some(found) = exercised(state, agent, resource, action, decision)? {
         return Ok(found);
     }
     if resource.kind() == "agent"
@@ -252,6 +279,7 @@ pub(crate) fn require(
             agent,
             &Resource::new("person", &person.to_string())?,
             action,
+            decision,
         )?
     {
         return Ok(found);
@@ -274,13 +302,14 @@ fn answering(state: &AppState, id: &str) -> Result<Option<PersonId>, ServerError
     })
 }
 
-/// `agent`'s grant of `action` on `resource`, its use recorded; none when
-/// no grant of the agent's admits it.
+/// `agent`'s grant of `action` on `resource`, its use recorded when
+/// `decision` is an exercise; none when no grant of the agent's admits it.
 fn exercised(
     state: &AppState,
     agent: AgentId,
     resource: &Resource,
     action: &Action,
+    decision: Decision,
 ) -> Result<Option<Exercised>, ServerError> {
     let request = ExerciseRequest {
         caller: IdentityId::Agent(agent),
@@ -304,15 +333,21 @@ fn exercised(
             )?;
             judged.apps.admit_kind(None, resource.kind())?;
             judged.apps.admit_action(resource.kind(), action.as_str())?;
-            match decide(&mut judged, &request, now(), None, Decision::Exercise) {
-                Ok((permit, _)) => match permit.use_event {
-                    Some(Ok(_)) => Ok(Some(Exercised {
-                        grant: permit.grant,
-                        root: permit.root_person,
-                    })),
-                    Some(Err(error)) => Err(error.into()),
-                    None => Err(GrantError::LogUnavailable {
+            match decide(&mut judged, &request, now(), None, decision) {
+                Ok((permit, _)) => match (permit.use_event, decision) {
+                    (Some(Ok(_)), Decision::Exercise) | (None, Decision::Explain) => {
+                        Ok(Some(Exercised {
+                            grant: permit.grant,
+                            root: permit.root_person,
+                        }))
+                    }
+                    (Some(Err(error)), _) => Err(error.into()),
+                    (None, Decision::Exercise) => Err(GrantError::LogUnavailable {
                         reason: format!("the exercise of {action} has no recorded use event"),
+                    }
+                    .into()),
+                    (Some(Ok(_)), Decision::Explain) => Err(GrantError::LogUnavailable {
+                        reason: format!("a question about {action} recorded a use event"),
                     }
                     .into()),
                 },

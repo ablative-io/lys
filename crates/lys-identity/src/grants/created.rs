@@ -1,12 +1,20 @@
-//! The rights an agent holds on an agent it registers (AGENTS-015 R2): when
-//! an agent registers an agent under its grant of `agent.create`, the person
-//! answering for both gives it exactly [`CREATED_RIGHTS`] on the new agent,
-//! each one relation carrying one action, use-only, standing in the chain of
-//! that `agent.create` grant, so revoking it withdraws them. All five are
-//! written in one durable act: one append, one flush, one pin.
+//! The rights an agent holds on an agent it registers (AGENTS-015 R2,
+//! AGENTS-016 R3): when an agent registers an agent under its grant of
+//! `agent.create`, the person answering for both gives it exactly
+//! [`CREATED_RIGHTS`] on the new agent, each one relation carrying one
+//! action, use-only, standing in the chain of that `agent.create` grant, so
+//! revoking it withdraws them.
+//!
+//! The agent exists before its rights do: they are recorded only on an agent
+//! the directory already holds, answering to the same person, and refused by
+//! name otherwise. The rights and the use of `agent.create` they record are
+//! written in one durable act: one append, one flush, one pin. Asked again,
+//! only the rights not already standing are written, so a finished
+//! registration asked again appends nothing.
 
 use lys_log_store::LeafStore;
 
+use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
@@ -28,6 +36,8 @@ pub struct CreatedRequest {
     pub source: GrantId,
     /// The agent registered.
     pub agent: AgentId,
+    /// How the registration arrived, recorded on the use of `source`.
+    pub route: Route,
 }
 
 /// The operation of the right to `action` recorded for the registration
@@ -40,14 +50,20 @@ fn derived(operation: OperationId, action: &str) -> OperationId {
     OperationId::from_bytes(id)
 }
 
+/// The use of `agent.create` a registration records with its rights.
+const USE: &str = "use-of-agent.create";
+
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Record the creator's [`CREATED_RIGHTS`] on `request.agent`, under its
-    /// grant `request.source` of `agent.create`, in one append. Asked again for
-    /// the same registration, the rights already recorded are answered.
+    /// grant `request.source` of `agent.create`, with that grant's use, in
+    /// one append. Asked again for the same registration, the rights already
+    /// recorded are answered and only the missing ones are written; when none
+    /// is missing nothing is appended.
     ///
     /// # Errors
     /// - `GrantError::SourceUnknown` if the source grant is absent.
-    /// - `GrantError::LineageMalformed` if it is not an agent's grant of `agent.create`.
+    /// - `GrantError::LineageMalformed` if it is not an agent's grant of
+    ///   `agent.create`, or the directory does not hold the agent yet.
     /// - `GrantError::Revoked` if it was revoked.
     /// - `GrantError::OperationReused` if the agent answers to another person, or the operations name other changes.
     /// - `GrantError::LogUnavailable` or `GrantError::AppendRefused` if the batch is not recorded.
@@ -58,19 +74,83 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         at: u64,
     ) -> Result<Vec<Recorded>, GrantError> {
         self.settle_for_change()?;
-        let operations: Vec<OperationId> = CREATED_RIGHTS
-            .iter()
-            .map(|action| derived(request.operation, action))
-            .collect();
+        let source = self.created_source(directory, request)?;
+        let resource = Resource::new("agent", &request.agent.to_string())?;
+        let responsible = source.responsible();
         let mut answered = Vec::new();
-        for operation in &operations {
-            if let Some(found) = self.answered(*operation)? {
-                answered.push(found);
+        let mut events = Vec::new();
+        for action in CREATED_RIGHTS {
+            let operation = derived(request.operation, action);
+            if let Some((event, receipt)) = self.answered(operation)? {
+                let standing = match event.change() {
+                    GrantChange::Issue(grant) => {
+                        grant.resource() == &resource && created_hop(grant, &source)
+                    }
+                    GrantChange::Revoke { .. } | GrantChange::Use { .. } => false,
+                };
+                if !standing {
+                    return Err(GrantError::OperationReused {
+                        operation: operation.to_string(),
+                    });
+                }
+                answered.push(self.answer(event, receipt)?);
+                continue;
             }
+            let relation = Relation::new(&format!("{ONE}{action}"))?;
+            let actions = self.model.actions_on("agent", &relation)?.clone();
+            let grant = Grant::new(GrantParts {
+                id: GrantId::generate()?,
+                issuer: IdentityId::Person(responsible),
+                holder: source.holder(),
+                responsible,
+                resource: resource.clone(),
+                relation,
+                actions,
+                pass_on: PassOn::UseOnly,
+                source: Source::Grant(source.id()),
+                window: Window::new(at, source.window().ends_at())?,
+                model_version: self.model.version_on("agent"),
+                operation,
+            })?;
+            let event = GrantEvent::new(
+                operation,
+                IdentityId::Person(responsible),
+                at,
+                GrantChange::Issue(Box::new(grant)),
+            )?;
+            self.book.check(&event)?;
+            events.push(event);
         }
-        if !answered.is_empty() {
-            return self.answered_created(request, answered, operations.len());
+        if events.is_empty() {
+            return Ok(answered);
         }
+        let used = derived(request.operation, USE);
+        if self.answered(used)?.is_none() {
+            let event = GrantEvent::new(
+                used,
+                source.holder(),
+                at,
+                GrantChange::Use {
+                    grant: source.id(),
+                    route: request.route,
+                },
+            )?;
+            self.book.check(&event)?;
+            events.insert(0, event);
+        }
+        let mut recorded = self.commit_batch(events)?;
+        recorded.retain(|one| matches!(one.event.change(), GrantChange::Issue(_)));
+        answered.extend(recorded);
+        Ok(answered)
+    }
+
+    /// The live `agent.create` grant `request` stands under, once the
+    /// directory holds its agent answering to that grant's person.
+    fn created_source(
+        &self,
+        directory: &Projection,
+        request: &CreatedRequest,
+    ) -> Result<Grant, GrantError> {
         let source =
             self.book
                 .grant(request.source)
@@ -97,75 +177,15 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 grant: source.id().to_string(),
             });
         }
-        let responsible = source.responsible();
-        if directory
-            .record(IdentityId::Agent(request.agent))
-            .is_some_and(|record| record.responsible() != Some(responsible))
-        {
-            return Err(GrantError::OperationReused {
+        match directory.record(IdentityId::Agent(request.agent)) {
+            Some(record) if record.responsible() == Some(source.responsible()) => Ok(source),
+            Some(_) => Err(GrantError::OperationReused {
                 operation: request.operation.to_string(),
-            });
+            }),
+            None => Err(GrantError::LineageMalformed {
+                reason: "an agent's rights are recorded only on an agent the directory already holds: the agent is registered first",
+            }),
         }
-        let resource = Resource::new("agent", &request.agent.to_string())?;
-        let mut events = Vec::with_capacity(CREATED_RIGHTS.len());
-        for (action, operation) in CREATED_RIGHTS.iter().zip(operations) {
-            let relation = Relation::new(&format!("{ONE}{action}"))?;
-            let actions = self.model.actions_on("agent", &relation)?.clone();
-            let grant = Grant::new(GrantParts {
-                id: GrantId::generate()?,
-                issuer: IdentityId::Person(responsible),
-                holder: source.holder(),
-                responsible,
-                resource: resource.clone(),
-                relation,
-                actions,
-                pass_on: PassOn::UseOnly,
-                source: Source::Grant(source.id()),
-                window: Window::new(at, source.window().ends_at())?,
-                model_version: self.model.version_on("agent"),
-                operation,
-            })?;
-            let event = GrantEvent::new(
-                operation,
-                IdentityId::Person(responsible),
-                at,
-                GrantChange::Issue(Box::new(grant)),
-            )?;
-            self.book.check(&event)?;
-            events.push(event);
-        }
-        self.commit_batch(events)
-    }
-
-    /// The rights a registration already recorded, each answered; refused
-    /// when they are not the whole batch for this agent and creator.
-    fn answered_created(
-        &mut self,
-        request: &CreatedRequest,
-        answered: Vec<(GrantEvent, GrantReceipt)>,
-        expected: usize,
-    ) -> Result<Vec<Recorded>, GrantError> {
-        let resource = Resource::new("agent", &request.agent.to_string())?;
-        let whole = answered.len() == expected
-            && answered.iter().all(|(event, _)| match event.change() {
-                GrantChange::Issue(grant) => {
-                    grant.resource() == &resource
-                        && self
-                            .book
-                            .grant(request.source)
-                            .is_some_and(|source| created_hop(grant, source))
-                }
-                GrantChange::Revoke { .. } | GrantChange::Use { .. } => false,
-            });
-        if !whole {
-            return Err(GrantError::OperationReused {
-                operation: request.operation.to_string(),
-            });
-        }
-        answered
-            .into_iter()
-            .map(|(event, receipt)| self.answer(event, receipt))
-            .collect()
     }
 
     /// Commit `events` in one append: each checked, signed and folded, and
