@@ -1,5 +1,5 @@
 {
-  "stages": ["tokei", "ast-grep", "clippy", "tsc", "nextest", "vitest", "push"],
+  "stages": ["tokei", "ast-grep", "clippy", "tsc", "nextest", "doc", "vitest", "push"],
   "slow": 60,
   "tsc": { "dirs": ["surface/identity"] },
   "vitest": { "dirs": ["surface/identity"] },
