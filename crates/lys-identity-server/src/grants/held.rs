@@ -1,6 +1,6 @@
 //! DIRECTORY-108: whether a resource of the asker's own kind has any holder of
 //! an action, answered held or none from the whole book and naming no one.
-//! `who` answers only the grants its caller sees (grant_sight.rs), so an app
+//! `who` answers only the grants its caller sees (`grant_sight.rs`), so an app
 //! could never read "nobody holds this" from it; `held` judges every grant on
 //! the resource, as `who` does before its sight filter, and discloses only
 //! whether one permits.
