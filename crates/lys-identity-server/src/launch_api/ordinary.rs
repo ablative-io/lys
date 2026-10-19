@@ -324,12 +324,21 @@ fn reviewed_harness(
     state: &Arc<AppState>,
     agent: &str,
 ) -> Result<Option<lys_runner::tracking::Harness>, ServerError> {
+    // Read from the directory before the profiles are held (AGENTS-017 R3).
+    let kin = crate::start_checks::kin(state, agent)?;
     with_provisioning(state, |store| {
-        let Some(version) = store.latest_reviewed(agent) else {
-            let latest = store
-                .profile(agent)
-                .and_then(|profile| profile.versions.last())
-                .ok_or(ServerError::LaunchRecordMissing)?;
+        let latest = store
+            .profile(agent)
+            .and_then(|profile| profile.versions.last())
+            .ok_or(ServerError::LaunchRecordMissing)?;
+        // The latest version, reviewed itself or by content on another agent
+        // of the same person; else the latest reviewed one; else refused.
+        let carried = latest.reviewed.is_none()
+            && crate::start_checks::carried(store, &kin, latest).is_some();
+        let Some(version) = carried
+            .then_some(latest)
+            .or_else(|| store.latest_reviewed(agent))
+        else {
             return Err(ServerError::ProfileNotReviewed {
                 version: latest.number,
             });

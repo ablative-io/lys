@@ -16,7 +16,8 @@ use crate::routes::AppState;
 
 use crate::error::ServerError;
 use crate::network_store::{Machine, NetworkStore};
-use crate::provisioning_store::{McpServer, Setting, Settings, Version};
+use crate::provisioning_store::{McpServer, ProvisioningStore, Setting, Settings, Version};
+use std::str::FromStr;
 
 #[cfg(test)]
 #[path = "start_proxy_tests.rs"]
@@ -112,6 +113,136 @@ pub(crate) fn reviewed(version: &Version) -> Result<(), ServerError> {
         });
     }
     Ok(())
+}
+
+/// A kept start's review, read again when its launch is rebuilt: the
+/// version's own, or the carried review the start was admitted with
+/// (`carried_review` in the kept view) while that version still holds a
+/// person's review of the same settings. Kinship was proved at admission.
+pub(crate) fn kept_reviewed(
+    store: &ProvisioningStore,
+    view: &Value,
+    version: &Version,
+) -> Result<(), ServerError> {
+    if version.reviewed.is_some() {
+        return Ok(());
+    }
+    let source = view.get("carried_review").and_then(|carried| {
+        let agent = carried.get("agent")?.as_str()?;
+        let number = u32::try_from(carried.get("version")?.as_u64()?).ok()?;
+        store
+            .profile(agent)?
+            .versions
+            .iter()
+            .find(|kept| kept.number == number)
+    });
+    let digest = version.settings.sha256();
+    let holds = source.is_some_and(|source| {
+        source
+            .reviewed
+            .as_ref()
+            .is_some_and(|review| lys_identity::PersonId::from_str(&review.by).is_ok())
+            && digest.is_some()
+            && source.settings.sha256() == digest
+    });
+    if holds { Ok(()) } else { reviewed(version) }
+}
+
+/// A review carried to a version without its own (AGENTS-017 R3): a person's
+/// review of the same settings on another agent answering to the same person.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+pub struct CarriedReview {
+    /// The agent whose version was reviewed.
+    pub agent: String,
+    /// That version's number.
+    pub version: u32,
+    /// The person who reviewed it: the responsible person or the administrator.
+    pub by: String,
+    /// When, in seconds since the Unix epoch.
+    pub at: u64,
+}
+
+/// An agent and every agent answering to the same person, read from the
+/// directory before any profile is read, so the directory is never asked
+/// while the profiles are held.
+pub(crate) struct Kin {
+    agent: String,
+    agents: BTreeSet<String>,
+}
+
+/// `agent`'s kin in `projection`: none beside it when it answers to no one.
+pub(crate) fn kin_in(
+    projection: &lys_identity::projection::Projection,
+    agent: &str,
+) -> Result<Kin, ServerError> {
+    let parsed: lys_identity::AgentId = agent.parse().map_err(|error| {
+        drop(error);
+        ServerError::AgentNotVisible
+    })?;
+    let person = projection
+        .record(lys_identity::IdentityId::Agent(parsed))
+        .and_then(lys_identity::projection::Record::responsible);
+    let mut agents = BTreeSet::new();
+    if let Some(person) = person {
+        for held in projection.agents_of(person) {
+            let (identity, _) = held.map_err(|error| ServerError::DirectoryUnavailable {
+                reason: error.to_string(),
+            })?;
+            agents.insert(identity.to_string());
+        }
+    }
+    Ok(Kin {
+        agent: agent.to_owned(),
+        agents,
+    })
+}
+
+/// `agent`'s kin, read from the directory alone.
+pub(crate) fn kin(state: &AppState, agent: &str) -> Result<Kin, ServerError> {
+    crate::routes::with_directory(state, |directory| kin_in(directory.projection()?, agent))
+}
+
+/// The review that carries to `version`, which has none of its own: the
+/// latest review, by a person, of a version with the same settings digest on
+/// another agent answering to the same person. A review an agent made never
+/// carries; nor does any review to an agent that answers to no one.
+pub(crate) fn carried(
+    store: &ProvisioningStore,
+    kin: &Kin,
+    version: &Version,
+) -> Option<CarriedReview> {
+    let digest = version.settings.sha256()?;
+    store
+        .reviewed_with(&digest)
+        .filter(|(agent, _)| *agent != kin.agent && kin.agents.contains(*agent))
+        .filter_map(|(agent, kept)| {
+            let review = kept.reviewed.as_ref()?;
+            lys_identity::PersonId::from_str(&review.by).ok()?;
+            Some(CarriedReview {
+                agent: agent.to_owned(),
+                version: kept.number,
+                by: review.by.clone(),
+                at: review.at,
+            })
+        })
+        .max_by_key(|review| review.at)
+}
+
+/// A new start's review: the version's own (none carried), or one carried to
+/// it by content; refused `ProfileNotReviewed` when neither stands.
+pub(crate) fn reviewed_for(
+    store: &ProvisioningStore,
+    kin: &Kin,
+    version: &Version,
+) -> Result<Option<CarriedReview>, ServerError> {
+    if version.reviewed.is_some() {
+        return Ok(None);
+    }
+    carried(store, kin, version)
+        .map(Some)
+        .ok_or(ServerError::ProfileNotReviewed {
+            version: version.number,
+        })
 }
 
 /// The broker metadata a launch needs, without any credential value.

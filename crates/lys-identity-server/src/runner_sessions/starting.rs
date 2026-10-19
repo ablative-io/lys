@@ -391,6 +391,8 @@ pub(super) fn prepare_record(
         executed: false,
         conversation,
         native_conversation,
+        // A launch record names a version reviewed itself (`reviewed` above).
+        carried_review: None,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),

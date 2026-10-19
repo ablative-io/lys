@@ -17,6 +17,9 @@ pub(super) struct Indexes {
     pub skills: BTreeMap<String, BTreeMap<String, usize>>,
     pub latest_skills: BTreeMap<String, usize>,
     pub reviewed_builds: builds::ReviewedBuilds,
+    /// Every version reviewed itself, by the digest of its settings
+    /// (AGENTS-017 R3), recomputed from the settings whenever the file is read.
+    pub reviewed_digests: BTreeMap<String, Vec<Position>>,
     reviews: BTreeMap<String, Vec<Position>>,
 }
 
@@ -62,6 +65,12 @@ impl Indexes {
                 .entry(profile_index)
                 .and_modify(|kept| *kept = (*kept).max(version_index))
                 .or_insert(version_index);
+            if let Some(digest) = version.settings.sha256() {
+                let same = self.reviewed_digests.entry(digest).or_default();
+                if !same.contains(&position) {
+                    same.push(position);
+                }
+            }
             for (server_index, server) in version.settings.mcp_servers.iter().enumerate() {
                 let declared = (profile_index, version_index, server_index);
                 self.servers

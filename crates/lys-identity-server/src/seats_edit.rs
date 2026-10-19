@@ -40,13 +40,15 @@ pub(crate) async fn version(
     let actor = signed_in(&state, &headers)?;
     let held = crate::seats_api::seat(&state, &name)?;
     let by = crate::launch_api::start_caller(&state, &headers, &actor, &held.added.agent)?;
+    // A review carries by content to the same person's agents (AGENTS-017 R3).
+    let kin = crate::start_checks::kin(&state, &held.added.agent)?;
     let harness = with_provisioning(&state, |store| {
         let selected = store
             .version(&held.added.agent, given.profile_version)
             .ok_or(ServerError::ProfileVersionUnknown {
                 version: given.profile_version,
             })?;
-        crate::start_checks::reviewed(selected)?;
+        crate::start_checks::reviewed_for(store, &kin, selected)?;
         selected
             .settings
             .harness

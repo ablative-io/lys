@@ -88,6 +88,27 @@ pub struct Settings {
 }
 
 impl Settings {
+    /// The SHA-256 of these settings serialised canonically, keys sorted and
+    /// no whitespace, as lowercase hex (AGENTS-017 R3). It is computed from
+    /// the settings each time a version is kept or read, never stored and
+    /// never trusted from the file: the same content has the same digest on
+    /// any agent, and any changed setting changes it. None when the settings
+    /// cannot be written as JSON: such a version has no digest, so no review
+    /// is ever carried to or from it.
+    #[must_use]
+    pub fn sha256(&self) -> Option<String> {
+        use sha2::Digest;
+        const DIGITS: &[u8; 16] = b"0123456789abcdef";
+        let mut text = String::new();
+        canonical(&serde_json::to_value(self).ok()?, &mut text);
+        let mut hex = String::with_capacity(64);
+        for byte in sha2::Sha256::digest(text.as_bytes()) {
+            hex.push(char::from(DIGITS[usize::from(byte >> 4)]));
+            hex.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+        }
+        Some(hex)
+    }
+
     /// Assemble the declared seat fields, preserving the existing session form.
     ///
     /// # Errors
@@ -114,6 +135,39 @@ impl Settings {
                 session.and_then(|session| session.config_dir.as_ref()),
             )?,
         })
+    }
+}
+
+/// `value` written with object keys sorted and no whitespace.
+fn canonical(value: &serde_json::Value, out: &mut String) {
+    match value {
+        serde_json::Value::Object(members) => {
+            let mut keys: Vec<&String> = members.keys().collect();
+            keys.sort_unstable();
+            out.push('{');
+            for (index, key) in keys.into_iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                out.push_str(&serde_json::Value::String(key.clone()).to_string());
+                out.push(':');
+                if let Some(member) = members.get(key) {
+                    canonical(member, out);
+                }
+            }
+            out.push('}');
+        }
+        serde_json::Value::Array(items) => {
+            out.push('[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    out.push(',');
+                }
+                canonical(item, out);
+            }
+            out.push(']');
+        }
+        scalar => out.push_str(&scalar.to_string()),
     }
 }
 

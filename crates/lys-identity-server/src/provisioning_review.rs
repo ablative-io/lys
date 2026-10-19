@@ -76,6 +76,7 @@ pub(super) async fn review(
             at: now(),
         };
         let agent = agent.to_string();
+        let kin = crate::start_checks::kin_in(directory, &agent)?;
         write_provisioning(&state, |store| {
             store
                 .version(&agent, number)
@@ -98,7 +99,7 @@ pub(super) async fn review(
                     operation: kept.operation.clone(),
                     version: number,
                 });
-            Ok(Json(view(&state, &agent, store.profile(&agent), recorded)?))
+            Ok(Json(view(&state, (store, &kin), &agent, recorded)?))
         })
     })
 }
@@ -172,12 +173,13 @@ pub(super) async fn seat_program(
             by,
             at,
         });
+        let kin = crate::start_checks::kin_in(projection, &id)?;
         write_provisioning(&state, |store| {
             let version = store.set(&id, number, candidate)?;
             Ok(Json(view(
                 &state,
+                (store, &kin),
                 &id,
-                store.profile(&id),
                 Some(Recorded { operation, version }),
             )?))
         })

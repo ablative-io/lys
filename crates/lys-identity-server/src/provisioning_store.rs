@@ -357,6 +357,23 @@ impl ProvisioningStore {
         self.kept.profiles.get(profile)?.versions.get(version)
     }
 
+    /// Every version reviewed itself whose settings have `digest`, with its
+    /// agent, in the order kept (AGENTS-017 R3).
+    pub(crate) fn reviewed_with<'a>(
+        &'a self,
+        digest: &str,
+    ) -> impl Iterator<Item = (&'a str, &'a Version)> + 'a {
+        self.indexes
+            .reviewed_digests
+            .get(digest)
+            .into_iter()
+            .flatten()
+            .filter_map(|&(profile, version)| {
+                let profile = self.kept.profiles.get(profile)?;
+                Some((profile.agent.as_str(), profile.versions.get(version)?))
+            })
+    }
+
     /// Keep `settings` as the version of `agent` after `from`, under
     /// `operation`, and answer its number. `from` is the latest version the
     /// setter saw, 0 for none.

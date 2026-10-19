@@ -232,11 +232,13 @@ async fn add(
         .transpose()?;
     let by = crate::launch_api::start_caller(&state, &headers, &actor, &given.agent)?;
     let number = given.profile_version;
+    // A review carries by content to the same person's agents (AGENTS-017 R3).
+    let kin = crate::start_checks::kin(&state, &given.agent)?;
     let harness = with_provisioning(&state, |store| {
         let version = store
             .version(&given.agent, number)
             .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
-        crate::start_checks::reviewed(version)?;
+        crate::start_checks::reviewed_for(store, &kin, version)?;
         version
             .settings
             .harness

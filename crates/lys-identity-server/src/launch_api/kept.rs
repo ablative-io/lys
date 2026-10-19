@@ -1,5 +1,5 @@
 //! Runner inputs reconstructed from the exact kept provisioning version.
-use super::{HandleName, ServerError, Value, reviewed};
+use super::{HandleName, ServerError, Value};
 
 /// Build the signed launch using only the kept template and its exact version.
 ///
@@ -32,7 +32,7 @@ pub fn kept_launch(
                 .find(|version| version.number == number)
         })
         .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
-    reviewed(version)?;
+    crate::start_checks::kept_reviewed(store, view, version)?;
     let mut native = crate::launch_template::from_template(
         version,
         text("template")?,

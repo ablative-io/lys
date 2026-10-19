@@ -327,7 +327,7 @@
         {
           "id": "C789",
           "text": "A profile version without its own review starts when its responsible person or the administrator reviewed the same settings content on any agent of theirs, the answer naming the carried review; a changed digest needs review again; an agent never carries a review it made.",
-          "done": false
+          "done": true
         },
         {
           "id": "C790",

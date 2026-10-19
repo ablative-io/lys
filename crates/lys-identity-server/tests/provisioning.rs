@@ -484,3 +484,81 @@ async fn instructions_mode_refuses_an_unknown_mode_without_recording_it() -> Tes
 
 #[path = "provisioning/saved_session.rs"]
 mod saved_session;
+
+/// AGENTS-017 R3: the history says per version which review stands: its own,
+/// one carried by content from another agent of the same person (naming it),
+/// or neither when one setting differs.
+#[tokio::test]
+async fn each_version_says_whether_its_review_is_its_own_carried_or_neither() -> TestResult {
+    let table = Table::set().await?;
+    let first = table.seeded.people[1].agents[0].id.to_string();
+    let mut others = Vec::new();
+    for name in ["Second", "Third"] {
+        let (status, registered) = table
+            .service
+            .post(
+                "/agents",
+                Some(&table.bea),
+                &json!({"operation": operation()?, "display_name": name}),
+            )
+            .await?;
+        assert_eq!(status, 200, "{registered}");
+        others.push(registered["agent"].as_str().ok_or("no agent")?.to_owned());
+    }
+    let (second, third) = (&others[0], &others[1]);
+    for (agent, note) in [(&first, "same"), (second, "same"), (third, "other")] {
+        let (status, set) = table
+            .service
+            .post(
+                &format!("/agents/{agent}/provisioning"),
+                Some(&table.bea),
+                &profile(&operation()?, 0, note),
+            )
+            .await?;
+        assert_eq!(status, 200, "{set}");
+    }
+    let (status, reviewed) = table
+        .service
+        .post(
+            &format!("/agents/{first}/provisioning/1/review"),
+            Some(&table.bea),
+            &json!({"operation": operation()?}),
+        )
+        .await?;
+    assert_eq!(status, 200, "{reviewed}");
+    let bea = table.seeded.people[1].id.to_string();
+
+    let line = |answer: &Value| answer["versions"][0].clone();
+    let (_, own) = table
+        .service
+        .get(&format!("/agents/{first}/provisioning"), Some(&table.bea))
+        .await?;
+    assert_eq!(line(&own)["reviewed"], "itself", "{own}");
+    let (status, carried) = table
+        .service
+        .get(&format!("/agents/{second}/provisioning"), Some(&table.bea))
+        .await?;
+    assert_eq!(status, 200, "{carried}");
+    assert_eq!(line(&carried)["reviewed"], "carried", "{carried}");
+    assert_eq!(
+        line(&carried)["carried_review"],
+        json!({"agent": first, "version": 1, "by": bea, "at": reviewed["profile"]["reviewed_at"]}),
+        "{carried}"
+    );
+    assert_eq!(
+        line(&carried)["settings_sha256"],
+        line(&own)["settings_sha256"],
+        "the same content has the same digest"
+    );
+    let (_, neither) = table
+        .service
+        .get(&format!("/agents/{third}/provisioning"), Some(&table.bea))
+        .await?;
+    assert_eq!(line(&neither)["reviewed"], "neither", "{neither}");
+    assert_ne!(
+        line(&neither)["settings_sha256"],
+        line(&own)["settings_sha256"],
+        "a changed setting changes the digest"
+    );
+    Ok(())
+}

@@ -9,6 +9,10 @@
 //! The person responsible for the agent, or the administrator, reviews a
 //! version under an operation id; an agent is started only from a reviewed
 //! version, and the answer says when the reviewer is the person who set it.
+//! A version without its own review is started when that person or the
+//! administrator reviewed the same settings on another agent of theirs, and
+//! the history says per version which review stands: its own, one carried by
+//! content (naming it), or neither (AGENTS-017 R3).
 //!
 //! A profile is applied only when its complete native start was reported
 //! running by its machine's runner. A newer version remains recorded until
@@ -133,6 +137,15 @@ pub struct VersionLine {
     pub set_at: u64,
     /// Why it was set.
     pub note: String,
+    /// The SHA-256 of its settings serialised canonically, computed from the
+    /// settings as kept; null when they cannot be written as JSON.
+    pub settings_sha256: Option<String>,
+    /// Which review stands for it: `itself`, `carried` (the same settings
+    /// reviewed on another agent of the same person) or `neither`.
+    pub reviewed: String,
+    /// The carried review, when `reviewed` is `carried`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub carried_review: Option<crate::start_checks::CarriedReview>,
 }
 
 /// The answer of the provisioning routes.
@@ -296,10 +309,11 @@ pub(crate) fn write_provisioning<T>(
 
 fn view(
     state: &AppState,
+    (store, kin): (&ProvisioningStore, &crate::start_checks::Kin),
     agent: &str,
-    profile: Option<&Profile>,
     recorded: Option<Recorded>,
 ) -> Result<ProvisioningView, ServerError> {
+    let profile: Option<&Profile> = store.profile(agent);
     let versions = profile.map_or(&[][..], |profile| profile.versions.as_slice());
     Ok(ProvisioningView {
         agent: agent.to_owned(),
@@ -338,11 +352,28 @@ fn view(
         }),
         versions: versions
             .iter()
-            .map(|version| VersionLine {
-                version: version.number,
-                set_by: version.set_by.clone(),
-                set_at: version.set_at,
-                note: version.settings.note.clone(),
+            .map(|version| {
+                let carried_review = version
+                    .reviewed
+                    .is_none()
+                    .then(|| crate::start_checks::carried(store, kin, version))
+                    .flatten();
+                VersionLine {
+                    version: version.number,
+                    set_by: version.set_by.clone(),
+                    set_at: version.set_at,
+                    note: version.settings.note.clone(),
+                    settings_sha256: version.settings.sha256(),
+                    reviewed: if version.reviewed.is_some() {
+                        "itself"
+                    } else if carried_review.is_some() {
+                        "carried"
+                    } else {
+                        "neither"
+                    }
+                    .to_owned(),
+                    carried_review,
+                }
             })
             .collect(),
         enforced: crate::launch_api::enforced(state, agent, versions.last())?,
@@ -356,8 +387,10 @@ async fn read(
     Path(id): Path<String>,
 ) -> Result<Json<ProvisioningView>, ServerError> {
     let agent = seen_agent(&state, &headers, &id)?.agent.to_string();
+    // Read from the directory before the profiles are held (AGENTS-017 R3).
+    let kin = crate::start_checks::kin(&state, &agent)?;
     with_provisioning(&state, |store| {
-        Ok(Json(view(&state, &agent, store.profile(&agent), None)?))
+        Ok(Json(view(&state, (store, &kin), &agent, None)?))
     })
 }
 
@@ -403,6 +436,7 @@ async fn set(
             reviewed: None,
         };
         let agent = agent.to_string();
+        let kin = crate::start_checks::kin_in(directory, &agent)?;
         write_provisioning(&state, |store| {
             let operation = version.operation.clone();
             let mut version = version;
@@ -421,12 +455,7 @@ async fn set(
                 session::recorded(&agent, version);
             }
             let recorded = Recorded { operation, version };
-            Ok(Json(view(
-                &state,
-                &agent,
-                store.profile(&agent),
-                Some(recorded),
-            )?))
+            Ok(Json(view(&state, (store, &kin), &agent, Some(recorded))?))
         })
     })
 }

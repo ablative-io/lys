@@ -197,13 +197,16 @@ pub(crate) async fn remember_started(
         return Ok(());
     };
     let number = profile_number(view)?;
+    // A review carries by content to the same person's agents (AGENTS-017 R3).
+    let kin = crate::start_checks::kin(state, agent)?;
     let version = with_provisioning(state, |store| {
-        store
+        let version = store
             .version(agent, number)
             .cloned()
-            .ok_or(ServerError::ProfileVersionUnknown { version: number })
+            .ok_or(ServerError::ProfileVersionUnknown { version: number })?;
+        crate::start_checks::reviewed_for(store, &kin, &version)?;
+        Ok(version)
     })?;
-    crate::start_checks::reviewed(&version)?;
     let transport = transport(&version, view)?;
     previous_ended(state, &held, session).await?;
     let observed = super::live_session(state, machine, session)

@@ -15,7 +15,9 @@
 //! any other report is refused. Only an active agent is started, only on a
 //! machine that lists the agent or a role it holds and whose egress list
 //! names every host its profile's servers are reached at, and only from a
-//! profile version someone answering for the agent reviewed.
+//! profile version someone answering for the agent reviewed, or whose same
+//! settings that person or the administrator reviewed on another agent of
+//! theirs; the answer then names the carried review (AGENTS-017 R3).
 //!
 //! The administrator and the person responsible for the agent are given
 //! the command. Each refusal is by name: an agent the directory does not
@@ -72,7 +74,7 @@ use crate::runtime_api::with_runtime;
 use crate::runtime_state::{Report, Reported};
 use crate::session::now;
 pub(crate) use crate::start_checks::placed;
-use crate::start_checks::{active, handles, reaches, reviewed};
+use crate::start_checks::{CarriedReview, active, handles, reaches};
 
 /// The answer of the start-command route.
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
@@ -111,6 +113,11 @@ pub struct StartCommandView {
     /// The native terminal conversation selected before launch, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub native_conversation: Option<String>,
+    /// The review that admitted this start when the version has none of its
+    /// own: the same settings reviewed on another agent of the same person
+    /// (AGENTS-017 R3). Absent when the version was reviewed itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub carried_review: Option<CarriedReview>,
 }
 
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -259,14 +266,16 @@ pub(crate) async fn start_as(
         Who::Admitted(by) => by,
     };
     let admission = admit_start(state, (&agent, &session, machine), profile, admitted_by)?;
-    let (version, runtime, admitted_by) = match admission {
+    let (version, runtime, admitted_by, carried_review) = match admission {
         Admission::Kept(kept, admitted_by) => {
             if kept.get("conversation").and_then(Value::as_str) != conversation.as_deref() {
                 return Err(ServerError::RuntimeReportReused { operation: session });
             }
             return run(state, kept, &admitted_by, record_seat).await;
         }
-        Admission::New(version, runtime, admitted_by) => (version, runtime, admitted_by),
+        Admission::New(version, runtime, admitted_by, carried) => {
+            (version, runtime, admitted_by, carried)
+        }
     };
     validate_conversation(&version, conversation.as_deref())?;
     let directory = match named {
@@ -313,6 +322,7 @@ pub(crate) async fn start_as(
         executed: false,
         conversation,
         native_conversation,
+        carried_review,
     })
     .map_err(|error| ServerError::LaunchUnrenderable {
         reason: error.to_string(),
@@ -386,7 +396,7 @@ pub(crate) fn start_caller(
 /// A start already admitted, or what a new one is rendered from.
 enum Admission {
     Kept(Value, String),
-    New(Box<Version>, String, String),
+    New(Box<Version>, String, String, Option<CarriedReview>),
 }
 
 /// The start kept under `session` for `agent`, answered exactly as it was
@@ -458,7 +468,10 @@ fn admit_start(
                     .ok_or(ServerError::LaunchRecordMissing)
             })?,
         };
-        reviewed(&version)?;
+        let kin = crate::start_checks::kin_in(directory, agent)?;
+        let carried = with_provisioning(state, |store| {
+            crate::start_checks::reviewed_for(store, &kin, &version)
+        })?;
         let held = crate::roles_api::held_roles(state, agent, now())?;
         let runtime = with_network(state, |store| {
             let machine = placed(store, machine, (agent, &held))?;
@@ -468,7 +481,12 @@ fn admit_start(
                 .clone()
                 .ok_or(ServerError::MachineWithoutRuntime)
         })?;
-        Ok(Admission::New(Box::new(version), runtime, admitted_by))
+        Ok(Admission::New(
+            Box::new(version),
+            runtime,
+            admitted_by,
+            carried,
+        ))
     })
 }
 
