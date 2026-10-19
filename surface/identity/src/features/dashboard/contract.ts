@@ -30,7 +30,21 @@ export interface Waiting {
   product_drafts?: number | PartRefused;
 }
 
-export interface DashboardAnswer extends Paged { agents: DashboardAgent[]; waiting: Waiting; alarms: AlarmSummary | PartRefused }
+/** One thing an agent of the person's did for them (AGENTS-016 R5): registered an agent, or started one, with the session it runs as. */
+export interface ActedLine { kind: 'registered' | 'started'; acting_agent: string; agent: string; at: number; session?: string }
+
+export interface DashboardAnswer extends Paged {
+  agents: DashboardAgent[]; waiting: Waiting; alarms: AlarmSummary | PartRefused;
+  /** Newest first; absent from a service older than AGENTS-016. */
+  acted_by_agents?: ActedLine[] | PartRefused;
+}
+
+const actedLine = (line: unknown): line is ActedLine => {
+  if (!line || typeof line !== 'object') return false;
+  const each = line as Partial<ActedLine>;
+  return (each.kind === 'registered' || each.kind === 'started') && typeof each.acting_agent === 'string' && typeof each.agent === 'string'
+    && Number.isSafeInteger(each.at) && (each.session === undefined || typeof each.session === 'string');
+};
 
 export const refusedPart = (part: unknown): part is PartRefused =>
   !!part && typeof part === 'object' && !Array.isArray(part) && typeof (part as PartRefused).refusal === 'string';
@@ -75,6 +89,10 @@ export async function readDashboard(): Promise<DashboardAnswer> {
     || answer.alarms.newest.length > 3 || answer.alarms.open_count < answer.alarms.newest.length
     || !answer.alarms.newest.every((alarm) => validAlarm(alarm) && alarm.cleared_at === null))) {
     answer.alarms = { refusal: 'AlarmsUnreadable', reason: 'The service did not answer the open alarm count and newest alarms.' };
+  }
+  const acted = answer.acted_by_agents;
+  if (acted !== undefined && !refusedPart(acted) && !(Array.isArray(acted) && acted.every(actedLine))) {
+    answer.acted_by_agents = { refusal: 'ActedUnreadable', reason: 'The service did not answer what your agents registered and started for you as a list.' };
   }
   return answer;
 }

@@ -36,6 +36,7 @@ import type { WaitingLine } from './waiting';
 import './dashboard.css';
 import { Act } from '../../shell/Act';
 import { Alarms } from './Alarms';
+import { ActedByAgents } from './ActedByAgents';
 import { Unread } from './Unread';
 import { Spend } from './Spend';
 import { DashOptionStrip, DashboardOption, dashOptionOf } from './DashboardOptions';
@@ -116,6 +117,7 @@ function Page({ data, reload, watching, watch, option, fixture }: { data: Ready;
       <div className="you-scroll"><AgentTree branches={branches} context={context} /></div>
     </section>
     <div className="dash-side">
+      <ActedByAgents lines={data.answer.acted_by_agents} names={new Map(every.map((row) => [row.agent.id, row.agent.display_name]))} changed={reload} />
       <WaitingOnYou waiting={data.waiting} me={data.me.person.id} changed={reload} />
       <Exceptions rows={rows} />
       <Spend rows={rows} budgets={data.budgets} />

@@ -307,7 +307,7 @@
         {
           "id": "C786",
           "text": "GET /dashboard lists every agent an agent registered and every start an agent made for the signed-in person, and the dashboard shows them under one heading in plain words with Stop beside each, posting the agent's stop as the agent file does; no lines, no heading.",
-          "done": false
+          "done": true
         }
       ]
     }

@@ -449,6 +449,8 @@ fn served_routes(
         .with_state(Arc::clone(&state));
     let start_service = start_service(config, &state)?;
     crate::agent_pass_recovery::at_start(&state, &start_service)?;
+    // The dashboard reads the launch records an agent gave (AGENTS-016 R5).
+    let launches = axum::Extension(Arc::clone(&start_service));
     let starts = start::routes(start_service);
     let starts = crate::start_budget::guarded(
         starts.merge(crate::launch_api::routes().with_state(Arc::clone(&state))),
@@ -485,6 +487,7 @@ fn served_routes(
             .merge(configured)
             .merge(starts)
             .layer(axum::Extension(catalogue))
+            .layer(launches)
             .fallback(crate::surface::not_an_api_route),
     );
     let dispatcher = api.clone().layer(axum::middleware::from_fn_with_state(
