@@ -206,7 +206,9 @@ async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
 /// AGENTS-015 R1: an agent may be given what it needs to set up, review and
 /// start agents, allow them on a computer and pass on or take back what it
 /// gave; every act that hands out authority, mints an identity or decides on
-/// access stays withheld.
+/// access stays withheld. AGENTS-016 R4 admits an agent to issue the first
+/// certificate of an agent it registered, read from the registration record
+/// and never from a grant, so both certificate acts stay on this list.
 #[test]
 fn the_withheld_list_keeps_exactly_the_acts_an_agent_never_holds() {
     let kept = [

@@ -56,6 +56,11 @@ const ACTS: &[(&str, Judged)] = &[
     ("/agents/{id}/start-command", Judged::Door),
     ("/agents/{id}/restart", Judged::Door),
     ("/agents/{id}/stop", Judged::Door),
+    ("/agents/{id}/certificates", Judged::Handler),
+    (
+        "/agents/{id}/certificates/{serial}/withdrawal",
+        Judged::Door,
+    ),
     ("/seats", Judged::Handler),
     ("/seats/{name}/version", Judged::Handler),
     ("/seats/{name}/start", Judged::Handler),
@@ -404,4 +409,39 @@ pub(crate) fn recorded(state: &AppState, actor: lys_identity::Actor) -> Result<A
 /// `NoPerson` when it answers to none.
 pub(crate) fn person_of(state: &AppState, agent: AgentId) -> Result<PersonId, ServerError> {
     answering(state, &agent.to_string())?.ok_or(ServerError::NoPerson)
+}
+
+/// The agent that registered `agent` and when, read from the actor of its
+/// registration event in the directory's log; none when a person registered
+/// it or the directory holds no such agent (AGENTS-016 R4, R5).
+///
+/// # Errors
+/// The directory's own refusal when its log cannot be read.
+pub(crate) fn registrar(
+    directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+    agent: AgentId,
+) -> Result<Option<(AgentId, u64)>, ServerError> {
+    let Some(first) = directory
+        .record(IdentityId::Agent(agent))?
+        .and_then(|record| record.events().first().copied())
+    else {
+        return Ok(None);
+    };
+    let (signed, _) =
+        directory
+            .log()?
+            .entry(first)?
+            .ok_or_else(|| ServerError::DirectoryUnavailable {
+                reason: format!("agent {agent}'s registration event {first} is not in the log"),
+            })?;
+    let event = signed.event()?;
+    Ok(match event.change() {
+        lys_identity::Change::RegisterAgent { .. }
+        | lys_identity::Change::ReportingRegistration { .. } => event
+            .actor()
+            .provenance()
+            .agent()
+            .map(|by| (by, event.recorded_at())),
+        _ => None,
+    })
 }

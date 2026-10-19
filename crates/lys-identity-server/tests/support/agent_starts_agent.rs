@@ -334,14 +334,36 @@ impl World {
     }
 }
 
+/// A key for `agent` kept beside the service as `name`, held by the agent
+/// once a certificate is issued over it, and the certificate request over
+/// it in standard base64.
+///
+/// # Errors
+/// Refuses a key that cannot be made or a request that cannot be signed.
+pub fn key_for(
+    service: &Service,
+    agent: &str,
+    name: &str,
+) -> Result<(Certified, String), Box<dyn Error>> {
+    let key = Arc::new(Ed25519Identity::load_or_generate(
+        &service.dir.path().join(format!("{agent}.{name}.key")),
+    )?);
+    let request = STANDARD.encode(create_certificate_request(&key, agent)?);
+    Ok((
+        Certified {
+            id: agent.to_owned(),
+            key,
+        },
+        request,
+    ))
+}
+
 /// `agent`, certified by `person`'s session over a key kept beside the service.
 async fn enroll(service: &Service, person: &str, agent: &str) -> Result<Certified, Box<dyn Error>> {
-    let key = Arc::new(Ed25519Identity::load_or_generate(
-        &service.dir.path().join(format!("{agent}.key")),
-    )?);
+    let (certified, request) = key_for(service, agent, "enrolled")?;
     let body = json!({
         "operation": operation()?,
-        "request": STANDARD.encode(create_certificate_request(&key, agent)?),
+        "request": request,
     });
     let (status, issued) = service
         .post(
@@ -351,10 +373,7 @@ async fn enroll(service: &Service, person: &str, agent: &str) -> Result<Certifie
         )
         .await?;
     assert_eq!(status, 200, "{issued}");
-    Ok(Certified {
-        id: agent.to_owned(),
-        key,
-    })
+    Ok(certified)
 }
 
 /// Whether `answer` is the refusal `name`, or a start refused by it.

@@ -19,6 +19,10 @@ mod harness_description;
 #[path = "agent_starts_agent/ordering.rs"]
 mod ordering;
 
+/// AGENTS-016 R4: the creator issues the first certificate, and only the first.
+#[path = "agent_starts_agent/first_certificate.rs"]
+mod first_certificate;
+
 use std::collections::BTreeSet;
 
 use serde_json::{Value, json};

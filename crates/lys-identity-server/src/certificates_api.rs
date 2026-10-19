@@ -8,7 +8,9 @@
 //! `claims_are_live`.
 //!
 //! Issuing and withdrawing are in `certificates_issue`; their answers are
-//! this same view, with the serial the act was recorded under.
+//! this same view, with the serial the act was recorded under. An agent's
+//! own signed call issues only the first certificate of an agent it
+//! registered, and never withdraws one (AGENTS-016 R4).
 
 use std::sync::Arc;
 

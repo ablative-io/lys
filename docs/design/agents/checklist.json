@@ -302,7 +302,7 @@
         {
           "id": "C785",
           "text": "An agent holding agent.create issues the first certificate of an agent whose record names it as registrar, and only while that agent holds none; a second certificate, one for an agent it did not register, one after the person revoked its agent.create, and every withdrawal are refused by name (certificate_not_first, agent_not_yours, agent_create_revoked, not_permitted), and the certificate acts stay withheld from grants.",
-          "done": false
+          "done": true
         },
         {
           "id": "C786",

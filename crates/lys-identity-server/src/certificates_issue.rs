@@ -191,6 +191,9 @@ pub(crate) async fn issue(
     Path(id): Path<String>,
     body: Result<Json<IssueBody>, JsonRejection>,
 ) -> Result<Json<CertificatesView>, ServerError> {
+    if let Some(admitted) = crate::agent_acts::admitted() {
+        return first(&state, admitted.agent, &id, body);
+    }
     let seen = if let Some(actor) = crate::provider::app_person_actor(&state, &headers)? {
         with_directory(&state, |directory| {
             let projection = directory.projection()?;
@@ -212,6 +215,33 @@ pub(crate) async fn issue(
         crate::routes::responsible_or_administrator(&state, &headers, &id)?;
         seen_agent(&state, &headers, &id)?
     };
+    let asked = asked(&state, &seen, body)?;
+    if let Some(answered) = asked.answered {
+        return Ok(answered);
+    }
+    let issued = issued(&state, &seen, &asked.request, asked.serial.clone(), now())?;
+    let agent = seen.agent.to_string();
+    with_store(&state, |store| {
+        store.issue(issued)?;
+        answer(store, &agent, Some(asked.serial))
+    })
+}
+
+/// A certificate asked for: its serial and request, or the answer already
+/// recorded under that serial.
+struct Asked {
+    serial: String,
+    request: Vec<u8>,
+    answered: Option<Json<CertificatesView>>,
+}
+
+/// Read `body` for `seen`'s agent: answered from the store when its serial
+/// already names the same agent and key, refused when it names another.
+fn asked(
+    state: &AppState,
+    seen: &SeenAgent,
+    body: Result<Json<IssueBody>, JsonRejection>,
+) -> Result<Asked, ServerError> {
     let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
     let serial = OperationId::from_str(&body.operation)?.to_string();
     let request = STANDARD
@@ -221,20 +251,102 @@ pub(crate) async fn issue(
         .map_err(|error| malformed(format!("the request was refused: {error}")))?;
     let agent = seen.agent.to_string();
     seen.responsible.ok_or(ServerError::AgentNotVisible)?;
-    let kept = with_store(&state, |store| Ok(store.certificate(&serial).cloned()))?;
-    if let Some(kept) = kept {
-        let der = STANDARD.decode(&kept.issued.der).map_err(unavailable)?;
-        let key = certificate_subject_public_key(&der).map_err(unavailable)?;
-        return if kept.issued.agent == agent && &key == proved.subject_public_key() {
-            with_store(&state, |store| answer(store, &agent, Some(serial)))
-        } else {
-            Err(ServerError::CertificateReused { serial })
-        };
+    let kept = with_store(state, |store| Ok(store.certificate(&serial).cloned()))?;
+    let answered = match kept {
+        Some(kept) => {
+            let der = STANDARD.decode(&kept.issued.der).map_err(unavailable)?;
+            let key = certificate_subject_public_key(&der).map_err(unavailable)?;
+            if kept.issued.agent != agent || &key != proved.subject_public_key() {
+                return Err(ServerError::CertificateReused { serial });
+            }
+            Some(with_store(state, |store| {
+                answer(store, &agent, Some(serial.clone()))
+            })?)
+        }
+        None => None,
+    };
+    Ok(Asked {
+        serial,
+        request,
+        answered,
+    })
+}
+
+/// The first certificate of agent `id`, asked by `caller`, the agent that
+/// registered it (AGENTS-016 R4). Admitted only when the registration names
+/// `caller`, `caller` holds a live grant of `agent.create` from the agent's
+/// person now, and the agent holds no certificate, issued or withdrawn; the
+/// admission is read from the registration record, never from a grant. The
+/// certificate records `caller` as the one who issued it and the person as
+/// responsible.
+fn first(
+    state: &AppState,
+    caller: lys_identity::AgentId,
+    id: &str,
+    body: Result<Json<IssueBody>, JsonRejection>,
+) -> Result<Json<CertificatesView>, ServerError> {
+    use crate::error_agent_acts::AgentActsError;
+    let agent: lys_identity::AgentId = id.parse().map_err(|error| {
+        drop(error);
+        ServerError::AgentNotVisible
+    })?;
+    let (person, registrar) = with_directory(state, |directory| {
+        let person = directory
+            .projection()?
+            .record(IdentityId::Agent(agent))
+            .and_then(lys_identity::projection::Record::responsible)
+            .ok_or(ServerError::AgentNotVisible)?;
+        Ok((person, crate::agent_acts::registrar(directory, agent)?))
+    })?;
+    let words = |error: AgentActsError| ServerError::from(error);
+    if registrar.map(|(by, _)| by) != Some(caller) {
+        return Err(words(AgentActsError::AgentNotYours {
+            agent: agent.to_string(),
+            caller: caller.to_string(),
+        }));
     }
-    let issued = issued(&state, &seen, &request, serial.clone(), now())?;
-    with_store(&state, |store| {
+    let create = crate::agent_acts::require(
+        state,
+        caller,
+        &lys_identity::grants::Resource::new("person", &person.to_string())?,
+        &lys_identity::grants::Action::new(lys_identity::grants::lineage::CREATE)?,
+    );
+    match create {
+        Ok(_) => {}
+        Err(ServerError::NotPermitted { .. }) => {
+            return Err(words(AgentActsError::AgentCreateRevoked {
+                agent: agent.to_string(),
+                caller: caller.to_string(),
+                person: person.to_string(),
+            }));
+        }
+        Err(error) => return Err(error),
+    }
+    let seen = SeenAgent {
+        agent,
+        responsible: Some(person),
+    };
+    let asked = asked(state, &seen, body)?;
+    if let Some(answered) = asked.answered {
+        return Ok(answered);
+    }
+    let issued = issued_by(
+        state,
+        &seen,
+        &asked.request,
+        asked.serial.clone(),
+        (now(), Some(caller)),
+    )?;
+    let named = agent.to_string();
+    with_store(state, |store| {
+        if store
+            .certificates()
+            .any(|entered| entered.issued.agent == named)
+        {
+            return Err(words(AgentActsError::CertificateNotFirst { agent: named }));
+        }
         store.issue(issued)?;
-        answer(store, &agent, Some(serial))
+        answer(store, &named, Some(asked.serial))
     })
 }
 
@@ -247,12 +359,27 @@ pub(crate) fn issued(
     serial: String,
     at: u64,
 ) -> Result<Issued, ServerError> {
+    issued_by(state, seen, request, serial, (at, None))
+}
+
+/// [`issued`], naming in its claims the agent that issued it, when an agent
+/// did, beside the person responsible (AGENTS-016 R4).
+fn issued_by(
+    state: &AppState,
+    seen: &SeenAgent,
+    request: &[u8],
+    serial: String,
+    (at, by): (u64, Option<lys_identity::AgentId>),
+) -> Result<Issued, ServerError> {
     let agent = seen.agent.to_string();
     let person = seen
         .responsible
         .ok_or(ServerError::AgentNotVisible)?
         .to_string();
-    let claims = claims(state, seen, at)?;
+    let mut claims = claims(state, seen, at)?;
+    if let Some(by) = by {
+        claims["issued_by"] = json!({ "actor": by.to_string(), "responsible": person });
+    }
     let der = certificate(state, request, &agent, &claims)?;
     Ok(Issued {
         serial,
