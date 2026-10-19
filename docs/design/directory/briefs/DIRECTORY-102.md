@@ -44,8 +44,17 @@ Behavioural. In crates/lys-identity-server/src/apps_connect.rs, connect no longe
 
 **Files:**
 - create: crates/lys-identity-server/src/apps_connect_reconnect_tests.rs
+- create: crates/lys-identity-server/src/apps_connect_exchange.rs
+- create: crates/lys-identity-server/src/apps_client_bearer.rs
 - modify: crates/lys-identity-server/src/apps_connect.rs
+- modify: crates/lys-identity-server/src/apps_connect_checkpoint.rs
+- modify: crates/lys-identity-server/src/apps_client_credentials.rs
+- modify: crates/lys-identity-server/src/apps_credentials.rs
+- modify: crates/lys-identity-server/tests/apps_connect.rs
+- modify: crates/lys-identity-server/tests/apps_connect_retry.rs
 - modify: surface/identity/src/features/apps/ConnectApp.tsx
+- modify: surface/identity/src/features/apps/connect-again.test.tsx
+- modify: surface/identity/src/features/apps/connect-signed-out.test.tsx
 
 **Checklist:**
 - C764 — Connecting an approved app again leaves its running credentials live until the exchange hands over the new ones; the revocation happens in the exchange with its reason, and the approve page says so.
@@ -66,8 +75,13 @@ Behavioural. GET /apps gains public_address: string | null, computed as network_
 - create: crates/lys-identity-server/src/apps_api_read.rs
 - create: crates/lys-identity-server/src/apps_api_read_tests.rs
 - modify: crates/lys-identity-server/src/apps_api.rs
-- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/apps_api_tests.rs
+- modify: crates/lys-identity-server/src/apps_read.rs
+- modify: crates/lys-identity-server/src/apps_views.rs
 - modify: surface/identity/src/features/apps/ConnectApp.tsx
+- modify: surface/identity/src/features/apps/Apps.tsx
+- modify: surface/identity/src/features/apps/connect-address.test.tsx
+- modify: surface/identity/src/features/apps/connect-another.test.tsx
 
 **Checklist:**
 - C765 — GET /apps answers public_address from the server's own dialable address, or null with a reason, and the approve page sends and shows it.
@@ -86,9 +100,11 @@ Behavioural. GET /apps/connect/manifest?address=<manifest url>, administrator on
 **Files:**
 - create: crates/lys-identity-server/src/apps_connect_manifest.rs
 - create: crates/lys-identity-server/src/apps_connect_manifest_tests.rs
-- modify: crates/lys-identity-server/src/routes_startup.rs
-- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/apps_connect.rs
+- modify: crates/lys-identity-server/src/openapi_typed.rs
+- modify: crates/lys-identity-server/src/openapi_typed/apps.rs
 - modify: surface/identity/src/features/apps/ConnectApp.tsx
+- modify: surface/identity/src/features/apps/connect-manifest.test.tsx
 - modify: surface/identity/tests/apps-connect.test.tsx
 
 **Checklist:**
@@ -106,11 +122,21 @@ Behavioural. Each app in GET /apps gains connect_origin: string | null, the orig
 - grep of surface/identity/src for KNOWN_APPS answers 0 after the change, and the Apps vitest cases show a self-registered app pending under its own name and Connect again on a connected app's card
 
 **Files:**
+- create: surface/identity/src/features/apps/connect-origin.test.tsx
+- create: crates/lys-identity-server/tests/fixtures/apps-line-connected-from.json
 - modify: crates/lys-identity-server/src/apps_api_read.rs
 - modify: crates/lys-identity-server/src/apps_connect.rs
-- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/apps_client_lines.rs
+- modify: crates/lys-identity-server/src/apps_state.rs
+- modify: crates/lys-identity-server/src/apps_fold.rs
+- modify: crates/lys-identity-server/src/apps_views.rs
+- modify: crates/lys-identity-server/tests/apps_lines.rs
+- modify: crates/lys-identity-server/tests/apps_snapshot.rs
 - modify: surface/identity/src/features/apps/ConnectApp.tsx
 - modify: surface/identity/src/features/apps/Apps.tsx
+- modify: surface/identity/src/features/apps/ClientCredentials.tsx
+- modify: surface/identity/src/features/apps/credentials-where.test.tsx
+- modify: surface/identity/tests/config-secrets-review.test.tsx
 
 **Checklist:**
 - C767 — GET /apps answers connect_origin per app; a self-registered app is listed pending under its own name; the surface holds no app's name.

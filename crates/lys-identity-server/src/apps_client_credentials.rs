@@ -90,112 +90,9 @@ struct Ended {
     ended: Vec<String>,
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct IssuedBearer {
-    app: String,
-    owner: String,
-    client_secret_ref: String,
-    api_credential_ref: String,
-    client_secret_sha256: String,
-    credential: Option<String>,
-}
-
-/// Issue or rotate an approved app's bearer, answering its value once.
-pub(crate) async fn issue_bearer(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    UrlPath(id): UrlPath<String>,
-    body: Result<Json<ClientCredentialIssueBody>, JsonRejection>,
-) -> Result<Json<crate::apps_views::AppBearerGiven>, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let operation = OperationId::from_str(&body.operation)?.to_string();
-    let (repeated, expected) = with_apps(&state, |apps, projection| {
-        may_issue(&acting(&state, apps.held(), &headers, projection)?)?;
-        if let Some(line) = apps.held().operation(&operation) {
-            return match line {
-                Line::CustodyPrepared(prepared) if prepared.app == id && prepared.bearer_issued => {
-                    Ok((
-                        Some(crate::apps_views::AppBearerGiven {
-                            app: id.clone(),
-                            reference: prepared.api_credential_ref,
-                            credential: None,
-                        }),
-                        String::new(),
-                    ))
-                }
-                _ => Err(AppError::AppOperationReused {
-                    operation: operation.clone(),
-                }
-                .into()),
-            };
-        }
-        let app = approved(apps, &id)?;
-        let approval = app
-            .approved
-            .as_ref()
-            .ok_or_else(|| AppError::AppNotApproved { app: id.clone() })?;
-        Ok((None, approval.client.secret_sha256.clone()))
-    })?;
-    if let Some(given) = repeated {
-        return Ok(Json(given));
-    }
-    let answer = crate::secrets_api::ask(&state, &headers, Method::POST, "/_lys/apps/bearer/issue", encoded(&json!({
-        "app": id, "operation": operation, "expected_digest": expected, "upstream": state.identity_upstream,
-    }))).await?;
-    let issued: IssuedBearer =
-        serde_json::from_value(answer).map_err(|_error| unconfirmed("the app bearer's issue"))?;
-    let prefix = format!("lys-app-{}-{id}", issued.owner);
-    let shaped = issued.client_secret_sha256.len() == 64
-        && issued
-            .client_secret_sha256
-            .bytes()
-            .all(|byte| byte.is_ascii_hexdigit());
-    let value_valid = issued.credential.as_ref().is_none_or(|value| {
-        value
-            .strip_prefix(&format!("lys-app.{id}."))
-            .is_some_and(|secret| {
-                secret.len() == 64
-                    && secret.bytes().all(|byte| byte.is_ascii_hexdigit())
-                    && crate::apps_binding::sha256_hex(secret) == issued.client_secret_sha256
-            })
-    });
-    if issued.app != id
-        || !shaped
-        || !value_valid
-        || issued.client_secret_ref != format!("{prefix}-client")
-        || issued.api_credential_ref != format!("{prefix}-api-{operation}")
-    {
-        return Err(unconfirmed("the app bearer's custody"));
-    }
-    let by = with_apps(&state, |apps, projection| {
-        may_issue(&acting(&state, apps.held(), &headers, projection)?)
-    })?;
-    crate::apps_credentials::keep_custody(
-        &state,
-        &headers,
-        CustodyPrepared {
-            operation,
-            app: id.clone(),
-            client: Client {
-                client_id: id.clone(),
-                secret_sha256: issued.client_secret_sha256,
-            },
-            owner: issued.owner,
-            client_secret_ref: issued.client_secret_ref,
-            api_credential_ref: issued.api_credential_ref.clone(),
-            bearer_issued: true,
-            by,
-            at: now(),
-        },
-        &expected,
-    )?;
-    Ok(Json(crate::apps_views::AppBearerGiven {
-        app: id,
-        reference: issued.api_credential_ref,
-        credential: issued.credential,
-    }))
-}
+#[path = "apps_client_bearer.rs"]
+mod bearer;
+pub(crate) use bearer::{bearer_as, issue_bearer};
 
 /// Who acts, when they hold `issue_app_client_credential`; its refusal
 /// names the permission.
@@ -362,11 +259,19 @@ pub(crate) async fn revoke(
 /// endings are asked again by the next administrator act on any app's
 /// credentials or standing.
 pub(crate) async fn ended_after(state: &AppState, headers: &HeaderMap, id: &str) {
-    let ended = match crate::secrets_api::person(state, headers) {
-        Ok(person) => end_pending(state, &person).await,
-        Err(error) => Err(error),
-    };
-    if let Err(error) = ended {
+    match crate::secrets_api::person(state, headers) {
+        Ok(person) => ended_as(state, &person, id).await,
+        Err(error) => {
+            tracing::warn!(app = %id, %error, "app client credentials no longer live were not yet ended at the broker; the apps' record refuses them, and the next administrator act asks again");
+        }
+    }
+}
+
+/// [`ended_after`] on behalf of `person`, for an act no session makes: the
+/// connect exchange ending, as the administrator who approved the connect,
+/// the credentials an app's new ones replaced.
+pub(crate) async fn ended_as(state: &AppState, person: &str, id: &str) {
+    if let Err(error) = end_pending(state, person).await {
         tracing::warn!(app = %id, %error, "app client credentials no longer live were not yet ended at the broker; the apps' record refuses them, and the next administrator act asks again");
     }
 }

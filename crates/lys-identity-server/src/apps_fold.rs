@@ -3,8 +3,7 @@
 //! a start replays them over the leaves after the snapshot.
 
 use super::{
-    App, Applied, By, Connected, Held, Line, LysRecorded, Refused, Registered, SignInSet, Standing,
-    Version,
+    App, Applied, By, Connected, Held, Line, LysRecorded, Registered, SignInSet, Standing, Version,
 };
 
 /// The app `lys` as its one line records it: approved at the model's version.
@@ -106,6 +105,7 @@ pub(super) fn allows_on(app: &App, line: &Line, held: &Held) -> Result<(), Refus
         | Line::ClientCredentialIssued(_)
         | Line::ClientCredentialRevoked(_)
         | Line::CustodyPrepared(_)
+        | Line::ConnectedFrom(_)
             if standing != Standing::Approved =>
         {
             Err(Refused::Standing(standing))
@@ -219,6 +219,30 @@ pub(super) fn apply(app: &mut App, line: &Line) {
         | Line::Registrar(_)
         | Line::ClientCredentialIssued(_)
         | Line::ClientCredentialRevoked(_)
-        | Line::ClientCredentialsEnded(_) => {}
+        | Line::ClientCredentialsEnded(_)
+        | Line::ConnectedFrom(_) => {}
     }
+}
+
+/// Why a line cannot be kept on the apps as they stand.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refused {
+    /// An app by that id is already registered.
+    Exists,
+    /// No app by that id is registered.
+    Unknown,
+    /// The act is not one the app as it stands takes, and why.
+    Standing(Standing),
+    /// A change already waits for approval.
+    Pending,
+    /// No change waits for approval.
+    NothingPending,
+    /// The version named is not the current one, which is this.
+    Moved(u64),
+    /// The resource is already placed.
+    Placed,
+    /// The app is `lys`, which is never retired.
+    Lys,
+    /// No live client credential of the app has that id.
+    Credential,
 }

@@ -14,7 +14,6 @@ import { send } from './SchemaBuilder';
 import { who } from './Apps';
 import { ErrorWords } from '../people/Words';
 import type { AppRecord, By } from './Apps';
-import { KNOWN_APPS } from './ConnectApp';
 
 /** One of an app's client credentials as Lys lists it. It never carries a value. */
 export interface CredentialRecord {
@@ -98,13 +97,14 @@ export function ClientCredentials({ app }: { app: AppRecord }) {
     setHeld(listed(await send('POST', path('/credentials/' + encodeURIComponent(credential) + '/revoke'), { operation: operationId(), reason: reason.trim() }), app.id));
     setAsking(null); setReason('');
   });
-  // A known app is given its credentials by connecting, all of them at once and to its server; one issued by hand is
-  // only part of what it needs, so it is not offered here (Cambium also needs its workspace credential and Lys's keys).
-  const known = KNOWN_APPS.some((entry) => entry.id === app.id);
+  // An app that connected (Lys answers where from) is given its credentials by connecting, all of them at once and to its
+  // server; one issued by hand is only part of what it needs, so it is not offered here (it also needs its workspace
+  // credential and Lys's keys). Keyed on Lys's answer, never on the app's name (ADR-116).
+  const known = app.connect_origin != null;
   const issuable = open && !known;
   return <section className="app-credentials" aria-label={'Client credentials of ' + app.id}>
     <b>Client credentials</b>
-    {open && known ? <p className="note">{app.name} is given its credentials by connecting: Lys hands them to {app.name}’s server and nobody copies them. If {app.name} has lost them, use Connect again under Connect an app.</p> : null}
+    {open && known ? <p className="note">{app.name} is given its credentials by connecting: Lys hands them to {app.name}’s server and nobody copies them. If {app.name} has lost them, use Connect again on this card.</p> : null}
     {issuable ? <p className="note">{app.name} signs people in with its client id and a client secret issued here. Each secret is shown once, when issued.</p> : null}
     {shown ? <div className="app-secret" role="group" aria-label={'Credential ' + shown.credential_id + ' of ' + app.id}>
       <p>Put these two in {app.name}’s sign-in settings, where it is configured as an OpenID Connect client of Lys. Keep the secret to {app.name} alone. It is shown once, here, and Lys keeps no copy: if it is lost, issue another and take this one back.</p>

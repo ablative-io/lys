@@ -69,8 +69,8 @@ it('offers no Connect again on an app registered by hand, which never connected'
 });
 
 it('tells a person Lys says may not read apps so, in place of an Approve that could only fail', async () => {
-  await mount(HASH, { ...SERVICE, [READ]: () => refused(403, 'NotAdmitted', 'only the administrator does this, on a Lys screen'), '/apps': () => refused(403, 'NotAdmitted', 'apps are approved by the administrator') });
+  await mount(HASH, { ...SERVICE, [READ]: () => refused(403, 'NotAdmitted', 'only the administrator does this, on a Lys screen'), '/apps': () => listed([]) });
   await settle();
   expect(button('Approve Cambium')).toBeNull();
-  expect(document.body.textContent).toContain('only the administrator does this, on a Lys screen');
+  expect(document.querySelector('[role="alert"]')?.textContent).toBe('Lys did not read the app’s manifest for you: only the administrator does this, on a Lys screen. Send this page’s address to the administrator, who connects apps on this Lys.');
 });

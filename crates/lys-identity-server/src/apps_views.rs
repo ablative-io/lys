@@ -180,6 +180,9 @@ pub struct AppView {
     pub registered_by: By,
     /// When.
     pub registered_at: u64,
+    /// The origin it last connected from by its manifest; null for an app
+    /// registered by hand.
+    pub connect_origin: Option<String>,
 }
 
 impl From<&App> for AppView {
@@ -230,6 +233,7 @@ impl From<&App> for AppView {
                 .collect(),
             registered_by: registered.by.clone(),
             registered_at: registered.at,
+            connect_origin: app.connect_origin(),
         }
     }
 }
@@ -239,6 +243,12 @@ impl From<&App> for AppView {
 pub struct AppsView {
     /// Every app the caller may see, in the order registered.
     pub apps: Vec<AppView>,
+    /// Lys's own address for an app on another computer to call back, as
+    /// a runner is given it; null when Lys is served only on its own
+    /// computer or over plain http.
+    pub public_address: Option<String>,
+    /// Why there is no public address, in words; null when there is one.
+    pub public_address_reason: Option<String>,
 }
 
 /// A virtual client credential issued for an app, answered once to the

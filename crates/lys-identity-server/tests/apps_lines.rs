@@ -10,8 +10,8 @@ use std::error::Error;
 use lys_identity_server::apps_binding::{Binding, Registrar};
 use lys_identity_server::apps_state::{
     Applied, Approved, By, Client, ClientCredentialIssued, ClientCredentialRevoked,
-    ClientCredentialsEnded, Connected, Decided, Line, LysRecorded, Placed, Proposed, Registered,
-    ReturnDeclared, SignInSet,
+    ClientCredentialsEnded, Connected, ConnectedFrom, Decided, Line, LysRecorded, Placed, Proposed,
+    Registered, ReturnDeclared, SignInSet,
 };
 use lys_identity_server::read_views::Login;
 use serde_json::json;
@@ -127,6 +127,7 @@ fn shape(line: &Line) -> &'static str {
         Line::ClientCredentialRevoked(_) => "client_credential_revoked",
         Line::ClientCredentialsEnded(_) => "client_credentials_ended",
         Line::CustodyPrepared(_) => "custody_prepared",
+        Line::ConnectedFrom(_) => "connected_from",
     }
 }
 
@@ -189,13 +190,14 @@ fn every_client_credential_line_shape_keeps_its_bytes_and_reads_back() -> TestRe
     }
     let connector: Line = serde_json::from_str(CONNECTOR_FIXTURE.trim_end())?;
     let declared: Line = serde_json::from_str(RETURN_DECLARED_FIXTURE.trim_end())?;
+    let connected_from: Line = serde_json::from_str(CONNECTED_FROM_FIXTURE.trim_end())?;
     let shapes: std::collections::BTreeSet<_> = lines()
         .iter()
         .chain(&credentials)
-        .chain([&connector, &declared])
+        .chain([&connector, &declared, &connected_from])
         .map(shape)
         .collect();
-    assert_eq!(shapes.len(), 16, "every shape of apps line is pinned");
+    assert_eq!(shapes.len(), 17, "every shape of apps line is pinned");
     Ok(())
 }
 
@@ -241,6 +243,27 @@ fn the_return_declared_line_keeps_its_bytes_and_reads_back() -> TestResult {
     let read: Line = serde_json::from_str(RETURN_DECLARED_FIXTURE.trim_end())?;
     assert_eq!(read, line);
     assert_eq!(shape(&read), "return_declared");
+    Ok(())
+}
+
+/// Where an app connected from by its manifest (DIRECTORY-102 R4), written
+/// once by hand as the bytes the line must keep, and never regenerated.
+const CONNECTED_FROM_FIXTURE: &str = include_str!("fixtures/apps-line-connected-from.json");
+
+#[test]
+fn the_connected_from_line_keeps_its_bytes_and_reads_back() -> TestResult {
+    let line = Line::ConnectedFrom(ConnectedFrom {
+        operation: "op-14141414141414141414141414141414".to_owned(),
+        app: "notes".to_owned(),
+        origin: "https://notes.example.test".to_owned(),
+        by: operator(),
+        at: 20,
+    });
+    let written = serde_json::to_string(&line)?;
+    assert_eq!(CONNECTED_FROM_FIXTURE.trim_end(), written);
+    let read: Line = serde_json::from_str(CONNECTED_FROM_FIXTURE.trim_end())?;
+    assert_eq!(read, line);
+    assert_eq!(shape(&read), "connected_from");
     Ok(())
 }
 

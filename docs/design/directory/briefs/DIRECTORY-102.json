@@ -37,11 +37,20 @@
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/src/apps_connect_reconnect_tests.rs"
+          "crates/lys-identity-server/src/apps_connect_reconnect_tests.rs",
+          "crates/lys-identity-server/src/apps_connect_exchange.rs",
+          "crates/lys-identity-server/src/apps_client_bearer.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/apps_connect.rs",
-          "surface/identity/src/features/apps/ConnectApp.tsx"
+          "crates/lys-identity-server/src/apps_connect_checkpoint.rs",
+          "crates/lys-identity-server/src/apps_client_credentials.rs",
+          "crates/lys-identity-server/src/apps_credentials.rs",
+          "crates/lys-identity-server/tests/apps_connect.rs",
+          "crates/lys-identity-server/tests/apps_connect_retry.rs",
+          "surface/identity/src/features/apps/ConnectApp.tsx",
+          "surface/identity/src/features/apps/connect-again.test.tsx",
+          "surface/identity/src/features/apps/connect-signed-out.test.tsx"
         ],
         "delete": []
       },
@@ -68,8 +77,13 @@
         ],
         "modify": [
           "crates/lys-identity-server/src/apps_api.rs",
-          "crates/lys-identity-server/src/openapi_table.rs",
-          "surface/identity/src/features/apps/ConnectApp.tsx"
+          "crates/lys-identity-server/src/apps_api_tests.rs",
+          "crates/lys-identity-server/src/apps_read.rs",
+          "crates/lys-identity-server/src/apps_views.rs",
+          "surface/identity/src/features/apps/ConnectApp.tsx",
+          "surface/identity/src/features/apps/Apps.tsx",
+          "surface/identity/src/features/apps/connect-address.test.tsx",
+          "surface/identity/src/features/apps/connect-another.test.tsx"
         ],
         "delete": []
       },
@@ -94,9 +108,11 @@
           "crates/lys-identity-server/src/apps_connect_manifest_tests.rs"
         ],
         "modify": [
-          "crates/lys-identity-server/src/routes_startup.rs",
-          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/apps_connect.rs",
+          "crates/lys-identity-server/src/openapi_typed.rs",
+          "crates/lys-identity-server/src/openapi_typed/apps.rs",
           "surface/identity/src/features/apps/ConnectApp.tsx",
+          "surface/identity/src/features/apps/connect-manifest.test.tsx",
           "surface/identity/tests/apps-connect.test.tsx"
         ],
         "delete": []
@@ -117,13 +133,24 @@
         "grep of surface/identity/src for KNOWN_APPS answers 0 after the change, and the Apps vitest cases show a self-registered app pending under its own name and Connect again on a connected app's card"
       ],
       "files": {
-        "create": [],
+        "create": [
+          "surface/identity/src/features/apps/connect-origin.test.tsx",
+          "crates/lys-identity-server/tests/fixtures/apps-line-connected-from.json"
+        ],
         "modify": [
           "crates/lys-identity-server/src/apps_api_read.rs",
           "crates/lys-identity-server/src/apps_connect.rs",
-          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/apps_client_lines.rs",
+          "crates/lys-identity-server/src/apps_state.rs",
+          "crates/lys-identity-server/src/apps_fold.rs",
+          "crates/lys-identity-server/src/apps_views.rs",
+          "crates/lys-identity-server/tests/apps_lines.rs",
+          "crates/lys-identity-server/tests/apps_snapshot.rs",
           "surface/identity/src/features/apps/ConnectApp.tsx",
-          "surface/identity/src/features/apps/Apps.tsx"
+          "surface/identity/src/features/apps/Apps.tsx",
+          "surface/identity/src/features/apps/ClientCredentials.tsx",
+          "surface/identity/src/features/apps/credentials-where.test.tsx",
+          "surface/identity/tests/config-secrets-review.test.tsx"
         ],
         "delete": []
       },

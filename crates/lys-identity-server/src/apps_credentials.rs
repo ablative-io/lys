@@ -28,8 +28,26 @@ pub(crate) fn keep_custody(
     prepared: crate::apps_state::CustodyPrepared,
     previous_digest: &str,
 ) -> Result<(), ServerError> {
+    keep_custody_by(state, prepared, previous_digest, |apps, projection| {
+        acting(state, apps.held(), headers, projection)?
+            .administrator()
+            .map(|_actor| ())
+    })
+}
+
+/// [`keep_custody`], judged by `admitted` rather than a session: the connect
+/// exchange keeps custody as the administrator who approved the connect.
+pub(crate) fn keep_custody_by(
+    state: &AppState,
+    prepared: crate::apps_state::CustodyPrepared,
+    previous_digest: &str,
+    admitted: impl FnOnce(
+        &crate::apps_store::AppStore,
+        &lys_identity::projection::Projection,
+    ) -> Result<(), ServerError>,
+) -> Result<(), ServerError> {
     with_apps(state, |apps, projection| {
-        acting(state, apps.held(), headers, projection)?.administrator()?;
+        admitted(apps, projection)?;
         if apps.held().operation(&prepared.operation).is_none() {
             let current = apps
                 .app(&prepared.app)

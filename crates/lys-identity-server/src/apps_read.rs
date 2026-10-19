@@ -54,6 +54,10 @@ pub(crate) enum AppRead {
 #[derive(Serialize)]
 pub(crate) struct AppsRead {
     pub(crate) apps: Vec<AppRead>,
+    /// Lys's own address for an app on another computer to call back.
+    pub(crate) public_address: Option<String>,
+    /// Why Lys has no public address, when it has none.
+    pub(crate) public_address_reason: Option<String>,
 }
 
 pub(crate) fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {

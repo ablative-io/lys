@@ -1,10 +1,21 @@
 //! Connect an app in one act (the app-manifest pattern): the administrator
-//! approves the manifest the browser fetched from the app, and Lys registers,
-//! approves and issues the app's credentials with the existing acts, keeping
-//! them behind a one-time code the app's server exchanges.
+//! approves the manifest Lys read from the app, and Lys registers, approves
+//! and issues the app's client credential with the existing acts, keeping
+//! it behind a one-time code the app's server exchanges.
 //!
-//! Lys still calls no app: the manifest arrives in the administrator's body
-//! and the return address is only answered, never fetched.
+//! Connecting an approved app again ends nothing the running app holds: the
+//! approval issues a new client credential beside the live ones and keeps
+//! where the app connected from (`connect_origin`); the exchange that hands
+//! the new values over issues the app's new workspace credential and then
+//! revokes every client credential live at the approval, with the reason
+//! "the app was connected again" (DIRECTORY-102 R1). A reconnect the app
+//! never finishes leaves the running app signed in. A newer connect before
+//! the exchange replaces the waiting one, whose code is then refused
+//! `connect_code_replaced`.
+//!
+//! Lys reads an app only for the administrator, at the manifest address the
+//! approve page names (`apps_connect_manifest`); the return address is only
+//! answered, never fetched.
 //!
 //! The code is 256 bits, is used once and is bound to its app by a SHA-256
 //! lookup. An encrypted operation checkpoint retains
@@ -20,9 +31,8 @@ use std::sync::{Mutex, OnceLock};
 
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path as UrlPath, State};
-use axum::http::{HeaderMap, StatusCode};
-use axum::response::{IntoResponse, Response};
-use axum::routing::post;
+use axum::http::HeaderMap;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use lys_identity::OperationId;
 use serde::{Deserialize, Serialize};
@@ -30,11 +40,9 @@ use serde_json::{Value, json};
 
 use super::{AppApprovalBody, RegisterBody, approve, malformed, redirect, register, with_apps};
 use crate::apps_binding::{new_secret, sha256_hex};
-use crate::apps_client_credentials::{
-    ClientCredentialIssueBody, ClientCredentialRevokeBody, issue, issue_bearer, revoke,
-};
+use crate::apps_client_credentials::{ClientCredentialIssueBody, issue};
 use crate::apps_error::AppError;
-use crate::apps_state::Standing;
+use crate::apps_state::{ConnectedFrom, Line, Standing};
 use crate::error::ServerError;
 use crate::routes::AppState;
 use crate::session::now;
@@ -45,11 +53,19 @@ const CODE_LIFETIME_MS: u64 = 10 * 60 * 1000;
 #[path = "apps_connect_checkpoint.rs"]
 mod checkpoint;
 
+#[path = "apps_connect_exchange.rs"]
+mod exchange;
+
+#[path = "apps_connect_manifest.rs"]
+mod manifest;
+pub(crate) use manifest::ManifestRead;
+
 /// The connect routes, merged into the app routes.
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/apps/connect", post(connect))
-        .route("/apps/connect/exchange", post(exchange))
+        .route("/apps/connect/exchange", post(exchange::exchange))
+        .route("/apps/connect/manifest", get(manifest::read))
 }
 
 /// What an app publishes at `{app}/identity/lys/manifest`.
@@ -66,7 +82,7 @@ pub(crate) struct Manifest {
     schema: Value,
 }
 
-/// The administrator's approval of a fetched manifest.
+/// The administrator's approval of a manifest Lys read.
 #[derive(Deserialize, Serialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConnectBody {
@@ -99,6 +115,7 @@ pub(crate) struct Exchanged {
     workspace_credential: String,
 }
 
+#[cfg(test)]
 struct Pending {
     at: u64,
     answer: Option<Exchanged>,
@@ -208,45 +225,59 @@ async fn prepare_app(
     Ok(())
 }
 
-async fn replace_credentials(
+/// Issue the app's new client credential beside the live ones, its value
+/// checkpointed before anything answers. The workspace credential is issued
+/// by the exchange, so the running app's stays live until then.
+async fn new_client(
     state: &Arc<AppState>,
     headers: &HeaderMap,
     record: &mut checkpoint::Record,
     operation_id: &str,
     checkpoint: &checkpoint::Checkpoint,
 ) -> Result<(), ServerError> {
-    let id = &record.app;
-    if record.client.is_none() {
-        let Json(client) = issue(
-            State(Arc::clone(state)),
-            headers.clone(),
-            UrlPath(id.to_owned()),
-            Ok(Json(ClientCredentialIssueBody {
-                operation: operation_id.to_owned(),
-            })),
-        )
-        .await?;
-        let value = client.credential.ok_or_else(|| unavailable(
-            "the client issue is recorded but its one-time value was not checkpointed; the old credentials remain live; start a new connect operation"))?;
-        record.client = Some((client.credential_id, Some(value)));
-        checkpoint.save(record)?;
+    if record.client.is_some() {
+        return Ok(());
     }
-    if record.bearer.is_none() {
-        let Json(bearer) = issue_bearer(
-            State(Arc::clone(state)),
-            headers.clone(),
-            UrlPath(id.to_owned()),
-            Ok(Json(ClientCredentialIssueBody {
-                operation: operation(operation_id, "bearer"),
-            })),
-        )
-        .await?;
-        let value = bearer.credential.ok_or_else(|| unavailable(
-            "the bearer issue is recorded but its one-time value was not checkpointed; start a new connect operation"))?;
-        record.bearer = Some((bearer.reference, Some(value)));
-        checkpoint.save(record)?;
-    }
-    Ok(())
+    let Json(client) = issue(
+        State(Arc::clone(state)),
+        headers.clone(),
+        UrlPath(record.app.clone()),
+        Ok(Json(ClientCredentialIssueBody {
+            operation: operation_id.to_owned(),
+        })),
+    )
+    .await?;
+    let value = client.credential.ok_or_else(|| unavailable(
+        "the client issue is recorded but its one-time value was not checkpointed; the old credentials remain live; start a new connect operation"))?;
+    record.client = Some((client.credential_id, Some(value)));
+    checkpoint.save(record)
+}
+
+/// Keep where app `id` connected from: the origin of the return address,
+/// which `return_admitted` has held to an origin of the manifest's own.
+fn keep_origin(
+    state: &AppState,
+    headers: &HeaderMap,
+    parent: &str,
+    id: &str,
+    back: &str,
+) -> Result<(), ServerError> {
+    let origin = origin(back).ok_or_else(|| malformed("the return address has no origin"))?;
+    let operation = operation(parent, "origin");
+    with_apps(state, |apps, directory| {
+        let by = super::administrator(state, apps, headers, directory)?;
+        if apps.held().operation(&operation).is_some() {
+            return Ok(());
+        }
+        apps.keep(Line::ConnectedFrom(ConnectedFrom {
+            operation,
+            app: id.to_owned(),
+            origin,
+            by,
+            at: now(),
+        }))
+        .map(|_kept| ())
+    })
 }
 
 fn complete(
@@ -269,6 +300,7 @@ fn complete(
     record.connected = Some(connected.clone());
     checkpoint.save(record)?;
     checkpoint.index(record)?;
+    checkpoint.replace_waiting(record)?;
     Ok(connected)
 }
 
@@ -333,6 +365,9 @@ async fn connect(
                 .as_ref()
                 .map_or_else(|| state.oidc.issuer(), |provider| provider.issuer())
                 .to_owned();
+            // The exchange acts as this administrator: it issues the
+            // workspace credential and revokes what the new values replace.
+            let person = crate::secrets_api::person(&state, &headers)?;
             let record = checkpoint::Record::new(
                 request,
                 body.operation.clone(),
@@ -340,32 +375,20 @@ async fn connect(
                 issuer,
                 prior,
                 now(),
-            );
+            )
+            .acting_as(by, person);
             checkpoint.save(&record)?;
             record
         }
     };
     if let Some(connected) = record.connected.clone() {
         checkpoint.index(&record)?;
+        checkpoint.replace_waiting(&record)?;
         return Ok(Json(connected));
     }
     prepare_app(&state, &headers, &manifest, &body.operation).await?;
-    replace_credentials(&state, &headers, &mut record, &body.operation, &checkpoint).await?;
-    // Both replacement values are durable before any previous credential is revoked.
-    for credential in &record.prior {
-        drop(
-            revoke(
-                State(Arc::clone(&state)),
-                headers.clone(),
-                UrlPath((id.clone(), credential.clone())),
-                Ok(Json(ClientCredentialRevokeBody {
-                    operation: operation(&body.operation, &format!("revoke/{credential}")),
-                    reason: "the app was connected again".to_owned(),
-                })),
-            )
-            .await?,
-        );
-    }
+    new_client(&state, &headers, &mut record, &body.operation, &checkpoint).await?;
+    keep_origin(&state, &headers, &body.operation, &id, &body.back)?;
     let connected = complete(&checkpoint, &mut record, &body.back, &body.state)?;
     drop(gate);
     Ok(Json(connected))
@@ -398,45 +421,11 @@ fn take(code: &str, at: u64) -> Result<Result<Exchanged, &'static str>, ServerEr
     let Some(pending) = codes.get_mut(&sha256_hex(code)) else {
         return Ok(Err("connect_code_unknown"));
     };
-    Ok(take_pending(pending, at))
-}
-
-fn take_pending(pending: &mut Pending, at: u64) -> Result<Exchanged, &'static str> {
     if at.saturating_sub(pending.at) > CODE_LIFETIME_MS {
         pending.answer = None;
-        return Err("connect_code_expired");
+        return Ok(Err("connect_code_expired"));
     }
-    pending.answer.take().ok_or("connect_code_used")
-}
-
-/// The refusal `name` in plain words for the person reading the app's page.
-fn refusal_words(name: &str) -> &'static str {
-    match name {
-        "connect_code_used" => "this connection code was already used; start the connection again",
-        "connect_code_expired" => {
-            "this connection code is more than ten minutes old; start the connection again"
-        }
-        _ => "Lys does not know this connection code; start the connection again",
-    }
-}
-
-async fn exchange(
-    State(state): State<Arc<AppState>>,
-    body: Result<Json<ExchangeBody>, JsonRejection>,
-) -> Result<Response, ServerError> {
-    let Json(body) = body.map_err(|refused| malformed(refused.body_text()))?;
-    let checkpoint = checkpoint::Checkpoint::open(&state)?;
-    let gate = checkpoint.gate().await?;
-    let answer = checkpoint.take(&body.code, now())?;
-    drop(gate);
-    Ok(match answer {
-        Ok(answer) => Json(answer).into_response(),
-        Err(refusal) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"refusal": refusal, "reason": refusal_words(refusal)})),
-        )
-            .into_response(),
-    })
+    Ok(pending.answer.take().ok_or("connect_code_used"))
 }
 
 #[cfg(test)]
@@ -446,7 +435,3 @@ mod tests;
 #[cfg(test)]
 #[path = "apps_connect_reconnect_tests.rs"]
 mod reconnect_tests;
-
-#[cfg(test)]
-#[path = "apps_connect_manifest_tests.rs"]
-mod manifest_tests;

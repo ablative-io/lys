@@ -27,13 +27,8 @@ fn connect_body() -> Result<Value> {
 
 /// Approve a connect as the administrator, answering its one-time code.
 async fn approved(service: &Service, admin: &str) -> Result<String> {
-    let answer = ok(post(
-        service,
-        "/apps/connect",
-        Auth::Cookie(admin),
-        &connect_body()?,
-    )
-    .await?)?;
+    let body = connect_body()?;
+    let answer = ok(post(service, "/apps/connect", Auth::Cookie(admin), &body).await?)?;
     let redirect = answer["redirect"].as_str().ok_or("no redirect")?;
     reqwest::Url::parse(redirect)?
         .query_pairs()

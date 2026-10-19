@@ -86,14 +86,23 @@ async fn personal_apps_only_name_sign_in_ready_apps_without_registry_details() -
     let (status, personal) = service.get("/apps", Some(&member)).await?;
     assert_eq!(status, 200, "{personal}");
     assert_eq!(
-        personal,
-        json!({"apps": [{
+        personal["apps"],
+        json!([{
             "id": "ready",
             "name": "ready",
             "state": "approved",
             "address": "https://app.example.test",
-        }]})
+        }])
     );
+    // Beside the apps, only Lys's own public address and why it has none
+    // (DIRECTORY-102 R2): nothing of any app's registry.
+    let mut keys: Vec<&String> = personal
+        .as_object()
+        .ok_or("not an object")?
+        .keys()
+        .collect();
+    keys.sort();
+    assert_eq!(keys, ["apps", "public_address", "public_address_reason"]);
     let (status, one) = service.get("/apps/ready", Some(&member)).await?;
     assert_eq!(status, 200, "{one}");
     assert_eq!(one, personal["apps"][0]);

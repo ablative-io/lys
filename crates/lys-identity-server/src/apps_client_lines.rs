@@ -5,6 +5,10 @@
 //! revoked, and of an app not retired. Retiring an app ends every credential
 //! it holds by the retirement's one line, whatever the broker answers; the
 //! broker's own ending of them is recorded when it confirms it.
+//!
+//! A connect by manifest also keeps where the app connected from
+//! (`ConnectedFrom`, DIRECTORY-102 R4), so Lys knows which apps connected by
+//! themselves without holding any app's name.
 
 use serde::{Deserialize, Serialize};
 
@@ -31,6 +35,24 @@ pub struct CustodyPrepared {
     /// The administrator who requested custody.
     pub by: By,
     /// When custody was confirmed.
+    pub at: u64,
+}
+
+/// Where an approved app connected from by its manifest: the origin of the
+/// connect's return address, which lies on an origin of the manifest's own
+/// return addresses.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectedFrom {
+    /// The operation id it was kept under.
+    pub operation: String,
+    /// The app.
+    pub app: String,
+    /// The origin, `scheme://host[:port]`.
+    pub origin: String,
+    /// The administrator who approved the connect.
+    pub by: By,
+    /// When.
     pub at: u64,
 }
 
@@ -160,6 +182,16 @@ impl App {
             .filter(|credential| !credential.live_on(self) && !credential.ended_at_broker)
             .map(|credential| credential.issued.credential_id)
             .collect()
+    }
+
+    /// The origin the app last connected from by its manifest; none for an
+    /// app registered by hand.
+    #[must_use]
+    pub fn connect_origin(&self) -> Option<String> {
+        self.history.iter().rev().find_map(|line| match line {
+            Line::ConnectedFrom(connected) => Some(connected.origin.clone()),
+            _ => None,
+        })
     }
 
     /// The custody owner the app's credentials were issued under.

@@ -29,7 +29,8 @@ import { ClientCredentials, CustodyConfirmed, credentialRecord } from './ClientC
 import type { CredentialRecord, StoredCredentials } from './ClientCredentials';
 import { Act } from '../../shell/Act';
 import { roleChanges } from './roleChanges';
-import { KNOWN_APPS, KnownApps } from './ConnectApp';
+import { ConnectAgain, ConnectAnother, lysAddress } from './ConnectApp';
+import type { LysAddress } from './ConnectApp';
 import { WhoCanUse } from './WhoCanUse';
 import { ErrorWords, IdentityName, problemWords } from '../people/Words';
 import type { MeView } from '../../generated';
@@ -47,6 +48,8 @@ export interface AppRecord {
   schema: unknown; version: number; versions: number[];
   pending: { operation: string; replaces: number; schema: unknown; by: By; at: number } | null;
   client_id: string | null; service_account: string | null; client_credentials: CredentialRecord[]; registered_by: By; registered_at: number;
+  /** The origin the app last connected from; null for an app registered by hand, absent from a Lys that does not say. */
+  connect_origin?: string | null;
 }
 
 const strings = (values: unknown): values is string[] => Array.isArray(values) && values.every((entry) => typeof entry === 'string');
@@ -140,7 +143,7 @@ export function Apps() {
   const [notice, setNotice] = useState('');
   // What approval's custody answered, shown until the page is left.
   const [stored, setStored] = useState<Record<string, StoredCredentials>>({});
-  const load = useLoad(() => send<{ apps: AppRecord[] }>('GET', '/apps'), 'apps:' + revision);
+  const load = useLoad(() => send<{ apps: AppRecord[]; public_address?: string | null; public_address_reason?: string | null }>('GET', '/apps'), 'apps:' + revision);
   const changed = (message: string) => { setApproved({}); setNotice(message); setRevision((value) => value + 1); };
   const [picked, setPicked] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -148,10 +151,11 @@ export function Apps() {
   const self = useLoad(api.me, 'me');
   const me = self.status === 'ok' ? self.data : null;
   return <div className="page fill apps">
-    <PageHeader title="Apps" subtitle="Apps such as Cambium sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here." />
+    <PageHeader title="Apps" subtitle="Apps sign people in with Lys, and Lys decides what each person and agent may do in them. Connect an app below; nothing it asks for takes effect until you approve it here." />
     {notice ? <p role="status">{notice}</p> : null}
     <Gate load={load} title="Apps" ok={(answer) => {
       const apps = answer.apps.map((app) => approved[app.id] ?? app);
+      const lys = lysAddress(answer);
       const open = apps.find((app) => app.id === picked) ?? apps.find((app) => app.state === 'pending') ?? apps[0] ?? null;
       const edited = apps.find((app) => app.id === editing);
       if (edited) return <div className="pane"><section className="card" aria-label={'Permission template of ' + edited.id}>
@@ -160,7 +164,7 @@ export function Apps() {
       </section></div>;
       // The app is chosen above; its card and its matrix take the whole width below and scroll inside their own pane.
       return <>
-        <KnownApps apps={apps} />
+        <ConnectAnother lys={lys} />
         {apps.length ? <nav className="app-picker" aria-label="Apps">
           <span className="note">Apps on this Lys</span>
           {apps.map((app) => <button type="button" key={app.id} className={'app-choice' + (app.id === open?.id ? ' on' : '')} aria-pressed={app.id === open?.id} onClick={() => setPicked(app.id)}>
@@ -168,9 +172,9 @@ export function Apps() {
         </nav> : null}
         <div className="pane app-pane">
           <details className="card" aria-label="Add your own app (for developers)"><summary>Add your own app (for developers)</summary>
-            {apps.some((app) => app.id !== LYS && !KNOWN_APPS.some((known) => known.id === app.id)) ? null : <p className="dim">No other apps yet.</p>}
+            {apps.some((app) => app.id !== LYS) ? null : <p className="dim">No other apps yet.</p>}
             <Register changed={changed} /></details>
-          {open ? <AppCard me={me} edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved. People can sign in to it now, and can do things there once you give them access, under Who can use ' + answer.name + ' below.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : null}
+          {open ? <AppCard lys={lys} me={me} edit={() => setEditing(open.id)} key={open.id + ':' + revision} app={open} approved={(answer) => { setApproved((held) => ({ ...held, [answer.id]: answer })); setNotice(answer.name + ' is approved. People can sign in to it now, and can do things there once you give them access, under Who can use ' + answer.name + ' below.'); }} stored={stored[open.id] ?? null} saved={(answer) => setStored((held) => ({ ...held, [open.id]: answer }))} changed={changed} /> : null}
         </div>
       </>;
     }} />
@@ -185,7 +189,7 @@ function SignInFields({ redirects, setRedirects, profile, setProfile, app, name 
   </>;
 }
 
-function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeView | null; edit: () => void; approved: (answer: AppRecord) => void; stored: StoredCredentials | null; saved: (answer: StoredCredentials) => void; app: AppRecord; changed: (message: string) => void }) {
+function AppCard({ app, changed, stored, saved, approved, edit, me, lys }: { lys: LysAddress; me: MeView | null; edit: () => void; approved: (answer: AppRecord) => void; stored: StoredCredentials | null; saved: (answer: StoredCredentials) => void; app: AppRecord; changed: (message: string) => void }) {
   const [reason, setReason] = useState('');
   // Retiring ends every client credential the app holds, so it is asked about first, with its reason, and can be cancelled.
   const [retiring, setRetiring] = useState(false);
@@ -231,6 +235,7 @@ function AppCard({ app, changed, stored, saved, approved, edit, me }: { me: MeVi
       <Act symbol="decline" name={'Decline the change'} word="Decline" tone="danger" disabled={busy} onClick={() => { void act('/schema/decline', { reason }, () => changed('The change to ' + app.name + ' was declined.')); }} />
     </div> : null}
     {app.state === 'approved' && app.id !== LYS ? <SignInSettings app={app} busy={busy} act={act} changed={changed} /> : null}
+    {app.state === 'approved' && app.id !== LYS && app.connect_origin ? <ConnectAgain app={app} lys={lys} /> : null}
     {(app.state === 'approved' || app.state === 'retired') && app.id !== LYS ? <ClientCredentials app={app} /> : null}
     {app.state === 'approved' && app.id !== LYS ? <div className="app-actions">
       <Act symbol="edit" name="Edit the permission template" word="Template" onClick={edit} />

@@ -43,7 +43,6 @@ use serde_json::Value;
 
 use crate::apps_binding::{Acting, Binding, acting};
 use crate::apps_error::AppError;
-use crate::apps_read::{AppRead, AppsRead, read_view, sees};
 use crate::apps_state::{
     Approved, By, Client, Decided, Line, LysRecorded, Registered, SignInSet, Standing,
 };
@@ -60,10 +59,6 @@ const LYS_OPERATION: &str = "lys-model";
 #[cfg(test)]
 #[path = "apps_api_tests.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "apps_api_read_tests.rs"]
-mod read_tests;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -121,6 +116,10 @@ pub fn routes() -> Router<Arc<AppState>> {
 
 #[path = "apps_connect.rs"]
 pub(crate) mod connect;
+
+#[path = "apps_api_read.rs"]
+mod read;
+use read::{list, one};
 
 /// The apps kept beside the grant log `config` names, with the app `lys`
 /// recorded from the model file when the log does not hold it yet, saying
@@ -262,40 +261,6 @@ pub(crate) fn view(apps: &AppStore, id: &str) -> Result<AppView, ServerError> {
     apps.app(id)
         .map(AppView::from)
         .ok_or_else(|| AppError::AppUnknown { app: id.to_owned() }.into())
-}
-
-async fn list(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<Json<AppsRead>, ServerError> {
-    with_apps(&state, |apps, projection| {
-        let who = acting(&state, apps.held(), &headers, projection)?;
-        Ok(AppsRead {
-            apps: apps
-                .held()
-                .apps
-                .iter()
-                .filter(|app| sees(&who, app))
-                .map(|app| read_view(&who, app))
-                .collect(),
-        })
-    })
-    .map(Json)
-}
-
-async fn one(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    UrlPath(id): UrlPath<String>,
-) -> Result<Json<AppRead>, ServerError> {
-    with_apps(&state, |apps, projection| {
-        let who = acting(&state, apps.held(), &headers, projection)?;
-        apps.app(&id)
-            .filter(|app| sees(&who, app))
-            .map(|app| read_view(&who, app))
-            .ok_or_else(|| AppError::AppUnknown { app: id.clone() }.into())
-    })
-    .map(Json)
 }
 
 /// The app a credential signs in as: an app's sign-in to Lys's API.

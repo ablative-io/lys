@@ -1,4 +1,8 @@
 //! Operation checkpoints retain one encrypted connection outcome across retries and restart.
+//!
+//! Beside each outcome, `<code digest>.code` names the operation a code
+//! opens, and `<app digest>.app` the app's latest connect, so a newer connect
+//! marks the one still waiting for its exchange replaced in one read.
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
@@ -15,7 +19,8 @@ use lys_identity::OperationId;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use super::{Connected, Exchanged, Pending, take_pending, unavailable};
+use super::{CODE_LIFETIME_MS, Connected, Exchanged, unavailable};
+use crate::apps_state::By;
 use crate::error::ServerError;
 use crate::routes::AppState;
 
@@ -37,6 +42,26 @@ pub(super) struct Record {
     pub(super) code: Option<String>,
     pub(super) connected: Option<Connected>,
     spent: bool,
+    /// The administrator who approved, and their person, whom the exchange
+    /// acts as; absent from an outcome kept before DIRECTORY-102.
+    #[serde(default)]
+    pub(super) acting: Option<(By, String)>,
+    /// Whether the values were handed over by an exchange.
+    #[serde(default)]
+    pub(super) handed: bool,
+    /// Whether a newer connect of the app replaced this one before its exchange.
+    #[serde(default)]
+    replaced: bool,
+    /// Whether every prior credential still live at the hand-over is revoked.
+    #[serde(default)]
+    pub(super) prior_revoked: bool,
+}
+
+/// What opening a code finds: the outcome to hand over, or the refusal's
+/// name with the outcome when it was already handed over.
+pub(super) enum Opened {
+    Ready(Record),
+    Refused(&'static str, Option<Record>),
 }
 
 impl Record {
@@ -61,7 +86,17 @@ impl Record {
             code: None,
             connected: None,
             spent: false,
+            acting: None,
+            handed: false,
+            replaced: false,
+            prior_revoked: false,
         }
+    }
+
+    /// The record acting as administrator `by`, the person `person`.
+    pub(super) fn acting_as(mut self, by: By, person: String) -> Self {
+        self.acting = Some((by, person));
+        self
     }
 
     fn answer(&self) -> Result<Exchanged, ServerError> {
@@ -260,14 +295,44 @@ impl Checkpoint {
         }
     }
 
-    pub(super) fn take(
-        &self,
-        code: &str,
-        at: u64,
-    ) -> Result<Result<Exchanged, &'static str>, ServerError> {
+    /// Mark the app's connect still waiting for its exchange, when another
+    /// than `record`'s, replaced, and name `record` the app's latest.
+    pub(super) fn replace_waiting(&self, record: &Record) -> Result<(), ServerError> {
+        let path = self.root.join(format!(
+            "{}.app",
+            crate::apps_binding::sha256_hex(&record.app)
+        ));
+        if let Some(held) = read(&path)? {
+            let earlier = std::str::from_utf8(&held)
+                .ok()
+                .and_then(|operation| OperationId::from_str(operation).ok())
+                .ok_or_else(|| unavailable("the app's connect index is malformed"))?
+                .to_string();
+            if earlier != record.operation
+                && let Some(mut waiting) = self.load(&earlier)?
+                && !waiting.spent
+            {
+                waiting.replaced = true;
+                waiting.consume();
+                self.save(&waiting)?;
+            }
+        }
+        self.write(&path, record.operation.as_bytes())
+    }
+
+    /// Record `record`'s values handed over, answering them.
+    pub(super) fn hand_over(&self, record: &mut Record) -> Result<Exchanged, ServerError> {
+        let answer = record.answer()?;
+        record.consume();
+        record.handed = true;
+        self.save(record)?;
+        Ok(answer)
+    }
+
+    pub(super) fn open_code(&self, code: &str, at: u64) -> Result<Opened, ServerError> {
         let digest = crate::apps_binding::sha256_hex(code);
         let Some(operation) = read(&self.root.join(format!("{digest}.code")))? else {
-            return Ok(Err("connect_code_unknown"));
+            return Ok(Opened::Refused("connect_code_unknown", None));
         };
         let operation = std::str::from_utf8(&operation)
             .ok()
@@ -287,23 +352,19 @@ impl Checkpoint {
                 "the connect code does not match its completed operation",
             ));
         }
-        let answer = if record.spent {
-            None
-        } else {
-            Some(record.answer()?)
-        };
-        let answer = take_pending(
-            &mut Pending {
-                at: record.at,
-                answer,
-            },
-            at,
-        );
-        if matches!(answer, Err("connect_code_used")) {
-            return Ok(answer);
+        if record.replaced {
+            return Ok(Opened::Refused("connect_code_replaced", None));
         }
-        record.consume();
-        self.save(&record)?;
-        Ok(answer)
+        if at.saturating_sub(record.at) > CODE_LIFETIME_MS {
+            if !record.spent {
+                record.consume();
+                self.save(&record)?;
+            }
+            return Ok(Opened::Refused("connect_code_expired", None));
+        }
+        if record.spent {
+            return Ok(Opened::Refused("connect_code_used", Some(record)));
+        }
+        Ok(Opened::Ready(record))
     }
 }

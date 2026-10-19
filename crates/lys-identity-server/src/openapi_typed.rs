@@ -5,8 +5,8 @@ use lys_openapi::Api;
 
 use crate::openapi::route;
 use crate::openapi_refusals::{
-    ADMIN_BODY, APP_READ, APP_SELF, BATCH, CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, DECIDE, PLACE,
-    REGISTER, RETIRE, VERSION, WHICH,
+    ADMIN, ADMIN_BODY, APP_READ, APP_SELF, BATCH, CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, DECIDE,
+    PLACE, REGISTER, RETIRE, VERSION, WHICH,
 };
 use crate::openapi_table::{A, GET, POST, PUT, S};
 

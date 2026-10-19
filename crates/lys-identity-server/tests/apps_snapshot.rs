@@ -248,6 +248,7 @@ fn kind(line: &Line) -> &'static str {
         Line::ClientCredentialRevoked(_) => "client_credential_revoked",
         Line::ClientCredentialsEnded(_) => "client_credentials_ended",
         Line::CustodyPrepared(_) => "custody_prepared",
+        Line::ConnectedFrom(_) => "connected_from",
     }
 }
 
@@ -273,6 +274,7 @@ fn actor(line: &Line) -> Option<By> {
         | Line::ClientCredentialRevoked(ClientCredentialRevoked { by, .. }) => Some(by.clone()),
         Line::ClientCredentialsEnded(_) => None,
         Line::CustodyPrepared(prepared) => Some(prepared.by.clone()),
+        Line::ConnectedFrom(connected) => Some(connected.by.clone()),
     }
 }
 

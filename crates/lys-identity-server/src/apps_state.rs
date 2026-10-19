@@ -26,12 +26,13 @@ mod index;
 
 #[path = "apps_fold.rs"]
 mod fold;
+pub use fold::Refused;
 
 #[path = "apps_client_lines.rs"]
 mod client_lines;
 pub use client_lines::{
     ClientCredential, ClientCredentialIssued, ClientCredentialRevoked, ClientCredentialsEnded,
-    CustodyPrepared,
+    ConnectedFrom, CustodyPrepared,
 };
 
 #[cfg(test)]
@@ -333,6 +334,8 @@ pub enum Line {
     ClientCredentialsEnded(ClientCredentialsEnded),
     /// An approved app's current credential digest and sealed references.
     CustodyPrepared(CustodyPrepared),
+    /// Where an approved app connected from by its manifest (DIRECTORY-102).
+    ConnectedFrom(ConnectedFrom),
 }
 
 impl Line {
@@ -357,6 +360,7 @@ impl Line {
             Self::ClientCredentialRevoked(line) => &line.operation,
             Self::ClientCredentialsEnded(line) => &line.operation,
             Self::CustodyPrepared(line) => &line.operation,
+            Self::ConnectedFrom(line) => &line.operation,
         }
     }
 
@@ -381,6 +385,7 @@ impl Line {
             Self::ClientCredentialRevoked(line) => Some(&line.app),
             Self::ClientCredentialsEnded(line) => Some(&line.app),
             Self::CustodyPrepared(line) => Some(&line.app),
+            Self::ConnectedFrom(line) => Some(&line.app),
         }
     }
 }
@@ -474,29 +479,6 @@ impl App {
     pub fn version(&self, version: u64) -> Option<&Version> {
         self.versions.iter().find(|held| held.version == version)
     }
-}
-
-/// Why a line cannot be kept on the apps as they stand.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Refused {
-    /// An app by that id is already registered.
-    Exists,
-    /// No app by that id is registered.
-    Unknown,
-    /// The act is not one the app as it stands takes, and why.
-    Standing(Standing),
-    /// A change already waits for approval.
-    Pending,
-    /// No change waits for approval.
-    NothingPending,
-    /// The version named is not the current one, which is this.
-    Moved(u64),
-    /// The resource is already placed.
-    Placed,
-    /// The app is `lys`, which is never retired.
-    Lys,
-    /// No live client credential of the app has that id.
-    Credential,
 }
 
 /// The apps as their log folds them, in the order registered.

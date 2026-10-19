@@ -1,10 +1,10 @@
 //! App registration, approval, credentials and schemas in table order.
 
 use super::{
-    A, ADMIN_BODY, APP_READ, APP_SELF, Api, AppApprovalBody, AppSignInBody, Approval, CHANGE,
-    CHANGE_DECIDE, CHECK, CREDENTIAL, ChangeBody, ChangeDecision, CheckBody, ConnectorBody, DECIDE,
-    GET, POST, PUT, REGISTER, RETIRE, RegisterBody, RegistrarBody, RegistrarIssued, S, SchemaCheck,
-    SchemaVersionView, VERSION, route,
+    A, ADMIN, ADMIN_BODY, APP_READ, APP_SELF, Api, AppApprovalBody, AppSignInBody, Approval,
+    CHANGE, CHANGE_DECIDE, CHECK, CREDENTIAL, ChangeBody, ChangeDecision, CheckBody, ConnectorBody,
+    DECIDE, GET, POST, PUT, REGISTER, RETIRE, RegisterBody, RegistrarBody, RegistrarIssued, S,
+    SchemaCheck, SchemaVersionView, VERSION, route,
 };
 use crate::openapi_table::P;
 
@@ -33,6 +33,27 @@ pub(super) fn credentials(api: &mut Api, app: &str) -> Vec<lys_openapi::Route> {
         ),
         route(
             (
+                GET,
+                "/apps/connect/manifest",
+                "Lys reads an app's manifest for the administrator's approve page: the manifest and its origin, or why not",
+            ),
+            S,
+            None,
+            Some(api.schema::<crate::apps_api::connect::ManifestRead>()),
+            &[
+                ADMIN,
+                &[
+                    "RequestMalformed",
+                    "manifest_address_refused",
+                    "manifest_not_answering",
+                    "manifest_answered_status",
+                    "manifest_not_a_manifest",
+                    "apps_unavailable",
+                ],
+            ],
+        ),
+        route(
+            (
                 POST,
                 "/apps/connect/exchange",
                 "Exchange a one-time connect code for the app's credentials, once",
@@ -45,6 +66,9 @@ pub(super) fn credentials(api: &mut Api, app: &str) -> Vec<lys_openapi::Route> {
                 "connect_code_unknown",
                 "connect_code_used",
                 "connect_code_expired",
+                "connect_code_replaced",
+                "SecretsUnavailable",
+                "apps_unavailable",
             ]],
         ),
         route(
