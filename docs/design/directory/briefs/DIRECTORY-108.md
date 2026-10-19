@@ -101,3 +101,12 @@ Documentation. THE SYSTEM SHALL list POST /grants/held in the served OpenAPI doc
 - gate -stages nextest -crates lys-identity-server -test 'test(held)'
 - gate -stages clippy, then the whole declared gate
 - python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory read for FAIL lines
+
+## Amendments
+
+### Amendment 1: Who may ask, where the tests live, and the route's scope
+
+- **Date:** 2026-10-20
+- **By:** Hermes, writing R1-R3 (save/directory-108 b418575c)
+
+held admits an approved app's credential for kinds it owns and the administrator for any kind; a signed-in person who is not the administrator, and a registrar, are refused NotAdmitted naming the route's two askers, so R1's last sentence (any caller who may read grants) is replaced by that. The tests are an integration file, crates/lys-identity-server/tests/grants_held.rs, on the identity_contract harness the apps tests use, in place of src/grants/held_tests.rs. The route sits in the route table under the existing grant.who scope, since it discloses less than who, so the shipped grant model gains no action. One test asks who with the app's credential first and fails if the app sees the grant, so the held answer is proven independent of sight.
