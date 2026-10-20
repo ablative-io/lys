@@ -122,12 +122,18 @@ describe('Add a person in one act', () => {
     expect([...(receipt?.querySelectorAll(':scope > ul > li') ?? [])].map((leaf) => leaf.textContent)).toEqual(['Registered', 'Sign-in bound', 'Activated', 'First grant issued']);
   });
 
-  it('shows a mail_unconfigured refusal in the server\'s words and no receipt', async () => {
-    const { entry } = await form({ 'POST /people/admit': refused(503, 'mail_unconfigured', 'mail_unconfigured: a person admitted now would receive nothing: Lys has no mail settings; add the [mail] table to deployment.toml and run lys identity upgrade') });
+  it('confirms an answer whose letter is handed and shows the link to give them (DIRECTORY-112 R4)', async () => {
+    const link = 'https://lys.example.test/#/added/xK9mQ2vLp8Rt4Wn7Yb3Zc6Fh1Jd5Sg0Ae2Uo4Ii8Qw';
+    const { entry } = await form({ 'POST /people/admit': (body) => ok({ ...admitted(body), letter: { letter: 'added', to: 'helper@example.test', sent: false, by: 'lys', reason: 'Lys has no mail settings, so the link is handed here', handed: link } }) });
     await fill(entry);
     await submit(entry);
-    expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
-    expect(entry.textContent).toContain('a person admitted now would receive nothing');
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Care Helper is added. This Lys cannot send email, so give them this link; opening it signs them in once, and they set a password there.');
+    const field = document.querySelector('input[aria-label="Their sign-in link"]') as HTMLInputElement | null;
+    expect(field?.value).toBe(link);
+    expect(field?.readOnly).toBe(true);
+    const receipt = document.querySelector('[aria-label="Receipt"]');
+    expect(receipt).not.toBeNull();
+    expect(receipt?.textContent).toContain('Letter: handed to you here to give them; nothing was sent');
   });
 
   it('refuses an answer whose letter did not go as unconfirmed, keeping the request', async () => {

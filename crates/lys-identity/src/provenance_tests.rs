@@ -122,5 +122,26 @@ fn founding_and_address_proof_round_trip_and_only_the_proof_is_the_person_signed
     let agent = AgentId::from_bytes([9; 16]);
     assert!(wire::method_from(5, Some(agent)).is_err());
     assert!(wire::method_from(6, Some(agent)).is_err());
-    assert!(wire::method_from(7, None).is_err());
+    assert!(wire::method_from(8, None).is_err());
+}
+
+/// DIRECTORY-112 R2: a session begun by a handed link is the person signed
+/// in, carried as code 7 with no principal; 8 is the next free code.
+#[test]
+fn a_handed_link_is_code_seven_with_no_principal_and_the_person_signed_in() {
+    let method = wire::method_from(7, None).expect("the handed-link method");
+    assert!(method.is_person_signed_in(), "{method:?}");
+    assert_eq!(wire::method(method), 7);
+    let binding = crate::LoginBinding::new("https://issuer.test", "subject").expect("binding");
+    let actor = super::Actor::new(binding, super::Provenance::new(method, 13));
+    assert_eq!(actor.provenance().agent(), None);
+    assert_eq!(actor.provenance().service_account(), None);
+    let mut encoded = Vec::new();
+    crate::encoding::actor(&mut encoded, &actor);
+    let value = crate::encoding::cbor(&encoded, "actor").expect("CBOR");
+    assert_eq!(
+        crate::encoding::decode_actor(value, 2).expect("actor"),
+        actor
+    );
+    assert!(wire::method_from(7, Some(AgentId::from_bytes([9; 16]))).is_err());
 }

@@ -379,30 +379,38 @@ async fn an_admit_refused_at_a_step_delivers_no_letter() -> TestResult {
 }
 
 #[tokio::test]
-async fn without_mail_settings_nobody_is_admitted_and_a_root_says_no_letter_went() -> TestResult {
+async fn without_mail_settings_admission_hands_the_link_and_a_root_says_no_letter_went()
+-> TestResult {
     let (service, _rauthy, ada, mut sink) = table(false).await?;
-    let (status, refused) = service
+    // DIRECTORY-112 R3: with no mail settings the person is admitted and
+    // the link that signs them in once is handed in the answer.
+    let (status, admitted) = service
         .post(
             "/people/admit",
             Some(&ada),
             &admit(&OperationId::generate()?.to_string(), None),
         )
         .await?;
-    assert_eq!(status, 503, "{refused}");
-    assert_eq!(refused["refusal"], "mail_unconfigured");
+    assert_eq!(status, 200, "{admitted}");
+    assert_eq!(admitted["letter"]["letter"], "added", "{admitted}");
+    assert_eq!(admitted["letter"]["sent"], false, "{admitted}");
     assert!(
-        refused["reason"]
+        admitted["letter"]["handed"]
             .as_str()
-            .is_some_and(|reason| reason.contains("[mail]") && reason.contains("receive nothing")),
-        "{refused}"
+            .is_some_and(|link| link.contains("/#/added/")),
+        "{admitted}"
     );
-    assert_eq!(refused["receipt"]["completed"], json!([]));
-    assert!(refused["receipt"]["failed"].is_null(), "{refused}");
+    assert!(admitted["receipt"]["failed"].is_null(), "{admitted}");
     let listed = people(&service, &ada).await?;
-    assert_eq!(listed.len(), 1, "{listed:?}");
+    assert_eq!(listed.len(), 2, "{listed:?}");
     // The administrator's root on an existing person is still recorded;
     // the answer says no letter went.
-    let ada_person = listed[0]["id"].as_str().ok_or("Ada's id")?.to_owned();
+    let ada_person = listed
+        .iter()
+        .find(|person| person["email"] == ADMIN_EMAIL || person["display_name"] == "Ada Lovelace")
+        .and_then(|person| person["id"].as_str())
+        .ok_or("Ada's id")?
+        .to_owned();
     let (status, answer) = service
         .post(
             "/grants/roots",

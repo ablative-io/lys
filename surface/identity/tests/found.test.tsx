@@ -50,16 +50,41 @@ describe('Founding an organisation', () => {
     expect($('form')).toBeNull();
   });
 
-  it('says this Lys cannot send mail when the service refuses mail_unconfigured', async () => {
+  it('shows the link when Lys cannot send email and the answer hands it (DIRECTORY-112 R4)', async () => {
+    const link = 'https://lys.example.test/#/found/xK9mQ2vLp8Rt4Wn7Yb3Zc6Fh1Jd5Sg0Ae2Uo4Ii8Qw';
     const { posted } = await mount('#/found', {
       ...SERVICE,
-      'POST /organisations/found': refused(503, 'mail_unconfigured', 'mail_unconfigured: a person admitted now would receive nothing'),
+      'POST /organisations/found': (body) => {
+        const asked = body as { operation: string; email: string };
+        return ok({ operation: asked.operation, letter: { letter: 'founded', to: asked.email, sent: false, by: 'lys', reason: 'Lys has no mail settings, so the link is handed here', handed: link } });
+      },
     });
     await fill();
     await click($('button[aria-label="Found"]'));
     expect(posted).toHaveLength(1);
-    expect($('[role="alert"]')?.textContent).toBe('This Lys cannot send mail yet, so nobody can found an organisation here. Ask whoever runs it.');
-    expect($('form[aria-label="Found an organisation"]')).not.toBeNull();
+    expect($('.page.found h1')?.textContent).toBe('Your link');
+    expect($('[role="status"]')?.textContent).toBe("This Lys cannot send email, so your link is here instead of in a letter. Open it to finish founding Bea's Bakery; it works once.");
+    const anchor = $('a.handed-link');
+    expect(anchor?.textContent).toBe(link);
+    expect(anchor?.getAttribute('href')).toBe(link);
+    expect(text()).not.toMatch(/person-|organisation-[0-9a-f]/);
+    expect($('form')).toBeNull();
+  });
+
+  it('says the address already signs in when Lys cannot send email and the answer is already_yours unsent', async () => {
+    await mount('#/found', {
+      ...SERVICE,
+      'POST /organisations/found': (body) => {
+        const asked = body as { operation: string; email: string };
+        return ok({ operation: asked.operation, letter: { letter: 'already_yours', to: asked.email, sent: false, by: 'lys', reason: 'This address already signs in to Lys' } });
+      },
+    });
+    await fill();
+    await click($('button[aria-label="Found"]'));
+    const status = $('[role="status"]');
+    expect(status?.textContent).toBe('That address already signs in to Lys. Sign in instead.');
+    expect(status?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
+    expect($('form')).toBeNull();
   });
 
   it('shows a malformed request in its words without the name', async () => {
@@ -86,9 +111,16 @@ describe('The account page after a founding', () => {
     expect($('.founded-note')?.textContent).toBe("You are signed in by the letter's link. Set a password or connect Google here so you can sign in again.");
   });
 
-  it('says nothing of a letter otherwise', async () => {
+  it('says how an admitted person is signed in when the address carries added=1 (DIRECTORY-112 R4)', async () => {
+    await mount('#/settings/account?added=1', { ...SERVICE, '/me': ok(ME) });
+    expect($('.added-note')?.textContent).toBe('You are signed in by the link you were given. Set a password or connect Google here so you can sign in again.');
+    expect($('.founded-note')).toBeNull();
+  });
+
+  it('says nothing of a letter or a link otherwise', async () => {
     await mount('#/settings/account', { ...SERVICE, '/me': ok(ME) });
     expect($('section[aria-label="Your account"]')).not.toBeNull();
     expect($('.founded-note')).toBeNull();
+    expect($('.added-note')).toBeNull();
   });
 });

@@ -1,0 +1,261 @@
+#![cfg(test)]
+
+//! Founding and admission on an install with no mail settings (DIRECTORY-112):
+//! the link a letter would have carried is handed in the answer, the proof
+//! signs the person in as begun by a handed link, an admitted person's
+//! handed link signs them in once, and nothing is refused mail_unconfigured.
+
+#[path = "founding/table.rs"]
+mod founding;
+
+use std::error::Error;
+
+use founding::{
+    ADMIN_EMAIL, BEA, FOUND, TestResult, accounts_for, file_under, found, foundings, leaves,
+    prove, table,
+};
+use identity_contract::harness::Service;
+use lys_identity::OperationId;
+use serde_json::{Value, json};
+
+/// The token after `path` in a handed link.
+fn token_after(link: &str, path: &str) -> Result<String, Box<dyn Error>> {
+    let (_, after) = link
+        .split_once(path)
+        .ok_or_else(|| format!("the link carries {path}: {link}"))?;
+    Ok(after.to_owned())
+}
+
+/// The handed link in an answer's letter view.
+fn handed(answer: &Value) -> Result<String, Box<dyn Error>> {
+    assert_eq!(answer["letter"]["sent"], false, "{answer}");
+    assert_eq!(answer["letter"]["by"], "lys", "{answer}");
+    assert!(
+        answer["letter"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("no mail settings")),
+        "{answer}"
+    );
+    Ok(answer["letter"]["handed"]
+        .as_str()
+        .ok_or("the link is handed in the answer")?
+        .to_owned())
+}
+
+/// The stored entry under `digest`-less lookup: the one entry whose
+/// `handed` and `kind` the test reads.
+fn entries(service: &Service) -> Result<Vec<Value>, Box<dyn Error>> {
+    let stored = foundings(service)?.ok_or("the foundings file")?;
+    Ok(stored["foundings"]
+        .as_object()
+        .ok_or("foundings")?
+        .values()
+        .cloned()
+        .collect())
+}
+
+/// Whether the session store holds a session begun by a handed link.
+fn a_session_by_handed_link(service: &Service) -> Result<bool, Box<dyn Error>> {
+    let path = file_under(service.dir.path(), "sessions.json").ok_or("the sessions file")?;
+    let stored: Value = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+    Ok(stored["sessions"]
+        .as_array()
+        .ok_or("sessions")?
+        .iter()
+        .any(|session| session["actor"]["method"] == "handed_link"))
+}
+
+/// Ada admits Bea, answering the answer.
+async fn admit_bea(service: &Service, ada: &str) -> Result<Value, Box<dyn Error>> {
+    let (status, admitted) = service
+        .post(
+            "/people/admit",
+            Some(ada),
+            &json!({
+                "operation": OperationId::generate()?.to_string(),
+                "display_name": "Bea",
+                "email": BEA,
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{admitted}");
+    Ok(admitted)
+}
+
+#[tokio::test]
+async fn without_mail_the_founding_hands_the_link_and_the_link_signs_the_founder_in() -> TestResult {
+    let (service, rauthy, _ada, mut sink) = table(false).await?;
+    let before = leaves(&service).await?;
+    let (status, answer) = service
+        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["letter"]["letter"], "founded", "{answer}");
+    assert_eq!(answer["letter"]["to"], BEA, "{answer}");
+    let link = handed(&answer)?;
+    let token = token_after(&link, "/#/found/")?;
+    assert!(!answer.to_string().contains("person-"), "{answer}");
+    assert!(leaves(&service).await? > before, "the founding was recorded");
+    let stored = entries(&service)?;
+    assert_eq!(stored.len(), 1, "{stored:?}");
+    assert_eq!(stored[0]["handed"], true, "{stored:?}");
+    assert_eq!(stored[0]["spent"], false, "{stored:?}");
+    assert!(
+        !foundings(&service)?.ok_or("the file")?.to_string().contains(&token),
+        "the token is stored"
+    );
+    assert!(sink.taken().is_none(), "a letter went with no mail settings");
+    assert!(
+        file_under(service.dir.path(), "letters-sent.jsonl").is_none(),
+        "a letters-sent record was made with no mail settings"
+    );
+    assert_eq!(accounts_for(&rauthy, BEA)?, 0);
+
+    let (status, proved, cookie) = prove(&service, &token).await?;
+    assert_eq!(status, 200, "{proved}");
+    let cookie = cookie.ok_or("a session cookie")?;
+    assert_eq!(proved["signed_in"]["issuer"], service.issuer.issuer());
+    let person = proved["person"].as_str().ok_or("the person")?.to_owned();
+    let (status, me) = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{me}");
+    assert_eq!(me["person"]["id"], person, "{me}");
+    assert_eq!(me["person"]["state"], "active", "{me}");
+    assert_eq!(me["organisation"]["display_name"], "Bea's Bakery", "{me}");
+    assert!(
+        a_session_by_handed_link(&service)?,
+        "the session says it was begun by a handed link"
+    );
+    assert_eq!(accounts_for(&rauthy, BEA)?, 1);
+    let (status, refused, cookie) = prove(&service, &token).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "proof_refused");
+    assert!(cookie.is_none());
+    assert!(sink.taken().is_none(), "a letter went at the proof");
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_mail_a_second_founding_for_the_address_hands_a_fresh_link_and_the_first_is_refused()
+-> TestResult {
+    let (service, _rauthy, _ada, mut sink) = table(false).await?;
+    let (status, first) = service
+        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
+        .await?;
+    assert_eq!(status, 200, "{first}");
+    let after_first = leaves(&service).await?;
+    let (status, second) = service
+        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
+        .await?;
+    assert_eq!(status, 200, "{second}");
+    assert_eq!(leaves(&service).await?, after_first, "a second founding was recorded");
+    let first_link = handed(&first)?;
+    let second_link = handed(&second)?;
+    assert_ne!(first_link, second_link);
+    assert_eq!(entries(&service)?.len(), 1);
+    let (status, refused, _) = prove(&service, &token_after(&first_link, "/#/found/")?).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "proof_refused");
+    let (status, proved, cookie) = prove(&service, &token_after(&second_link, "/#/found/")?).await?;
+    assert_eq!(status, 200, "{proved}");
+    assert!(cookie.is_some());
+    assert!(sink.taken().is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_mail_an_address_that_signs_in_is_told_on_the_screen_and_nothing_is_founded()
+-> TestResult {
+    let (service, _rauthy, _ada, mut sink) = table(false).await?;
+    let before = leaves(&service).await?;
+    let mut body = found(&OperationId::generate()?.to_string());
+    body["email"] = json!(ADMIN_EMAIL);
+    let (status, answer) = service.post(FOUND, None, &body).await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["letter"]["letter"], "already_yours", "{answer}");
+    assert_eq!(answer["letter"]["sent"], false, "{answer}");
+    assert_eq!(answer["letter"]["to"], ADMIN_EMAIL, "{answer}");
+    assert!(answer["letter"]["handed"].is_null(), "{answer}");
+    assert!(!answer.to_string().contains("person-"), "{answer}");
+    assert_eq!(leaves(&service).await?, before);
+    assert!(foundings(&service)?.is_none(), "a foundings file was made");
+    assert!(sink.taken().is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_mail_an_admitted_person_is_handed_a_link_that_signs_them_in_once() -> TestResult {
+    let (service, rauthy, ada, mut sink) = table(false).await?;
+    let admitted = admit_bea(&service, &ada).await?;
+    assert_eq!(
+        admitted["receipt"]["completed"],
+        json!(["register", "account", "bind", "activate", "grant", "letter"]),
+        "{admitted}"
+    );
+    assert_eq!(admitted["letter"]["letter"], "added", "{admitted}");
+    assert_eq!(admitted["letter"]["to"], BEA, "{admitted}");
+    let link = handed(&admitted)?;
+    let token = token_after(&link, "/#/added/")?;
+    let person = admitted["person"].as_str().ok_or("the person")?.to_owned();
+    let stored = entries(&service)?;
+    assert_eq!(stored.len(), 1, "{stored:?}");
+    assert_eq!(stored[0]["kind"], "admission", "{stored:?}");
+    assert_eq!(stored[0]["handed"], true, "{stored:?}");
+    assert_eq!(stored[0]["founder"], person, "{stored:?}");
+    assert!(sink.taken().is_none(), "a letter went with no mail settings");
+    assert_eq!(accounts_for(&rauthy, BEA)?, 1);
+    let (status, ada_me) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(status, 200, "{ada_me}");
+    let organisation = ada_me["organisation"]["id"].clone();
+
+    let (status, proved, cookie) = prove(&service, &token).await?;
+    assert_eq!(status, 200, "{proved}");
+    let cookie = cookie.ok_or("a session cookie")?;
+    assert_eq!(proved["person"], person, "{proved}");
+    assert_eq!(proved["organisation"], organisation, "{proved}");
+    let (status, me) = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{me}");
+    assert_eq!(me["person"]["id"], person, "{me}");
+    assert_eq!(me["person"]["state"], "active", "{me}");
+    assert_eq!(me["person"]["display_name"], "Bea", "{me}");
+    let (status, account) = service.get("/me/account", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{account}");
+    assert_eq!(account["email"], BEA, "{account}");
+    assert_eq!(account["password"], false, "{account}");
+    assert!(a_session_by_handed_link(&service)?);
+    assert_eq!(entries(&service)?[0]["spent"], true);
+    let (status, refused, cookie) = prove(&service, &token).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "proof_refused");
+    assert!(cookie.is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn without_mail_a_retired_persons_handed_link_is_refused_and_nothing_recorded() -> TestResult {
+    let (service, _rauthy, ada, mut sink) = table(false).await?;
+    let admitted = admit_bea(&service, &ada).await?;
+    let token = token_after(&handed(&admitted)?, "/#/added/")?;
+    let person = admitted["person"].as_str().ok_or("the person")?.to_owned();
+    let (status, retired) = service
+        .post(
+            &format!("/identities/{person}/transitions"),
+            Some(&ada),
+            &json!({
+                "operation": OperationId::generate()?.to_string(),
+                "transition": "retire",
+                "reason": "left before the link was used",
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{retired}");
+    let before = leaves(&service).await?;
+    let (status, refused, cookie) = prove(&service, &token).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "proof_refused", "{refused}");
+    assert!(cookie.is_none());
+    assert!(!refused.to_string().contains("person-"), "{refused}");
+    assert_eq!(leaves(&service).await?, before);
+    assert_eq!(entries(&service)?[0]["spent"], false);
+    assert!(sink.taken().is_none());
+    Ok(())
+}

@@ -76,21 +76,6 @@ async fn a_founding_records_both_registered_and_writes_one_letter_with_the_link(
 }
 
 #[tokio::test]
-async fn without_mail_nobody_founds_and_nothing_is_recorded() -> TestResult {
-    let (service, _rauthy, _ada, mut sink) = table(false).await?;
-    let before = leaves(&service).await?;
-    let (status, refused) = service
-        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
-        .await?;
-    assert_eq!(status, 503, "{refused}");
-    assert_eq!(refused["refusal"], "mail_unconfigured", "{refused}");
-    assert_eq!(leaves(&service).await?, before);
-    assert!(foundings(&service)?.is_none(), "a foundings file was made");
-    assert!(sink.taken().is_none());
-    Ok(())
-}
-
-#[tokio::test]
 async fn the_same_operation_answers_the_same_and_sends_once() -> TestResult {
     let (service, _rauthy, _ada, mut sink) = table(true).await?;
     let before = leaves(&service).await?;

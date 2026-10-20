@@ -79,6 +79,34 @@ fn pass_session_actor_round_trips_without_a_time() -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
+/// A session begun by a handed link (DIRECTORY-112 R2) is stored as
+/// handed_link and reads back as the person signed in.
+#[test]
+fn handed_link_session_actor_reads_back_as_the_person_signed_in() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("sessions.json");
+    let stored = serde_json::json!({"format":super::FORMAT,"sessions":[{
+        "key":"digest", "id":"id", "started_at":1, "ends_at":100,
+        "actor":{"issuer":"https://issuer.test", "subject":"subject", "method":"handed_link",
+            "agent":null, "authenticated_at":7}
+    }]});
+    std::fs::write(&path, serde_json::to_vec(&stored)?)?;
+    let live = super::load(&path, 2)?;
+    let method = live["digest"].actor.provenance().method();
+    assert!(method.is_person_signed_in(), "{method:?}");
+    assert_eq!(live["digest"].actor.provenance().agent(), None);
+    assert_eq!(
+        live["digest"].actor.provenance().authenticated_at(),
+        Some(7)
+    );
+    super::save(&path, &live)?;
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path)?)?,
+        stored
+    );
+    Ok(())
+}
+
 /// A session begun by a proving link (DIRECTORY-111 R2) reads back from
 /// the store as the person signed in, and a founding actor never holds a
 /// session.

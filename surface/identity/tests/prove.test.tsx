@@ -52,3 +52,32 @@ describe('Finishing a founding by its link', () => {
     expect(alert?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
   });
 });
+
+describe('Signing in by a handed link (DIRECTORY-112 R4)', () => {
+  it('posts nothing on load and the proof once on the click, then lands on the account page told of the link', async () => {
+    const { posted } = await mount('#/added/' + TOKEN, {
+      ...SERVICE,
+      '/me': ok(ME),
+      'POST /organisations/found/prove': ok({ signed_in: { issuer: 'https://issuer.test', subject: 'subject-bea' }, authority: 'a', organisation: 'organisation-' + '1'.repeat(32), person: 'person-' + '2'.repeat(32) }),
+    });
+    expect($('.page.found h1')?.textContent).toBe('Sign in to Lys');
+    expect($('.page.found .sub')?.textContent).toBe('This link signs you in to Lys once. Press the button to finish and sign in.');
+    expect(posted).toHaveLength(0);
+    await click($('button[aria-label="Sign in"]'));
+    await settle();
+    expect(posted).toEqual([{ path: '/organisations/found/prove', body: { proof: TOKEN } }]);
+    expect(location.hash).toBe('#/settings/account?added=1');
+    expect($('.added-note')?.textContent).toBe('You are signed in by the link you were given. Set a password or connect Google here so you can sign in again.');
+  });
+
+  it('shows a refused link in its words with the way to sign in', async () => {
+    await mount('#/added/' + TOKEN, {
+      ...SERVICE,
+      'POST /organisations/found/prove': refused(403, 'proof_refused', 'proof_refused: This link is not one Lys issued, or it was already used. Found again from the sign-in page.'),
+    });
+    await click($('button[aria-label="Sign in"]'));
+    const alert = $('[role="alert"]');
+    expect(alert?.textContent).toBe('This link is not one Lys issued, or it was already used. Found again from the sign-in page. Go to sign in.');
+    expect(alert?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
+  });
+});
