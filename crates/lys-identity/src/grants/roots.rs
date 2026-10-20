@@ -212,7 +212,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// The install's root person, when `grant` is on an install-level
     /// resource and so revoked by standing.
-    fn standing_over(&self, grant: GrantId) -> Option<PersonId> {
+    pub(super) fn standing_over(&self, grant: GrantId) -> Option<PersonId> {
         self.book
             .grant(grant)
             .filter(|held| install_level(held.resource()))
