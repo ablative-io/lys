@@ -16,7 +16,7 @@
 use std::error::Error;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use axum::extract::{Path, Request, State};
@@ -37,6 +37,9 @@ struct Inner {
     providers: Mutex<Vec<Value>>,
     users: Mutex<Vec<Value>>,
     requests: AtomicUsize,
+    /// Whether the next account creation is refused, once, as a service
+    /// that will not take the request does.
+    refuse_create: AtomicBool,
     issuer: Mutex<Option<FakeIssuer>>,
     /// Holds the API key file, as the installation writes it, for the
     /// stand-in's life.
@@ -85,6 +88,7 @@ impl FakeRauthy {
             providers: Mutex::new(Vec::new()),
             users: Mutex::new(Vec::new()),
             requests: AtomicUsize::new(0),
+            refuse_create: AtomicBool::new(false),
             issuer: Mutex::new(None),
             keys,
         });
@@ -146,6 +150,12 @@ impl FakeRauthy {
     /// Returns the named fixture fault if a state lock is poisoned.
     pub fn users(&self) -> std::io::Result<Vec<Value>> {
         Ok(held(&self.inner.users)?.clone())
+    }
+
+    /// Refuse the next POST /users once, answering 503, so a caller's
+    /// failed account step can be exercised and retried.
+    pub fn refuse_create_once(&self) {
+        self.inner.refuse_create.store(true, Ordering::SeqCst);
     }
 
     /// How many requests reached the stand-in, on any route, answered or refused.
@@ -275,6 +285,13 @@ async fn create_user(
 ) -> Response {
     if let Some(refusal) = refused(&headers) {
         return refusal;
+    }
+    if inner.refuse_create.swap(false, Ordering::SeqCst) {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({ "message": "the stand-in refuses this creation once" })),
+        )
+            .into_response();
     }
     let mut held = fixture!(held(&inner.users));
     let id = format!("user-{}", held.len() + 1);

@@ -1,0 +1,54 @@
+/**
+ * The proving page (DIRECTORY-111 R3): the letter's link lands on
+ * #/found/<token>, nothing is posted on load, the one button posts the
+ * proof once, success lands on the account page told how the person is
+ * signed in, and a refusal is read in words with the way to sign-in.
+ */
+import { afterEach, describe, expect, it } from 'vitest';
+import { $, click, mount, settle, unmountAll } from './harness';
+import { ME, SERVICE, ok, refused } from './fixtures';
+
+afterEach(() => unmountAll());
+
+const TOKEN = 'xK9mQ2vLp8Rt4Wn7Yb3Zc6Fh1Jd5Sg0Ae2Uo4Ii8Qw';
+
+describe('Finishing a founding by its link', () => {
+  it('posts nothing on load and the proof once on the click, then lands on the account page', async () => {
+    const { posted } = await mount('#/found/' + TOKEN, {
+      ...SERVICE,
+      '/me': ok(ME),
+      'POST /organisations/found/prove': ok({ signed_in: { issuer: 'https://issuer.test', subject: 'subject-bea' }, authority: 'a', organisation: 'organisation-' + '1'.repeat(32), person: 'person-' + '2'.repeat(32) }),
+    });
+    expect($('.page.found h1')?.textContent).toBe('Finish founding');
+    expect(posted).toHaveLength(0);
+    await click($('button[aria-label="Finish founding"]'));
+    await settle();
+    expect(posted).toEqual([{ path: '/organisations/found/prove', body: { proof: TOKEN } }]);
+    expect(location.hash).toBe('#/settings/account?founded=1');
+    expect($('.founded-note')?.textContent).toBe("You are signed in by the letter's link. Set a password or connect Google here so you can sign in again.");
+  });
+
+  it('shows a refused proof in its words with the way to sign in', async () => {
+    const { posted } = await mount('#/found/' + TOKEN, {
+      ...SERVICE,
+      'POST /organisations/found/prove': refused(403, 'proof_refused', 'proof_refused: This link is not one Lys issued, or it was already used. Found again from the sign-in page.'),
+    });
+    await click($('button[aria-label="Finish founding"]'));
+    expect(posted).toHaveLength(1);
+    const alert = $('[role="alert"]');
+    expect(alert?.textContent).toBe('This link is not one Lys issued, or it was already used. Found again from the sign-in page. Go to sign in.');
+    expect(alert?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
+    expect(location.hash).toBe('#/found/' + TOKEN);
+  });
+
+  it('shows already_admitted in its words with the way to sign in', async () => {
+    await mount('#/found/' + TOKEN, {
+      ...SERVICE,
+      'POST /organisations/found/prove': refused(403, 'already_admitted', 'already_admitted: That address already signs in to Lys. Sign in there; nothing was founded.'),
+    });
+    await click($('button[aria-label="Finish founding"]'));
+    const alert = $('[role="alert"]');
+    expect(alert?.textContent).toBe('That address already signs in to Lys. Sign in there; nothing was founded. Go to sign in.');
+    expect(alert?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
+  });
+});
