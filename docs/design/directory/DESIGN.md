@@ -1443,6 +1443,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/grants_batch.rs` | /grants/which answers only ids of the caller's organisation (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `surface/identity/src/features/people/People.tsx` | The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `surface/identity/src/features/people/people-views.test.tsx` | The organisation name shown in the People header (DIRECTORY-109 R4). | DIRECTORY-109 |
+| `crates/lys-identity/src/grants/change_stream.rs` | The grant log batch that stamps every unstamped grant with the install's organisation (DIRECTORY-109 R2). | DIRECTORY-109 |
 
 ## Inventory
 

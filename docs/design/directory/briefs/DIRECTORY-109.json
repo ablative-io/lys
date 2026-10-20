@@ -54,11 +54,14 @@
     {
       "id": "R2",
       "title": "The install's own people are an organisation too, founded by the install from admin_email with the administrator as founder, and an existing store is brought under it in one durable batch",
-      "spec": "Behavioural. One path, not two (docs/design/onboarding/ORGANISATION-ALONE.md, ruling 1). WHEN first-run setup records the administrator (SetupPerson, crates/lys-identity-server/src/admission.rs:13-14, the one administrator login per install) THE SYSTEM SHALL in the same batch found the install's organisation, profile from the install's name in deployment.toml and, for an unattended install, admin_email (crates/lys/src/identity/config.rs:70-74), with the administrator as founder, Active at once, and SHALL register the administrator under it. WHEN the server boots a store written before this brief (people with no organisation) THE SYSTEM SHALL, before serving, found the install's organisation and attach every existing person and agent to it as one durable batch with one full flush (Tom, 3 October 2026: a batch is one durable operation, never leaf by leaf), recorded as one boot_stage line naming the count, and SHALL refuse to serve by name if the batch cannot be committed; a second boot finds nothing to do. There is no record without an organisation after this boot, and no code path special-cases the install's own organisation: routes::administrator (crates/lys-identity-server/src/routes.rs:336-344) stays for install-level acts only, apps, the settings zone and the issuer, and every people, teams and grants read of R4 filters our administrator exactly as it filters Priya.",
+      "spec": "Behavioural. One path, not two (docs/design/onboarding/ORGANISATION-ALONE.md, ruling 1). WHEN first-run setup records the administrator (SetupPerson, crates/lys-identity-server/src/admission.rs:13-14, the one administrator login per install) THE SYSTEM SHALL in the same batch found the install's organisation, profile from the install's name in deployment.toml and, for an unattended install, admin_email (crates/lys/src/identity/config.rs:70-74), with the administrator as founder, Active at once, and SHALL register the administrator under it. WHEN the server boots a store written before this brief (people with no organisation) THE SYSTEM SHALL, before serving, found the install's organisation and attach every existing person and agent to it as one durable batch with one full flush (Tom, 3 October 2026: a batch is one durable operation, never leaf by leaf), recorded as one boot_stage line naming the count, and SHALL refuse to serve by name if the batch cannot be committed; a second boot finds nothing to do. There is no record without an organisation after this boot, and no code path special-cases the install's own organisation: routes::administrator (crates/lys-identity-server/src/routes.rs:336-344) stays for install-level acts only, apps, the settings zone and the issuer, and every people, teams and grants read of R4 filters our administrator exactly as it filters Priya. Rollback, read at the previous build 043cc007 (the installed Lys): crates/lys-identity/src/encoding_read.rs:94 answers an unknown change kind with Err(malformed(\"a change kind is 1 to 10\")) and :229 propagates it into the fold, and :28-33 decodes a person registration with fields::<1> (crates/lys-identity/src/encoding.rs:276-284, a map of exactly one key), so a FoundOrganisation change or an organisation field on RegisterPerson makes the directory log unreadable to the previous build: it refuses the log, it does not ignore what it does not know. So the install that carries this brief is one-way: THE SYSTEM SHALL, in the installer, copy every store the batch will touch (the directory log and the grant log) to data.previous-organisation/<rfc3339>/ before the batch runs, in the same step that reads the receipt (DIRECTORY-107), and the upgrade fence SHALL name that copy's path in its refusal and on /health, so a put-back to 043cc007 is the copy, by hand, and nothing else. The same batch SHALL stamp every grant in the grant log that carries no organisation (Tom's roots, the agent roots, the door's connector grant, every grant written before this brief) with the install's organisation, as one durable append to the grant log with one flush in the same boot step, the count of stamped grants on the same boot_stage line as the attached records; the judge never reads a missing organisation as the install's (ruling 1 refuses the special case). The copy's path SHALL be written onto the upgrade's own record, install/upgrade.json (crates/lys/src/identity/upgrade/intent.rs:1, :30, where the data.previous copy is already recorded), so a rollback has it in hand without reading a log.",
       "acceptance": [
         "First-run setup on an empty store ends with one organisation, Active, founder the administrator, and the administrator's record carrying it (the setup test in lys-identity-server)",
         "A fixture store holding three people and two agents with no organisation boots once: one boot_stage line names 5 attached, every record then carries the install's organisation, and the second boot writes nothing and names 0",
-        "A fixture whose batch is made to fail at commit leaves the store as it was, and the server refuses to serve naming the batch; nothing is attached leaf by leaf"
+        "A fixture whose batch is made to fail at commit leaves the store as it was, and the server refuses to serve naming the batch; nothing is attached leaf by leaf",
+        "Rollback is one-way and said so: a test reads the migrated fixture with the previous build's decode (the 043cc007 encoding kept as a test fixture, or the current decoder with the new kinds removed) and asserts the refusal at encoding_read.rs:94; the installer's step copies the directory and grant logs to data.previous-organisation/<rfc3339>/ before the batch and the fence names the path",
+        "The boot batch stamps every grant without an organisation with the install's: a fixture grant log with Tom's three roots, two agent roots and the connector grant boots once, the boot_stage line names 6 stamped, every grant then carries the organisation, and the second boot names 0",
+        "install/upgrade.json names the organisation copy's path after the step, read back by the test"
       ],
       "files": {
         "create": [
@@ -68,7 +71,11 @@
         "modify": [
           "crates/lys-identity-server/src/admission.rs",
           "crates/lys-identity-server/src/routes_startup.rs",
-          "crates/lys/src/identity/config.rs"
+          "crates/lys/src/identity/config.rs",
+          "crates/lys/src/identity/upgrade/swap.rs",
+          "crates/lys-identity/src/grants/change_stream.rs",
+          "crates/lys/src/identity/upgrade/intent.rs",
+          "crates/lys/src/identity/upgrade.rs"
         ],
         "delete": []
       },
@@ -109,12 +116,13 @@
     {
       "id": "R4",
       "title": "Every people, teams, identities and grants read answers within the caller's organisation, with no special case for the install's own",
-      "spec": "Behavioural. THE SYSTEM SHALL filter by the caller's organisation, from the projection of R1, every read that lists or resolves identities and grants: GET /people and GET /directory/people (crates/lys-identity-server/src/read_api.rs:57, :59), GET /identities and GET /identities/{id} (crates/lys-identity-server/src/routes_table.rs:24-25), GET /teams (openapi_table.rs:353 and crates/lys-identity-server/src/teams_api.rs:259-265), GET /grants (crates/lys-identity-server/src/grants.rs:284), POST /grants/who, /grants/why, /grants/reach and /grants/which (grants.rs:296, :317-320): an identity, team or grant of another organisation is answered as absent, exactly as one the caller may not see is today, never as refused, so no answer says whether another organisation exists. The administrator's wider view (read_api.rs:6) is the wider view within the install's organisation and nothing more. The directory log stays one log and the projection one projection; the partition is the view. GET /me SHALL name the caller's organisation (id and profile) so the screens can show it (surface/identity/src/features/people/People.tsx:28-29 header; surface/identity/src/features/me/).",
+      "spec": "Behavioural. THE SYSTEM SHALL filter by the caller's organisation, from the projection of R1, every read that lists or resolves identities and grants: GET /people and GET /directory/people (crates/lys-identity-server/src/read_api.rs:57, :59), GET /identities and GET /identities/{id} (crates/lys-identity-server/src/routes_table.rs:24-25), GET /teams (openapi_table.rs:353 and crates/lys-identity-server/src/teams_api.rs:259-265), GET /grants (crates/lys-identity-server/src/grants.rs:284), POST /grants/who, /grants/why, /grants/reach and /grants/which (grants.rs:296, :317-320): an identity, team or grant of another organisation is answered as absent, exactly as one the caller may not see is today, never as refused, so no answer says whether another organisation exists. The administrator's wider view (read_api.rs:6) is the wider view within the install's organisation and nothing more. The directory log stays one log and the projection one projection; the partition is the view. GET /me SHALL name the caller's organisation (id and profile) so the screens can show it (surface/identity/src/features/people/People.tsx:28-29 header; surface/identity/src/features/me/). An app's credential belongs to no organisation: a person's or an agent's question to /grants/who, /why, /reach and /which is partitioned by their organisation; an app's question for its own kinds, through its credential (crates/lys-identity-server/src/grants_batch.rs:1-14's rule, unchanged), answers across organisations as today, so the door may ask which workspaces of kind cambium.workspace a subject of any organisation may read (CORE-073).",
       "acceptance": [
         "With two organisations A and B each holding two people, a team and a root grant, every route named answers A's caller only A's records and B's caller only B's, in the lys-identity-server route tests, one assertion per route",
         "A's caller reading B's person by id through /identities/{id} is answered as absent with the same status and body as an unknown id",
         "Our administrator reading /directory/people sees the install's organisation's people only; a test seeds one person of B and asserts they are absent from the answer",
-        "GET /me carries the caller's organisation id and name, read by the People header and shown as text (people-views.test.tsx)"
+        "GET /me carries the caller's organisation id and name, read by the People header and shown as text (people-views.test.tsx)",
+        "An app asking /grants/which for its own kind is answered ids across organisations A and B; a person of A asking the same is answered A's ids only"
       ],
       "files": {
         "create": [
@@ -148,7 +156,9 @@
     "No organisation in Cambium: the door's workspace per organisation is CORE-073, which asks POST /grants/which for kind cambium.workspace",
     "Teams keep carrying no authority (teams_api.rs:7-9); they gain an organisation and nothing else",
     "No mail, no issuer change: the issuer account is made as today by accounts::make (accounts.rs:148-170)",
-    "One person, one organisation; the field becomes a list only by a later brief and nothing else on the page moves (ruling 8)"
+    "One person, one organisation; the field becomes a list only by a later brief and nothing else on the page moves (ruling 8)",
+    "An app's credential belongs to no organisation: app questions for the app's own kinds answer across organisations as today; only people's and agents' questions are partitioned",
+    "Follow-up, not this brief: budgets_state.rs:41-43 HolderKind::Organisation means the install today; after this brief the word has two meanings, and a later DIRECTORY row binds it to the organisation record (one budget holder per organisation) so the install's budgets are the install's organisation's"
   ],
   "verification": [
     "gate -stages nextest -crates lys-identity -test 'test(organisation)' then -crates lys-identity-server -test 'test(organisation)'; every red first, the FAIL line quoted in the handback before the code",
@@ -156,5 +166,12 @@
     "python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory read for FAIL lines, never the exit code",
     "The whole declared gate on Tom's Mac, START and END posted with df"
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "date": "2026-10-20",
+      "by": "Waffles, written by Flapjack",
+      "subject": "Rollback, app callers, existing grants, budgets' organisation word",
+      "ruling": "R2: the previous build (043cc007) refuses a log it cannot decode (encoding_read.rs:94, fields::<1> at encoding.rs:283), so the install is one-way: a store copy before the batch at data.previous-organisation/<rfc3339>/, the fence naming it; and the same batch stamps every existing grant with the install's organisation, counted on the boot_stage line, the judge never defaulting a missing organisation. R4: an app's credential belongs to no organisation; its questions for its own kinds answer across organisations as today. Boundaries: the HolderKind::Organisation follow-up named."
+    }
+  ]
 }
