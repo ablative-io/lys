@@ -1444,6 +1444,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/people/People.tsx` | The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `surface/identity/src/features/people/people-views.test.tsx` | The organisation name shown in the People header (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `crates/lys-identity/src/grants/change_stream.rs` | The grant log batch that stamps every unstamped grant with the install's organisation (DIRECTORY-109 R2). | DIRECTORY-109 |
+| `crates/lys/tests/rauthy_mail_leg.rs` | The measured leg: the pinned issuer image against a capturing sink, recording whether POST /users sends a letter. | DIRECTORY-110 |
+| `crates/lys-identity-server/src/mail.rs` | The one sender: the configured SMTP settings, the password read from its file, a named refusal for every failed send. | DIRECTORY-110 |
+| `crates/lys-identity-server/src/mail_letters.rs` | The three letters, one template each: added, access given, founded. | DIRECTORY-110 |
+| `crates/lys-identity-server/tests/mail_letters.rs` | Every letter asserted word for word at a test-owned SMTP sink; once per act; none for a refused act. | DIRECTORY-110 |
 
 ## Inventory
 

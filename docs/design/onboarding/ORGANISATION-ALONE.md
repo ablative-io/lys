@@ -230,7 +230,7 @@ writes each takes the next free id at that moment and keeps the order.
    has routes and no door: People and Access scoped to her organisation in `surface/identity/src/features/people/` and
    `surface/identity/src/features/access/` (the add-person act names her organisation; the access screen gives only what
    she holds under it; our administrator's screens show only ours).
-3. **IDENTITY-004 (lys): mail.** The install carries a `[mail]` section (SMTP host, port, user, from, TLS mode) in
+3. **DIRECTORY-110 (lys): mail** (written as the page's IDENTITY-004; the identity directory sits outside the gate). The install carries a `[mail]` section (SMTP host, port, user, from, TLS mode) in
    `deployment.toml`; `prepare.rs` writes it to the issuer as `RAUTHY_SMTP_*`; the compose template carries the keys; Lys
    itself sends its own mail through the same settings (one sender crate, one template per letter: founded, added, access
    given), and a missing `[mail]` section makes founding and admit refuse by name rather than copy text to a clipboard.
@@ -238,7 +238,7 @@ writes each takes the next free id at that moment and keeps the order.
    `crates/lys/src/identity/config.rs`, `prepare.rs` (:216-245), `deploy/identity/compose.yaml` (:84-117),
    `crates/lys-identity-server/src/people_admit.rs`, a new `mail.rs`, `surface/identity/src/features/people/AddPerson.tsx`
    (:106-138).
-4. **DIRECTORY-110 (lys): founding.** `POST /organisations/found`, the proving link, the founding page on the public sign-in
+4. **DIRECTORY-111 or the next free (lys): founding.** `POST /organisations/found`, the proving link, the founding page on the public sign-in
    surface, the Founding states and their activation, idempotence on the operation id. Depends on 1, 2, 3. Files:
    `crates/lys-identity-server/src/sign_in.rs` (:593-595), `sign_in_callback.rs` (:58-77), `sign_in_refusals.rs` (:31-34),
    `session_admission.rs` (:31, :56-57), `accounts.rs` (:148-170), a new `organisations_found.rs`, the surface sign-in page.
@@ -262,7 +262,7 @@ can be written now against their contract. No brief is written before Waffles re
    "Without me" is the bar.
 3. Mail: the install's own SMTP, no mail API, with two rules. (a) One letter per act reaches the person, never two; the
    issuer's own mail must be on, because forgot-password has to work with nobody from us present; if Rauthy's
-   first-password mail on `POST /users` duplicates Lys's letter and cannot be turned off per account, IDENTITY-004 decides
+   first-password mail on `POST /users` duplicates Lys's letter and cannot be turned off per account, DIRECTORY-110 decides
    by test which one goes and says so. (b) The gate proves letters against a capturing SMTP sink in the test, every letter's
    text asserted; no live mailbox in a test, ever.
 4. One door, many workspaces.
@@ -289,7 +289,7 @@ can be written now against their contract. No brief is written before Waffles re
 ## What this page does not prove
 
 - Rauthy 0.36.2's behaviour on `POST /users` without SMTP was read from its documentation, not run; whether its
-  first-password mail is the right letter for a Google-linked account is not decided here (IDENTITY-004 decides, by test).
+  first-password mail is the right letter for a Google-linked account is not decided here (DIRECTORY-110 decides, by test).
 - That the door's reads are scoped by workspace everywhere: `oidc_admission.rs:166` scopes channels and topics; search,
   drafts, presence and the live prefix were not read for it today. CORE-073's red proves or disproves each.
 - The cost of a grant check per sign-in per organisation at scale (the 14 October sign-in cost, rights_claim::pass over

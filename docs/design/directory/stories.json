@@ -384,6 +384,10 @@
         {
           "id": "S140",
           "text": "As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched."
+        },
+        {
+          "id": "S459",
+          "text": "As a Directory administrator, I want Lys to write to each person I admit, once, through our own mail settings, and to refuse to admit anyone when it cannot write, so that nobody is added and left to hear about it by chance."
         }
       ]
     },

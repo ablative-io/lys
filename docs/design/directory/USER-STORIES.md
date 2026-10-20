@@ -184,6 +184,8 @@
 
 **S140.** As a directory administrator, I want a refusal to show me the provider and subject involved, and which agent holds a binding a person tried to link, so that I can tell which account and which agent a refused act touched.
 
+**S459.** As a Directory administrator, I want Lys to write to each person I admit, once, through our own mail settings, and to refuse to admit anyone when it cannot write, so that nobody is added and left to hear about it by chance.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.

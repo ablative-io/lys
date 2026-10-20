@@ -669,3 +669,11 @@
 - [ ] **C797** — The grants model ships the kind organisation with organisation.read, organisation.admit, organisation.grant and organisation.administer (the last three withheld from agents), and founding issues exactly one administrator grant to the founder with pass-on bounded to people.
 - [ ] **C798** — GET /people, /directory/people, /identities, /identities/{id}, /teams, /grants and the who, why, reach and which questions answer only the caller's organisation, another organisation's records answered as absent, with no special case for the install's own.
 - [ ] **C799** — GET /me names the caller's organisation and the People header shows it.
+
+## Lys writes to the people it admits (DIRECTORY-110)
+
+- [ ] **C804** — The install reads one [mail] section, keeps its password as a credential, and refuses plain SMTP to any host but loopback. DIRECTORY-110/R1.
+- [ ] **C805** — The issuer always gets SMTP, and a measured leg decides whether it or Lys sends the added letter, so a person never gets two letters for one act. DIRECTORY-110/R2.
+- [ ] **C806** — Lys sends added, access given and founded from one sender, each asserted word for word at a capturing sink, once per act. DIRECTORY-110/R3.
+- [ ] **C807** — With no mail settings, admit refuses as mail_unconfigured before recording anything. DIRECTORY-110/R4.
+- [ ] **C808** — The copy-invite is gone; the receipt says Lys wrote to the person. DIRECTORY-110/R5.
