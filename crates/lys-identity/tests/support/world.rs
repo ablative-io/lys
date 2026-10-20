@@ -18,8 +18,8 @@ use lys_identity::grants::{
 };
 use lys_identity::log::Reopen;
 use lys_identity::{
-    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, OrganisationId,
-    PersonId, Profile, Provenance, Transition,
+    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId,
+    Profile, Provenance, Transition,
 };
 use lys_log_store::{FileLeafStore, LeafStore};
 
@@ -85,8 +85,6 @@ pub struct World<S: LeafStore = FileLeafStore, R: RelationshipStore = MemoryRela
     pub grants: Grants<S, R>,
     /// The root authority, the organisation's founder.
     pub admin: PersonId,
-    /// The organisation everyone is of.
-    pub organisation: OrganisationId,
     /// A person who holds root grants.
     pub dana: PersonId,
     /// A person Dana lends to.
@@ -198,7 +196,6 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
             directory,
             grants,
             admin,
-            organisation,
             dana,
             tom,
             lee,
