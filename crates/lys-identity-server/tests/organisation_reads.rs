@@ -132,12 +132,12 @@ fn two_organisations(config: &Config) -> Result<Two, Box<dyn Error>> {
 }
 
 async fn signed_in(service: &Service, subject: &str) -> Result<String, Box<dyn Error>> {
-    Ok(service
+    service
         .sign_in(Login {
             subject: subject.to_owned(),
             email: format!("{subject}@example.test"),
         })
-        .await?)
+        .await
 }
 
 fn ids(value: &Value, member: &str) -> Vec<String> {
