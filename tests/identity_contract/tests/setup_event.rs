@@ -17,8 +17,11 @@ fn setup_has_one_frozen_body_and_cannot_name_an_agent() -> Result {
         LoginBinding::new("https://i", "a")?,
         Provenance::new(AuthMethod::Oidc, 1),
     );
+    // The frozen body is the one written before organisations existed, so
+    // the person is under none: the member is absent, and the bytes are kept.
     let change = Change::SetupPerson {
         profile: Profile::new("N")?,
+        organisation: None,
     };
     let event = IdentityEvent::new(
         OperationId::from_bytes([7; 16]),
