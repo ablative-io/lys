@@ -530,8 +530,8 @@ mod receipts {
     use lys_identity::receipt::{Receipt, verify_receipt};
     use lys_identity::signer::load_service_key;
     use lys_identity::{
-        Actor, AuthMethod, Change, IdentityEvent, LoginBinding, Profile, Provenance, sign_event,
-        verify_event,
+        Actor, AuthMethod, Change, IdentityEvent, LoginBinding, OrganisationId, Profile,
+        Provenance, sign_event, verify_event,
     };
     use sha2::{Digest, Sha256};
 
