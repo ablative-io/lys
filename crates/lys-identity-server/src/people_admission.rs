@@ -33,7 +33,15 @@ pub(crate) fn organisation<S: LeafStore>(
     named: Option<&str>,
     decision: Decision,
 ) -> Result<OrganisationId, ServerError> {
-    let (caller, organisation) = crate::caller_admission::caller_within(judged.directory, actor)?;
+    // A login bound to no person is not admitted to admit: NotAdmitted, as
+    // every mutation route answers a stranger, never the reads' NoPerson.
+    let (caller, organisation) = crate::caller_admission::caller_within(judged.directory, actor)
+        .map_err(|error| match error {
+            ServerError::NoPerson => ServerError::NotAdmitted {
+                reason: "the caller's login is bound to no person, so no organisation admits through it",
+            },
+            other => other,
+        })?;
     if let Some(named) = named {
         let asked = OrganisationId::from_str(named)?;
         if asked != organisation {
