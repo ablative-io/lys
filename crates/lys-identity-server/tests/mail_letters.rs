@@ -284,7 +284,7 @@ async fn a_root_grant_to_a_person_writes_to_them_once_in_the_access_screens_word
     assert_eq!(
         letter.body,
         format!(
-            "Hello Bea, you have been given access in Lys: alpha on doc beta: Read this resource; write. Sign in at {} to use it.",
+            "Hello Bea, you have been given access in Lys: alpha on doc beta: Read this resource; Write to this resource. Sign in at {} to use it.",
             service.base
         )
     );
