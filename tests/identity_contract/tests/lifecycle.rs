@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use identity_contract::fixtures::{administrator, op, shown};
+use identity_contract::fixtures::{administrator, founded, op, shown};
 use identity_contract::harness::Harness;
 use lys_identity::{
     AgentId, Change, IdentityError, IdentityId, LifecycleState, Transition, verify_event,
@@ -21,7 +21,9 @@ fn register_activate_suspend_reinstate_retire_is_five_signed_events() -> TestRes
 
     let harness = Harness::new(5)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let (agent, _) = directory.register_agent(administrator()?, op(2), person, shown("A")?, 11)?;
     let agent = IdentityId::Agent(agent);
     let steps = [
@@ -97,7 +99,9 @@ fn register_activate_suspend_reinstate_retire_is_five_signed_events() -> TestRes
 fn every_transition_outside_the_table_is_refused_and_the_log_does_not_grow() -> TestResult {
     let harness = Harness::new(5)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let (agent, _) = directory.register_agent(administrator()?, op(2), person, shown("A")?, 11)?;
     let (retired, _) =
         directory.register_agent(administrator()?, op(3), person, shown("R")?, 12)?;

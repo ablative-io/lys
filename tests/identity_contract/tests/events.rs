@@ -276,7 +276,7 @@ fn an_event_the_table_forbids_cannot_be_made() -> TestResult {
 mod directory_events {
     use std::error::Error;
 
-    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::fixtures::{administrator, founded, op, shown};
     use identity_contract::harness::{Fault, Harness};
     use lys_identity::receipt::verify_receipt;
     use lys_identity::{IdentityError, IdentityId};
@@ -288,8 +288,10 @@ mod directory_events {
     fn a_receipt_verifies_and_a_changed_one_does_not() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let organisation = founded(&mut directory)?;
+        let (_, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+        directory.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11)?;
         let index = receipt.coordinate().index;
         let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
         let checkpoint = directory.log()?.head()?;
@@ -311,14 +313,16 @@ mod directory_events {
     fn an_append_whose_leaf_landed_is_found_committed_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         harness.fail(Fault::AfterLeaf)?;
         let (person, receipt) =
-            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        assert_eq!(receipt.coordinate().index, 0);
-        assert_eq!(directory.log()?.len()?, 1);
-        let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+        assert_eq!(receipt.coordinate().index, 2);
+        assert_eq!(directory.log()?.len()?, 3);
+        let again =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(again.0, person, "the retry finds the one committed event");
-        assert_eq!(directory.log()?.len()?, 1);
+        assert_eq!(directory.log()?.len()?, 3);
         Ok(())
     }
 
@@ -326,12 +330,14 @@ mod directory_events {
     fn an_append_whose_leaf_never_landed_is_refused_and_records_nothing() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         harness.fail(Fault::BeforeLeaf)?;
-        let refused = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        let refused =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10);
         assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
-        assert_eq!(directory.log()?.len()?, 0);
-        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        assert_eq!(directory.log()?.len()?, 1);
+        assert_eq!(directory.log()?.len()?, 4);
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+        assert_eq!(directory.log()?.len()?, 3);
         Ok(())
     }
 
@@ -339,8 +345,10 @@ mod directory_events {
     fn an_uncertain_append_holds_every_read_until_it_is_resolved() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         harness.fail(Fault::AfterLeafUnreadable)?;
-        let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        let held =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
         assert!(
             directory.projection().is_err(),
@@ -349,7 +357,7 @@ mod directory_events {
         harness.fail(Fault::None)?;
         assert_eq!(
             directory.projection()?.records().count(),
-            1,
+            3,
             "resolved as committed, applied once"
         );
         let live = directory.projection()?.clone();
@@ -362,18 +370,20 @@ mod directory_events {
     fn a_leaf_stored_behind_a_failed_write_is_found_committed_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         harness.fail(Fault::LeafStoredWriteFailed)?;
         let (person, receipt) =
-            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(
             receipt.coordinate().index,
-            0,
+            2,
             "the stored leaf is the answer"
         );
-        let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let again =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(again.0, person, "the retry finds the one committed event");
         drop(directory);
-        assert_eq!(harness.open()?.log()?.len()?, 1);
+        assert_eq!(harness.open()?.log()?.len()?, 3);
         Ok(())
     }
 
@@ -383,7 +393,8 @@ mod directory_events {
 
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let organisation = founded(&mut directory)?;
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         let whole = directory.log()?.leaf(0)?.ok_or("leaf missing")?;
         drop(directory);
         // A second act killed mid-write: its record's length and half its
@@ -402,28 +413,28 @@ mod directory_events {
 
         // A reader names the torn bytes, leaves them, and serves none of them.
         let reader = FileLeafStore::open_read_only(&harness.log_path())?;
-        assert_eq!(reader.extent(), 1);
+        assert_eq!(reader.extent(), 3);
         assert_eq!(
             reader.pinned().tree_size,
-            1,
+            3,
             "the torn record was never pinned"
         );
         let tail = reader.unfinished_tail().ok_or("the torn record is named")?;
         assert_eq!(tail.segment, segment);
         assert_eq!(tail.offset, u64::try_from(sound.len())?);
         assert_eq!(tail.bytes, u64::try_from(4 + half.len())?);
-        assert_eq!(reader.leaf(1)?, None, "nothing of it is served");
+        assert_eq!(reader.leaf(3)?, None, "nothing of it is served");
         drop(reader);
 
         // The directory opens on the one event, and its writable open cut the
         // torn bytes off the segment.
         let mut directory = harness.open()?;
-        assert_eq!(directory.projection()?.records().count(), 1);
-        assert_eq!(directory.log()?.len()?, 1);
+        assert_eq!(directory.projection()?.records().count(), 3);
+        assert_eq!(directory.log()?.len()?, 3);
         drop(directory);
         assert_eq!(std::fs::read(&segment)?, sound, "the torn record was cut");
         let store = FileLeafStore::open(&harness.log_path())?;
-        assert_eq!(store.pinned().tree_size, 1);
+        assert_eq!(store.pinned().tree_size, 3);
         assert!(store.unfinished_tail().is_none());
         Ok(())
     }
@@ -432,22 +443,25 @@ mod directory_events {
     fn a_second_writers_leaf_is_applied_when_an_append_finds_it() -> TestResult {
         let harness = Harness::new(9)?;
         let mut first = harness.open()?;
+        let organisation = founded(&mut first)?;
         let mut second = harness.open()?;
-        first.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        let refused = second.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        first.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+        let refused =
+            second.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11);
         assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
         assert_eq!(
             second.projection()?.records().count(),
-            1,
+            3,
             "the other writer's event is applied, not skipped"
         );
-        let again = second.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        let again =
+            second.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10);
         assert!(
             again.is_ok(),
             "the adopted operation answers its first receipt"
         );
-        second.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
-        assert_eq!(second.log()?.len()?, 2);
+        second.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11)?;
+        assert_eq!(second.log()?.len()?, 4);
         let live = second.projection()?.clone();
         drop((first, second));
         assert_eq!(harness.open()?.projection()?, &live);
@@ -458,9 +472,12 @@ mod directory_events {
     fn nothing_reads_the_log_or_a_record_while_an_append_is_uncertain() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        let (ada, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let organisation = founded(&mut directory)?;
+        let (ada, _) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         harness.fail(Fault::AfterLeafUnreadable)?;
-        let held = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        let held =
+            directory.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
         assert!(
             directory.log().is_err(),
@@ -471,7 +488,7 @@ mod directory_events {
             "no record is served while uncertain"
         );
         harness.fail(Fault::None)?;
-        assert_eq!(directory.log()?.len()?, 2);
+        assert_eq!(directory.log()?.len()?, 4);
         Ok(())
     }
 
@@ -479,18 +496,20 @@ mod directory_events {
     fn the_same_operation_retried_after_the_log_was_unavailable_records_once() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         harness.fail(Fault::AfterLeafUnreadable)?;
-        let held = directory.register_person(administrator()?, op(1), shown("Ada")?, 10);
+        let held =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10);
         assert!(matches!(held, Err(IdentityError::LogUnavailable { .. })));
         harness.fail(Fault::None)?;
         let (person, receipt) =
-            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(
             receipt.coordinate().index,
-            0,
+            2,
             "the retry answers the first leaf"
         );
-        assert_eq!(directory.log()?.len()?, 1);
+        assert_eq!(directory.log()?.len()?, 3);
         assert!(directory.record(IdentityId::Person(person))?.is_some());
         Ok(())
     }
@@ -502,7 +521,7 @@ mod receipts {
 
     use coset::{CoseSign1, TaggedCborSerializable};
     use identity_contract::fake_issuer::{CLIENT_SECRET, Login};
-    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::fixtures::{administrator, founded, op, shown};
     use identity_contract::harness::{ADMINISTRATOR, Harness, Service};
     use lys_core::Ed25519Identity;
     use lys_identity::log::Coordinate;
@@ -600,8 +619,10 @@ mod receipts {
         let harness = Harness::new(9)?;
         let signing = Ed25519Identity::load(&harness.dir.path().join("service.key"))?;
         let mut directory = harness.open()?;
-        let (_, receipt) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-        directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let organisation = founded(&mut directory)?;
+        let (_, receipt) =
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+        directory.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11)?;
         let index = receipt.coordinate().index;
         let leaf = directory.log()?.leaf(index)?.ok_or("leaf missing")?;
         let checkpoint = directory.log()?.head()?;
@@ -757,7 +778,7 @@ mod receipts {
 mod faults {
     use std::error::Error;
 
-    use identity_contract::fixtures::{administrator, op, shown};
+    use identity_contract::fixtures::{administrator, founded, op, shown};
     use identity_contract::harness::{Fault, Harness};
     use lys_identity::{IdentityError, IdentityId};
 
@@ -790,9 +811,11 @@ mod faults {
     fn exercise(fault: Fault, recovery: Recovery) -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
-        directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+        let organisation = founded(&mut directory)?;
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         harness.fail(fault)?;
-        let first = directory.register_person(administrator()?, op(2), shown("Grace")?, 11);
+        let first =
+            directory.register_person(administrator()?, op(2), shown("Grace")?, organisation, 11);
         if matches!(first, Err(IdentityError::LogUnavailable { .. })) {
             assert!(
                 directory.projection().is_err(),
@@ -804,13 +827,25 @@ mod faults {
             drop(directory);
             directory = harness.open()?;
         }
-        let (grace, _) = directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let (grace, _) = directory.register_person(
+            administrator()?,
+            op(2),
+            shown("Grace")?,
+            organisation,
+            11,
+        )?;
         if let Ok((answered, _)) = &first {
             assert_eq!(*answered, grace, "{fault:?}: the first answer's id is kept");
         }
-        let (again, _) = directory.register_person(administrator()?, op(2), shown("Grace")?, 11)?;
+        let (again, _) = directory.register_person(
+            administrator()?,
+            op(2),
+            shown("Grace")?,
+            organisation,
+            11,
+        )?;
         assert_eq!(again, grace, "{fault:?}: resolved once, answered the same");
-        assert_eq!(directory.log()?.len()?, 2, "{fault:?}: no loss, no double");
+        assert_eq!(directory.log()?.len()?, 4, "{fault:?}: no loss, no double");
         let graces = directory
             .projection()?
             .records()
@@ -858,15 +893,16 @@ mod faults {
     fn an_answer_lost_after_the_commit_is_found_by_its_operation_after_a_restart() -> TestResult {
         let harness = Harness::new(9)?;
         let mut directory = harness.open()?;
+        let organisation = founded(&mut directory)?;
         let (lost, receipt) =
-            directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+            directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         drop(directory);
         let mut restarted = harness.open()?;
         let (found, again) =
-            restarted.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+            restarted.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(found, lost);
         assert_eq!(again, receipt);
-        assert_eq!(restarted.log()?.len()?, 1);
+        assert_eq!(restarted.log()?.len()?, 3);
         assert!(restarted.record(IdentityId::Person(found))?.is_some());
         Ok(())
     }

@@ -5,7 +5,7 @@ use std::collections::btree_map::Entry;
 use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
-use identity_contract::fixtures::{administrator, linked, op, shown, source};
+use identity_contract::fixtures::{administrator, founded, linked, op, shown, source};
 use identity_contract::harness::{ADMINISTRATOR, Harness, LINK_AUDIT_SOURCE, Service};
 use lys_identity::receipt::{Receipt, verify_receipt};
 use lys_identity::{Change, IdentityError, IdentityId, LinkChange, LinkObservation, LoginBinding};
@@ -17,7 +17,9 @@ type TestResult = Result<(), Box<dyn Error>>;
 fn a_redelivered_source_operation_is_answered_once_and_survives_a_restart() -> TestResult {
     let harness = Harness::new(7)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let first = directory.accept_link_audit(source()?, person, linked("rauthy-op-1")?, 20)?;
     let again = directory.accept_link_audit(source()?, person, linked("rauthy-op-1")?, 21)?;
     assert_eq!(
@@ -50,7 +52,7 @@ fn a_redelivered_source_operation_is_answered_once_and_survives_a_restart() -> T
         "the source's provenance survives replay"
     );
     assert!(matches!(event.event()?.change(), Change::LinkAudit(_)));
-    assert_eq!(restarted.log()?.len()?, 2);
+    assert_eq!(restarted.log()?.len()?, 4);
     Ok(())
 }
 
@@ -63,7 +65,9 @@ fn a_long_observer_and_source_operation_id_are_signed_logged_and_read_back_whole
     assert!(matches!(refused, Err(IdentityError::ChangeMismatch { .. })));
     let harness = Harness::new(7)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let observer = format!("https://{}", "o".repeat(10_000));
     let source_operation = "s".repeat(10_000);
     let observation =
@@ -125,7 +129,9 @@ impl Outbox {
 fn every_receiver_leg_leaves_one_logical_event_per_source_operation() -> TestResult {
     let harness = Harness::new(7)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let registered = directory.log()?.len()?;
     let mut outbox = Outbox {
         pending: vec!["rauthy-op-1", "rauthy-op-2", "rauthy-op-3"],

@@ -6,7 +6,7 @@ use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::fake_rauthy::FakeRauthy;
-use identity_contract::fixtures::{administrator, op, shown};
+use identity_contract::fixtures::{administrator, founded, op, shown};
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Harness, Service};
 use lys_identity::{Change, IdentityError, IdentityId, LifecycleState, PersonId, verify_event};
 use lys_identity_server::sign_in_providers::SignInProvidersSettings;
@@ -21,7 +21,9 @@ type TestResult = Result<(), Box<dyn Error>>;
 fn a_person_and_an_agent_keep_their_ids_and_history_across_a_reopen() -> TestResult {
     let harness = Harness::new(3)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let (agent, receipt) =
         directory.register_agent(administrator()?, op(2), person, shown("Builder")?, 11)?;
     directory.change_profile(
@@ -48,7 +50,11 @@ fn a_person_and_an_agent_keep_their_ids_and_history_across_a_reopen() -> TestRes
         .records()
         .map(|(id, _)| *id)
         .collect::<Vec<_>>();
-    assert_eq!(listed.len(), 2, "the list holds both identities");
+    assert_eq!(
+        listed.len(),
+        4,
+        "the list holds both identities and the founding's two"
+    );
     assert!(listed.contains(&IdentityId::Person(person)));
     assert!(listed.contains(&IdentityId::Agent(agent)));
     let read_person = reopened
@@ -67,7 +73,11 @@ fn a_person_and_an_agent_keep_their_ids_and_history_across_a_reopen() -> TestRes
     let reread = (0..reopened.log()?.len()?)
         .map(|index| reopened.log()?.leaf(index))
         .collect::<Result<Vec<_>, _>>()?;
-    assert_eq!(history.len(), 3, "three changes, three signed events");
+    assert_eq!(
+        history.len(),
+        5,
+        "the founding's two leaves, then three changes, three signed events"
+    );
     assert_eq!(reread, history, "history unchanged");
     Ok(())
 }
@@ -78,7 +88,9 @@ fn a_person_and_an_agent_keep_their_ids_and_history_across_a_reopen() -> TestRes
 fn an_agents_record_and_its_signed_registration_name_its_responsible_person() -> TestResult {
     let harness = Harness::new(3)?;
     let mut directory = harness.open()?;
-    let (person, _) = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
+    let organisation = founded(&mut directory)?;
+    let (person, _) =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
     let (agent, receipt) =
         directory.register_agent(administrator()?, op(2), person, shown("Builder")?, 11)?;
     let leaf = directory
@@ -118,13 +130,17 @@ fn an_agent_needs_a_registered_responsible_person_and_nothing_is_recorded_otherw
 fn the_same_operation_answers_once_and_a_different_request_under_it_is_refused() -> TestResult {
     let harness = Harness::new(3)?;
     let mut directory = harness.open()?;
-    let first = directory.register_person(administrator()?, op(1), shown("Ada")?, 10)?;
-    let again = directory.register_person(administrator()?, op(1), shown("Ada")?, 99)?;
+    let organisation = founded(&mut directory)?;
+    let first =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
+    let again =
+        directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 99)?;
     assert_eq!(first, again);
-    assert_eq!(directory.log()?.len()?, 1);
-    let other = directory.register_person(administrator()?, op(1), shown("Grace")?, 10);
+    assert_eq!(directory.log()?.len()?, 3);
+    let other =
+        directory.register_person(administrator()?, op(1), shown("Grace")?, organisation, 10);
     assert!(matches!(other, Err(IdentityError::OperationReused { .. })));
-    assert_eq!(directory.log()?.len()?, 1);
+    assert_eq!(directory.log()?.len()?, 3);
     Ok(())
 }
 

@@ -52,6 +52,28 @@ pub fn organisation() -> Result<Profile, IdentityError> {
 /// The name of the fixtures' organisation, the harness's setup organisation too.
 pub const ORGANISATION: &str = "Example organisation";
 
+/// Found the fixtures' organisation in a fresh `directory`, the administrator
+/// founding it with "Admin" as its founder, answering its id: every person a
+/// contract test registers belongs to it (DIRECTORY-109 R1). The founding
+/// writes the log's first two leaves, the organisation's and its founder's,
+/// and the projection's first two records, so a test's own leaves and
+/// records come after them.
+///
+/// # Errors
+/// Refuses a directory that cannot found the organisation.
+pub fn founded<S: lys_log_store::LeafStore>(
+    directory: &mut lys_identity::Directory<S>,
+) -> Result<lys_identity::OrganisationId, Box<dyn std::error::Error>> {
+    let founded = directory.found_organisation(
+        administrator()?,
+        op(0),
+        organisation()?,
+        shown("Admin")?,
+        1,
+    )?;
+    Ok(founded.organisation)
+}
+
 /// The organisation `person` was registered under (DIRECTORY-109 R1).
 ///
 /// # Errors
