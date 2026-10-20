@@ -15,10 +15,10 @@ use lys_identity::grants::{
     Route, Window,
 };
 use lys_identity::{Directory, IdentityId, OperationId, OrganisationId, PersonId, Profile};
-use lys_identity_server::Config;
 use lys_log_store::FileLeafStore;
 use serde_json::{Value, json};
 
+use crate::Config;
 use crate::organisation_fixture::{T0, activate, actor, bind, model};
 
 type Outcome = Result<(), Box<dyn Error>>;

@@ -15,10 +15,11 @@ use lys_identity::grants::{
 use lys_identity::{
     Actor, AgentId, Change, Directory, IdentityEvent, IdentityId, OperationId, PersonId, Profile,
 };
-use lys_identity_server::{Config, Say};
 use lys_log_store::{FileLeafStore, LeafStore};
 
+use crate::Config;
 use crate::organisation_fixture::{T0, activate, model};
+use crate::routes::Say;
 
 type Outcome = Result<(), Box<dyn Error>>;
 
