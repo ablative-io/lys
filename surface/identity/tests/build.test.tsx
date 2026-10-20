@@ -24,11 +24,11 @@ describe('Running build', () => {
   // A signed-out caller's change feed is refused as the service refuses it, so nothing reads on.
   const signedOut = { ...SERVICE, '/changes': refused(401, 'NotSignedIn', 'Sign in first'), '/directory/people': refused(401, 'NotSignedIn', 'Sign in first'), '/sign-in/help': ok({ administrator: null }) };
 
-  it('signs in with the title, the one form and one account help line, without service details or build', async () => {
+  it('signs in with the title, the one form, one account help line and the founding link, without service details or build', async () => {
     const { requests } = await mount('#/people', signedOut);
     expect($('#screen h1, .page h1')?.textContent).toBe('Sign in');
     const page = $('.page');
-    expect([...(page?.querySelectorAll('a, button') ?? [])].map((each) => each.textContent)).toEqual(['Sign in']);
+    expect([...(page?.querySelectorAll('a, button') ?? [])].map((each) => each.textContent)).toEqual(['Sign in', 'Found an organisation']);
     expect(page?.querySelector('form[aria-label="Sign in"]')).not.toBeNull();
     expect(page?.querySelector('p.account-help')?.textContent).toBe('No account yet, or cannot get in? Ask your administrator.');
     expect(page?.querySelectorAll('section, code')).toHaveLength(0);
