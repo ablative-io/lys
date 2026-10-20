@@ -50,7 +50,7 @@ pub const COMPOSE_ENV: &str = "compose.env";
 
 /// The owner-only file the sign-in service's SMTP settings are rendered to,
 /// read by compose as the issuer's `env_file` (DIRECTORY-110 R2); with no
-/// `[mail]` the issuer's env_file is /dev/null and it has no SMTP.
+/// `[mail]` the issuer's `env_file` is `/dev/null` and it has no SMTP.
 pub const MAIL_ENV: &str = "rauthy-smtp.env";
 
 /// The provided credential holding the mail user's password, read when
@@ -353,7 +353,8 @@ pub fn mail_password(
         .at(&path)
     };
     let text = Zeroizing::new(
-        String::from_utf8(bytes.to_vec()).map_err(|_| malformed("the password is not text"))?,
+        String::from_utf8(bytes.to_vec())
+            .map_err(|error| malformed(&format!("the password is not text: {error}")))?,
     );
     let password = text.trim_end_matches(['\r', '\n']);
     if password.is_empty() || password.contains(['\'', '\n', '\r']) {
