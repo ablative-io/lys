@@ -301,7 +301,7 @@ fn mutation_acknowledgement_retains_the_projection_cause_and_real_revision() -> 
     let events = capture.read()?;
     assert!(matches!(
         answer,
-        Err(GrantError::ProjectionPending { index: 1, .. })
+        Err(GrantError::ProjectionPending { index: 2, .. })
     ));
     assert!(observed(&events, "project", WRITE_FAILURE, revision));
     Ok(())
@@ -347,7 +347,7 @@ fn failed_mutation_revision_read_is_named_instead_of_inventing_revision_zero() -
     }
     assert_eq!(
         FileLeafStore::open(&world.dir.path().join("grants"))?.extent(),
-        2
+        3
     );
     Ok(())
 }

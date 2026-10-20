@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use std::error::Error;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
 
@@ -207,6 +207,9 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
     let weak = Arc::downgrade(&table);
     let calls = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&calls);
+    // The root the hook issues reads the engine itself (the caller's
+    // organisation.grant, ACCESS-009 R2): those reads are not the batch's.
+    let moving = Arc::new(AtomicBool::new(false));
     table
         .state
         .grants
@@ -216,6 +219,9 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
         .ok_or("grants missing")?
         .relationships()
         .on_read(ReadHook(Box::new(move |_, _| {
+            if moving.load(Ordering::SeqCst) {
+                return Ok(());
+            }
             if counted.fetch_add(1, Ordering::SeqCst) < count {
                 let table = weak.upgrade().ok_or_else(|| {
                     lys_identity::grants::GrantError::LogUnavailable {
@@ -227,7 +233,8 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
                         reason: "the read still holds the grants lock".to_owned(),
                     });
                 }
-                crate::grants::with_grants(&table.state, |judged| {
+                moving.store(true, Ordering::SeqCst);
+                let issued = crate::grants::with_grants(&table.state, |judged| {
                     judged.grants.issue_root(
                         judged.directory,
                         &RootRequest {
@@ -243,11 +250,10 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
                         crate::session::now(),
                     )?;
                     Ok(())
-                })
-                .map_err(|error| {
-                    lys_identity::grants::GrantError::LogUnavailable {
-                        reason: error.to_string(),
-                    }
+                });
+                moving.store(false, Ordering::SeqCst);
+                issued.map_err(|error| lys_identity::grants::GrantError::LogUnavailable {
+                    reason: error.to_string(),
                 })?;
             }
             Ok(())

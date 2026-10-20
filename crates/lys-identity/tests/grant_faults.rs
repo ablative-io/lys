@@ -366,7 +366,11 @@ fn grant_idempotence_a_lost_acknowledgement_retries_to_one_grant() -> TestResult
     let reopened = world.delegate(&request)?;
     assert_eq!(retried, first, "the retry answers the first receipt");
     assert_eq!(reopened, first, "so does a retry after a restart");
-    assert_eq!(world.events(), 2, "one root and one grant");
+    assert_eq!(
+        world.events(),
+        3,
+        "the founding grant, one root and one grant"
+    );
     let issued = world
         .grants
         .events()?

@@ -540,26 +540,6 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         )?)
     }
 
-    /// Revoke a grant, and with it everything derived from it, as its
-    /// issuer, a holder of a grant it derives from, or the install's root
-    /// person over an install-level grant (ACCESS-009 R2).
-    ///
-    /// # Errors
-    /// Refuses an unauthorized revocation, operation reuse or a failed commit.
-    pub fn revoke(&mut self, request: &RevokeRequest, at: u64) -> Result<Recorded, GrantError> {
-        self.settle_for_change()?;
-        if let Some(answered) = self.revoke_answered(request)? {
-            return answered;
-        }
-        judge_revoke(
-            &self.book,
-            self.standing_over(request.grant),
-            request.caller,
-            request.grant,
-        )?;
-        self.record_revoke(request, at)
-    }
-
     /// The answer already recorded for a revocation's operation, if any.
     pub(super) fn revoke_answered(
         &mut self,

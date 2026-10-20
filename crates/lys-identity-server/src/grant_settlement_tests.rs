@@ -364,7 +364,7 @@ async fn serialized_grant_answers_share_the_selected_degradation_and_omit_privat
     assert!(healthy.get("degraded").is_none());
     let legacy: serde_json::Map<String, serde_json::Value> = serde_json::from_value(healthy)?;
     assert_eq!(legacy["permitted"], true);
-    assert_eq!(legacy.len(), 7);
+    assert_eq!(legacy.len(), 8);
     assert!(shared);
     assert!(recovered);
     for answer in answers {

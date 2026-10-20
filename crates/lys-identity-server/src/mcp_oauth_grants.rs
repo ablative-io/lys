@@ -178,7 +178,9 @@ pub(crate) fn pass_on(
                 });
             match passed {
                 Ok(recorded) => made.push(recorded.event.grant()),
-                Err(refused) => return withdrawn(judged.grants, caller, &made, refused),
+                Err(refused) => {
+                    return withdrawn((judged.grants, judged.directory), caller, &made, refused);
+                }
             }
         }
         Ok(())
@@ -199,7 +201,10 @@ fn still_offered(model: &Model, offer: &Offer) -> bool {
 /// Revoke each grant `made` so far and answer `refused`, or a refusal
 /// naming the grants still standing when a revocation is itself refused.
 fn withdrawn(
-    grants: &mut crate::grants::GrantState,
+    (grants, directory): (
+        &mut crate::grants::GrantState,
+        &lys_identity::projection::Projection,
+    ),
     caller: IdentityId,
     made: &[GrantId],
     refused: ServerError,
@@ -209,6 +214,7 @@ fn withdrawn(
         let revoked = OperationId::generate().map_err(ServerError::from).and_then(|operation| {
             grants
                 .revoke(
+                    directory,
                     &RevokeRequest {
                         operation,
                         caller,

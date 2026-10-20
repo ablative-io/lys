@@ -221,7 +221,7 @@ fn cost_reading(
         )
     });
     let stale_log = engine.faults.log_counts().since(&before)?;
-    let revoke = world.grants.revoke(
+    let revoke = world.revoke(
         &lys_identity::grants::RevokeRequest {
             operation: lys_identity::OperationId::generate()?,
             caller: IdentityId::Person(world.admin),

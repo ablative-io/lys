@@ -213,10 +213,7 @@ pub(super) async fn revoke(
                 },
             ));
         }
-        match judged
-            .grants
-            .revoke_within(judged.directory, &request, now())
-        {
+        match judged.grants.revoke(judged.directory, &request, now()) {
             Ok(recorded) => Ok(Json(RecordedView::from(&recorded))),
             Err(error) => Err(as_seen_by(&judged, caller, error)),
         }

@@ -215,7 +215,8 @@ fn grant_audit_a_refusal_never_appears_as_a_grant_event() -> TestResult {
 fn grant_wire_boundary_a_signed_grant_names_its_envelope_and_no_other_is_read() -> TestResult {
     let mut world = World::new()?;
     let root = world.root(world.dana, "kite", pass(&["read"], &BOTH)?, None)?;
-    let message = world.grants.events()?[0].0.bytes().to_vec();
+    // Leaf zero is the founding grant (DIRECTORY-109 R3); Dana's root is next.
+    let message = world.grants.events()?[1].0.bytes().to_vec();
     let protected: Value = ciborium::from_reader(bytes_of(&parts(&message)?[0])?.as_slice())?;
     let Value::Map(header) = protected else {
         return Err("the protected header is not a map".into());

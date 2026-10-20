@@ -25,7 +25,7 @@ pub(super) fn assert_log_boundary(
                 ),
                 "{name}"
             );
-            assert_eq!(world.events(), 2, "{name}: nothing recorded");
+            assert_eq!(world.events(), 3, "{name}: nothing recorded");
         }
         1 | 2 => {
             set(
@@ -38,7 +38,7 @@ pub(super) fn assert_log_boundary(
             );
             let recorded = world.delegate(request)?;
             assert_eq!(
-                recorded.index, 2,
+                recorded.index, 3,
                 "{name}: the stored leaf is found committed once"
             );
             assert_eq!(
@@ -70,7 +70,7 @@ pub(super) fn assert_log_boundary(
             set(plan, LogFault::None);
             assert_eq!(
                 world.delegate(request)?.index,
-                2,
+                3,
                 "{name}: resolved as committed"
             );
         }
@@ -95,7 +95,7 @@ pub(super) fn assert_projection_boundary(
             assert!(
                 matches!(
                     world.delegate(request),
-                    Err(GrantError::ProjectionPending { index: 2, .. })
+                    Err(GrantError::ProjectionPending { index: 3, .. })
                 ),
                 "{name}"
             );
@@ -103,7 +103,7 @@ pub(super) fn assert_projection_boundary(
             assert!(
                 matches!(
                     world.exercise(tom, "read", Route::Api),
-                    Err(GrantError::ProjectionPending { index: 2, .. })
+                    Err(GrantError::ProjectionPending { index: 3, .. })
                 ),
                 "{name}: the pending read names its operation"
             );
@@ -111,7 +111,7 @@ pub(super) fn assert_projection_boundary(
             set(&engine.plan, EngineFault::None);
             assert_eq!(
                 world.delegate(request)?.index,
-                2,
+                3,
                 "{name}: the retry answers once projected"
             );
         }
@@ -119,7 +119,7 @@ pub(super) fn assert_projection_boundary(
             set(&engine.plan, EngineFault::StoredReportedFailed);
             assert_eq!(
                 world.delegate(request)?.index,
-                2,
+                3,
                 "{name}: the stored write is found"
             );
         }
@@ -136,7 +136,7 @@ pub(super) fn assert_projection_boundary(
             world.reopen(engine.clone())?;
             assert_eq!(
                 world.delegate(request)?.index,
-                2,
+                3,
                 "{name}: the restart projects what was committed"
             );
         }

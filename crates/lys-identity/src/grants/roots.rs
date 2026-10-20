@@ -158,13 +158,15 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         )?)
     }
 
-    /// [`Grants::revoke`], and also as a person holding organisation.grant
-    /// on the grant's organisation (ACCESS-009 R2), shown by the caller's
-    /// grants in `directory`.
+    /// Revoke a grant, and with it everything derived from it, as its
+    /// issuer, a holder of a grant it derives from, the install's root
+    /// person over an install-level grant, or a person holding
+    /// organisation.grant on the grant's organisation (ACCESS-009 R2),
+    /// shown by the caller's grants in `directory`.
     ///
     /// # Errors
     /// Refuses an unauthorized revocation, operation reuse or a failed commit.
-    pub fn revoke_within(
+    pub fn revoke(
         &mut self,
         directory: &Projection,
         request: &RevokeRequest,

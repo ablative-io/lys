@@ -91,7 +91,7 @@ fn row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent
     assert!(world.grants.relationships_derived_from(root)? > 0);
     let request = revoke(&world, root)?;
     let now = world.now;
-    world.grants.revoke(&request, now)?;
+    world.revoke(&request, now)?;
     for (_, grant) in derived {
         let directory = world.directory.projection()?;
         assert_eq!(
@@ -135,8 +135,8 @@ fn row_2_5_grant_revoke_withdraws_every_derived_grant_and_leaves_the_independent
     );
     assert_eq!(
         world.events(),
-        9,
-        "six grant changes and three observed uses"
+        10,
+        "the founding grant, six grant changes and three observed uses"
     );
     Ok(())
 }
@@ -238,8 +238,7 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
     engine.pause(true);
     let request = revoke(&world, root)?;
     let now = world.now;
-    let Err(GrantError::ProjectionPending { index, .. }) = world.grants.revoke(&request, now)
-    else {
+    let Err(GrantError::ProjectionPending { index, .. }) = world.revoke(&request, now) else {
         return Err("a revoke committed while projection is paused is answered pending".into());
     };
     let required = index + 1;
@@ -286,7 +285,7 @@ fn grant_freshness_a_stale_engine_never_permits_after_a_committed_revoke() -> Te
     );
     assert_eq!(world.grants.relationships_derived_from(root)?, 0);
     assert_eq!(
-        world.grants.revoke(&request, now)?.index,
+        world.revoke(&request, now)?.index,
         index,
         "the revoke's retry answers it once"
     );
@@ -393,7 +392,7 @@ fn control_1_a_degraded_reading_refuses_an_ancestor_revoke_and_keeps_an_independ
     engine.pause(true);
     let request = revoke(&world, root)?;
     let now = world.now;
-    let Err(GrantError::ProjectionPending { .. }) = world.grants.revoke(&request, now) else {
+    let Err(GrantError::ProjectionPending { .. }) = world.revoke(&request, now) else {
         return Err("the ancestor revoke commits while its projection fails".into());
     };
     let events = world.events();
@@ -480,7 +479,7 @@ fn control_1_a_one_time_hop_spent_under_a_degraded_reading_refuses_its_second_us
     let spare = world.root(world.dana, "tern", PassOn::UseOnly, None)?;
     engine.pause(true);
     let request = revoke(&world, spare)?;
-    let Err(GrantError::ProjectionPending { .. }) = world.grants.revoke(&request, now) else {
+    let Err(GrantError::ProjectionPending { .. }) = world.revoke(&request, now) else {
         return Err("an unrelated revoke commits while its projection fails".into());
     };
     let revision = engine.revision()?;

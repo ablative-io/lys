@@ -21,7 +21,7 @@ fn revoke(world: &mut World, grant: lys_identity::grants::GrantId) -> TestResult
         reason: "withdrawn".to_owned(),
     };
     let now = world.now;
-    world.grants.revoke(&request, now)?;
+    world.revoke(&request, now)?;
     Ok(())
 }
 

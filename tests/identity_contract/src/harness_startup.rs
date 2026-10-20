@@ -18,6 +18,26 @@ use super::{
 use crate::fake_issuer::{CLIENT_ID, CLIENT_SECRET, FakeIssuer};
 use crate::harness_serve::{DropMarker, StageTimer, serve};
 
+/// `model` with the shipped administrator relation added when it names
+/// none: the install writes the shipped model, which always carries it, so
+/// a fixture names only the relations its test is about and the
+/// organisation's founder grant still issues at boot (DIRECTORY-109 R3).
+fn with_administrator(model: &str) -> Result<String, Box<dyn Error>> {
+    use lys_identity::grants::shipped::{ADMINISTRATOR_RELATION, ORGANISATION_ACTIONS};
+    let mut file: serde_json::Value = serde_json::from_str(model)?;
+    let relations = file
+        .get_mut("relations")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("the fixture model names no relations")?;
+    if !relations.contains_key(ADMINISTRATOR_RELATION) {
+        relations.insert(
+            ADMINISTRATOR_RELATION.to_owned(),
+            serde_json::json!(ORGANISATION_ACTIONS),
+        );
+    }
+    Ok(serde_json::to_string(&file)?)
+}
+
 impl Service {
     /// Stop and join every fixture task, reporting all shutdown failures.
     ///
@@ -249,7 +269,7 @@ impl Service {
             sign_in_providers,
         );
         adjust(&mut config);
-        std::fs::write(&config.grant_model_file, model)?;
+        std::fs::write(&config.grant_model_file, with_administrator(model)?)?;
         config.validate()?;
         drop(stage);
         let stage = StageTimer::new("fixture.prepare_callback");

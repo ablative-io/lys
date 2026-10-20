@@ -282,7 +282,7 @@ fn row_2_1_row_2_3_grant_ancestry_refuses_at_the_blocking_boundary_and_explains_
         reason: "the project closed".to_owned(),
     };
     let now = world.now;
-    world.grants.revoke(&revoke, now)?;
+    world.revoke(&revoke, now)?;
     let after_revoke = world.events();
     let under_revoked = world.request(tom, lent, dana_agent, "tern", PassOn::UseOnly, None)?;
     assert_eq!(

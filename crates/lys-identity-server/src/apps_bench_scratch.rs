@@ -229,7 +229,6 @@ fn directory(examples: &Examples<'_>, at: u64) -> Result<Scratch, ServerError> {
     let mut directory = Projection::new();
     let (root, organisation) = (PersonId::generate()?, OrganisationId::generate()?);
     found(&mut directory, organisation, root, at)?;
-    person(&mut directory, root, organisation, at)?;
     let mut people = BTreeMap::new();
     let subjects = examples
         .holdings
