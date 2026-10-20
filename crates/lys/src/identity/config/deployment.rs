@@ -257,6 +257,13 @@ impl DeploymentConfig {
                 "name the user, or leave it out",
             ));
         }
+        if mail.user.is_none() && mail.tls != MailTls::None {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "mail.user",
+                "a server reached over tls or starttls is signed in to: name the user, or set tls = \"none\" for a loopback relay that takes no sign-in",
+            ));
+        }
         if mail.tls == MailTls::None && !LOOPBACK_HOSTS.contains(&mail.host.as_str()) {
             return Err(refuse(
                 ErrorKind::MailTlsRequired,

@@ -393,10 +393,17 @@ pub fn render_mail_env(
         ("SMTP_FROM", mail.from.clone()),
         ("SMTP_TLS_MODE", mode.to_owned()),
     ];
-    if let (Some(user), Some(password)) = (&mail.user, password) {
-        lines.push(("SMTP_USERNAME", user.clone()));
-        lines.push(("SMTP_PASSWORD", password.to_owned()));
-    }
+    // The pinned issuer reads SMTP_USERNAME and SMTP_PASSWORD before it looks
+    // at the mode and ends at boot when either is unset (its mailer.rs, an
+    // expect on each); in danger-insecure mode it then uses neither. So a
+    // relay with no sign-in, which validation holds to tls = "none", is given
+    // a pair of placeholders the issuer never sends.
+    let (user, password) = match (&mail.user, password) {
+        (Some(user), Some(password)) => (user.clone(), password.to_owned()),
+        _ => ("unused".to_owned(), "unused".to_owned()),
+    };
+    lines.push(("SMTP_USERNAME", user));
+    lines.push(("SMTP_PASSWORD", password));
     let mut env = Zeroizing::new(String::new());
     for (name, value) in lines {
         writeln!(env, "{name}='{value}'").map_err(|error| {

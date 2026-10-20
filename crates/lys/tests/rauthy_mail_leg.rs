@@ -154,6 +154,11 @@ fn environment(port: u16, sink_port: u16, api_secret: &str) -> Vec<(&'static str
         ("SMTP_PORT", sink_port.to_string()),
         ("SMTP_TLS_MODE", "danger-insecure".to_owned()),
         ("SMTP_FROM", "Lys <lys@example.test>".to_owned()),
+        // Read by the issuer at boot in every mode (an expect on each) and
+        // used in none of the danger-insecure ones: the leg's first run on
+        // the Mac ended at "SMTP_USERNAME is not set" without them.
+        ("SMTP_USERNAME", "unused".to_owned()),
+        ("SMTP_PASSWORD", "unused".to_owned()),
         ("LOG_LEVEL", "info".to_owned()),
     ]
 }

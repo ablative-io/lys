@@ -332,14 +332,19 @@ fn the_mail_table_is_read_and_plain_smtp_is_for_loopback_alone() -> Result<(), B
         refused.to_string().contains("smtp.example.com"),
         "{refused}"
     );
-    let starttls = remote.replace("tls = \"none\"", "tls = \"starttls\"");
+    let unsigned = remote.replace("tls = \"none\"", "tls = \"starttls\"");
+    assert!(
+        refused_as(&format!("{EXAMPLE}{unsigned}"), ErrorKind::ConfigInvalid),
+        "a server reached over starttls with no user named"
+    );
+    let starttls = remote.replace("tls = \"none\"", "tls = \"starttls\"\nuser = \"lys\"");
     assert_eq!(
         parse(&format!("{EXAMPLE}{starttls}"))?
             .mail
             .map(|mail| mail.tls),
         Some(MailTls::Starttls)
     );
-    let implicit = remote.replace("tls = \"none\"", "tls = \"implicit\"");
+    let implicit = remote.replace("tls = \"none\"", "tls = \"implicit\"\nuser = \"lys\"");
     assert_eq!(
         parse(&format!("{EXAMPLE}{implicit}"))?
             .mail

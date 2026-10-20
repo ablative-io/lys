@@ -95,7 +95,9 @@ challenges = []
 # password, when `user` is set, is the file state/mail-password (mode 600),
 # provided by you; it is never written here. tls is "implicit" (TLS from the
 # first byte), "starttls" or "none"; "none" is accepted for 127.0.0.1,
-# localhost and [::1] alone.
+# localhost and [::1] alone. A server reached over tls or starttls is signed
+# in to, so `user` is required there; only a plain loopback relay takes no
+# user.
 #
 # [mail]
 # host = "smtp.example.test"
