@@ -123,6 +123,8 @@ impl Render for Templates {
             credentials.push((spec, read_secret(&state, spec)?));
         }
         let environment = prepare::render_env(&config, &credentials)?;
+        let password = prepare::mail_password(&config, &state)?;
+        let mail = prepare::render_mail_env(&config, password.as_deref().map(String::as_str))?;
         let mut carried = server_config::carried(layout)?.ok_or_else(|| {
             IdentityError::new(
                 ErrorKind::NotInstalled,
@@ -200,6 +202,15 @@ impl Render for Templates {
             ),
         ];
         files.extend(model);
+        files.extend(mail.map(|env| {
+            file(
+                prepare::MAIL_ENV,
+                state.join(prepare::MAIL_ENV),
+                env.as_bytes(),
+                true,
+                true,
+            )
+        }));
         Ok(files)
     }
 }

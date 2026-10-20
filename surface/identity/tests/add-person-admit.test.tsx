@@ -6,7 +6,6 @@ import { App } from '../src/App';
 import { ADA, BEA, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { choose, serve, type } from './harness';
-import { invitation } from '../src/features/people/AddPerson';
 
 /** Adding a person is one act (POST /people/admit): their name, their email and their first grant, answered by one receipt naming each step's log leaf. */
 let root: Root | null = null;
@@ -42,9 +41,10 @@ function admitted(body: unknown) {
   if (!body || typeof body !== 'object' || !('operation' in body) || typeof body.operation !== 'string') throw new Error('Missing operation');
   return {
     person: BEA, subject: 'subject-helper', grant: 'grant-' + 'b'.repeat(32),
+    letter: { letter: 'added', to: 'helper@example.test', sent: true, by: 'lys' },
     receipt: {
       operation: body.operation, person: BEA, failed: null,
-      completed: ['register', 'account', 'bind', 'activate', 'grant'],
+      completed: ['register', 'account', 'bind', 'activate', 'grant', 'letter'],
       logged: [
         { step: 'register', log: 'directory', index: 12 },
         { step: 'bind', log: 'directory', index: 13 },
@@ -85,28 +85,57 @@ describe('Add a person in one act', () => {
     expect(sessionStorage.getItem('lys.add-person.' + ADA)).toBeNull();
   });
 
-  it('tells a person invited where Lys offers Google to choose Sign in with Google, using their email, and names the password way otherwise', async () => {
-    const google = { 'POST /people/admit': (body: unknown) => ok(admitted(body)), '/sign-in/providers': ok({ providers: [{ id: 'google', name: 'Google' }] }) };
-    const { entry } = await form(google);
+  it('says that Lys wrote to them at their email, and offers no invitation to copy', async () => {
+    const { entry } = await form({ 'POST /people/admit': (body) => ok(admitted(body)) });
     await fill(entry);
     await submit(entry);
-    await act(async () => { await Promise.resolve(); });
-    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They open ' + location.origin + ' and choose Sign in with Google, using helper@example.test.');
-    expect(invitation('Care Helper', 'helper@example.test', location.origin, 'Google')).toBe('Hello Care Helper, you have been added to Lys. Open ' + location.origin + ' and choose Sign in with Google, using helper@example.test.');
-    act(() => root?.unmount()); root = null; document.body.innerHTML = ''; sessionStorage.clear();
-    const { entry: plain } = await form({ 'POST /people/admit': (body) => ok(admitted(body)), '/sign-in/providers': ok({ providers: [] }) });
-    await fill(plain);
-    await submit(plain);
-    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They sign in at ' + location.origin + ' with helper@example.test.');
+    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. Lys wrote to them at helper@example.test.');
+    expect(document.body.textContent).not.toContain('Copy invite');
+    expect(document.querySelector('[aria-label^="Copy the invitation"]')).toBeNull();
   });
 
-  it('names Lys\u2019s own address, as the service serves it, in the invitation, not the address this page was opened at', async () => {
-    const { entry } = await form({ 'POST /people/admit': (body: unknown) => ok(admitted(body)),
-      '/sign-in/providers': ok({ providers: [{ id: 'google', name: 'Google' }], origin: 'https://lys.example.test' }) });
+  it('says the sign-in service wrote to them when it made their account', async () => {
+    const byIssuer = (body: unknown) => ok({ ...admitted(body), letter: { letter: 'added', to: 'helper@example.test', sent: true, by: 'issuer' } });
+    const { entry } = await form({ 'POST /people/admit': byIssuer });
     await fill(entry);
     await submit(entry);
-    await act(async () => { await Promise.resolve(); });
-    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. They open https://lys.example.test and choose Sign in with Google, using helper@example.test.');
+    expect(document.querySelector('[aria-label="Receipt"] p[role="status"]')?.textContent).toBe('Care Helper is added. The sign-in service wrote to them at helper@example.test with their first sign-in.');
+  });
+
+  it('shows an admit whose letter was not sent as added but unwritten, with every step kept', async () => {
+    const unsent = (body: unknown) => {
+      const operation = (body as { operation: string }).operation;
+      return { status: 503, body: {
+        refusal: 'mail_not_sent', reason: 'mail_not_sent: the added letter to helper@example.test was not sent: permanent error (554): the sink refuses this letter; the act is recorded, ask again with the same operation to send it',
+        receipt: { operation, person: BEA, completed: ['register', 'account', 'bind', 'activate', 'grant'], failed: 'letter',
+          logged: [{ step: 'register', log: 'directory', index: 12 }, { step: 'bind', log: 'directory', index: 13 }, { step: 'activate', log: 'directory', index: 14 }, { step: 'grant', log: 'grants', index: 7 }] },
+      } };
+    };
+    const { entry } = await form({ 'POST /people/admit': unsent });
+    await fill(entry);
+    await submit(entry);
+    expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
+    const receipt = document.querySelector('[aria-label="Refused receipt"]');
+    const text = receipt?.textContent ?? '';
+    expect(text).toContain('Added, but the letter was not sent. Lys refused while writing to them');
+    expect(text).toContain('permanent error (554)');
+    expect([...(receipt?.querySelectorAll(':scope > ul > li') ?? [])].map((leaf) => leaf.textContent)).toEqual(['Registered', 'Sign-in bound', 'Activated', 'First grant issued']);
+  });
+
+  it('shows a mail_unconfigured refusal in the server\'s words and no receipt', async () => {
+    const { entry } = await form({ 'POST /people/admit': refused(503, 'mail_unconfigured', 'mail_unconfigured: a person admitted now would receive nothing: Lys has no mail settings; add the [mail] table to deployment.toml and run lys identity upgrade') });
+    await fill(entry);
+    await submit(entry);
+    expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
+    expect(entry.textContent).toContain('a person admitted now would receive nothing');
+  });
+
+  it('refuses an answer whose letter did not go as unconfirmed, keeping the request', async () => {
+    const { entry } = await form({ 'POST /people/admit': (body) => ok({ ...admitted(body), letter: { letter: 'added', sent: false, by: 'lys', reason: 'mail_unconfigured' } }) });
+    await fill(entry);
+    await submit(entry);
+    expect(document.querySelector('[aria-label="Receipt"]')).toBeNull();
+    expect(entry.textContent).toContain('did not confirm');
   });
 
   it('refuses an answer whose receipt is not for this operation, keeping the request', async () => {
@@ -166,7 +195,7 @@ describe('Add a person in one act', () => {
   it('adds a person with no access when none is chosen, sending no grant, and says so', async () => {
     const noGrant = (body: unknown) => {
       const answer = admitted(body);
-      return ok({ ...answer, grant: null, receipt: { ...answer.receipt, completed: ['register', 'account', 'bind', 'activate'], logged: answer.receipt.logged.filter((leaf) => leaf.step !== 'grant') } });
+      return ok({ ...answer, grant: null, receipt: { ...answer.receipt, completed: ['register', 'account', 'bind', 'activate', 'letter'], logged: answer.receipt.logged.filter((leaf) => leaf.step !== 'grant') } });
     };
     const { entry, posted } = await form({ 'POST /people/admit': noGrant });
     expect((entry.querySelector('select[name="kind"]') as HTMLSelectElement).value).toBe('');

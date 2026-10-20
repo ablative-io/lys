@@ -18,19 +18,23 @@ import { organisationActs, ORGANISATION_ADMIT } from '../grants/organisation-act
 import type { OrganisationActs } from '../grants/organisation-acts';
 
 /** Adding a person is one act, POST /people/admit: register them, make their sign-in account at the issuer by
- * email, bind it, activate them and, when one is chosen, issue their first grant. A fresh install has nothing to
- * grant yet, so "No access yet" is the default and no grant is sent. The answer is one receipt naming each step and the log
- * leaf it was recorded at; asking again with the saved request answers the same receipt and makes nothing twice. */
+ * email, bind it, activate them, when one is chosen issue their first grant, and write to them. A fresh install has
+ * nothing to grant yet, so "No access yet" is the default and no grant is sent. The letter is Lys's own when their
+ * sign-in account already existed, and the sign-in service's own when it made the account (DIRECTORY-110). The answer
+ * is one receipt naming each step and the log leaf it was recorded at, and who wrote to them; asking again with the
+ * saved request answers the same receipt and makes nothing twice. */
 /** A saved request: `name` is the name people see, made from `given` and `family`; a request saved before the two
  * were asked for apart carries `name` alone. */
 interface PendingPerson { name: string; given?: string; family?: string; email: string; kind: string; id: string; relation: string; operation: string }
 type Asking = { given: string; family: string; email: string; kind: string; id: string; relation: string };
 interface Logged { step: string; log: string; index: number }
-interface Admitted { person: string; logged: Logged[] }
-const STEPS = ['register', 'account', 'bind', 'activate', 'grant'];
+/** The letter the act owed: who sent it (Lys, or the sign-in service when it made the account) and where. */
+interface Letter { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string }
+interface Admitted { person: string; logged: Logged[]; letter: Letter }
+const STEPS = ['register', 'account', 'bind', 'activate', 'grant', 'letter'];
 /** Each step as the act under way, for saying where a refusal stopped. */
-const DOING: Record<string, string> = { register: 'registering them', account: 'finding or making their sign-in account', bind: 'binding their sign-in', activate: 'activating them', grant: 'giving their first access' };
-const WORDS: Record<string, string> = { register: 'Registered', account: 'Sign-in account found or made', bind: 'Sign-in bound', activate: 'Activated', grant: 'First grant issued' };
+const DOING: Record<string, string> = { register: 'registering them', account: 'finding or making their sign-in account', bind: 'binding their sign-in', activate: 'activating them', grant: 'giving their first access', letter: 'writing to them' };
+const WORDS: Record<string, string> = { register: 'Registered', account: 'Sign-in account found or made', bind: 'Sign-in bound', activate: 'Activated', grant: 'First grant issued', letter: 'Letter sent' };
 
 function object(value: unknown): value is Record<string, unknown> { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 function filled(value: Record<string, unknown>, key: string): string | null {
@@ -51,7 +55,15 @@ function restored(key: string): PendingPerson | null {
   return { name, email, kind: kind ?? '', id: id ?? '', relation: relation ?? '', operation, ...(given && family ? { given, family } : {}) };
 }
 
-/** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named. */
+/** The letter member of an answer, when it is one: which letter, to whom, whether it went and who sent it. */
+function letterOf(value: unknown): Letter | null {
+  if (!object(value) || typeof value.letter !== 'string' || typeof value.sent !== 'boolean' || (value.by !== 'lys' && value.by !== 'issuer')
+    || (value.to !== undefined && typeof value.to !== 'string') || (value.reason !== undefined && typeof value.reason !== 'string')) return null;
+  return { letter: value.letter, sent: value.sent, by: value.by as 'lys' | 'issuer', ...(typeof value.to === 'string' ? { to: value.to } : {}),
+    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}) };
+}
+
+/** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named, the letter sent. */
 function confirmed(answer: unknown, operation: string, granting: boolean): Admitted {
   const steps = granting ? STEPS : STEPS.filter((step) => step !== 'grant');
   const unconfirmed = new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm this person was added. The original request is saved.' });
@@ -62,7 +74,9 @@ function confirmed(answer: unknown, operation: string, granting: boolean): Admit
     || !Array.isArray(receipt.completed) || receipt.completed.join(' ') !== steps.join(' ') || !Array.isArray(logged)
     || !logged.every((leaf: unknown) => object(leaf) && typeof leaf.step === 'string' && typeof leaf.log === 'string'
       && typeof leaf.index === 'number' && Number.isSafeInteger(leaf.index) && leaf.index >= 0)) throw unconfirmed;
-  return { person: answer.person, logged: logged as Logged[] };
+  const letter = letterOf(answer.letter);
+  if (!letter || !letter.sent) throw unconfirmed;
+  return { person: answer.person, logged: logged as Logged[], letter };
 }
 
 /** What a refused act had already written: the step that failed and each earlier step's log leaf (`AdmitReceipt`). */
@@ -90,7 +104,7 @@ function spoken(stopped: Stopped): string {
 /** A refused act said whole: its refusal by name and reason, the step it stopped at, and the leaf of each step already written. */
 function RefusedReceipt({ stopped }: { stopped: Stopped }) {
   return <section aria-label="Refused receipt" className="why-not" role="alert">
-    <p>Not added. Lys refused while {DOING[stopped.failed] ?? 'adding them'}: {spoken(stopped)}</p>
+    <p>{stopped.failed === 'letter' ? 'Added, but the letter was not sent.' : 'Not added.'} Lys refused while {DOING[stopped.failed] ?? 'adding them'}: {spoken(stopped)}</p>
     <details><summary>Error details</summary><p className="refusal-name" style={{ overflowWrap: 'anywhere' }}>{stopped.refusal}: {stopped.reason}</p></details>
     {stopped.logged.length
       ? <><p>These steps are already done and kept. Asking again finishes from here and does none of them twice:</p>
@@ -100,48 +114,23 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
   </section>;
 }
 
-/** The address people sign in at: Lys's own, as `/sign-in/providers` serves it (`origin`, the address every
- * provider is registered with), else the address this page is open at, which an administrator's signed change
- * already had to come from (crates/lys-identity-server/src/signed_json.rs). */
-const signInAddress = (served: string | null): string => served ?? location.origin;
-
-/** The invitation, as the person adding them would send it. When Lys offers Google, it tells them to choose it, with the email it knows them by. */
-export const invitation = (name: string, email: string, address: string, google: string | null = null): string => google
-  ? 'Hello ' + name + ', you have been added to Lys. Open ' + address + ' and choose Sign in with ' + google + ', using ' + email + '.'
-  : 'Hello ' + name + ', you have been added to Lys. Sign in at ' + address + ' with ' + email + '.';
-
-/**
- * What the sign-in page offers (`/sign-in/providers`): Google's name, or null when it is not offered, and Lys's own
- * address when the service names one. When the list cannot be read the invitation names the email and password way.
- */
-const readSignIn = (): Promise<{ google: string | null; origin: string | null }> => request<{ providers?: { id: string; name: string }[]; origin?: unknown }>('/sign-in/providers').then(
-  (answer) => ({
-    google: answer.providers?.find((entry) => /google/i.test(entry.id + ' ' + entry.name))?.name ?? null,
-    origin: typeof answer.origin === 'string' && /^https?:\/\/[^/?#]+$/.test(answer.origin) ? answer.origin : null,
-  }), () => ({ google: null, origin: null }));
+/** Who wrote to the person, as the receipt says it: Lys itself, or the sign-in service when it made their account. */
+function wrote(letter: Letter, name: string, email: string): string {
+  return letter.by === 'issuer'
+    ? name + ' is added. The sign-in service wrote to them at ' + email + ' with their first sign-in.'
+    : name + ' is added. Lys wrote to them at ' + email + '.';
+}
 
 function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; email: string }) {
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
-  const providers = useLoad(readSignIn, 'add-person-sign-in');
-  const google = providers.status === 'ok' ? providers.data.google : null;
-  const address = signInAddress(providers.status === 'ok' ? providers.data.origin : null);
-  const [copy, setCopy] = useState<'idle' | 'copied' | 'refused'>('idle');
-  const copyInvite = async () => {
-    try { await navigator.clipboard.writeText(invitation(name, email, address, google)); setCopy('copied'); }
-    catch { setCopy('refused'); }
-  };
   return <section aria-label="Receipt" className="note">
-    <p role="status">{google
-      ? <>{name} is added. They open <a href={address}>{address}</a> and choose Sign in with {google}, using {email}.</>
-      : <>{name} is added. They sign in at <a href={address}>{address}</a> with {email}.</>}</p>
-    <p><Act symbol="copy" name={'Copy the invitation for ' + name} word="Copy invite" tone="primary" onClick={() => { void copyInvite(); }} />
-      {copy === 'copied' ? <span role="status"> Copied. Send it to {name}.</span> : null}</p>
-    {copy === 'refused' ? <p role="alert" className="why-not">This browser would not copy. Send {name} this instead: {invitation(name, email, address, google)}</p> : null}
+    <p role="status">{wrote(admitted.letter, name, admitted.letter.to ?? email)}</p>
     {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
     <p><a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a></p>
     <details><summary>What Lys recorded</summary><ul>
       {admitted.logged.map((leaf) => <li key={leaf.log + leaf.index}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log, entry {leaf.index}</li>)}
       <li>Sign-in account: the issuer account for their email, found or made there; the issuer keeps that record</li>
+      <li>Letter: {admitted.letter.by === 'issuer' ? 'the sign-in service wrote to them when it made their account' : 'Lys wrote to them'}; the send is recorded beside the directory, not in a log</li>
     </ul></details>
   </section>;
 }

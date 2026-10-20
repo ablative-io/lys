@@ -125,6 +125,11 @@ pub struct Config {
     /// answer `SecretsUnavailable`.
     #[serde(default)]
     pub secrets: Option<crate::secrets_api::SecretsSettings>,
+    /// The mail settings letters go out through (DIRECTORY-110). Without
+    /// them POST /people/admit answers `mail_unconfigured` and a root
+    /// grant's answer says no letter went.
+    #[serde(default)]
+    pub mail: Option<crate::mail::MailSettings>,
     /// The directory the access requests are kept in, created when it does
     /// not exist. Without it the request routes answer `RequestsUnavailable`.
     #[serde(default)]

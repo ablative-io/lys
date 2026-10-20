@@ -14,9 +14,11 @@ use std::sync::Arc;
 use identity_contract::fake_issuer::Login;
 use identity_contract::fake_rauthy::FakeRauthy;
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
+use identity_contract::mail_sink::MailSink;
 use lys_identity::signer::load_service_key;
 use lys_identity::{OperationId, OrganisationId};
 use lys_identity_server::configuration_store::ConfigurationStore;
+use lys_identity_server::mail::{MailSettings, Tls};
 use lys_identity_server::routes::open_directory;
 use lys_identity_server::runner_acts::ActStore;
 use lys_identity_server::setup::SetupSettings;
@@ -31,11 +33,15 @@ const ADMIN_EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
 const BEA: &str = "bea@example.test";
 const CY: &str = "cy@example.test";
-const STEPS: [&str; 5] = ["register", "account", "bind", "activate", "grant"];
+const STEPS: [&str; 6] = ["register", "account", "bind", "activate", "grant", "letter"];
 
 /// A service with a fake issuer and Ada as its first-run administrator.
 async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
     let rauthy = FakeRauthy::start().await?;
+    // The letters go to a sink of their own: the act is refused without
+    // mail settings (DIRECTORY-110 R4). The handle may go; the sink stays.
+    let sink = MailSink::start().await?;
+    let port = sink.port();
     let settings = SignInProvidersSettings {
         api: rauthy.api().to_owned(),
         api_key_file: rauthy.api_key_file(),
@@ -65,6 +71,15 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
                 administrator_file: config.log_dir.with_file_name("administrator.json"),
                 email: None,
                 organisation: "Example organisation".to_owned(),
+            });
+            config.mail = Some(MailSettings {
+                host: "127.0.0.1".to_owned(),
+                port,
+                user: None,
+                password_file: None,
+                from: "Lys <lys@example.test>".to_owned(),
+                tls: Tls::None,
+                sent_file: config.log_dir.with_file_name("letters-sent.jsonl"),
             });
         },
         |config| {
@@ -332,7 +347,10 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
     let (status, admitted) = service.post("/people/admit", Some(&ada), &no_grant).await?;
     assert_eq!(status, 200, "{admitted}");
     assert!(admitted["grant"].is_null(), "{admitted}");
-    assert_eq!(admitted["receipt"]["completed"], json!(&STEPS[..4]));
+    assert_eq!(
+        admitted["receipt"]["completed"],
+        json!(["register", "account", "bind", "activate", "letter"])
+    );
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     assert_eq!(people(&service, &ada).await?, before + 1);
     Ok(())

@@ -36,6 +36,8 @@ macro_rules! unavailable_refusals {
             | ServerError::IssuerRefused { .. }
             | ServerError::SecretsUnavailable { .. }
             | ServerError::SignInProvidersRefused { .. }
+            | ServerError::MailUnconfigured
+            | ServerError::MailNotSent { .. }
     };
 }
 

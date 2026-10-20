@@ -219,6 +219,7 @@ fn fixture_state(
         rights_cache: Mutex::default(),
         grant_setup: fixture_grant_setup(config, model, model_revision),
         secrets: None,
+        mailer: None,
         requests: None,
         mcp_requests: None,
         network: None,

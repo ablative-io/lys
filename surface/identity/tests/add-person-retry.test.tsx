@@ -35,8 +35,8 @@ async function fill(entry: HTMLFormElement) {
 }
 function admitted(body: unknown) {
   if (!body || typeof body !== 'object' || !('operation' in body) || typeof body.operation !== 'string') throw new Error('Missing operation');
-  return { person: BEA, subject: 'subject-helper', grant: 'grant-' + 'b'.repeat(32), receipt: {
-    operation: body.operation, person: BEA, failed: null, completed: ['register', 'account', 'bind', 'activate', 'grant'],
+  return { person: BEA, subject: 'subject-helper', grant: 'grant-' + 'b'.repeat(32), letter: { letter: 'added', to: 'helper@example.test', sent: true, by: 'lys' }, receipt: {
+    operation: body.operation, person: BEA, failed: null, completed: ['register', 'account', 'bind', 'activate', 'grant', 'letter'],
     logged: [{ step: 'register', log: 'directory', index: 12 }, { step: 'bind', log: 'directory', index: 13 },
       { step: 'activate', log: 'directory', index: 14 }, { step: 'grant', log: 'grants', index: 7 }],
   } };

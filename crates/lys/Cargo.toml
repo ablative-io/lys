@@ -108,5 +108,12 @@ name = "identity_install"
 path = "tests/identity_install.rs"
 test = false
 
+# The mail leg runs the pinned issuer image against a capturing sink; it
+# needs Docker, so it runs only when named (DIRECTORY-110 R2).
+[[test]]
+name = "rauthy_mail_leg"
+path = "tests/rauthy_mail_leg.rs"
+test = false
+
 [lints]
 workspace = true

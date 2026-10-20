@@ -165,6 +165,8 @@ pub mod link_audit_api;
 pub mod list_page;
 mod machine_folders;
 mod machine_pass;
+pub mod mail;
+pub mod mail_letters;
 mod mcp_approval_sight;
 mod mcp_callers;
 mod mcp_endpoint;

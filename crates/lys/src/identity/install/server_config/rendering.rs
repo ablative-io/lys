@@ -55,6 +55,26 @@ pub fn render(
     if surface {
         rendered["surface_dir"] = Value::String(layout.surface_dir().display().to_string());
     }
+    if let Some(mail) = &config.mail {
+        // The password stays in its file (DIRECTORY-110 R1); the record of
+        // letters sent sits beside the directory's data.
+        let password_file = mail.user.as_ref().map(|_| {
+            config
+                .state_dir()
+                .join(crate::identity::prepare::MAIL_PASSWORD_FILE)
+                .display()
+                .to_string()
+        });
+        rendered["mail"] = json!({
+            "host": mail.host,
+            "port": mail.port,
+            "user": mail.user,
+            "password_file": password_file,
+            "from": mail.from,
+            "tls": mail.tls.word(),
+            "sent_file": layout.data_dir().join("letters-sent.jsonl").display().to_string(),
+        });
+    }
     rendered
 }
 

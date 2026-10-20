@@ -39,10 +39,17 @@ Behavioural. THE SYSTEM SHALL read an optional [mail] section in deployment.toml
 
 **Files:**
 - modify: crates/lys/src/identity/config.rs
+- modify: crates/lys/src/identity/config/deployment.rs
+- modify: crates/lys/src/identity/config_tests.rs
+- modify: crates/lys/src/identity/error.rs
+- modify: crates/lys/src/identity/error_tests.rs
 - modify: crates/lys/src/identity/install/deployment.template.toml
 - modify: crates/lys/src/identity/install/server_config/rendering.rs
 - modify: crates/lys/src/identity/prepare.rs
+- modify: crates/lys/src/identity/prepare_tests.rs
+- modify: crates/lys/src/identity/upgrade/render.rs
 - modify: crates/lys-identity-server/src/config.rs
+- modify: deploy/identity/config.example.toml
 
 **Checklist:**
 - C804 — The install reads one [mail] section, keeps its password as a credential, and refuses plain SMTP to any host but loopback. DIRECTORY-110/R1.
@@ -62,7 +69,9 @@ Measured, then behavioural. THE SYSTEM SHALL write the [mail] settings to the is
 
 **Files:**
 - create: crates/lys/tests/rauthy_mail_leg.rs
+- modify: crates/lys/Cargo.toml
 - modify: crates/lys/src/identity/prepare.rs
+- modify: crates/lys/src/identity/prepare_tests.rs
 - modify: deploy/identity/compose.yaml
 
 **Checklist:**
@@ -84,9 +93,26 @@ Behavioural. THE SYSTEM SHALL send mail from one module (crates/lys-identity-ser
 - create: crates/lys-identity-server/src/mail.rs
 - create: crates/lys-identity-server/src/mail_letters.rs
 - create: crates/lys-identity-server/tests/mail_letters.rs
-- modify: crates/lys-identity-server/src/people_admit.rs
-- modify: crates/lys-identity-server/src/grants/handlers.rs
+- create: tests/identity_contract/src/mail_sink.rs
+- modify: Cargo.toml
 - modify: crates/lys-identity-server/Cargo.toml
+- modify: crates/lys-identity-server/src/error/directory.rs
+- modify: crates/lys-identity-server/src/error_names.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/grant_contract/views.rs
+- modify: crates/lys-identity-server/src/grant_settlement_seed_tests.rs
+- modify: crates/lys-identity-server/src/grants.rs
+- modify: crates/lys-identity-server/src/grants/handlers.rs
+- modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/people_admit.rs
+- modify: crates/lys-identity-server/src/provider/refusal.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/routes_startup.rs
+- modify: crates/lys-identity-server/tests/budgets_feed_entries.rs
+- modify: crates/lys-identity-server/tests/people_admit.rs
+- modify: tests/identity_contract/Cargo.toml
+- modify: tests/identity_contract/src/harness_startup.rs
+- modify: tests/identity_contract/src/lib.rs
 
 **Checklist:**
 - C806 — Lys sends added, access given and founded from one sender, each asserted word for word at a capturing sink, once per act. DIRECTORY-110/R3.
@@ -99,14 +125,13 @@ Behavioural. THE SYSTEM SHALL send mail from one module (crates/lys-identity-ser
 Behavioural. WHEN the server has no mail settings, THE SYSTEM SHALL refuse POST /people/admit before its first step as mail_unconfigured, saying that a person admitted now would receive nothing and naming the [mail] section of deployment.toml, and SHALL list mail_unconfigured among the route's refusals in the OpenAPI table. A root grant issued to a person by an install without mail SHALL still be recorded (it is the administrator's act on an existing person), and its answer SHALL say that no letter was sent.
 
 **Acceptance:**
-- An admit against a server with no mail block answers 409 mail_unconfigured and records nothing
+- An admit against a server with no mail block answers 503 mail_unconfigured and records nothing
 - The OpenAPI document lists mail_unconfigured for POST /people/admit
 - A root grant on a server with no mail answers its grant and letter: not_sent mail_unconfigured
 
 **Files:**
 - modify: crates/lys-identity-server/src/people_admit.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
-- modify: crates/lys-identity-server/src/openapi_refusals.rs
 
 **Checklist:**
 - C807 — With no mail settings, admit refuses as mail_unconfigured before recording anything. DIRECTORY-110/R4.
@@ -124,7 +149,9 @@ Behavioural. THE SYSTEM SHALL remove the invitation text and the Copy invite act
 
 **Files:**
 - modify: surface/identity/src/features/people/AddPerson.tsx
-- modify: surface/identity/src/features/people/AddPerson.test.tsx
+- modify: surface/identity/src/shell/help/pages.ts
+- modify: surface/identity/tests/add-person-admit.test.tsx
+- modify: surface/identity/tests/add-person-retry.test.tsx
 
 **Checklist:**
 - C808 — The copy-invite is gone; the receipt says Lys wrote to the person. DIRECTORY-110/R5.
@@ -147,3 +174,12 @@ Behavioural. THE SYSTEM SHALL remove the invitation text and the Copy invite act
 - The reds red at the brief commit and green at the fix commit through the Go gate on the Mac, named in the END with their seconds.
 - R2's leg run once on Tom's Mac against the installed image, its record quoted in the END, and the chosen branch named.
 - The closing note says plainly that R1 to R5 are done, or names what is not.
+
+## Amendments
+
+### Amendment 1: The rulings the build settled: 503, the issuer's env_file, a provided password, which letters exist, and the surface files
+
+- **Date:** 2026-10-20
+- **By:** Waffles
+
+R4 answers 503, not 409: mail_unconfigured and mail_not_sent are unavailable refusals, the class the server answers with whenever a dependency it needs is absent or refuses; 409 names a conflict in the records and there is none. R2 reaches the issuer through an env_file of its own, not RAUTHY_SMTP_* keys in compose.env: the pinned issuer (ghcr.io/sebadob/rauthy:0.36.2) reads SMTP_URL, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, SMTP_TLS_MODE (tls, starttls or danger-insecure) and SMTP_CONNECT_RETRIES; an SMTP_URL that is set to the empty string still counts as set, the issuer then tries to connect and panics once its retries are exhausted, so the keys may reach it only when [mail] exists. prepare renders them to state/rauthy-smtp.env (mode 600), compose.env names that path as IDENTITY_SMTP_ENV_FILE, and compose.yaml reads it as the issuer's env_file; without [mail] the path is /dev/null and no SMTP key is set at all. A loopback mail host is given to the container as the network's gateway, the address the container reaches this machine on. R1's password is provided, never generated: it is the mail server's own credential and nothing here can mint it. It is the file state/mail-password, read only when [mail] names a user; missing, prepare refuses secret_missing naming the file; a password that is not one line, or holds a single quote, is secret_malformed, because the env file quotes it. The upgrade carries no SMTP key from an earlier compose.env, since none ever lives there. R3's letters: a held (draft-mode) root grant carries no letter, because it gives nothing until it is approved; a pass-on carries none in this brief; an outright root grant to a person whose login is bound carries the access letter, and a root grant's letter that fails answers 503 mail_not_sent with the grant recorded, so the same operation asked again sends it. Every send is recorded in letters-sent.jsonl beside the directory's data, by operation and letter, and a recorded letter is never sent again. The added letter is Lys's own when the issuer already held the person's account; when the issuer made the account in this act, Lys records the issuer's own letter as the added letter and sends none, on the leg's finding that the pinned issuer writes to a new account; the leg runs on the Mac before the handback and the END quotes its record, and if the leg finds no letter the made branch sends Lys's letter before the handback. The receipt and the admit answer say who wrote (by: lys or issuer). R4 touches openapi_table.rs alone: the names are the two routes' own entries there; openapi_refusals.rs holds the shared sets and gains nothing. R5's test file is surface/identity/tests/add-person-admit.test.tsx (AddPerson.test.tsx does not exist), with add-person-retry.test.tsx and the help pages; the receipt reads that Lys wrote to them at their email, or that the sign-in service wrote to them with their first sign-in.

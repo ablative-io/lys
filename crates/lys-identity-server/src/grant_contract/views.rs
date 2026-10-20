@@ -321,6 +321,10 @@ pub struct RecordedView {
     /// The redacted failure of the revision selected for this acknowledgement.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub degraded: Option<crate::grants::DegradedView>,
+    /// The letter a root grant to a person owes (DIRECTORY-110 R3): sent,
+    /// found sent, or not sent and why; absent on a held grant or a pass-on.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub letter: Option<crate::mail::LetterView>,
 }
 
 impl From<&Recorded> for RecordedView {
@@ -335,6 +339,7 @@ impl From<&Recorded> for RecordedView {
                 .degraded
                 .as_deref()
                 .map(crate::grants::DegradedView::from),
+            letter: None,
             receipt: ReceiptView {
                 version: receipt.version,
                 caller: receipt.caller.to_string(),

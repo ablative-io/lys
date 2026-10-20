@@ -40,6 +40,8 @@ pub enum ErrorKind {
     DatabaseAddressInvalid,
     /// A client section is missing, duplicated or malformed.
     ClientInvalid,
+    /// `[mail]` names a host that is not loopback with `tls = "none"`.
+    MailTlsRequired,
     /// A credential the configuration requires is absent.
     SecretMissing,
     /// A credential file holds something other than a credential.
@@ -120,6 +122,7 @@ impl ErrorKind {
             Self::RedirectInvalid => "redirect_uri_invalid",
             Self::DatabaseAddressInvalid => "database_address_invalid",
             Self::ClientInvalid => "client_invalid",
+            Self::MailTlsRequired => "mail_tls_required",
             Self::SecretMissing => "secret_missing",
             Self::SecretMalformed => "secret_malformed",
             Self::PrivateFileModeOpen => "private_file_mode_open",

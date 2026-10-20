@@ -302,3 +302,61 @@ fn a_password_policy_the_sign_in_service_cannot_hold_is_refused_by_field() {
     }
     assert_eq!(refused.len(), 5);
 }
+
+const MAIL: &str = r#"
+[mail]
+host = "127.0.0.1"
+port = 2525
+from = "Lys <lys@example.test>"
+tls = "none"
+"#;
+
+#[test]
+fn the_mail_table_is_read_and_plain_smtp_is_for_loopback_alone() -> Result<(), Box<dyn Error>> {
+    let config = parse(&format!("{EXAMPLE}{MAIL}"))?;
+    let mail = config.mail.as_ref().ok_or("the mail table is read")?;
+    assert_eq!(
+        (mail.host.as_str(), mail.port, mail.user.as_deref()),
+        ("127.0.0.1", 2525, None)
+    );
+    assert_eq!(mail.from, "Lys <lys@example.test>");
+    assert_eq!(mail.tls, MailTls::None);
+    assert!(
+        parse(EXAMPLE)?.mail.is_none(),
+        "the example has no mail table"
+    );
+    let remote = MAIL.replace("127.0.0.1", "smtp.example.com");
+    let refused = parse(&format!("{EXAMPLE}{remote}")).expect_err("plain SMTP to a remote host");
+    assert_eq!(refused.kind(), ErrorKind::MailTlsRequired);
+    assert!(
+        refused.to_string().contains("smtp.example.com"),
+        "{refused}"
+    );
+    let starttls = remote.replace("tls = \"none\"", "tls = \"starttls\"");
+    assert_eq!(
+        parse(&format!("{EXAMPLE}{starttls}"))?
+            .mail
+            .map(|mail| mail.tls),
+        Some(MailTls::Starttls)
+    );
+    let implicit = remote.replace("tls = \"none\"", "tls = \"implicit\"");
+    assert_eq!(
+        parse(&format!("{EXAMPLE}{implicit}"))?
+            .mail
+            .map(|mail| mail.tls),
+        Some(MailTls::Implicit)
+    );
+    for bad in [
+        MAIL.replace("Lys <lys@example.test>", "not an address"),
+        MAIL.replace("Lys <lys@example.test>", "<lys@example.test>"),
+        MAIL.replace("port = 2525", "port = 0"),
+        MAIL.replace("host = \"127.0.0.1\"", "host = \"\""),
+        MAIL.replace("tls = \"none\"", "tls = \"none\"\nuser = \" \""),
+    ] {
+        assert!(
+            refused_as(&format!("{EXAMPLE}{bad}"), ErrorKind::ConfigInvalid),
+            "{bad}"
+        );
+    }
+    Ok(())
+}

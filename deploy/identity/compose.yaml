@@ -115,6 +115,11 @@ services:
       BOOTSTRAP_API_KEY: ${RAUTHY_BOOTSTRAP_API_KEY:?config_invalid RAUTHY_BOOTSTRAP_API_KEY}
       BOOTSTRAP_API_KEY_SECRET: ${RAUTHY_BOOTSTRAP_API_KEY_SECRET:?secret_missing RAUTHY_BOOTSTRAP_API_KEY_SECRET}
       LOG_LEVEL: info
+    # The SMTP settings from deployment.toml's [mail], rendered by lys identity
+    # prepare to state/rauthy-smtp.env (DIRECTORY-110 R2); /dev/null without a
+    # [mail] table, so no SMTP key is set at all.
+    env_file:
+      - path: ${IDENTITY_SMTP_ENV_FILE:?config_invalid IDENTITY_SMTP_ENV_FILE}
     volumes:
       - rauthy-data:/app/data
     ports:

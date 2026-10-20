@@ -27,6 +27,7 @@ fn every_kind_has_a_distinct_snake_case_name() {
         ErrorKind::RedirectInvalid,
         ErrorKind::DatabaseAddressInvalid,
         ErrorKind::ClientInvalid,
+        ErrorKind::MailTlsRequired,
         ErrorKind::SecretMissing,
         ErrorKind::SecretMalformed,
         ErrorKind::PrivateFileModeOpen,

@@ -48,6 +48,11 @@ pub struct DeploymentConfig {
     /// the table is absent.
     #[serde(default)]
     pub identity: super::install::settings::IdentitySettings,
+    /// The `[mail]` table (DIRECTORY-110 R1): the server Lys and the sign-in
+    /// service send letters through; absent, Lys admits nobody and the
+    /// sign-in service sends nothing.
+    #[serde(default)]
+    pub mail: Option<Mail>,
     #[serde(skip)]
     base: PathBuf,
 }
@@ -266,9 +271,54 @@ impl PasswordPolicy {
     }
 }
 
+/// The `[mail]` table: the SMTP server letters go through. Its password is
+/// never here; it is the provided credential file `mail-password` under
+/// state, read by `prepare` when `user` is set.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Mail {
+    /// The server's host name or address.
+    pub host: String,
+    /// Its port.
+    pub port: u16,
+    /// The user the server is signed in to as; none for a server that takes
+    /// no sign-in.
+    #[serde(default)]
+    pub user: Option<String>,
+    /// The sender every letter carries: an address, or `Name <address>`.
+    pub from: String,
+    /// How the connection is secured.
+    pub tls: MailTls,
+}
+
+/// How the mail server's connection is secured: TLS from the first byte,
+/// upgraded after the greeting, or none, which only a loopback host may use.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MailTls {
+    /// TLS from the first byte.
+    Implicit,
+    /// Upgraded after the greeting.
+    Starttls,
+    /// Plain.
+    None,
+}
+
+impl MailTls {
+    /// The word the configuration and the service configuration use.
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            Self::Implicit => "implicit",
+            Self::Starttls => "starttls",
+            Self::None => "none",
+        }
+    }
+}
+
 const TOKEN_ALGORITHMS: [&str; 4] = ["RS256", "RS384", "RS512", "EdDSA"];
 const TLS_MODES: [&str; 3] = ["disable", "prefer", "require"];
-const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
+pub(crate) const LOOPBACK_HOSTS: [&str; 3] = ["localhost", "127.0.0.1", "[::1]"];
 
 fn refuse(kind: ErrorKind, resource: &str, detail: impl Into<String>) -> IdentityError {
     IdentityError::new(kind, "validate configuration", resource, detail)
@@ -283,6 +333,20 @@ impl ClientRole {
             Self::App => "app",
         }
     }
+}
+
+/// Whether `text` is a sender a letter may carry: an address, or a name
+/// then an address in angle brackets, as `Lys <lys@example.test>`.
+#[must_use]
+pub fn is_mailbox(text: &str) -> bool {
+    if let Some((name, rest)) = text.split_once('<') {
+        return !name.trim().is_empty()
+            && !name.contains('>')
+            && rest
+                .strip_suffix('>')
+                .is_some_and(|address| !address.contains('>') && is_email(address));
+    }
+    is_email(text)
 }
 
 /// Whether `text` is shaped as an email address: one `@` with text on each

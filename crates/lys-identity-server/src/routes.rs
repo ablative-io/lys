@@ -79,6 +79,9 @@ pub struct AppState {
     pub grant_setup: GrantSetup,
     /// The secrets broker the secrets screens ask, when one is configured.
     pub secrets: Option<crate::secrets_api::SecretsBroker>,
+    /// The sender letters go out through; none when the install has no
+    /// mail settings (DIRECTORY-110).
+    pub mailer: Option<crate::mail::Mailer>,
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
     /// Requests for declared MCP servers, recorded without changing provisioning.

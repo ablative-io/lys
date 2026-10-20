@@ -60,6 +60,24 @@ macro_rules! directory_refusals {
         /// The organisation the body named.
         organisation: String,
     },
+    /// The install has no mail settings, so a person admitted now would
+    /// receive nothing (DIRECTORY-110 R4).
+    #[error(
+        "mail_unconfigured: a person admitted now would receive nothing: Lys has no mail settings; add the [mail] table to deployment.toml and run lys identity upgrade"
+    )]
+    MailUnconfigured,
+    /// A letter did not go; the act it reports is recorded (DIRECTORY-110 R3).
+    #[error(
+        "mail_not_sent: the {letter} letter to {to} was not sent: {reply}; the act is recorded, ask again with the same operation to send it"
+    )]
+    MailNotSent {
+        /// The letter: `added`, `access_given` or `founded`.
+        letter: String,
+        /// The address it was for.
+        to: String,
+        /// The mail server's reply, or why the letter could not be built.
+        reply: String,
+    },
     /// The caller is signed in through a login bound to no person, so no personal view is theirs.
     #[error("NoPerson: the signed-in login is bound to no person in the directory")]
     NoPerson,

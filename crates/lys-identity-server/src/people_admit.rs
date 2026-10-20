@@ -1,9 +1,10 @@
 //! Admitting a person in one act: register them, make their sign-in account
-//! at the issuer by email, bind that login, activate them and, when one is
-//! asked for, issue their first named root grant, in that order. A fresh
-//! install has nothing to grant yet, so the grant is optional and a person
-//! admitted without one holds no access (PERMISSIONS-STORY 9 Oct 2026: a
-//! root grant to a person not yet active is refused `IdentityNotActive`).
+//! at the issuer by email, bind that login, activate them, issue their first
+//! named root grant when one is asked for, and write to them, in that order.
+//! A fresh install has nothing to grant yet, so the grant is optional and a
+//! person admitted without one holds no access (PERMISSIONS-STORY 9 Oct
+//! 2026: a root grant to a person not yet active is refused
+//! `IdentityNotActive`).
 //!
 //! Each step runs as the existing route does, under an operation derived from
 //! the act's one operation and the step's name, so asking again replays the
@@ -13,6 +14,15 @@
 //! completed before it. The receipt names the log leaf each written step was
 //! recorded at, the directory's three and the grant's, so it is the logs'
 //! own record: asking again with the same operation answers the same leaves.
+//!
+//! The letter (DIRECTORY-110): a person admitted now receives one added
+//! letter, never two. When the account step made their account, the sign-in
+//! service's own letter on a new account is the added letter, and Lys records
+//! it as sent by the issuer; when the account was already held, Lys writes
+//! the added letter itself. An install with no mail settings admits nobody:
+//! the act is refused as `mail_unconfigured` before its first step. A letter
+//! that does not go leaves every step before it recorded and is answered as
+//! `mail_not_sent`; asking again with the same operation sends it.
 //! Nothing here calls a product or holds a lock across the issuer's answer.
 
 use axum::Json;
@@ -29,10 +39,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::error::ServerError;
+use crate::mail::{LetterView, Sender};
+use crate::mail_letters::Letter;
 use crate::routes::{Shared, signed_in};
+use crate::sign_in_providers::{Provider, SignInProviders};
 
 /// The steps of the act, in the order they run.
-pub const STEPS: [&str; 5] = ["register", "account", "bind", "activate", "grant"];
+pub const STEPS: [&str; 6] = ["register", "account", "bind", "activate", "grant", "letter"];
 
 /// What the admitting caller asks for.
 #[derive(Deserialize, utoipa::ToSchema)]
@@ -97,7 +110,8 @@ pub struct AdmitReceipt {
     /// The step that failed, if one did.
     pub failed: Option<String>,
     /// The log leaf each completed step was recorded at, in order. The
-    /// issuer account is written at the issuer, and has none.
+    /// issuer account is written at the issuer, and the letter is sent, so
+    /// neither has one.
     pub logged: Vec<Logged>,
 }
 
@@ -136,6 +150,8 @@ pub struct Admitted {
     pub subject: String,
     /// Their first grant, when one was asked for.
     pub grant: Option<String>,
+    /// The added letter: who wrote to them, and where.
+    pub letter: LetterView,
     /// What the act did.
     #[schema(inline)]
     pub receipt: AdmitReceipt,
@@ -188,17 +204,21 @@ fn parts_only(parts: axum::http::response::Parts) -> Response {
 }
 
 /// The act's words checked before any step: the body is whole, the
-/// operation and the email are well formed, and the caller is an active
-/// person holding organisation.admit on their own organisation, the one
-/// the body names if it names one (ACCESS-009 R1). The question is asked
-/// here and recorded nothing; the register step exercises the grant. The
-/// issuer is the one the caller signed in through.
+/// operation and the email are well formed, the install can write to the
+/// person (DIRECTORY-110 R4), and the caller is an active person holding
+/// organisation.admit on their own organisation, the one the body names if
+/// it names one (ACCESS-009 R1). The question is asked here and recorded
+/// nothing; the register step exercises the grant. The issuer is the one
+/// the caller signed in through.
 fn checked(
     state: &Shared,
     headers: &HeaderMap,
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Result<(AdmitBody, OperationId, String, String), ServerError> {
     let actor = signed_in(state, headers)?;
+    if state.mailer.is_none() {
+        return Err(ServerError::MailUnconfigured);
+    }
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let operation = OperationId::from_str(&asked.operation)?;
     let email = crate::accounts::check_email(&asked.email)
@@ -216,8 +236,8 @@ fn checked(
     Ok((asked, operation, email, issuer))
 }
 
-/// POST /people/admit: the five steps, in order, as one act; the last,
-/// the first grant, only when one was asked for.
+/// POST /people/admit: the six steps, in order, as one act; the fifth, the
+/// first grant, only when one was asked for.
 pub(crate) async fn admit(
     State(state): State<Shared>,
     headers: HeaderMap,
@@ -236,10 +256,11 @@ pub(crate) async fn admit(
         issuer: &issuer,
     };
     match steps(&state, &headers, &act, &mut receipt).await {
-        Ok((person, subject, grant)) => Json(Admitted {
-            person,
-            subject,
-            grant,
+        Ok(done) => Json(Admitted {
+            person: done.person,
+            subject: done.subject,
+            grant: done.grant,
+            letter: done.letter,
             receipt,
         })
         .into_response(),
@@ -260,6 +281,14 @@ struct Act<'a> {
     issuer: &'a str,
 }
 
+/// What the steps answered.
+struct Done {
+    person: String,
+    subject: String,
+    grant: Option<String>,
+    letter: LetterView,
+}
+
 /// Run every step, recording each as it completes; the failing step's name
 /// beside its refusal.
 async fn steps(
@@ -267,14 +296,14 @@ async fn steps(
     headers: &HeaderMap,
     act: &Act<'_>,
     receipt: &mut AdmitReceipt,
-) -> Result<(String, String, Option<String>), (&'static str, ServerError)> {
+) -> Result<Done, (&'static str, ServerError)> {
     let Act {
         asked,
         operation,
         email,
         issuer,
     } = *act;
-    let [register, account, bind, activate, grant] = STEPS;
+    let [register, account, bind, activate, grant, letter] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
     let registered = crate::routes::register_person(
         State(Arc::clone(state)),
@@ -300,7 +329,7 @@ async fn steps(
         given: asked.given_name.as_deref(),
         family: asked.family_name.as_deref(),
     };
-    let (subject, _made) = crate::accounts::make(api, email, name)
+    let (subject, made) = crate::accounts::make(api, email, name)
         .await
         .map_err(at(account))?;
     receipt.done(account, None);
@@ -335,13 +364,9 @@ async fn steps(
     .map_err(at(activate))?;
     receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
 
-    let Some(first) = asked.grant.as_ref() else {
-        return Ok((person, subject, None));
-    };
-    let granted = crate::grants::issue_root(
-        State(Arc::clone(state)),
-        headers.clone(),
-        body(json!({
+    let mut granted = None;
+    if let Some(first) = asked.grant.as_ref() {
+        let Json(root) = body(json!({
             "operation": derived(operation, grant),
             "route": first.route,
             "holder": person,
@@ -350,12 +375,54 @@ async fn steps(
             "pass_on": {"kind": "use_only"},
             "window": {"starts_at": 0, "ends_at": null},
         }))
-        .map_err(at(grant))?,
-    )
-    .await
-    .map_err(at(grant))?;
-    receipt.done(grant, Some(("grants", granted.0.index)));
-    Ok((person, subject, Some(granted.0.grant)))
+        .map_err(at(grant))?;
+        // The grant is recorded here and its own letter is not sent: the
+        // added letter below is the one letter this act writes.
+        let (recorded, _recipient) =
+            crate::grants::issue_root_recorded(state, headers, &root).map_err(at(grant))?;
+        receipt.done(grant, Some(("grants", recorded.index)));
+        granted = Some(recorded.grant);
+    }
+
+    let mailer = state
+        .mailer
+        .as_ref()
+        .ok_or((letter, ServerError::MailUnconfigured))?;
+    let added = Letter::Added {
+        name: asked.display_name.clone(),
+        email: email.to_owned(),
+        address: state.oidc.public_origin().to_owned(),
+        google: google_offered(api).await.map_err(at(letter))?,
+    };
+    let wrote = if made {
+        mailer
+            .note_sent_by_issuer(&operation.to_string(), &added)
+            .await
+    } else {
+        mailer.send_once(&operation.to_string(), &added).await
+    }
+    .map_err(at(letter))?;
+    debug_assert!(wrote.by == Sender::Issuer || !made);
+    receipt.done(letter, None);
+    Ok(Done {
+        person,
+        subject,
+        grant: granted,
+        letter: wrote,
+    })
+}
+
+/// Google's name at the issuer when people may sign in with it, so the
+/// added letter tells the person to choose it.
+async fn google_offered(api: &SignInProviders) -> Result<Option<String>, ServerError> {
+    Ok(api
+        .listed()
+        .await?
+        .into_iter()
+        .find(|listed| {
+            listed.enabled && Provider::from_name(&listed.name) == Some(Provider::Google)
+        })
+        .map(|listed| listed.name))
 }
 
 #[cfg(test)]
@@ -374,6 +441,11 @@ mod tests {
             derived(&operation, "register"),
             derived(&OperationId::from_bytes([8; 16]), "register")
         );
+    }
+
+    #[test]
+    fn the_letter_is_the_last_step_and_the_grant_before_it() {
+        assert_eq!(STEPS[4..], ["grant", "letter"]);
     }
 
     #[test]

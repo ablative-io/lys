@@ -44,3 +44,19 @@ redirect_uris = ["http://localhost:{{service_port}}/api/callback"]
 post_logout_redirect_uris = ["http://localhost:{{service_port}}/"]
 token_alg = "EdDSA"
 challenges = ["S256"]
+
+# Letters (DIRECTORY-110): Lys writes to a person it admits, to a person a
+# grant names, and to a founder; the sign-in service writes its own letters
+# (a new account, a password reset) through the same server. Without this
+# table Lys admits nobody and the sign-in service sends nothing. The
+# password, when `user` is set, is the file state/mail-password (mode 600),
+# provided by you; it is never written here. tls is "implicit" (TLS from the
+# first byte), "starttls" or "none"; "none" is accepted for 127.0.0.1,
+# localhost and [::1] alone.
+#
+# [mail]
+# host = "smtp.example.test"
+# port = 465
+# user = "lys@example.test"
+# from = "Lys <lys@example.test>"
+# tls = "implicit"

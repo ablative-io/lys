@@ -279,6 +279,11 @@ async fn make_state(
             .as_ref()
             .map(crate::secrets_api::SecretsBroker::open)
             .transpose()?,
+        mailer: config
+            .mail
+            .as_ref()
+            .map(crate::mail::Mailer::open)
+            .transpose()?,
         requests: primary.requests.map(Mutex::new),
         mcp_requests: primary.mcp_requests,
         network: primary.network.map(Mutex::new),

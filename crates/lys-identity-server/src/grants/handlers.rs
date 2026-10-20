@@ -15,7 +15,7 @@ use crate::session::now;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use lys_identity::grants::{ExerciseRequest, GrantError, Mode, owner_of};
+use lys_identity::grants::{Action, ExerciseRequest, GrantError, Mode, owner_of};
 use lys_identity::{IdentityError, IdentityId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -102,14 +102,30 @@ pub(super) fn refuse_held_on_hot(
     }
 }
 
-pub(crate) async fn issue_root(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<RootBody>,
-) -> Result<Json<RecordedView>, ServerError> {
-    with_grants(&state, |judged| {
+/// The person a root grant names and what it lets them do, for the letter
+/// written to them once the grant is recorded (DIRECTORY-110 R3).
+pub(crate) struct Recipient {
+    /// Their display name.
+    pub(crate) name: String,
+    /// Their subject at the issuer, whose account holds their email.
+    pub(crate) subject: String,
+    /// What they may now do, in the access screen's words.
+    pub(crate) words: String,
+}
+
+/// Record a root grant as `body` asks, answering the record and, for an
+/// outright grant to a person with a bound login, the recipient of the
+/// access letter. The letter is not sent here: the one act that owns the
+/// grant sends its one letter (POST /people/admit the added letter, POST
+/// /grants/roots the access letter).
+pub(crate) fn issue_root_recorded(
+    state: &Arc<AppState>,
+    headers: &HeaderMap,
+    body: &RootBody,
+) -> Result<(RecordedView, Option<Recipient>), ServerError> {
+    with_grants(state, |judged| {
         let request = body.request(crate::service_account_grants::caller(
-            &state, &headers, &judged,
+            state, headers, &judged,
         )?)?;
         judged.apps.admit_kind(None, request.resource.kind())?;
         refuse_held_on_hot(&judged, &request.resource, &request.relation, body.mode())?;
@@ -117,8 +133,65 @@ pub(crate) async fn issue_root(
             judged
                 .grants
                 .issue_root_in(judged.directory, &request, body.mode(), now())?;
-        Ok(Json(RecordedView::from(&recorded)))
+        let recipient = (body.mode() == Mode::Outright)
+            .then(|| {
+                let holder = judged
+                    .directory
+                    .record(IdentityId::Person(request.holder))?;
+                let parts = judged.grants.book().grant(recorded.receipt.grant)?.parts();
+                Some(Recipient {
+                    name: holder.profile().display_name().to_owned(),
+                    subject: holder.bindings().first()?.subject().to_owned(),
+                    words: crate::mail_letters::access_words(
+                        parts.relation.as_str(),
+                        parts.resource.kind(),
+                        parts.resource.id(),
+                        parts.actions.iter().map(Action::as_str),
+                    ),
+                })
+            })
+            .flatten();
+        Ok((RecordedView::from(&recorded), recipient))
     })
+}
+
+/// The access letter for `recipient`, sent once for `operation`: unsent by
+/// name when the install has no mail settings; `MailNotSent` when the
+/// server refuses it, the grant staying recorded.
+async fn access_letter(
+    state: &Arc<AppState>,
+    operation: &str,
+    recipient: Option<Recipient>,
+) -> Result<Option<crate::mail::LetterView>, ServerError> {
+    let Some(recipient) = recipient else {
+        return Ok(None);
+    };
+    let Some(mailer) = &state.mailer else {
+        return Ok(Some(crate::mail::LetterView::unsent(
+            "access_given",
+            None,
+            "mail_unconfigured",
+        )));
+    };
+    let api = crate::sign_in_providers::api(state)?;
+    let email = crate::accounts::email_of(api, &recipient.subject).await?;
+    let letter = crate::mail_letters::Letter::AccessGiven {
+        name: recipient.name,
+        email,
+        words: recipient.words,
+        address: state.oidc.public_origin().to_owned(),
+    };
+    mailer.send_once(operation, &letter).await.map(Some)
+}
+
+pub(crate) async fn issue_root(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(body): Json<RootBody>,
+) -> Result<Json<RecordedView>, ServerError> {
+    let (mut view, recipient) = issue_root_recorded(&state, &headers, &body)?;
+    view.letter = access_letter(&state, &view.operation, recipient).await?;
+    Ok(Json(view))
 }
 
 pub(crate) async fn delegate(

@@ -496,6 +496,11 @@
       "brief": "DIRECTORY-002"
     },
     {
+      "path": "crates/lys/src/identity/config/deployment.rs",
+      "note": "The deployment configuration's validation, the [mail] table's with it: plain SMTP for a loopback host alone.",
+      "brief": "DIRECTORY-110"
+    },
+    {
       "path": "crates/lys/src/identity/credentials.rs",
       "note": "Zeroizing, redacted credential material and stable reuse",
       "brief": "DIRECTORY-002"
@@ -6471,6 +6476,11 @@
     {
       "path": "crates/lys-identity-server/tests/mail_letters.rs",
       "note": "Every letter asserted word for word at a test-owned SMTP sink; once per act; none for a refused act.",
+      "brief": "DIRECTORY-110"
+    },
+    {
+      "path": "tests/identity_contract/src/mail_sink.rs",
+      "note": "The test-owned SMTP listener on 127.0.0.1 that captures every letter whole and refuses on demand.",
       "brief": "DIRECTORY-110"
     }
   ],

@@ -24,7 +24,8 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true
-tokio.workspace = true
+# io-util: the mail sink reads and writes its SMTP conversation.
+tokio = { workspace = true, features = ["io-util"] }
 
 [dev-dependencies]
 # The receipt test parses the signed event with standard COSE tooling, not the crate's own reader.

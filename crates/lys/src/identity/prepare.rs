@@ -14,7 +14,7 @@ use std::path::Path;
 use base64::Engine;
 use zeroize::Zeroizing;
 
-use super::config::{CredentialSource, DeploymentConfig};
+use super::config::{CredentialSource, DeploymentConfig, LOOPBACK_HOSTS, MailTls};
 use super::credentials::{Credential, ENCRYPTION_KEY_ID, Shape};
 use super::error::{ErrorKind, IdentityError, IdentityResult};
 use super::private_files::{self, Outcome};
@@ -47,6 +47,15 @@ pub const FORWARDED_FOR: &str = "X-Forwarded-For";
 
 /// The rendered compose environment's file name.
 pub const COMPOSE_ENV: &str = "compose.env";
+
+/// The owner-only file the sign-in service's SMTP settings are rendered to,
+/// read by compose as the issuer's `env_file` (DIRECTORY-110 R2); with no
+/// `[mail]` the issuer's env_file is /dev/null and it has no SMTP.
+pub const MAIL_ENV: &str = "rauthy-smtp.env";
+
+/// The provided credential holding the mail user's password, read when
+/// `[mail]` names a user; never generated: it is a server's own.
+pub const MAIL_PASSWORD_FILE: &str = "mail-password";
 
 /// Every declared credential, in the order they are materialised.
 pub const SECRETS: [SecretSpec; 9] = [
@@ -102,11 +111,17 @@ pub const API_KEY_SECRET: SecretSpec = SECRETS[7];
 
 /// The file names of every private artifact prepare declares.
 #[must_use]
-pub fn declared_private_files() -> Vec<&'static str> {
+pub fn declared_private_files(config: &DeploymentConfig) -> Vec<&'static str> {
+    let mail = config.mail.as_ref();
     SECRETS
         .iter()
         .map(|spec| spec.file)
         .chain([COMPOSE_ENV])
+        .chain(mail.map(|_| MAIL_ENV))
+        .chain(
+            mail.and_then(|mail| mail.user.as_ref())
+                .map(|_| MAIL_PASSWORD_FILE),
+        )
         .collect()
 }
 
@@ -213,7 +228,7 @@ pub fn render_env(
         .publish_port
         .map_or(String::new(), |p| p.to_string());
     let profiles = if database.bundled { "bundled-db" } else { "" };
-    let lines: [(&str, String); 23] = [
+    let lines: [(&str, String); 24] = [
         ("COMPOSE_PROJECT_NAME", config.deployment.project.clone()),
         ("COMPOSE_PROFILES", profiles.to_string()),
         ("IDENTITY_NODE", config.deployment.node.clone()),
@@ -260,6 +275,15 @@ pub fn render_env(
         ("RAUTHY_BOOTSTRAP_API_KEY", bootstrap_api_key()),
         ("SPICEDB_GRPC_PORT", config.spicedb.grpc_port.to_string()),
         ("SPICEDB_HTTP_PORT", config.spicedb.http_port.to_string()),
+        // The issuer's SMTP settings are its own env_file, so that with no
+        // [mail] none of its SMTP keys is set, not even empty.
+        (
+            "IDENTITY_SMTP_ENV_FILE",
+            config.mail.as_ref().map_or_else(
+                || "/dev/null".to_owned(),
+                |_| config.state_dir().join(MAIL_ENV).display().to_string(),
+            ),
+        ),
     ];
     for (name, value) in &lines {
         if value.contains(['\n', '\r']) {
@@ -292,6 +316,100 @@ pub fn render_env(
     Ok(env)
 }
 
+/// The mail user's password from its provided file under `state`, when
+/// `[mail]` names a user; none when it names no user.
+///
+/// # Errors
+/// A named user with no password file is refused `SecretMissing` naming the
+/// file: a server's password cannot be generated here. A password that is
+/// not one line of text, or holds a single quote, is refused
+/// `SecretMalformed`, since the env file quotes it.
+pub fn mail_password(
+    config: &DeploymentConfig,
+    state: &Path,
+) -> IdentityResult<Option<Zeroizing<String>>> {
+    let Some(user) = config.mail.as_ref().and_then(|mail| mail.user.as_ref()) else {
+        return Ok(None);
+    };
+    let path = state.join(MAIL_PASSWORD_FILE);
+    let Some(bytes) = private_files::read(&path)? else {
+        return Err(IdentityError::new(
+            ErrorKind::SecretMissing,
+            "read credential",
+            MAIL_PASSWORD_FILE,
+            format!(
+                "place the password of the mail user {user} in the state directory; a server's password cannot be generated here"
+            ),
+        )
+        .at(&path));
+    };
+    let malformed = |detail: &str| {
+        IdentityError::new(
+            ErrorKind::SecretMalformed,
+            "read credential",
+            MAIL_PASSWORD_FILE,
+            detail,
+        )
+        .at(&path)
+    };
+    let text = Zeroizing::new(
+        String::from_utf8(bytes.to_vec()).map_err(|_| malformed("the password is not text"))?,
+    );
+    let password = text.trim_end_matches(['\r', '\n']);
+    if password.is_empty() || password.contains(['\'', '\n', '\r']) {
+        return Err(malformed("the password is one line with no single quote"));
+    }
+    Ok(Some(Zeroizing::new(password.to_owned())))
+}
+
+/// The issuer's SMTP environment from `[mail]`, none without it: the keys
+/// the pinned sign-in service reads, each value single-quoted so compose
+/// takes it literally. A loopback mail host is reached from the container
+/// at the network's gateway.
+///
+/// # Errors
+/// Refuses a configuration whose gateway cannot be named.
+pub fn render_mail_env(
+    config: &DeploymentConfig,
+    password: Option<&str>,
+) -> IdentityResult<Option<Zeroizing<String>>> {
+    let Some(mail) = &config.mail else {
+        return Ok(None);
+    };
+    let host = if LOOPBACK_HOSTS.contains(&mail.host.as_str()) {
+        config.gateway()?.to_string()
+    } else {
+        mail.host.clone()
+    };
+    let mode = match mail.tls {
+        MailTls::Implicit => "tls",
+        MailTls::Starttls => "starttls",
+        MailTls::None => "danger-insecure",
+    };
+    let mut lines = vec![
+        ("SMTP_URL", host),
+        ("SMTP_PORT", mail.port.to_string()),
+        ("SMTP_FROM", mail.from.clone()),
+        ("SMTP_TLS_MODE", mode.to_owned()),
+    ];
+    if let (Some(user), Some(password)) = (&mail.user, password) {
+        lines.push(("SMTP_USERNAME", user.clone()));
+        lines.push(("SMTP_PASSWORD", password.to_owned()));
+    }
+    let mut env = Zeroizing::new(String::new());
+    for (name, value) in lines {
+        writeln!(env, "{name}='{value}'").map_err(|error| {
+            IdentityError::new(
+                ErrorKind::RenderFailed,
+                "render mail environment",
+                name,
+                error.to_string(),
+            )
+        })?;
+    }
+    Ok(Some(env))
+}
+
 /// Materialises every declared credential and the compose environment for
 /// `config`, answering each private file with its outcome, in order.
 ///
@@ -310,6 +428,11 @@ pub fn materialise_all(config: &DeploymentConfig) -> IdentityResult<Vec<(&'stati
     let env = render_env(config, &credentials)?;
     let env_outcome = private_files::write(&state_dir.join(COMPOSE_ENV), env.as_bytes())?;
     outcomes.push((COMPOSE_ENV, env_outcome));
+    let password = mail_password(config, &state_dir)?;
+    if let Some(mail) = render_mail_env(config, password.as_deref().map(String::as_str))? {
+        let outcome = private_files::write(&state_dir.join(MAIL_ENV), mail.as_bytes())?;
+        outcomes.push((MAIL_ENV, outcome));
+    }
     Ok(outcomes)
 }
 
@@ -334,7 +457,7 @@ pub fn run(config_path: &Path, json: bool) -> IdentityResult<()> {
     emitter.field(
         "private files",
         "private_files",
-        declared_private_files().len(),
+        declared_private_files(&config).len(),
     );
     if emitter.is_json() {
         emitter.field("", "outcomes", serde_json::Value::Object(outcomes));

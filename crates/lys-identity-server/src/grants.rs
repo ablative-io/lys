@@ -61,7 +61,7 @@ mod handlers;
 pub(crate) mod held;
 pub(crate) use decisions::{Decision, decide, decide_as};
 use handlers::{cannot_give, check, list, model, read, revoke, who, why};
-pub(crate) use handlers::{delegate, issue_root};
+pub(crate) use handlers::{delegate, issue_root, issue_root_recorded};
 
 /// The grants as the service holds them.
 pub type GrantState = Grants<FileLeafStore, Relationships>;

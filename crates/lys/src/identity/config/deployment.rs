@@ -1,8 +1,9 @@
 //! A deployment is loaded and validated before its fields serve an install.
 use super::{
     BUNDLED_DATABASE_HOST, Client, DeploymentConfig, ErrorKind, IdentityError, IdentityResult,
-    Ipv4Addr, Path, PathBuf, TLS_MODES, authority_of, bring_forward, is_email, network_gateway,
-    refuse, validate_admin_url, validate_client, validate_origin,
+    Ipv4Addr, LOOPBACK_HOSTS, MailTls, Path, PathBuf, TLS_MODES, authority_of, bring_forward,
+    is_email, is_mailbox, network_gateway, refuse, validate_admin_url, validate_client,
+    validate_origin,
 };
 impl DeploymentConfig {
     /// Reads and validates the configuration at `path`, first bringing a
@@ -166,6 +167,7 @@ impl DeploymentConfig {
             ));
         }
         self.validate_database()?;
+        self.validate_mail()?;
         if self
             .clients
             .app
@@ -211,6 +213,58 @@ impl DeploymentConfig {
                 ErrorKind::ConfigInvalid,
                 "deployment.admin_email",
                 "expected an email address",
+            ));
+        }
+        Ok(())
+    }
+
+    /// The `[mail]` table, when present: a host and a port, a sender that is
+    /// a mailbox, a user that is a name when set, and plain SMTP for a
+    /// loopback host alone (DIRECTORY-110 R1).
+    fn validate_mail(&self) -> IdentityResult<()> {
+        let Some(mail) = &self.mail else {
+            return Ok(());
+        };
+        if mail.host.is_empty() || mail.host.chars().any(char::is_whitespace) {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "mail.host",
+                "name the mail server's host",
+            ));
+        }
+        if mail.port == 0 {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "mail.port",
+                "name the mail server's port",
+            ));
+        }
+        if !is_mailbox(&mail.from) {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "mail.from",
+                format!("{} is not an address or `Name <address>`", mail.from),
+            ));
+        }
+        if mail
+            .user
+            .as_deref()
+            .is_some_and(|user| user.trim().is_empty())
+        {
+            return Err(refuse(
+                ErrorKind::ConfigInvalid,
+                "mail.user",
+                "name the user, or leave it out",
+            ));
+        }
+        if mail.tls == MailTls::None && !LOOPBACK_HOSTS.contains(&mail.host.as_str()) {
+            return Err(refuse(
+                ErrorKind::MailTlsRequired,
+                "mail.tls",
+                format!(
+                    "{} is not a loopback host; letters to it go over tls or starttls, never none",
+                    mail.host
+                ),
             ));
         }
         Ok(())

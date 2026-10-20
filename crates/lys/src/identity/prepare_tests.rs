@@ -22,7 +22,7 @@ fn prepare_creates_every_declared_private_file_owner_only() -> Result<(), Box<dy
         private_files::mode_of(&state)?,
         Some(private_files::DIR_MODE)
     );
-    let declared = declared_private_files();
+    let declared = declared_private_files(&DeploymentConfig::load(&config)?);
     assert_eq!(declared.len(), SECRETS.len() + 1);
     let mut counted = 0;
     for name in &declared {
@@ -42,12 +42,12 @@ fn a_second_prepare_reuses_every_credential() -> Result<(), Box<dyn Error>> {
     let config = write_config(dir.path(), EXAMPLE)?;
     run(&config, true)?;
     let state = dir.path().join("state");
-    let first: Vec<Vec<u8>> = declared_private_files()
+    let first: Vec<Vec<u8>> = declared_private_files(&DeploymentConfig::load(&config)?)
         .iter()
         .map(|name| std::fs::read(state.join(name)))
         .collect::<Result<_, _>>()?;
     run(&config, true)?;
-    let second: Vec<Vec<u8>> = declared_private_files()
+    let second: Vec<Vec<u8>> = declared_private_files(&DeploymentConfig::load(&config)?)
         .iter()
         .map(|name| std::fs::read(state.join(name)))
         .collect::<Result<_, _>>()?;
@@ -289,5 +289,75 @@ fn the_passkey_origin_names_its_port_and_the_public_url_stays_as_configured()
             "{origin}"
         );
     }
+    Ok(())
+}
+
+const MAIL: &str = "\n[mail]\nhost = \"127.0.0.1\"\nport = 2525\nuser = \"lys\"\nfrom = \"Lys <lys@example.test>\"\ntls = \"none\"\n";
+
+#[test]
+fn the_issuers_smtp_env_file_is_rendered_from_the_mail_table_with_a_provided_password()
+-> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let config = write_config(dir.path(), &format!("{EXAMPLE}{MAIL}"))?;
+    let state = dir.path().join("state");
+    // A user with no password file: refused by name, nothing generated.
+    let refused = run(&config, true).expect_err("the mail password is provided, never generated");
+    assert_eq!(refused.kind(), ErrorKind::SecretMissing);
+    assert!(
+        refused.to_string().contains(MAIL_PASSWORD_FILE),
+        "{refused}"
+    );
+    assert!(
+        refused.to_string().contains("cannot be generated"),
+        "{refused}"
+    );
+    assert_eq!(
+        private_files::mode_of(&state.join(MAIL_PASSWORD_FILE))?,
+        None
+    );
+    assert_eq!(private_files::mode_of(&state.join(MAIL_ENV))?, None);
+    private_files::ensure_dir(&state)?;
+    private_files::write(
+        &state.join(MAIL_PASSWORD_FILE),
+        b"correct horse battery staple\n",
+    )?;
+    run(&config, true)?;
+    let loaded = DeploymentConfig::load(&config)?;
+    let declared = declared_private_files(&loaded);
+    assert_eq!(declared.len(), SECRETS.len() + 3);
+    assert!(declared.contains(&MAIL_ENV) && declared.contains(&MAIL_PASSWORD_FILE));
+    assert_eq!(
+        private_files::mode_of(&state.join(MAIL_ENV))?,
+        Some(private_files::FILE_MODE)
+    );
+    let mail_env = std::fs::read_to_string(state.join(MAIL_ENV))?;
+    assert_eq!(
+        mail_env,
+        format!(
+            "SMTP_URL='{}'\nSMTP_PORT='2525'\nSMTP_FROM='Lys <lys@example.test>'\nSMTP_TLS_MODE='danger-insecure'\nSMTP_USERNAME='lys'\nSMTP_PASSWORD='correct horse battery staple'\n",
+            loaded.gateway()?
+        )
+    );
+    let compose_env = std::fs::read_to_string(state.join(COMPOSE_ENV))?;
+    assert!(
+        !compose_env.contains("correct horse"),
+        "the password is in compose.env"
+    );
+    let named = format!("IDENTITY_SMTP_ENV_FILE={}", state.join(MAIL_ENV).display());
+    assert!(
+        compose_env.lines().any(|line| line == named),
+        "{compose_env}"
+    );
+    let plain = rendered_for(EXAMPLE)?;
+    assert!(
+        plain
+            .lines()
+            .any(|line| line == "IDENTITY_SMTP_ENV_FILE=/dev/null")
+    );
+    let example = DeploymentConfig::parse(EXAMPLE, std::path::PathBuf::from("/deployments/dev"))?;
+    assert!(render_mail_env(&example, None)?.is_none());
+    private_files::write(&state.join(MAIL_PASSWORD_FILE), b"it's\n")?;
+    let refused = run(&config, true).expect_err("a quote in the password");
+    assert_eq!(refused.kind(), ErrorKind::SecretMalformed);
     Ok(())
 }

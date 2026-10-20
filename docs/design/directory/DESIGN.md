@@ -198,6 +198,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/mod.rs` | declarations and re-exports only | DIRECTORY-002 |
 | `crates/lys/src/identity/cli.rs` | identity subcommand argument declarations | DIRECTORY-002 |
 | `crates/lys/src/identity/config.rs` | typed deployment configuration and validation; no secret values in diagnostics | DIRECTORY-002 |
+| `crates/lys/src/identity/config/deployment.rs` | The deployment configuration's validation, the [mail] table's with it: plain SMTP for a loopback host alone. | DIRECTORY-110 |
 | `crates/lys/src/identity/credentials.rs` | Zeroizing, redacted credential material and stable reuse | DIRECTORY-002 |
 | `crates/lys/src/identity/private_files.rs` | restricted-mode durable file creation and outcome reconciliation | DIRECTORY-002 |
 | `crates/lys/src/identity/prepare.rs` | validates inputs and materialises the declared private deployment artifacts | DIRECTORY-002 |
@@ -1448,6 +1449,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/src/mail.rs` | The one sender: the configured SMTP settings, the password read from its file, a named refusal for every failed send. | DIRECTORY-110 |
 | `crates/lys-identity-server/src/mail_letters.rs` | The three letters, one template each: added, access given, founded. | DIRECTORY-110 |
 | `crates/lys-identity-server/tests/mail_letters.rs` | Every letter asserted word for word at a test-owned SMTP sink; once per act; none for a refused act. | DIRECTORY-110 |
+| `tests/identity_contract/src/mail_sink.rs` | The test-owned SMTP listener on 127.0.0.1 that captures every letter whole and refuses on demand. | DIRECTORY-110 |
 
 ## Inventory
 

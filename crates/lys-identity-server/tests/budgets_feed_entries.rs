@@ -203,7 +203,7 @@ macro_rules! budgets_feed_entries {
                     spicedb: None, model_revision: AtomicU64::new(apps.model_revision()),
                     refresh: Mutex::new(()), changes: $crate::grant_changes::GrantChanges::default(),
                 },
-                secrets: None, requests: None, mcp_requests: None, network: Some(Mutex::new(network)),
+                secrets: None, mailer: None, requests: None, mcp_requests: None, network: Some(Mutex::new(network)),
                 joins: None, roles: None, provisioning: None, certificates: None,
                 runtime: Some(Mutex::new($crate::runtime_store::RuntimeStore::open(&path.join("runtime"), Arc::clone(&key))?)),
                 service_accounts: None, reviews: None, teams: None,
