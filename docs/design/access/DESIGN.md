@@ -77,7 +77,7 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `crates/lys-identity-server/src/routes.rs` | routes::administrator keeps install-level acts only; /people/admit and /people no longer consult it (ACCESS-009 R1). | ACCESS-009 |
 | `crates/lys-identity-server/src/routes_table.rs` | POST /people judged by organisation.admit like /people/admit (ACCESS-009 R1). | ACCESS-009 |
 | `crates/lys-identity-server/src/openapi_table.rs` | The two people routes declare organisation.admit and the refusals organisation_not_own and NotAdmitted (ACCESS-009 R1). | ACCESS-009 |
-| `crates/lys-identity-server/src/people_admit_tests.rs` | Admit by organisation.admit on one's own organisation; organisation_not_own; our administrator by the founding grant only (ACCESS-009 R1). | ACCESS-009 |
+| `crates/lys-identity-server/tests/people_admit.rs` | Admit by organisation.admit on one's own organisation; organisation_not_own; our administrator by the founding grant only (ACCESS-009 R1). | ACCESS-009 |
 | `crates/lys-identity-server/src/grants/organisation_roots_tests.rs` | Root authority by resource: organisation.grant for organisation-owned kinds, the install's person for install-level kinds, resource_owned_elsewhere (ACCESS-009 R2). | ACCESS-009 |
 | `crates/lys-identity/src/grants/admission.rs` | judge_root by resource: organisation.grant or the install's person; recipient_outside_organisation on delegation (ACCESS-009 R2, R3). | ACCESS-009 |
 | `crates/lys-identity/src/grants/authority.rs` | The root authority as a function of the resource's kind and organisation (ACCESS-009 R2). | ACCESS-009 |

@@ -243,6 +243,7 @@ impl ServerError {
             Self::Inactive { .. }
             | Self::AgentHasNoPolicy { .. }
             | Self::NotAdmitted { .. }
+            | Self::OrganisationNotOwn { .. }
             | Self::NoPerson
             | Self::ProductPassPersonRequired
             | Self::SetupRequired

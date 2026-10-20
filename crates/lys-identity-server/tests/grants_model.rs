@@ -56,7 +56,7 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
     assert_eq!(before["version"], 1);
     assert_eq!(
         before["relations"],
-        json!({"alpha": ["read", "write"], "beta": ["read"]})
+        json!({"administrator": ["organisation.administer", "organisation.admit", "organisation.grant", "organisation.read"], "alpha": ["read", "write"], "beta": ["read"]})
     );
     approve(&service, &admin, NOTES).await?;
     approve(&service, &admin, FILES).await?;

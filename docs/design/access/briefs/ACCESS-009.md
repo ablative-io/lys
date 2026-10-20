@@ -45,7 +45,7 @@ Behavioural. THE SYSTEM SHALL replace the check at crates/lys-identity-server/sr
 - modify: crates/lys-identity-server/src/routes.rs
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/openapi_table.rs
-- modify: crates/lys-identity-server/src/people_admit_tests.rs
+- modify: crates/lys-identity-server/tests/people_admit.rs
 
 **Checklist:**
 - C800 — POST /people/admit and POST /people are judged by organisation.admit on the caller's own organisation through the grants engine; a body naming another organisation is refused organisation_not_own before any write; routes::administrator is not consulted.

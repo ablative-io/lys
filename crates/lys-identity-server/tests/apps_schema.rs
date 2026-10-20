@@ -231,7 +231,7 @@ async fn lys_is_an_app_whose_schema_is_the_model_and_changes_only_by_the_adminis
     assert_eq!(lys["state"], "approved", "{lys}");
     assert_eq!(
         lys["schema"],
-        json!({"relations": {"alpha": ["read", "write"], "beta": ["read"]}})
+        json!({"relations": {"administrator": ["organisation.administer", "organisation.admit", "organisation.grant", "organisation.read"], "alpha": ["read", "write"], "beta": ["read"]}})
     );
     ok(root(&service, &admin, &bea, ("doc", "1"), "alpha").await?)?;
     let dry = json!({"replaces": 1, "schema": {"relations": {"beta": ["read"]}}});

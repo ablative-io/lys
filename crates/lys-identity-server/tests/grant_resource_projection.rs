@@ -237,7 +237,8 @@ async fn a_preexisting_person_grant_starts_against_an_old_engine_schema() -> Out
     let (mut engine, mut service, _, cookie) = started(true).await?;
     let path = service.dir.path().join("grant-log");
     let before = FileLeafStore::open(&path)?.pinned();
-    assert_eq!(FileLeafStore::open(&path)?.extent(), 1);
+    // The person's grant and the founder's administrator grant (DIRECTORY-109 R3).
+    assert_eq!(FileLeafStore::open(&path)?.extent(), 2);
     let (status, answer) = service.get("/grants", Some(&cookie)).await?;
     assert_eq!(status, 200, "old person grant at start: {answer}");
     assert_eq!(

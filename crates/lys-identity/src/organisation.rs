@@ -280,7 +280,18 @@ impl<S: LeafStore> Directory<S> {
                 },
             )?,
         ];
-        let mut receipts = self.commit_batch(&events)?.into_iter();
+        let mut receipts = match self.commit_batch(&events) {
+            Ok(receipts) => receipts.into_iter(),
+            // The batch stored whole with its answer lost: the settle the
+            // refusal ran read it back, and the operation answers from the
+            // log, as one change does.
+            Err(failure) => {
+                return match self.answered(operation)? {
+                    Some((event, receipt)) if event == events[1] => Ok((person, receipt)),
+                    _ => Err(failure),
+                };
+            }
+        };
         let (Some(_), Some(receipt)) = (receipts.next(), receipts.next()) else {
             return Err(IdentityError::LogUnavailable {
                 reason: "the setup batch answered fewer receipts than events".to_owned(),

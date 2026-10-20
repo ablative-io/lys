@@ -203,6 +203,8 @@ pub mod operator;
 mod own_computer;
 #[cfg(test)]
 mod pass_provenance_tests;
+/// Admitting a person is judged by organisation.admit (ACCESS-009 R1).
+pub mod people_admission;
 pub mod people_admit;
 pub mod plugins_installed_api;
 mod product_agents;

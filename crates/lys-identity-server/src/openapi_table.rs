@@ -159,11 +159,11 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/drafts/{id}/correct" "Refuse and save the responsible person's correction" C [SIGNED_BODY, &["AgentSignatureRefused", "NotAdmitted", "NoPerson", "DraftNotFound", "DraftHashMismatch", "DraftNotPending", "DraftChangeInvalid", "OperationReused", "IdentifierMalformed"]];
     POST "/agents/{id}/reports-to" "Change an agent's reporting edge" S [ADMIN_BODY, REPORTING] scope("agent", "agent.reports-to.set", ["id"]);
     GET "/identities" "Every identity of the caller's organisation" S [ADMIN] scope("identity", "read", []);
-    GET "/identities/{id}" "One identity of the caller's organisation" S [ADMIN, &["IdentifierMalformed"]] scope("identity", "read", ["id"]);
+    GET "/identities/{id}" "One identity of the caller's organisation" S [ADMIN, &["IdentifierMalformed", "IdentityUnknown"]] scope("identity", "read", ["id"]);
     POST "/identities/{id}/profile" "Change an identity's profile" G [ADMIN_BODY, AGENT, GRANT_ASKED, UNANSWERED, &["NotHeld", "Revoked", "HoldingNotHeld", "TeamsUnavailable", "NoPerson", "IdentityUnknown", "OperationReused", "ProfileInvalid"]] scope("person", "person.profile.set", ["id"]);
     POST "/identities/{id}/transitions" "Move an identity's state; a person's app pass only activates an own registered agent" S [APP_PERSON, ADMIN_BODY, &["TransitionRefused"]] scope("identity", "identity.transition", ["id"]);
     POST "/people/{id}/logins" "Bind a login to a person" S [ADMIN_BODY] scope("person", "person.login.bind", ["id"]);
-    POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, and a first root grant only when one is asked for" S [ADMIN_BODY, &["RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
+    POST "/people/admit" "Admit a person in one act: register, issuer account by email, bind, activate, and a first root grant only when one is asked for" S [ADMIN_BODY, &["organisation_not_own", "RelationUnknown", "OperationReused"]] scope("person", "person.create", []);
     GET "/me" "The signed-in caller and their organisation" C [SIGNED, &["NoPerson", "SetupRequired"]];
     PUT "/me/getting-started" "Keep the caller's getting-started answers, read back on GET /me" C [SIGNED_BODY, &["NoPerson", "DirectoryUnavailable"]];
     GET "/people" "The people the caller may see" S [SIGNED, &["NoPerson", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("person", "read", []);

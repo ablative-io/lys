@@ -349,7 +349,12 @@ fn configured_service(
             github: issuer.provider_base().to_owned(),
         }),
         provider: None,
-        setup: None,
+        setup: Some(lys_identity_server::setup::SetupSettings {
+            code_file: dir.path().join("setup").join("code"),
+            administrator_file: dir.path().join("setup").join("administrator"),
+            email: None,
+            organisation: "Harness organisation".to_owned(),
+        }),
         password_policy: None,
         model_proxy: Some("http://127.0.0.1:18484".to_owned()),
         proxy_dir: None,

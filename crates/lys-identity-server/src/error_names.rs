@@ -100,6 +100,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::Inactive { .. } => "inactive",
         ServerError::NotSignedIn => "NotSignedIn",
         ServerError::NotAdmitted { .. } => "NotAdmitted",
+        ServerError::OrganisationNotOwn { .. } => "organisation_not_own",
         ServerError::NoPerson => "NoPerson",
         ServerError::SetupRequired => "SetupRequired",
         ServerError::AgentNotVisible => "AgentNotVisible",

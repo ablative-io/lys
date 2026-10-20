@@ -21,6 +21,7 @@ macro_rules! server_refusals {
             | ServerError::Inactive { .. }
             | ServerError::NotSignedIn
             | ServerError::NotAdmitted { .. }
+            | ServerError::OrganisationNotOwn { .. }
             | ServerError::NoPerson
             | ServerError::ProductPassPersonRequired
             | ServerError::SetupRequired

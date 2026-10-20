@@ -17,8 +17,8 @@ pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId
     resolve(directory, actor, false)
 }
 
-/// The organisation the active caller acts within (DIRECTORY-109 R1): the
-/// one their own record carries. A caller with a record under no
+/// The active caller and the organisation they act within (DIRECTORY-109
+/// R1): the one their own record carries. A caller with a record under no
 /// organisation (a login admitted as the configured administrator before
 /// first-run setup, or an identity the directory does not hold) is refused
 /// by name: nothing is registered into no organisation.
@@ -26,16 +26,17 @@ pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId
 /// # Errors
 /// Refuses an unknown or inactive caller, or one that belongs to no
 /// organisation.
-pub(crate) fn caller_organisation(
+pub(crate) fn caller_within(
     directory: &Projection,
     actor: &Actor,
-) -> Result<lys_identity::OrganisationId, ServerError> {
+) -> Result<(IdentityId, lys_identity::OrganisationId), ServerError> {
     let identity = active_caller(directory, actor)?;
-    directory
+    let organisation = directory
         .organisation_of(identity)
         .ok_or(ServerError::NotAdmitted {
             reason: "the caller belongs to no organisation; first-run setup founds one",
-        })
+        })?;
+    Ok((identity, organisation))
 }
 
 /// The organisation a signed-in caller reads within (DIRECTORY-109 R4):
@@ -51,6 +52,25 @@ pub(crate) fn reading_organisation(
     active_caller(directory, actor)
         .ok()
         .and_then(|identity| directory.organisation_of(identity))
+}
+
+/// The organisation the administrator's wider view is within (DIRECTORY-109
+/// R4), read after `routes::administrator` admitted them: their own as a
+/// person; for the configured administrator bound to no person yet, the
+/// install's own organisation, the one founded first, so the directory
+/// views are read before first-run setup binds them. None for an
+/// administrator of no organisation, who reads nothing.
+pub(crate) fn administrators_organisation(
+    directory: &Projection,
+    actor: &Actor,
+) -> Option<lys_identity::OrganisationId> {
+    if let Some(organisation) = reading_organisation(directory, actor) {
+        return Some(organisation);
+    }
+    if directory.person_for(actor.binding()).is_some() {
+        return None;
+    }
+    directory.first_organisation()
 }
 
 /// Personal mutations admit the caller before reading their requested target.

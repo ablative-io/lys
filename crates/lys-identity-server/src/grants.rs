@@ -129,12 +129,13 @@ impl GrantSetup {
         Ok(())
     }
 
-    fn open(
-        &self,
-        root_authority: PersonId,
-        model: Model,
-        say: &dyn Fn(&str),
-    ) -> Result<GrantState, ServerError> {
+    /// Make the grant log where it is not yet, as the first use makes it:
+    /// the boot issues founder grants before any use (DIRECTORY-109 R3).
+    ///
+    /// # Errors
+    /// Refuses a counted log that is absent (DIRECTORY-107 R2), or a log
+    /// that cannot be created.
+    pub(crate) fn ensure_log(&self) -> Result<(), ServerError> {
         // A grant log the stores receipt counts is never made anew empty:
         // its absence is a loss (DIRECTORY-107 R2).
         if !self.log_dir.exists() && self.changes.is_counted() {
@@ -152,6 +153,16 @@ impl GrantSetup {
                 }
             })?;
         }
+        Ok(())
+    }
+
+    fn open(
+        &self,
+        root_authority: PersonId,
+        model: Model,
+        say: &dyn Fn(&str),
+    ) -> Result<GrantState, ServerError> {
+        self.ensure_log()?;
         let log_dir = self.log_dir.clone();
         let relationships = match &self.spicedb {
             Some(engine) => {

@@ -34,7 +34,7 @@ use crate::routes::{Shared, signed_in};
 /// The steps of the act, in the order they run.
 pub const STEPS: [&str; 5] = ["register", "account", "bind", "activate", "grant"];
 
-/// What the administrator asks for.
+/// What the admitting caller asks for.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 #[schema(as = PeopleAdmitBody)]
@@ -51,6 +51,10 @@ pub(crate) struct AdmitBody {
     family_name: Option<String>,
     /// The email their issuer account is found or made by.
     email: String,
+    /// The organisation the person is admitted into, when the asker names
+    /// it: the caller's own and no other (ACCESS-009 R1).
+    #[serde(default)]
+    organisation: Option<String>,
     /// Their first root grant, if any. An install with nothing to grant yet
     /// admits a person with no access; the grant step is then not run.
     #[serde(default)]
@@ -183,21 +187,31 @@ fn parts_only(parts: axum::http::response::Parts) -> Response {
     Response::from_parts(parts, axum::body::Body::empty())
 }
 
-/// The act's words checked before any step: the caller is the
-/// administrator, the body is whole, the operation and the email are well
-/// formed. The issuer is the one the administrator signed in through.
+/// The act's words checked before any step: the body is whole, the
+/// operation and the email are well formed, and the caller is an active
+/// person holding organisation.admit on their own organisation, the one
+/// the body names if it names one (ACCESS-009 R1). The question is asked
+/// here and recorded nothing; the register step exercises the grant. The
+/// issuer is the one the caller signed in through.
 fn checked(
     state: &Shared,
     headers: &HeaderMap,
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Result<(AdmitBody, OperationId, String, String), ServerError> {
     let actor = signed_in(state, headers)?;
-    crate::routes::administrator(state, &actor)?;
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let operation = OperationId::from_str(&asked.operation)?;
     let email = crate::accounts::check_email(&asked.email)
         .map_err(|_refused| malformed(format!("{} is not an email", asked.email)))?
         .to_owned();
+    crate::grants::with_grants(state, |mut judged| {
+        crate::people_admission::organisation(
+            &mut judged,
+            &actor,
+            asked.organisation.as_deref(),
+            crate::grants::Decision::Explain,
+        )
+    })?;
     let issuer = actor.binding().issuer().to_owned();
     Ok((asked, operation, email, issuer))
 }
@@ -236,9 +250,9 @@ pub(crate) async fn admit(
     }
 }
 
-/// The act's checked words. The login is bound at the issuer the
-/// administrator signed in through, the one whose accounts Lys administers,
-/// as first-run setup binds its own.
+/// The act's checked words. The login is bound at the issuer the caller
+/// signed in through, the one whose accounts Lys administers, as first-run
+/// setup binds its own.
 struct Act<'a> {
     asked: &'a AdmitBody,
     operation: &'a OperationId,

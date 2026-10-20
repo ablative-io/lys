@@ -28,11 +28,11 @@ fn actor(issuer: &str) -> Result<Actor, Box<dyn Error>> {
 /// The directory of a store written before organisations: the
 /// administrator set up, two people registered, two agents, every one
 /// active and none carrying an organisation, written as that build wrote
-/// them. Answers the administrator and the agents.
+/// them. Answers the administrator, Bea and the agents.
 fn people_before_organisations<S: LeafStore>(
     directory: &mut Directory<S>,
     actor: &Actor,
-) -> Result<(PersonId, [AgentId; 2]), Box<dyn Error>> {
+) -> Result<(PersonId, PersonId, [AgentId; 2]), Box<dyn Error>> {
     let (admin, bea, cal) = (
         PersonId::generate()?,
         PersonId::generate()?,
@@ -77,7 +77,7 @@ fn people_before_organisations<S: LeafStore>(
         directory.commit_batch(&[activate(actor, IdentityId::Agent(agent))?])?;
         agents[slot] = agent;
     }
-    Ok((admin, agents))
+    Ok((admin, bea, agents))
 }
 
 /// Six grants carrying no organisation, as the build before wrote them:
@@ -88,6 +88,7 @@ fn grants_before_organisations(
     config: &Config,
     directory: &mut Directory<FileLeafStore>,
     admin: PersonId,
+    bea: PersonId,
     agents: [AgentId; 2],
 ) -> Result<(), Box<dyn Error>> {
     FileLeafStore::create(&config.grant_log_dir, &config.grant_log_origin)?;
@@ -134,7 +135,11 @@ fn grants_before_organisations(
         )?;
         roots.push((recorded.event.grant(), project));
     }
-    for (agent, (source, project)) in agents.into_iter().zip(roots.iter().take(2)) {
+    for ((agent, responsible), (source, project)) in agents
+        .into_iter()
+        .zip([admin, bea])
+        .zip(roots.iter().take(2))
+    {
         grants.delegate(
             projection,
             &DelegateRequest {
@@ -143,7 +148,7 @@ fn grants_before_organisations(
                 route: Route::Api,
                 source: *source,
                 recipient: IdentityId::Agent(agent),
-                responsible: admin,
+                responsible,
                 resource: Resource::new("project", project)?,
                 relation: Relation::new("beta")?,
                 pass_on: PassOn::UseOnly,
@@ -164,8 +169,9 @@ fn store_before_organisations(config: &Config) -> Result<(), Box<dyn Error>> {
         Box::new(move || FileLeafStore::open(&path)),
         Ed25519Identity::load(&config.event_key_file)?,
     )?;
-    let (admin, agents) = people_before_organisations(&mut directory, &actor(&config.issuer)?)?;
-    grants_before_organisations(config, &mut directory, admin, agents)
+    let (admin, bea, agents) =
+        people_before_organisations(&mut directory, &actor(&config.issuer)?)?;
+    grants_before_organisations(config, &mut directory, admin, bea, agents)
 }
 
 /// Every line the service says, kept for reading.

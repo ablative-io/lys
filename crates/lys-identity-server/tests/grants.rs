@@ -374,7 +374,7 @@ async fn the_permission_model_is_served_to_a_signed_in_caller_only() -> TestResu
     assert_eq!(status, 200, "{model}");
     assert_eq!(
         json!({ "version": model["version"], "relations": model["relations"] }),
-        json!({ "version": 1, "relations": { "alpha": ["read", "write"], "beta": ["read"] } })
+        json!({ "version": 1, "relations": { "administrator": ["organisation.administer", "organisation.admit", "organisation.grant", "organisation.read"], "alpha": ["read", "write"], "beta": ["read"] } })
     );
     let (status, _) = service.get("/grants/model", None).await?;
     assert_eq!(status, 401);

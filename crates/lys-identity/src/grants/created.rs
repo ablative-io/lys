@@ -55,8 +55,8 @@ const USE: &str = "use-of-agent.create";
 
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Record the creator's [`CREATED_RIGHTS`] on `request.agent`, under its
-    /// grant `request.source` of `agent.create`, with that grant's use, in
-    /// one append. Asked again for the same registration, the rights already
+    /// grant `request.source` of `agent.create`, with that grant's use and
+    /// under its organisation (DIRECTORY-109 R4), in one append. Asked again for the same registration, the rights already
     /// recorded are answered and only the missing ones are written; when none
     /// is missing nothing is appended.
     ///
@@ -113,7 +113,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 window: Window::new(at, source.window().ends_at())?,
                 model_version: self.model.version_on("agent"),
                 operation,
-            })?;
+            })?
+            .with_organisation(source.organisation());
             let event = GrantEvent::new(
                 operation,
                 IdentityId::Person(responsible),

@@ -441,7 +441,13 @@ async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outc
     let before = extents(&service)?;
     on_the_shipped_model(&mut service).await?;
     let after = extents(&service)?;
-    assert_eq!(after[1], before[1], "the upgrade issues no grant");
+    // The one grant the upgrade issues is the founder's administrator grant
+    // (DIRECTORY-109 R3), the first boot on a model naming the relation.
+    assert_eq!(
+        after[1],
+        before[1] + 1,
+        "the upgrade issues no loader grant"
+    );
     let token = credential();
     let grants = ok(get(&service, "/grants", Auth::Bearer(&token)).await?)?;
     assert!(
@@ -491,8 +497,8 @@ async fn a_revoked_loader_grant_stays_revoked_through_the_upgrade() -> Outcome {
     on_the_shipped_model(&mut service).await?;
     assert_eq!(
         extents(&service)?[1],
-        before[1],
-        "the upgrade restores nothing"
+        before[1] + 1,
+        "the upgrade restores nothing: its one grant is the founder's administrator grant (DIRECTORY-109 R3)"
     );
     let refused = post(
         &service,

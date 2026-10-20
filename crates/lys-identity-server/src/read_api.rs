@@ -258,7 +258,7 @@ async fn every_person(
         let projection = directory.projection()?;
         // The wider view is the wider view within the administrator's
         // organisation (DIRECTORY-109 R4): a person of another is absent.
-        let scope = crate::caller_admission::reading_organisation(projection, &actor);
+        let scope = crate::caller_admission::administrators_organisation(projection, &actor);
         let within = |person: PersonId| {
             scope.is_some() && projection.organisation_of(IdentityId::Person(person)) == scope
         };

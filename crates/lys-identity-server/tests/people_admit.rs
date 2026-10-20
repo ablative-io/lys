@@ -11,10 +11,11 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use identity_contract::fake_issuer::Login;
 use identity_contract::fake_rauthy::FakeRauthy;
 use identity_contract::harness::{GRANT_MODEL, Service, session_cookie};
-use lys_identity::OperationId;
 use lys_identity::signer::load_service_key;
+use lys_identity::{OperationId, OrganisationId};
 use lys_identity_server::configuration_store::ConfigurationStore;
 use lys_identity_server::routes::open_directory;
 use lys_identity_server::runner_acts::ActStore;
@@ -29,6 +30,7 @@ const CODE: &str = "people-admit-first-run-code";
 const ADMIN_EMAIL: &str = "ada@example.test";
 const PASSWORD: &str = "Analytical-Engine-1843";
 const BEA: &str = "bea@example.test";
+const CY: &str = "cy@example.test";
 const STEPS: [&str; 5] = ["register", "account", "bind", "activate", "grant"];
 
 /// A service with a fake issuer and Ada as its first-run administrator.
@@ -119,6 +121,25 @@ fn admit(operation: &str, relation: &str) -> Value {
             "relation": relation,
         },
     })
+}
+
+/// Sign in as the person an admit answer names, at the issuer their login
+/// was bound at.
+async fn signed_in_as(
+    service: &Service,
+    admitted: &Value,
+    email: &str,
+) -> Result<String, Box<dyn Error>> {
+    let subject = admitted["subject"]
+        .as_str()
+        .ok_or("an issuer subject")?
+        .to_owned();
+    service
+        .sign_in(Login {
+            subject,
+            email: email.to_owned(),
+        })
+        .await
 }
 
 /// The accounts the issuer holds for `email`.
@@ -314,5 +335,121 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
     assert_eq!(admitted["receipt"]["completed"], json!(&STEPS[..4]));
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     assert_eq!(people(&service, &ada).await?, before + 1);
+    Ok(())
+}
+
+/// ACCESS-009 R1: admitting is the organisation.admit grant on the
+/// caller's own organisation, on both routes that register a person.
+#[tokio::test]
+async fn a_person_without_organisation_admit_is_refused_by_name_and_writes_nothing() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let (status, admitted) = service
+        .post(
+            "/people/admit",
+            Some(&ada),
+            &admit(&OperationId::generate()?.to_string(), "alpha"),
+        )
+        .await?;
+    assert_eq!(status, 200, "{admitted}");
+    let bea = signed_in_as(&service, &admitted, BEA).await?;
+    let before = people(&service, &ada).await?;
+    let body = json!({
+        "operation": OperationId::generate()?.to_string(),
+        "display_name": "Cy",
+        "email": CY,
+    });
+    let (status, refused) = service.post("/people/admit", Some(&bea), &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
+    assert!(
+        refused["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("organisation.admit")),
+        "the refusal names the act: {refused}"
+    );
+    assert!(refused["receipt"]["failed"].is_null(), "{refused}");
+    assert_eq!(refused["receipt"]["completed"], json!([]), "{refused}");
+    let body = json!({
+        "operation": OperationId::generate()?.to_string(),
+        "display_name": "Cy",
+    });
+    let (status, refused) = service.post("/people", Some(&bea), &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
+    assert_eq!(people(&service, &ada).await?, before);
+    assert_eq!(accounts_for(&rauthy, CY)?, 0);
+    Ok(())
+}
+
+/// ACCESS-009 R1: a body naming another organisation is refused before any
+/// step; naming the caller's own names nothing new.
+#[tokio::test]
+async fn a_body_naming_another_organisation_is_refused_before_any_step() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let before = people(&service, &ada).await?;
+    let mut body = admit(&OperationId::generate()?.to_string(), "alpha");
+    body["organisation"] = json!(OrganisationId::generate()?.to_string());
+    let (status, refused) = service.post("/people/admit", Some(&ada), &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "organisation_not_own", "{refused}");
+    assert!(refused["receipt"]["failed"].is_null(), "{refused}");
+    assert_eq!(refused["receipt"]["completed"], json!([]), "{refused}");
+    assert_eq!(people(&service, &ada).await?, before);
+    assert_eq!(accounts_for(&rauthy, BEA)?, 0);
+
+    let (status, me) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(status, 200, "{me}");
+    let own = me["organisation"]["id"]
+        .as_str()
+        .ok_or("the caller's organisation")?
+        .to_owned();
+    let mut body = admit(&OperationId::generate()?.to_string(), "alpha");
+    body["organisation"] = json!(own);
+    let (status, admitted) = service.post("/people/admit", Some(&ada), &body).await?;
+    assert_eq!(status, 200, "{admitted}");
+    assert_eq!(people(&service, &ada).await?, before + 1);
+    Ok(())
+}
+
+/// ACCESS-009 R1: the administrator admits through the founding grant and
+/// through nothing else; with it revoked they are refused like anyone.
+#[tokio::test]
+async fn the_administrator_admits_by_the_founding_grant_alone() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let (status, grants) = service.get("/grants", Some(&ada)).await?;
+    assert_eq!(status, 200, "{grants}");
+    let founding = grants["grants"]
+        .as_array()
+        .ok_or("the grants are listed")?
+        .iter()
+        .find(|grant| {
+            grant["resource"]["kind"] == "organisation" && grant["relation"] == "administrator"
+        })
+        .ok_or("the founding grant is listed")?;
+    let id = founding["id"].as_str().ok_or("a grant id")?;
+    let (status, revoked) = service
+        .post(
+            &format!("/grants/{id}/revoke"),
+            Some(&ada),
+            &json!({
+                "operation": OperationId::generate()?.to_string(),
+                "route": "browser",
+                "reason": "the founder steps back",
+            }),
+        )
+        .await?;
+    assert_eq!(status, 200, "{revoked}");
+    let before = people(&service, &ada).await?;
+    let (status, refused) = service
+        .post(
+            "/people/admit",
+            Some(&ada),
+            &admit(&OperationId::generate()?.to_string(), "alpha"),
+        )
+        .await?;
+    assert_eq!(status, 403, "{refused}");
+    assert_eq!(refused["refusal"], "NotAdmitted", "{refused}");
+    assert_eq!(people(&service, &ada).await?, before);
+    assert_eq!(accounts_for(&rauthy, BEA)?, 0);
     Ok(())
 }

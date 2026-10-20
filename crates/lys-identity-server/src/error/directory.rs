@@ -51,6 +51,15 @@ macro_rules! directory_refusals {
         /// Why the caller is not admitted.
         reason: &'static str,
     },
+    /// The body names an organisation that is not the caller's own
+    /// (ACCESS-009 R1): a person is admitted into the caller's.
+    #[error(
+        "organisation_not_own: {organisation} is not the caller's organisation; a person is admitted into the caller's own"
+    )]
+    OrganisationNotOwn {
+        /// The organisation the body named.
+        organisation: String,
+    },
     /// The caller is signed in through a login bound to no person, so no personal view is theirs.
     #[error("NoPerson: the signed-in login is bound to no person in the directory")]
     NoPerson,

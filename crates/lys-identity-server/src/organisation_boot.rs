@@ -111,8 +111,8 @@ fn attach(
 
 /// Stamp every unmarked grant with the install's organisation and issue
 /// the administrator grant of every organisation that lacks one; the
-/// counts of each. A store with no organisation, no root authority or no
-/// grant log yet has no grant to stamp and answers zeros.
+/// counts of each. A store with no organisation or no root authority has
+/// no grant to stamp or issue and answers zeros.
 fn under_organisation(
     state: &AppState,
     projection: &Projection,
@@ -124,9 +124,10 @@ fn under_organisation(
     let Some(root) = root_authority(state, projection)? else {
         return Ok((0, 0));
     };
-    if !state.grant_setup.log_dir.exists() {
-        return Ok((0, 0));
-    }
+    // The log is made here when it is not yet, as the first use makes it,
+    // so the founder's grant is issued at the first boot (R3), never at
+    // the second.
+    state.grant_setup.ensure_log()?;
     let model =
         {
             let apps = state.apps.lock().map_err(|error| {
