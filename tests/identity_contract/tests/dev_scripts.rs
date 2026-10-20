@@ -240,7 +240,11 @@ async fn the_real_development_scripts_seed_their_named_grants_on_fresh_state() -
         .json::<Value>()
         .await?;
     let grants = answer["grants"].as_array().ok_or("no grants listed")?;
-    assert_eq!(grants.len(), 3, "{answer}");
+    assert_eq!(
+        grants.len(),
+        4,
+        "the founder's administrator grant on the development organisation and the three seed-grants issues: {answer}"
+    );
     let seed = std::fs::read_to_string(held.logs().join("seed.log"))?;
     let first = |suffix: &str| -> Result<&str, Box<dyn Error>> {
         seed.lines()

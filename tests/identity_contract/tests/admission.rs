@@ -42,7 +42,11 @@ async fn the_configured_administrator_is_admitted() -> TestResult {
     );
     let (status, body) = service.get("/identities", Some(&cookie)).await?;
     assert_eq!(status, 200, "{body}");
-    assert_eq!(body["identities"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        body["identities"].as_array().map(Vec::len),
+        Some(2),
+        "the organisation founded by the registration, and Ada: {body}"
+    );
     Ok(())
 }
 
@@ -219,7 +223,10 @@ async fn every_mutation_by_a_denied_caller_is_refused_and_changes_nothing() -> T
     assert_eq!(status, 200, "{body}");
     let agent = body["agent"].as_str().ok_or("no agent")?.to_owned();
     let size = service.log_size().await?;
-    assert_eq!(size, 4, "the administrator's four changes are logged");
+    assert_eq!(
+        size, 5,
+        "the administrator's four changes are logged, the first founding the organisation in two leaves"
+    );
     let (_, before) = service.get("/identities", Some(&administrator)).await?;
 
     let same_email = service.sign_in(login("someone-else")).await?;
