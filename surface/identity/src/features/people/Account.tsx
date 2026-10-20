@@ -155,6 +155,9 @@ export function OwnAccount() {
   );
 }
 
+/** Whether this page was reached by a founding letter's link (features/found/Prove.tsx), so it says how the person is signed in. */
+const foundedByLetter = (): boolean => new URLSearchParams(location.hash.split('?')[1] ?? '').get('founded') === '1';
+
 /** Credential fields exist only for the change the person has requested. */
 export function AccountSettings() {
   const { account, setAccount, unavailable } = useAccount('/me/account');
@@ -171,6 +174,7 @@ export function AccountSettings() {
   return (
     <section aria-label="Your account">
       <h2>Your account</h2>
+      {foundedByLetter() ? <p role="status" className="note founded-note">You are signed in by the letter's link. Set a password or connect Google here so you can sign in again.</p> : null}
       {unavailable ? (
         <p role="alert" className="why-not">
           {unavailable}

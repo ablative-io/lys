@@ -24,6 +24,8 @@ macro_rules! server_refusals {
             | ServerError::OrganisationNotOwn { .. }
             | ServerError::MailUnconfigured
             | ServerError::MailNotSent { .. }
+            | ServerError::ProofRefused
+            | ServerError::AlreadyAdmitted
             | ServerError::NoPerson
             | ServerError::ProductPassPersonRequired
             | ServerError::SetupRequired

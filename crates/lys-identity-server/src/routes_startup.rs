@@ -284,6 +284,9 @@ async fn make_state(
             .as_ref()
             .map(crate::mail::Mailer::open)
             .transpose()?,
+        foundings: Mutex::new(crate::foundings_store::Foundings::open(
+            config.log_dir.with_file_name("foundings.json"),
+        )?),
         requests: primary.requests.map(Mutex::new),
         mcp_requests: primary.mcp_requests,
         network: primary.network.map(Mutex::new),

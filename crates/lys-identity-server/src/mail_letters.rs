@@ -1,8 +1,10 @@
-//! The three letters Lys writes, one template each (DIRECTORY-110 R3):
-//! added, to a person admitted; access given, to a person a root grant
-//! names; founded, to a founder, carrying the link that proves their
-//! address. Every letter is plain text, says who it is to, and names the
-//! address people open Lys at. The words are the ones the screens use.
+//! The four letters Lys writes, one template each (DIRECTORY-110 R3,
+//! DIRECTORY-111 R4): added, to a person admitted; access given, to a
+//! person a root grant names; founded, to a founder, carrying the link that
+//! proves their address; already yours, to an address someone asked to
+//! found with that already signs in. Every letter is plain text, says who
+//! it is to, and names the address people open Lys at. The words are the
+//! ones the screens use.
 
 use lettre::Address;
 use lettre::message::Mailbox;
@@ -46,16 +48,29 @@ pub enum Letter {
         /// The organisation's name.
         organisation: String,
     },
+    /// Someone asked to found an organisation with an address that already
+    /// signs in to Lys: the person is told, nothing was founded, and the
+    /// asker learns nothing (DIRECTORY-111 R1).
+    AlreadyYours {
+        /// Their email.
+        email: String,
+        /// The organisation's name as it was asked for.
+        organisation: String,
+        /// The address people open Lys at.
+        address: String,
+    },
 }
 
 impl Letter {
-    /// The letter's name: `added`, `access_given` or `founded`.
+    /// The letter's name: `added`, `access_given`, `founded` or
+    /// `already_yours`.
     #[must_use]
     pub fn name(&self) -> &'static str {
         match self {
             Self::Added { .. } => "added",
             Self::AccessGiven { .. } => "access_given",
             Self::Founded { .. } => "founded",
+            Self::AlreadyYours { .. } => "already_yours",
         }
     }
 
@@ -65,17 +80,20 @@ impl Letter {
         match self {
             Self::Added { email, .. }
             | Self::AccessGiven { email, .. }
-            | Self::Founded { email, .. } => email,
+            | Self::Founded { email, .. }
+            | Self::AlreadyYours { email, .. } => email,
         }
     }
 
-    /// The name of the person it goes to.
+    /// The name of the person it goes to; the already-yours letter knows
+    /// no name, since it says nothing the asker gave.
     #[must_use]
     pub fn recipient(&self) -> &str {
         match self {
             Self::Added { name, .. }
             | Self::AccessGiven { name, .. }
             | Self::Founded { name, .. } => name,
+            Self::AlreadyYours { .. } => "",
         }
     }
 
@@ -86,6 +104,7 @@ impl Letter {
             Self::Added { .. } => "You have been added to Lys".to_owned(),
             Self::AccessGiven { .. } => "You have been given access in Lys".to_owned(),
             Self::Founded { organisation, .. } => format!("Found {organisation} in Lys"),
+            Self::AlreadyYours { .. } => "This address already signs in to Lys".to_owned(),
         }
     }
 
@@ -125,6 +144,13 @@ impl Letter {
             } => format!(
                 "Hello {name}, open {link} to prove this address and found {organisation} in Lys. The link is yours alone; if you did not ask for it, ignore this letter."
             ),
+            Self::AlreadyYours {
+                organisation,
+                address,
+                ..
+            } => format!(
+                "Hello, someone asked to found {organisation} in Lys with this address. It already signs in to Lys at {address}, so nothing was founded; sign in there. If this was not you, ignore this letter."
+            ),
         }
     }
 
@@ -134,7 +160,10 @@ impl Letter {
             .to()
             .parse()
             .map_err(|error| format!("{} is not an address: {error}", self.to()))?;
-        Ok(Mailbox::new(Some(self.recipient().to_owned()), address))
+        let name = Some(self.recipient())
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned);
+        Ok(Mailbox::new(name, address))
     }
 }
 
@@ -257,5 +286,25 @@ mod tests {
             refused.starts_with("not an address is not an address"),
             "{refused}"
         );
+    }
+
+    #[test]
+    fn the_already_yours_letter_names_the_organisation_asked_for_and_no_asker() {
+        let letter = Letter::AlreadyYours {
+            email: "priya@example.test".to_owned(),
+            organisation: "Acme".to_owned(),
+            address: "https://lys.example.test".to_owned(),
+        };
+        assert_eq!(letter.name(), "already_yours");
+        assert_eq!(letter.to(), "priya@example.test");
+        assert_eq!(letter.recipient(), "");
+        assert_eq!(letter.subject(), "This address already signs in to Lys");
+        assert_eq!(
+            letter.body(),
+            "Hello, someone asked to found Acme in Lys with this address. It already signs in to Lys at https://lys.example.test, so nothing was founded; sign in there. If this was not you, ignore this letter."
+        );
+        let mailbox = letter.mailbox().expect("an address");
+        assert_eq!(mailbox.name, None);
+        assert_eq!(mailbox.email.to_string(), "priya@example.test");
     }
 }

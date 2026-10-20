@@ -30,7 +30,12 @@ async fn a_founding_records_both_registered_and_writes_one_letter_with_the_link(
     assert_eq!(answer["letter"]["sent"], true);
     assert_eq!(answer["letter"]["to"], BEA);
     assert_eq!(answer["letter"]["letter"], "founded");
-    let members: Vec<&String> = answer.as_object().ok_or("an object")?.keys().collect();
+    let members: Vec<&str> = answer
+        .as_object()
+        .ok_or("an object")?
+        .keys()
+        .map(String::as_str)
+        .collect();
     assert_eq!(
         members,
         ["letter", "operation"],
@@ -161,7 +166,12 @@ async fn an_address_that_already_signs_in_gets_the_already_yours_letter_and_noth
     body["organisation"] = json!("Ada's Engine");
     let (status, answer) = service.post(FOUND, None, &body).await?;
     assert_eq!(status, 200, "{answer}");
-    let members: Vec<&String> = answer.as_object().ok_or("an object")?.keys().collect();
+    let members: Vec<&str> = answer
+        .as_object()
+        .ok_or("an object")?
+        .keys()
+        .map(String::as_str)
+        .collect();
     assert_eq!(
         members,
         ["letter", "operation"],

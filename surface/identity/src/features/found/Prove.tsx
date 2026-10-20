@@ -1,0 +1,49 @@
+/**
+ * The proving page (DIRECTORY-111 R3), outside the signed-in shell: the
+ * letter's link lands here with the proof in the address, and one button
+ * posts it. Nothing is posted on load, because mail scanners open links.
+ * On success the founder is signed in by the answer's cookie and lands on
+ * their account page to set a password; a refusal is shown in words with
+ * the way back to sign-in.
+ */
+import { useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
+import { Refused, request } from '../../api';
+import type { OrganisationProved } from '../../generated';
+import '../people/recorded-form.css';
+import '../sign-in/sign-in.css';
+import { Act } from '../../shell/Act';
+import { LysMark } from '../../shell/LysMark';
+import { foundingReasonOf } from './Found';
+
+/** Where a proven founder lands: their account page, told how they are signed in. */
+export const FOUNDED = '/settings/account?founded=1';
+
+export function Prove() {
+  const { proof = '' } = useParams();
+  const navigate = useNavigate();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<{ name: string; words: string } | null>(null);
+
+  async function finish() {
+    setBusy(true);
+    setRefusal(null);
+    try {
+      await request<OrganisationProved>('/organisations/found/prove', { proof });
+      navigate(FOUNDED);
+    } catch (failure) {
+      setRefusal({ name: failure instanceof Refused ? failure.refusal.refusal : '', words: foundingReasonOf(failure) });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="page sign-in found">
+    <LysMark />
+    <h1 ref={heading} tabIndex={-1}>Finish founding</h1>
+    <p className="sub">This link proves your email address. Press the button to finish founding your organisation and sign in.</p>
+    {refusal ? <p role="alert" className="why-not">{refusal.words}{refusal.name === 'proof_refused' || refusal.name === 'already_admitted' ? <> <a href="#/sign-in">Go to sign in</a>.</> : null}</p> : null}
+    <Act symbol="enter" name={busy ? 'Finishing…' : 'Finish founding'} word={busy ? 'Finishing…' : 'Finish founding'} tone="primary" disabled={busy || !proof} onClick={finish} />
+  </div>;
+}

@@ -42,7 +42,8 @@
         "create": [
           "crates/lys-identity-server/src/organisations_found.rs",
           "crates/lys-identity-server/src/foundings_store.rs",
-          "crates/lys-identity-server/tests/organisations_found.rs"
+          "crates/lys-identity-server/tests/organisations_found.rs",
+          "crates/lys-identity-server/tests/founding/mod.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/routes_table.rs",
@@ -55,7 +56,7 @@
           "crates/lys-identity/src/provenance.rs",
           "crates/lys-identity/src/event.rs",
           "crates/lys-identity-server/src/session_store.rs",
-          "crates/lys/src/identity/install/server_config/rendering.rs"
+          "tests/identity_contract/src/fake_rauthy.rs"
         ],
         "delete": []
       },
@@ -80,9 +81,11 @@
         "C811"
       ],
       "files": {
-        "create": [],
+        "create": [
+          "crates/lys-identity-server/src/organisations_prove.rs",
+          "crates/lys-identity-server/tests/organisations_prove.rs"
+        ],
         "modify": [
-          "crates/lys-identity-server/src/organisations_found.rs",
           "crates/lys-identity-server/src/foundings_store.rs",
           "crates/lys-identity-server/tests/organisations_found.rs",
           "crates/lys-identity-server/src/organisation_boot.rs",
@@ -92,7 +95,8 @@
           "crates/lys-identity-server/src/mcp_oauth_flow.rs",
           "crates/lys-identity-server/src/session_store.rs",
           "crates/lys-identity/src/provenance.rs",
-          "crates/lys-identity/src/event.rs"
+          "crates/lys-identity/src/event.rs",
+          "tests/identity_contract/src/fake_rauthy.rs"
         ],
         "delete": []
       },
@@ -119,13 +123,13 @@
         "create": [
           "surface/identity/src/features/found/Found.tsx",
           "surface/identity/src/features/found/Prove.tsx",
-          "surface/identity/src/features/found/Found.test.tsx",
-          "surface/identity/src/features/found/Prove.test.tsx"
+          "surface/identity/tests/found.test.tsx",
+          "surface/identity/tests/prove.test.tsx"
         ],
         "modify": [
           "surface/identity/src/App.tsx",
           "surface/identity/src/features/sign-in/SignIn.tsx",
-          "surface/identity/src/features/me/Account.tsx",
+          "surface/identity/src/features/people/Account.tsx",
           "surface/identity/src/generated/index.ts"
         ],
         "delete": []
@@ -153,7 +157,10 @@
           "crates/lys-identity-server/tests/mail_letters.rs",
           "crates/lys-identity-server/src/openapi_table.rs",
           "crates/lys-identity-server/tests/openapi.rs",
-          "crates/lys-identity-server/src/error.rs"
+          "crates/lys-identity-server/src/error/directory.rs",
+          "crates/lys-identity-server/src/error_names.rs",
+          "crates/lys-identity-server/src/error_status.rs",
+          "crates/lys-identity-server/src/provider/refusal.rs"
         ],
         "delete": []
       },
@@ -178,5 +185,12 @@
     "The path walked once on the dev install against the fake issuer and the sink: found from the sign-in page, the letter read at the sink, the link followed, the account page reached signed in, a password set, signed out and in again; the walk's record quoted in the END.",
     "The closing note says plainly that R1 to R4 are done, or names what is not, and carries the hospital line."
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "date": "2026-10-21",
+      "by": "Waffles",
+      "subject": "What the build settled: the third file, the store's place, the letter's name, the refusal texts, the receipt and where the surface tests live",
+      "ruling": "The proof's eight steps are a file of their own, organisations_prove.rs, beside organisations_found.rs (the two routes, the founding's three steps, the receipt, the founding actor and the derived-operation helper they share): one file for both would pass 500 lines of code (ADR-111), and the boundary line that nothing else moves into either stands. The foundings store is kept at log_dir.with_file_name(\"foundings.json\") beside the directory log, exactly as grant-tokens.json and the canvas files are, opened at make_state and made at the first founding; no configuration key names it and crates/lys/.../rendering.rs renders nothing, so that file leaves R1's list. The already-yours letter is named already_yours in LetterView and the letters-sent record, the underscore as access_given has it; the hyphen in R4 was prose. The two refusal texts are the sentences the person reads once the name is stripped: 'proof_refused: This link is not one Lys issued, or it was already used. Found again from the sign-in page.' and 'already_admitted: That address already signs in to Lys. Sign in there; nothing was founded.' Both carry a receipt as admit's refusals do, {operation, completed, failed}, with completed the member's name (R2's 'receipt.done' meant this) and nothing naming an identity; the prove row also names AccountRefused, the refusal the issuer's refusal of the account step is answered as, and RequestMalformed. The guard against minting a second link for the same operation is the letters-sent record: Mailer::recorded_by(operation, \"founded\") read before anything is founded or rotated, so a repeat answers the same letter view and the link already sent stays the one that proves; an unspent founding for the address with no letter recorded under this operation is the re-send case, whichever operation first founded it, and the stored founding keeps that first operation so the proof's derived steps replay against the same leaves. The three places R2 names (grants/administrator.rs, drafts_api.rs, mcp_oauth_flow.rs) now ask one function, AuthMethod::is_person_signed_in (Oidc or AddressProof), tested once in provenance_tests.rs beside the wire round trip, and a stored AddressProof session reads back in session_provenance_tests.rs, where a Founding actor is shown refused a session; that is R2's last acceptance line, one test per fact rather than one per call site. Tests count directory leaves through the public GET /receipts/{index}, the first index that answers none, since no caller outside the organisation may list its identities before the proof. The fake issuer gains refuse_create_once() for the failed-step case. The tests are two files on one table, tests/organisations_found.rs (R1) and tests/organisations_prove.rs (R2), sharing tests/founding/mod.rs, since one file would pass 500 lines. The account page is features/people/Account.tsx (there is no features/me/Account.tsx) and the surface tests live under surface/identity/tests/ (found.test.tsx, prove.test.tsx), the only place vite.config.ts includes; the sign-in line test sits in found.test.tsx. Founding posts nothing on the account page's own routes; the founded sentence is read from the hash query as the signed-out notice is."
+    }
+  ]
 }

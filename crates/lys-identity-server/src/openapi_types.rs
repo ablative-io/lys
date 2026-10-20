@@ -216,6 +216,18 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::people_admit::AdmitBody>()),
             Some(api.schema::<crate::people_admit::Admitted>()),
         ),
+        (
+            POST,
+            "/organisations/found",
+            Some(api.schema::<crate::organisations_found::FoundBody>()),
+            Some(api.schema::<crate::organisations_found::Founded>()),
+        ),
+        (
+            POST,
+            "/organisations/found/prove",
+            Some(api.schema::<crate::organisations_prove::ProveBody>()),
+            Some(api.schema::<crate::organisations_prove::Proved>()),
+        ),
         (GET, "/me", None, Some(api.schema::<MeView>())),
         (
             GET,

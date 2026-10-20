@@ -315,3 +315,17 @@ export interface WaitingEntryView {
   /** An agent_draft entry's draft, exactly as GET /drafts answers it; absent on every other kind and from an older service. */
   draft?: Draft;
 }
+
+/** `organisations_found.rs` `Founded`: POST /organisations/found. One shape to everyone, naming no identity (DIRECTORY-111). */
+export interface OrganisationFounded {
+  operation: string;
+  letter: { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string };
+}
+
+/** `organisations_prove.rs` `Proved`: POST /organisations/found/prove, what POST /sign-in answers with the organisation and person added. */
+export interface OrganisationProved {
+  signed_in: { issuer: string; subject: string };
+  authority: string;
+  organisation: string;
+  person: string;
+}

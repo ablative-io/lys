@@ -34,6 +34,24 @@ pub enum AuthMethod {
     ServiceAccountBearer(ServiceAccountId),
     /// A live pass bound to this agent's run authenticated the request.
     AgentPass(AgentId),
+    /// A founding request from a person who has no account yet
+    /// (DIRECTORY-111 R1): no credential, the address unproven at this
+    /// leaf. The binding names the founding, never a login.
+    Founding,
+    /// The person proved their address by following the letter's link
+    /// (DIRECTORY-111 R2): the session this begins is the person signed in,
+    /// as a sign-in through the issuer is.
+    AddressProof,
+}
+
+impl AuthMethod {
+    /// Whether this is the person themselves signed in: through the issuer
+    /// or by the proof of their address, never a pass, a signature, the
+    /// operator or a service account.
+    #[must_use]
+    pub fn is_person_signed_in(self) -> bool {
+        matches!(self, Self::Oidc | Self::AddressProof)
+    }
 }
 
 /// The authentication evidence the service has for the actor.
@@ -105,7 +123,11 @@ impl Provenance {
     #[must_use]
     pub fn agent(&self) -> Option<AgentId> {
         match self.method() {
-            AuthMethod::Oidc | AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => None,
+            AuthMethod::Oidc
+            | AuthMethod::Operator
+            | AuthMethod::ServiceAccountBearer(_)
+            | AuthMethod::Founding
+            | AuthMethod::AddressProof => None,
             AuthMethod::AgentSignature(agent) | AuthMethod::AgentPass(agent) => Some(agent),
         }
     }
@@ -118,7 +140,9 @@ impl Provenance {
             AuthMethod::Oidc
             | AuthMethod::Operator
             | AuthMethod::AgentSignature(_)
-            | AuthMethod::AgentPass(_) => None,
+            | AuthMethod::AgentPass(_)
+            | AuthMethod::Founding
+            | AuthMethod::AddressProof => None,
         }
     }
 

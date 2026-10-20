@@ -159,7 +159,7 @@ pub struct Admitted {
 
 /// The operation of `step` within the act `operation`: the first sixteen
 /// bytes of SHA-256 over the act's operation, a zero byte and the step name.
-fn derived(operation: &OperationId, step: &str) -> String {
+pub(crate) fn derived(operation: &OperationId, step: &str) -> String {
     let mut digest = Sha256::new();
     digest.update(operation.to_string().as_bytes());
     digest.update([0]);
@@ -181,7 +181,8 @@ fn body<T: serde::de::DeserializeOwned>(value: Value) -> Result<Json<T>, ServerE
 }
 
 /// `error` answered as the route answers it, carrying `receipt` beside it.
-async fn refused(error: ServerError, receipt: &AdmitReceipt) -> Response {
+/// A founding's receipts ride the same way (DIRECTORY-111).
+pub(crate) async fn refused<R: Serialize>(error: ServerError, receipt: &R) -> Response {
     let (mut parts, carried) = error.into_response().into_parts();
     // The answer is this service's own refusal object, made just above from
     // a ServerError, so it is read whole; no size is invented for it.
@@ -414,7 +415,7 @@ async fn steps(
 
 /// Google's name at the issuer when people may sign in with it, so the
 /// added letter tells the person to choose it.
-async fn google_offered(api: &SignInProviders) -> Result<Option<String>, ServerError> {
+pub(crate) async fn google_offered(api: &SignInProviders) -> Result<Option<String>, ServerError> {
     Ok(api
         .listed()
         .await?

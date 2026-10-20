@@ -83,6 +83,8 @@ fn pass_actor_bytes_round_trip_and_historical_methods_keep_their_codes() {
             Some(agent),
             super::AuthMethod::ServiceAccountBearer(crate::ServiceAccountId::from_bytes([7; 16])),
         ),
+        (5, None, super::AuthMethod::Founding),
+        (6, None, super::AuthMethod::AddressProof),
     ] {
         assert_eq!(
             wire::method_from(code, principal).expect("historical method"),
@@ -90,4 +92,35 @@ fn pass_actor_bytes_round_trip_and_historical_methods_keep_their_codes() {
         );
         assert_eq!(wire::method(expected), code);
     }
+}
+
+/// DIRECTORY-111: a founding leaf and a proof-begun session name no agent
+/// and no service account; the proof is the person signed in, the founding
+/// is not, and neither code carries a principal.
+#[test]
+fn founding_and_address_proof_round_trip_and_only_the_proof_is_the_person_signed_in() {
+    let binding =
+        crate::LoginBinding::new("https://issuer.test", "founding:op-1").expect("binding");
+    for (method, signed_in) in [
+        (super::AuthMethod::Founding, false),
+        (super::AuthMethod::AddressProof, true),
+        (super::AuthMethod::Oidc, true),
+        (super::AuthMethod::Operator, false),
+    ] {
+        assert_eq!(method.is_person_signed_in(), signed_in, "{method:?}");
+        let actor = super::Actor::new(binding.clone(), super::Provenance::new(method, 13));
+        assert_eq!(actor.provenance().agent(), None);
+        assert_eq!(actor.provenance().service_account(), None);
+        let mut encoded = Vec::new();
+        crate::encoding::actor(&mut encoded, &actor);
+        let value = crate::encoding::cbor(&encoded, "actor").expect("CBOR");
+        assert_eq!(
+            crate::encoding::decode_actor(value, 2).expect("actor"),
+            actor
+        );
+    }
+    let agent = AgentId::from_bytes([9; 16]);
+    assert!(wire::method_from(5, Some(agent)).is_err());
+    assert!(wire::method_from(6, Some(agent)).is_err());
+    assert!(wire::method_from(7, None).is_err());
 }

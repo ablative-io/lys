@@ -460,3 +460,38 @@ async fn the_founded_letter_carries_the_link_and_is_sent_once_per_operation() ->
     assert!(sink.next().await.is_some());
     Ok(())
 }
+
+/// DIRECTORY-111 R4: the already-yours letter, word for word, with no
+/// name, since it says nothing the asker gave.
+#[tokio::test]
+async fn the_already_yours_letter_names_the_organisation_and_the_address_and_no_person()
+-> TestResult {
+    let mut sink = MailSink::start().await?;
+    let dir = tempfile::tempdir()?;
+    let mailer = Mailer::open(&sink.settings(dir.path().join("letters-sent.jsonl")))?;
+    let letter = Letter::AlreadyYours {
+        email: ADMIN_EMAIL.to_owned(),
+        organisation: "Acme".to_owned(),
+        address: "https://lys.example.test".to_owned(),
+    };
+    let view = mailer.send_once("op-1", &letter).await?;
+    assert_eq!((view.sent, view.letter.as_str()), (true, "already_yours"));
+    let taken = sink.next().await.ok_or("the already-yours letter")?;
+    assert_eq!(taken.subject(), "This address already signs in to Lys");
+    assert_eq!(taken.to, vec![ADMIN_EMAIL.to_owned()]);
+    assert_eq!(
+        taken.body,
+        "Hello, someone asked to found Acme in Lys with this address. It already signs in to Lys at https://lys.example.test, so nothing was founded; sign in there. If this was not you, ignore this letter."
+    );
+    assert!(
+        taken
+            .header("To")
+            .is_some_and(|to| !to.contains('<') || to.trim().starts_with('<')),
+        "the letter carries a name it was never given: {:?}",
+        taken.headers
+    );
+    let again = mailer.send_once("op-1", &letter).await?;
+    assert!(again.sent);
+    assert!(sink.taken().is_none(), "sent twice");
+    Ok(())
+}

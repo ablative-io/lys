@@ -6489,6 +6489,11 @@
       "brief": "DIRECTORY-111"
     },
     {
+      "path": "crates/lys-identity-server/src/organisations_prove.rs",
+      "note": "The proof's eight steps under the founding operation: account, bind, activate, organisation, grant, letter, session and spend; the founder signed in by the answer's cookie.",
+      "brief": "DIRECTORY-111"
+    },
+    {
       "path": "crates/lys-identity-server/src/foundings_store.rs",
       "note": "Digests of proving tokens with the founding each proves, one durable write per change, a digest spent once; the token itself is never held.",
       "brief": "DIRECTORY-111"

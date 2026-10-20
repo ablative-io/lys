@@ -254,6 +254,22 @@ impl Mailer {
         Ok(LetterView::sent(letter, Sender::Issuer))
     }
 
+    /// Who the record says sent the letter named `letter` for `operation`,
+    /// if anyone: a founding asked again reads this before it mints a new
+    /// proving link (DIRECTORY-111 R1).
+    ///
+    /// # Errors
+    /// A record that cannot be read is named as the directory being
+    /// unavailable.
+    pub async fn recorded_by(
+        &self,
+        operation: &str,
+        letter: &str,
+    ) -> Result<Option<Sender>, ServerError> {
+        let _one = self.record.lock().await;
+        self.recorded(operation, letter)
+    }
+
     /// Who the record says sent `letter` for `operation`, if anyone.
     fn recorded(&self, operation: &str, letter: &str) -> Result<Option<Sender>, ServerError> {
         let text = match std::fs::read_to_string(&self.sent_file) {

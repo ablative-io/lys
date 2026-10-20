@@ -197,7 +197,7 @@ pub(super) async fn consent(
                         "Person reads is an app's read-only choice, without agent permissions",
                     ));
                 }
-                if session.actor.provenance().method() != lys_identity::AuthMethod::Oidc {
+                if !session.actor.provenance().method().is_person_signed_in() {
                     return Err(malformed("Person reads needs your browser sign-in"));
                 }
                 Some(PersonReads {

@@ -66,6 +66,19 @@ macro_rules! directory_refusals {
         "mail_unconfigured: a person admitted now would receive nothing: Lys has no mail settings; add the [mail] table to deployment.toml and run lys identity upgrade"
     )]
     MailUnconfigured,
+    /// A proving link that Lys did not issue, or one already used
+    /// (DIRECTORY-111 R2): one name and one text for both, so the link's
+    /// standing is never read off the refusal.
+    #[error(
+        "proof_refused: This link is not one Lys issued, or it was already used. Found again from the sign-in page."
+    )]
+    ProofRefused,
+    /// The address being proven already signs in to Lys as an active
+    /// person who is not the founder (DIRECTORY-111 R2).
+    #[error(
+        "already_admitted: That address already signs in to Lys. Sign in there; nothing was founded."
+    )]
+    AlreadyAdmitted,
     /// A letter did not go; the act it reports is recorded (DIRECTORY-110 R3).
     #[error(
         "mail_not_sent: the {letter} letter to {to} was not sent: {reply}; the act is recorded, ask again with the same operation to send it"

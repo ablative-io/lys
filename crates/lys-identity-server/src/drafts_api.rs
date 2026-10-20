@@ -12,7 +12,7 @@ use lys_identity::draft_event::{
     Approved, Correction, DraftEvent, Refused, RequestEvidence, RequestSignature,
 };
 use lys_identity::projection::draft::DraftRecord;
-use lys_identity::{Actor, AuthMethod, Directory, IdentityId, OperationId, PersonId, Provenance};
+use lys_identity::{Actor, Directory, IdentityId, OperationId, PersonId, Provenance};
 use lys_log_store::FileLeafStore;
 use serde::{Deserialize, Serialize};
 
@@ -284,7 +284,7 @@ pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, S
         });
     }
     let actor = signed_in(state, headers)?;
-    if actor.provenance().method() != AuthMethod::Oidc {
+    if !actor.provenance().method().is_person_signed_in() {
         return Err(ServerError::NotAdmitted {
             reason: "only the responsible person's session may decide a draft",
         });

@@ -459,10 +459,17 @@ pub(crate) mod wire {
     pub(crate) const OPERATOR_OR_SERVICE_ACCOUNT: u64 = 3;
     /// A live pass authenticated the agent whose id is carried under key 5.
     pub(crate) const AGENT_PASS: u64 = 4;
+    /// An unauthenticated founding request (DIRECTORY-111 R1); no principal.
+    pub(crate) const FOUNDING: u64 = 5;
+    /// The person proved their address by a letter's link (DIRECTORY-111
+    /// R2); no principal.
+    pub(crate) const ADDRESS_PROOF: u64 = 6;
 
     pub(crate) fn method(value: AuthMethod) -> u64 {
         match value {
             AuthMethod::Oidc => OIDC,
+            AuthMethod::Founding => FOUNDING,
+            AuthMethod::AddressProof => ADDRESS_PROOF,
             AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
             AuthMethod::AgentPass(_) => AGENT_PASS,
             AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => {
@@ -480,6 +487,8 @@ pub(crate) mod wire {
     ) -> Result<AuthMethod, &'static str> {
         match (code, agent) {
             (OIDC, None) => Ok(AuthMethod::Oidc),
+            (FOUNDING, None) => Ok(AuthMethod::Founding),
+            (ADDRESS_PROOF, None) => Ok(AuthMethod::AddressProof),
             (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
             (AGENT_PASS, Some(agent)) => Ok(AuthMethod::AgentPass(agent)),
             (OPERATOR_OR_SERVICE_ACCOUNT, None) => Ok(AuthMethod::Operator),
@@ -487,11 +496,15 @@ pub(crate) mod wire {
                 crate::ServiceAccountId::from_bytes(*account.as_bytes()),
             )),
             (OIDC, Some(_)) => Err("an OIDC actor carries no agent id under key 5"),
+            (FOUNDING, Some(_)) => Err("a founding actor carries no agent id under key 5"),
+            (ADDRESS_PROOF, Some(_)) => {
+                Err("an address-proof actor carries no agent id under key 5")
+            }
             (AGENT_SIGNATURE, None) => {
                 Err("an agent-signature actor carries the agent's id under key 5")
             }
             (AGENT_PASS, None) => Err("an agent-pass actor carries the agent's id under key 5"),
-            _ => Err("an authentication method code is 1, 2, 3 or 4"),
+            _ => Err("an authentication method code is 1 to 6"),
         }
     }
 

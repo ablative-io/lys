@@ -249,6 +249,7 @@ export function SignIn({ signedIn = () => location.replace(SIGNED_IN) }: { signe
       {error || (!providerDismissed && providerError) ? <p role="alert" className="why-not">{error || providerError}</p> : null}
       <Act symbol="enter" name={busy ? 'Signing in…' : 'Sign in'} word={busy ? 'Signing in…' : 'Sign in'} tone="primary" type="submit" disabled={busy} />
     </form>
+    <p className="note found-line">New here? <a href="#/found">Found an organisation</a>.</p>
     <Providers list={providers} />
     <AccountHelpWords help={help} />
   </div>;

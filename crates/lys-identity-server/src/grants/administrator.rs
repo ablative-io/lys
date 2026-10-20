@@ -5,8 +5,8 @@ use crate::error::ServerError;
 use crate::grant_contract::{DelegateBody, RecordedView};
 use crate::routes::{AppState, signed_in};
 use axum::http::{HeaderMap, header};
+use lys_identity::IdentityId;
 use lys_identity::grants::GrantError;
-use lys_identity::{AuthMethod, IdentityId};
 
 pub(super) fn delegate(
     state: &AppState,
@@ -23,7 +23,8 @@ pub(super) fn delegate(
     }
     let actor = signed_in(state, headers)?;
     let caller = super::caller(state, headers, judged.directory)?;
-    if actor.provenance().method() != AuthMethod::Oidc || caller != IdentityId::Person(judged.root)
+    if !actor.provenance().method().is_person_signed_in()
+        || caller != IdentityId::Person(judged.root)
     {
         return Err(GrantError::RootAuthorityRefused {
             caller: caller.to_string(),

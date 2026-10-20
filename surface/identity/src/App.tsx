@@ -2,6 +2,8 @@ import { HashRouter, Route, Routes, useNavigate, useParams, useSearchParams } fr
 import { FirstRunSetup, setupCode } from './features/setup/Setup';
 import { SetupBoundary } from './features/setup/SetupBoundary';
 import { SignIn } from './features/sign-in/SignIn';
+import { Found } from './features/found/Found';
+import { Prove } from './features/found/Prove';
 import { Callback } from './features/signin/Gate';
 import { ProviderFileReturn, takeFileReturn } from './features/signin/fileReturn';
 import { Terminal } from './features/runtime/Terminal';
@@ -33,6 +35,8 @@ export function App() {
       <ProviderFileReturn />
       <Routes>
         <Route path="/sign-in" element={<SignInScreen />} />
+        <Route path="/found" element={<Found />} />
+        <Route path="/found/:proof" element={<Prove />} />
         <Route path="/window/:session" element={<TerminalWindow />} />
         <Route path="*" element={
           <ShellProvider>

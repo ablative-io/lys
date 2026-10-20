@@ -78,3 +78,52 @@ fn pass_session_actor_round_trips_without_a_time() -> Result<(), Box<dyn Error>>
     );
     Ok(())
 }
+
+/// A session begun by a proving link (DIRECTORY-111 R2) reads back from
+/// the store as the person signed in, and a founding actor never holds a
+/// session.
+#[test]
+fn address_proof_session_actor_round_trips_and_founding_is_refused() -> Result<(), Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("sessions.json");
+    let actor = Actor::new(
+        LoginBinding::new("https://issuer.test", "subject")?,
+        Provenance::new(AuthMethod::AddressProof, 7),
+    );
+    let live = HashMap::from([(
+        "digest".to_owned(),
+        SessionEntry {
+            id: "id".to_owned(),
+            actor: actor.clone(),
+            started_at: 1,
+            ends_at: 100,
+        },
+    )]);
+    super::save(&path, &live)?;
+    let stored: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+    assert_eq!(stored["sessions"][0]["actor"]["method"], "address_proof");
+    let reopened = super::load(&path, 2)?;
+    assert_eq!(reopened["digest"].actor, actor);
+    assert!(
+        reopened["digest"]
+            .actor
+            .provenance()
+            .method()
+            .is_person_signed_in()
+    );
+    let founding = Actor::new(
+        LoginBinding::new("https://issuer.test", "founding:op-1")?,
+        Provenance::new(AuthMethod::Founding, 7),
+    );
+    let refused = HashMap::from([(
+        "founding".to_owned(),
+        SessionEntry {
+            id: "id".to_owned(),
+            actor: founding,
+            started_at: 1,
+            ends_at: 100,
+        },
+    )]);
+    assert!(super::save(&path, &refused).is_err());
+    Ok(())
+}

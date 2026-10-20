@@ -82,6 +82,9 @@ pub struct AppState {
     /// The sender letters go out through; none when the install has no
     /// mail settings (DIRECTORY-110).
     pub mailer: Option<crate::mail::Mailer>,
+    /// The foundings waiting on their proof, kept beside the directory log
+    /// (DIRECTORY-111); never held across an await.
+    pub foundings: Mutex<crate::foundings_store::Foundings>,
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
     /// Requests for declared MCP servers, recorded without changing provisioning.

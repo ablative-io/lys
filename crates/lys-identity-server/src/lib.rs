@@ -120,6 +120,8 @@ mod estate_api;
 pub mod file_stores;
 #[cfg(test)]
 mod folded_work;
+/// A stranger founds an organisation and proves their address (DIRECTORY-111).
+pub mod foundings_store;
 pub mod getting_started_api;
 #[cfg(test)]
 mod getting_started_tests;
@@ -201,6 +203,8 @@ pub mod operations_api;
 #[cfg(test)]
 mod operations_api_tests;
 pub mod operator;
+pub mod organisations_found;
+pub mod organisations_prove;
 /// The computer Lys runs on, named once by its administrator (AGENTS-017 R4).
 mod own_computer;
 #[cfg(test)]

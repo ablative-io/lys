@@ -45,6 +45,8 @@
   "POST /network/machines/{id}/join-code": ["operation"],
   "POST /network/machines/{id}/team": ["operation", "team"],
   "POST /oauth/jwks/rotate": ["operation"],
+  "POST /organisations/found": ["display_name", "email", "operation", "organisation"],
+  "POST /organisations/found/prove": ["proof"],
   "POST /people": ["display_name", "operation"],
   "POST /people/admit": ["display_name", "email", "operation"],
   "POST /people/{id}/logins": ["issuer", "operation", "subject"],

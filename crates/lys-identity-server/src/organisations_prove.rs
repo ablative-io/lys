@@ -1,0 +1,348 @@
+//! The proving link activates everything and signs the founder in
+//! (DIRECTORY-111 R2): POST /organisations/found/prove, unauthenticated,
+//! with the proof alone. An unknown or spent digest is refused
+//! `proof_refused` with one text, so a link's standing is never read off
+//! the refusal. Otherwise eight steps run in order under operations
+//! derived from the founding operation: account (the issuer's account by
+//! email, found before one is made; `already_admitted` when its subject is
+//! bound to an active person who is not the founder), bind, activate,
+//! organisation, grant (the administrator grant on the organisation, as
+//! first-run setup issues it), letter (the issuer's own new-account letter
+//! recorded as this act's added letter when the account was made here;
+//! Lys sends none), session (begun for the founder's new binding with
+//! provenance `AddressProof`) and spend, the digest marked spent, durably,
+//! last. A failed step is answered with its refusal and a receipt naming
+//! the steps completed; the digest stays unspent so the same proof asked
+//! again finishes what is left. The found and bind leaves are the founding
+//! actor's; from the activate on they are the founder's own.
+
+use axum::Json;
+use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
+use axum::http::header;
+use axum::response::{IntoResponse, Response};
+use lys_identity::{
+    Actor, AuthMethod, IdentityId, LifecycleState, LoginBinding, OperationId, OrganisationId,
+    PersonId, Provenance, Transition,
+};
+use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+use crate::admission::AUTHORITY;
+use crate::error::ServerError;
+use crate::foundings_store::{Founding, digest};
+use crate::mail_letters::Letter;
+use crate::organisations_found::{FoundingReceipt, founding_actor, foundings, step_operation};
+use crate::people_admit::refused;
+use crate::routes::{AppState, Shared, with_directory};
+use crate::sessions_api::SessionLogin;
+
+/// The proving act's steps, in order.
+pub const STEPS: [&str; 8] = [
+    "account",
+    "bind",
+    "activate",
+    "organisation",
+    "grant",
+    "letter",
+    "session",
+    "spend",
+];
+
+/// What the link's opener posts.
+#[derive(Deserialize, utoipa::ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrganisationsProveBody)]
+pub struct ProveBody {
+    /// The token from the letter's link.
+    proof: String,
+}
+
+/// What POST /sign-in answers, with the organisation and person added.
+#[derive(Serialize, utoipa::ToSchema)]
+#[schema(as = OrganisationProved)]
+pub struct Proved {
+    /// The login the session was begun for.
+    pub signed_in: SessionLogin,
+    /// The authority this service speaks for.
+    pub authority: String,
+    /// The organisation, now Active.
+    pub organisation: String,
+    /// The founder, now Active and signed in.
+    pub person: String,
+}
+
+/// The founding the proof names, its digest and the ids as the directory
+/// reads them.
+struct Proven {
+    digest: String,
+    founding: Founding,
+    operation: OperationId,
+    organisation: OrganisationId,
+    founder: PersonId,
+}
+
+fn malformed(reason: String) -> ServerError {
+    ServerError::RequestMalformed { reason }
+}
+
+/// The proof checked before any step: the install can write, the body is
+/// whole, the digest names an unspent founding.
+fn checked(
+    state: &AppState,
+    asked: Result<Json<ProveBody>, JsonRejection>,
+) -> Result<Proven, ServerError> {
+    if state.mailer.is_none() {
+        return Err(ServerError::MailUnconfigured);
+    }
+    let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
+    let digest = digest(&asked.proof);
+    let founding = foundings(state)?
+        .by_digest(&digest)
+        .filter(|founding| !founding.spent)
+        .cloned()
+        .ok_or(ServerError::ProofRefused)?;
+    let operation = OperationId::from_str(&founding.operation)?;
+    let organisation = OrganisationId::from_str(&founding.organisation)?;
+    let founder = PersonId::from_str(&founding.founder)?;
+    Ok(Proven {
+        digest,
+        founding,
+        operation,
+        organisation,
+        founder,
+    })
+}
+
+/// POST /organisations/found/prove: the eight steps, in order, as one act.
+pub(crate) async fn prove(
+    State(state): State<Shared>,
+    asked: Result<Json<ProveBody>, JsonRejection>,
+) -> Response {
+    let mut receipt = FoundingReceipt::default();
+    let proven = match checked(&state, asked) {
+        Ok(proven) => proven,
+        Err(error) => return refused(error, &receipt).await,
+    };
+    receipt.operation = proven.operation.to_string();
+    match steps(&state, &proven, &mut receipt).await {
+        Ok((cookie, proved)) => ([(header::SET_COOKIE, cookie)], Json(proved)).into_response(),
+        Err((step, error)) => {
+            receipt.failed = Some(step.to_owned());
+            refused(error, &receipt).await
+        }
+    }
+}
+
+/// Whether `binding` already names an active person other than `founder`.
+fn bound_to_another(
+    state: &AppState,
+    binding: &LoginBinding,
+    founder: PersonId,
+) -> Result<bool, ServerError> {
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        Ok(projection
+            .person_for(binding)
+            .filter(|person| *person != founder)
+            .and_then(|person| projection.record(IdentityId::Person(person)))
+            .is_some_and(|record| record.state() == LifecycleState::Active))
+    })
+}
+
+/// The founder's display name, as the directory holds it.
+fn founder_name(state: &AppState, founder: PersonId) -> Result<String, ServerError> {
+    with_directory(state, |directory| {
+        Ok(directory
+            .projection()?
+            .record(IdentityId::Person(founder))
+            .ok_or(ServerError::ProofRefused)?
+            .profile()
+            .display_name()
+            .to_owned())
+    })
+}
+
+/// Activate `identity` under `actor`, once; a repeat under the same
+/// operation records nothing, and an identity already Active by another
+/// act is left as it is.
+fn activate(
+    state: &AppState,
+    actor: Actor,
+    operation: OperationId,
+    identity: IdentityId,
+    reason: &str,
+    now: u64,
+) -> Result<(), ServerError> {
+    with_directory(state, |directory| {
+        let state_now = directory
+            .projection()?
+            .record(identity)
+            .map(|record| record.state());
+        if state_now == Some(LifecycleState::Active) {
+            return Ok(());
+        }
+        directory.transition(
+            actor,
+            operation,
+            identity,
+            Transition::Activate,
+            reason,
+            now,
+        )?;
+        Ok(())
+    })
+}
+
+/// Run every step, recording each as it completes; the failing step's name
+/// beside its refusal.
+async fn steps(
+    state: &Shared,
+    proven: &Proven,
+    receipt: &mut FoundingReceipt,
+) -> Result<(String, Proved), (&'static str, ServerError)> {
+    let [
+        account,
+        bind,
+        activate_step,
+        organisation,
+        grant,
+        letter,
+        session,
+        spend,
+    ] = STEPS;
+    let at = |step: &'static str| move |error: ServerError| (step, error);
+    let mailer = state
+        .mailer
+        .as_ref()
+        .ok_or((account, ServerError::MailUnconfigured))?;
+    let now = crate::session::now();
+    let operation = &proven.operation;
+    let founder = proven.founder;
+
+    let api = crate::sign_in_providers::api(state).map_err(at(account))?;
+    let name = founder_name(state, founder).map_err(at(account))?;
+    let (subject, made) = crate::accounts::make(
+        api,
+        &proven.founding.email,
+        crate::accounts::AccountName {
+            display: &name,
+            given: None,
+            family: None,
+        },
+    )
+    .await
+    .map_err(at(account))?;
+    let binding = LoginBinding::new(state.oidc.issuer(), &subject).map_err(at(account))?;
+    if bound_to_another(state, &binding, founder).map_err(at(account))? {
+        return Err((account, ServerError::AlreadyAdmitted));
+    }
+    receipt.done(account);
+
+    let founding = founding_actor(state, operation, now).map_err(at(bind))?;
+    let step = step_operation(operation, bind).map_err(at(bind))?;
+    with_directory(state, |directory| {
+        let bound = directory
+            .projection()?
+            .record(IdentityId::Person(founder))
+            .is_some_and(|record| record.bindings().contains(&binding));
+        if !bound {
+            directory.bind_login(founding, step, founder, binding.clone(), now)?;
+        }
+        Ok(())
+    })
+    .map_err(at(bind))?;
+    receipt.done(bind);
+
+    let own = Actor::new(
+        binding.clone(),
+        Provenance::new(AuthMethod::AddressProof, now),
+    );
+    let step = step_operation(operation, activate_step).map_err(at(activate_step))?;
+    activate(
+        state,
+        own.clone(),
+        step,
+        IdentityId::Person(founder),
+        "address proven by the founding letter's link",
+        now,
+    )
+    .map_err(at(activate_step))?;
+    receipt.done(activate_step);
+
+    let step = step_operation(operation, organisation).map_err(at(organisation))?;
+    activate(
+        state,
+        own.clone(),
+        step,
+        IdentityId::Organisation(proven.organisation),
+        "founded; the founder's address proven",
+        now,
+    )
+    .map_err(at(organisation))?;
+    receipt.done(organisation);
+
+    crate::organisation_boot::founder_grant(state, founder).map_err(at(grant))?;
+    receipt.done(grant);
+
+    if made {
+        let added = Letter::Added {
+            name,
+            email: proven.founding.email.clone(),
+            address: state.oidc.public_origin().to_owned(),
+            google: crate::people_admit::google_offered(api)
+                .await
+                .map_err(at(letter))?,
+        };
+        mailer
+            .note_sent_by_issuer(&operation.to_string(), &added)
+            .await
+            .map_err(at(letter))?;
+    }
+    receipt.done(letter);
+
+    let cookie = crate::session_admission::begin(state, own)
+        .await
+        .map_err(at(session))?;
+    receipt.done(session);
+
+    foundings(state)
+        .map_err(at(spend))?
+        .spend(&proven.digest)
+        .map_err(at(spend))?;
+    receipt.done(spend);
+
+    Ok((
+        cookie,
+        Proved {
+            signed_in: SessionLogin {
+                issuer: binding.issuer().to_owned(),
+                subject: binding.subject().to_owned(),
+            },
+            authority: AUTHORITY.to_owned(),
+            organisation: proven.organisation.to_string(),
+            person: founder.to_string(),
+        },
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_spend_is_last_and_the_session_before_it() {
+        assert_eq!(STEPS[6..], ["session", "spend"]);
+        assert_eq!(STEPS[0], "account");
+    }
+
+    #[test]
+    fn the_body_takes_the_proof_alone() {
+        let whole: Result<ProveBody, _> =
+            serde_json::from_value(serde_json::json!({"proof": "abc"}));
+        assert!(whole.is_ok());
+        let extra: Result<ProveBody, _> =
+            serde_json::from_value(serde_json::json!({"proof": "abc", "email": "x@y"}));
+        assert!(extra.is_err(), "an unknown member is refused");
+    }
+}
