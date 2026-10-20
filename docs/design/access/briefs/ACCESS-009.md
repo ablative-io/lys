@@ -55,13 +55,14 @@ Behavioural. THE SYSTEM SHALL replace the check at crates/lys-identity-server/sr
 
 ### R2: The root authority for a resource is a function of the resource: the holder of organisation.grant for a resource of an organisation, the install's person for an install-level kind
 
-Behavioural. judge_root (crates/lys-identity/src/grants/admission.rs:273-281) today compares request.caller with one root_authority: PersonId (crates/lys-identity/src/grants/authority.rs:121, passed at crates/lys-identity-server/src/grants.rs:134 and :172). THE SYSTEM SHALL judge a root request by the resource: WHEN the resource's kind is organisation-owned (every kind except the install-level kinds the model marks, today the apps, configuration zone and issuer kinds, listed once in crates/lys-identity/src/grants/shipped.rs) THE SYSTEM SHALL require the caller to hold organisation.grant on their own organisation and SHALL record the organisation on the issued grant, so every grant in the lineage below it carries the organisation that owns the resource; WHEN the kind is install-level THE SYSTEM SHALL require today's root authority person, unchanged. A root on an organisation-owned resource already rooted under another organisation is refused by name (resource_owned_elsewhere): a resource belongs to one organisation for as long as any grant on it lives. POST /grants/roots (crates/lys-identity-server/src/grants/handlers.rs:105-122) and the admit step that issues one (people_admit.rs:327-343) both go through this judge; POST /grants/agent-roots (grants.rs:287, agent_roots.rs:135, :151-158) issues an agent's setup roots under its responsible person's organisation. Our administrator gains nothing and loses nothing: root authority for our install-level kinds and, by the founding grant, for our organisation's resources, and none for Priya's.
+Behavioural. judge_root (crates/lys-identity/src/grants/admission.rs:273-281) today compares request.caller with one root_authority: PersonId (crates/lys-identity/src/grants/authority.rs:121, passed at crates/lys-identity-server/src/grants.rs:134 and :172). THE SYSTEM SHALL judge a root request by the resource: WHEN the resource's kind is organisation-owned (every kind except the one install-level kind the tree roots today: directory with collection apps (directory:apps, the root the administrator holds for registering apps, crates/lys-identity-server/src/agent_roots.rs:35 COLLECTIONS and crates/lys-identity-server/src/apps_register.rs:28); the settings zone and the issuer are not grant kinds, they are routes::administrator acts and stay so; directory:agents, person, agent, machine, account, budget, team and policy (the other kinds crates/lys-identity-server/src/setup.rs and agent_roots.rs root) are organisation-owned) THE SYSTEM SHALL require the caller to hold organisation.grant on their own organisation and SHALL record the organisation on the issued grant, so every grant in the lineage below it carries the organisation that owns the resource; WHEN the kind is install-level THE SYSTEM SHALL require today's root authority person, unchanged. A root on an organisation-owned resource already rooted under another organisation is refused by name (resource_owned_elsewhere): a resource belongs to one organisation for as long as any grant on it lives. POST /grants/roots (crates/lys-identity-server/src/grants/handlers.rs:105-122) and the admit step that issues one (people_admit.rs:327-343) both go through this judge; POST /grants/agent-roots (grants.rs:287, agent_roots.rs:135, :151-158) issues an agent's setup roots under its responsible person's organisation. Our administrator gains nothing and loses nothing: root authority for our install-level kinds and, by the founding grant, for our organisation's resources, and none for Priya's. Every grant already in the installed log carries its organisation from DIRECTORY-109 R2's boot batch (the install's), so resource_owned_elsewhere reads a stamped organisation on every lineage and never a missing one. An app's credential belongs to no organisation: an app is never a root authority and never a holder under an organisation.
 
 **Acceptance:**
 - A founder of organisation A issues a root on cambium.workspace:<A> to one of A's people and the grant records organisation A; the same caller asked for a root on an install-level kind is refused RootAuthorityRefused as today
 - A founder of B asked for a root on cambium.workspace:<A> while A's grant lives is refused resource_owned_elsewhere; after A's grants on it are all revoked, B may root it
 - The install's root authority person issues a root on an install-level kind as today, and is refused a root on a resource of B
 - The grant log's record and /grants/{id} carry the organisation; /grants/why names it in the lineage
+- A root on directory:apps is judged by the install's root authority person as today, and a founder of A asking for it is refused RootAuthorityRefused; a root on a machine or a team by A's founder is allowed and records A
 
 **Files:**
 - create: crates/lys-identity-server/src/grants/organisation_roots_tests.rs
@@ -83,12 +84,13 @@ Behavioural. judge_root (crates/lys-identity/src/grants/admission.rs:273-281) to
 
 ### R3: Pass-on stays inside the organisation: a delegation names only recipients of the issuer's organisation and resources it owns; revocation is unchanged
 
-Behavioural. THE SYSTEM SHALL add one rule to delegation judging (delegation_authority, crates/lys-identity-server/src/grants/handlers.rs:124-179 and crates/lys-identity/src/grants/admission.rs): the recipient, person, agent, service account, connector or machine, belongs to the issuing grant's organisation (an agent, service account, connector or machine through its owner's record, DIRECTORY-109 R1), else the delegation is refused by name (recipient_outside_organisation) and nothing is written; and the resource is one the lineage's root recorded under that organisation (R2), which the lineage check already walks. PassOn::To's recipients list (crates/lys-identity/src/grants/types.rs:245-255) keeps its meaning; the rule narrows who may stand in it. Revocation (crates/lys-identity/src/grants/revocation.rs:71: the root authority or the issuer) is unchanged in words and widened in meaning by R2: the root authority of a resource of organisation A is A's organisation.grant holder. A grant Priya can revoke is the only way for anyone outside her organisation to act inside it (ruling 2), and this rule is what makes it the only way.
+Behavioural. THE SYSTEM SHALL add one rule to delegation judging (delegation_authority, crates/lys-identity-server/src/grants/handlers.rs:124-179 and crates/lys-identity/src/grants/admission.rs): the recipient, person, agent, service account, connector or machine, belongs to the issuing grant's organisation (an agent, service account, connector or machine through its owner's record, DIRECTORY-109 R1), else the delegation is refused by name (recipient_outside_organisation) and nothing is written; and the resource is one the lineage's root recorded under that organisation (R2), which the lineage check already walks. PassOn::To's recipients list (crates/lys-identity/src/grants/types.rs:245-255) keeps its meaning; the rule narrows who may stand in it. Revocation (crates/lys-identity/src/grants/revocation.rs:71: the root authority or the issuer) is unchanged in words and widened in meaning by R2: the root authority of a resource of organisation A is A's organisation.grant holder. A grant Priya can revoke is the only way for anyone outside her organisation to act inside it (ruling 2), and this rule is what makes it the only way. Apps and connectors belong to no organisation, so no delegation reaches them: a recipient that is an app's credential or a connector is refused recipient_outside_organisation like any recipient outside it; the door's access to Lys is its app credential and the connect flow, not a grant.
 
 **Acceptance:**
 - A holder in A delegating to a person of B is refused recipient_outside_organisation; to a person of A, allowed, and the grant records A
 - A holder in A delegating to an agent whose responsible person is in B is refused the same way; the agent of a person in A is allowed
 - A's founder revokes a grant their person passed on; B's founder asked to revoke it is refused as today
+- A delegation naming an app credential or a connector as recipient is refused recipient_outside_organisation
 
 **Files:**
 - modify: crates/lys-identity/src/grants/admission.rs
@@ -134,6 +136,8 @@ Behavioural. Or she has routes and no door (Waffles, 20 October 2026). THE SYSTE
 - No change to what a grant permits once issued, to /grants/check, /grants/check/batch or /grants/which: they answer the subject's grants as today
 - No change to the door: CORE-073 asks /grants/which for cambium.workspace and is written after this brief
 - Agents' seats in an organisation's workspace are the sixth brief the page names, not this one
+- Apps and connectors belong to no organisation: no delegation reaches them, an app is never a root authority, and an app's questions for its own kinds (/grants/which, /check, /check/batch) answer across organisations as today
+- The install-level kinds are named here from the tree, not decided at build time: directory:apps alone; the settings zone and the issuer are routes::administrator acts, not kinds
 
 ## Verification
 
@@ -141,3 +145,12 @@ Behavioural. Or she has routes and no door (Waffles, 20 October 2026). THE SYSTE
 - bun run test in surface/identity, the summary line read and both new and changed test files named in it
 - python3 scripts/design/validate.py docs/design/access and python3 scripts/design/check-coverage.py docs/design/access read for FAIL lines, never the exit code
 - The whole declared gate on Tom's Mac, START and END posted with df
+
+## Amendments
+
+### Amendment 1: App callers, existing grants, the install-level kinds named
+
+- **Date:** 2026-10-20
+- **By:** Waffles, written by Flapjack
+
+R2: the install-level kinds are named from the tree now (directory:apps; the settings zone and the issuer are administrator acts, not kinds), every existing grant carries the install's organisation from DIRECTORY-109 R2's batch, and an app is never a root authority. R3 and Boundaries: apps and connectors belong to no organisation, so no delegation reaches them; app questions for their own kinds answer across organisations as today.
