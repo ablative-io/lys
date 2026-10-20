@@ -6,6 +6,7 @@ pub mod fake_issuer;
 pub mod fake_rauthy;
 pub mod fixtures;
 pub mod harness;
+pub mod mail_sink;
 pub mod membership_world;
 pub mod organisation_fixture;
 pub mod refusals;
