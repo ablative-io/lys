@@ -29,10 +29,6 @@ use lys_log_store::FileLeafStore;
 use crate::error::ServerError;
 use crate::routes::{AppState, with_directory};
 
-#[cfg(test)]
-#[path = "organisation_boot_tests.rs"]
-mod tests;
-
 fn refused(reason: String) -> ServerError {
     ServerError::OrganisationBootRefused { reason }
 }

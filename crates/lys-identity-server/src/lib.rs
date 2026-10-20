@@ -321,11 +321,6 @@ mod boot_refused;
 /// The store brought under the install's organisation at its first boot
 /// (DIRECTORY-109 R2).
 mod organisation_boot;
-#[cfg(test)]
-mod organisation_fixture;
-/// Every read partitioned by the caller's organisation (DIRECTORY-109 R4).
-#[cfg(test)]
-mod organisation_reads_tests;
 /// Every store held against its receipt (DIRECTORY-107 R2, R4).
 pub mod stores_receipt;
 

@@ -68,7 +68,7 @@ Behavioural. One path, not two (docs/design/onboarding/ORGANISATION-ALONE.md, ru
 
 **Files:**
 - create: crates/lys-identity-server/src/organisation_boot.rs
-- create: crates/lys-identity-server/src/organisation_boot_tests.rs
+- create: crates/lys-identity-server/tests/organisation_boot.rs
 - modify: crates/lys-identity-server/src/admission.rs
 - modify: crates/lys-identity-server/src/routes_startup.rs
 - modify: crates/lys/src/identity/config.rs
@@ -117,7 +117,7 @@ Behavioural. THE SYSTEM SHALL filter by the caller's organisation, from the proj
 - An app asking /grants/which for its own kind is answered ids across organisations A and B; a person of A asking the same is answered A's ids only
 
 **Files:**
-- create: crates/lys-identity-server/src/organisation_reads_tests.rs
+- create: crates/lys-identity-server/tests/organisation_reads.rs
 - modify: crates/lys-identity-server/src/read_api.rs
 - modify: crates/lys-identity-server/src/routes_table.rs
 - modify: crates/lys-identity-server/src/teams_api.rs

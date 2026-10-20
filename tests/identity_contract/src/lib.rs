@@ -7,6 +7,7 @@ pub mod fake_rauthy;
 pub mod fixtures;
 pub mod harness;
 pub mod membership_world;
+pub mod organisation_fixture;
 pub mod refusals;
 
 /// The service crate the harness starts, as the harness links it. A test

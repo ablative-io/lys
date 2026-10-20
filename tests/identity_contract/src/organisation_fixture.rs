@@ -13,10 +13,13 @@ use lys_identity::{
 use lys_log_store::LeafStore;
 
 /// The first second every fixture is written at.
-pub(crate) const T0: u64 = 1_800_000_000;
+pub const T0: u64 = 1_800_000_000;
 
 /// An actor signed in at `issuer` as `subject`.
-pub(crate) fn actor(issuer: &str, subject: &str) -> Result<Actor, Box<dyn Error>> {
+///
+/// # Errors
+/// Refuses a malformed issuer or subject.
+pub fn actor(issuer: &str, subject: &str) -> Result<Actor, Box<dyn Error>> {
     Ok(Actor::new(
         LoginBinding::new(issuer, subject)?,
         Provenance::new(AuthMethod::Oidc, T0),
@@ -24,10 +27,10 @@ pub(crate) fn actor(issuer: &str, subject: &str) -> Result<Actor, Box<dyn Error>
 }
 
 /// The leaf that activates `identity`.
-pub(crate) fn activate(
-    actor: &Actor,
-    identity: IdentityId,
-) -> Result<IdentityEvent, Box<dyn Error>> {
+///
+/// # Errors
+/// Refuses an operation id or event the directory cannot form.
+pub fn activate(actor: &Actor, identity: IdentityId) -> Result<IdentityEvent, Box<dyn Error>> {
     Ok(IdentityEvent::new(
         OperationId::generate()?,
         actor.clone(),
@@ -44,7 +47,10 @@ pub(crate) fn activate(
 
 /// Bind `person` to the login `subject` at `issuer`, so the fake issuer's
 /// sign-in as that subject reaches them.
-pub(crate) fn bind<S: LeafStore>(
+///
+/// # Errors
+/// Refuses a malformed login or a directory write that fails.
+pub fn bind<S: LeafStore>(
     directory: &mut Directory<S>,
     actor: &Actor,
     person: PersonId,
@@ -63,7 +69,10 @@ pub(crate) fn bind<S: LeafStore>(
 
 /// The harness's model with the administrator relation: `alpha` carries
 /// read and write, `beta` read, `administrator` the four organisation acts.
-pub(crate) fn model() -> Result<Model, Box<dyn Error>> {
+///
+/// # Errors
+/// Refuses a relation, action or model the grants cannot form.
+pub fn model() -> Result<Model, Box<dyn Error>> {
     let actions = |names: &[&str]| -> Result<BTreeSet<Action>, Box<dyn Error>> {
         Ok(names
             .iter()

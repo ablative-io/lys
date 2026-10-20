@@ -7,6 +7,7 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 use identity_contract::harness::{ADMINISTRATOR, Fault, Harness, ManualClock, Service};
+use identity_contract::organisation_fixture::{T0, activate, model};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Action, DelegateRequest, Grants, MemoryRelationships, PassOn, RecipientKind, Relation,
@@ -15,16 +16,13 @@ use lys_identity::grants::{
 use lys_identity::{
     Actor, AgentId, Change, Directory, IdentityEvent, IdentityId, OperationId, PersonId, Profile,
 };
+use lys_identity_server::{Config, Say};
 use lys_log_store::{FileLeafStore, LeafStore};
-
-use crate::Config;
-use crate::organisation_fixture::{T0, activate, model};
-use crate::routes::Say;
 
 type Outcome = Result<(), Box<dyn Error>>;
 
 fn actor(issuer: &str) -> Result<Actor, Box<dyn Error>> {
-    crate::organisation_fixture::actor(issuer, ADMINISTRATOR)
+    identity_contract::organisation_fixture::actor(issuer, ADMINISTRATOR)
 }
 
 /// The directory of a store written before organisations: the

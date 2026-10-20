@@ -9,17 +9,16 @@ use std::error::Error;
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::organisation_fixture::{T0, activate, actor, bind, model};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Action, Grants, MemoryRelationships, PassOn, RecipientKind, Relation, Resource, RootRequest,
     Route, Window,
 };
 use lys_identity::{Directory, IdentityId, OperationId, OrganisationId, PersonId, Profile};
+use lys_identity_server::Config;
 use lys_log_store::FileLeafStore;
 use serde_json::{Value, json};
-
-use crate::Config;
-use crate::organisation_fixture::{T0, activate, actor, bind, model};
 
 type Outcome = Result<(), Box<dyn Error>>;
 

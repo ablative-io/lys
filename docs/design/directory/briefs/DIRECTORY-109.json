@@ -66,7 +66,7 @@
       "files": {
         "create": [
           "crates/lys-identity-server/src/organisation_boot.rs",
-          "crates/lys-identity-server/src/organisation_boot_tests.rs"
+          "crates/lys-identity-server/tests/organisation_boot.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/admission.rs",
@@ -126,7 +126,7 @@
       ],
       "files": {
         "create": [
-          "crates/lys-identity-server/src/organisation_reads_tests.rs"
+          "crates/lys-identity-server/tests/organisation_reads.rs"
         ],
         "modify": [
           "crates/lys-identity-server/src/read_api.rs",

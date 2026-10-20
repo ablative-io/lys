@@ -1436,10 +1436,10 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity/src/id.rs` | IdentityId gains Organisation(OrganisationId) (DIRECTORY-109 R1). | DIRECTORY-109 |
 | `crates/lys-identity/src/projection.rs` | A person's and agent's record carries its organisation; organisation_of and the organisations held (DIRECTORY-109 R1). | DIRECTORY-109 |
 | `crates/lys-identity-server/src/organisation_boot.rs` | At boot, the install's organisation is founded once and every record without one is attached to it in one durable batch (DIRECTORY-109 R2). | DIRECTORY-109 |
-| `crates/lys-identity-server/src/organisation_boot_tests.rs` | The boot batch: attaches every record once, nothing twice, refuses to serve on a failed commit (DIRECTORY-109 R2). | DIRECTORY-109 |
+| `crates/lys-identity-server/tests/organisation_boot.rs` | The boot batch: attaches every record once, nothing twice, refuses to serve on a failed commit (DIRECTORY-109 R2). | DIRECTORY-109 |
 | `crates/lys-identity-server/src/admission.rs` | First-run setup founds the install's organisation with the administrator as founder in the same batch (DIRECTORY-109 R2). | DIRECTORY-109 |
 | `crates/lys-identity/src/grants/shipped.rs` | The kind organisation, its four actions, the administrator role, and the three actions withheld from agents (DIRECTORY-109 R3). | DIRECTORY-109 |
-| `crates/lys-identity-server/src/organisation_reads_tests.rs` | Two organisations, every read route answers only the caller's own (DIRECTORY-109 R4). | DIRECTORY-109 |
+| `crates/lys-identity-server/tests/organisation_reads.rs` | Two organisations, every read route answers only the caller's own (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `crates/lys-identity-server/src/grants_batch.rs` | /grants/which answers only ids of the caller's organisation (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `surface/identity/src/features/people/People.tsx` | The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4). | DIRECTORY-109 |
 | `surface/identity/src/features/people/people-views.test.tsx` | The organisation name shown in the People header (DIRECTORY-109 R4). | DIRECTORY-109 |
