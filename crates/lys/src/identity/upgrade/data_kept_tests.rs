@@ -337,7 +337,8 @@ fn the_stores_before_organisations_are_kept_once_and_named_on_the_record() -> Te
     assert_eq!(read.organisation_copy, Some(copy.clone()));
     // A later upgrade finds the copy and leaves it: the record then names none.
     append(&layout.data_dir().join("directory-log"), 4)?;
-    let mut later = intent();
+    // The record above shadows the fixture's maker.
+    let mut later = self::intent();
     keep_for_organisations(&layout, &mut later)?;
     assert_eq!(later.organisation_copy, None);
     assert_eq!(records(&copy.join("directory-log"))?, 3);
