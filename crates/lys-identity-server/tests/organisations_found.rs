@@ -18,7 +18,6 @@ use founding::{
 };
 use lys_identity::OperationId;
 use serde_json::json;
-use sha2::{Digest, Sha256};
 
 #[tokio::test]
 async fn a_founding_records_both_registered_and_writes_one_letter_with_the_link() -> TestResult {
@@ -65,10 +64,7 @@ async fn a_founding_records_both_registered_and_writes_one_letter_with_the_link(
     );
     // The store holds the digest and never the token.
     let stored = foundings(&service)?.ok_or("the foundings file")?;
-    let digest: String = Sha256::digest(token.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+    let digest = lys_identity_server::foundings_store::digest(&token);
     assert!(stored["foundings"][&digest].is_object(), "{stored}");
     assert_eq!(stored["foundings"][&digest]["email"], BEA);
     assert_eq!(stored["foundings"][&digest]["spent"], false);
