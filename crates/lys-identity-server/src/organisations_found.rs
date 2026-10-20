@@ -327,14 +327,14 @@ async fn steps(
         .map_err(at(proof))?;
     receipt.done(proof);
 
-    let founded = Letter::Founded {
+    let proving = Letter::Founded {
         name: asked.founder.display_name().to_owned(),
         email: asked.email.clone(),
         link: format!("{address}/#/found/{token}"),
         organisation: asked.organisation.display_name().to_owned(),
     };
     let wrote = mailer
-        .send_once(&operation, &founded)
+        .send_once(&operation, &proving)
         .await
         .map_err(at(letter))?;
     receipt.done(letter);

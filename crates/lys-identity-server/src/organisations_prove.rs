@@ -126,7 +126,7 @@ pub(crate) async fn prove(
     };
     receipt.operation = proven.operation.to_string();
     match steps(&state, &proven, &mut receipt).await {
-        Ok((cookie, proved)) => ([(header::SET_COOKIE, cookie)], Json(proved)).into_response(),
+        Ok((cookie, answer)) => ([(header::SET_COOKIE, cookie)], Json(answer)).into_response(),
         Err((step, error)) => {
             receipt.failed = Some(step.to_owned());
             refused(error, &receipt).await
@@ -233,13 +233,15 @@ async fn steps(
     )
     .await
     .map_err(at(account))?;
-    let binding = LoginBinding::new(state.oidc.issuer(), &subject).map_err(at(account))?;
+    let binding = LoginBinding::new(state.oidc.issuer(), &subject)
+        .map_err(ServerError::from)
+        .map_err(at(account))?;
     if bound_to_another(state, &binding, founder).map_err(at(account))? {
         return Err((account, ServerError::AlreadyAdmitted));
     }
     receipt.done(account);
 
-    let founding = founding_actor(state, operation, now).map_err(at(bind))?;
+    let as_founding = founding_actor(state, operation, now).map_err(at(bind))?;
     let step = step_operation(operation, bind).map_err(at(bind))?;
     with_directory(state, |directory| {
         let bound = directory
@@ -247,7 +249,7 @@ async fn steps(
             .record(IdentityId::Person(founder))
             .is_some_and(|record| record.bindings().contains(&binding));
         if !bound {
-            directory.bind_login(founding, step, founder, binding.clone(), now)?;
+            directory.bind_login(as_founding, step, founder, binding.clone(), now)?;
         }
         Ok(())
     })
