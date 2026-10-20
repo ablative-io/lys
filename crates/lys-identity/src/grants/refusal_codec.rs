@@ -144,6 +144,7 @@ pub(crate) fn decode_refusal(value: Value) -> Result<GrantError, Unreadable> {
                 3 => RecipientKind::ServiceAccount,
                 4 => RecipientKind::Connector,
                 5 => RecipientKind::Machine,
+                6 => RecipientKind::Organisation,
                 other => return Err(format!("recipient kind {other} is not a kind")),
             },
             grant: next_text(members)?,

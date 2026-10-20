@@ -412,15 +412,15 @@ impl<S: LeafStore> Directory<S> {
             return Ok(None);
         }
         let operation = derived(OperationId::from_bytes([0; ID_LEN]), ATTACH_OPERATION);
-        let (organisation_id, founded) = match self.projection.first_organisation() {
+        let (organisation_id, founding) = match self.projection.first_organisation() {
             Some(held) => (held, false),
             None => match self.founded_by(operation)? {
-                Some((founded, _)) => (founded, true),
+                Some((answered, _)) => (answered, true),
                 None => (OrganisationId::generate()?, true),
             },
         };
         let mut events = Vec::with_capacity(unattached.len() + 2);
-        if founded {
+        if founding {
             let founder = self
                 .projection
                 .first_person()
@@ -466,7 +466,7 @@ impl<S: LeafStore> Directory<S> {
         Ok(Some(Attached {
             organisation: organisation_id,
             attached: unattached.len() as u64,
-            founded,
+            founded: founding,
         }))
     }
 }

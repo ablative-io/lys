@@ -194,6 +194,7 @@ impl Projection {
         } else {
             person.state()
         };
+        let organisation = person.organisation;
         let identity = IdentityId::ServiceAccount(id);
         if self.records.contains_key(&identity) {
             return Err(IdentityError::AlreadyRegistered {
@@ -211,7 +212,7 @@ impl Projection {
                 bindings: Vec::new(),
                 registered_by: created_by,
                 events: Vec::new(),
-                organisation: person.organisation,
+                organisation,
                 founder: None,
             },
         );

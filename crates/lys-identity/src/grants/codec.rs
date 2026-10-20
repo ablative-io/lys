@@ -86,6 +86,7 @@ pub(crate) fn recipient_code(kind: RecipientKind) -> u64 {
         RecipientKind::ServiceAccount => 3,
         RecipientKind::Connector => 4,
         RecipientKind::Machine => 5,
+        RecipientKind::Organisation => 6,
     }
 }
 

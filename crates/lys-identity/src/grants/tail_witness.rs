@@ -48,6 +48,12 @@ pub enum TailEffect {
         /// The grant used.
         grant: GrantId,
     },
+    /// A stamp of the organisation a grant belongs to (DIRECTORY-109 R2):
+    /// it changes no authority, whether or not the grant is known here.
+    Stamped {
+        /// The grant stamped.
+        grant: GrantId,
+    },
     /// A revoke or use of a grant neither the folded book nor an earlier
     /// tail event issued: its effect cannot be classified.
     Unknown {
@@ -63,6 +69,7 @@ impl TailEffect {
             | Self::Revoked { grant }
             | Self::Spent { grant }
             | Self::Used { grant }
+            | Self::Stamped { grant }
             | Self::Unknown { grant } => *grant,
         }
     }
@@ -178,6 +185,7 @@ fn effect_of(book: &GrantBook, seen: &mut Seen, event: &GrantEvent) -> TailEffec
         book.grant(grant).is_some() || seen.issued.contains_key(&grant)
     };
     match event.change() {
+        GrantChange::Stamp { grant, .. } => TailEffect::Stamped { grant: *grant },
         GrantChange::Issue(grant) => {
             seen.issued
                 .insert(grant.id(), (grant.is_once(), grant.holder()));
@@ -248,7 +256,8 @@ fn classify(
                 TailEffect::Issued { .. }
                 | TailEffect::Revoked { .. }
                 | TailEffect::Spent { .. }
-                | TailEffect::Used { .. } => TailBearing::Disjoint,
+                | TailEffect::Used { .. }
+                | TailEffect::Stamped { .. } => TailBearing::Disjoint,
             };
         }
         effects.push(TailEffectAt { index, effect });

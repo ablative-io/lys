@@ -86,7 +86,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                     GrantChange::Issue(grant) => {
                         grant.resource() == &resource && created_hop(grant, &source)
                     }
-                    GrantChange::Revoke { .. } | GrantChange::Use { .. } => false,
+                    GrantChange::Revoke { .. }
+                    | GrantChange::Use { .. }
+                    | GrantChange::Stamp { .. } => false,
                 };
                 if !standing {
                     return Err(GrantError::OperationReused {

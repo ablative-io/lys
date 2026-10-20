@@ -260,7 +260,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             .uncertain()
             .and_then(|held| match held.event.change() {
                 GrantChange::Revoke { grant, .. } => Some((held.operation, *grant)),
-                GrantChange::Issue(_) | GrantChange::Use { .. } => None,
+                GrantChange::Issue(_) | GrantChange::Use { .. } | GrantChange::Stamp { .. } => None,
             })
     }
 
