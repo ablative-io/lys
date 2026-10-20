@@ -22,7 +22,7 @@ use crate::harness_serve::{DropMarker, StageTimer, serve};
 /// none: the install writes the shipped model, which always carries it, so
 /// a fixture names only the relations its test is about and the
 /// organisation's founder grant still issues at boot (DIRECTORY-109 R3).
-pub fn with_administrator(model: &str) -> Result<String, Box<dyn Error>> {
+pub fn with_administrator(model: &str) -> Result<String, Box<dyn Error + Send + Sync>> {
     use lys_identity::grants::shipped::{ADMINISTRATOR_RELATION, ORGANISATION_ACTIONS};
     let mut file: serde_json::Value = serde_json::from_str(model)?;
     let relations = file
