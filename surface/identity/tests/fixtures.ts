@@ -309,6 +309,7 @@ export const BEA_ME: MeView = {
   signed_in: { provider: ISSUER, subject: 'bea' },
   sign_in_identities: [{ provider: ISSUER, subject: 'bea' }],
   service_accounts: [],
+  organisation: { id: ORGANISATION, display_name: 'Example organisation' },
 };
 
 export const BEA_ROOT_G = 'grant-' + hex(41);

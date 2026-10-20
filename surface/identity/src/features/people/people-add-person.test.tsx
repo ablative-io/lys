@@ -25,7 +25,7 @@ describe('Add person on People and agents', () => {
     unmountAll();
     await mount('#/people/new', BEA);
     await settle();
-    expect(text()).toContain('Only the Lys administrator adds people, so this form is not open to you.');
+    expect(text()).toContain('Adding a person to Example organisation needs organisation.admit there, which you do not hold, so this form is not open to you.');
     expect($('a[href="#/agents/new"]')?.textContent).toBe('Add an agent');
   });
 });

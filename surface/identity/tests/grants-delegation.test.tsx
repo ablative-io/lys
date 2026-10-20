@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { $, $$, choose, click, mount, press, unmountAll, unreachable } from './harness';
-import { ADA, GRANTS, AGENT_MODEL as MODEL, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
+import { ADA, GRANTS, AGENT_MODEL as MODEL, ORGANISATION, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
 import type { DelegateBody } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
@@ -411,8 +411,8 @@ describe('Can X do this? (conformance 8.1)', () => {
   it('names each resource as the mock-up does: a project by its id, anything else as name (type)', async () => {
     const channel = { ...GRANTS[1], id: 'grant-' + '9'.repeat(32), resource: { kind: 'channel', id: 'general' } };
     await mount('#/access/can', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, channel], revision: 7 }) });
-    expect($$('#cRes option').map((o) => o.textContent)).toEqual(['project:identity', 'project:ledger', 'general (channel)']);
-    expect($$('#cRes option').map((o) => (o as HTMLOptionElement).value)).toEqual(['project:identity', 'project:ledger', 'channel:general']);
+    expect($$('#cRes option').map((o) => o.textContent)).toEqual(['project:identity', 'project:ledger', 'organisation:' + ORGANISATION, 'general (channel)']);
+    expect($$('#cRes option').map((o) => (o as HTMLOptionElement).value)).toEqual(['project:identity', 'project:ledger', 'organisation:' + ORGANISATION, 'channel:general']);
   });
 
   it("asks /grants/why for the caller's own question and shows its named refusal", async () => {

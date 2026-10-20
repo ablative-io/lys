@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, serve, text } from './harness';
 import { reachMap } from '../src/features/grants/check';
-import { OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ORGANISATION, OWN, SCRIBE, SERVICE, ok, refused } from './fixtures';
 
 const drawing = () => $('svg[aria-label="Permission graph"]');
 const titles = (kind: string) => $$('line.ge.' + kind).map((line) => line.textContent ?? '');
@@ -16,7 +16,7 @@ describe('Identity graph', () => {
     await click($$('button').find(button => button.textContent === 'Show retired') ?? null);
     const labels = $$('g.gn').map((node) => node.getAttribute('aria-label'));
     for (const name of ['Ada (test person)', 'Scribe', 'Courier', 'Archivist', 'Bea (test person)', 'Reviewer', 'Lamplighter', 'identity', 'ledger']) expect(labels).toContain(name);
-    expect(titles('grant')).toEqual(['Ada (test person): everything here on project identity', 'Ada (test person): View this resource on project ledger', 'Scribe: View this resource on project identity']);
+    expect(titles('grant')).toEqual(['Ada (test person): everything here on project identity', 'Ada (test person): View this resource on project ledger', 'Scribe: View this resource on project identity', 'Ada (test person): organisation.administer; organisation.admit; organisation.grant; organisation.read on organisation ' + ORGANISATION]);
     expect(titles('answers')).toHaveLength(5);
     expect(titles('answers')).toContain('Scribe answers to Ada (test person)');
     expect(app.posted.map((call) => call.path)).toEqual(['/grants/reach']);

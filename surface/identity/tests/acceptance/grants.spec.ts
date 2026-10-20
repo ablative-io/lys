@@ -24,7 +24,7 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, choose, click, mount, press, text, unmountAll, unreachable, settle } from '../harness';
-import { BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_ROOT_G, BEA_SERVICE, GRANTS, ROOT_G, SCRIBE, SERVICE, ok, refused } from '../fixtures';
+import { BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_ROOT_G, BEA_SERVICE, GRANTS, ORGANISATION, ROOT_G, SCRIBE, SERVICE, ok, refused } from '../fixtures';
 
 beforeEach(() => sessionStorage.clear());
 
@@ -142,6 +142,7 @@ const ROWS: ConformanceRow[] = [
       expect(holdRows()).toEqual([
         ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give'],
         ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
+        ['organisation.administer; organisation.admit; organisation.grant; organisation.read', 'administrator', 'organisation:' + ORGANISATION, 'root', 'no', ''],
       ]);
     },
   },

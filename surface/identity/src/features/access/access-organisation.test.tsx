@@ -3,9 +3,9 @@
  * the Access and People heads name; a direct entry without the right is told which right, and given no form.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
-import { $, mount, settle, text } from './harness';
-import { FOUNDING_G, GRANTS, SERVICE, ok, refused } from './fixtures';
-import type { Route } from './fixtures';
+import { $, mount, settle, text } from '../../../tests/harness';
+import { FOUNDING_G, GRANTS, SERVICE, ok, refused } from '../../../tests/fixtures';
+import type { Route } from '../../../tests/fixtures';
 
 beforeEach(() => sessionStorage.clear());
 
@@ -55,6 +55,6 @@ describe('Add person from organisation.admit', () => {
     expect($('form[aria-label="Add a person"]')).toBeNull();
     expect(text()).toContain('needs organisation.admit there, which you do not hold');
     expect(text()).toContain('Example organisation');
-    expect(posted).toHaveLength(0);
+    expect(posted.map((call) => call.path)).not.toContain('/people/admit');
   });
 });

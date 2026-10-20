@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, mount, press, text, unmountAll, unreachable } from './harness';
-import { ADA, BEA, COURIER, DIRECTORY, GRANTS, ISSUER, LEDGER_G, SCRIBE, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, COURIER, DIRECTORY, GRANTS, ISSUER, LEDGER_G, ORGANISATION, SCRIBE, SERVICE, ok, refused } from './fixtures';
 import type { Grant } from '../src/generated/grants';
 
 /** The grants that stand on an agent's Access tab, each by its relation and resource. */
@@ -94,7 +94,7 @@ describe('Personal scope', () => {
     unmountAll();
     await mount('#/me?tab=account', routes);
     const holds = [...document.querySelectorAll('table[aria-label="Grants"] tbody tr[data-grant]')].map((tr) => `${tr.querySelector('td[data-col="Relation"]')?.textContent} of ${tr.querySelector<HTMLElement>('td[data-col="On"] span')?.title}`);
-    expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger']);
+    expect(holds).toEqual(['owner of project:identity', 'viewer of project:ledger', 'administrator of organisation:' + ORGANISATION]);
     expect(holds).not.toContain('viewer of project:atlas');
     // Secrets have their place on the rail; Account does not repeat it.
     expect($$('.card').find((c) => c.querySelector('h2')?.textContent === 'Secrets available to you')).toBeUndefined();
@@ -138,6 +138,7 @@ describe('What you hold', () => {
     expect(rows()).toEqual([
       ['Everything here', 'owner', 'project:identity', 'root'],
       ['View this resource', 'viewer', 'project:ledger', 'root'],
+      ['organisation.administer; organisation.admit; organisation.grant; organisation.read', 'administrator', 'organisation:' + ORGANISATION, 'root'],
       ['Edit this resource; View this resource', 'editor', 'directory:agents', 'root'],
       ['No action', 'auditor', 'project:atlas', 'root'],
     ]);

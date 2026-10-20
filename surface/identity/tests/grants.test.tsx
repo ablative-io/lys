@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, choose, click, mount, text, unmountAll, unreachable, settle } from './harness';
-import { ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G, AGENT_MODEL as MODEL, ME, REVIEWER, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
+import { ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G, AGENT_MODEL as MODEL, ME, ORGANISATION, REVIEWER, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
+
+/** Ada's founding grant as the hold table says it: the organisation acts by name, held outright and never passed on. */
+const FOUNDING_ROW = ['organisation.administer; organisation.admit; organisation.grant; organisation.read', 'administrator', 'organisation:' + ORGANISATION, 'root', 'no', ''];
 import type { DelegateBody, LastUse } from '../src/generated/grants';
 
 beforeEach(() => sessionStorage.clear());
@@ -19,6 +22,7 @@ describe('What you hold', () => {
     expect(rows).toEqual([
       ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give'],
       ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
+      FOUNDING_ROW,
     ]);
     expect(unreachable()).toEqual([]);
   });
@@ -41,11 +45,12 @@ describe('Who can reach this? (conformance 8.2)', () => {
     location.hash = '#/access';
     await settle();
     const grants = $$('table tbody tr[data-href]').map((r) => [...r.querySelectorAll('.chain .pill')].map((pill) => pill.textContent));
-    expect(grants).toEqual([['Ada (test person)'], ['Ada (test person)'], ['Ada (test person)', 'Scribe']]);
+    expect(grants).toEqual([['Ada (test person)'], ['Ada (test person)'], ['Ada (test person)', 'Scribe'], ['Ada (test person)']]);
     expect($$('table tbody tr[data-href] .chain').map((chain) => chain.getAttribute('title'))).toEqual([
       'Ada (test person), P/00000000 · owner of project:identity',
       'Ada (test person), P/00000000 · viewer of project:ledger',
       'Ada (test person), P/00000000 · owner of project:identity → Scribe, agent of Ada (test person), A/00000000 · viewer of project:identity',
+      'Ada (test person), P/00000000 · administrator of organisation:' + ORGANISATION,
     ]);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[8].textContent);
     expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
@@ -152,6 +157,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
     expect(holdText()).toEqual([
       ['Everything here', 'owner', 'project:identity', 'root', 'yes', 'Give'],
       ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
+      FOUNDING_ROW,
     ]);
     expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020']);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
@@ -270,7 +276,7 @@ describe('Every refusal of a delegation (conformance 2.3, 2.4)', () => {
       const name = refusalName(c.reason);
       const { requests, posted } = await mount('#/me?tab=account', { ...SERVICE, 'POST /grants': refused(c.status, name, c.reason) });
       const before = holdText();
-      expect(before).toHaveLength(2);
+      expect(before).toHaveLength(3);
       const reads = requests.filter((r) => r === '/grants').length;
       await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
       await click($('.act-panel input[name="action"][value="view"]'));
@@ -345,8 +351,8 @@ describe('The grant table says each fact once, by name (walk of 4 Oct)', () => {
   it('Allows carries the actions only; the resource is said in On', async () => {
     await mount('#/me?tab=account');
     for (const tr of holdRows()) {
-      expect(cell(tr, 'Allows')).not.toMatch(/identity|ledger/);
-      expect(cell(tr, 'On')).toMatch(/identity|ledger/);
+      expect(cell(tr, 'Allows')).not.toMatch(/identity|ledger|organisation-/);
+      expect(cell(tr, 'On')).toMatch(/identity|ledger|organisation/);
     }
   });
 

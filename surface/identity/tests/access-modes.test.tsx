@@ -6,13 +6,17 @@
 import { act } from 'react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, choose, mount, pick, settle, text, click } from './harness';
-import { ADA, GRANTS, RECEIPTS, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
+import { ADA, FOUNDING_G, GRANTS, RECEIPTS, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 
 beforeEach(() => sessionStorage.clear());
 
-/** Ada is not the administrator: the wider directory is refused her, and her own scope answered. */
-const PERSONAL: Record<string, Route> = { ...SERVICE, '/directory/people': refused(403, 'NotAdmitted', 'the wider directory is for its administrators') };
+/** Ada is not the administrator and holds nothing on her organisation: the wider directory is refused her, her own scope answered, and her founding grant is not hers (ACCESS-009 R4). */
+const PERSONAL: Record<string, Route> = {
+  ...SERVICE,
+  '/directory/people': refused(403, 'NotAdmitted', 'the wider directory is for its administrators'),
+  '/grants': ok({ grants: GRANTS.filter((grant) => grant.id !== FOUNDING_G), revision: 7 }),
+};
 
 /** Scribe's grant held by draft. */
 const HELD = GRANTS.map((grant) => (grant.id === SCRIBE_G ? { ...grant, mode: 'by_draft' as const } : grant));
@@ -118,7 +122,7 @@ describe('The kind of thing is picked from the app schemas', () => {
     // Each kind is named in words; its value is the kind the grant is sent with.
     expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.textContent)).toEqual(['Doc', 'Folder']);
     expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.getAttribute('value'))).toEqual(['notes.doc', 'notes.folder']);
-    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['Project']);
+    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['Organisation', 'Project']);
   });
 
   it('offers the ids Lys already holds for the chosen kind', async () => {
@@ -173,7 +177,7 @@ describe('Only the root authority is offered a root grant', () => {
     const panel = $('.act-panel.issue-root');
     expect(panel?.querySelectorAll('input, select, textarea, button[type="submit"]')).toHaveLength(0);
     expect(panel?.querySelector('.refusal-name')?.textContent).toContain('RootAuthorityRefused');
-    expect(panel?.textContent).toContain('only the administrator gives access directly');
+    expect(panel?.textContent).toContain('you hold no organisation.grant on Example organisation');
     expect(posted).toHaveLength(0);
   });
 });

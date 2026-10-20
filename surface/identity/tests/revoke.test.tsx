@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { $, $$, click, mount, press, unmountAll, unreachable, settle } from './harness';
-import { ADA, GRANTS, LEDGER_G, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
+import { ADA, GRANTS, LEDGER_G, ORGANISATION, ROOT_G, SCRIBE, SCRIBE_G, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import type { Grant, RevokeBody } from '../src/generated/grants';
 
@@ -145,7 +145,7 @@ describe('What you hold after a revoke', () => {
   it('row_2_5_what_you_hold_drops_the_grants_derived_from_a_revoked_one', async () => {
     const routes = handbook();
     await mount('#/me?tab=account', routes);
-    expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger', 'editor of project:handbook', 'viewer of project:handbook']);
+    expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger', 'administrator of organisation:' + ORGANISATION, 'editor of project:handbook', 'viewer of project:handbook']);
     location.hash = `#/file/${SCRIBE}/access`;
     await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity', 'viewer of project:handbook']);
