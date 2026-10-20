@@ -182,7 +182,7 @@ fn body<T: serde::de::DeserializeOwned>(value: Value) -> Result<Json<T>, ServerE
 
 /// `error` answered as the route answers it, carrying `receipt` beside it.
 /// A founding's receipts ride the same way (DIRECTORY-111).
-pub(crate) async fn refused<R: Serialize>(error: ServerError, receipt: &R) -> Response {
+pub(crate) async fn refused<R: Serialize + Sync>(error: ServerError, receipt: &R) -> Response {
     let (mut parts, carried) = error.into_response().into_parts();
     // The answer is this service's own refusal object, made just above from
     // a ServerError, so it is read whole; no size is invented for it.

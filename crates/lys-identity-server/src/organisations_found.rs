@@ -283,14 +283,15 @@ async fn steps(
         .map_err(at(found))?
         .unspent_for_email(&asked.email)
         .map(|(old, waiting)| (old.to_owned(), waiting.clone()));
-    let (organisation, founder, founding_operation, replaced) = match waiting {
-        Some((old, waiting)) => (
-            waiting.organisation,
-            waiting.founder,
-            waiting.operation,
-            Some(old),
-        ),
-        None => {
+    let (organisation, founder, founding_operation, replaced) =
+        if let Some((old, waiting)) = waiting {
+            (
+                waiting.organisation,
+                waiting.founder,
+                waiting.operation,
+                Some(old),
+            )
+        } else {
             let actor = founding_actor(state, &asked.operation, now).map_err(at(found))?;
             let step = step_operation(&asked.operation, found).map_err(at(found))?;
             let founded = with_directory(state, |directory| {
@@ -309,8 +310,7 @@ async fn steps(
                 operation.clone(),
                 None,
             )
-        }
-    };
+        };
     receipt.done(found);
 
     let token = new_token().map_err(at(proof))?;

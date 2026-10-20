@@ -65,9 +65,15 @@ fn unusable(file: &Path, error: &dyn std::fmt::Display) -> ServerError {
 /// The lowercase hex SHA-256 of `token`.
 #[must_use]
 pub fn digest(token: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
     Sha256::digest(token.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
+        .into_iter()
+        .flat_map(|byte| {
+            [
+                char::from(HEX[usize::from(byte >> 4)]),
+                char::from(HEX[usize::from(byte & 15)]),
+            ]
+        })
         .collect()
 }
 

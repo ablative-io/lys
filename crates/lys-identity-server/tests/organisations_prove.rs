@@ -7,6 +7,7 @@
 //! proof spent last; a failed step retried by the same proof; a proof of an
 //! address admitted meanwhile refused.
 
+#[path = "founding/table.rs"]
 mod founding;
 
 use std::error::Error;

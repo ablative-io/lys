@@ -9,6 +9,7 @@
 //! letter. Every act is idempotent by operation, and a failed proving step
 //! is retried by the same proof.
 
+#[path = "founding/table.rs"]
 mod founding;
 
 use founding::{

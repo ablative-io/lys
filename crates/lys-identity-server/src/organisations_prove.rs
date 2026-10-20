@@ -178,7 +178,7 @@ fn activate(
         let state_now = directory
             .projection()?
             .record(identity)
-            .map(|record| record.state());
+            .map(lys_identity::projection::Record::state);
         if state_now == Some(LifecycleState::Active) {
             return Ok(());
         }
