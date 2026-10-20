@@ -286,6 +286,10 @@
         {
           "id": "S437",
           "text": "As an administrator whose approve page could not read the app's manifest, I am told whether the app is not answering, answered with an error, or is not an app, and what to do next."
+        },
+        {
+          "id": "S455",
+          "text": "As the founding administrator of my organisation, I hold its administrator grant from the moment it exists, I may pass admitting and granting to my own people, and nobody from the service provider holds anything inside it."
         }
       ]
     },
@@ -362,6 +366,10 @@
         {
           "id": "S433",
           "text": "As a person who is not an administrator, Open Cambium on my page is a link that opens Cambium."
+        },
+        {
+          "id": "S456",
+          "text": "As a person of one organisation, every list I read, people, agents, teams and grants, is my organisation's and nothing else exists as far as Lys tells me; the provider's own administrator reads their organisation the same way."
         }
       ]
     },

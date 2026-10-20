@@ -138,6 +138,8 @@
 
 **S437.** As an administrator whose approve page could not read the app's manifest, I am told whether the app is not answering, answered with an error, or is not an app, and what to do next.
 
+**S455.** As the founding administrator of my organisation, I hold its administrator grant from the moment it exists, I may pass admitting and granting to my own people, and nobody from the service provider holds anything inside it.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -173,6 +175,8 @@
 **S432.** As a person who opened Lys at a different address, the sign-in page tells me before I try that Sign in with Google works only at Lys's registered address, and links me there.
 
 **S433.** As a person who is not an administrator, Open Cambium on my page is a link that opens Cambium.
+
+**S456.** As a person of one organisation, every list I read, people, agents, teams and grants, is my organisation's and nothing else exists as far as Lys tells me; the provider's own administrator reads their organisation the same way.
 
 ## Directory administrator — Resolves a refused act
 

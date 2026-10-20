@@ -2450,6 +2450,36 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "The organisation (DIRECTORY-109)",
+      "items": [
+        {
+          "id": "C795",
+          "text": "The organisation is a directory record (IdentityId::Organisation) founded by one person with ADR-027 lifecycle states, and every person and agent record carries exactly one organisation id, set at registration and never moved across organisations.",
+          "done": false
+        },
+        {
+          "id": "C796",
+          "text": "The install's own people are an organisation founded at first-run setup with the administrator as founder; an existing store is attached to it at the first boot in one durable batch with one flush, recorded as one boot_stage line, and a failed batch refuses to serve by name.",
+          "done": false
+        },
+        {
+          "id": "C797",
+          "text": "The grants model ships the kind organisation with organisation.read, organisation.admit, organisation.grant and organisation.administer (the last three withheld from agents), and founding issues exactly one administrator grant to the founder with pass-on bounded to people.",
+          "done": false
+        },
+        {
+          "id": "C798",
+          "text": "GET /people, /directory/people, /identities, /identities/{id}, /teams, /grants and the who, why, reach and which questions answer only the caller's organisation, another organisation's records answered as absent, with no special case for the install's own.",
+          "done": false
+        },
+        {
+          "id": "C799",
+          "text": "GET /me names the caller's organisation and the People header shows it.",
+          "done": false
+        }
+      ]
     }
   ]
 }

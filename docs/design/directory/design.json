@@ -6440,7 +6440,18 @@
     {"path": "crates/lys-identity-server/src/runner_dial.rs", "note": "the runner refusal carries the machines loss (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
     {"path": "crates/lys-identity-server/src/grant_changes/stream.rs", "note": "Reset{Rollback} for an earlier epoch of the same log, whatever the cursor (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
     {"path": "crates/lys/src/commands/launch_device.rs", "note": "machine_not_joined carries the computer loss when the view does (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/commands/launch_device_tests.rs", "note": "the loss sentence on machine_not_joined (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"}
+    {"path": "crates/lys/src/commands/launch_device_tests.rs", "note": "the loss sentence on machine_not_joined (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
+    {"path": "crates/lys-identity/src/organisation.rs", "note": "The organisation identity: OrganisationId, its profile and founder, folded from FoundOrganisation and the lifecycle transitions (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity/src/id.rs", "note": "IdentityId gains Organisation(OrganisationId) (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity/src/projection.rs", "note": "A person's and agent's record carries its organisation; organisation_of and the organisations held (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity-server/src/organisation_boot.rs", "note": "At boot, the install's organisation is founded once and every record without one is attached to it in one durable batch (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity-server/src/organisation_boot_tests.rs", "note": "The boot batch: attaches every record once, nothing twice, refuses to serve on a failed commit (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity-server/src/admission.rs", "note": "First-run setup founds the install's organisation with the administrator as founder in the same batch (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity/src/grants/shipped.rs", "note": "The kind organisation, its four actions, the administrator role, and the three actions withheld from agents (DIRECTORY-109 R3).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity-server/src/organisation_reads_tests.rs", "note": "Two organisations, every read route answers only the caller's own (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
+    {"path": "crates/lys-identity-server/src/grants_batch.rs", "note": "/grants/which answers only ids of the caller's organisation (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
+    {"path": "surface/identity/src/features/people/People.tsx", "note": "The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
+    {"path": "surface/identity/src/features/people/people-views.test.tsx", "note": "The organisation name shown in the People header (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"}
   ],
   "inventory": [
     {

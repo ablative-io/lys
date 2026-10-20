@@ -661,3 +661,11 @@
 - [ ] **C792** — POST /grants/held answers an approved app held or none for an action on a resource of its own kind, judged from the whole book regardless of the caller's sight, naming no holder.
 - [ ] **C793** — A held question outside the app's own kinds, with an unknown action, or without a known credential is refused by its existing name and answers nothing.
 - [ ] **C794** — The OpenAPI document lists POST /grants/held and the grants reference says what held discloses and how it differs from who.
+
+## The organisation (DIRECTORY-109)
+
+- [ ] **C795** — The organisation is a directory record (IdentityId::Organisation) founded by one person with ADR-027 lifecycle states, and every person and agent record carries exactly one organisation id, set at registration and never moved across organisations.
+- [ ] **C796** — The install's own people are an organisation founded at first-run setup with the administrator as founder; an existing store is attached to it at the first boot in one durable batch with one flush, recorded as one boot_stage line, and a failed batch refuses to serve by name.
+- [ ] **C797** — The grants model ships the kind organisation with organisation.read, organisation.admit, organisation.grant and organisation.administer (the last three withheld from agents), and founding issues exactly one administrator grant to the founder with pass-on bounded to people.
+- [ ] **C798** — GET /people, /directory/people, /identities, /identities/{id}, /teams, /grants and the who, why, reach and which questions answer only the caller's organisation, another organisation's records answered as absent, with no special case for the install's own.
+- [ ] **C799** — GET /me names the caller's organisation and the People header shows it.

@@ -1,0 +1,160 @@
+{
+  "id": "DIRECTORY-109",
+  "cluster": "directory",
+  "title": "The organisation is a directory record and a grants kind; every person belongs to one; the install's own people are the first organisation",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C795",
+    "C796",
+    "C797",
+    "C798",
+    "C799"
+  ],
+  "stories": [
+    "S455",
+    "S456"
+  ],
+  "design_anchor": [
+    "ADR-011",
+    "ADR-027"
+  ],
+  "purpose": "Tom, 20 October 2026, 10:5x, by voice: an organisation must be able to onboard itself, \"seamless and doable alone, without me and without one of my devices\". The design page docs/design/onboarding/ORGANISATION-ALONE.md (Lys main bb6c09cc) walks the path and finds Lys has no organisation a tenant could hang off: the only one is the install's settings zone (crates/lys-identity-server/src/configuration_api.rs:87, :100), teams carry no authority (crates/lys-identity-server/src/teams_api.rs:7-9), and lys-secrets' Organisation scope is a path label. This brief is the first seam the page names: the organisation as a record and a kind, every person under one, and our own people the first one so there is one path and not two. ACCESS-009 then scopes admission and roots by it; DIRECTORY-110 founds one from nothing.",
+  "task": "Add the organisation identity kind and its founding change to lys-identity; give every person and agent record one organisation; found the install's organisation at first-run setup and, for an existing store, at the first boot in one durable batch; ship the kind organisation with its four actions and the founding administrator grant; partition every identities, people, teams and grants read by the caller's organisation with no special case for ours; name the organisation on /me and the People header.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "The organisation is a directory record with a lifecycle, founded by one person, and every person and agent carries exactly one",
+      "spec": "Behavioural. THE SYSTEM SHALL hold organisations in the directory log as records of a new identity kind, IdentityId::Organisation(OrganisationId) (crates/lys-identity/src/id.rs:287), written by two new signed changes in crates/lys-identity/src/event.rs:113 (Change): FoundOrganisation { profile, founder: PersonId } and the existing lifecycle transitions (ADR-027: Registered at founding, Active once the founder's address is proven or, for the install's own organisation, at once; Retired by its administrator). The organisation's name is its profile and is a label: no uniqueness is claimed or enforced beyond the founding person's own, two organisations may share a name and are told apart by id everywhere (docs/design/onboarding/ORGANISATION-ALONE.md, ruling 7). A person's Record (crates/lys-identity/src/projection.rs:45-53) SHALL carry organisation: OrganisationId, set by RegisterPerson and SetupPerson (event.rs:113 onward) from the registering caller's organisation and never changed afterwards; an agent carries its responsible person's organisation (RegisterAgent, the responsible edge) and follows it on ReportsToChanged only within the same organisation, a move across organisations being refused by name. One person, one organisation (ruling 8): the field is one id, named on the page as the thing that becomes a list if ever needed. Projection (crates/lys-identity/src/projection.rs:108) SHALL answer organisation_of(IdentityId) and the organisations it holds; a record with no organisation cannot exist once R2 has run.",
+      "acceptance": [
+        "A FoundOrganisation change folds into a Registered organisation record whose founder is the person named; a transition to Active and to Retired folds as ADR-027 folds every identity (lys-identity directory tests)",
+        "RegisterPerson by a caller of organisation A writes a person of organisation A; the projection answers organisation_of for the person and for an agent they register; ReportsToChanged to a person of organisation B is refused by name and moves nothing",
+        "Two organisations with the same name fold to two records with different ids; no refusal"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity/src/organisation.rs"
+        ],
+        "modify": [
+          "crates/lys-identity/src/id.rs",
+          "crates/lys-identity/src/event.rs",
+          "crates/lys-identity/src/projection.rs",
+          "crates/lys-identity/src/directory.rs",
+          "crates/lys-identity/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C795"
+      ],
+      "stories": [
+        "S455"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "The install's own people are an organisation too, founded by the install from admin_email with the administrator as founder, and an existing store is brought under it in one durable batch",
+      "spec": "Behavioural. One path, not two (docs/design/onboarding/ORGANISATION-ALONE.md, ruling 1). WHEN first-run setup records the administrator (SetupPerson, crates/lys-identity-server/src/admission.rs:13-14, the one administrator login per install) THE SYSTEM SHALL in the same batch found the install's organisation, profile from the install's name in deployment.toml and, for an unattended install, admin_email (crates/lys/src/identity/config.rs:70-74), with the administrator as founder, Active at once, and SHALL register the administrator under it. WHEN the server boots a store written before this brief (people with no organisation) THE SYSTEM SHALL, before serving, found the install's organisation and attach every existing person and agent to it as one durable batch with one full flush (Tom, 3 October 2026: a batch is one durable operation, never leaf by leaf), recorded as one boot_stage line naming the count, and SHALL refuse to serve by name if the batch cannot be committed; a second boot finds nothing to do. There is no record without an organisation after this boot, and no code path special-cases the install's own organisation: routes::administrator (crates/lys-identity-server/src/routes.rs:336-344) stays for install-level acts only, apps, the settings zone and the issuer, and every people, teams and grants read of R4 filters our administrator exactly as it filters Priya.",
+      "acceptance": [
+        "First-run setup on an empty store ends with one organisation, Active, founder the administrator, and the administrator's record carrying it (the setup test in lys-identity-server)",
+        "A fixture store holding three people and two agents with no organisation boots once: one boot_stage line names 5 attached, every record then carries the install's organisation, and the second boot writes nothing and names 0",
+        "A fixture whose batch is made to fail at commit leaves the store as it was, and the server refuses to serve naming the batch; nothing is attached leaf by leaf"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/organisation_boot.rs",
+          "crates/lys-identity-server/src/organisation_boot_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/admission.rs",
+          "crates/lys-identity-server/src/routes_startup.rs",
+          "crates/lys/src/identity/config.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C796"
+      ],
+      "stories": [
+        "S456"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "organisation is a kind in the grants model with four actions, and founding issues the founder's administrator grant with pass-on bounded to the organisation's own people",
+      "spec": "Behavioural. THE SYSTEM SHALL ship the kind organisation in the grants model (crates/lys-identity/src/grants/shipped.rs, beside the actions at :24-68; crates/lys-identity/src/grants/model.rs:105 kinds) with the actions organisation.read, organisation.admit (admit a person into it), organisation.grant (issue a root on a resource it owns) and organisation.administer (change its name, retire it, pass its administration on), and the role administrator holding all four. organisation.admit, organisation.grant and organisation.administer are in WITHHELD_FROM_AGENTS (shipped.rs:232 onward): an agent may read its organisation and nothing more. WHEN an organisation is founded (R1, R2) THE SYSTEM SHALL issue, in the same durable batch as the founding change, one root grant on organisation:<id> to the founder with relation administrator and pass_on To { actions: [organisation.admit, organisation.grant, organisation.administer], recipients: [Person] } (crates/lys-identity/src/grants/types.rs:245-255), through a founding path in crates/lys-identity/src/grants/authority.rs beside issue_root (:314) that takes no caller and records the issuer as the organisation itself; it is the one grant Lys issues without a person asking, and the record says so. Nobody else is issued anything at founding. Our administrator holds this grant on the install's organisation and no grant on any other (ruling 2): there is no standing power inside an organisation for anyone but the people its administrator passes it to, and a grant Priya can revoke (crates/lys-identity/src/grants/revocation.rs:71, unchanged) is the only way in.",
+      "acceptance": [
+        "The model answers the four actions on kind organisation and the administrator role; an agent asking to hold organisation.admit, organisation.grant or organisation.administer is refused as withheld (the shipped tests beside shipped.rs:448)",
+        "Founding an organisation leaves exactly one grant in the grant log: holder the founder, resource organisation:<id>, relation administrator, pass_on To with the three actions and Person, issuer the organisation; the founder may then delegate organisation.admit to a person of the same organisation and the delegation is judged allowed",
+        "Our administrator, asked by /grants/check for organisation.admit on another organisation, is refused; the install's organisation answers allowed"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/src/grants/shipped.rs",
+          "crates/lys-identity/src/grants/authority.rs",
+          "crates/lys-identity/src/grants/types.rs",
+          "crates/lys-identity/src/grants/admission.rs",
+          "crates/lys-identity-server/src/grants.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C797"
+      ],
+      "stories": [
+        "S455"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Every people, teams, identities and grants read answers within the caller's organisation, with no special case for the install's own",
+      "spec": "Behavioural. THE SYSTEM SHALL filter by the caller's organisation, from the projection of R1, every read that lists or resolves identities and grants: GET /people and GET /directory/people (crates/lys-identity-server/src/read_api.rs:57, :59), GET /identities and GET /identities/{id} (crates/lys-identity-server/src/routes_table.rs:24-25), GET /teams (openapi_table.rs:353 and crates/lys-identity-server/src/teams_api.rs:259-265), GET /grants (crates/lys-identity-server/src/grants.rs:284), POST /grants/who, /grants/why, /grants/reach and /grants/which (grants.rs:296, :317-320): an identity, team or grant of another organisation is answered as absent, exactly as one the caller may not see is today, never as refused, so no answer says whether another organisation exists. The administrator's wider view (read_api.rs:6) is the wider view within the install's organisation and nothing more. The directory log stays one log and the projection one projection; the partition is the view. GET /me SHALL name the caller's organisation (id and profile) so the screens can show it (surface/identity/src/features/people/People.tsx:28-29 header; surface/identity/src/features/me/).",
+      "acceptance": [
+        "With two organisations A and B each holding two people, a team and a root grant, every route named answers A's caller only A's records and B's caller only B's, in the lys-identity-server route tests, one assertion per route",
+        "A's caller reading B's person by id through /identities/{id} is answered as absent with the same status and body as an unknown id",
+        "Our administrator reading /directory/people sees the install's organisation's people only; a test seeds one person of B and asserts they are absent from the answer",
+        "GET /me carries the caller's organisation id and name, read by the People header and shown as text (people-views.test.tsx)"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/organisation_reads_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/read_api.rs",
+          "crates/lys-identity-server/src/routes_table.rs",
+          "crates/lys-identity-server/src/teams_api.rs",
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/grants_batch.rs",
+          "crates/lys-identity-server/src/grants_reach.rs",
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "surface/identity/src/features/people/People.tsx",
+          "surface/identity/src/features/people/people-views.test.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C798",
+        "C799"
+      ],
+      "stories": [
+        "S456"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No founding by a stranger here: POST /organisations/found and the proving letter are DIRECTORY-110, after IDENTITY-004 (mail)",
+    "No change to who may admit a person or issue a root: ACCESS-009 scopes people_admit.rs:195 and judge_root (grants/admission.rs:277) by the organisation; this brief only makes the organisation exist and the reads partition",
+    "No organisation in Cambium: the door's workspace per organisation is CORE-073, which asks POST /grants/which for kind cambium.workspace",
+    "Teams keep carrying no authority (teams_api.rs:7-9); they gain an organisation and nothing else",
+    "No mail, no issuer change: the issuer account is made as today by accounts::make (accounts.rs:148-170)",
+    "One person, one organisation; the field becomes a list only by a later brief and nothing else on the page moves (ruling 8)"
+  ],
+  "verification": [
+    "gate -stages nextest -crates lys-identity -test 'test(organisation)' then -crates lys-identity-server -test 'test(organisation)'; every red first, the FAIL line quoted in the handback before the code",
+    "The existing-store boot proved on a copy of a fixture store, never on the installed store; the installed store moves only at the install that carries this brief",
+    "python3 scripts/design/validate.py docs/design/directory and python3 scripts/design/check-coverage.py docs/design/directory read for FAIL lines, never the exit code",
+    "The whole declared gate on Tom's Mac, START and END posted with df"
+  ],
+  "amendments": []
+}
