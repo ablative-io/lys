@@ -117,22 +117,19 @@ fn bootstrap_registration(
 ) -> Result<Json<PersonRegistered>, ServerError> {
     with_directory(state, |directory| {
         let first = directory.projection()?.first_organisation();
-        let (id, receipt) = match first {
-            Some(organisation) => {
-                directory.register_person(actor, op, profile, organisation, now())?
-            }
-            None => {
-                let name = state
-                    .setup
-                    .as_ref()
-                    .map(|settings| settings.organisation.as_str())
-                    .ok_or(ServerError::NotAdmitted {
-                        reason: "the directory holds no organisation and the configuration names no setup organisation to found one as",
-                    })?;
-                let founded =
-                    directory.found_organisation(actor, op, Profile::new(name)?, profile, now())?;
-                (founded.founder, founded.founder_receipt)
-            }
+        let (id, receipt) = if let Some(organisation) = first {
+            directory.register_person(actor, op, profile, organisation, now())?
+        } else {
+            let name = state
+                .setup
+                .as_ref()
+                .map(|settings| settings.organisation.as_str())
+                .ok_or(ServerError::NotAdmitted {
+                    reason: "the directory holds no organisation and the configuration names no setup organisation to found one as",
+                })?;
+            let founded =
+                directory.found_organisation(actor, op, Profile::new(name)?, profile, now())?;
+            (founded.founder, founded.founder_receipt)
         };
         Ok(Json(PersonRegistered {
             person: id.to_string(),
