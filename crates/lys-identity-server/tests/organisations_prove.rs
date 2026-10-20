@@ -65,17 +65,15 @@ async fn the_proof_activates_everything_grants_the_founder_and_signs_them_in() -
     assert_eq!(leaves(&service).await?, before + 3);
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
 
-    let (status, read) = service
-        .get(&format!("/identities/{person}"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 200, "{read}");
-    assert_eq!(read["state"], "active", "{read}");
-    assert!(read["logins"].to_string().contains(&subject), "{read}");
-    let (status, read) = service
-        .get(&format!("/identities/{organisation}"), Some(&cookie))
-        .await?;
-    assert_eq!(status, 200, "{read}");
-    assert_eq!(read["state"], "active", "{read}");
+    // The founder reads themselves and their organisation through GET /me,
+    // the signed-in person's own view (DIRECTORY-109 R4).
+    let (status, me) = service.get("/me", Some(&cookie)).await?;
+    assert_eq!(status, 200, "{me}");
+    assert_eq!(me["person"]["id"], person, "{me}");
+    assert_eq!(me["person"]["state"], "active", "{me}");
+    assert_eq!(me["signed_in"]["subject"], subject, "{me}");
+    assert_eq!(me["organisation"]["id"], organisation, "{me}");
+    assert_eq!(me["organisation"]["display_name"], "Bea's Bakery", "{me}");
 
     // The founder holds administrator on the organisation, as 9846f30c's
     // founder-grant test reads it.
@@ -96,22 +94,14 @@ async fn the_proof_activates_everything_grants_the_founder_and_signs_them_in() -
     assert_eq!(account["email"], BEA);
     assert_eq!(account["password"], false, "{account}");
 
-    // ACCESS-009's partition: the founder sees their own organisation's
-    // identities and the configured administrator does not see them.
+    // DIRECTORY-109 R4's partition: GET /identities is the configured
+    // administrator's view within the install's organisation, so the
+    // founder, administrator of their own organisation by grant and not the
+    // install's, is refused it, and the install's administrator does not see
+    // the founder in it.
     let (status, own) = service.get("/identities", Some(&cookie)).await?;
-    assert_eq!(status, 200, "{own}");
-    let ids: Vec<&str> = own["identities"]
-        .as_array()
-        .ok_or("identities")?
-        .iter()
-        .filter_map(|identity| identity["id"].as_str())
-        .collect();
-    assert!(ids.contains(&person.as_str()), "{own}");
-    assert!(
-        !ids.iter()
-            .any(|id| id.starts_with("person-") && *id != person),
-        "{own}"
-    );
+    assert_eq!(status, 403, "{own}");
+    assert_eq!(own["refusal"], "NotAdmitted", "{own}");
     let (status, theirs) = service.get("/identities", Some(&ada)).await?;
     assert_eq!(status, 200, "{theirs}");
     assert!(!theirs.to_string().contains(&person), "{theirs}");
