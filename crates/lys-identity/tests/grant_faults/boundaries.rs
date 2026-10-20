@@ -155,8 +155,9 @@ pub(super) fn assert_projection_boundary(
             );
             assert_eq!(
                 world.grants.relationships().read()?.len(),
-                // The two roots' six and the founder's administrator grant.
-                7,
+                // The two roots' six and the founder's administrator grant's three:
+                // every grant is written as holder, source and relation.
+                9,
                 "{name}: no relationship is written for it"
             );
             assert!(matches!(
