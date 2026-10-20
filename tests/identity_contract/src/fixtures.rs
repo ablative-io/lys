@@ -46,8 +46,11 @@ pub fn shown(name: &str) -> Result<Profile, IdentityError> {
 /// # Errors
 /// Returns the underlying named setup or API refusal.
 pub fn organisation() -> Result<Profile, IdentityError> {
-    Profile::new("Example organisation")
+    Profile::new(ORGANISATION)
 }
+
+/// The name of the fixtures' organisation, the harness's setup organisation too.
+pub const ORGANISATION: &str = "Example organisation";
 
 /// The organisation `person` was registered under (DIRECTORY-109 R1).
 ///

@@ -317,10 +317,12 @@ async fn a_signed_message_cannot_also_carry_a_grant_token() -> Result<(), Box<dy
 
 /// An agent's MCP call to a route whose door knew only a person's session answered
 /// `NotSignedIn` (12 Oct 2026). Relayed, it is judged through the agent's own grants: with
-/// no grant for the route's action it is refused by name, and with one it registers a
-/// person exactly as the HTTP route would for a run pass holding that grant.
+/// no grant for the route's action it is refused by name, and with one it reaches the
+/// route, which refuses it too: admitting a person is organisation.admit on the caller's
+/// own organisation (ACCESS-009 R1), an act withheld from agents, so no agent registers
+/// a person by any route.
 #[tokio::test]
-async fn an_agent_registers_a_person_through_mcp_only_with_a_grant_for_it()
+async fn an_agents_mcp_call_is_judged_by_its_grants_and_admitting_a_person_is_withheld_from_it()
 -> Result<(), Box<dyn Error>> {
     let (service, cookie, agent, key) = certified_agent().await?;
     let register = |id: u64| -> Result<(Vec<u8>, String), Box<dyn Error>> {
@@ -375,12 +377,18 @@ async fn an_agent_registers_a_person_through_mcp_only_with_a_grant_for_it()
     assert_eq!(status, 200, "{granted}");
 
     let (bytes, signature) = register(21)?;
-    let admitted: Value = post_signed(&service.base, bytes, &signature)
+    let refused: Value = post_signed(&service.base, bytes, &signature)
         .await?
         .json()
         .await?;
-    let answer = &crate::mcp_test_answer::body(&admitted["result"]);
-    assert_eq!(answer["status"], 200, "{admitted}");
-    assert!(answer["body"]["person"].is_string(), "{admitted}");
+    let answer = &crate::mcp_test_answer::body(&refused["result"]);
+    assert_eq!(answer["status"], 403, "{refused}");
+    assert_eq!(answer["body"]["refusal"], "NotAdmitted", "{refused}");
+    assert!(
+        answer["body"]["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("organisation.admit")),
+        "{refused}"
+    );
     Ok(())
 }

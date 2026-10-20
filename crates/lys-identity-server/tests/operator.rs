@@ -80,8 +80,10 @@ async fn matching_token_records_operator_provenance_and_exact_retry_keeps_one_le
     let repeated = service.post_carrying("/setup", &headers, body).await?;
     assert_eq!(repeated, (200, first));
     let store = FileLeafStore::open_read_only(&service.dir.path().join("log"))?;
-    assert_eq!(store.extent(), 1);
-    let bytes = store.leaf(0)?.ok_or("setup leaf missing")?;
+    // Setup is one batch of three leaves (DIRECTORY-109 R2); the person's
+    // is the second.
+    assert_eq!(store.extent(), 3);
+    let bytes = store.leaf(1)?.ok_or("setup leaf missing")?;
     let key = Ed25519Identity::load(&service.dir.path().join("service.key"))?;
     let signed = verify_event(&bytes, &key.public_key_bytes())?;
     assert_eq!(signed.event()?.actor().binding().subject(), ADMINISTRATOR);

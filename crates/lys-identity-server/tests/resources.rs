@@ -48,8 +48,12 @@ async fn resources_are_read_from_the_grants_the_caller_may_see() -> TestResult {
     assert_eq!(status, 401, "{none}");
     let (status, empty) = service.get("/resources", Some(&ada)).await?;
     assert_eq!(status, 200, "{empty}");
-    assert_eq!(empty["resources"], json!([]));
-    assert_eq!(empty["kinds"], json!([]));
+    // The founding grant stands on the organisation from the seed's first
+    // boot (DIRECTORY-109 R3): the one resource before any act.
+    let founding = json!({ "kind": "organisation", "id": seeded.organisation.to_string(),
+        "standing": 1, "ended": 0, "holders": 1 });
+    assert_eq!(empty["resources"], json!([founding]));
+    assert_eq!(empty["kinds"], json!(["organisation"]));
 
     for body in [
         root(&bea_id, "2", None)?,
@@ -62,12 +66,13 @@ async fn resources_are_read_from_the_grants_the_caller_may_see() -> TestResult {
 
     let (status, all) = service.get("/resources", Some(&ada)).await?;
     assert_eq!(status, 200, "{all}");
-    assert_eq!(all["kinds"], json!(["doc"]));
+    assert_eq!(all["kinds"], json!(["doc", "organisation"]));
     assert_eq!(
         all["resources"],
         json!([
             { "kind": "doc", "id": "1", "standing": 0, "ended": 1, "holders": 0 },
             { "kind": "doc", "id": "2", "standing": 2, "ended": 0, "holders": 2 },
+            founding,
         ])
     );
 

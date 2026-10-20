@@ -357,9 +357,11 @@ async fn native_lys_cli_carries_approving_administrator_session_authority_but_no
         .await?;
     assert_eq!(status, 200, "native administrator act directory readback");
     let after = table.stored()?;
+    // Registering a person exercises organisation.admit (ACCESS-009 R1):
+    // the grant log gains that one use, never a grant.
     assert!(
-        after[0] == before[0],
-        "person registration must not create a grant"
+        after[0].len() == before[0].len() + 1 && after[0].starts_with(&before[0]),
+        "person registration records one use and must not create a grant"
     );
     assert!(
         after[1] != before[1],

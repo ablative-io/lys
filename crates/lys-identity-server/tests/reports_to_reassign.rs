@@ -348,7 +348,12 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
         std::fs::read(service.dir.path().join("log/snapshot.bin"))?,
         old_snapshot
     );
-    assert_eq!(leaf_bytes(&service)?, old_leaves);
+    // The first boot under organisations appends its batch after the old
+    // leaves (DIRECTORY-109 R2); every old leaf is kept as it was.
+    let kept = leaf_bytes(&service)?;
+    for (index, bytes) in &old_leaves {
+        assert_eq!(kept.get(index), Some(bytes), "leaf {index} changed");
+    }
     let owner = legacy.owner.to_string();
     for agent in &legacy.agents {
         let (status, seen) = service
@@ -378,7 +383,12 @@ async fn an_old_directory_requires_migration_and_preserves_every_registration()
         assert_eq!(agent["accountable"]["id"], owner);
         assert_eq!(agent["gap"], Value::Null);
     }
-    assert_eq!(leaf_bytes(&service)?, old_leaves);
+    // The first boot under organisations appends its batch after the old
+    // leaves (DIRECTORY-109 R2); every old leaf is kept as it was.
+    let kept = leaf_bytes(&service)?;
+    for (index, bytes) in &old_leaves {
+        assert_eq!(kept.get(index), Some(bytes), "leaf {index} changed");
+    }
     Ok(())
 }
 

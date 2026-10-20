@@ -259,6 +259,9 @@ async fn every_read_answers_the_callers_organisation_and_the_other_as_absent() -
         json!({"route": "browser", "resource": {"kind": "project", "id": site},
             "action": "read", "page_size": 10, "after": null})
     };
+    let check = json!({"route": "browser", "resource": {"kind": "project", "id": "a-site"}, "action": "read"});
+    let (status, checked) = service.post("/grants/check", Some(&ada), &check).await?;
+    assert_eq!(status, 200, "Ada's own root on a-site: {checked}");
     let (status, holders) = service
         .post("/grants/who", Some(&admin), &who("a-site"))
         .await?;

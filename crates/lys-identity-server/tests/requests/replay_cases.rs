@@ -182,8 +182,8 @@ async fn an_approval_the_grants_refuse_holds_nothing_and_gives_nothing() -> Test
     refused(&again, 409, "RequestDecided");
     let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
     assert_eq!(
-        held["grants"].as_array().map(Vec::len),
-        Some(1),
+        issued(&held).len(),
+        1,
         "only the grant Bea lends from exists: {held}"
     );
     Ok(())

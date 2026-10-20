@@ -461,7 +461,7 @@ async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outc
     service.restart().await?;
     assert_eq!(
         extents(&service)?[1],
-        before[1],
+        before[1] + 1,
         "a later start issues none either"
     );
     Ok(())

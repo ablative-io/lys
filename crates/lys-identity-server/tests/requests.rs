@@ -7,6 +7,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use identity_contract::apps::issued;
 use identity_contract::harness::ManualClock;
 
 use identity_contract::fake_issuer::Login;

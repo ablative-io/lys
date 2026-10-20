@@ -244,7 +244,10 @@ async fn lys_is_an_app_whose_schema_is_the_model_and_changes_only_by_the_adminis
     .await?)?;
     assert_eq!(
         checked["stranded"],
-        json!([{"kind": "doc", "relation": "alpha", "count": 1}]),
+        json!([
+            {"kind": "doc", "relation": "alpha", "count": 1},
+            {"kind": "organisation", "relation": "administrator", "count": 1},
+        ]),
         "{checked}"
     );
     let wider = json!({"operation": op()?, "replaces": 1, "schema": {"relations": {

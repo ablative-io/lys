@@ -161,6 +161,20 @@ pub fn refused(answer: &Answer, status: u16, name: &str) -> TestResult {
     Ok(())
 }
 
+/// The grants `answer` lists that an act issued: every grant but the
+/// founding grant of an organisation, which every install holds from its
+/// setup or first boot (DIRECTORY-109 R3) and no act under test issued.
+#[must_use]
+pub fn issued(answer: &Value) -> Vec<Value> {
+    answer["grants"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|grant| grant["resource"]["kind"] != "organisation")
+        .cloned()
+        .collect()
+}
+
 /// Refuse the test unless `answer` is a success, answering its body.
 ///
 /// # Errors

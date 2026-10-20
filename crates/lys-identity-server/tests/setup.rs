@@ -38,8 +38,9 @@ async fn one_click_sets_up_only_the_verified_administrator_and_opens_personal_vi
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["receipt"]["change_kind"], 7);
     // Setup is one batch of three leaves: the founding, the person, the
-    // organisation's activation (DIRECTORY-109 R2).
-    assert_eq!(answer["receipt"]["log"]["tree_size"], 3);
+    // organisation's activation (DIRECTORY-109 R2); the person's receipt is
+    // the second leaf's, before the activation.
+    assert_eq!(answer["receipt"]["log"]["tree_size"], 2);
     assert_eq!(answer["receipt"]["actor"]["subject"], ADMINISTRATOR);
     assert_eq!(answer["person"], answer["receipt"]["identity"]);
     for route in ["/me", "/people", "/grants"] {

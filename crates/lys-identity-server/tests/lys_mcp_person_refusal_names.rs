@@ -2,6 +2,7 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use identity_contract::apps::issued;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use reqwest::{Client, redirect::Policy};
 use serde_json::{Value, json};
@@ -142,8 +143,8 @@ async fn a_connection_missing_a_grant_names_its_resource_action_route_and_granto
     let (status, grants) = service.get("/grants", Some(&cookie)).await?;
     assert_eq!(status, 200);
     assert_eq!(
-        grants["grants"],
-        json!([]),
+        issued(&grants),
+        Vec::<serde_json::Value>::new(),
         "refusal must not create authority"
     );
     Ok(())

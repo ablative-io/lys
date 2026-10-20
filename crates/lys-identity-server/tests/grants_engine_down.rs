@@ -179,6 +179,10 @@ async fn a_grant_the_engine_would_not_take_is_named_pending_by_reach_and_who() -
         })
         .await?;
     let doc = json!({ "kind": "doc", "id": "1" });
+    // The served grants open at the first question, folding the founding
+    // grant into the engine (DIRECTORY-109 R3); the refusal starts after.
+    let (status, opened) = service.get("/grants", Some(&ada)).await?;
+    assert_eq!(status, 200, "{opened}");
     refusing.store(true, Ordering::SeqCst);
     let root = json!({
         "operation": OperationId::generate()?.to_string(), "route": "api",

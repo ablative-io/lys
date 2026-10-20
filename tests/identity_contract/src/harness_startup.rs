@@ -353,7 +353,7 @@ fn configured_service(
             code_file: dir.path().join("setup").join("code"),
             administrator_file: dir.path().join("setup").join("administrator"),
             email: None,
-            organisation: "Harness organisation".to_owned(),
+            organisation: crate::fixtures::ORGANISATION.to_owned(),
         }),
         password_policy: None,
         model_proxy: Some("http://127.0.0.1:18484".to_owned()),

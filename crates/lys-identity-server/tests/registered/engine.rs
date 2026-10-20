@@ -90,6 +90,11 @@ async fn counted_engine_answer(
     match (request.method().as_str(), request.uri().path()) {
         ("POST", "/v1/schema/read") => (axum::http::StatusCode::OK, "{\"schemaText\":\"\"}"),
         ("POST", "/v1/schema/write") => (axum::http::StatusCode::OK, "{}"),
+        // The founding grant's relationships (DIRECTORY-109 R3).
+        ("POST", "/v1/relationships/write") => (
+            axum::http::StatusCode::OK,
+            "{\"writtenAt\":{\"token\":\"counted-write\"}}",
+        ),
         ("POST", "/v1/relationships/read") => (axum::http::StatusCode::OK, ""),
         _ => (
             axum::http::StatusCode::NOT_FOUND,

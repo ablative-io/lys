@@ -6,6 +6,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use identity_contract::apps::issued;
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
@@ -153,11 +154,7 @@ async fn a_grant_issued_before_its_decision_was_kept_is_the_decision() -> TestRe
     assert_eq!(approved["decision"]["note"], "for the quarter");
     assert_eq!(approved["held_by"], Value::Null);
     let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
-    assert_eq!(
-        held["grants"].as_array().map(Vec::len),
-        Some(1),
-        "no second grant is issued: {held}"
-    );
+    assert_eq!(issued(&held).len(), 1, "no second grant is issued: {held}");
     Ok(())
 }
 
@@ -176,7 +173,7 @@ async fn an_intent_the_grants_hold_nothing_for_is_withdrawn_at_the_next_decision
     assert_eq!(declined["state"], "declined");
     assert_eq!(declined["held_by"], Value::Null);
     let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
-    assert_eq!(held["grants"], json!([]), "{held}");
+    assert_eq!(issued(&held), Vec::<serde_json::Value>::new(), "{held}");
     Ok(())
 }
 
@@ -238,7 +235,7 @@ async fn settling_an_approval_the_grants_hold_nothing_for_leaves_the_request_wai
     assert_eq!(settled["held_by"], Value::Null);
     assert_eq!(settled["decision"], Value::Null);
     let (_, held) = table.service.get("/grants", Some(&table.ada)).await?;
-    assert_eq!(held["grants"], json!([]), "{held}");
+    assert_eq!(issued(&held), Vec::<serde_json::Value>::new(), "{held}");
     Ok(())
 }
 
@@ -289,6 +286,6 @@ async fn a_connectors_request_approved_with_no_source_is_refused_before_its_inte
     assert_eq!(seen["requests"][0]["id"], asking.as_str(), "{seen}");
     assert_eq!(seen["requests"][0]["state"], "waiting", "{seen}");
     let (_, held) = service.get("/grants", Some(&ada)).await?;
-    assert_eq!(held["grants"], json!([]), "{held}");
+    assert_eq!(issued(&held), Vec::<serde_json::Value>::new(), "{held}");
     Ok(())
 }

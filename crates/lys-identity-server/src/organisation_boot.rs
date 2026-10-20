@@ -202,7 +202,8 @@ fn root_authority(
 ///
 /// # Errors
 /// Refuses a founder registered under no organisation, or whatever opening
-/// the grants or committing the grant refuses.
+/// the grants or committing the grant refuses; a model naming no
+/// administrator relation is said, not refused.
 pub(crate) fn founder_grant(state: &AppState, founder: PersonId) -> Result<(), ServerError> {
     let at = state.sessions.now()?;
     crate::grants::with_schema_grants(state, |judged| {
@@ -210,9 +211,21 @@ pub(crate) fn founder_grant(state: &AppState, founder: PersonId) -> Result<(), S
             .directory
             .organisation_of(IdentityId::Person(founder))
             .ok_or_else(|| refused(format!("{founder} was set up under no organisation")))?;
-        judged
+        match judged
             .grants
-            .found_organisation(judged.directory, organisation, at)?;
-        Ok(())
+            .found_organisation(judged.directory, organisation, at)
+        {
+            Ok(_) => Ok(()),
+            // The model carries no administrator relation yet: the grant is
+            // issued at the first boot after the lys app's schema does, as
+            // the boot says it.
+            Err(GrantError::RelationUnknown { relation, .. }) => {
+                (state.say)(&format!(
+                    "organisation: {organisation} has no administrator grant yet: the model names no relation {relation} on organisation"
+                ));
+                Ok(())
+            }
+            Err(error) => Err(error.into()),
+        }
     })
 }

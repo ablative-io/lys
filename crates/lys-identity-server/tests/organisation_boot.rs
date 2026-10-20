@@ -291,19 +291,28 @@ fn a_batch_that_cannot_be_committed_leaves_the_store_as_it_was() -> Outcome {
     Ok(())
 }
 
+/// Every file under `dir` 0400 and every directory 0500, deepest first.
+fn read_only(dir: &std::path::Path) -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            read_only(&path)?;
+        } else {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400))?;
+        }
+    }
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o500))?;
+    Ok(())
+}
+
 #[tokio::test]
 async fn a_boot_that_cannot_commit_the_batch_refuses_to_serve_naming_it() -> Outcome {
-    use std::os::unix::fs::PermissionsExt;
     let started = Service::start_with(|config| {
         store_before_organisations(config)?;
-        // The directory log takes no write: the batch cannot be committed.
-        for entry in std::fs::read_dir(&config.log_dir)? {
-            let path = entry?.path();
-            if path.is_file() {
-                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400))?;
-            }
-        }
-        std::fs::set_permissions(&config.log_dir, std::fs::Permissions::from_mode(0o500))?;
+        // The directory log takes no write, segments and head included:
+        // the batch cannot be committed.
+        read_only(&config.log_dir)?;
         Ok(())
     })
     .await;

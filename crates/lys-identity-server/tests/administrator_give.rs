@@ -1,6 +1,7 @@
 #![cfg(test)]
 //! Standing gives a recorded, bounded and revocable grant without an intermediate root.
 
+use identity_contract::apps::issued;
 use identity_contract::apps::{
     Auth, BEA, NOTES, TestResult, check, get, login, ok, op, post, put, refused, registered,
 };
@@ -100,7 +101,7 @@ async fn standing_gives_own_agent_membership_reach_which_pass_rights_and_revocat
     let credential = registered(&service, &admin, NOTES).await?;
     approve_agent_actions(&service, &admin).await?;
     let before = ok(get(&service, "/grants", Auth::Cookie(&admin)).await?)?;
-    assert_eq!(before["grants"], json!([]));
+    assert_eq!(issued(&before), Vec::<serde_json::Value>::new());
     ok(post(
         &service,
         &format!("/apps/{NOTES}/placements"),
@@ -213,7 +214,11 @@ async fn standing_refuses_other_people_withheld_owner_undeclared_kinds_mismatche
         "IdentityNotActive",
     )?;
     let list = ok(get(&service, "/grants", Auth::Cookie(&admin)).await?)?;
-    assert_eq!(list["grants"], json!([]), "refusals record no grants");
+    assert_eq!(
+        issued(&list),
+        Vec::<serde_json::Value>::new(),
+        "refusals record no grants"
+    );
     Ok(())
 }
 

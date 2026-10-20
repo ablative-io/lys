@@ -6,6 +6,7 @@
 
 use std::error::Error;
 
+use identity_contract::apps::issued;
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
 use lys_identity::OperationId;
@@ -156,8 +157,8 @@ async fn row_4_1_a_role_is_a_job_a_profile_and_grant_templates() -> TestResult {
     table.assigned(&id, None).await?;
     let (_, grants) = table.service.get("/grants", Some(&table.ada)).await?;
     assert_eq!(
-        grants["grants"],
-        json!([]),
+        issued(&grants),
+        Vec::<serde_json::Value>::new(),
         "a template is copied when a grant is made: assigning the role issues none"
     );
     Ok(())
