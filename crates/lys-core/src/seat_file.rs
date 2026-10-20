@@ -275,13 +275,11 @@ pub fn identity_from_pem(pem: &str) -> Result<Ed25519Identity, SeatFileError> {
             .filter(|line| !line.is_empty() && !line.starts_with("-----"))
             .collect(),
     );
-    let der = Zeroizing::new(
-        STANDARD
-            .decode(body.as_bytes())
-            .map_err(|_not_pem| SeatFileError::KeyUnreadable {
-                reason: "the key is not PEM",
-            })?,
-    );
+    let der = Zeroizing::new(STANDARD.decode(body.as_bytes()).map_err(|_not_pem| {
+        SeatFileError::KeyUnreadable {
+            reason: "the key is not PEM",
+        }
+    })?);
     let seed = der
         .strip_prefix(&PKCS8_ED25519_PREFIX)
         .and_then(|seed| <[u8; 32]>::try_from(seed).ok())

@@ -20,7 +20,8 @@ fn written(door: Option<DoorSeat>) -> SeatFile {
         ("https://lys.example.test/api", AGENT),
         door,
     );
-    seat.certificate_pem = Some("-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n".to_owned());
+    seat.certificate_pem =
+        Some("-----BEGIN CERTIFICATE-----\nAA==\n-----END CERTIFICATE-----\n".to_owned());
     seat.serial = Some("op-00000000000000000000000000000001".to_owned());
     seat
 }
@@ -97,8 +98,13 @@ fn a_file_of_another_version_is_refused_naming_the_version() -> TestResult {
     let words = missing.to_string();
     assert!(words.starts_with("seat_file_version_unknown"), "{words}");
     assert!(words.contains("carries no version"), "{words}");
-    assert!(words.contains(&format!("reads version {SEAT_FILE_VERSION}")), "{words}");
-    let torn = SeatFile::from_json("{\"version\": 1,").err().ok_or("torn JSON was read")?;
+    assert!(
+        words.contains(&format!("reads version {SEAT_FILE_VERSION}")),
+        "{words}"
+    );
+    let torn = SeatFile::from_json("{\"version\": 1,")
+        .err()
+        .ok_or("torn JSON was read")?;
     assert!(matches!(torn, SeatFileError::Unreadable { .. }), "{torn}");
     Ok(())
 }
@@ -113,17 +119,30 @@ fn the_key_is_never_in_debug_or_in_a_refusal() -> TestResult {
         .ok_or("the PEM has no body")?
         .to_owned();
     assert!(!format!("{seat:?}").contains(&body), "Debug shows the key");
-    let torn = seat.to_json()?.replace("\"version\": 1", "\"version\": \"one\"");
-    let refused = SeatFile::from_json(&torn).err().ok_or("a torn file was read")?;
-    assert!(!refused.to_string().contains(&body), "the refusal shows the key");
+    let torn = seat
+        .to_json()?
+        .replace("\"version\": 1", "\"version\": \"one\"");
+    let refused = SeatFile::from_json(&torn)
+        .err()
+        .ok_or("a torn file was read")?;
+    assert!(
+        !refused.to_string().contains(&body),
+        "the refusal shows the key"
+    );
     Ok(())
 }
 
 #[test]
 fn a_pem_that_is_not_an_ed25519_key_is_refused_by_name() {
-    for text in ["not pem at all", "-----BEGIN PRIVATE KEY-----\nAAEC\n-----END PRIVATE KEY-----\n"] {
+    for text in [
+        "not pem at all",
+        "-----BEGIN PRIVATE KEY-----\nAAEC\n-----END PRIVATE KEY-----\n",
+    ] {
         assert!(
-            matches!(identity_from_pem(text), Err(SeatFileError::KeyUnreadable { .. })),
+            matches!(
+                identity_from_pem(text),
+                Err(SeatFileError::KeyUnreadable { .. })
+            ),
             "{text} was read as a key"
         );
     }
