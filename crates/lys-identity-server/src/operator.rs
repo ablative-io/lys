@@ -197,9 +197,17 @@ fn upgrade_pending_refusal(state: &AppState) -> ServerError {
         Ok(previous_organisation) => ServerError::UpgradePending {
             previous_organisation,
         },
-        Err(error) => ServerError::ConfigInvalid {
-            reason: format!("the upgrade record cannot be read: {error}"),
-        },
+        // The record is there and is not the installer's: the upgrade is
+        // under way all the same, and the operator is refused as for any
+        // unreadable upgrade state, the cause said on the service's line.
+        Err(error) => {
+            (state.say)(&format!(
+                "operator_refused: the upgrade record cannot be read as the installer's: {error}"
+            ));
+            ServerError::OperatorRefused {
+                reason: "the upgrade record cannot be read",
+            }
+        }
     }
 }
 

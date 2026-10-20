@@ -116,7 +116,9 @@ fn two_organisations(config: &Config) -> Result<Two, Box<dyn Error>> {
                     [Action::new("read")?].into_iter().collect(),
                     [RecipientKind::Person].into_iter().collect(),
                 )?,
-                window: Window::new(T0, None)?,
+                // The service judges at the system clock; a window from
+                // T0, a fixture instant ahead of it, would read NotStarted.
+                window: Window::new(0, None)?,
             },
             T0,
         )?;

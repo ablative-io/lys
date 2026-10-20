@@ -123,10 +123,11 @@ async fn standing_gives_own_agent_membership_reach_which_pass_rights_and_revocat
         recorded
     );
     let listed = ok(get(&service, "/grants", Auth::Cookie(&admin)).await?)?;
-    assert_eq!(listed["grants"].as_array().ok_or("no grants")?.len(), 1);
-    assert_eq!(listed["grants"][0]["source"], "administrator");
-    assert_eq!(listed["grants"][0]["holder"], agent);
-    assert_eq!(listed["grants"][0]["standing"]["stands"], true);
+    let given = issued(&listed);
+    assert_eq!(given.len(), 1, "{listed}");
+    assert_eq!(given[0]["source"], "administrator");
+    assert_eq!(given[0]["holder"], agent);
+    assert_eq!(given[0]["standing"]["stands"], true);
     let allowed = batch(&service, &admin, &agent, revision).await?;
     for result in allowed["results"].as_array().ok_or("no check results")? {
         assert_eq!(result["allowed"], true, "{result}");

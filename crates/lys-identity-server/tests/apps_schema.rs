@@ -250,7 +250,10 @@ async fn lys_is_an_app_whose_schema_is_the_model_and_changes_only_by_the_adminis
         ]),
         "{checked}"
     );
+    // A wider schema keeps administrator, the relation the founding grant
+    // stands on (DIRECTORY-109 R3): dropping it would strand that grant.
     let wider = json!({"operation": op()?, "replaces": 1, "schema": {"relations": {
+        "administrator": ["organisation.administer", "organisation.admit", "organisation.grant", "organisation.read"],
         "alpha": ["read", "write"], "beta": ["read"], "gamma": ["read"],
     }}});
     let changed = ok(put(&service, "/apps/lys/schema", Auth::Cookie(&admin), &wider).await?)?;
