@@ -26,7 +26,6 @@ use super::permission::RelationshipStore;
 use super::projection::GrantBook;
 use super::receipt::GrantReceipt;
 use super::recovery::{GrantLedger, checkpoint_refused};
-use super::revocation::judge_revoke;
 use super::settlement::ProjectionDegraded;
 use super::state;
 use super::types::{Action, Grant, GrantId, Mode, Resource, Source};
