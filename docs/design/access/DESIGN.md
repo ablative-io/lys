@@ -78,7 +78,6 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `crates/lys-identity-server/src/routes_table.rs` | POST /people judged by organisation.admit like /people/admit (ACCESS-009 R1). | ACCESS-009 |
 | `crates/lys-identity-server/src/openapi_table.rs` | The two people routes declare organisation.admit and the refusals organisation_not_own and NotAdmitted (ACCESS-009 R1). | ACCESS-009 |
 | `crates/lys-identity-server/tests/people_admit.rs` | Admit by organisation.admit on one's own organisation; organisation_not_own; our administrator by the founding grant only (ACCESS-009 R1). | ACCESS-009 |
-| `crates/lys-identity-server/src/grants/organisation_roots_tests.rs` | Root authority by resource: organisation.grant for organisation-owned kinds, the install's person for install-level kinds, resource_owned_elsewhere (ACCESS-009 R2). | ACCESS-009 |
 | `crates/lys-identity/src/grants/admission.rs` | judge_root by resource: organisation.grant or the install's person; recipient_outside_organisation on delegation (ACCESS-009 R2, R3). | ACCESS-009 |
 | `crates/lys-identity/src/grants/authority.rs` | The root authority as a function of the resource's kind and organisation (ACCESS-009 R2). | ACCESS-009 |
 | `crates/lys-identity/src/grants/mode.rs` | issue_root_in carries the resource's organisation to the judge (ACCESS-009 R2). | ACCESS-009 |
@@ -88,14 +87,16 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `crates/lys-identity-server/src/grants/handlers.rs` | issue_root and delegate carry the organisation rules (ACCESS-009 R2, R3). | ACCESS-009 |
 | `crates/lys-identity-server/src/agent_roots.rs` | An agent's setup roots are issued under its responsible person's organisation (ACCESS-009 R2). | ACCESS-009 |
 | `crates/lys-identity-server/src/grants_delegation_tests.rs` | Delegation stays inside the organisation: recipient_outside_organisation (ACCESS-009 R3). | ACCESS-009 |
-| `surface/identity/src/features/access/access-organisation.test.tsx` | Access names the caller's organisation, lists only its resources and holders, offers the root act by authority (ACCESS-009 R4). | ACCESS-009 |
-| `surface/identity/src/features/people/People.tsx` | The add act shown by organisation.admit from GET /authority (ACCESS-009 R4). | ACCESS-009 |
+| `surface/identity/src/features/access/access-organisation.test.tsx` | Access names the caller's organisation and offers Give access by organisation.grant; Add person by organisation.admit (ACCESS-009 R4). | ACCESS-009 |
+| `surface/identity/src/features/people/People.tsx` | Add person shown by organisation.admit from the caller's own grants; names the organisation (ACCESS-009 R4). | ACCESS-009 |
 | `surface/identity/src/features/people/AddPerson.tsx` | Names the caller's organisation read-only; sends no organisation field (ACCESS-009 R4). | ACCESS-009 |
-| `surface/identity/src/features/people/people-views.test.tsx` | People header names the organisation; lists are the partitioned routes' answers (ACCESS-009 R4). | ACCESS-009 |
 | `surface/identity/src/features/people/people-add-person.test.tsx` | The add act shown by organisation.admit and naming the caller's organisation (ACCESS-009 R4). | ACCESS-009 |
 | `surface/identity/src/features/access/Access.tsx` | Access names the caller's organisation; lists only the partitioned routes' resources and holders (ACCESS-009 R4). | ACCESS-009 |
-| `surface/identity/src/features/access/Resources.tsx` | The root act offered only with organisation.grant (ACCESS-009 R4). | ACCESS-009 |
-| `surface/identity/src/features/access/Graph.tsx` | The permission graph drawn from the partitioned reach and who answers; holders of another organisation never appear (ACCESS-009 R4). | ACCESS-009 |
+| `tests/identity_contract/src/two_organisations.rs` | The two-organisation fixture: A and B founded, a root in each (ACCESS-009 R2). | ACCESS-009 |
+| `tests/identity_contract/src/harness_startup.rs` | Named by ACCESS-009 R2. | ACCESS-009 |
+| `tests/identity_contract/src/lib.rs` | Named by ACCESS-009 R2. | ACCESS-009 |
+| `surface/identity/src/features/grants/organisation-acts.ts` | What a person holds on their own organisation, read from their own grants (ACCESS-009 R4). | ACCESS-009 |
+| `surface/identity/src/features/grants/IssueRoot.tsx` | Give access opens to organisation.grant or the install's root authority; the refusal names the right (ACCESS-009 R4). | ACCESS-009 |
 
 ## Inventory
 

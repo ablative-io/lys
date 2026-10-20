@@ -69,21 +69,27 @@ Behavioural. judge_root (crates/lys-identity/src/grants/admission.rs:273-281) to
 - A root on directory:apps is judged by the install's root authority person as today, and a founder of A asking for it is refused RootAuthorityRefused; a root on a machine or a team by A's founder is allowed and records A
 
 **Files:**
+- create: crates/lys-identity/src/grants/roots.rs
 - create: crates/lys-identity-server/tests/organisation_grants.rs
-- modify: crates/lys-identity-server/src/agent_roots.rs
-- modify: crates/lys-identity-server/src/error_names.rs
-- modify: crates/lys-identity-server/src/error_status.rs
-- modify: crates/lys-identity-server/src/grant_contract/views.rs
-- modify: crates/lys-identity-server/src/grants.rs
-- modify: crates/lys-identity-server/src/grants/handlers.rs
-- modify: crates/lys-identity-server/src/openapi_table.rs
-- modify: crates/lys-identity-server/src/people_admit.rs
+- create: tests/identity_contract/src/two_organisations.rs
 - modify: crates/lys-identity/src/grants/admission.rs
 - modify: crates/lys-identity/src/grants/authority.rs
 - modify: crates/lys-identity/src/grants/error.rs
+- modify: crates/lys-identity/src/grants/frame.rs
+- modify: crates/lys-identity/src/grants/mod.rs
 - modify: crates/lys-identity/src/grants/mode.rs
+- modify: crates/lys-identity/src/grants/revocation.rs
 - modify: crates/lys-identity/src/grants/shipped.rs
-- modify: crates/lys-identity/src/grants/types.rs
+- modify: crates/lys-identity/tests/support/world.rs
+- modify: crates/lys-identity-server/src/error_names.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/grant_contract/views.rs
+- modify: crates/lys-identity-server/src/grants/handlers.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/requests_api.rs
+- modify: crates/lys-identity-server/src/apps_bench_scratch.rs
+- modify: tests/identity_contract/src/harness_startup.rs
+- modify: tests/identity_contract/src/lib.rs
 
 **Checklist:**
 - C801 — judge_root's root authority is a function of the resource: organisation.grant on the caller's organisation for organisation-owned kinds, the install's person for install-level kinds; every root records its organisation; a resource rooted under another organisation is refused resource_owned_elsewhere while any grant on it lives.
@@ -102,6 +108,7 @@ Behavioural. THE SYSTEM SHALL add one rule to delegation judging (delegation_aut
 - A delegation naming a recipient of another organisation, a person or an agent whose responsible person is in B, is refused OrganisationOutside; a service account owned by a person of A is a recipient within A
 
 **Files:**
+- modify: crates/lys-identity/src/grants/administrator.rs
 - modify: crates/lys-identity/src/grants/admission.rs
 - modify: crates/lys-identity/src/grants/authority.rs
 - modify: crates/lys-identity-server/src/grants/handlers.rs
@@ -115,7 +122,7 @@ Behavioural. THE SYSTEM SHALL add one rule to delegation judging (delegation_aut
 
 ### R4: Priya's screens: People and Access are her organisation's, the add-person act names it, and our administrator's screens show only ours
 
-Behavioural. Or she has routes and no door (Waffles, 20 October 2026). THE SYSTEM SHALL show on surface/identity/src/features/people/People.tsx the caller's organisation name from GET /me (DIRECTORY-109 R4) above the list, and list people, agents and teams from the partitioned routes without a client-side filter; surface/identity/src/features/people/AddPerson.tsx:18 onward SHALL name the organisation the person is being added to (read-only, the caller's own), SHALL send no organisation field, and SHALL show the add act only to a caller whose own grants (GET /grants, the caller as holder) hold a live grant on their organisation carrying organisation.admit, otherwise the words of ADR-011 for a right not held; GET /authority (read_api.rs:55) answers the install's root authority person and build, and keeps to that; the copy-invite words (AddPerson.tsx:106-138) stay until IDENTITY-004 removes them. surface/identity/src/features/access/Access.tsx, Resources.tsx and Graph.tsx SHALL list and draw only resources and holders the partitioned grants routes answer (/grants, /grants/reach, /grants/who), the organisation named in the Access header, and SHALL offer the root act (Resources.tsx) only to a caller whose own grants hold a live grant on their organisation carrying organisation.grant; isRootAuthority (IssueRoot.tsx) keeps naming the install's root person for the install-level kinds. No screen has a branch for the install's own organisation: our administrator's People and Access read as Priya's do, scoped to ours.
+Behavioural. Or she has routes and no door (Waffles, 20 October 2026). THE SYSTEM SHALL show on surface/identity/src/features/people/People.tsx the caller's organisation name from GET /me (DIRECTORY-109 R4) above the list, and list people, agents and teams from the partitioned routes without a client-side filter; surface/identity/src/features/people/AddPerson.tsx:18 onward SHALL name the organisation the person is being added to (read-only, the caller's own), SHALL send no organisation field, and SHALL show the add act only to a caller whose own grants (GET /grants, the caller as holder) hold a live grant on their organisation carrying organisation.admit, otherwise the words of ADR-011 for a right not held; GET /authority (read_api.rs:55) answers the install's root authority person and build, and keeps to that; the copy-invite words (AddPerson.tsx:106-138) stay until IDENTITY-004 removes them. surface/identity/src/features/access/Access.tsx, Resources.tsx and Graph.tsx SHALL list and draw only resources and holders the partitioned grants routes answer (/grants, /grants/reach, /grants/who), the organisation named in the Access header, and SHALL offer the root act (Access.tsx, through IssueRoot.tsx) only to a caller whose own grants hold a live grant on their organisation carrying organisation.grant; isRootAuthority (IssueRoot.tsx) keeps naming the install's root person for the install-level kinds. No screen has a branch for the install's own organisation: our administrator's People and Access read as Priya's do, scoped to ours.
 
 **Acceptance:**
 - people-views.test.tsx: a caller of A sees A's name in the header and only A's people, agents and teams, from a mocked API that also returns nothing of B because the route does not
@@ -124,14 +131,21 @@ Behavioural. Or she has routes and no door (Waffles, 20 October 2026). THE SYSTE
 - bun run test in surface/identity: the three files pass; the summary line read, never the exit code
 
 **Files:**
+- create: surface/identity/src/features/grants/organisation-acts.ts
 - create: surface/identity/src/features/access/access-organisation.test.tsx
 - modify: surface/identity/src/features/people/People.tsx
 - modify: surface/identity/src/features/people/AddPerson.tsx
-- modify: surface/identity/src/features/people/people-views.test.tsx
 - modify: surface/identity/src/features/people/people-add-person.test.tsx
 - modify: surface/identity/src/features/access/Access.tsx
-- modify: surface/identity/src/features/access/Resources.tsx
-- modify: surface/identity/src/features/access/Graph.tsx
+- modify: surface/identity/src/features/grants/IssueRoot.tsx
+- modify: surface/identity/tests/fixtures.ts
+- modify: surface/identity/tests/access-modes.test.tsx
+- modify: surface/identity/tests/grants.test.tsx
+- modify: surface/identity/tests/grants-delegation.test.tsx
+- modify: surface/identity/tests/graph.test.tsx
+- modify: surface/identity/tests/me.test.tsx
+- modify: surface/identity/tests/revoke.test.tsx
+- modify: surface/identity/tests/acceptance/grants.spec.ts
 
 **Checklist:**
 - C803 — People and Access show the caller's organisation and only its records, from the partitioned routes without client filtering, with the add-person and root acts shown by GET /authority's organisation.admit and organisation.grant; no screen branches on the install's own organisation.
@@ -171,3 +185,10 @@ R2: the install-level kinds are named from the tree now (directory:apps; the set
 - **By:** Waffles
 
 R1: organisation.admit is withheld from agents, so an agent's call to register a person is refused NotAdmitted by any route. R2: the refusal for a resource rooted under another organisation is RootOwnedElsewhere, PascalCase like its siblings; its tests live in crates/lys-identity-server/tests/organisation_grants.rs. R3: a recipient outside the issuer's organisation is refused OrganisationOutside, the name DIRECTORY-109 already gives it; a service account owned by a person of the organisation is within it. R4: GET /authority answers only the root person and the build, so the add and root acts are shown from the caller's own grants (GET /grants) on their organisation, and isRootAuthority keeps to the install-level kinds.
+
+### Amendment 3: File lists name what was written; the founding grant is a grant like any other
+
+- **Date:** 2026-10-20
+- **By:** Waffles
+
+R2: the root-authority judgement lives in a new crates/lys-identity/src/grants/roots.rs (root_authority_for, rooters, the one organisation-aware revoke, record_unjudged for fixtures); the two-organisation fixture is tests/identity_contract/src/two_organisations.rs; the contract harness adds the shipped administrator relation to every fixture model that names none, as the install's model file always carries it, so every started service's root authority holds organisation.grant. R3: delegate_administrator (administrator.rs) refuses a recipient outside the caller's organisation. R4: the surface reads its acts from surface/identity/src/features/grants/organisation-acts.ts; Resources.tsx and Graph.tsx needed no change, the partitioned routes answer only the caller's organisation; the founder's grant on the organisation is listed, drawn and offered as a resource wherever grants are, so the fixtures that count Ada's grants count it. The World's grant tests count the founding grant at leaf zero.
