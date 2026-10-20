@@ -73,7 +73,7 @@ pub fn the_organisation<S: lys_log_store::LeafStore>(
     directory: &mut lys_identity::Directory<S>,
 ) -> Result<lys_identity::OrganisationId, Box<dyn std::error::Error>> {
     let mut held = directory.projection()?.organisations().map(|(id, _)| id);
-    let one = held.ok_or("the directory holds no organisation")?;
+    let one = held.next().ok_or("the directory holds no organisation")?;
     if held.next().is_some() {
         return Err("the directory holds more than one organisation".into());
     }
