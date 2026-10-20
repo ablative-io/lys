@@ -60,6 +60,25 @@ pub(crate) async fn register_person(
         operation(&body.operation)?,
         Profile::new(&body.display_name)?,
     );
+    // The configured administrator whose login is bound to no person yet is
+    // the install acting, as the boot's attach has it: no person exists to
+    // judge a grant under, so their registration is not judged. The first
+    // founds the install's organisation, named by the setup settings, with
+    // the person registered as its founder; until their login is bound they
+    // register into that organisation. Binding it ends this: the founder's
+    // administrator grant is issued at the bind, and from then on they are
+    // judged as anyone (ACCESS-009 R1, the configured-administrator ruling).
+    if state.admission.configured_administrator(&actor).is_ok() {
+        let unbound = with_directory(&state, |directory| {
+            Ok(directory
+                .projection()?
+                .person_for(actor.binding())
+                .is_none())
+        })?;
+        if unbound {
+            return bootstrap_registration(&state, actor, op, profile);
+        }
+    }
     // The caller holds organisation.admit on their own organisation
     // (ACCESS-009 R1), exercised under the hold the write takes; the new
     // person belongs to that organisation (DIRECTORY-109 R1), never to one
@@ -84,6 +103,43 @@ pub(crate) async fn register_person(
             }))
         },
     )
+}
+
+/// The configured administrator's registration before their login is
+/// bound to a person: into the first organisation, founding it as the
+/// setup settings name it when the directory holds none, the person
+/// registered as its founder.
+fn bootstrap_registration(
+    state: &Shared,
+    actor: lys_identity::Actor,
+    op: OperationId,
+    profile: Profile,
+) -> Result<Json<PersonRegistered>, ServerError> {
+    with_directory(state, |directory| {
+        let first = directory.projection()?.first_organisation();
+        let (id, receipt) = match first {
+            Some(organisation) => {
+                directory.register_person(actor, op, profile, organisation, now())?
+            }
+            None => {
+                let name = state
+                    .setup
+                    .as_ref()
+                    .map(|settings| settings.organisation.as_str())
+                    .ok_or(ServerError::NotAdmitted {
+                        reason: "the directory holds no organisation and the configuration names no setup organisation to found one as",
+                    })?;
+                let founded =
+                    directory.found_organisation(actor, op, Profile::new(name)?, profile, now())?;
+                (founded.founder, founded.founder_receipt)
+            }
+        };
+        Ok(Json(PersonRegistered {
+            person: id.to_string(),
+            receipt: receipt_view(&receipt),
+            own_computer_unnamed: None,
+        }))
+    })
 }
 
 pub(crate) async fn register_agent(
@@ -356,10 +412,21 @@ pub(crate) async fn bind_login(
         operation(&body.operation)?,
         LoginBinding::new(&body.issuer, &body.subject)?,
     );
-    with_directory(&state, |directory| {
+    let administrators = state.admission.administrator_login()?.as_ref() == Some(&binding);
+    let bound = with_directory(&state, |directory| {
         let receipt = directory.bind_login(actor, op, person, binding, now())?;
         Ok(Json(ReceiptAnswer {
             receipt: receipt_view(&receipt),
         }))
-    })
+    })?;
+    // Binding the configured administrator's login to a person gives the
+    // grants their root authority: the founder's administrator grant of
+    // that person's organisation is issued now (DIRECTORY-109 R3), as
+    // first-run setup issues it after its batch, so the administrator admits
+    // people from this call on. Retried, it answers the same grant and
+    // records nothing.
+    if administrators {
+        crate::organisation_boot::founder_grant(&state, person)?;
+    }
+    Ok(bound)
 }

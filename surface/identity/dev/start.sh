@@ -86,13 +86,17 @@ cat >"$STATE/config.json" <<JSON
 JSON
 
 # The development permission model: each relation and the actions it carries.
+# The administrator relation is the shipped one (lys_identity::grants::shipped):
+# the seed's founder holds it on the development organisation, and a root
+# grant on a project rests on organisation.grant there (ACCESS-009 R2).
 cat >"$STATE/model.json" <<JSON
 {
   "version": 1,
   "relations": {
     "owner": ["view", "edit", "grant"],
     "editor": ["view", "edit"],
-    "viewer": ["view"]
+    "viewer": ["view"],
+    "administrator": ["organisation.administer", "organisation.admit", "organisation.grant", "organisation.read"]
   }
 }
 JSON

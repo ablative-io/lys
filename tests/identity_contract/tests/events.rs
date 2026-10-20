@@ -337,7 +337,8 @@ mod directory_events {
         let refused =
             directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10);
         assert!(matches!(refused, Err(IdentityError::AppendRefused { .. })));
-        assert_eq!(directory.log()?.len()?, 4);
+        // The founding's two leaves and nothing of the refused append.
+        assert_eq!(directory.log()?.len()?, 2);
         directory.register_person(administrator()?, op(1), shown("Ada")?, organisation, 10)?;
         assert_eq!(directory.log()?.len()?, 3);
         Ok(())

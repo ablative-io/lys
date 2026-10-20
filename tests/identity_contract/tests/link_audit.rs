@@ -77,8 +77,8 @@ fn a_long_observer_and_source_operation_id_are_signed_logged_and_read_back_whole
     let mut reopened = harness.open()?;
     assert_eq!(
         reopened.log()?.len()?,
-        2,
-        "the long observation is signed, logged and read back"
+        4,
+        "the founding's two leaves, then the long observation is signed, logged and read back"
     );
     let leaf = reopened
         .log()?
