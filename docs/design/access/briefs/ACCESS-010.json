@@ -1,0 +1,148 @@
+{
+  "id": "ACCESS-010",
+  "cluster": "access",
+  "title": "A revoked grant or a stopped holder ends hot routes when the change stream delivers it, checked once in lys-pass",
+  "depends_on": [
+    "DIRECTORY-089"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C804",
+    "C805",
+    "C806",
+    "C807"
+  ],
+  "stories": [
+    "S459"
+  ],
+  "design_anchor": [],
+  "purpose": "Waffles's ruling of 20 October 2026, on haematite's design page docs/design/access/HOT-ROUTE-REVOCATION-2026-10-20.md (haematite main d27301e2): option 2 with option 4. Today a product decides a hot route from the pass alone (lys-pass verify.rs:253-309, VerifiedPass::evaluate and hot_allowed, which never read any revoked set), so a revoked grant keeps admitting hot acts until the pass expires, up to its lifetime (600 s by default in haematite), and D3 says so (docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md:50-57). Lys already publishes what a product needs to do better: POST /grants/changes (DIRECTORY-089 R1, crates/lys-identity-server/src/grant_changes.rs:155-224) gives a baseline of revoked grants, the ordered changes after it, and Ready (crates/lys-identity/src/grants/change_stream.rs:100-174). liminal consumes it in its own ACCESS-005 (liminal crates/liminal-server/src/auth_revocation.rs), and nobody else does. This brief builds that consumer once, in lys-pass, so every product (haematite, liminal, Cambium, Tharsis) checks a revocation the same way. It adds one frame, a per-holder not-before, so a stop, a suspension, a retirement or a compromised key ends every pass of that holder at once, which a grant revocation cannot: none of POST /agents/{id}/stop, /identities/{id}/transitions or /agents/{id}/pass/revoke writes anything to the stream today (stop_api.rs, routes/identities.rs:241-311, agent_app_pass.rs:83 and :163, which answers offline_pass_revocation_unsupported). The bound is never a number of seconds: a revoke reaches every product when the change stream delivers it. Before Ready, or with the stream lost, D10 stands: a hot route is decided from an unexpired pass, as today, so nobody is wrongly refused (Tom, 13 October 2026: a wrong refusal that stops people using it is the failure that cannot happen). haematite's stream reader is its own brief after this one lands, never before.",
+  "task": "Add the consumer and the check to crates/lys-pass (a new module crates/lys-pass/src/revocation.rs and its tests in crates/lys-pass/tests/revocation.rs, the hot-route entry in crates/lys-pass/src/verify.rs, the http client's reading loop behind the existing http feature in crates/lys-pass/src/lib.rs). Add the not-before event and frame to the grant log in crates/lys-identity/src/grants/ (events.rs, change_stream.rs, revocation.rs) and emit it from crates/lys-identity-server/src/stop_api.rs, crates/lys-identity-server/src/routes/identities.rs and crates/lys-identity-server/src/agent_app_pass.rs, served through crates/lys-identity-server/src/grant_changes.rs and grant_changes/stream.rs. Write the rule into D3 of docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "lys-pass holds the revoked grants and holder cut-offs from the change stream",
+      "spec": "Behavioural. THE SYSTEM SHALL offer, in lys-pass, a RevocationView fed by the frames of POST /grants/changes in order, with no transport of its own in the core (so a product with its own reader, as liminal's ACCESS-007 owner, feeds it the same frames), and, behind the http feature, a reader that posts to /grants/changes with wait set and feeds every page to the view, waiting only on the server's answer, never on a timer. The view SHALL apply a baseline (its revoked grants and its holder cut-offs), then each change in revision order, and SHALL be Ready only after a Ready frame at or above every revision it has applied. A gap in revisions, a reset, an unready frame or a lost connection SHALL make it not Ready, with its last applied revision and the instant it was applied kept, and SHALL resume from that revision, or take a new baseline when the server answers reset. It SHALL keep a revoked grant only while a pass naming it could still be unexpired (its revocation instant plus the longest pass lifetime the product accepts, a setting the product gives when it builds the view), and a holder cut-off the same way, so its size is bounded by the revocations of one lifetime, never by the whole history. The same consumer SHALL serve liminal's binding admission without changing its rule: a product that asks for revocation-required admission (liminal ACCESS-005 R3, require_ready) is refused before Ready exactly as today; that is a liminal brief's move, named here and not made here.",
+      "acceptance": [
+        "Red first (cargo nextest, lys-pass, tests/revocation.rs): a view fed a baseline revoking grant g1 and a Ready frame reports g1 revoked and is Ready; today lys-pass has no such type.",
+        "Red: a change at revision n+2 after n is a gap: the view is not Ready, keeps revision n, and a resumed read from n that brings n+1 and n+2 and a Ready makes it Ready again with both applied.",
+        "Red: a reset frame drops the view's state and the next baseline replaces it; nothing from the old log is kept.",
+        "Red: a revoked grant whose revocation is older than the lifetime setting is dropped, and the view's count goes down by one.",
+        "Red (http feature, a test server): the reader's request carries wait and the last applied revision, and a server that closes the connection leaves the view not Ready with its last revision and instant."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-pass/src/revocation.rs",
+          "crates/lys-pass/tests/revocation.rs"
+        ],
+        "modify": [
+          "crates/lys-pass/src/lib.rs",
+          "crates/lys-pass/Cargo.toml"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C804"
+      ],
+      "stories": [
+        "S459"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A hot route refuses a revoked grant or a cut-off holder by name, and never refuses before Ready",
+      "spec": "Behavioural. THE SYSTEM SHALL offer VerifiedPass::evaluate_with(&self, view, kind, id, action, now) and hot_allowed_with, which decide as evaluate and hot_allowed do today (verify.rs:253-309) and then: WHEN the view is Ready, SHALL refuse a right whose grant (Claims rights[].grant, rights.rs:46-55) the view holds revoked, as grant_revoked naming the grant, and SHALL refuse every right of a pass whose holder the view holds a cut-off for at or after the pass's iat, as holder_cut_off naming the holder; WHEN the view is not Ready, SHALL decide from the pass alone, as today, and SHALL say so in its answer (decided_without_stream, with the view's last applied revision and instant), so a product's status screen can show 'Lys last answered at …' as D10 asks. A right that the view does not hold revoked is decided exactly as today. evaluate and hot_allowed SHALL keep their meaning, so no product changes behaviour until it calls the new entry.",
+      "acceptance": [
+        "Red first (cargo nextest, lys-pass): with a Ready view revoking g1, a pass whose only matching right carries g1 is refused grant_revoked naming g1; the same pass with the view not Ready is allowed and the answer says decided_without_stream with the revision and instant.",
+        "Red: with a Ready view holding a cut-off for holder h at instant t, a pass of h issued before t is refused holder_cut_off for every right, and a pass of h issued at or after t is decided as today.",
+        "Red: a right with a grant the view never saw is decided exactly as evaluate decides it, compared for every case in the conformance fixtures (crates/lys-pass/src/conformance.rs).",
+        "Red: evaluate and hot_allowed answer the same as before for every conformance fixture, with or without a view existing."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-pass/src/verify.rs",
+          "crates/lys-pass/src/refusal.rs",
+          "crates/lys-pass/src/conformance.rs",
+          "crates/lys-pass/tests/revocation.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C805"
+      ],
+      "stories": [
+        "S459"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "Lys writes a holder cut-off to the grant log when it stops, suspends or retires a holder or revokes its passes",
+      "spec": "Behavioural. THE SYSTEM SHALL record a holder cut-off (the holder's id and the instant from which its passes count) as a signed event in the grant log, in revision order with the grant events, WHEN POST /agents/{id}/stop stops an agent, WHEN POST /identities/{id}/transitions suspends or retires an identity, and WHEN POST /agents/{id}/pass/revoke revokes an agent's passes; that route SHALL then answer that offline passes are cut off when the change stream delivers it, in place of offline_pass_revocation_unsupported. POST /grants/changes SHALL carry it as a holder_cut_off frame {revision, holder, not_before}, to every app's read (a holder's id is already in every pass an app verifies), and its baseline SHALL carry the cut-offs still within one pass lifetime beside the revoked grants. A reinstatement SHALL NOT remove a cut-off: passes issued before it stay ended, and new passes are issued after it. The event's form SHALL be added to the frame schema in grant_changes.rs and the OpenAPI table, and a log written before this brief SHALL read as one with no cut-offs.",
+      "acceptance": [
+        "Red first (cargo nextest, lys-identity-server): stopping an agent appends one holder cut-off event, and a /grants/changes read after it carries a holder_cut_off frame naming the agent at the next revision.",
+        "Red: suspending and retiring an identity each append one; reinstating appends none and leaves the cut-off in the next baseline.",
+        "Red: POST /agents/{id}/pass/revoke appends one, and its answer no longer carries offline_pass_revocation_unsupported.",
+        "Red: a baseline read carries every cut-off younger than one pass lifetime and none older.",
+        "Red: a grant log written before this change reads with no cut-offs and every revision unchanged."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/src/grants/events.rs",
+          "crates/lys-identity/src/grants/change_stream.rs",
+          "crates/lys-identity/src/grants/revocation.rs",
+          "crates/lys-identity-server/src/stop_api.rs",
+          "crates/lys-identity-server/src/routes/identities.rs",
+          "crates/lys-identity-server/src/agent_app_pass.rs",
+          "crates/lys-identity-server/src/grant_changes.rs",
+          "crates/lys-identity-server/src/grant_changes/stream.rs",
+          "crates/lys-identity-server/src/openapi_table.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C806"
+      ],
+      "stories": [
+        "S459"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "D3 says what a revocation reaches and when",
+      "spec": "Documentary. THE SYSTEM's D3 in docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (:50-57) SHALL say, from the day this brief is written, option 1's sentence: a revoked grant stops a hot route at the pass's expiry, at most its lifetime, until the product reads the change stream. From the commit that lands R1 to R3 it SHALL say instead: a revoke or a holder cut-off reaches every product that reads the change stream when the stream delivers it; before the stream is Ready, or while it is lost, a hot route is decided from an unexpired pass, as D10 says, and the product's status screen shows the last instant Lys answered. No number of seconds is stated as the bound.",
+      "acceptance": [
+        "The design gate's parsed output names no failure for the access cluster.",
+        "D3's text at the final commit says the second form, and the brief's commit carries the first."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C807"
+      ],
+      "stories": [
+        "S459"
+      ]
+    }
+  ],
+  "boundaries": [
+    "SHALL NOT refuse a hot route before the view is Ready or while the stream is lost (D10).",
+    "SHALL NOT change evaluate's or hot_allowed's answers, the pass format, or a deliberate route's live check.",
+    "SHALL NOT state the revocation bound as a number of seconds.",
+    "SHALL NOT change liminal's admission rule; liminal moves onto this consumer in its own brief.",
+    "SHALL NOT build haematite's stream reader; that is haematite's brief after this lands.",
+    "SHALL NOT wait a set time anywhere, in the reader or in the tests: every wait ends on the server's answer, a closed connection, a signal or an exit."
+  ],
+  "verification": [
+    "gate -stages nextest -crates lys-pass,lys-identity,lys-identity-server -test 'test(revocation) | test(cut_off) | test(grant_changes)'; every red first with the FAIL line quoted",
+    "python3 scripts/design/validate.py docs/design/access and python3 scripts/design/check-coverage.py docs/design/access read for FAIL lines, never the exit code",
+    "The whole declared gate on Tom's Mac, START and END posted with df"
+  ],
+  "amendments": []
+}

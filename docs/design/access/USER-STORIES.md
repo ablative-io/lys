@@ -10,6 +10,8 @@
 
 **S457.** As the administrator of my own organisation's Lys, I admit my people and give them our Cambium by grants I hold on my organisation, and the provider's administrator cannot do either inside it unless I pass them the right and I can take it back.
 
+**S459.** As Tom, when I revoke a grant or stop an agent, I want every product to stop honouring it as soon as Lys's change stream reaches it, without anyone being refused while Lys is out of reach, so that taking access away is real and never locks people out by mistake.
+
 ## Hermes — a product lead (liminal)
 
 **S304.** As a product lead, I want one library that verifies a pass, reaches through parents and refuses in one shape, so that I do not implement permissions a fourth way.

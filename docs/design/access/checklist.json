@@ -120,6 +120,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Revocation reaches hot routes through lys-pass (ACCESS-010)",
+      "items": [
+        {
+          "id": "C804",
+          "text": "lys-pass's RevocationView applies the change stream's baseline, changes and Ready in revision order, is not Ready on a gap, reset, unready or lost connection, resumes from its last revision, and keeps a revocation only within one pass lifetime (ACCESS-010 R1).",
+          "done": false
+        },
+        {
+          "id": "C805",
+          "text": "evaluate_with refuses a right with a revoked grant (grant_revoked) and every right of a holder cut off at or after the pass's iat (holder_cut_off) when the view is Ready, and decides from the pass alone, saying so, when it is not (ACCESS-010 R2).",
+          "done": false
+        },
+        {
+          "id": "C806",
+          "text": "Stopping an agent, suspending or retiring an identity and revoking an agent's passes each write a holder cut-off to the grant log, carried as a holder_cut_off frame and in the baseline (ACCESS-010 R3).",
+          "done": false
+        },
+        {
+          "id": "C807",
+          "text": "D3 says a revoke reaches every product when the change stream delivers it, and that before Ready a hot route is decided from an unexpired pass, with no number of seconds as the bound (ACCESS-010 R4).",
+          "done": false
+        }
+      ]
     }
   ]
 }

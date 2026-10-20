@@ -52,8 +52,10 @@ AND agents (an agent proves itself with its key where a person uses Google; the 
 The access token for an app carries, for that app only (`aud`): the holder, its kind, the responsible
 person, and a list of rights `{resource: kind, id-or-prefix, actions, mode, grant}`. Short-lived
 (minutes, a setting; refreshed by the product's client library). Signed by Lys with the key its
-`/.well-known` publishes. Products verify offline. A revoked grant stops at the next refresh for hot
-routes and at once for deliberate routes. Liminal's existing wire pass remains, minted by cambium-door
+`/.well-known` publishes. Products verify offline. A revoked grant stops a deliberate route at once; on a hot
+route it stops at the pass's expiry, at most the pass lifetime, because a hot route is decided from the pass
+alone until the product reads Lys's change stream (ACCESS-010, which makes a revoke reach every product
+when the stream delivers it; Waffles, 20 October 2026). Liminal's existing wire pass remains, minted by cambium-door
 from the holder's Lys rights, until liminal verifies Lys's token directly (its brief says when).
 
 D4. **A grant carries its mode.** `outright` (the act happens), `by_draft` (the product writes the act as

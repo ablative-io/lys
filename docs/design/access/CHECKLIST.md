@@ -35,3 +35,10 @@
 - [ ] **C801** — judge_root's root authority is a function of the resource: organisation.grant on the caller's organisation for organisation-owned kinds, the install's person for install-level kinds; every root records its organisation; a resource rooted under another organisation is refused resource_owned_elsewhere while any grant on it lives.
 - [ ] **C802** — A delegation to a recipient outside the issuer's organisation, directly or through an agent's, service account's, connector's or machine's owner, is refused recipient_outside_organisation; revocation keeps revocation.rs:71's rule.
 - [ ] **C803** — People and Access show the caller's organisation and only its records, from the partitioned routes without client filtering, with the add-person and root acts shown by GET /authority's organisation.admit and organisation.grant; no screen branches on the install's own organisation.
+
+## Revocation reaches hot routes through lys-pass (ACCESS-010)
+
+- [ ] **C804** — lys-pass's RevocationView applies the change stream's baseline, changes and Ready in revision order, is not Ready on a gap, reset, unready or lost connection, resumes from its last revision, and keeps a revocation only within one pass lifetime (ACCESS-010 R1).
+- [ ] **C805** — evaluate_with refuses a right with a revoked grant (grant_revoked) and every right of a holder cut off at or after the pass's iat (holder_cut_off) when the view is Ready, and decides from the pass alone, saying so, when it is not (ACCESS-010 R2).
+- [ ] **C806** — Stopping an agent, suspending or retiring an identity and revoking an agent's passes each write a holder cut-off to the grant log, carried as a holder_cut_off frame and in the baseline (ACCESS-010 R3).
+- [ ] **C807** — D3 says a revoke reaches every product when the change stream delivers it, and that before Ready a hot route is decided from an unexpired pass, with no number of seconds as the bound (ACCESS-010 R4).
