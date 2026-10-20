@@ -269,7 +269,8 @@ impl Service {
             sign_in_providers,
         );
         adjust(&mut config);
-        std::fs::write(&config.grant_model_file, with_administrator(model)?)?;
+        let model = with_administrator(model).map_err(|error| error as Box<dyn Error>)?;
+        std::fs::write(&config.grant_model_file, model)?;
         config.validate()?;
         drop(stage);
         let stage = StageTimer::new("fixture.prepare_callback");
