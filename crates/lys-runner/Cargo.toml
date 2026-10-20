@@ -247,6 +247,14 @@ name = "seat_cost"
 path = "tests/seat_cost.rs"
 
 [[test]]
+name = "seat_owner_dir"
+path = "tests/seat_owner_dir.rs"
+
+[[test]]
+name = "seat_owner_socket"
+path = "tests/seat_owner_socket.rs"
+
+[[test]]
 name = "seat_owner_store"
 path = "tests/seat_owner_store.rs"
 
