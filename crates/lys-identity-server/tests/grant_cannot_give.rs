@@ -191,6 +191,13 @@ impl World {
             .into_iter()
             .map(|(_, label, reason)| (label.to_owned(), reason.to_owned(), false))
             .collect();
+        // The administrator relation the harness adds to every fixture
+        // model is above what Bea holds, as damson is.
+        list.push((
+            "administrator".to_owned(),
+            "above_what_you_hold".to_owned(),
+            false,
+        ));
         list.push(("damson".to_owned(), "above_what_you_hold".to_owned(), false));
         list.push((
             "sign-in identity".to_owned(),
@@ -374,7 +381,7 @@ async fn cannot_give_wire_unknown_reason() -> TestResult {
     let world = world(&[]).await?;
     let answer = world.bea_asks(&world.grant("G1")?, &world.a1()).await?;
     let parsed: CannotGiveAnswer = serde_json::from_value(answer.clone())?;
-    assert_eq!(parsed.items.len(), 4, "the service's own answer parses");
+    assert_eq!(parsed.items.len(), 5, "the service's own answer parses");
     let borrowed = json!({
         "source": answer["source"], "recipient": answer["recipient"],
         "items": [{

@@ -414,7 +414,10 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             actions,
             pass_on,
             source: Source::Root,
-            window: Window::new(at, None)?,
+            // The founder's standing is theirs from the founding, with no
+            // start to wait for: the install issues this grant at its own
+            // clock and a root is judged at the clock the route reads.
+            window: Window::new(0, None)?,
             model_version: self.model.version_on("organisation"),
             operation,
         })?

@@ -147,14 +147,16 @@ pub(super) fn assert_projection_boundary(
             world.reopen(engine.clone())?;
             assert!(
                 matches!(
-                    world.grants.book().refused().get(&2),
+                    // Leaf 3: after the founding grant and the two roots.
+                    world.grants.book().refused().get(&3),
                     Some((_, GrantError::ExpiryBeyondSource { .. }))
                 ),
                 "{name}: refused by name"
             );
             assert_eq!(
                 world.grants.relationships().read()?.len(),
-                6,
+                // The two roots' six and the founder's administrator grant.
+                7,
                 "{name}: no relationship is written for it"
             );
             assert!(matches!(

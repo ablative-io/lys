@@ -163,23 +163,25 @@ fn apps(draft: &Draft<'_>, at: u64) -> Result<AppStore<MemoryStore>, ServerError
 
 /// The actor every scratch record is written by: the bench's root, bound
 /// at the example issuer.
-fn actor(at: u64) -> Result<Actor, ServerError> {
-    let binding = LoginBinding::new(EXAMPLE_ISSUER, "the bench's root")?;
+fn actor(subject: &str, at: u64) -> Result<Actor, ServerError> {
+    let binding = LoginBinding::new(EXAMPLE_ISSUER, subject)?;
     Ok(Actor::new(binding, Provenance::new(AuthMethod::Oidc, at)))
 }
 
-/// Found the scratch organisation, with `founder` as its founder: every
-/// example person is of it, and the root's grants rest on its
-/// administrator grant (ACCESS-009 R2).
+/// Found the scratch organisation, with `founder` as its founder, set up
+/// active under a login of their own as the directory's founding sets up
+/// a founder: every example person is of it, and the root's grants rest
+/// on its administrator grant (ACCESS-009 R2).
 fn found(
     directory: &mut Projection,
     organisation: OrganisationId,
     founder: PersonId,
     at: u64,
 ) -> Result<(), ServerError> {
+    let root = "the bench's root";
     let event = IdentityEvent::new(
         OperationId::generate()?,
-        actor(at)?,
+        actor(root, at)?,
         IdentityId::Organisation(organisation),
         at,
         Change::FoundOrganisation {
@@ -189,20 +191,32 @@ fn found(
     )?;
     let index = directory.records().count() as u64;
     directory.apply(&event, index)?;
+    let set_up = IdentityEvent::new(
+        OperationId::generate()?,
+        actor(root, at)?,
+        IdentityId::Person(founder),
+        at,
+        Change::SetupPerson {
+            profile: Profile::new("The bench's root")?,
+            organisation: Some(organisation),
+        },
+    )?;
+    let index = directory.records().count() as u64;
+    directory.apply(&set_up, index)?;
     Ok(())
 }
 
-/// Add the active person `person` of `organisation` to the scratch
-/// directory.
+/// Add the active person `person`, the example `subject`, of
+/// `organisation` to the scratch directory, under a login of their own.
 fn person(
     directory: &mut Projection,
-    person: PersonId,
+    (person, subject): (PersonId, &str),
     organisation: OrganisationId,
     at: u64,
 ) -> Result<(), ServerError> {
     let event = IdentityEvent::new(
         OperationId::generate()?,
-        actor(at)?,
+        actor(&format!("the bench's example {subject}"), at)?,
         IdentityId::Person(person),
         at,
         Change::SetupPerson {
@@ -238,7 +252,7 @@ fn directory(examples: &Examples<'_>, at: u64) -> Result<Scratch, ServerError> {
     for subject in subjects {
         if !people.contains_key(subject) {
             let id = PersonId::generate()?;
-            person(&mut directory, id, organisation, at)?;
+            person(&mut directory, (id, subject), organisation, at)?;
             people.insert(subject.to_owned(), id);
         }
     }

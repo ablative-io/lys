@@ -267,7 +267,8 @@ async fn moves(count: usize) -> Result<(), Box<dyn Error>> {
     .await;
     if count == 1 {
         let answer = answer?;
-        assert_eq!(answer.revision, 3);
+        // The founding grant, the fixture's roots and the hook's move.
+        assert_eq!(answer.revision, 4);
         assert!(answer.results[0].allowed);
     } else {
         let error = answer.expect_err("a second revision move must refuse");

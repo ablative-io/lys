@@ -386,6 +386,7 @@ async fn answer(response: reqwest::Response) -> Result<Answer, Box<dyn Error>> {
 mod requests;
 #[path = "harness_startup.rs"]
 mod startup;
+pub use startup::with_administrator;
 
 impl Service {
     /// The active signing key path, so runner clients authenticate as this service.

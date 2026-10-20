@@ -1,15 +1,27 @@
 use super::{Draft, Examples, answer_in};
 use crate::apps_bench::{Example, Holding, Question};
 use crate::apps_state::By;
+use lys_identity::grants::shipped::{ADMINISTRATOR_RELATION, ORGANISATION_ACTIONS};
 use lys_identity::grants::{Action, Model, Relation};
 use serde_json::json;
 use std::error::Error;
 
 #[test]
 fn scratch_questions_preserve_decisions_without_disk_syncs() -> Result<(), Box<dyn Error>> {
+    // The scratch organisation's founder grant rests on the shipped
+    // administrator relation, which the install's model always carries.
     let model = Model::new(
         1,
-        [(Relation::new("viewer")?, [Action::new("read")?].into())],
+        [
+            (Relation::new("viewer")?, [Action::new("read")?].into()),
+            (
+                Relation::new(ADMINISTRATOR_RELATION)?,
+                ORGANISATION_ACTIONS
+                    .iter()
+                    .map(|action| Action::new(action))
+                    .collect::<Result<_, _>>()?,
+            ),
+        ],
     )?;
     let schema =
         json!({"kinds":{"notes.doc":{"actions":["read","write"],"relations":{"viewer":["read"]}}}});

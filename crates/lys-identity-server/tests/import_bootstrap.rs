@@ -7,7 +7,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::time::Instant;
 
 use identity_contract::apps::{Auth, get, login, ok, op, post};
-use identity_contract::harness::{ADMINISTRATOR, Service};
+use identity_contract::harness::{ADMINISTRATOR, Service, with_administrator};
 use lys_core::Ed25519Identity;
 use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
 use lys_log_store::{FileLeafStore, LeafStore};
@@ -17,7 +17,10 @@ use sha2::{Digest, Sha256};
 type Outcome = Result<(), Box<dyn Error>>;
 const ACCOUNT: &str = "op-91919191919191919191919191919191";
 
-fn model(version: u64) -> String {
+/// The fixture model at `version`, carrying the administrator relation the
+/// harness adds at the first start: a model applied at start only adds
+/// (DIRECTORY-109 R3).
+fn model(version: u64) -> Result<String, Box<dyn Error>> {
     let mut editor = vec!["view", "edit"];
     if version >= 2 {
         editor.push("agent.create");
@@ -27,8 +30,10 @@ fn model(version: u64) -> String {
     }
     let mut owner = editor.clone();
     owner.push("grant");
-    json!({"version":version,"relations":{"owner":owner,"editor":editor,"viewer":["view"]}})
-        .to_string()
+    with_administrator(
+        &json!({"version":version,"relations":{"owner":owner,"editor":editor,"viewer":["view"]}})
+            .to_string(),
+    )
 }
 
 fn operation(collection: &str, kind: &str, version: u64) -> String {
@@ -124,7 +129,7 @@ async fn root(
     collection: &str,
     version: u64,
 ) -> Result<Value, Box<dyn Error>> {
-    let actions = serde_json::from_str::<Value>(&model(version))?["relations"]["editor"].clone();
+    let actions = serde_json::from_str::<Value>(&model(version)?)?["relations"]["editor"].clone();
     ok(post(
         service,
         "/grants/roots",
@@ -145,7 +150,7 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
     for collection in ["apps", "agents"] {
         root(&service, &cookie, &owner, collection, 1).await?;
     }
-    fs::write(service.dir.path().join("grant-model.json"), model(2))?;
+    fs::write(service.dir.path().join("grant-model.json"), model(2)?)?;
     let before = extent(&service)?;
     let error = loader(&mut service, true)
         .await
@@ -239,7 +244,7 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
 async fn revoked_across_upgrade(version: u64) -> Outcome {
     let (mut service, owner, cookie) = fixture().await?;
     if version > 1 {
-        fs::write(service.dir.path().join("grant-model.json"), model(version))?;
+        fs::write(service.dir.path().join("grant-model.json"), model(version)?)?;
         service.restart().await?;
     }
     loader(&mut service, true).await?;
@@ -255,7 +260,7 @@ async fn revoked_across_upgrade(version: u64) -> Outcome {
     let before = extent(&service)?;
     fs::write(
         service.dir.path().join("grant-model.json"),
-        model(version + 1),
+        model(version + 1)?,
     )?;
     service.restart().await?;
     assert_eq!(

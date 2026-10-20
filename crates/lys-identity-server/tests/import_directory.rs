@@ -435,19 +435,57 @@ async fn on_the_shipped_model(service: &mut Service) -> Outcome {
     service.restart().await
 }
 
+/// Each grant the loader sees on /grants: its id, holder and resource.
+async fn loader_sees(service: &Service) -> Result<Vec<(String, String, String)>, Box<dyn Error>> {
+    let grants = ok(get(service, "/grants", Auth::Bearer(&credential())).await?)?;
+    let mut seen: Vec<(String, String, String)> = grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .map(|grant| {
+            (
+                grant["id"].to_string(),
+                grant["holder"].to_string(),
+                grant["resource"]["id"].to_string(),
+            )
+        })
+        .collect();
+    seen.sort();
+    Ok(seen)
+}
+
+/// How many administrator grants the administrator sees on /grants.
+async fn administrator_grants(service: &Service) -> Result<usize, Box<dyn Error>> {
+    let admin = service
+        .sign_in(Login {
+            subject: ADMINISTRATOR.to_owned(),
+            email: "fixture@example.test".to_owned(),
+        })
+        .await?;
+    let grants = ok(get(service, "/grants", Auth::Cookie(&admin)).await?)?;
+    Ok(grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .filter(|grant| grant["relation"] == "administrator")
+        .count())
+}
+
 #[tokio::test]
 async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outcome {
     let mut service = upgraded(Seed::Administrator).await?;
-    let before = extents(&service)?;
+    let before = loader_sees(&service).await?;
     on_the_shipped_model(&mut service).await?;
-    let after = extents(&service)?;
-    // The one grant the upgrade issues is the founder's administrator grant
-    // (DIRECTORY-109 R3), the first boot on a model naming the relation.
+    // The founder's administrator grant was issued at the first start, on
+    // the model the harness writes with the relation (DIRECTORY-109 R3):
+    // this start issues nothing, and the administrator holds that one.
     assert_eq!(
-        after[1],
-        before[1] + 1,
+        loader_sees(&service).await?,
+        before,
         "the upgrade issues no loader grant"
     );
+    assert_eq!(administrator_grants(&service).await?, 1);
+    let after = extents(&service)?;
     let token = credential();
     let grants = ok(get(&service, "/grants", Auth::Bearer(&token)).await?)?;
     assert!(
@@ -461,7 +499,7 @@ async fn an_upgraded_install_replays_its_loader_grants_and_issues_none() -> Outc
     service.restart().await?;
     assert_eq!(
         extents(&service)?[1],
-        before[1] + 1,
+        after[1],
         "a later start issues none either"
     );
     Ok(())
@@ -493,13 +531,14 @@ async fn a_revoked_loader_grant_stays_revoked_through_the_upgrade() -> Outcome {
         &json!({"operation":op()?,"route":"api","reason":"remove import authority"}),
     )
     .await?)?;
-    let before = extents(&service)?;
+    let before = loader_sees(&service).await?;
     on_the_shipped_model(&mut service).await?;
     assert_eq!(
-        extents(&service)?[1],
-        before[1] + 1,
-        "the upgrade restores nothing: its one grant is the founder's administrator grant (DIRECTORY-109 R3)"
+        loader_sees(&service).await?,
+        before,
+        "the upgrade restores nothing: the founder's administrator grant was issued at the first start (DIRECTORY-109 R3)"
     );
+    assert_eq!(administrator_grants(&service).await?, 1);
     let refused = post(
         &service,
         "/identity/import",
