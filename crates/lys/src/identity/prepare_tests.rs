@@ -334,7 +334,7 @@ fn the_issuers_smtp_env_file_is_rendered_from_the_mail_table_with_a_provided_pas
     assert_eq!(
         mail_env,
         format!(
-            "SMTP_URL='{}'\nSMTP_PORT='2525'\nSMTP_FROM='Lys <lys@example.test>'\nSMTP_TLS_MODE='danger-insecure'\nSMTP_USERNAME='lys'\nSMTP_PASSWORD='correct horse battery staple'\n",
+            "SMTP_URL='{}'\nSMTP_PORT='2525'\nSMTP_FROM='Lys <lys@example.test>'\nSMTP_DANGER_INSECURE='true'\nSMTP_USERNAME='lys'\nSMTP_PASSWORD='correct horse battery staple'\n",
             loaded.gateway()?
         )
     );

@@ -12,10 +12,13 @@
 //! to the path in `LEG_RECORD`, else printed. No secret is in it: every
 //! value the container is given is made here and named nowhere.
 //!
-//! Events, never waits: the issuer is up when its log says its SMTP
-//! connection opened, or down when it says the connection failed or the
-//! container ends; the outcome is the sink's next letter, or an issuer log
-//! line saying the send failed, or the container ending.
+//! Events, never waits: the issuer is up when its log has said both that it
+//! connected to the relay ("Successfully connected"; "SMTP connection
+//! opened" is written before the attempt and means nothing) and that its
+//! HTTP service is listening (actix's "listening on:"), or down when it says
+//! the connection failed or the container ends; the outcome is the sink's
+//! next letter, or an issuer log line saying the send failed, or the
+//! container ending.
 
 use std::error::Error;
 use std::io::{BufRead, BufReader};
@@ -85,12 +88,15 @@ fn free_port() -> Result<u16, Box<dyn Error>> {
         .port())
 }
 
+/// Run `docker` with `args`, answering its stdout. A failure names the verb
+/// and the daemon's reply only: the arguments carry the container's
+/// environment, and no value of it is ever written anywhere.
 fn docker(args: &[String]) -> Result<String, Box<dyn Error>> {
     let output = Command::new("docker").args(args).output()?;
     if !output.status.success() {
         return Err(format!(
             "docker {} failed: {}",
-            args.join(" "),
+            args.first().map_or("", String::as_str),
             String::from_utf8_lossy(&output.stderr)
         )
         .into());
@@ -152,7 +158,7 @@ fn environment(port: u16, sink_port: u16, api_secret: &str) -> Vec<(&'static str
         ("BOOTSTRAP_API_KEY_SECRET", api_secret.to_owned()),
         ("SMTP_URL", "host.docker.internal".to_owned()),
         ("SMTP_PORT", sink_port.to_string()),
-        ("SMTP_TLS_MODE", "danger-insecure".to_owned()),
+        ("SMTP_DANGER_INSECURE", "true".to_owned()),
         ("SMTP_FROM", "Lys <lys@example.test>".to_owned()),
         // Read by the issuer at boot in every mode (an expect on each) and
         // used in none of the danger-insecure ones: the leg's first run on
@@ -163,23 +169,25 @@ fn environment(port: u16, sink_port: u16, api_secret: &str) -> Vec<(&'static str
     ]
 }
 
-/// Read the log until the issuer says its SMTP connection opened (`true`),
-/// or says it failed or ends (`false`), with every line read.
-async fn smtp_opened(log: &mut UnboundedReceiver<Said>) -> (bool, Vec<String>) {
+/// Read the log until the issuer has said both that it connected to the
+/// relay and that its HTTP service is listening (`true`), or that the
+/// connection failed, or the container ends (`false`), with every line read.
+async fn issuer_ready(log: &mut UnboundedReceiver<Said>) -> (bool, Vec<String>) {
     let mut said = Vec::new();
+    let (mut connected, mut listening) = (false, false);
     while let Some(line) = log.recv().await {
         match line {
             Said::Line(text) => {
-                let opened = text.contains("SMTP connection opened")
-                    || text.contains("Successfully connected");
+                connected |= text.contains("Successfully connected");
+                listening |= text.contains("listening on:");
                 let failed =
                     text.contains("Could not connect") || text.contains("retries exceeded");
                 said.push(text);
-                if opened {
-                    return (true, said);
-                }
                 if failed {
                     return (false, said);
+                }
+                if connected && listening {
+                    return (true, said);
                 }
             }
             Said::Ended => return (false, said),
@@ -225,7 +233,9 @@ async fn outcome(sink: &mut MailSink, log: &mut UnboundedReceiver<Said>) -> Stri
 #[tokio::test]
 async fn the_issuer_given_smtp_writes_or_does_not_to_a_newly_made_account()
 -> Result<(), Box<dyn Error>> {
-    let mut sink = MailSink::start().await?;
+    // Bound on every interface: the container reaches the host through its
+    // gateway, which a loopback-only listener never hears.
+    let mut sink = MailSink::start_at("0.0.0.0:0").await?;
     let port = free_port()?;
     let api_secret = Credential::generate("api", Shape::Alphanumeric(64));
     let mut args: Vec<String> = ["run", "-d", "--name", CONTAINER, "-p"]
@@ -238,13 +248,16 @@ async fn the_issuer_given_smtp_writes_or_does_not_to_a_newly_made_account()
         args.push(format!("{name}={value}"));
     }
     args.push(IMAGE.to_owned());
+    // A container of this name left by an earlier run that ended before its
+    // removal is taken down first; none there is not a failure.
+    let _earlier = remove_container();
     docker(&args)?;
     let mut log = follow_log();
-    let (connected, said) = smtp_opened(&mut log).await;
-    if !connected {
+    let (ready, said) = issuer_ready(&mut log).await;
+    if !ready {
         let removed = remove_container();
         return Err(format!(
-            "the issuer did not open its SMTP connection ({removed:?}):\n{}",
+            "the issuer did not connect to the sink and listen ({removed:?}):\n{}",
             said.join("\n")
         )
         .into());
@@ -263,7 +276,14 @@ async fn the_issuer_given_smtp_writes_or_does_not_to_a_newly_made_account()
         &format!("{API_KEY_NAME}${}", api_secret.expose()),
         &request,
     )
-    .await?;
+    .await
+    .map_err(|error| {
+        let removed = remove_container();
+        format!(
+            "POST /users failed ({removed:?}): {error}; the issuer had said:\n{}",
+            said.join("\n")
+        )
+    })?;
     let found = if (200..300).contains(&status) {
         outcome(&mut sink, &mut log).await
     } else {

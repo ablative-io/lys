@@ -62,7 +62,16 @@ impl MailSink {
     /// # Errors
     /// Fails when no loopback port can be bound.
     pub async fn start() -> Result<Self, Box<dyn Error>> {
-        let listener = TcpListener::bind("127.0.0.1:0").await?;
+        Self::start_at("127.0.0.1:0").await
+    }
+
+    /// Start a sink bound at `address` (`0.0.0.0:0` for one a container
+    /// reaches through the host's gateway; the mail leg's).
+    ///
+    /// # Errors
+    /// Fails when the address cannot be bound.
+    pub async fn start_at(address: &str) -> Result<Self, Box<dyn Error>> {
+        let listener = TcpListener::bind(address).await?;
         let port = listener.local_addr()?.port();
         let (sender, letters) = mpsc::unbounded_channel();
         let refusing = Arc::new(AtomicBool::new(false));

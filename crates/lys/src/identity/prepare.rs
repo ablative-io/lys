@@ -364,8 +364,9 @@ pub fn mail_password(
 }
 
 /// The issuer's SMTP environment from `[mail]`, none without it: the keys
-/// the pinned sign-in service reads, each value single-quoted so compose
-/// takes it literally. A loopback mail host is reached from the container
+/// the pinned sign-in service reads (`SMTP_URL`, `SMTP_PORT`, `SMTP_FROM`,
+/// the mode flag, `SMTP_USERNAME`, `SMTP_PASSWORD`), each value single-quoted so
+/// compose takes it literally. A loopback mail host is reached from the container
 /// at the network's gateway.
 ///
 /// # Errors
@@ -382,17 +383,20 @@ pub fn render_mail_env(
     } else {
         mail.host.clone()
     };
-    let mode = match mail.tls {
-        MailTls::Implicit => "tls",
-        MailTls::Starttls => "starttls",
-        MailTls::None => "danger-insecure",
-    };
     let mut lines = vec![
         ("SMTP_URL", host),
         ("SMTP_PORT", mail.port.to_string()),
         ("SMTP_FROM", mail.from.clone()),
-        ("SMTP_TLS_MODE", mode.to_owned()),
     ];
+    // The pinned issuer's modes are two flags, not one key: TLS from the
+    // first byte is its default (with a downgrade to STARTTLS when TLS
+    // fails), SMTP_STARTTLS_ONLY takes STARTTLS straight away, and
+    // SMTP_DANGER_INSECURE allows plain; its config.toml at v0.36.2.
+    match mail.tls {
+        MailTls::Implicit => {}
+        MailTls::Starttls => lines.push(("SMTP_STARTTLS_ONLY", "true".to_owned())),
+        MailTls::None => lines.push(("SMTP_DANGER_INSECURE", "true".to_owned())),
+    }
     // The pinned issuer reads SMTP_USERNAME and SMTP_PASSWORD before it looks
     // at the mode and ends at boot when either is unset (its mailer.rs, an
     // expect on each); in danger-insecure mode it then uses neither. So a
