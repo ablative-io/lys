@@ -215,19 +215,17 @@ fn person(
     Ok(())
 }
 
+/// The scratch directory and who is in it.
+struct Scratch {
+    directory: Projection,
+    root: PersonId,
+    organisation: OrganisationId,
+    people: BTreeMap<String, PersonId>,
+}
+
 /// The scratch directory: its organisation, founded by its root, and a
 /// person of it for each example subject.
-fn directory(
-    examples: &Examples<'_>,
-    at: u64,
-) -> Result<
-    (
-        Projection,
-        (PersonId, OrganisationId),
-        BTreeMap<String, PersonId>,
-    ),
-    ServerError,
-> {
+fn directory(examples: &Examples<'_>, at: u64) -> Result<Scratch, ServerError> {
     let mut directory = Projection::new();
     let (root, organisation) = (PersonId::generate()?, OrganisationId::generate()?);
     found(&mut directory, organisation, root, at)?;
@@ -245,7 +243,12 @@ fn directory(
             people.insert(subject.to_owned(), id);
         }
     }
-    Ok((directory, (root, organisation), people))
+    Ok(Scratch {
+        directory,
+        root,
+        organisation,
+        people,
+    })
 }
 
 /// The scratch grants, on the scratch scope `scope` of the service's
@@ -332,7 +335,12 @@ fn answer(
 ) -> Result<BenchAnswer, ServerError> {
     let at = now();
     let mut apps = apps(draft, at)?;
-    let (directory, (root, organisation), people) = directory(examples, at)?;
+    let Scratch {
+        directory,
+        root,
+        organisation,
+        people,
+    } = directory(examples, at)?;
     let mut grants = grants(
         draft,
         &directory,
