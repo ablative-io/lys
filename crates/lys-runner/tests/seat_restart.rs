@@ -161,6 +161,36 @@ impl Drop for Owners {
     }
 }
 
+/// Whether the process group `pid` leads still has a member.
+fn group_alive(pid: u32) -> bool {
+    pid_of(pid).is_ok_and(|pid| rustix::process::test_kill_process_group(pid).is_ok())
+}
+
+/// AGENTS-018 R1: an owner the fixture started is gone, with its process
+/// group, once the fixture is dropped, and the runner that started it is
+/// not what ended it.
+#[test]
+fn an_owner_the_fixture_started_is_gone_when_the_fixture_drops() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let key = Arc::new(Ed25519Identity::load_or_generate(&dir.path().join("key"))?);
+    let state = dir.path().join("state");
+    let (seat, mut runner) = runner_with_owner(&state, "ends-with-fixture", &key)?;
+    let pid = seat.endpoint.owner.pid;
+    let owners = Owners::hold(&seat);
+    assert!(alive(pid), "the owner runs once started");
+    assert!(group_alive(pid), "the owner leads a group of its own");
+    drop(owners);
+    assert!(!alive(pid), "owner {pid} outlived the fixture that started it");
+    assert!(!group_alive(pid), "owner {pid}'s group outlived the fixture");
+    assert!(
+        alive(runner.id()),
+        "the runner was not what ended the owner"
+    );
+    rustix::process::kill_process(pid_of(runner.id())?, rustix::process::Signal::KILL)?;
+    runner.wait()?;
+    Ok(())
+}
+
 fn journal_lines(seat: &OwnedSeat) -> Result<usize, Box<dyn Error>> {
     Ok(
         std::fs::read_to_string(seat.endpoint.dir.join("seat-owners.journal"))?

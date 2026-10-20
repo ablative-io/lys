@@ -64,6 +64,50 @@ async fn seat_import_survives_lifecycle() -> TestResult {
     scene.table.close()
 }
 
+/// AGENTS-018 R1: the owner a scene started is gone once its table is
+/// dropped, close() or not, because the table ends what it started.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_started_owner_is_gone_when_the_table_drops_without_close() -> TestResult {
+    support::owner_program()?.ok_or(
+        "owner_program_missing: build the workspace's lys binary beside the tests (cargo nextest run --workspace)",
+    )?;
+    let scene = scene().await?;
+    let kept = harness::install(&scene.table)?;
+    let (_plan, _confirming, _completed) = scene.imported().await?;
+    let answer = scene.start().await?;
+    assert_eq!(answer.0, 200, "managed fixture start refused: {}", answer.1);
+    let owners = scene
+        .table
+        .serving
+        .as_ref()
+        .ok_or("the table's runner")?
+        .sessions()
+        .owned_seats()?;
+    let owner = owners
+        .first()
+        .ok_or("the started seat has an owner")?
+        .endpoint
+        .owner
+        .clone();
+    assert!(owner_alive(owner.pid), "the owner runs once started");
+    drop(scene);
+    assert!(
+        !owner_alive(owner.pid),
+        "owner {} outlived the table that started it",
+        owner.pid
+    );
+    drop(kept);
+    Ok(())
+}
+
+/// Whether any process has `pid`, asked of the kernel.
+fn owner_alive(pid: u32) -> bool {
+    i32::try_from(pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+        .is_some_and(|pid| rustix::process::test_kill_process(pid).is_ok())
+}
+
 /// The managed fixture starts through its owner and retains the same
 /// session across attachment exit, service restart and upgrade handoff.
 #[tokio::test(flavor = "multi_thread")]
