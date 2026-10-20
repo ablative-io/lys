@@ -20,7 +20,7 @@ const ACCOUNT: &str = "op-91919191919191919191919191919191";
 /// The fixture model at `version`, carrying the administrator relation the
 /// harness adds at the first start: a model applied at start only adds
 /// (DIRECTORY-109 R3).
-fn model(version: u64) -> Result<String, Box<dyn Error + Send + Sync>> {
+fn model(version: u64) -> Result<String, Box<dyn Error>> {
     let mut editor = vec!["view", "edit"];
     if version >= 2 {
         editor.push("agent.create");
@@ -52,8 +52,9 @@ fn operation(collection: &str, kind: &str, version: u64) -> String {
 
 async fn fixture() -> Result<(Service, String, String), Box<dyn Error>> {
     let started = Instant::now();
+    let model = model(1)?;
     let (service, owner) = Service::start_adjusted(
-        &model(1)?,
+        &model,
         None,
         None,
         None,
