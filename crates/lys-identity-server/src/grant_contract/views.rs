@@ -379,6 +379,10 @@ pub struct PermitView {
     pub path: Vec<String>,
     /// The person the root grant is held by.
     pub responsible: String,
+    /// The organisation the grant belongs to; absent for a grant written
+    /// before organisations (ACCESS-009 R2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub organisation: Option<String>,
     /// The actions the grant carries.
     pub scope: Vec<String>,
     /// The model version the grant was judged under.
@@ -400,6 +404,9 @@ impl From<&Permit> for PermitView {
             grant: permit.grant.to_string(),
             path: permit.path_names(),
             responsible: permit.root_person.to_string(),
+            organisation: permit
+                .organisation
+                .map(|organisation| organisation.to_string()),
             scope: names(&permit.actions),
             model_version: permit.model_version,
             revision: permit.revision,

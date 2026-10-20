@@ -232,6 +232,7 @@ fn grant(error: &GrantError) -> &str {
         GrantError::Expired { .. } => "Expired",
         GrantError::NotStarted { .. } => "NotStarted",
         GrantError::RootAuthorityRefused { .. } => "RootAuthorityRefused",
+        GrantError::RootOwnedElsewhere { .. } => "RootOwnedElsewhere",
         GrantError::RevokeRefused { .. } => "RevokeRefused",
         GrantError::AlreadyRevoked { .. } => "AlreadyRevoked",
         GrantError::GrantExists { .. } => "GrantExists",

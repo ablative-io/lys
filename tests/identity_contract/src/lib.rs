@@ -9,6 +9,7 @@ pub mod harness;
 pub mod membership_world;
 pub mod organisation_fixture;
 pub mod refusals;
+pub mod two_organisations;
 
 /// The service crate the harness starts, as the harness links it. A test
 /// inside lys-identity-server names the harness's configuration and seeding

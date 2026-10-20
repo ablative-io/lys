@@ -127,6 +127,8 @@ pub(crate) struct Weighed {
     pub(crate) resource: Resource,
     pub(crate) relation: Relation,
     approvers: Vec<PersonId>,
+    /// The people who may issue the root asked for (ACCESS-009 R2).
+    rooters: Vec<PersonId>,
     lenders: Vec<(PersonId, GrantId)>,
 }
 
@@ -143,8 +145,11 @@ impl Weighed {
         let book = judged.grants.book();
         let mut approvers = Vec::new();
         let mut lenders = Vec::new();
+        let mut rooters = Vec::new();
         if kind == RecipientKind::Person {
-            approvers.push(judged.root);
+            let organisation = judged.directory.organisation_of(seeker);
+            rooters = judged.grants.rooters(organisation, &resource, at)?;
+            approvers.extend(rooters.iter().copied());
         }
         for record in book.on_resource(&resource) {
             let grant = record.grant();
@@ -169,6 +174,7 @@ impl Weighed {
             resource,
             relation,
             approvers,
+            rooters,
             lenders,
         })
     }
@@ -236,9 +242,12 @@ impl Weighed {
                 .filter(|(holder, _)| IdentityId::Person(*holder) == caller)
                 .map(|(_, grant)| grant.to_string())
                 .collect(),
-            can_issue_root: is_root(caller, judged.root)
+            can_issue_root: self
+                .rooters
+                .iter()
+                .any(|person| IdentityId::Person(*person) == caller)
                 && matches!(self.seeker, IdentityId::Person(_)),
-            can_decide: self.decides(caller) || is_root(caller, judged.root),
+            can_decide: self.decides(caller),
             held_by: held_by.map(str::to_owned),
             decision: decided.map(DecisionView::from),
         })

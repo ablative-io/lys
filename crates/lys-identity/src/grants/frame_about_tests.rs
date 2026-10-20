@@ -93,15 +93,14 @@ fn fixture(others: usize) -> Result<Fixture, Box<dyn Error>> {
         LoginBinding::new("https://issuer.test", "administrator")?,
         Provenance::new(AuthMethod::Oidc, 1),
     );
-    let person = directory
-        .found_organisation(
-            actor.clone(),
-            OperationId::generate()?,
-            Profile::new("Example organisation")?,
-            Profile::new("holder")?,
-            1,
-        )?
-        .founder;
+    let founded = directory.found_organisation(
+        actor.clone(),
+        OperationId::generate()?,
+        Profile::new("Example organisation")?,
+        Profile::new("holder")?,
+        1,
+    )?;
+    let (person, organisation) = (founded.founder, founded.organisation);
     directory.transition(
         actor,
         OperationId::generate()?,
@@ -134,10 +133,24 @@ fn fixture(others: usize) -> Result<Fixture, Box<dyn Error>> {
     };
     let model = Model::new(
         1,
-        [(
-            Relation::new("reader")?,
-            BTreeSet::from([Action::new("read")?]),
-        )],
+        [
+            (
+                Relation::new("reader")?,
+                BTreeSet::from([Action::new("read")?]),
+            ),
+            (
+                Relation::new("administrator")?,
+                [
+                    "organisation.administer",
+                    "organisation.admit",
+                    "organisation.grant",
+                    "organisation.read",
+                ]
+                .into_iter()
+                .map(Action::new)
+                .collect::<Result<BTreeSet<_>, _>>()?,
+            ),
+        ],
     )?;
     let mut grants = Grants::open(
         Box::new(move || FileLeafStore::open(&grant_path)),
@@ -146,6 +159,8 @@ fn fixture(others: usize) -> Result<Fixture, Box<dyn Error>> {
         model,
         person,
     )?;
+    // The founder's administrator grant, which the five roots rest on.
+    grants.found_organisation(directory.projection()?, organisation, 1)?;
     for n in 0..5 {
         grants.issue_root(
             directory.projection()?,
@@ -186,8 +201,8 @@ fn a_decision_reads_only_the_subjects_five_grants() -> Result<(), Box<dyn Error>
     assert_eq!(permit.path.len(), 1);
     assert_eq!(
         f.rows.load(Ordering::Relaxed),
-        15,
-        "only the subject's five grants reach the frame"
+        18,
+        "only the subject's six grants, the founding one among them, reach the frame"
     );
     assert!(f.temporary.path().exists());
     Ok(())

@@ -31,8 +31,8 @@ use lys_identity::grants::{
 };
 use lys_identity::projection::Projection;
 use lys_identity::{
-    Actor, AuthMethod, Change, IdentityEvent, IdentityId, LoginBinding, OperationId, PersonId,
-    Profile, Provenance,
+    Actor, AuthMethod, Change, IdentityEvent, IdentityId, LoginBinding, OperationId,
+    OrganisationId, PersonId, Profile, Provenance,
 };
 use serde_json::Value;
 
@@ -161,33 +161,77 @@ fn apps(draft: &Draft<'_>, at: u64) -> Result<AppStore<MemoryStore>, ServerError
     Ok(apps)
 }
 
-/// Add an active person to the scratch directory, bound to `subject` at the
-/// example issuer.
-fn person(directory: &mut Projection, subject: &str, at: u64) -> Result<PersonId, ServerError> {
-    let person = PersonId::generate()?;
-    let binding = LoginBinding::new(EXAMPLE_ISSUER, subject)?;
+/// The actor every scratch record is written by: the bench's root, bound
+/// at the example issuer.
+fn actor(at: u64) -> Result<Actor, ServerError> {
+    let binding = LoginBinding::new(EXAMPLE_ISSUER, "the bench's root")?;
+    Ok(Actor::new(binding, Provenance::new(AuthMethod::Oidc, at)))
+}
+
+/// Found the scratch organisation, with `founder` as its founder: every
+/// example person is of it, and the root's grants rest on its
+/// administrator grant (ACCESS-009 R2).
+fn found(
+    directory: &mut Projection,
+    organisation: OrganisationId,
+    founder: PersonId,
+    at: u64,
+) -> Result<(), ServerError> {
     let event = IdentityEvent::new(
         OperationId::generate()?,
-        Actor::new(binding, Provenance::new(AuthMethod::Oidc, at)),
-        IdentityId::Person(person),
+        actor(at)?,
+        IdentityId::Organisation(organisation),
         at,
-        Change::SetupPerson {
-            profile: Profile::new("An example on the test bench")?,
-            organisation: None,
+        Change::FoundOrganisation {
+            profile: Profile::new("The test bench")?,
+            founder,
         },
     )?;
     let index = directory.records().count() as u64;
     directory.apply(&event, index)?;
-    Ok(person)
+    Ok(())
 }
 
-/// The scratch directory: its root, and a person for each example subject.
+/// Add the active person `person` of `organisation` to the scratch
+/// directory.
+fn person(
+    directory: &mut Projection,
+    person: PersonId,
+    organisation: OrganisationId,
+    at: u64,
+) -> Result<(), ServerError> {
+    let event = IdentityEvent::new(
+        OperationId::generate()?,
+        actor(at)?,
+        IdentityId::Person(person),
+        at,
+        Change::SetupPerson {
+            profile: Profile::new("An example on the test bench")?,
+            organisation: Some(organisation),
+        },
+    )?;
+    let index = directory.records().count() as u64;
+    directory.apply(&event, index)?;
+    Ok(())
+}
+
+/// The scratch directory: its organisation, founded by its root, and a
+/// person of it for each example subject.
 fn directory(
     examples: &Examples<'_>,
     at: u64,
-) -> Result<(Projection, PersonId, BTreeMap<String, PersonId>), ServerError> {
+) -> Result<
+    (
+        Projection,
+        (PersonId, OrganisationId),
+        BTreeMap<String, PersonId>,
+    ),
+    ServerError,
+> {
     let mut directory = Projection::new();
-    let root = person(&mut directory, "the bench's root", at)?;
+    let (root, organisation) = (PersonId::generate()?, OrganisationId::generate()?);
+    found(&mut directory, organisation, root, at)?;
+    person(&mut directory, root, organisation, at)?;
     let mut people = BTreeMap::new();
     let subjects = examples
         .holdings
@@ -196,19 +240,22 @@ fn directory(
         .chain([examples.question.subject.as_str()]);
     for subject in subjects {
         if !people.contains_key(subject) {
-            let id = person(&mut directory, &format!("example:{subject}"), at)?;
+            let id = PersonId::generate()?;
+            person(&mut directory, id, organisation, at)?;
             people.insert(subject.to_owned(), id);
         }
     }
-    Ok((directory, root, people))
+    Ok((directory, (root, organisation), people))
 }
 
 /// The scratch grants, on the scratch scope `scope` of the service's
 /// `SpiceDB` when the draft names one, as the service opens its own.
 fn grants(
     draft: &Draft<'_>,
-    (model, root): (Model, PersonId),
+    directory: &Projection,
+    (model, root, organisation): (Model, PersonId, OrganisationId),
     scope: &str,
+    at: u64,
 ) -> Result<ScratchGrants, ServerError> {
     let leaves = MemoryStore::empty();
     let key = Ed25519Identity::ephemeral();
@@ -223,6 +270,9 @@ fn grants(
         model,
         root,
     )?;
+    // The root's administrator grant on the scratch organisation, which
+    // every example root rests on (ACCESS-009 R2).
+    grants.found_organisation(directory, organisation, at)?;
     if draft.engine.is_some() {
         grants.project()?;
     }
@@ -282,8 +332,14 @@ fn answer(
 ) -> Result<BenchAnswer, ServerError> {
     let at = now();
     let mut apps = apps(draft, at)?;
-    let (directory, root, people) = directory(examples, at)?;
-    let mut grants = grants(draft, (apps.model()?, root), scope)?;
+    let (directory, (root, organisation), people) = directory(examples, at)?;
+    let mut grants = grants(
+        draft,
+        &directory,
+        (apps.model()?, root, organisation),
+        scope,
+        at,
+    )?;
     place((&mut apps, &grants), draft, examples.placements, at)?;
     let mut held = BTreeMap::new();
     for holding in examples.holdings {

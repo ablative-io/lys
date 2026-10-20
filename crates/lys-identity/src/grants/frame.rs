@@ -393,6 +393,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                         path: lineage.path,
                         administrator: lineage.administrator,
                         root_person: lineage.root_person,
+                        organisation: grant.organisation(),
                         actions: self.model.actions_of(grant).clone(),
                         // A role is judged under the version current now.
                         model_version: if grant.names_role() {

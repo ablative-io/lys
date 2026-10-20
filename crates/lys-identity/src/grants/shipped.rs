@@ -14,6 +14,10 @@ pub const SHIPPED_VERSION: u64 = 6;
 /// every act of [`ORGANISATION_ACTIONS`].
 pub const ADMINISTRATOR_RELATION: &str = "administrator";
 
+/// The act of issuing a root grant on a resource the organisation owns, or
+/// that no organisation owns yet (ACCESS-009 R2).
+pub const ORGANISATION_GRANT: &str = "organisation.grant";
+
 /// The acts on an organisation, in name order: reading it, admitting a
 /// person into it, issuing a root on a resource it owns, and administering
 /// it (its name, its retirement, passing its administration on). The last

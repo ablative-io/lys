@@ -79,6 +79,9 @@ pub struct Permit {
     pub administrator: bool,
     /// The person the root grant is held by.
     pub root_person: PersonId,
+    /// The organisation the grant exercised belongs to; none for a grant
+    /// written before organisations (ACCESS-009 R2).
+    pub organisation: Option<crate::OrganisationId>,
     /// The actions the grant carries.
     pub actions: BTreeSet<Action>,
     /// The model version the grant was judged under.
@@ -326,10 +329,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 _ => Err(Self::reused(request.operation)),
             };
         }
+        let authority = self.root_authority_for(directory, request, at)?;
         let grant = judge_root(
             directory,
             &self.model,
-            self.root_authority,
+            authority,
             request,
             GrantId::generate()?,
         )?;
@@ -536,34 +540,60 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         )?)
     }
 
-    /// Revoke a grant, and with it everything derived from it.
+    /// Revoke a grant, and with it everything derived from it, as its
+    /// issuer, a holder of a grant it derives from, or the install's root
+    /// person over an install-level grant (ACCESS-009 R2).
     ///
     /// # Errors
     /// Refuses an unauthorized revocation, operation reuse or a failed commit.
     pub fn revoke(&mut self, request: &RevokeRequest, at: u64) -> Result<Recorded, GrantError> {
         self.settle_for_change()?;
+        if let Some(answered) = self.revoke_answered(request)? {
+            return answered;
+        }
+        judge_revoke(
+            &self.book,
+            self.standing_over(request.grant),
+            request.caller,
+            request.grant,
+        )?;
+        self.record_revoke(request, at)
+    }
+
+    /// The answer already recorded for a revocation's operation, if any.
+    pub(super) fn revoke_answered(
+        &mut self,
+        request: &RevokeRequest,
+    ) -> Result<Option<Result<Recorded, GrantError>>, GrantError> {
         let change = GrantChange::Revoke {
             grant: request.grant,
             reason: request.reason.clone(),
         };
-        if let Some((event, receipt)) = self.answered(request.operation)? {
-            return if event.caller() == request.caller && event.change() == &change {
+        let Some((event, receipt)) = self.answered(request.operation)? else {
+            return Ok(None);
+        };
+        Ok(Some(
+            if event.caller() == request.caller && event.change() == &change {
                 self.answer(event, receipt)
             } else {
                 Err(Self::reused(request.operation))
-            };
-        }
-        judge_revoke(
-            &self.book,
-            self.root_authority,
-            request.caller,
-            request.grant,
-        )?;
+            },
+        ))
+    }
+
+    pub(super) fn record_revoke(
+        &mut self,
+        request: &RevokeRequest,
+        at: u64,
+    ) -> Result<Recorded, GrantError> {
         self.commit(GrantEvent::new(
             request.operation,
             request.caller,
             at,
-            change,
+            GrantChange::Revoke {
+                grant: request.grant,
+                reason: request.reason.clone(),
+            },
         )?)
     }
 

@@ -22,6 +22,7 @@ use super::revocation::unrevoked;
 use super::types::{
     Action, Grant, GrantId, GrantParts, PassOn, RecipientKind, Relation, Resource, Source, Window,
 };
+use crate::OrganisationId;
 use crate::error::IdentityError;
 use crate::id::{IdentityId, PersonId};
 use crate::lifecycle::LifecycleState;
@@ -271,21 +272,55 @@ pub fn effective(
     Ok(lineage)
 }
 
+/// Whose authority a root grant rests on (ACCESS-009 R2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RootAuthority {
+    /// The install's root person, for an install-level resource.
+    Install(PersonId),
+    /// A person shown to hold organisation.grant on the organisation, for a
+    /// resource it owns or that no organisation owns yet.
+    Organisation(OrganisationId),
+}
+
+/// Whether `resource` is the install's own, rooted by its root person and
+/// owned by no organisation: the directory's collections (apps, agents).
+#[must_use]
+pub fn install_level(resource: &Resource) -> bool {
+    resource.kind() == "directory"
+}
+
 /// Judge a root request, answering the grant it would issue.
 ///
 /// # Errors
-/// Refuses a non-root caller, inactive people, unknown relations or inadmissible pass-on terms.
+/// Refuses a caller other than the install's root person for an
+/// install-level resource, a holder outside the organisation the authority
+/// names, inactive people, unknown relations or inadmissible pass-on terms.
 pub fn judge_root(
     directory: &Projection,
     model: &Model,
-    root_authority: PersonId,
+    authority: RootAuthority,
     request: &RootRequest,
     id: GrantId,
 ) -> Result<Grant, GrantError> {
-    if request.caller != IdentityId::Person(root_authority) {
-        return Err(GrantError::RootAuthorityRefused {
-            caller: request.caller.to_string(),
-        });
+    match authority {
+        RootAuthority::Install(root) => {
+            if request.caller != IdentityId::Person(root) {
+                return Err(GrantError::RootAuthorityRefused {
+                    caller: request.caller.to_string(),
+                });
+            }
+        }
+        // A root is issued within its organisation (ACCESS-009 R3): the
+        // holder is of the organisation the authority rests on.
+        RootAuthority::Organisation(organisation) => {
+            if directory.organisation_of(IdentityId::Person(request.holder)) != Some(organisation) {
+                return Err(GrantError::OrganisationOutside {
+                    grant: format!("a root on {}", request.resource),
+                    organisation: organisation.to_string(),
+                    recipient: request.holder.to_string(),
+                });
+            }
+        }
     }
     active(directory, request.caller)?;
     active(directory, IdentityId::Person(request.holder))?;
@@ -329,9 +364,13 @@ pub fn judge_root(
         model_version: model.version_on(kind),
         operation: request.operation,
     })?
-    // The holder's organisation, read from the directory and never
-    // defaulted: a holder attached to none leaves the grant unmarked.
-    .with_organisation(directory.organisation_of(IdentityId::Person(request.holder)));
+    // The organisation the authority rests on; an install-level grant
+    // carries its holder's, read from the directory and never defaulted:
+    // a holder attached to none leaves it unmarked.
+    .with_organisation(match authority {
+        RootAuthority::Install(_) => directory.organisation_of(IdentityId::Person(request.holder)),
+        RootAuthority::Organisation(organisation) => Some(organisation),
+    });
     Ok(if role { grant.as_role() } else { grant })
 }
 

@@ -63,10 +63,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 }),
             };
         }
+        let authority = self.root_authority_for(directory, request, at)?;
         let grant = judge_root(
             directory,
             &self.model,
-            self.root_authority,
+            authority,
             request,
             GrantId::generate()?,
         )?

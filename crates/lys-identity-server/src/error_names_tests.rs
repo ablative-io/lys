@@ -245,6 +245,7 @@ fn grant_authority_refusals_keep_their_forbidden_status() {
                 | "Expired"
                 | "NotStarted"
                 | "RootAuthorityRefused"
+                | "RootOwnedElsewhere"
                 | "RevokeRefused"
                 | "NotHeld"
                 | "EnvelopeMismatch"

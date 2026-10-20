@@ -10,8 +10,8 @@ use identity_contract::harness::{ADMINISTRATOR, Fault, Harness, ManualClock, Ser
 use identity_contract::organisation_fixture::{T0, activate, model};
 use lys_core::Ed25519Identity;
 use lys_identity::grants::{
-    Action, DelegateRequest, Grants, MemoryRelationships, PassOn, RecipientKind, Relation,
-    Resource, RootRequest, Route, Window,
+    Action, DelegateRequest, Grant, GrantId, GrantParts, Grants, MemoryRelationships, PassOn,
+    RecipientKind, Relation, Resource, Route, Source, Window,
 };
 use lys_identity::{
     Actor, AgentId, Change, Directory, IdentityEvent, IdentityId, OperationId, PersonId, Profile,
@@ -118,18 +118,25 @@ fn grants_before_organisations(
         (admin, "gamma"),
         (bea, "delta"),
     ] {
-        let recorded = grants.issue_root(
-            projection,
-            &RootRequest {
-                operation: OperationId::generate()?,
-                caller: IdentityId::Person(admin),
-                route: Route::Api,
-                holder,
+        // Written as that build wrote it: a root its root person issued by
+        // standing, which no judge of this build admits (ACCESS-009 R2).
+        let recorded = grants.record_unjudged(
+            Grant::new(GrantParts {
+                id: GrantId::generate()?,
+                issuer: IdentityId::Person(admin),
+                holder: IdentityId::Person(holder),
+                responsible: holder,
                 resource: Resource::new("project", project)?,
                 relation: Relation::new("alpha")?,
+                actions: [Action::new("read")?, Action::new("write")?]
+                    .into_iter()
+                    .collect(),
                 pass_on: pass_on.clone(),
+                source: Source::Root,
                 window: Window::new(T0, None)?,
-            },
+                model_version: 1,
+                operation: OperationId::generate()?,
+            })?,
             T0,
         )?;
         roots.push((recorded.event.grant(), project));

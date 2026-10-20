@@ -1,6 +1,8 @@
 //! A directory of four people and two agents on a temporary log, every one
-//! active, and the grants on their own log, judged against a three-relation
-//! model, with a permission engine the test chooses.
+//! active, and the grants on their own log, judged against a four-relation
+//! model, with a permission engine the test chooses. The administrator
+//! founded the organisation and holds its administrator grant, which every
+//! root they issue rests on (ACCESS-009 R2).
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -16,8 +18,8 @@ use lys_identity::grants::{
 };
 use lys_identity::log::Reopen;
 use lys_identity::{
-    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, PersonId,
-    Profile, Provenance, Transition,
+    Actor, AgentId, AuthMethod, Directory, IdentityId, LoginBinding, OperationId, OrganisationId,
+    PersonId, Profile, Provenance, Transition,
 };
 use lys_log_store::{FileLeafStore, LeafStore};
 
@@ -40,11 +42,21 @@ pub fn alpha() -> Result<Resource, GrantError> {
 }
 
 /// The model: `kite` carries read, write and delete; `heron` read and write;
-/// `tern` read alone. The names say nothing about the sets.
+/// `tern` read alone; `administrator` the four organisation acts. The names
+/// say nothing about the sets.
 pub fn model() -> Result<Model, GrantError> {
     Model::new(
         1,
         [
+            (
+                Relation::new("administrator")?,
+                actions(&[
+                    "organisation.administer",
+                    "organisation.admit",
+                    "organisation.grant",
+                    "organisation.read",
+                ])?,
+            ),
             (
                 Relation::new("kite")?,
                 actions(&["delete", "read", "write"])?,
@@ -71,8 +83,10 @@ pub struct World<S: LeafStore = FileLeafStore, R: RelationshipStore = MemoryRela
     pub directory: Directory<FileLeafStore>,
     /// The grants.
     pub grants: Grants<S, R>,
-    /// The root authority.
+    /// The root authority, the organisation's founder.
     pub admin: PersonId,
+    /// The organisation everyone is of.
+    pub organisation: OrganisationId,
     /// A person who holds root grants.
     pub dana: PersonId,
     /// A person Dana lends to.
@@ -170,17 +184,21 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
                 T0,
             )?;
         }
-        let grants = Grants::open(
+        let mut grants = Grants::open(
             opener(&dir.path().join("grants")),
             Ed25519Identity::load(&key)?,
             relationships,
             model()?,
             admin,
         )?;
+        // The founder's administrator grant, as the service issues it at
+        // setup: every root the administrator issues rests on it.
+        grants.found_organisation(directory.projection()?, organisation, T0)?;
         Ok(Self {
             directory,
             grants,
             admin,
+            organisation,
             dana,
             tom,
             lee,

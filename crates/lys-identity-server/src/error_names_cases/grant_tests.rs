@@ -191,6 +191,13 @@ pub(super) fn grant_standing(detail: &'static str) -> Vec<(ServerError, &'static
             "RootAuthorityRefused",
         ),
         (
+            ServerError::Grant(GrantError::RootOwnedElsewhere {
+                resource: detail.to_owned(),
+                organisation: detail.to_owned(),
+            }),
+            "RootOwnedElsewhere",
+        ),
+        (
             ServerError::Grant(GrantError::RevokeRefused {
                 caller: detail.to_owned(),
                 grant: detail.to_owned(),

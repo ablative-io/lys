@@ -161,7 +161,7 @@ pub enum GrantError {
     /// A grant of one organisation was to be passed on to an identity of
     /// another, or of none (DIRECTORY-109 R3).
     #[error(
-        "OrganisationOutside: {grant} belongs to {organisation}, and {recipient} is not of it; a grant is passed on within its organisation"
+        "OrganisationOutside: {grant} belongs to {organisation}, and {recipient} is not of it; a grant is issued within its organisation"
     )]
     OrganisationOutside {
         /// The source grant.
@@ -253,13 +253,27 @@ pub enum GrantError {
         /// When it starts.
         starts_at: u64,
     },
-    /// A root grant was asked for by someone other than the configured root authority.
+    /// A root grant was asked for by someone holding no organisation.grant on
+    /// the organisation, who is not the install's root authority either
+    /// (ACCESS-009 R2).
     #[error(
-        "RootAuthorityRefused: {caller} is not the root authority, and only it issues a root grant"
+        "RootAuthorityRefused: {caller} holds no organisation.grant on the organisation and is not the install's root authority; only they issue a root grant"
     )]
     RootAuthorityRefused {
         /// The caller.
         caller: String,
+    },
+    /// A root grant was asked for on a resource rooted under another
+    /// organisation (ACCESS-009 R2): a resource belongs to one organisation
+    /// while any grant on it lives.
+    #[error(
+        "RootOwnedElsewhere: {resource} is rooted under {organisation}; a resource belongs to one organisation while any grant on it lives"
+    )]
+    RootOwnedElsewhere {
+        /// The resource.
+        resource: String,
+        /// The organisation it is rooted under.
+        organisation: String,
     },
     /// A revocation was asked for by someone with no authority over the grant.
     #[error("RevokeRefused: {caller} neither issued {grant} nor holds a grant it derives from")]

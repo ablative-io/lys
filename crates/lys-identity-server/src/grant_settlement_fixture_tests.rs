@@ -156,7 +156,7 @@ impl Table {
         let model_file = path.join("model.json");
         std::fs::write(
             &model_file,
-            br#"{"version":1,"relations":{"operator":["read","operate"],"reader":["read"]}}"#,
+            br#"{"version":1,"relations":{"administrator":["organisation.administer","organisation.admit","organisation.grant","organisation.read"],"operator":["read","operate"],"reader":["read"]}}"#,
         )?;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
         let issuer = format!("http://{}", listener.local_addr()?);

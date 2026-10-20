@@ -53,10 +53,10 @@ pub fn unrevoked(book: &GrantBook, lineage: &Lineage) -> Result<(), GrantError> 
 /// - `GrantError::ExpiryBeyondSource` if a child outlives its source.
 /// - `GrantError::GrantUnknown` if the requested grant is absent.
 /// - `GrantError::AlreadyRevoked` if it was already revoked.
-/// - `GrantError::RevokeRefused` if the caller is neither root authority, issuer nor ancestor holder.
+/// - `GrantError::RevokeRefused` if the caller is neither the standing authority named, issuer nor ancestor holder.
 pub fn judge_revoke(
     book: &GrantBook,
-    root_authority: PersonId,
+    standing: Option<PersonId>,
     caller: IdentityId,
     grant: GrantId,
 ) -> Result<(), GrantError> {
@@ -68,7 +68,12 @@ pub fn judge_revoke(
             grant: grant.to_string(),
         });
     }
-    if caller == IdentityId::Person(root_authority) || record.grant().parts().issuer == caller {
+    // Standing to revoke by name is the install's root person's over an
+    // install-level grant alone (ACCESS-009 R2); inside an organisation
+    // it rests on organisation.grant, judged by the caller's grants.
+    if standing.is_some_and(|person| caller == IdentityId::Person(person))
+        || record.grant().parts().issuer == caller
+    {
         return Ok(());
     }
     let lineage = book.lineage(grant)?;

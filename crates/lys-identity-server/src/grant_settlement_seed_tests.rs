@@ -3,6 +3,7 @@ struct SeededAuthority {
     administrator: LoginBinding,
     actor: Actor,
     admin: PersonId,
+    organisation: lys_identity::OrganisationId,
     asker: PersonId,
     holder: AgentId,
     agent: AgentId,
@@ -99,6 +100,7 @@ fn seeded_authority(config: &crate::Config) -> TestResult<SeededAuthority> {
         administrator,
         actor,
         admin,
+        organisation,
         asker,
         holder,
         agent,
@@ -113,14 +115,15 @@ fn fixture_grants(
     fault: &Arc<AtomicBool>,
     model: &Model,
 ) -> TestResult<crate::grants::GrantState> {
-    let directory = &mut authority.directory;
-    let (admin, asker, holder, agent, now) = (
+    let (admin, organisation, asker, holder, agent, now) = (
         authority.admin,
+        authority.organisation,
         authority.asker,
         authority.holder,
         authority.agent,
         authority.now,
     );
+    let directory = &mut authority.directory;
     let log_dir = config.grant_log_dir.clone();
     let mut grants = Grants::open(
         Box::new(move || FileLeafStore::open(&log_dir)),
@@ -129,6 +132,9 @@ fn fixture_grants(
         model.clone(),
         admin,
     )?;
+    // The founder's administrator grant, from the epoch: the service judges
+    // later roots at the system clock, before this fixture's instants.
+    grants.found_organisation(directory.projection()?, organisation, 0)?;
     let resource = Resource::new("agent", &agent.to_string())?;
     let pass_on = PassOn::to(
         [Action::new("read")?].into_iter().collect(),

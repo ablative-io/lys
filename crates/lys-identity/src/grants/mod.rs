@@ -33,6 +33,7 @@ pub mod receipt;
 pub mod recovery;
 mod refusal_codec;
 pub mod revocation;
+mod roots;
 pub mod schema;
 pub mod schema_diff;
 #[cfg(test)]
@@ -46,7 +47,7 @@ pub mod test_support;
 pub mod types;
 pub mod usage;
 
-pub use admission::{DelegateRequest, RootRequest, Route};
+pub use admission::{DelegateRequest, RootAuthority, RootRequest, Route, install_level};
 pub use authority::{ExerciseRequest, Grants, ONE_TIME_SPENT, Permit, Recorded, RevokeRequest};
 pub use cannot_give::{
     CannotGiveItem, CannotGiveList, CannotGiveReason, CannotGiveRequest, CannotGiveSubject,

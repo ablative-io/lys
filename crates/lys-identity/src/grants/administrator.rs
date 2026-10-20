@@ -29,6 +29,17 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             });
         }
         active(directory, request.caller)?;
+        // Standing is passed on within the administrator's organisation
+        // (ACCESS-009 R3); an administrator of none passes it to anyone.
+        if let Some(organisation) = directory.organisation_of(request.caller)
+            && directory.organisation_of(request.recipient) != Some(organisation)
+        {
+            return Err(GrantError::OrganisationOutside {
+                grant: "the administrator's standing".to_owned(),
+                organisation: organisation.to_string(),
+                recipient: request.recipient.to_string(),
+            });
+        }
         self.settle_for_change()?;
         if let Some((event, receipt)) = self.answered(request.operation)? {
             return match event.change() {

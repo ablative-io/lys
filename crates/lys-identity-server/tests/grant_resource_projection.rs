@@ -9,7 +9,8 @@ use std::sync::atomic::AtomicBool;
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, GRANT_MODEL, Service};
 use lys_identity::grants::{
-    Grants, MemoryRelationships, PassOn, Relation, Resource, RootRequest, Route, Window,
+    Action, Grant, GrantId, GrantParts, Grants, MemoryRelationships, PassOn, Relation, Resource,
+    Source, Window,
 };
 use lys_identity::signer::load_service_key;
 use lys_identity::{
@@ -70,18 +71,25 @@ fn old_grant(config: &lys_identity_server::Config, person: PersonId) -> Outcome 
         config.grant_model()?,
         person,
     )?;
-    grants.issue_root(
-        directory.projection()?,
-        &RootRequest {
-            operation: OperationId::generate()?,
-            caller: IdentityId::Person(person),
-            route: Route::Browser,
-            holder: person,
+    // A root of the store before organisations, written as that build
+    // wrote it: one grant, at index zero, with no founding grant before it.
+    grants.record_unjudged(
+        Grant::new(GrantParts {
+            id: GrantId::generate()?,
+            issuer: IdentityId::Person(person),
+            holder: IdentityId::Person(person),
+            responsible: person,
             resource: Resource::new("person", "target")?,
             relation: Relation::new("alpha")?,
+            actions: [Action::new("read")?, Action::new("write")?]
+                .into_iter()
+                .collect(),
             pass_on: PassOn::UseOnly,
+            source: Source::Root,
             window: Window::new(0, None)?,
-        },
+            model_version: 1,
+            operation: OperationId::generate()?,
+        })?,
         4,
     )?;
     assert_eq!(grants.revision(), 1);

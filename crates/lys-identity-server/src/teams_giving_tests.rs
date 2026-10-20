@@ -293,6 +293,11 @@ fn a_pass_requires_member_operate_and_records_only_its_own_use() -> TestResult {
         model,
         person,
     )?;
+    // The owner's administrator grant, which the roots given rest on.
+    let organisation = projection
+        .organisation_of(IdentityId::Person(person))
+        .ok_or("the owner was set up under no organisation")?;
+    grants.found_organisation(projection, organisation, 0)?;
     let app_leaves = MemoryStore::empty();
     let mut apps = AppStore::over(
         Box::new(move || MemoryStore::open(Arc::clone(&app_leaves), crate::apps_store::ORIGIN)),
@@ -374,6 +379,18 @@ fn member_model() -> TestResult<lys_identity::grants::Model> {
         [
             (Relation::new("writer")?, [Action::new("write")?].into()),
             (Relation::new("operator")?, [Action::new("operate")?].into()),
+            (
+                Relation::new("administrator")?,
+                [
+                    "organisation.administer",
+                    "organisation.admit",
+                    "organisation.grant",
+                    "organisation.read",
+                ]
+                .into_iter()
+                .map(Action::new)
+                .collect::<Result<_, _>>()?,
+            ),
         ],
     )?)
 }

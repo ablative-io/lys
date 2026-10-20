@@ -178,6 +178,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::Expired { .. }
         | GrantError::NotStarted { .. }
         | GrantError::RootAuthorityRefused { .. }
+        | GrantError::RootOwnedElsewhere { .. }
         | GrantError::RevokeRefused { .. }
         | GrantError::NotHeld { .. }
         | GrantError::EnvelopeMismatch { .. }
