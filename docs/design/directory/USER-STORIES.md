@@ -178,6 +178,8 @@
 
 **S456.** As a person of one organisation, every list I read, people, agents, teams and grants, is my organisation's and nothing else exists as far as Lys tells me; the provider's own administrator reads their organisation the same way.
 
+**S461.** As a Person who signs in, I want the link in my founding letter to sign me in once and lead me to set a password or connect Google, so that I can come back tomorrow without a second letter.
+
 ## Directory administrator — Resolves a refused act
 
 **S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
@@ -199,6 +201,8 @@
 ## Stranger — Checks an issued certificate and its log entry offline, holding nothing from lys
 
 **S84.** As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged.
+
+**S460.** As a Stranger, I want to found my organisation in Lys by naming it and my address, and to finish by following the letter Lys writes me, so that my people and I have our own place without anyone from Lys being present.
 
 ## Issuer — Issues an agent's certificate under the CA key it holds
 

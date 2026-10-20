@@ -191,8 +191,12 @@ taken: a second founding with the same email and name re-sends the mail (idempot
 device for each (test 2 fails) and the door's store already holds several workspaces (`field_builtin.rs:308`). The door
 stops serving one configured id and serves the workspace Lys names for the person.
 
-**Made by whom and when.** The workspace exists in Lys first: founding an organisation issues, under it, a resource
-`workspace:<organisation id>` with the founding person as root authority through `organisation.grant`. The door mints the
+**Made by whom and when.** The workspace exists in Lys first: the organisation is the workspace, one id for both.
+(Ruled in DIRECTORY-111 R2, 21 October 2026: founding issues no product grant, because a kind only a product declares,
+such as the door's workspace, cannot be granted before that product connects; the founder's administrator grant on the
+organisation is the authority, and the door's admission question is `POST /grants/which` for kind `organisation`, action
+`organisation.read`, answering the one organisation that admits the subject. The earlier line, a resource
+`workspace:<organisation id>` with the founder as root through `organisation.grant`, is withdrawn.) The door mints the
 workspace's boot channel the first time an admitted person of that organisation enters (`place::boot_channel(store,
 workspace_id)`, `place.rs:160-178`, called per workspace rather than once at serve), and from then on that person's live
 prefix, channels, topics, drafts and search are scoped by that id as `oidc_admission.rs:166` scopes channels and topics

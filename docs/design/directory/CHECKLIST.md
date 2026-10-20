@@ -677,3 +677,11 @@
 - [ ] **C806** — Lys sends added, access given and founded from one sender, each asserted word for word at a capturing sink, once per act. DIRECTORY-110/R3.
 - [ ] **C807** — With no mail settings, admit refuses as mail_unconfigured before recording anything. DIRECTORY-110/R4.
 - [ ] **C808** — The copy-invite is gone; the receipt says Lys wrote to the person. DIRECTORY-110/R5.
+
+## A stranger founds an organisation (DIRECTORY-111)
+
+- [ ] **C809** — POST /organisations/found founds both records Registered, writes the proof's digest in one durable write, sends the founded letter with the link, answers one shape to everyone and refuses by name without mail. DIRECTORY-111/R1.
+- [ ] **C810** — POST /organisations/found/prove makes the account, binds, activates the person and the organisation, issues the founder's administrator grant, records the issuer's letter, signs the founder in and spends the proof, each step under a derived operation; a failed step is answered by name with the steps done and the proof unspent. DIRECTORY-111/R2.
+- [ ] **C811** — A session begun by address proof is the person signed in everywhere a sign-in through the issuer is; the founding leaves carry the Founding method and claim no login. DIRECTORY-111/R2.
+- [ ] **C812** — The sign-in page offers founding; #/found and #/found/:proof serve outside the shell, prove only on a click, and land on the account page saying to set a password or connect Google. DIRECTORY-111/R3.
+- [ ] **C813** — The founded and already-yours letters are asserted word for word at the sink; proof_refused, already_admitted and mail_unconfigured are named on their routes and produced by tests. DIRECTORY-111/R4.

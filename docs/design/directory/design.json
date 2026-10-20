@@ -6482,6 +6482,31 @@
       "path": "tests/identity_contract/src/mail_sink.rs",
       "note": "The test-owned SMTP listener on 127.0.0.1 that captures every letter whole and refuses on demand.",
       "brief": "DIRECTORY-110"
+    },
+    {
+      "path": "crates/lys-identity-server/src/organisations_found.rs",
+      "note": "The two unauthenticated founding routes and their derived-operation steps: found, proof and letter; account, bind, activate, organisation, grant, letter, session and spend.",
+      "brief": "DIRECTORY-111"
+    },
+    {
+      "path": "crates/lys-identity-server/src/foundings_store.rs",
+      "note": "Digests of proving tokens with the founding each proves, one durable write per change, a digest spent once; the token itself is never held.",
+      "brief": "DIRECTORY-111"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/organisations_found.rs",
+      "note": "The founding path end to end against the fake issuer and the sink: one shape to everyone, idempotence by operation, the proof spent once, a failed step retried.",
+      "brief": "DIRECTORY-111"
+    },
+    {
+      "path": "surface/identity/src/features/found/Found.tsx",
+      "note": "The public founding form outside the shell: three fields, the written-to sentence, refusals in words, no identity shown.",
+      "brief": "DIRECTORY-111"
+    },
+    {
+      "path": "surface/identity/src/features/found/Prove.tsx",
+      "note": "The proving page outside the shell: one button that posts the proof, never on load; lands on the account page.",
+      "brief": "DIRECTORY-111"
     }
   ],
   "inventory": [

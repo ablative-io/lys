@@ -370,6 +370,10 @@
         {
           "id": "S456",
           "text": "As a person of one organisation, every list I read, people, agents, teams and grants, is my organisation's and nothing else exists as far as Lys tells me; the provider's own administrator reads their organisation the same way."
+        },
+        {
+          "id": "S461",
+          "text": "As a Person who signs in, I want the link in my founding letter to sign me in once and lead me to set a password or connect Google, so that I can come back tomorrow without a second letter."
         }
       ]
     },
@@ -422,6 +426,10 @@
         {
           "id": "S84",
           "text": "As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged."
+        },
+        {
+          "id": "S460",
+          "text": "As a Stranger, I want to found my organisation in Lys by naming it and my address, and to finish by following the letter Lys writes me, so that my people and I have our own place without anyone from Lys being present."
         }
       ]
     },
