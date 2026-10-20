@@ -45,9 +45,13 @@ fn frame(
     grant: GrantId,
     change: GrantChange,
 ) -> Result<ChangeFrame, Box<dyn Error>> {
+    // A stamp is never framed: the stream refuses it, so its kind here is
+    // the one the index reads as nothing to remove.
     let kind = match change {
         GrantChange::Revoke { .. } => ChangeKind::Revoke,
-        GrantChange::Issue(_) | GrantChange::Use { .. } => ChangeKind::Issue,
+        GrantChange::Issue(_) | GrantChange::Use { .. } | GrantChange::Stamp { .. } => {
+            ChangeKind::Issue
+        }
     };
     let event = GrantEvent::new(OperationId::generate()?, caller(), 1, change)?;
     let evidence = sign_grant_event(event, &signer.key)?;
