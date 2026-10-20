@@ -93,3 +93,9 @@
 - [x] **C789** — A profile version without its own review starts when its responsible person or the administrator reviewed the same settings content on any agent of theirs, the answer naming the carried review; a changed digest needs review again; an agent never carries a review it made.
 - [x] **C790** — One standing choice gives an agent its roots, agent-roots first for an administrator without them, then four grants in order with one receipt; the install names the computer Lys runs on, by the administrator with the lys runner, idempotently.
 - [x] **C791** — The enrol command writes the one seat file shape both Lys's bridge and Cambium's door read, with the door's fields when asked, so a Cambium seat's key is born on the computer it runs on and no seat file is carried by hand.
+
+## An owner a test starts ends with the test, and an owner whose folder is gone ends itself (AGENTS-018)
+
+- [ ] **C814** — Every test fixture that starts a seat owner ends that owner's process group and waits for its exit when the fixture is dropped, on return, on panic and on close, with the pid and group read from the runner's record of the start (AGENTS-018 R1).
+- [ ] **C815** — A seat owner watches its own folder as an event (kqueue EVFILT_VNODE on macOS, inotify on Linux) and, when the folder is removed or renamed away, ends its harness's group, writes one line to stderr and exits 0 (AGENTS-018 R2).
+- [ ] **C816** — A seat owner whose folder cannot be watched refuses to start by name, owner_dir_unwatched, so no owner runs unwatched (AGENTS-018 R2).

@@ -54,6 +54,10 @@
 
 **S443.** As an operator running Lys's tests on a shared Mac, no runner or owner a test started is left running after the run, however the run ended, so the machine I share carries no stray session, harness or socket of a test long gone.
 
+**S462.** As an operator whose machine runs the Lys gates, I want every test run to end the seat owners it started, so that a day of gates leaves no orphaned processes holding folders that no longer exist.
+
+**S463.** As an operator, I want removing a seat's folder to end its owner, with one line saying why, so that an owner never runs on nothing and I have one act that ends it for good.
+
 ## A person starting an agent on their own computer — types one word and expects the agent to start, whether or not the Lys console is up
 
 **S426.** As a person starting an agent on my own computer, I want lys claude to start my agent when the Lys console is off or unreachable, telling me plainly that it is, so that the one word works every time and I never have to open a terminal to work out why it did not.

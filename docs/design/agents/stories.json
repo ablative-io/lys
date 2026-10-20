@@ -112,6 +112,14 @@
         {
           "id": "S443",
           "text": "As an operator running Lys's tests on a shared Mac, no runner or owner a test started is left running after the run, however the run ended, so the machine I share carries no stray session, harness or socket of a test long gone."
+        },
+        {
+          "id": "S462",
+          "text": "As an operator whose machine runs the Lys gates, I want every test run to end the seat owners it started, so that a day of gates leaves no orphaned processes holding folders that no longer exist."
+        },
+        {
+          "id": "S463",
+          "text": "As an operator, I want removing a seat's folder to end its owner, with one line saying why, so that an owner never runs on nothing and I have one act that ends it for good."
         }
       ]
     },

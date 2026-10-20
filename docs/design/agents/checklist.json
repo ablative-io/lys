@@ -340,6 +340,26 @@
           "done": true
         }
       ]
+    },
+    {
+      "name": "An owner a test starts ends with the test, and an owner whose folder is gone ends itself (AGENTS-018)",
+      "items": [
+        {
+          "id": "C814",
+          "text": "Every test fixture that starts a seat owner ends that owner's process group and waits for its exit when the fixture is dropped, on return, on panic and on close, with the pid and group read from the runner's record of the start (AGENTS-018 R1).",
+          "done": false
+        },
+        {
+          "id": "C815",
+          "text": "A seat owner watches its own folder as an event (kqueue EVFILT_VNODE on macOS, inotify on Linux) and, when the folder is removed or renamed away, ends its harness's group, writes one line to stderr and exits 0 (AGENTS-018 R2).",
+          "done": false
+        },
+        {
+          "id": "C816",
+          "text": "A seat owner whose folder cannot be watched refuses to start by name, owner_dir_unwatched, so no owner runs unwatched (AGENTS-018 R2).",
+          "done": false
+        }
+      ]
     }
   ]
 }

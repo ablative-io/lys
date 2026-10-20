@@ -1,0 +1,85 @@
+---
+type: brief
+id: AGENTS-018
+cluster: agents
+title: An owner a test starts ends with the test, and an owner whose folder is gone ends itself
+---
+
+# AGENTS-018: An owner a test starts ends with the test, and an owner whose folder is gone ends itself
+
+> **Cluster:** agents
+> **Depends on:** AGENTS-004
+> **Checklist:**
+> - C814 — Every test fixture that starts a seat owner ends that owner's process group and waits for its exit when the fixture is dropped, on return, on panic and on close, with the pid and group read from the runner's record of the start (AGENTS-018 R1).
+> - C815 — A seat owner watches its own folder as an event (kqueue EVFILT_VNODE on macOS, inotify on Linux) and, when the folder is removed or renamed away, ends its harness's group, writes one line to stderr and exits 0 (AGENTS-018 R2).
+> - C816 — A seat owner whose folder cannot be watched refuses to start by name, owner_dir_unwatched, so no owner runs unwatched (AGENTS-018 R2).
+> **Stories:**
+> - S462 (An operator, a person running the estate) — As an operator whose machine runs the Lys gates, I want every test run to end the seat owners it started, so that a day of gates leaves no orphaned processes holding folders that no longer exist.
+> - S463 (An operator, a person running the estate) — As an operator, I want removing a seat's folder to end its owner, with one line saying why, so that an owner never runs on nothing and I have one act that ends it for good.
+
+## Purpose
+
+Hermes, 21 October 2026, reading Tom's Mac: eighteen `lys runner seat-owner` processes, every one started from the Lys checkout's target/debug by a test, every one with parent pid 1, thirty to forty-seven hours old, about 4 MB each, and every one's --dir a /private/var/folders temp folder that no longer existed. One per gate run since 19 October. Waffles stopped the eighteen by their listed pids; the defect is in the tests, and this brief is it. The owner outlives the runner by design (AGENTS-004 R1; crates/lys-runner/src/seat_owner/spawn.rs:1-12: its own session and process group by setsid, stdin closed, its words in its own log, so the terminal, the runner and the identity server can each close or die without ending it), so nothing ends an owner a test started unless the test does. Read at 15f07d0f, the fixtures that start owners: crates/lys-runner/tests/seat_restart.rs holds them in Owners, whose Drop (146-152) sends KILL to each pid; crates/lys-runner/tests/seat_owner_socket.rs holds one in OwnerProcess, whose Drop (39-46) kills the child; crates/lys-identity-server/tests/support/runner_start.rs holds the real runner in Table, whose close() (392-394) stops the runner's serving and ends no owner, and Table has no Drop, so a test that returns early, panics, or never calls close() leaves the runner's owners running under pid 1. A Drop runs only when the test's thread unwinds: a test nextest terminates at its slow bound, or a test binary killed when a battery is stopped, runs none, and seat_restart's Owners kills by pid, not by the owner's process group, so an owner's harness children survive the owner. In every case the owner's folder is removed by tempfile when the fixture drops, and the owner keeps running on a folder that is gone, holding nothing anyone can reach. Two halves, both structural: the fixture ends what it started, as a group, waited for, on every exit path it can see; and the owner ends itself when its folder is gone, which covers the exit paths no fixture sees and gives an operator one act, removing the seat's folder, that ends the owner for good.
+
+## Task
+
+Make every test fixture that starts a seat owner end that owner's process group and wait for its exit by the time the fixture is gone, on return, on panic and on close, and make the owner itself exit when its --dir is removed, watching the folder as it watches a pid today, so that no test run leaves an owner behind and a removed folder is an ended owner.
+
+## Requirements
+
+### R1: A fixture ends the owners it started, as a group, waited for, on every path it can see
+
+Behavioural. WHEN a test fixture that started a seat owner is dropped THE SYSTEM SHALL end that owner's process group with KILL (crates/lys-runner/src/seat_owner/spawn.rs:431, kill_process_group, the same act end_owner uses) and wait for the owner's exit (exit_wait.rs, the kqueue EVFILT_PROC / pidfd wait, never a sleep), before the fixture's temp folder is removed; for seat_restart.rs that is Owners::drop ending each held pid's group instead of the pid alone (146-152), for seat_owner_socket.rs OwnerProcess::drop ending the group (39-46), and for crates/lys-identity-server/tests/support/runner_start.rs a Drop on Table that ends every session the runner started (through the runner's own end act, Act::End, crates/lys-identity-server/src/runner_api.rs:366-375, when the service is still up, and by the owners' process groups read from the runner's tracking when it is not) before serving is stopped, with close() keeping its signature and calling the same path. The owner's pid and process group are read from the runner's record of the start (the announced pid, spawn.rs proved_ready), never found by name or pattern. Red first: a test in crates/lys-runner/tests/seat_restart.rs that starts an owner through the fixture, drops the fixture, and asserts by the pid that the owner is gone (rustix::process::test_kill_process refused, the alive() helper at seat_restart.rs:55) and that no process in its group remains; a test in crates/lys-identity-server/tests/support that starts a seat through Table, drops it without close(), and asserts the same by the announced pid. Both are red at 15f07d0f because the owner outlives the dropped fixture.
+
+**Acceptance:**
+- At the end of gate -stages nextest -crates lys-runner,lys-identity-server, the count of `lys runner seat-owner` processes started from the workspace's target folder whose --dir no longer exists is zero, read before and after the run, both numbers on the handback.
+- The two red tests (an owner gone by its pid and group after seat_restart's fixture drops; an owner gone by its announced pid after Table drops without close()) are green.
+- seat_restart.rs's survival tests still pass: an owner survives the runner's restart, because the fixture ends owners only when it is dropped, never when the runner restarts.
+
+**Files:**
+- modify: crates/lys-runner/tests/seat_restart.rs
+- modify: crates/lys-runner/tests/seat_owner_socket.rs
+- modify: crates/lys-identity-server/tests/support/runner_start.rs
+
+**Checklist:**
+- C814 — Every test fixture that starts a seat owner ends that owner's process group and waits for its exit when the fixture is dropped, on return, on panic and on close, with the pid and group read from the runner's record of the start (AGENTS-018 R1).
+
+**Stories:**
+- S462 (An operator, a person running the estate) — As an operator whose machine runs the Lys gates, I want every test run to end the seat owners it started, so that a day of gates leaves no orphaned processes holding folders that no longer exist.
+
+### R2: An owner whose folder is gone ends itself, on the folder's event, and says so once
+
+Behavioural. WHEN the folder a seat owner was started on (its --dir, holding its plan and its log) is removed or renamed away THE SYSTEM SHALL have the owner notice it as an event, not a poll: on macOS a kqueue EVFILT_VNODE registration on the folder's own descriptor with NOTE_DELETE and NOTE_RENAME, beside the EVFILT_PROC registration exit_wait.rs makes today; on Linux inotify IN_DELETE_SELF and IN_MOVE_SELF on the folder; the owner SHALL then end its harness's process group as a stop does, write one line to its standard error naming the folder and the event (its log file is inside the folder and is gone with it), and exit 0; an owner whose folder cannot be watched SHALL refuse to start by name (owner_dir_unwatched), so no owner runs unwatched. Nothing waits a set time: the watch is the event, and until it fires the owner serves as it does today. Red first: a test in crates/lys-runner/tests that starts an owner on a temp folder, removes the folder, and waits on the owner's exit through exit_wait (bounded by the test harness's own wall, never a sleep), asserting exit 0 and the line on stderr; red at 15f07d0f because the owner keeps running.
+
+**Acceptance:**
+- The red test is green: an owner whose folder is removed under it exits 0 with the one stderr line naming the folder and the event.
+- An owner's start refuses by name, owner_dir_unwatched, on a folder it cannot watch.
+- The installed runner's owners are unaffected while their folders stand: the gate's seat tests pass unchanged.
+
+**Files:**
+- create: crates/lys-runner/src/seat_owner/dir_watch.rs
+- create: crates/lys-runner/tests/seat_owner_dir.rs
+- modify: crates/lys-runner/src/seat_owner/exit_wait.rs
+- modify: crates/lys-runner/src/seat_owner/process.rs
+- modify: crates/lys-runner/src/seat_owner/spawn.rs
+
+**Checklist:**
+- C815 — A seat owner watches its own folder as an event (kqueue EVFILT_VNODE on macOS, inotify on Linux) and, when the folder is removed or renamed away, ends its harness's group, writes one line to stderr and exits 0 (AGENTS-018 R2).
+- C816 — A seat owner whose folder cannot be watched refuses to start by name, owner_dir_unwatched, so no owner runs unwatched (AGENTS-018 R2).
+
+**Stories:**
+- S463 (An operator, a person running the estate) — As an operator, I want removing a seat's folder to end its owner, with one line saying why, so that an owner never runs on nothing and I have one act that ends it for good.
+
+## Boundaries
+
+- The owner still outlives the runner, the terminal and the identity server (AGENTS-004 R1): R1 ends owners only when the fixture that started them is dropped, and R2 only when the owner's own folder is gone; a runner restart ends nothing
+- No process is found or ended by name or pattern anywhere: the pid and group come from the runner's record of the start
+- No fixed waits (Tom, 15 October 2026): the exit is waited on through exit_wait's event, the folder through its event; a test that needs a bound uses the harness's own wall
+- The eighteen already stopped are not this brief's: they were ended by pid on 21 October and are named here as the count behind R1's red
+- Nothing in lys identity install, upgrade or the runner's socket protocol changes
+
+## Verification
+
+- gate -stages nextest -crates lys-runner,lys-identity-server (the red run first, then the green, both records on the handback)
+- The count of `lys runner seat-owner` processes with a missing --dir, read before and after the green run on the venue, both on the handback
+- The whole Lys gate on the final commit
