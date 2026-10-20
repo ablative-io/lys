@@ -29,7 +29,7 @@ use crate::id::{ID_LEN, IdentityId, PersonId, from_hex, random_bytes, to_hex};
 use crate::lifecycle::{LifecycleState, Transition};
 use crate::operation::OperationId;
 use crate::profile::Profile;
-use crate::projection::Projection;
+use crate::projection::{Projection, Record};
 use crate::provenance::Actor;
 use crate::receipt::Receipt;
 
@@ -224,16 +224,15 @@ impl<S: LeafStore> Directory<S> {
     ) -> Result<(PersonId, Receipt), IdentityError> {
         self.settle()?;
         let founding = derived(operation, "organisation");
-        let (organisation_id, person) = match self.founded_by(founding)? {
-            Some(ids) => ids,
-            None => {
-                if let Some(person) = self.projection.person_for(actor.binding()) {
-                    return Err(IdentityError::AlreadyBootstrapped {
-                        person: person.to_string(),
-                    });
-                }
-                (OrganisationId::generate()?, PersonId::generate()?)
+        let (organisation_id, person) = if let Some(ids) = self.founded_by(founding)? {
+            ids
+        } else {
+            if let Some(person) = self.projection.person_for(actor.binding()) {
+                return Err(IdentityError::AlreadyBootstrapped {
+                    person: person.to_string(),
+                });
             }
+            (OrganisationId::generate()?, PersonId::generate()?)
         };
         if let Some((event, receipt)) = self.answered(operation)? {
             let same = event.actor().binding() == actor.binding()
@@ -301,7 +300,7 @@ impl Projection {
     #[must_use]
     pub fn organisation_of(&self, identity: IdentityId) -> Option<OrganisationId> {
         self.record(identity)
-            .and_then(|record| record.organisation())
+            .and_then(Record::organisation)
             .or_else(|| self.account_organisation(identity))
     }
 
@@ -402,7 +401,7 @@ impl<S: LeafStore> Directory<S> {
     /// - `IdentityError::AppendRefused` if the batch was not recorded.
     pub fn attach_unattached(
         &mut self,
-        actor: Actor,
+        actor: &Actor,
         organisation: Profile,
         recorded_at: u64,
     ) -> Result<Option<Attached>, IdentityError> {

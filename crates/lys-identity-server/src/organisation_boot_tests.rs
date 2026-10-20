@@ -267,7 +267,7 @@ fn a_batch_that_cannot_be_committed_leaves_the_store_as_it_was() -> Outcome {
     people_before_organisations(&mut directory, &actor)?;
     assert_eq!(directory.projection()?.unattached().count(), 5);
     harness.fail(Fault::BeforeLeaf)?;
-    let refused = directory.attach_unattached(actor.clone(), Profile::new("Example")?, T0);
+    let refused = directory.attach_unattached(&actor, Profile::new("Example")?, T0);
     assert!(
         refused.is_err(),
         "the batch was answered despite the store refusing it"
@@ -283,7 +283,7 @@ fn a_batch_that_cannot_be_committed_leaves_the_store_as_it_was() -> Outcome {
     assert_eq!(projection.organisations().count(), 0);
     // Once the store takes writes again the same call does the whole thing.
     let attached = reopened
-        .attach_unattached(actor, Profile::new("Example")?, T0)?
+        .attach_unattached(&actor, Profile::new("Example")?, T0)?
         .ok_or("nothing to attach")?;
     assert_eq!(attached.attached, 5);
     assert!(attached.founded);

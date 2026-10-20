@@ -222,8 +222,9 @@ fn reporting_target(target: IdentityId) -> bool {
 /// founded, renamed and moved through its lifecycle, and nothing else.
 fn check_organisation_fit(change: &Change) -> Result<(), IdentityError> {
     match change {
-        Change::FoundOrganisation { .. } | Change::ChangeProfile { .. } => Ok(()),
-        Change::Transition { .. } => Ok(()),
+        Change::FoundOrganisation { .. }
+        | Change::ChangeProfile { .. }
+        | Change::Transition { .. } => Ok(()),
         Change::SetupPerson { .. }
         | Change::RegisterPerson { .. }
         | Change::RegisterAgent { .. }

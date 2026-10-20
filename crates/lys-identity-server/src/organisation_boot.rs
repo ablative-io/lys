@@ -104,7 +104,7 @@ fn attach(
     // the operator's is the one that says no sign-in took place.
     let actor = Actor::new(login, Provenance::new(AuthMethod::Operator, at));
     let attached = directory
-        .attach_unattached(actor, Profile::new(name)?, at)
+        .attach_unattached(&actor, Profile::new(name)?, at)
         .map_err(|error| {
             refused(format!(
                 "the organisation batch was not committed, so nothing was attached: {error}"
