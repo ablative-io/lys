@@ -189,7 +189,7 @@ pub fn seed<S: LeafStore>(
         directory,
         actor: Actor::new(administrator, Provenance::new(AuthMethod::Oidc, now())),
     };
-    let founded = writer.directory.found_organisation(
+    let founding = writer.directory.found_organisation(
         writer.actor.clone(),
         OperationId::generate()?,
         Profile::new(ORGANISATION)?,
@@ -197,10 +197,10 @@ pub fn seed<S: LeafStore>(
         now(),
     )?;
     writer.transition_to(
-        IdentityId::Organisation(founded.organisation),
+        IdentityId::Organisation(founding.organisation),
         LifecycleState::Active,
     )?;
-    let mut founder = Some(founded.founder);
+    let mut founder = Some(founding.founder);
     let mut people = Vec::with_capacity(PLAN.len());
     for ((name, agents), subject) in PLAN.iter().zip(subjects) {
         let id = match founder.take() {

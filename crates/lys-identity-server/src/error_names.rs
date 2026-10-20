@@ -163,6 +163,7 @@ fn identity(error: &IdentityError) -> &str {
         IdentityError::AnswersToCycle { .. } => "AnswersToCycle",
         IdentityError::NoAccountablePerson { .. } => "NoAccountablePerson",
         IdentityError::AlreadyBootstrapped { .. } => "AlreadyBootstrapped",
+        IdentityError::OrganisationMismatch { .. } => "OrganisationMismatch",
         IdentityError::RandomSourceUnavailable { .. } => "RandomSourceUnavailable",
         IdentityError::IdentifierMalformed { .. } => "IdentifierMalformed",
         IdentityError::BindingMalformed { .. } => "BindingMalformed",

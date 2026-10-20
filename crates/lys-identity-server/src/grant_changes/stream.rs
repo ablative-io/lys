@@ -64,7 +64,10 @@ fn shown(
     let kind = match event.change() {
         GrantChange::Issue(_) => ChangeKind::Issue,
         GrantChange::Revoke { .. } => ChangeKind::Revoke,
-        GrantChange::Use { .. } => return None,
+        // A use changes no authority, and an organisation stamp (DIRECTORY-109
+        // R2) marks a grant without changing what it permits: neither is a
+        // change the stream carries.
+        GrantChange::Use { .. } | GrantChange::Stamp { .. } => return None,
     };
     sees(book, acting_for, event.grant()).then_some(kind)
 }

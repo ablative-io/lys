@@ -83,6 +83,7 @@ macro_rules! server_refusals {
             | ServerError::HoldingChanged
             | ServerError::LaunchRecordMissing
             | ServerError::OperatorRefused { .. }
+            | ServerError::UpgradePending { .. }
             | ServerError::AgentPassRefused { .. }
             | ServerError::AgentSignatureRefused { .. }
             | ServerError::AgentNotActive { .. }
@@ -167,7 +168,9 @@ fn oauth_code(error: &ServerError) -> &'static str {
         | ServerError::BodyTooLarge
         | ServerError::GrantStream(GrantStreamError::BindingUnsupported { .. })
         | ServerError::Holding(..) => "invalid_request",
-        ServerError::AuthorityUnavailable { .. } => "temporarily_unavailable",
+        ServerError::AuthorityUnavailable { .. } | ServerError::OrganisationBootRefused { .. } => {
+            "temporarily_unavailable"
+        }
         server_refusals!() => "server_error",
     }
 }
