@@ -53,7 +53,7 @@ fn operation(collection: &str, kind: &str, version: u64) -> String {
 async fn fixture() -> Result<(Service, String, String), Box<dyn Error>> {
     let started = Instant::now();
     let (service, owner) = Service::start_adjusted(
-        &model(1),
+        &model(1)?,
         None,
         None,
         None,
@@ -218,7 +218,7 @@ async fn partial_v1_refuses_then_documented_owner_recovery_is_idempotent() -> Ou
     let before = extent(&service)?;
     loader(&mut service, true).await?;
     assert_eq!(extent(&service)?, before);
-    fs::write(service.dir.path().join("grant-model.json"), model(3))?;
+    fs::write(service.dir.path().join("grant-model.json"), model(3)?)?;
     service.restart().await?;
     assert_eq!(extent(&service)?, before);
     let listed = ok(get(&service, "/grants", Auth::Cookie(&cookie)).await?)?;
