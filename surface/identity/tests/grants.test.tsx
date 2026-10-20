@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { $, $$, choose, click, mount, text, unmountAll, unreachable, settle } from './harness';
-import { ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G, AGENT_MODEL as MODEL, ME, ORGANISATION, REVIEWER, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
+import { ADA, BEA, BEA_DIRECTORY, BEA_GRANTS, BEA_REVIEWER_G, BEA_ROOT_G, BEA_SERVICE as BEA_BASE, DIRECTORY, GRANTS, LEDGER_G, AGENT_MODEL as MODEL, FOUNDING_G, ME, ORGANISATION, REVIEWER, ROOT_G, SCRIBE, SCRIBE_G, SERVICE as BASE, ok, refused } from './fixtures';
 
 /** Ada's founding grant as the hold table says it: the organisation acts by name, held outright and never passed on. */
 const FOUNDING_ROW = ['organisation.administer; organisation.admit; organisation.grant; organisation.read', 'administrator', 'organisation:' + ORGANISATION, 'root', 'no', ''];
@@ -53,7 +53,7 @@ describe('Who can reach this? (conformance 8.2)', () => {
       'Ada (test person), P/00000000 · administrator of organisation:' + ORGANISATION,
     ]);
     const used = $$('table tbody tr[data-href]').map((r) => r.querySelectorAll('td')[8].textContent);
-    expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool']);
+    expect(used).toEqual(['not seen', 'not seen', '27 Sep 12:00 · tool', 'not seen']);
     expect(unreachable()).toEqual([]);
     expect(SCRIBE_G).toMatch(/^grant-/);
   });
@@ -159,7 +159,7 @@ describe('Two people and their agents (conformance 1.4, 1.5)', () => {
       ['View this resource', 'viewer', 'project:ledger', 'root', 'no', ''],
       FOUNDING_ROW,
     ]);
-    expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020']);
+    expect(grantIdsOnScreen()).toEqual(['delegate:' + ROOT_G, 'revoke:' + ROOT_G, 'revoke:grant-00000000000000000000000000000020', 'revoke:' + FOUNDING_G]);
     await click($(`[data-act="delegate"][data-g="${ROOT_G}"]`));
     expect($('.act-panel')?.textContent).toContain('Scribe');
     const adaSource = $$('.act-panel .card')[0].textContent ?? '';

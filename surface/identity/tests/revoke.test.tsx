@@ -158,7 +158,7 @@ describe('What you hold after a revoke', () => {
 
     unmountAll();
     await mount('#/me?tab=account', routes);
-    expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger']);
+    expect(held()).toEqual(['owner of project:identity', 'viewer of project:ledger', 'administrator of organisation:' + ORGANISATION]);
     location.hash = `#/file/${SCRIBE}/access`;
     await settle();
     expect(scribeHolds()).toEqual(['viewer of project:identity']);
