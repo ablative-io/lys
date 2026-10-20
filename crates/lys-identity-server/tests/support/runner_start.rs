@@ -385,15 +385,55 @@ impl Table {
         self.service.post(&path, Some(&self.ada), body).await
     }
 
-    /// Stop the runner and propagate any shutdown error.
+    /// Ends every owner this table's runner started (AGENTS-018 R1): an
+    /// owner outlives the runner by design, so only the table that started
+    /// it can end it. Each is ended with its process group, proved by its
+    /// start identity, and waited for; one that cannot be proved gone is
+    /// said on standard error, never left silent.
+    fn end_owners(&self) {
+        let Some(serving) = &self.serving else {
+            return;
+        };
+        let seats = match serving.sessions().owned_seats() {
+            Ok(seats) => seats,
+            Err(error) => {
+                eprintln!("the table's owners could not be read: {error}");
+                return;
+            }
+        };
+        for seat in seats {
+            if let Err(error) = lys_runner::seat_owner::spawn::end_owner_now(&seat.endpoint.owner) {
+                eprintln!(
+                    "owner {} could not be ended: {error}",
+                    seat.endpoint.owner.pid
+                );
+            }
+        }
+    }
+
+    /// End the owners, stop the runner and propagate any shutdown error.
     ///
     /// # Errors
     /// Propagates failed fixture setup, transport errors or a service refusal.
     pub fn close(mut self) -> TestResult {
+        self.end_owners();
         if let Some(serving) = self.serving.take() {
             serving.stop()?;
         }
         Ok(())
+    }
+}
+
+impl Drop for Table {
+    /// A table dropped without `close()`, on a return, a panic or an early
+    /// `?`, still ends its owners and stops its runner (AGENTS-018 R1).
+    fn drop(&mut self) {
+        self.end_owners();
+        if let Some(serving) = self.serving.take()
+            && let Err(error) = serving.stop()
+        {
+            eprintln!("the table's runner could not be stopped: {error}");
+        }
     }
 }
 

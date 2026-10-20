@@ -22,7 +22,7 @@ use std::sync::Arc;
 use lys_runner::harness_control::{ManagedLaunch, Transport};
 use lys_runner::peer::{self, Leader};
 use lys_runner::protocol::{Launch, unhex};
-use lys_runner::seat_owner::process::{OwnerState, detach, establish};
+use lys_runner::seat_owner::process::{OwnerState, detach, end_when_dir_gone, establish};
 use lys_runner::seat_owner::protocol::{OwnerBinding, RUNNER_STATE, ready_line};
 use lys_runner::seat_owner::spawn::OwnerPlan;
 use lys_runner::seat_owner::store::OwnerStore;
@@ -108,6 +108,9 @@ fn owner(args: &[String]) -> Result<(), RunnerError> {
         runner_id.clone(),
         socket.clone(),
     )))?;
+    // The real owner ends itself when its folder is gone (AGENTS-018 R2);
+    // so does this one, with no harness to end.
+    end_when_dir_gone(&dir, &sessions, &plan.binding.session)?;
     // The build this fake owner announces: `<state>/owner-build` when the
     // test wrote one, so a seat started after an "upgrade" names the new
     // build while an earlier seat keeps its owner and its build.

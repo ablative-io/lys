@@ -37,11 +37,22 @@ fn plan(session: &str) -> Result<OwnerPlan, Box<dyn Error>> {
 struct OwnerProcess(Child);
 
 impl Drop for OwnerProcess {
+    /// Ends the owner with its process group and reaps it (AGENTS-018 R1):
+    /// the owner leads a group of its own once it has detached.
     fn drop(&mut self) {
         match self.0.try_wait() {
             Ok(Some(_)) => return,
             Ok(None) => {}
             Err(error) => eprintln!("owner_cleanup_status: {error}"),
+        }
+        if let Some(group) = i32::try_from(self.0.id())
+            .ok()
+            .and_then(rustix::process::Pid::from_raw)
+        {
+            match rustix::process::kill_process_group(group, rustix::process::Signal::KILL) {
+                Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+                Err(error) => eprintln!("owner_cleanup_group: {error}"),
+            }
         }
         if let Err(error) = self.0.kill() {
             eprintln!("owner_cleanup_signal: {error}");

@@ -22,6 +22,7 @@ use lys_runner::seat_owner::protocol::{ClientKind, OwnerAnswer, OwnerCommand};
 use lys_runner::seat_owner::record::Cursors;
 use lys_runner::seat_owner::recovery::{self, Found, Unreachable};
 use lys_runner::seat_owner::sessions::OwnedSeat;
+use lys_runner::seat_owner::spawn::end_owner_now;
 use lys_runner::session::Sessions;
 use lys_runner::{Client, RunnerError};
 
@@ -134,28 +135,21 @@ fn refusal_of(asked: Result<Answer, Box<dyn Error>>) -> Result<String, Box<dyn E
 
 /// The owners a test started, each ended when the test ends on any path,
 /// passing or failing: an owner outlives the runner that started it by
-/// design, so only the test can end it.
-struct Owners(Vec<u32>);
+/// design, so only the test can end it (AGENTS-018 R1). Each is ended with
+/// its process group, proved by its start identity, and waited for.
+struct Owners(Vec<Leader>);
 
 impl Owners {
     fn hold(seat: &OwnedSeat) -> Self {
-        Self(vec![seat.endpoint.owner.pid])
+        Self(vec![seat.endpoint.owner.clone()])
     }
 }
 
 impl Drop for Owners {
     fn drop(&mut self) {
-        for &pid in &self.0 {
-            let ended = pid_of(pid)
-                .map_err(|error| error.to_string())
-                .and_then(|pid| {
-                    match rustix::process::kill_process(pid, rustix::process::Signal::KILL) {
-                        Ok(()) | Err(rustix::io::Errno::SRCH) => Ok(()),
-                        Err(error) => Err(error.to_string()),
-                    }
-                });
-            if let Err(error) = ended {
-                eprintln!("owner {pid} could not be ended: {error}");
+        for owner in &self.0 {
+            if let Err(error) = end_owner_now(owner) {
+                eprintln!("owner {} could not be ended: {error}", owner.pid);
             }
         }
     }
@@ -180,8 +174,14 @@ fn an_owner_the_fixture_started_is_gone_when_the_fixture_drops() -> TestResult {
     assert!(alive(pid), "the owner runs once started");
     assert!(group_alive(pid), "the owner leads a group of its own");
     drop(owners);
-    assert!(!alive(pid), "owner {pid} outlived the fixture that started it");
-    assert!(!group_alive(pid), "owner {pid}'s group outlived the fixture");
+    assert!(
+        !alive(pid),
+        "owner {pid} outlived the fixture that started it"
+    );
+    assert!(
+        !group_alive(pid),
+        "owner {pid}'s group outlived the fixture"
+    );
     assert!(
         alive(runner.id()),
         "the runner was not what ended the owner"

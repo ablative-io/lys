@@ -12,7 +12,7 @@
 mod conversation;
 
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use super::counts::Meter;
@@ -210,6 +210,56 @@ pub fn detach() -> Result<(), RunnerError> {
     Ok(())
 }
 
+/// Ends this owner when its folder is gone (AGENTS-018 R2): the watch is
+/// registered now, so an owner whose folder cannot be watched never starts,
+/// and a thread waits on the kernel's event. When the folder is removed or
+/// renamed away the thread ends the harness's process group if one was
+/// started, writes one line on standard error naming the folder and the
+/// event (the owner's log is inside the folder and gone with it), and the
+/// owner exits 0. A watch that ends for any other reason ends the owner the
+/// same way, saying why: no owner runs unwatched.
+///
+/// # Errors
+///
+/// `owner_dir_unwatched` when the folder cannot be watched or the thread
+/// cannot start.
+pub fn end_when_dir_gone(
+    dir: &Path,
+    sessions: &Arc<Sessions>,
+    session: &str,
+) -> Result<(), RunnerError> {
+    let watch = super::dir_watch::DirWatch::open(dir).map_err(|words| {
+        RunnerError::refused("owner_dir_unwatched", format!("{}: {words}", dir.display()))
+    })?;
+    let sessions = Arc::clone(sessions);
+    let session = session.to_owned();
+    let dir = dir.to_path_buf();
+    std::thread::Builder::new()
+        .name("owner-dir-watch".to_owned())
+        .spawn(move || {
+            let event = watch.wait();
+            let harness = match sessions.leader_of(&session) {
+                Ok(leader) => match crate::pty::end_group(leader.pid) {
+                    Ok(()) => format!("its harness {} ended with its group", leader.pid),
+                    Err(error) => format!("its harness {} not ended: {error}", leader.pid),
+                },
+                Err(_) => "no harness".to_owned(),
+            };
+            eprintln!(
+                "seat_owner_dir_gone: {} {event}; {harness}; the owner exits",
+                dir.display()
+            );
+            std::process::exit(0);
+        })
+        .map_err(|error| {
+            RunnerError::refused(
+                "owner_dir_unwatched",
+                format!("the folder watch thread could not start: {error}"),
+            )
+        })?;
+    Ok(())
+}
+
 /// Serves as the owner in `serve.dir` until stopped: establishes the lease,
 /// opens a runner of its own, starts the one managed session, records its
 /// harness, then listens and writes the ready line on standard output.
@@ -270,6 +320,9 @@ pub fn serve(serve: &OwnerServe) -> Result<(), RunnerError> {
         },
     )?;
     crate::error::step("owner_harness_recorded", began);
+    let began = std::time::Instant::now();
+    end_when_dir_gone(&serve.dir, &sessions, &plan.binding.session)?;
+    crate::error::step("owner_dir_watched", began);
     let ready = ready_line(&runner_id, &socket, &own, super::protocol::BUILD);
     runner.serve_until_stopped(move || {
         let mut out = std::io::stdout();

@@ -23,6 +23,7 @@
 //! - [`counts`]: the counted work of every hot path and its ratchet (R5).
 
 pub mod counts;
+mod dir_watch;
 mod exit_wait;
 pub mod process;
 pub mod protocol;

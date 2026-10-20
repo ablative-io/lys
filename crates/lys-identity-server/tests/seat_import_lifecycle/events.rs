@@ -65,7 +65,7 @@ async fn seat_import_survives_lifecycle() -> TestResult {
 }
 
 /// AGENTS-018 R1: the owner a scene started is gone once its table is
-/// dropped, close() or not, because the table ends what it started.
+/// dropped, `close()` or not, because the table ends what it started.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_started_owner_is_gone_when_the_table_drops_without_close() -> TestResult {
     support::owner_program()?.ok_or(

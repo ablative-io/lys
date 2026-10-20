@@ -389,6 +389,54 @@ pub fn end_owner(owner: &Leader, refusal: &RunnerError) -> RunnerError {
     RunnerError::refused(&refusal.name(), format!("{refusal}; {ended}"))
 }
 
+/// Ends `owner` now, deliberately (AGENTS-018 R1): a fixture that started
+/// an owner ends it when the fixture is dropped, since the owner outlives
+/// the runner by design and nothing else will. The owner is proved by its
+/// start identity first, so a reused pid is never signalled; its process
+/// group is killed, then the owner itself, and its exit is waited on at the
+/// kernel. An owner already gone is nothing to do.
+///
+/// # Errors
+///
+/// `seat_owner_end_unconfirmed` when the owner cannot be proved gone: its
+/// identity could not be read, or its exit could not be watched and it
+/// still answers as the owner.
+pub fn end_owner_now(owner: &Leader) -> Result<(), RunnerError> {
+    let unconfirmed = |words: String| {
+        RunnerError::refused(
+            "seat_owner_end_unconfirmed",
+            format!("owner {}: {words}", owner.pid),
+        )
+    };
+    match owner_still(owner) {
+        Held::NotOwner => return Ok(()),
+        Held::Unknown(words) => return Err(unconfirmed(words)),
+        Held::Owner => {}
+    }
+    let group = ended_group(owner.pid);
+    if let Some(id) = i32::try_from(owner.pid)
+        .ok()
+        .and_then(rustix::process::Pid::from_raw)
+    {
+        match rustix::process::kill_process(id, rustix::process::Signal::KILL) {
+            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+            Err(error) => return Err(unconfirmed(format!("KILL: {error}{group}"))),
+        }
+    }
+    match super::exit_wait::wait(owner.pid) {
+        super::exit_wait::Exit::Gone => Ok(()),
+        super::exit_wait::Exit::Unwatched(cause) => match owner_still(owner) {
+            Held::NotOwner => Ok(()),
+            Held::Owner => Err(unconfirmed(format!(
+                "still the owner after KILL{group}; its end could not be watched ({cause})"
+            ))),
+            Held::Unknown(words) => Err(unconfirmed(format!(
+                "whether it is still the owner could not be read after KILL{group}: {words}"
+            ))),
+        },
+    }
+}
+
 /// Whether `owner.pid` still names the owner.
 enum Held {
     Owner,
