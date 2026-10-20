@@ -1456,6 +1456,7 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys-identity-server/tests/organisations_found.rs` | The founding path end to end against the fake issuer and the sink: one shape to everyone, idempotence by operation, the proof spent once, a failed step retried. | DIRECTORY-111 |
 | `surface/identity/src/features/found/Found.tsx` | The public founding form outside the shell: three fields, the written-to sentence, refusals in words, no identity shown. | DIRECTORY-111 |
 | `surface/identity/src/features/found/Prove.tsx` | The proving page outside the shell: one button that posts the proof, never on load; lands on the account page. | DIRECTORY-111 |
+| `crates/lys-identity-server/tests/organisations_handed.rs` | The no-mail path on the founding table: the link handed in the answer, the proof signed in as handed_link, admission's handed link signing the person in once, nothing refused mail_unconfigured. | DIRECTORY-112 |
 
 ## Inventory
 

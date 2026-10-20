@@ -188,6 +188,8 @@
 
 **S459.** As a Directory administrator, I want Lys to write to each person I admit, once, through our own mail settings, and to refuse to admit anyone when it cannot write, so that nobody is added and left to hear about it by chance.
 
+**S465.** As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
@@ -203,6 +205,8 @@
 **S84.** As a stranger holding the issuer's certificate, an issued certificate, its leaf and its inclusion artifact, I want to check the certificate and its entry in the log offline with openssl and a standard-library script, so that I rely on nothing from lys and on no one's word that the certificate was logged.
 
 **S460.** As a Stranger, I want to found my organisation in Lys by naming it and my address, and to finish by following the letter Lys writes me, so that my people and I have our own place without anyone from Lys being present.
+
+**S464.** As a Stranger, I want to found my organisation in Lys even when Lys cannot send email, by being shown my link on the screen instead of in a letter, so that I can finish founding and sign in without anyone from Lys and without a mail account existing yet.
 
 ## Issuer — Issues an agent's certificate under the CA key it holds
 

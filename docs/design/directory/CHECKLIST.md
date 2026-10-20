@@ -685,3 +685,11 @@
 - [ ] **C811** — A session begun by address proof is the person signed in everywhere a sign-in through the issuer is; the founding leaves carry the Founding method and claim no login. DIRECTORY-111/R2.
 - [ ] **C812** — The sign-in page offers founding; #/found and #/found/:proof serve outside the shell, prove only on a click, and land on the account page saying to set a password or connect Google. DIRECTORY-111/R3.
 - [ ] **C813** — The founded and already-yours letters are asserted word for word at the sink; proof_refused, already_admitted and mail_unconfigured are named on their routes and produced by tests. DIRECTORY-111/R4.
+
+## Founding and admission with no mail (DIRECTORY-112)
+
+- [ ] **C817** — POST /organisations/found on an install with no mail settings founds and records the proof, answers the link in letter.handed with sent false, and answers already_yours unsent for an address that signs in; nothing is refused mail_unconfigured. DIRECTORY-112/R1.
+- [ ] **C818** — POST /organisations/found/prove on an install with no mail settings completes, the letter step recording nothing, the session begun with the new HandedLink method, carried on the wire as code 7 and stored as handed_link, the person signed in. DIRECTORY-112/R2.
+- [ ] **C819** — POST /people/admit on an install with no mail settings completes every step and hands a sign-in link recorded as an admission in the foundings store; the link signs the admitted person in once by HandedLink and is spent. DIRECTORY-112/R3.
+- [ ] **C820** — The founding page shows a handed link and the already-yours sentence; #/added/:proof signs in on a click and lands on the account page saying so; the add-person page confirms a handed answer and shows the link to give. DIRECTORY-112/R4.
+- [ ] **C821** — mail_unconfigured is off the found, prove and admit rows and the openapi refusal test holds; the variant is removed where nothing produces it; the mail setting's doc says what no mail now means. DIRECTORY-112/R5.

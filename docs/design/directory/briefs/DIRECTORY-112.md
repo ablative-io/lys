@@ -1,0 +1,173 @@
+---
+type: brief
+id: DIRECTORY-112
+cluster: directory
+title: Founding and admission with no mail: the link is handed on the screen, not sent
+---
+
+# DIRECTORY-112: Founding and admission with no mail: the link is handed on the screen, not sent
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-111, DIRECTORY-110, ACCESS-009
+> **Checklist:**
+> - C817 — POST /organisations/found on an install with no mail settings founds and records the proof, answers the link in letter.handed with sent false, and answers already_yours unsent for an address that signs in; nothing is refused mail_unconfigured. DIRECTORY-112/R1.
+> - C818 — POST /organisations/found/prove on an install with no mail settings completes, the letter step recording nothing, the session begun with the new HandedLink method, carried on the wire as code 7 and stored as handed_link, the person signed in. DIRECTORY-112/R2.
+> - C819 — POST /people/admit on an install with no mail settings completes every step and hands a sign-in link recorded as an admission in the foundings store; the link signs the admitted person in once by HandedLink and is spent. DIRECTORY-112/R3.
+> - C820 — The founding page shows a handed link and the already-yours sentence; #/added/:proof signs in on a click and lands on the account page saying so; the add-person page confirms a handed answer and shows the link to give. DIRECTORY-112/R4.
+> - C821 — mail_unconfigured is off the found, prove and admit rows and the openapi refusal test holds; the variant is removed where nothing produces it; the mail setting's doc says what no mail now means. DIRECTORY-112/R5.
+> **Stories:**
+> - S464 (Stranger, Checks an issued certificate and its log entry offline, holding nothing from lys) — As a Stranger, I want to found my organisation in Lys even when Lys cannot send email, by being shown my link on the screen instead of in a letter, so that I can finish founding and sign in without anyone from Lys and without a mail account existing yet.
+> - S465 (Directory administrator, Resolves a refused act) — As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
+
+## Purpose
+
+Tom, 21 October 2026, 08:19, by voice: 'We just need to be able to do it without it, because it doesn't have that email. We don't have one at the moment, and we don't have a central one for Lys. You just need to be able to do it without it for the time being.' The installed Lys (15f07d0f) refuses POST /organisations/found and POST /people/admit as mail_unconfigured, so nobody can found an organisation or be admitted until the install has a mail account to send from, and there is none. DIRECTORY-110 made every letter go through Lys's one sender and DIRECTORY-111 made the founding letter carry the proving link; both took the letter as the only way a link reaches a person. This brief gives both acts a second way that needs nothing outside Lys: when the install has no mail settings, the link a letter would have carried is handed to the person on the screen instead, and the sign-in it begins is named as begun by a handed link, so the record says how the person got in.
+
+## Task
+
+Make POST /organisations/found, POST /organisations/found/prove and POST /people/admit complete on an install with no mail settings, the link handed in the answer and shown on the screen, the proof signing the person in under a provenance that names the handed link, and admission's handed link signing the admitted person in once so they can set a password. With mail settings nothing changes. Every red is written and shown red before its code through the gate on Dean's laptop; the whole brief is written before anything is built; the release that carries it is installed on the Mac and the path walked there.
+
+## Requirements
+
+### R1: Founding with no mail hands the link
+
+Behavioural. When the install has no mail settings, POST /organisations/found SHALL NOT be refused mail_unconfigured. It SHALL run the found and proof steps exactly as DIRECTORY-111 R1 has them and, in place of the letter step, SHALL answer the letter view {letter: 'founded', to: <email>, sent: false, by: 'lys', reason: 'Lys has no mail settings, so the link is handed here', handed: '<public origin>/#/found/<token>'}, the letter step marked done. handed is a new optional member of LetterView, absent whenever the install has mail, and with the store's digest the only place the token exists: never a log, a refusal or a test's output. The founding SHALL be recorded in the foundings store with a new member handed (default false) set true, so the proof knows how the link reached the person. When the issuer already holds an account for the email whose subject is bound to an active person, nothing SHALL be founded and the answer SHALL be {letter: 'already_yours', to: <email>, sent: false, by: 'lys', reason: 'This address already signs in to Lys'} with no handed member: with no mail there is no letter to carry the difference, so an install with no mail answers it on the screen. DIRECTORY-111's boundary that no answer says whether an address is known is given up for an install with no mail, by Tom's word of 21 October, and holds again the moment the install has mail settings. An unspent founding for the address SHALL be rotated to a fresh handed link as DIRECTORY-111 R1 rotates it, the old digest replaced in the same write, under the new operation; the same-operation guard reads the letters-sent record, which an install with no mail does not keep, so the same operation asked again hands a fresh link for the same founding and the earlier one is refused, and no second founding is ever recorded. The found row in openapi_table.rs SHALL no longer name mail_unconfigured.
+
+**Acceptance:**
+- On the founding table without mail, a founding answers 200 with letter.sent false, letter.by lys, letter.handed one link under the public origin at #/found/<token>, no member naming an identity; the directory holds the organisation and the person, both Registered; the foundings store holds the token's digest with handed true and not the token; the sink is empty and no letters-sent file exists
+- The same email founded again under a new operation adds no record, answers a different handed link, the first link is refused proof_refused and the second proves
+- A founding naming an active person's email answers 200 with letter already_yours, sent false and no handed member; no record and no leaf is added
+- On the founding table with mail, every DIRECTORY-111 test passes unchanged and no answer carries handed
+
+**Files:**
+- create: crates/lys-identity-server/tests/organisations_handed.rs
+- modify: crates/lys-identity-server/src/organisations_found.rs
+- modify: crates/lys-identity-server/src/foundings_store.rs
+- modify: crates/lys-identity-server/src/mail.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/tests/organisations_found.rs
+
+**Checklist:**
+- C817 — POST /organisations/found on an install with no mail settings founds and records the proof, answers the link in letter.handed with sent false, and answers already_yours unsent for an address that signs in; nothing is refused mail_unconfigured. DIRECTORY-112/R1.
+
+**Stories:**
+- S464 (Stranger, Checks an issued certificate and its log entry offline, holding nothing from lys) — As a Stranger, I want to found my organisation in Lys even when Lys cannot send email, by being shown my link on the screen instead of in a letter, so that I can finish founding and sign in without anyone from Lys and without a mail account existing yet.
+
+### R2: A handed link proves and signs in, and the record says it was handed
+
+Behavioural. When the install has no mail settings, POST /organisations/found/prove SHALL NOT be refused mail_unconfigured. It SHALL run DIRECTORY-111 R2's steps; the letter step SHALL record nothing when there is no sender and SHALL be marked done. The session step's provenance SHALL be the new AuthMethod::HandedLink when the founding's link was handed, and AddressProof as before when it was sent. HandedLink SHALL be the person signed in (AuthMethod::is_person_signed_in true), name no agent and no service account, be carried on the event wire as code 7 with no principal (the code the agent-signed-actor test holds as unassigned moves to 8) and in the session store as the stored method handed_link. The prove row in openapi_table.rs SHALL no longer name mail_unconfigured.
+
+**Acceptance:**
+- The handed link posted to prove answers 200 with a Set-Cookie, signed_in naming the issuer and the new subject, and the organisation and person; GET /me with the cookie answers the person active and their organisation by name; the session store file shows the session's method handed_link; the same link posted again is refused proof_refused
+- On the table with mail, the existing proving test still shows the session begun by address proof
+- provenance_tests.rs round-trips code 7 with no principal to HandedLink, shows it the person signed in, and shows code 8 as the unassigned code; session_provenance_tests.rs reads a stored handed_link session back
+
+**Files:**
+- modify: crates/lys-identity-server/src/organisations_prove.rs
+- modify: crates/lys-identity-server/src/session_store.rs
+- modify: crates/lys-identity-server/src/session_provenance_tests.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/tests/organisations_handed.rs
+- modify: crates/lys-identity/src/provenance.rs
+- modify: crates/lys-identity/src/event.rs
+- modify: crates/lys-identity/src/provenance_tests.rs
+
+**Checklist:**
+- C818 — POST /organisations/found/prove on an install with no mail settings completes, the letter step recording nothing, the session begun with the new HandedLink method, carried on the wire as code 7 and stored as handed_link, the person signed in. DIRECTORY-112/R2.
+
+**Stories:**
+- S464 (Stranger, Checks an issued certificate and its log entry offline, holding nothing from lys) — As a Stranger, I want to found my organisation in Lys even when Lys cannot send email, by being shown my link on the screen instead of in a letter, so that I can finish founding and sign in without anyone from Lys and without a mail account existing yet.
+
+### R3: Admission with no mail hands the person a sign-in link
+
+Behavioural. When the install has no mail settings, POST /people/admit SHALL NOT be refused mail_unconfigured. The register, account, bind, activate and grant steps SHALL run as they do with mail. In place of the letter step, Lys SHALL mint a proving token as R1 mints one and record its digest in the foundings store as an admission: a new member kind (founding, the default, or admission) set to admission, organisation the one the admission step admitted the person into, founder the person's id, the email, the act's operation, spent false, handed true; the answer's letter view SHALL be {letter: 'added', to: <email>, sent: false, by: 'lys', reason: 'Lys has no mail settings, so the link is handed here', handed: '<public origin>/#/added/<token>'} and the receipt's letter step done. With mail settings, admit SHALL be unchanged and no admission record made. POST /organisations/found/prove given an admission digest SHALL run two steps under operations derived from the admission's operation, session and spend: the person SHALL be Active and bound at the install's issuer, else the proof is refused proof_refused with DIRECTORY-111's one text and nothing recorded; the session SHALL be begun for that binding with HandedLink; the digest spent last; the answer as R2's, the organisation the admission's. The admit row in openapi_table.rs SHALL no longer name mail_unconfigured.
+
+**Acceptance:**
+- On the founding table without mail, Ada admits Bea: 200, every step done, letter.sent false, letter.handed one link at #/added/<token>, the store holds an admission digest with handed true; the sink is empty
+- The handed link posted to prove answers 200 with a Set-Cookie, Bea's person and Acme's organisation; GET /me with the cookie answers Bea active; GET /me/account answers her email with password false; the session store shows handed_link; the link posted again is refused proof_refused
+- A person admitted without mail and retired by Ada before the link is used: the link is refused proof_refused, the store shows the digest unspent, nothing is recorded
+- tests/mail_letters.rs's without-mail test now shows the admission completing with a handed link, and a root grant's answer still saying no letter went
+
+**Files:**
+- modify: crates/lys-identity-server/src/people_admit.rs
+- modify: crates/lys-identity-server/src/foundings_store.rs
+- modify: crates/lys-identity-server/src/organisations_prove.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/tests/mail_letters.rs
+- modify: crates/lys-identity-server/tests/organisations_handed.rs
+
+**Checklist:**
+- C819 — POST /people/admit on an install with no mail settings completes every step and hands a sign-in link recorded as an admission in the foundings store; the link signs the admitted person in once by HandedLink and is spent. DIRECTORY-112/R3.
+
+**Stories:**
+- S465 (Directory administrator, Resolves a refused act) — As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
+
+### R4: The screens hand the link
+
+Behavioural. Found.tsx: on a 200 whose letter.handed is a string the page SHALL show, in place of 'Check your email', the heading 'Your link' and the sentence 'This Lys cannot send email, so your link is here instead of in a letter. Open it to finish founding <organisation>; it works once.' with the link as an anchor whose text and href are the link; no identity shown and no form. On a 200 whose letter is already_yours with sent false and no handed member the page SHALL say 'That address already signs in to Lys. Sign in instead.' with a link to #/sign-in. Prove.tsx SHALL also be served at #/added/:proof outside the shell, with the heading 'Sign in to Lys', the sentence 'This link signs you in to Lys once. Press the button to finish and sign in.' and the button 'Sign in', posting to POST /organisations/found/prove on the click alone and landing on #/settings/account?added=1; Account.tsx SHALL read added from the address as it reads founded and say 'You are signed in by the link you were given. Set a password or connect Google here so you can sign in again.' AddPerson.tsx SHALL confirm an answer whose letter has sent false and handed a string (today it refuses it as unconfirmed), say '<name> is added. This Lys cannot send email, so give them this link; opening it signs them in once, and they set a password there.' and show the link in a read-only text field labelled 'Their sign-in link' so it can be copied; the receipt's letter line SHALL read 'Letter: handed to you here to give them; nothing was sent'. The mail_unconfigured words on Found.tsx and in the add-person tests SHALL go, since the refusal no longer exists on those routes. generated/index.ts SHALL carry handed on the letter view.
+
+**Acceptance:**
+- found.test.tsx: a 200 with a handed link shows the heading, the sentence naming the organisation and one anchor whose text and href equal the link, no form and no identity; a 200 with already_yours unsent shows the sign-in sentence and its link; the mail_unconfigured test is gone
+- prove.test.tsx: rendering #/added/<token> makes no request; the click posts {proof: <token>} once; on 200 the location becomes #/settings/account?added=1
+- account.test.tsx: with added=1 in the address the handed sentence is shown; with founded=1 the letter's sentence; with neither, neither
+- add-person-admit.test.tsx: an answer whose letter is unsent with a handed link is confirmed, the status says the link is to be given, the field holds the link, and the receipt's letter line reads as the spec words it; the mail_unconfigured refusal test is gone and the unsent-letter-without-handed test still refuses the answer
+- tsc and vitest green through the gate
+
+**Files:**
+- modify: surface/identity/src/features/found/Found.tsx
+- modify: surface/identity/src/features/found/Prove.tsx
+- modify: surface/identity/src/App.tsx
+- modify: surface/identity/src/features/people/Account.tsx
+- modify: surface/identity/src/features/people/AddPerson.tsx
+- modify: surface/identity/src/generated/index.ts
+- modify: surface/identity/tests/found.test.tsx
+- modify: surface/identity/tests/prove.test.tsx
+- modify: surface/identity/tests/account.test.tsx
+- modify: surface/identity/tests/add-person-admit.test.tsx
+
+**Checklist:**
+- C820 — The founding page shows a handed link and the already-yours sentence; #/added/:proof signs in on a click and lands on the account page saying so; the add-person page confirms a handed answer and shows the link to give. DIRECTORY-112/R4.
+
+**Stories:**
+- S464 (Stranger, Checks an issued certificate and its log entry offline, holding nothing from lys) — As a Stranger, I want to found my organisation in Lys even when Lys cannot send email, by being shown my link on the screen instead of in a letter, so that I can finish founding and sign in without anyone from Lys and without a mail account existing yet.
+- S465 (Directory administrator, Resolves a refused act) — As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
+
+### R5: The refusal nothing refuses any more
+
+Behavioural. With the three rows no longer refusing mail_unconfigured, THE SYSTEM SHALL keep the name only where something still produces it: if no route refuses it, the variant, its name, its status and its provider refusal row SHALL be removed and tests/openapi.rs's every-refusal test SHALL hold with the three rows as they now read; the root grant's answer keeps its letter view {sent: false, reason: 'mail_unconfigured'}, which is a reason string and not a refusal. The config.rs doc on mail SHALL say what no mail settings now means: founding and admission hand their link on the screen, and root grants send no letter.
+
+**Acceptance:**
+- tests/openapi.rs's every_refusal_the_document_names_is_produced_by_a_test passes with mail_unconfigured off the found, prove and admit rows
+- clippy -D warnings is clean with the variant removed or still produced, whichever the code shows
+- A root grant on an install with no mail still answers letter {sent: false, reason: 'mail_unconfigured'} (the existing assertion in tests/mail_letters.rs)
+
+**Files:**
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/config.rs
+- modify: crates/lys-identity-server/src/error/directory.rs
+- modify: crates/lys-identity-server/src/error_names.rs
+- modify: crates/lys-identity-server/src/error_status.rs
+- modify: crates/lys-identity-server/src/provider/refusal.rs
+- modify: crates/lys-identity-server/tests/openapi.rs
+
+**Checklist:**
+- C821 — mail_unconfigured is off the found, prove and admit rows and the openapi refusal test holds; the variant is removed where nothing produces it; the mail setting's doc says what no mail now means. DIRECTORY-112/R5.
+
+**Stories:**
+- S465 (Directory administrator, Resolves a refused act) — As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
+
+## Boundaries
+
+- No mail account is configured, sought or written by this brief: Tom's word of 21 October is that nothing happens on the install's outgoing email account until he is back and has talked it through.
+- With mail settings nothing changes: no answer carries handed, every letter goes as DIRECTORY-110 and DIRECTORY-111 have it, and the address-oracle boundary holds.
+- The token exists in the answer's handed member once and as the store's digest; never a log, a refusal, a letter that did not go, or a test's output.
+- A handed link signs in once and is spent; no expiry and no timer (Tom, 15 October), as a sent link.
+- The sign-in a handed link begins is named HandedLink in the session store and on the wire, never AddressProof: the record says how the person got in.
+- No second way to set a password: the account page's existing password and Google paths are where the person goes next.
+- No file over 500 lines of code; the no-mail tests are a file of their own on the founding table.
+
+## Verification
+
+- Every red written and shown red at the brief commit through the gate on Dean's laptop, green at the fix commit, named in the END with their seconds; the whole gate (tokei, ast-grep, clippy, tsc, nextest, doc, vitest) at the landing sha.
+- The release carrying this brief installed on the Mac (lys identity upgrade from a staged release build) and the path walked on the installed Lys: found from the sign-in page with a real address, the link shown, opened, the account page reached signed in, a password set, signed out and in again; then a person admitted from People, the link handed, opened in a fresh browser, the account page reached signed in; the walk's record quoted in the END.
+- The closing note says plainly that R1 to R5 are done, or names what is not, and carries the hospital line.
