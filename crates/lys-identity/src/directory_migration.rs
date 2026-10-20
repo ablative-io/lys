@@ -62,7 +62,10 @@ pub fn migrate<S: LeafStore>(store: S, key: &Ed25519Identity) -> Result<bool, Id
     if version == directory_state::STATE_VERSION {
         return Ok(false);
     }
-    if version != 2 && version != 3 && version != 4 {
+    // Every version from two to the one before this build's is read by
+    // migrate_v2 or decode; a hand-kept list of versions is what refused the
+    // installed version-five snapshot on 20 October 2026.
+    if !(2..directory_state::STATE_VERSION).contains(&version) {
         return Err(IdentityError::DirectorySnapshotUnmigrated {
             found: version,
             expected: directory_state::STATE_VERSION,
