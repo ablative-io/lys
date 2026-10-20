@@ -212,7 +212,7 @@ pub fn seed<S: LeafStore>(
                         writer.actor.clone(),
                         OperationId::generate()?,
                         Profile::new(name)?,
-                        founded.organisation,
+                        founding.organisation,
                         now(),
                     )?
                     .0
@@ -222,7 +222,7 @@ pub fn seed<S: LeafStore>(
     }
     let (tree_size, _) = writer.directory.log()?.head()?;
     Ok(Seeded {
-        organisation: founded.organisation,
+        organisation: founding.organisation,
         people,
         tree_size,
     })
