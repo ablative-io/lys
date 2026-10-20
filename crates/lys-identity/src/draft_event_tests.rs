@@ -229,6 +229,14 @@ fn a_version_four_draft_snapshot_migrates_without_rewriting_leaves() {
     old_install_migrates(4);
 }
 
+/// The snapshot every install written before DIRECTORY-109 holds: records
+/// of eight fields and no organisation. The installed Lys of 20 October
+/// 2026 refused it as unmigrated and the upgrade rolled back.
+#[test]
+fn a_version_five_snapshot_without_organisations_migrates_without_rewriting_leaves() {
+    old_install_migrates(5);
+}
+
 fn old_install_migrates(version: u8) {
     let home = home();
     let crate::draft_event::DraftEvent::Created(draft) =
@@ -253,7 +261,7 @@ fn old_install_migrates(version: u8) {
         .0
         .bytes()
         .to_vec();
-    if version == 4 {
+    if version >= 4 {
         directory
             .record_draft(crate::draft_event::DraftEvent::Created(
                 std::sync::Arc::clone(&draft),
@@ -262,7 +270,7 @@ fn old_install_migrates(version: u8) {
     }
     // Setup writes three leaves (the founding, the person, the activation);
     // a version-four fixture adds the draft's.
-    let fold = if version == 4 { 4 } else { 3 };
+    let fold = if version >= 4 { 4 } else { 3 };
     let state = crate::directory_state::encode(directory.projection().unwrap(), fold).unwrap();
     drop(directory);
     let Value::Array(mut fields) = crate::state_value::decode(&state).unwrap() else {
@@ -274,7 +282,7 @@ fn old_install_migrates(version: u8) {
     };
     if version == 3 {
         projection.pop();
-    } else {
+    } else if version == 4 {
         let Value::Array(drafts) = &mut projection[3] else {
             panic!("drafts must be an array");
         };
@@ -283,6 +291,27 @@ fn old_install_migrates(version: u8) {
                 panic!("draft record must be an array");
             };
             row.pop();
+        }
+    } else {
+        // Version five: no organisation record, and no organisation or
+        // founder field on any record.
+        let Value::Array(records) = &mut projection[0] else {
+            panic!("records must be an array");
+        };
+        records.retain(|record| {
+            let Value::Array(row) = record else {
+                panic!("directory record must be an array");
+            };
+            !matches!(
+                crate::state_value::read_identity(row[0].clone()),
+                Ok(crate::IdentityId::Organisation(_))
+            )
+        });
+        for record in records {
+            let Value::Array(row) = record else {
+                panic!("directory record must be an array");
+            };
+            row.truncate(8);
         }
     }
     let state = crate::state_value::encode(&Value::Array(fields)).unwrap();
