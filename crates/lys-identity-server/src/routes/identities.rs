@@ -62,7 +62,11 @@ pub(crate) async fn register_person(
         Profile::new(&body.display_name)?,
     );
     with_directory(&state, |directory| {
-        let (id, receipt) = directory.register_person(actor, op, profile, now())?;
+        // The new person belongs to the registering caller's organisation
+        // (DIRECTORY-109 R1), never to one the caller names.
+        let organisation =
+            crate::caller_admission::caller_organisation(directory.projection()?, &actor)?;
+        let (id, receipt) = directory.register_person(actor, op, profile, organisation, now())?;
         Ok(Json(PersonRegistered {
             person: id.to_string(),
             receipt: receipt_view(&receipt),
@@ -101,7 +105,8 @@ pub(crate) async fn register_agent(
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => {
                         return Err(ServerError::NotAdmitted {
                             reason: "an agent registration requires a person or an admitted service account",
                         });
@@ -165,9 +170,12 @@ pub(crate) async fn list(
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
-        let identities = directory
-            .projection()?
+        let projection = directory.projection()?;
+        // Within the administrator's organisation (DIRECTORY-109 R4).
+        let scope = crate::caller_admission::reading_organisation(projection, &actor);
+        let identities = projection
             .records()
+            .filter(|(id, _)| scope.is_some() && projection.organisation_of(**id) == scope)
             .map(|(id, record)| record_view(*id, record))
             .collect::<Vec<_>>();
         Ok(Json(IdentitiesView { identities }))
@@ -183,12 +191,17 @@ pub(crate) async fn read(
     crate::routes::administrator(&state, &actor)?;
     let id = identity_id(&id)?;
     with_directory(&state, |directory| {
-        let record =
-            directory
-                .record(id)?
-                .ok_or_else(|| lys_identity::IdentityError::IdentityUnknown {
-                    identity: id.to_string(),
-                })?;
+        let unknown = || lys_identity::IdentityError::IdentityUnknown {
+            identity: id.to_string(),
+        };
+        // An identity of another organisation is answered exactly as one
+        // the directory does not hold (DIRECTORY-109 R4).
+        let projection = directory.projection()?;
+        let scope = crate::caller_admission::reading_organisation(projection, &actor);
+        if scope.is_none() || projection.organisation_of(id) != scope {
+            return Err(unknown().into());
+        }
+        let record = directory.record(id)?.ok_or_else(unknown)?;
         Ok(Json(record_view(id, &record)))
     })
 }

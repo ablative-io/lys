@@ -55,6 +55,7 @@ pub(super) async fn service_with_trusted(
                 ),
                 OperationId::generate()?,
                 Profile::new("Owner")?,
+                Profile::new("Example organisation")?,
                 1,
             )?;
             Ok(())

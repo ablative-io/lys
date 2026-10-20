@@ -44,6 +44,7 @@ pub(super) async fn certified_agent() -> Result<
                 actor.clone(),
                 OperationId::generate()?,
                 Profile::new("Owner")?,
+                Profile::new("Example organisation")?,
                 1,
             )?;
             let (agent, _) = directory.register_agent(

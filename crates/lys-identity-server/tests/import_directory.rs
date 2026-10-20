@@ -38,12 +38,14 @@ fn prepare(config: &lys_identity_server::Config, seed: Seed) -> Outcome {
         Provenance::new(AuthMethod::Oidc, 1),
     );
     let mut directory = open_directory(config)?;
-    let (owner, _) = directory.register_person(
+    let founded = directory.found_organisation(
         actor.clone(),
         OperationId::generate()?,
+        identity_contract::fixtures::organisation()?,
         Profile::new("Administrator")?,
         1,
     )?;
+    let owner = founded.founder;
     directory.bind_login(
         actor.clone(),
         OperationId::generate()?,
@@ -66,6 +68,7 @@ fn prepare(config: &lys_identity_server::Config, seed: Seed) -> Outcome {
                 actor.clone(),
                 OperationId::generate()?,
                 Profile::new("Other")?,
+                founded.organisation,
                 4,
             )?;
             directory.bind_login(

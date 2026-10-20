@@ -107,14 +107,22 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
         .ok_or("no root on the administrator's own person")?;
     assert_eq!(
         own["pass_on"]["actions"],
-        json!(["agent.create", "agent.provisioning.review", "agent.provisioning.set"]),
+        json!([
+            "agent.create",
+            "agent.provisioning.review",
+            "agent.provisioning.set"
+        ]),
         "{own}"
     );
     let computer = roots
         .iter()
         .find(|root| root["resource"]["kind"] == "machine")
         .ok_or("no root on the computer Lys runs on")?;
-    assert_eq!(computer["pass_on"]["actions"], json!(["machine.agent.set"]), "{computer}");
+    assert_eq!(
+        computer["pass_on"]["actions"],
+        json!(["machine.agent.set"]),
+        "{computer}"
+    );
     assert_eq!(roots.len(), 4, "{roots:?}");
     for root in &roots {
         assert_eq!(root["holder"], person.as_str());
@@ -362,9 +370,17 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> Tes
     let given = ok(post(&service, "/grants/agent-roots", auth, &json!({})).await?)?;
     let computers = own_computers(&service, &cookie).await?;
     assert_eq!(computers.len(), 1, "{computers:?}");
-    let machine = computers[0]["id"].as_str().ok_or("no machine id")?.to_owned();
+    let machine = computers[0]["id"]
+        .as_str()
+        .ok_or("no machine id")?
+        .to_owned();
     assert_eq!(computers[0]["named_by"], person.as_str(), "{computers:?}");
-    let runner = ok(get(&service, &format!("/network/machines/{machine}/runner"), auth).await?)?;
+    let runner = ok(get(
+        &service,
+        &format!("/network/machines/{machine}/runner"),
+        auth,
+    )
+    .await?)?;
     assert_eq!(runner["runner"]["kind"], "lys", "{runner}");
     // Asked again, nothing new: the same roots, the same one computer.
     let again = ok(post(&service, "/grants/agent-roots", auth, &json!({})).await?)?;
@@ -395,11 +411,9 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> Tes
     .await?)?;
     let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
     let nonce = hex(OperationId::generate()?.as_bytes());
-    let cose = sign_attestation(&payload("GET", "/agent/grants", &[], at, &nonce), &key).to_cose_bytes();
-    let signature = format!(
-        "{agent} {at} {nonce} {}",
-        hex(&cose)
-    );
+    let cose =
+        sign_attestation(&payload("GET", "/agent/grants", &[], at, &nonce), &key).to_cose_bytes();
+    let signature = format!("{agent} {at} {nonce} {}", hex(&cose));
     let read: Value = reqwest::Client::new()
         .get(format!("{}/agent/grants", service.base))
         .header(HEADER, signature)
@@ -414,7 +428,10 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> Tes
         .filter_map(|grant| grant["grant"].as_str())
         .collect();
     for grant in &held {
-        assert!(own_grants.contains(&grant.as_str()), "{grant} not held: {read}");
+        assert!(
+            own_grants.contains(&grant.as_str()),
+            "{grant} not held: {read}"
+        );
     }
     assert_eq!(held.len(), 4);
     Ok(())

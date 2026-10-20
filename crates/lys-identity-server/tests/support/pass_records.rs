@@ -272,12 +272,15 @@ fn active_pair(
         config.administrator_binding()?,
         Provenance::new(AuthMethod::Oidc, 1),
     );
-    let (person, _) = directory.register_person(
-        actor.clone(),
-        OperationId::generate()?,
-        Profile::new("Fixture person")?,
-        1,
-    )?;
+    let person = directory
+        .found_organisation(
+            actor.clone(),
+            OperationId::generate()?,
+            identity_contract::fixtures::organisation()?,
+            Profile::new("Fixture person")?,
+            1,
+        )?
+        .founder;
     directory.bind_login(
         actor.clone(),
         OperationId::generate()?,

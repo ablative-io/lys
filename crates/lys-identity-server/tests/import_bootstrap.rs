@@ -82,6 +82,7 @@ async fn fixture() -> Result<(Service, String, String), Box<dyn Error>> {
                 actor,
                 OperationId::generate()?,
                 Profile::new("Owner")?,
+                Profile::new("Example organisation")?,
                 1,
             )?;
             Ok(person.to_string())

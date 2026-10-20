@@ -164,6 +164,48 @@ pub fn keep(layout: &Layout, intent: &mut Intent) -> IdentityResult<()> {
     intent.done(layout, Step::DataKept)
 }
 
+/// The stores the first boot under organisations rewrites in a shape the
+/// previous build refuses to read (DIRECTORY-109 R2): the directory log
+/// and the grant log, copied once to `data.previous-organisation/<rfc3339>/`
+/// before that boot, and named on the upgrade record, so a put-back to the
+/// build before organisations is that copy, by hand, and nothing else. A
+/// later upgrade finds the folder and keeps it as it is: the copy is the
+/// moment before organisations, never the moment before the latest build,
+/// which `data.previous/` is. An install holding neither store yet makes
+/// no copy.
+///
+/// # Errors
+/// Returns the named failure when a store cannot be copied or the record cannot be written.
+pub fn keep_for_organisations(layout: &Layout, intent: &mut Intent) -> IdentityResult<()> {
+    let kept = layout.root.join("data.previous-organisation");
+    if kept.is_dir() {
+        return Ok(());
+    }
+    let stores: Vec<PathBuf> = ["directory-log", "grant-log"]
+        .into_iter()
+        .map(|store| layout.data_dir().join(store))
+        .filter(|store| store.is_dir())
+        .collect();
+    if stores.is_empty() {
+        return Ok(());
+    }
+    let at = receipt::now();
+    let partial = layout.root.join("data.previous-organisation.partial");
+    remove(&partial)?;
+    private_dir(&partial)?;
+    for store in &stores {
+        let Some(name) = store.file_name() else {
+            continue;
+        };
+        copy_tree(store, &partial.join(name))?;
+    }
+    private_dir(&kept)?;
+    let copy = kept.join(&at);
+    rename(&partial, &copy, "keep stores before organisations")?;
+    intent.organisation_copy = Some(copy);
+    intent.write(layout)
+}
+
 /// Puts the kept data back in place of `data/`, when this upgrade kept it,
 /// moving the window's data aside under the instant the put-back began.
 ///

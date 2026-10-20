@@ -18,12 +18,15 @@ async fn a_person_is_admitted_only_when_active_and_other_states_are_named() -> T
         let mut directory = open_directory(config)?;
         let binding = LoginBinding::new(&config.issuer, "lifecycle-person")?;
         let actor = Actor::new(binding.clone(), Provenance::new(AuthMethod::Oidc, 1));
-        let (person, _) = directory.register_person(
-            actor.clone(),
-            OperationId::generate()?,
-            Profile::new("Lifecycle person")?,
-            1,
-        )?;
+        let person = directory
+            .found_organisation(
+                actor.clone(),
+                OperationId::generate()?,
+                identity_contract::fixtures::organisation()?,
+                Profile::new("Lifecycle person")?,
+                1,
+            )?
+            .founder;
         directory.bind_login(actor.clone(), OperationId::generate()?, person, binding, 2)?;
         let id = IdentityId::Person(person);
         let refused = active_caller(directory.projection()?, &actor)

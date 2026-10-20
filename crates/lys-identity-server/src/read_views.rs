@@ -44,6 +44,15 @@ pub struct AgentSummary {
     pub gap: Option<crate::reporting_views::ReportingGap>,
 }
 
+/// An organisation as a view names it (DIRECTORY-109 R4).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct OrganisationSummary {
+    /// The organisation's enduring id.
+    pub id: String,
+    /// Its name, a label: two organisations may share one.
+    pub display_name: String,
+}
+
 /// The answer of `GET /me`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MeView {
@@ -60,6 +69,11 @@ pub struct MeView {
     /// Getting started's answers, kept for the person; a refusal in their
     /// place when they cannot be read.
     pub getting_started: crate::getting_started_api::GettingStartedPart,
+    /// The organisation the person belongs to (DIRECTORY-109 R4); absent
+    /// only for a record written before organisations and not yet brought
+    /// under one at boot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organisation: Option<OrganisationSummary>,
 }
 
 /// A service account as the views show it.

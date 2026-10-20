@@ -207,7 +207,17 @@ pub(super) fn seed_configured(
         });
     }
     let tree_size = directory.log()?.head()?.0;
-    Ok(Seeded { people, tree_size })
+    let organisation = directory
+        .projection()?
+        .organisations()
+        .next()
+        .map(|(id, _)| id)
+        .ok_or("the cached fixture holds no organisation")?;
+    Ok(Seeded {
+        organisation,
+        people,
+        tree_size,
+    })
 }
 
 pub(super) fn scale(config: &Config) -> Result<scale::Fixture, Box<dyn Error>> {

@@ -70,6 +70,7 @@ impl Table {
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    Profile::new("Example organisation")?,
                     1,
                 )?;
                 let (giver, _) = directory.register_agent(

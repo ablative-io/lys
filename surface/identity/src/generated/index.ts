@@ -89,12 +89,20 @@ export interface ServiceAccount {
   retired_at: number | null;
 }
 
+/** `OrganisationSummary`: the organisation a view names (DIRECTORY-109 R4). */
+export interface OrganisationSummary {
+  id: string;
+  display_name: string;
+}
+
 /** GET /me. */
 export interface MeView {
   person: PersonSummary;
   signed_in: Login;
   sign_in_identities: Login[];
   service_accounts: ServiceAccount[];
+  /** The organisation the person belongs to; absent from an older service or a record not yet brought under one. */
+  organisation?: OrganisationSummary;
   /**
    * Getting started's answers, kept for the person (`PUT /me/getting-started`); the refusal in their place when Lys
    * could not read them; absent from an older service.

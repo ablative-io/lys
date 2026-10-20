@@ -73,6 +73,7 @@ impl Table {
                     ),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    Profile::new("Example organisation")?,
                     1,
                 )?;
                 let key = Arc::new(Ed25519Identity::load(&config.event_key_file)?);

@@ -14,6 +14,7 @@ macro_rules! unavailable_refusals {
             | ServerError::ConfigInvalid { .. }
             | ServerError::HarnessCatalogueUnreadable { .. }
             | ServerError::DirectoryUnavailable { .. }
+            | ServerError::OrganisationBootRefused { .. }
             | ServerError::RequestsUnavailable { .. }
             | ServerError::McpRequestsUnavailable { .. }
             | ServerError::NetworkUnavailable { .. }
@@ -114,6 +115,7 @@ pub(crate) fn identity_status(error: &IdentityError) -> StatusCode {
         | IdentityError::StateMismatch { .. }
         | IdentityError::OperationReused { .. }
         | IdentityError::LinkSourceSeen { .. }
+        | IdentityError::OrganisationMismatch { .. }
         | IdentityError::ReceiptInvalid { .. }
         | IdentityError::DraftHashMismatch
         | IdentityError::DraftNotPending { .. }
@@ -166,6 +168,7 @@ pub(crate) fn grant_status(error: &GrantError) -> StatusCode {
         | GrantError::ResourceOutside { .. }
         | GrantError::UseOnly { .. }
         | GrantError::RecipientRefused { .. }
+        | GrantError::OrganisationOutside { .. }
         | GrantError::WithheldFromAgents { .. }
         | GrantError::PassOnBeyondSource { .. }
         | GrantError::ExpiryBeyondSource { .. }
@@ -232,6 +235,7 @@ impl ServerError {
             | Self::AgentPassRefused { .. }
             | Self::AgentSignatureRefused { .. }
             | Self::OperatorRefused { .. }
+            | Self::UpgradePending { .. }
             | Self::SignInRefused
             | Self::SetupCodeRefused => StatusCode::UNAUTHORIZED,
             Self::SignInThrottled | Self::RegistrationThrottled => StatusCode::TOO_MANY_REQUESTS,

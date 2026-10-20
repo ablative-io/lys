@@ -79,11 +79,7 @@ async fn a_replaced_profile_is_refused_naming_the_latest_version() -> TestResult
 /// The same settings for every agent of the table, the declared fixture
 /// program's, working in the table's folder; `model` is the one setting a
 /// test changes.
-fn same_settings(
-    table: &support::Table,
-    from: u32,
-    model: &str,
-) -> Result<Value, Box<dyn Error>> {
+fn same_settings(table: &support::Table, from: u32, model: &str) -> Result<Value, Box<dyn Error>> {
     Ok(json!({
         "operation": OperationId::generate()?.to_string(), "from_version": from,
         "model_access": [model], "tools": [], "skills": [], "mcp_servers": [],
@@ -153,7 +149,11 @@ async fn carried_start(table: &support::Table) -> TestResult {
         .await?;
     assert_eq!(status, 200, "{started}");
     assert_eq!(started["provisioning_version"], 1, "{started}");
-    assert_eq!(started["carried_review"]["agent"], json!(first), "{started}");
+    assert_eq!(
+        started["carried_review"]["agent"],
+        json!(first),
+        "{started}"
+    );
     assert_eq!(started["carried_review"]["version"], 1, "{started}");
     assert_eq!(started["carried_review"]["by"], reviewer, "{started}");
     assert_eq!(
@@ -168,7 +168,10 @@ async fn carried_start(table: &support::Table) -> TestResult {
             &json!({"machine": machine, "operation": support::operation()?}),
         )
         .await?;
-    assert_eq!(refused["refusal"], "ProfileNotReviewed", "{status}: {refused}");
+    assert_eq!(
+        refused["refusal"], "ProfileNotReviewed",
+        "{status}: {refused}"
+    );
     Ok(())
 }
 
@@ -225,7 +228,10 @@ async fn a_review_an_agent_made_carries_to_no_other_agent() -> TestResult {
         .await?;
     assert_eq!(status, 200, "{read}");
     assert_eq!(read["versions"][0]["reviewed"], "neither", "{read}");
-    assert!(read["versions"][0].get("carried_review").is_none(), "{read}");
+    assert!(
+        read["versions"][0].get("carried_review").is_none(),
+        "{read}"
+    );
     let (status, refused) = world
         .service
         .post(
@@ -234,6 +240,9 @@ async fn a_review_an_agent_made_carries_to_no_other_agent() -> TestResult {
             &json!({"machine": world::operation()?, "operation": world::operation()?}),
         )
         .await?;
-    assert_eq!(refused["refusal"], "ProfileNotReviewed", "{status}: {refused}");
+    assert_eq!(
+        refused["refusal"], "ProfileNotReviewed",
+        "{status}: {refused}"
+    );
     Ok(())
 }

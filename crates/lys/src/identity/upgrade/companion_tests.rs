@@ -28,6 +28,7 @@ fn upgrade_places_the_helper_beside_lys_and_rollback_restores_the_pair()
         files: Vec::new(),
         compose_changed: false,
         steps: Vec::new(),
+        organisation_copy: None,
     };
     check(&layout, &from)?;
     swap::keep_binaries(&layout, &mut intent)?;

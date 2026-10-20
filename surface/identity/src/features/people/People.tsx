@@ -29,15 +29,19 @@ const VIEWS: [KindFilter, string, string][] = [
   ['teams', 'Teams', '/people/view/teams'],
 ];
 
-/** The page's head. Add person is offered only to the administrator, who alone may add one; `admin` is passed when the page already knows. */
+const EVERYONE = 'Everyone who works here, human or not. Every agent has a person who answers for it.';
+
+/** The page's head, naming the caller's organisation (DIRECTORY-109 R4). Add person is offered only to the administrator, who alone may add one; `admin` is passed when the page already knows. */
 function PeopleHead({ admin }: { admin?: boolean }) {
   const shell = useShell();
   const navigate = useNavigate();
   const scope = useLoad(async () => admin ?? (await api.people()).scope === 'directory', 'people-head-admin:' + String(admin));
+  const me = useLoad(() => api.me(), 'people-head-me');
   const mayAddPeople = scope.status === 'ok' && scope.data;
+  const organisation = me.status === 'ok' ? me.data.organisation?.display_name : undefined;
   return (
     <>
-      <PageHeader title="People and agents" subtitle="Everyone who works here, human or not. Every agent has a person who answers for it." actions={<>
+      <PageHeader title="People and agents" subtitle={organisation ? `${organisation}. ${EVERYONE}` : EVERYONE} actions={<>
           <a className="btn primary" href="#/agents/new">Add agent</a>
           {mayAddPeople ? <a className="btn" href="#/people/new">Add person</a> : null}
         </>} />

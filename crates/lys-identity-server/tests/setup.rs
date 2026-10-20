@@ -37,7 +37,9 @@ async fn one_click_sets_up_only_the_verified_administrator_and_opens_personal_vi
     let (status, answer) = service.post("/setup", Some(&admin), &body).await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["receipt"]["change_kind"], 7);
-    assert_eq!(answer["receipt"]["log"]["tree_size"], 1);
+    // Setup is one batch of three leaves: the founding, the person, the
+    // organisation's activation (DIRECTORY-109 R2).
+    assert_eq!(answer["receipt"]["log"]["tree_size"], 3);
     assert_eq!(answer["receipt"]["actor"]["subject"], ADMINISTRATOR);
     assert_eq!(answer["person"], answer["receipt"]["identity"]);
     for route in ["/me", "/people", "/grants"] {
@@ -99,7 +101,13 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
         let mut directory = harness.open()?;
         let op = OperationId::generate()?;
         harness.fail(fault)?;
-        let answer = directory.setup_person(actor(1)?, op, Profile::new("Tom")?, 2);
+        let answer = directory.setup_person(
+            actor(1)?,
+            op,
+            Profile::new("Tom")?,
+            Profile::new("Example organisation")?,
+            2,
+        );
         if matches!(fault, Fault::BeforeLeaf | Fault::AfterLeafUnreadable) {
             assert!(answer.is_err());
         } else {
@@ -108,16 +116,26 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
         harness.fail(Fault::None)?;
         drop(directory);
         let mut directory = harness.open()?;
-        let (person, receipt) = directory.setup_person(actor(3)?, op, Profile::new("Tom")?, 4)?;
-        assert_eq!(receipt.coordinate().index, 0);
+        let (person, receipt) = directory.setup_person(
+            actor(3)?,
+            op,
+            Profile::new("Tom")?,
+            Profile::new("Example organisation")?,
+            4,
+        )?;
+        assert_eq!(receipt.coordinate().index, 1);
         let projection = directory.projection()?;
-        assert_eq!(projection.records().count(), 1);
+        assert_eq!(
+            projection.records().count(),
+            2,
+            "the organisation and its founder"
+        );
         assert_eq!(projection.person_for(actor(3)?.binding()), Some(person));
         let record = projection
             .record(IdentityId::Person(person))
             .ok_or("missing setup person")?;
         assert_eq!(record.state(), LifecycleState::Active);
-        assert_eq!(record.events(), &[0]);
+        assert_eq!(record.events(), &[1]);
         directory.transition(
             actor(3)?,
             OperationId::generate()?,
@@ -126,7 +144,13 @@ fn setup_recovers_every_append_outcome_and_reopens_as_one_active_bound_person() 
             "test suspension",
             5,
         )?;
-        let (_, retried) = directory.setup_person(actor(6)?, op, Profile::new("Tom")?, 7)?;
+        let (_, retried) = directory.setup_person(
+            actor(6)?,
+            op,
+            Profile::new("Tom")?,
+            Profile::new("Example organisation")?,
+            7,
+        )?;
         assert_eq!(retried, receipt);
         assert_eq!(
             directory
@@ -197,16 +221,28 @@ fn setup_operation_cannot_be_reused_by_a_different_login() -> Result {
     let harness = Harness::new(8)?;
     let mut directory = harness.open()?;
     let operation = OperationId::generate()?;
-    directory.setup_person(actor(1)?, operation, Profile::new("Tom")?, 2)?;
+    directory.setup_person(
+        actor(1)?,
+        operation,
+        Profile::new("Tom")?,
+        Profile::new("Example organisation")?,
+        2,
+    )?;
     let other = Actor::new(
         LoginBinding::new("https://issuer.test", "different-login")?,
         Provenance::new(AuthMethod::Oidc, 3),
     );
     assert!(matches!(
-        directory.setup_person(other.clone(), operation, Profile::new("Tom")?, 4),
+        directory.setup_person(
+            other.clone(),
+            operation,
+            Profile::new("Tom")?,
+            Profile::new("Example organisation")?,
+            4
+        ),
         Err(IdentityError::OperationReused { .. })
     ));
-    assert_eq!(directory.projection()?.records().count(), 1);
+    assert_eq!(directory.projection()?.records().count(), 2);
     assert_eq!(directory.projection()?.person_for(other.binding()), None);
     Ok(())
 }

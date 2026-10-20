@@ -314,6 +314,7 @@ async fn an_answers_to_that_is_no_identity_is_refused_by_name() -> Result<(), Bo
             actor,
             OperationId::generate()?,
             lys_identity::Profile::new("Administrator")?,
+            lys_identity::Profile::new("Example organisation")?,
             1,
         )?;
         Ok(())

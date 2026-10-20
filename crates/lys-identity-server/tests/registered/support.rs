@@ -56,12 +56,22 @@ pub(super) async fn fixture_serving(
                 LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
                 Provenance::new(AuthMethod::Oidc, 1),
             );
+            let organisation = directory
+                .found_organisation(
+                    registrar.clone(),
+                    OperationId::generate()?,
+                    identity_contract::fixtures::organisation()?,
+                    Profile::new("Founder")?,
+                    1,
+                )?
+                .organisation;
             let mut register = |name: &str, activate: bool| -> Result<PersonId, Box<dyn Error>> {
                 let binding = LoginBinding::new(&config.issuer, name)?;
                 let (person, _) = directory.register_person(
                     registrar.clone(),
                     OperationId::generate()?,
                     Profile::new(name)?,
+                    organisation,
                     1,
                 )?;
                 directory.bind_login(

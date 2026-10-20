@@ -119,6 +119,7 @@ fn fixture() -> Result<
             1,
             Change::SetupPerson {
                 profile: Profile::new("owner")?,
+                organisation: None,
             },
         )?,
         0,

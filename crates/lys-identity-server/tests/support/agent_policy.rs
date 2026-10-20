@@ -49,6 +49,7 @@ fn seed(
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Owner")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     let (missing, _) = directory.register_agent(
@@ -58,10 +59,12 @@ fn seed(
         Profile::new("Missing")?,
         2,
     )?;
+    let organisation = identity_contract::fixtures::organisation_of(&mut directory, person)?;
     let (other, _) = directory.register_person(
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Other")?,
+        organisation,
         3,
     )?;
     directory.bind_login(

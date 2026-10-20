@@ -91,12 +91,49 @@ fn profile(out: &mut Vec<u8>, value: &Profile) {
 
 fn change(out: &mut Vec<u8>, value: &Change) {
     match value {
-        Change::SetupPerson { profile: shown }
-        | Change::RegisterPerson { profile: shown }
+        // A registration under no organisation keeps its one-key map, so
+        // every leaf written before DIRECTORY-109 re-encodes to its bytes.
+        Change::SetupPerson {
+            profile: shown,
+            organisation: None,
+        }
+        | Change::RegisterPerson {
+            profile: shown,
+            organisation: None,
+        }
         | Change::ChangeProfile { profile: shown } => {
             map(out, 1);
             uint(out, 1);
             profile(out, shown);
+        }
+        Change::SetupPerson {
+            profile: shown,
+            organisation: Some(organisation),
+        }
+        | Change::RegisterPerson {
+            profile: shown,
+            organisation: Some(organisation),
+        } => {
+            map(out, 2);
+            uint(out, 1);
+            profile(out, shown);
+            uint(out, 2);
+            bytes(out, organisation.as_bytes());
+        }
+        Change::FoundOrganisation {
+            profile: shown,
+            founder,
+        } => {
+            map(out, 2);
+            uint(out, 1);
+            profile(out, shown);
+            uint(out, 2);
+            bytes(out, founder.as_bytes());
+        }
+        Change::AttachOrganisation { organisation } => {
+            map(out, 1);
+            uint(out, 1);
+            bytes(out, organisation.as_bytes());
         }
         Change::RegisterAgent {
             responsible,
@@ -249,6 +286,7 @@ pub fn encode_body(event: &IdentityEvent) -> Vec<u8> {
         IdentityId::ServiceAccount(id) => (wire::SERVICE_ACCOUNT, *id.as_bytes()),
         IdentityId::Connector(id) => (wire::CONNECTOR, *id.as_bytes()),
         IdentityId::Machine(id) => (wire::MACHINE, *id.as_bytes()),
+        IdentityId::Organisation(id) => (wire::ORGANISATION, *id.as_bytes()),
     };
     uint(&mut out, kind);
     uint(&mut out, 2);
@@ -334,9 +372,13 @@ pub(crate) fn cbor(bytes: &[u8], reason: &'static str) -> Result<Value, Identity
 mod read;
 
 pub(crate) use read::decode_actor;
-pub use read::decode_body;
 use read::decode_profile;
+pub use read::{HIGHEST_KIND_BEFORE_ORGANISATIONS, decode_body, decode_body_before_organisations};
 
 #[cfg(test)]
 #[path = "encoding_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "encoding_rollback_tests.rs"]
+mod rollback_tests;

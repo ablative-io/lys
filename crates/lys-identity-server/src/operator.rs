@@ -162,6 +162,47 @@ pub fn upgrade_pending(state: &AppState) -> std::io::Result<bool> {
         .map_or(Ok(false), Path::try_exists)
 }
 
+/// The copy of the stores before organisations the upgrade under way kept,
+/// as its record names it (DIRECTORY-109 R2); none when no upgrade is under
+/// way or the record names none. The record is the installer's; only the
+/// one member is read here.
+///
+/// # Errors
+/// Propagates an unreadable record or one that is not the installer's JSON.
+pub fn organisation_copy(state: &AppState) -> std::io::Result<Option<String>> {
+    #[derive(serde::Deserialize)]
+    struct Named {
+        #[serde(default)]
+        organisation_copy: Option<std::path::PathBuf>,
+    }
+    let Some(path) = state.operator_upgrade_file.as_deref() else {
+        return Ok(None);
+    };
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let named: Named = serde_json::from_slice(&bytes).map_err(std::io::Error::other)?;
+    Ok(named
+        .organisation_copy
+        .map(|copy| copy.display().to_string()))
+}
+
+/// The refusal of an operator act while the upgrade is still reversible,
+/// naming the copy of the stores before organisations when the upgrade kept
+/// one, so the put-back is in the refusal itself.
+fn upgrade_pending_refusal(state: &AppState) -> ServerError {
+    match organisation_copy(state) {
+        Ok(previous_organisation) => ServerError::UpgradePending {
+            previous_organisation,
+        },
+        Err(error) => ServerError::ConfigInvalid {
+            reason: format!("the upgrade record cannot be read: {error}"),
+        },
+    }
+}
+
 /// The administrator, for a request carrying the operator token; none for
 /// a request that carries no `lys-operator` header. A header that does not
 /// match, or a service with no token or no administrator yet, is refused.
@@ -181,11 +222,7 @@ pub fn actor(state: &AppState, headers: &HeaderMap) -> Result<Option<Actor>, Ser
     }
     match upgrade_pending(state) {
         Ok(false) => {}
-        Ok(true) => {
-            return Err(ServerError::OperatorRefused {
-                reason: "the upgrade is still reversible",
-            });
-        }
+        Ok(true) => return Err(upgrade_pending_refusal(state)),
         Err(_) => {
             return Err(ServerError::OperatorRefused {
                 reason: "the upgrade state cannot be read",

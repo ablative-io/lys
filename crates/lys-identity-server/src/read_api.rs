@@ -37,7 +37,8 @@ use crate::admission::AUTHORITY;
 use crate::directory_views::receipt_json;
 use crate::error::ServerError;
 use crate::read_views::{
-    AgentSummary, AgentView, Login, MeView, PeopleView, PersonSummary, PersonView, Provenance,
+    AgentSummary, AgentView, Login, MeView, OrganisationSummary, PeopleView, PersonSummary,
+    PersonView, Provenance,
 };
 use crate::routes::{AppState, signed_in, with_directory};
 
@@ -180,7 +181,8 @@ pub(crate) fn own_person(projection: &Projection, actor: &Actor) -> Result<Perso
         IdentityId::Agent(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
-        | IdentityId::Machine(_) => Err(ServerError::NoPerson),
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => Err(ServerError::NoPerson),
     }
 }
 
@@ -202,12 +204,21 @@ async fn me(
             answer => answer?,
         };
         let record = person_record(projection, person)?;
+        let organisation = record.organisation().and_then(|id| {
+            projection
+                .record(IdentityId::Organisation(id))
+                .map(|held| OrganisationSummary {
+                    id: id.to_string(),
+                    display_name: held.profile().display_name().to_owned(),
+                })
+        });
         Ok(Json(MeView {
             person: person_summary(person, record),
             signed_in: login(actor.binding()),
             sign_in_identities: record.bindings().iter().map(login).collect(),
             service_accounts: crate::service_accounts_api::owned_by(&state, person)?,
             getting_started: state.getting_started.part(person),
+            organisation,
         }))
     })
 }
@@ -245,21 +256,29 @@ async fn every_person(
     crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
+        // The wider view is the wider view within the administrator's
+        // organisation (DIRECTORY-109 R4): a person of another is absent.
+        let scope = crate::caller_admission::reading_organisation(projection, &actor);
+        let within = |person: PersonId| {
+            scope.is_some() && projection.organisation_of(IdentityId::Person(person)) == scope
+        };
         let page = crate::list_page::Page::read(query, "/directory/people")?;
         let Some(page) = page else {
             let mut grouped = agents_by_person(projection)?;
             let people = projection
                 .records()
                 .filter_map(|(id, record)| match id {
-                    IdentityId::Person(person) => Some(person_view(
+                    IdentityId::Person(person) if within(*person) => Some(person_view(
                         *person,
                         record,
                         grouped.remove(person).unwrap_or_default(),
                     )),
+                    IdentityId::Person(_) => None,
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => None,
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => None,
                 })
                 .collect();
             return Ok(Json(PeopleView {
@@ -278,10 +297,19 @@ async fn every_person(
             page.after()
         };
         let rows = projection.people(after);
+        let total = (!filtered).then(|| {
+            projection
+                .people(Bound::Unbounded)
+                .filter(|(_, person)| within(*person))
+                .count()
+        });
         let (people, totals) = page.select(
             rows,
-            (!filtered).then_some(projection.people_count()),
+            total,
             |(_, person)| {
+                if !within(*person) {
+                    return Ok(false);
+                }
                 if !filtered {
                     return Ok(true);
                 }
@@ -316,7 +344,11 @@ async fn every_person(
             },
         )?;
         if !filtered {
-            agents_total = projection.people_agents_count();
+            agents_total = projection
+                .people(Bound::Unbounded)
+                .filter(|(_, person)| within(*person))
+                .map(|(_, person)| projection.person_agents_count(person))
+                .sum();
         }
         Ok(Json(PeopleView {
             scope: "directory".to_owned(),

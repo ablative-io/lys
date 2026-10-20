@@ -398,6 +398,23 @@ pub async fn which(
             judged.apps.admit_kind(acting_for.as_deref(), &body.kind)?;
             judged.apps.admit_action(&body.kind, action.as_str())?;
             let revision = judged.grants.read_stamp(body.at_least)?.revision();
+            // A person's question is partitioned by their organisation
+            // (DIRECTORY-109 R4): a subject of another is answered no ids.
+            // An app's question for its own kinds answers across them.
+            if acting_for.is_none() {
+                let own = judged
+                    .directory
+                    .organisation_of(IdentityId::Person(judged.root));
+                if own.is_none() || judged.directory.organisation_of(subject) != own {
+                    return Ok(Json(WhichPage {
+                        ids: Vec::new(),
+                        modes: Vec::new(),
+                        next: None,
+                        revision,
+                        degraded: None,
+                    }));
+                }
+            }
             let mut degraded = None;
             let candidates = candidates(&judged, subject, &body.kind);
             let administrator = subject == IdentityId::Person(judged.root);

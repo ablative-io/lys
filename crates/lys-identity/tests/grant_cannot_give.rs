@@ -108,21 +108,25 @@ impl People {
             Box::new(move || FileLeafStore::open(&held.path().join("log"))),
             Ed25519Identity::load(&key)?,
         )?;
+        let founded = directory.found_organisation(
+            administrator()?,
+            OperationId::generate()?,
+            Profile::new("Example organisation")?,
+            Profile::new("Admin")?,
+            T0,
+        )?;
+        let (organisation, admin) = (founded.organisation, founded.founder);
         let mut person = |name: &str| -> Result<PersonId, Box<dyn Error>> {
             let (id, _) = directory.register_person(
                 administrator()?,
                 OperationId::generate()?,
                 Profile::new(name)?,
+                organisation,
                 T0,
             )?;
             Ok(id)
         };
-        let (admin, holder, other, lender) = (
-            person("Admin")?,
-            person("P1")?,
-            person("P2")?,
-            person("P3")?,
-        );
+        let (holder, other, lender) = (person("P1")?, person("P2")?, person("P3")?);
         directory.bind_login(
             administrator()?,
             OperationId::generate()?,

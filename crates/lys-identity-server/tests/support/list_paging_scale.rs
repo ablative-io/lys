@@ -47,6 +47,7 @@ pub(super) fn build(config: &Config) -> Result<Fixture, Box<dyn Error>> {
             IdentityId::Person(person),
             Change::RegisterPerson {
                 profile: Profile::new(&format!("Person {index:03}"))?,
+                organisation: None,
             },
         )?);
         events.push(event(

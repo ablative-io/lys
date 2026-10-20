@@ -13,7 +13,7 @@ use std::sync::Arc;
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
 use crate::event::{Change, IdentityEvent};
-use crate::id::{AgentId, IdentityId, PersonId};
+use crate::id::{AgentId, IdentityId, OrganisationId, PersonId};
 use crate::lifecycle::LifecycleState;
 use crate::operation::OperationId;
 use crate::profile::Profile;
@@ -51,9 +51,26 @@ pub struct Record {
     bindings: Vec<LoginBinding>,
     registered_by: LoginBinding,
     events: Vec<u64>,
+    organisation: Option<OrganisationId>,
+    founder: Option<PersonId>,
 }
 
 impl Record {
+    /// The organisation the identity belongs to: its own for an
+    /// organisation, the one it was registered under for a person, its
+    /// responsible person's for an agent. `None` only for a record written
+    /// before organisations and not yet attached (DIRECTORY-109 R2).
+    #[must_use]
+    pub fn organisation(&self) -> Option<OrganisationId> {
+        self.organisation
+    }
+
+    /// The person who founded an organisation. `None` for every other kind.
+    #[must_use]
+    pub fn founder(&self) -> Option<PersonId> {
+        self.founder
+    }
+
     /// How the identity is shown.
     #[must_use]
     pub fn profile(&self) -> &Profile {
@@ -194,6 +211,8 @@ impl Projection {
                 bindings: Vec::new(),
                 registered_by: created_by,
                 events: Vec::new(),
+                organisation: person.organisation,
+                founder: None,
             },
         );
         Ok(())
@@ -211,6 +230,28 @@ impl Projection {
         self.records
             .get(&id)
             .or_else(|| self.accounts.record(id, self))
+    }
+
+    /// The organisation an account held in the separately folded accounts
+    /// belongs to: its owner's.
+    pub(crate) fn account_organisation(&self, id: IdentityId) -> Option<OrganisationId> {
+        self.accounts.organisation_of(id, self)
+    }
+
+    /// Refuse, by name, a registration under an organisation the directory
+    /// does not hold or has retired.
+    fn organisation_open(&self, organisation: OrganisationId) -> Result<(), IdentityError> {
+        let identity = IdentityId::Organisation(organisation);
+        let record = self
+            .records
+            .get(&identity)
+            .ok_or_else(|| unknown(identity))?;
+        if record.state == LifecycleState::Retired {
+            return Err(IdentityError::ChangeMismatch {
+                reason: "nothing is registered under a retired organisation",
+            });
+        }
+        Ok(())
     }
 
     /// Every identity, in identifier order.
@@ -264,7 +305,8 @@ impl Projection {
                     IdentityId::Person(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => false,
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => false,
                 };
                 if !agent || held.1.responsible != Some(person) {
                     return Err(IdentityError::LogUnavailable {
@@ -316,6 +358,7 @@ impl Projection {
     /// - `IdentityError::AnswersToInactive` if the immediate target is not active.
     /// - `IdentityError::AnswersToCycle` if the reporting walk revisits an identity.
     /// - `IdentityError::NoAccountablePerson` if the chain has a missing or inactive ancestor or no reporting edge.
+    /// - `IdentityError::OrganisationMismatch` if a reporting change would move an agent across organisations, or an attachment names a record already attached.
     pub fn check(&self, event: &IdentityEvent) -> Result<(), IdentityError> {
         if self.operations.contains_key(&event.operation()) {
             return Err(IdentityError::OperationReused {
@@ -329,19 +372,42 @@ impl Projection {
             | Change::RegisterPerson { .. }
             | Change::RegisterAgent { .. }
             | Change::ReportingRegistration { .. }
+            | Change::FoundOrganisation { .. }
                 if held.is_some() =>
             {
                 Err(IdentityError::AlreadyRegistered {
                     identity: identity.to_string(),
                 })
             }
-            Change::SetupPerson { .. } => match self.bindings.get(event.actor().binding()) {
-                Some(person) => Err(IdentityError::AlreadyBootstrapped {
-                    person: person.to_string(),
-                }),
-                None => Ok(()),
-            },
-            Change::RegisterPerson { .. } => Ok(()),
+            Change::SetupPerson { organisation, .. } => {
+                if let Some(organisation) = organisation {
+                    self.organisation_open(*organisation)?;
+                }
+                match self.bindings.get(event.actor().binding()) {
+                    Some(person) => Err(IdentityError::AlreadyBootstrapped {
+                        person: person.to_string(),
+                    }),
+                    None => Ok(()),
+                }
+            }
+            Change::RegisterPerson { organisation, .. } => {
+                organisation.map_or(Ok(()), |organisation| self.organisation_open(organisation))
+            }
+            // The founder is named, not yet held: the batch that founds an
+            // organisation registers its founder in the next leaf.
+            Change::FoundOrganisation { .. } => Ok(()),
+            Change::AttachOrganisation { organisation } => {
+                let record = held.ok_or_else(|| unknown(identity))?;
+                self.organisation_open(*organisation)?;
+                match record.organisation {
+                    None => Ok(()),
+                    Some(current) => Err(IdentityError::OrganisationMismatch {
+                        identity: identity.to_string(),
+                        organisation: current.to_string(),
+                        named: organisation.to_string(),
+                    }),
+                }
+            }
             Change::RegisterAgent { responsible, .. } => {
                 if self.records.contains_key(&IdentityId::Person(*responsible)) {
                     Ok(())

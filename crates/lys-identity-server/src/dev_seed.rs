@@ -1,8 +1,12 @@
-//! Development only: fill a disposable directory with two test people and
-//! their agents, so the identity screens have real records to show.
+//! Development only: fill a disposable directory with one organisation, two
+//! test people and their agents, so the identity screens have real records
+//! to show.
 //!
-//! Every record is written through the directory's own typed API, one signed
-//! event each, as the service writes them; nothing edits the store. The events
+//! Every record is written through the directory's own typed API, as the
+//! service writes them; nothing edits the store. The organisation is founded
+//! first with the first test person as its founder, in the one batch the
+//! founding writes, then activated; the second person is registered under
+//! it (DIRECTORY-109 R1). The events
 //! name the configured administrator as their actor, attested as authenticated
 //! when the seed runs although no sign-in took place. That attestation is why
 //! the seed is for a disposable development directory only, and why it refuses
@@ -15,7 +19,7 @@
 
 use lys_identity::{
     Actor, AgentId, AuthMethod, Directory, IdentityId, LifecycleState, LoginBinding, OperationId,
-    PersonId, Profile, Provenance, Transition,
+    OrganisationId, PersonId, Profile, Provenance, Transition,
 };
 use lys_log_store::LeafStore;
 
@@ -48,9 +52,14 @@ pub struct SeededPerson {
     pub agents: Vec<SeededAgent>,
 }
 
+/// The seeded organisation's name.
+pub const ORGANISATION: &str = "Development (test organisation)";
+
 /// What the seed wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Seeded {
+    /// The organisation every seeded person belongs to, founded by the first.
+    pub organisation: OrganisationId,
     /// The two test people.
     pub people: Vec<SeededPerson>,
     /// The log's size once the seed was written.
@@ -116,19 +125,16 @@ impl<S: LeafStore> Writer<'_, S> {
         Ok(())
     }
 
+    /// Bind the registered person `id` to their login, activate them and
+    /// register their agents.
     fn person(
         &mut self,
+        id: PersonId,
         issuer: &str,
         subject: &str,
         display_name: &str,
         agents: &[(&str, LifecycleState)],
     ) -> Result<SeededPerson, ServerError> {
-        let (id, _) = self.directory.register_person(
-            self.actor.clone(),
-            OperationId::generate()?,
-            Profile::new(display_name)?,
-            now(),
-        )?;
         self.directory.bind_login(
             self.actor.clone(),
             OperationId::generate()?,
@@ -183,12 +189,43 @@ pub fn seed<S: LeafStore>(
         directory,
         actor: Actor::new(administrator, Provenance::new(AuthMethod::Oidc, now())),
     };
+    let founded = writer.directory.found_organisation(
+        writer.actor.clone(),
+        OperationId::generate()?,
+        Profile::new(ORGANISATION)?,
+        Profile::new(PLAN[0].0)?,
+        now(),
+    )?;
+    writer.transition_to(
+        IdentityId::Organisation(founded.organisation),
+        LifecycleState::Active,
+    )?;
+    let mut founder = Some(founded.founder);
     let mut people = Vec::with_capacity(PLAN.len());
     for ((name, agents), subject) in PLAN.iter().zip(subjects) {
-        people.push(writer.person(issuer, subject, name, agents)?);
+        let id = match founder.take() {
+            Some(id) => id,
+            None => {
+                writer
+                    .directory
+                    .register_person(
+                        writer.actor.clone(),
+                        OperationId::generate()?,
+                        Profile::new(name)?,
+                        founded.organisation,
+                        now(),
+                    )?
+                    .0
+            }
+        };
+        people.push(writer.person(id, issuer, subject, name, agents)?);
     }
     let (tree_size, _) = writer.directory.log()?.head()?;
-    Ok(Seeded { people, tree_size })
+    Ok(Seeded {
+        organisation: founded.organisation,
+        people,
+        tree_size,
+    })
 }
 
 /// Seed the directory `config` names, creating its log when it does not

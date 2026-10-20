@@ -100,6 +100,14 @@ pub(crate) fn holds_a_role(book: &GrantBook) -> bool {
         .any(|record| record.grant.names_role())
 }
 
+/// Whether any grant in `book` carries its organisation, so its state is
+/// written at version 6 (DIRECTORY-109 R3).
+pub(crate) fn holds_an_organisation(book: &GrantBook) -> bool {
+    book.records
+        .values()
+        .any(|record| record.grant.organisation().is_some())
+}
+
 pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
     let refused = book
         .refused

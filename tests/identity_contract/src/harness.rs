@@ -280,9 +280,10 @@ pub const MEMBERSHIP_CURSOR_SECONDS: u64 = 600;
 pub const MEMBERSHIP_CURSORS_MAX: u32 = 64;
 /// The permission model every started service judges grants against. Its
 /// relation names say nothing of their actions: `alpha` carries read and
-/// write, `beta` carries read alone.
-pub const GRANT_MODEL: &str =
-    r#"{"version":1,"relations":{"alpha":["read","write"],"beta":["read"]}}"#;
+/// write, `beta` carries read alone; `administrator` carries the four
+/// organisation acts, so founding an organisation issues its founder's grant
+/// here as the shipped model does (DIRECTORY-109 R3).
+pub const GRANT_MODEL: &str = r#"{"version":1,"relations":{"alpha":["read","write"],"beta":["read"],"administrator":["organisation.administer","organisation.admit","organisation.grant","organisation.read"]}}"#;
 
 /// The administrator's subject at the fake issuer.
 pub const ADMINISTRATOR: &str = "administrator-subject";

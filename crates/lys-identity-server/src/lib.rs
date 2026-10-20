@@ -19,8 +19,6 @@ mod agent_seat;
 pub mod agent_policy_api;
 pub mod agent_policy_store;
 mod agent_roots;
-/// The computer Lys runs on, named once by its administrator (AGENTS-017 R4).
-mod own_computer;
 mod agent_sight;
 pub mod agent_signature;
 /// The agents cluster's records (AGENTS-001): one fold-and-snapshot engine, then the words, variables and schedules on it.
@@ -201,6 +199,8 @@ pub mod operations_api;
 #[cfg(test)]
 mod operations_api_tests;
 pub mod operator;
+/// The computer Lys runs on, named once by its administrator (AGENTS-017 R4).
+mod own_computer;
 #[cfg(test)]
 mod pass_provenance_tests;
 pub mod people_admit;
@@ -318,6 +318,14 @@ pub use routes::{
 /// A boot a lost whole store refused: health and the screens alone
 /// (DIRECTORY-107 R2).
 mod boot_refused;
+/// The store brought under the install's organisation at its first boot
+/// (DIRECTORY-109 R2).
+mod organisation_boot;
+#[cfg(test)]
+mod organisation_fixture;
+/// Every read partitioned by the caller's organisation (DIRECTORY-109 R4).
+#[cfg(test)]
+mod organisation_reads_tests;
 /// Every store held against its receipt (DIRECTORY-107 R2, R4).
 pub mod stores_receipt;
 

@@ -42,10 +42,12 @@ fn third_person(config: &lys_identity_server::config::Config) -> Result<String, 
         config.administrator_binding()?,
         Provenance::new(AuthMethod::Oidc, now()),
     );
+    let organisation = identity_contract::fixtures::the_organisation(&mut directory)?;
     let (cy, _) = directory.register_person(
         actor.clone(),
         lys_identity::OperationId::generate()?,
         Profile::new("Cy (test person)")?,
+        organisation,
         now(),
     )?;
     directory.bind_login(

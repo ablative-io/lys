@@ -160,6 +160,7 @@ impl Table {
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    Profile::new("Example organisation")?,
                     1,
                 )?;
                 let target = target_person(&mut directory, &config.issuer)?;
@@ -421,6 +422,7 @@ fn target_person(
         target_actor,
         OperationId::generate()?,
         Profile::new("Target")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     Ok(target)

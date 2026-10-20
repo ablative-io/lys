@@ -277,7 +277,10 @@ async fn a_request_given_as_pem_issues_what_its_der_issues() -> TestResult {
         .await?;
     assert_eq!(status, 200, "{by_pem}");
     assert_eq!(by_pem["recorded"], json!(operation), "{by_pem}");
-    assert_eq!(by_pem, by_der, "the PEM is the same request: the same serial, entered once");
+    assert_eq!(
+        by_pem, by_der,
+        "the PEM is the same request: the same serial, entered once"
+    );
 
     // A PEM-only first issue under a new operation is a certificate over the same key.
     let fresh = json!({"operation": OperationId::generate()?.to_string(), "request": pem("CERTIFICATE REQUEST", &request)});
@@ -290,7 +293,10 @@ async fn a_request_given_as_pem_issues_what_its_der_issues() -> TestResult {
     assert_eq!(certificates.len(), 2, "{issued}");
     for certificate in certificates {
         let der = STANDARD.decode(certificate["der"].as_str().ok_or("no der")?)?;
-        assert_eq!(certificate_subject_public_key(&der)?, table.key.public_key_bytes());
+        assert_eq!(
+            certificate_subject_public_key(&der)?,
+            table.key.public_key_bytes()
+        );
         assert_eq!(
             certificate["pem"],
             json!(pem("CERTIFICATE", &der)),

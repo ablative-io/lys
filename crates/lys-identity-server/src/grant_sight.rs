@@ -1,6 +1,12 @@
 //! What a caller may see of the grants: a grant it holds, issued or answers
 //! for, a grant derived from one of those, or any grant as the root
-//! authority, and the refusals it may read whole.
+//! authority, and the refusals it may read whole; for a person or an agent,
+//! only within their organisation (DIRECTORY-109 R4): a grant of another
+//! organisation, or of none, is not seen, exactly as one the caller may not
+//! see today, and the root authority's wider view is the wider view within
+//! its organisation. An app's credential, a service account, a connector or
+//! a machine belongs to no organisation and is not partitioned, so an app's
+//! question for its own kinds answers across organisations.
 
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -31,6 +37,9 @@ pub(crate) fn sees_with(
     record: &GrantRecord,
     known: &mut HashMap<GrantId, bool>,
 ) -> bool {
+    if !within_organisation(judged, caller, record.grant().organisation()) {
+        return false;
+    }
     if is_root(caller, judged.root) {
         return true;
     }
@@ -66,8 +75,30 @@ pub(crate) fn sees_with(
     seen
 }
 
-/// Whether `caller` may see `identity`'s records: its own, an agent it answers for, or any as the root authority.
+/// Whether a person or an agent `caller` reads within the organisation
+/// `held`: theirs, read from the directory, and never a missing one as
+/// anyone's. Every other caller is not partitioned.
+pub(crate) fn within_organisation(
+    judged: &Judged<'_>,
+    caller: IdentityId,
+    held: Option<lys_identity::OrganisationId>,
+) -> bool {
+    match caller {
+        IdentityId::Person(_) | IdentityId::Agent(_) => {
+            held.is_some() && judged.directory.organisation_of(caller) == held
+        }
+        IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => true,
+    }
+}
+
+/// Whether `caller` may see `identity`'s records: its own, an agent it answers for, or any as the root authority, within its organisation.
 pub(crate) fn sees_identity(judged: &Judged<'_>, caller: IdentityId, identity: IdentityId) -> bool {
+    if !within_organisation(judged, caller, judged.directory.organisation_of(identity)) {
+        return false;
+    }
     identity == caller
         || is_root(caller, judged.root)
         || judged

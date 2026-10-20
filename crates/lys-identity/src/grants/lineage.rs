@@ -51,7 +51,8 @@ pub(super) fn is_agent(identity: IdentityId) -> bool {
         IdentityId::Person(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
-        | IdentityId::Machine(_) => false,
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => false,
     }
 }
 
@@ -204,7 +205,8 @@ pub fn resolve<'a>(
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => {
                         return Err(GrantError::LineageMalformed {
                             reason: "a root grant is held by its responsible person",
                         });

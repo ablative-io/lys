@@ -17,6 +17,42 @@ pub fn active_caller(directory: &Projection, actor: &Actor) -> Result<IdentityId
     resolve(directory, actor, false)
 }
 
+/// The organisation the active caller acts within (DIRECTORY-109 R1): the
+/// one their own record carries. A caller with a record under no
+/// organisation (a login admitted as the configured administrator before
+/// first-run setup, or an identity the directory does not hold) is refused
+/// by name: nothing is registered into no organisation.
+///
+/// # Errors
+/// Refuses an unknown or inactive caller, or one that belongs to no
+/// organisation.
+pub(crate) fn caller_organisation(
+    directory: &Projection,
+    actor: &Actor,
+) -> Result<lys_identity::OrganisationId, ServerError> {
+    let identity = active_caller(directory, actor)?;
+    directory
+        .organisation_of(identity)
+        .ok_or(ServerError::NotAdmitted {
+            reason: "the caller belongs to no organisation; first-run setup founds one",
+        })
+}
+
+/// The organisation a signed-in caller reads within (DIRECTORY-109 R4):
+/// the active caller's own, read from the directory. None for a login bound
+/// to no identity, or one that is not active, who reads nothing: a record of
+/// another organisation, or of none, is answered as absent, never refused,
+/// so no read says whether another organisation exists. The reads call this
+/// after their own admission; it admits nothing itself.
+pub(crate) fn reading_organisation(
+    directory: &Projection,
+    actor: &Actor,
+) -> Option<lys_identity::OrganisationId> {
+    active_caller(directory, actor)
+        .ok()
+        .and_then(|identity| directory.organisation_of(identity))
+}
+
 /// Personal mutations admit the caller before reading their requested target.
 /// Missing personal authority must not expose a directory lookup refusal.
 pub(crate) fn admitted_person(
@@ -52,7 +88,8 @@ pub(crate) fn own_account_person(
         IdentityId::Agent(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
-        | IdentityId::Machine(_) => Err(ServerError::NoPerson),
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => Err(ServerError::NoPerson),
     }
 }
 

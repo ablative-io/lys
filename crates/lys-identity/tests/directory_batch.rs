@@ -61,6 +61,7 @@ fn events() -> Result<Vec<IdentityEvent>, IdentityError> {
             IdentityId::Person(person),
             Change::RegisterPerson {
                 profile: Profile::new("Person")?,
+                organisation: None,
             },
         )?,
         event(
@@ -155,6 +156,7 @@ fn operation_reuse_inside_a_batch_refuses_before_writing_and_empty_batch_is_a_no
         1,
         Change::RegisterPerson {
             profile: Profile::new("Changed")?,
+            organisation: None,
         },
     )?;
     assert!(matches!(

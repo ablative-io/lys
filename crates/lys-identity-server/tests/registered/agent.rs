@@ -19,12 +19,15 @@ async fn agent_pair(person_active: bool, agent_active: bool) -> TestResult {
             LoginBinding::new(&config.issuer, ADMINISTRATOR)?,
             Provenance::new(AuthMethod::Oidc, 1),
         );
-        let (person, _) = directory.register_person(
-            admin.clone(),
-            OperationId::generate()?,
-            Profile::new("Responsible person")?,
-            1,
-        )?;
+        let person = directory
+            .found_organisation(
+                admin.clone(),
+                OperationId::generate()?,
+                identity_contract::fixtures::organisation()?,
+                Profile::new("Responsible person")?,
+                1,
+            )?
+            .founder;
         directory.bind_login(
             admin.clone(),
             OperationId::generate()?,

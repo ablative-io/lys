@@ -30,8 +30,10 @@
 //! started and waited on for ready, and the upgrade fails naming the binary
 //! and its log. An upgrade writes only `bin/`, `bin.previous/`, those four
 //! rendered files, `config.previous/`, the screens, the logs, the process
-//! files and `install/`: never `data/`, a credential file or
-//! `deployment.toml`. `compose.env` carries the credentials as they are
+//! files, `install/` and, once, `data.previous-organisation/`, the copy of
+//! the directory and grant logs made before the first boot under
+//! organisations rewrites them (DIRECTORY-109 R2): never `data/`, a
+//! credential file or `deployment.toml`. `compose.env` carries the credentials as they are
 //! stored; it is rendered from them and is not itself a credential file.
 
 use std::collections::BTreeMap;
@@ -501,6 +503,7 @@ fn planned_intent(
             .collect(),
         compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
         steps: Vec::new(),
+        organisation_copy: None,
     }
 }
 

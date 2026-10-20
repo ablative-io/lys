@@ -390,7 +390,8 @@ async fn ask(
             IdentityId::Agent(_)
             | IdentityId::ServiceAccount(_)
             | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => judged
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => judged
                 .directory
                 .record(caller)
                 .and_then(lys_identity::projection::Record::responsible),

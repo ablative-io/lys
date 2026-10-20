@@ -208,10 +208,12 @@ fn register_cara(config: &lys_identity_server::config::Config) -> Result<PersonI
         config.administrator_binding()?,
         Provenance::new(AuthMethod::Oidc, now()),
     );
+    let organisation = identity_contract::fixtures::the_organisation(&mut directory)?;
     let (cara, _) = directory.register_person(
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Cara (test person)")?,
+        organisation,
         now(),
     )?;
     directory.bind_login(

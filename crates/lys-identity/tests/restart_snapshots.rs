@@ -15,7 +15,9 @@ use lys_core::Ed25519Identity;
 use lys_identity::log::Reopen;
 use lys_identity::projection::Projection;
 use lys_identity::receipt::Receipt;
-use lys_identity::{Actor, AuthMethod, Directory, LoginBinding, OperationId, Profile, Provenance};
+use lys_identity::{
+    Actor, AuthMethod, Directory, LoginBinding, OperationId, OrganisationId, Profile, Provenance,
+};
 use lys_log_store::{
     FileLeafStore, Frontier, LeafStore, PinnedRoot, SnapshotRefusal, Start, StoreResult, seal,
 };
@@ -121,13 +123,29 @@ fn administrator() -> Result<Actor, Box<dyn Error>> {
     ))
 }
 
-/// Registers `count` people, the `n`th with operation id `first + n`,
-/// answering the receipt each registration was answered with.
+/// Founds the organisation every person here is registered under: two
+/// leaves, the organisation's and its founder's, at indices 0 and 1.
+fn found(directory: &mut Directory<Counting>) -> Result<OrganisationId, Box<dyn Error>> {
+    Ok(directory
+        .found_organisation(
+            administrator()?,
+            OperationId::from_bytes([250; 16]),
+            Profile::new("Example organisation")?,
+            Profile::new("Founder")?,
+            1,
+        )?
+        .organisation)
+}
+
+/// Founds the organisation, then registers `count` people under it, the
+/// `n`th with operation id `first + n`, answering the receipt each
+/// registration was answered with; the log then holds `count + 2` leaves.
 fn register(
     directory: &mut Directory<Counting>,
     first: u8,
     count: u8,
 ) -> Result<Vec<Receipt>, Box<dyn Error>> {
+    let organisation = found(directory)?;
     let mut receipts = Vec::new();
     for n in 0..count {
         let seed = first + n;
@@ -135,6 +153,7 @@ fn register(
             administrator()?,
             OperationId::from_bytes([seed; 16]),
             Profile::new(&format!("Person {seed}"))?,
+            organisation,
             u64::from(seed),
         )?;
         receipts.push(receipt);
@@ -167,7 +186,7 @@ fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
         Some(&SnapshotRefusal::Missing),
         "a log with no snapshot is refused by name and rebuilt"
     );
-    let answered = register(&mut first, 1, 10)?;
+    let answered = register(&mut first, 1, 8)?;
     let before = projection_of(&mut first)?;
     drop(first);
 
@@ -185,7 +204,7 @@ fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
     );
     assert_eq!(projection_of(&mut restarted)?, before);
     assert_eq!(restarted.log()?.len()?, 10);
-    for (index, receipt) in (0_u64..).zip(&answered) {
+    for (index, receipt) in (2_u64..).zip(&answered) {
         assert_eq!(
             restarted.receipt_at(index)?.as_ref(),
             Some(receipt),
@@ -200,7 +219,7 @@ fn a_restart_reads_only_the_leaves_after_the_snapshot() -> TestResult {
 fn a_snapshot_that_does_not_verify_is_refused_and_rewritten() -> TestResult {
     let place = Place::new()?;
     let (mut first, _) = place.open()?;
-    register(&mut first, 1, 10)?;
+    register(&mut first, 1, 8)?;
     let before = projection_of(&mut first)?;
     drop(first);
 
@@ -235,10 +254,10 @@ fn a_snapshot_that_does_not_verify_is_refused_and_rewritten() -> TestResult {
 fn a_snapshot_of_another_log_is_refused_for_its_root() -> TestResult {
     let (one, other) = (Place::new()?, Place::new()?);
     let (mut first, _) = one.open()?;
-    register(&mut first, 1, 8)?;
+    register(&mut first, 1, 6)?;
     drop(first);
     let (mut second, _) = other.open()?;
-    register(&mut second, 101, 8)?;
+    register(&mut second, 101, 6)?;
     let before = projection_of(&mut second)?;
     drop(second);
 
@@ -260,7 +279,7 @@ fn a_snapshot_of_another_log_is_refused_for_its_root() -> TestResult {
 fn a_missing_snapshot_is_refused_by_name_and_rewritten() -> TestResult {
     let place = Place::new()?;
     let (mut first, _) = place.open()?;
-    register(&mut first, 1, 6)?;
+    register(&mut first, 1, 4)?;
     drop(first);
 
     std::fs::remove_file(place.snapshot())?;
@@ -284,7 +303,7 @@ fn a_missing_snapshot_is_refused_by_name_and_rewritten() -> TestResult {
 fn a_signed_snapshot_whose_state_does_not_read_is_refused_and_rewritten() -> TestResult {
     let place = Place::new()?;
     let (mut first, _) = place.open()?;
-    register(&mut first, 1, 8)?;
+    register(&mut first, 1, 6)?;
     let before = projection_of(&mut first)?;
     drop(first);
 

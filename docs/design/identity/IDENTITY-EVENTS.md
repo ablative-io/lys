@@ -30,7 +30,7 @@ A canonical CBOR map (RFC 8949 section 4.2: shortest heads, definite lengths, ke
 | 1 | version | `1`; service-account bearer events use `2` |
 | 2 | operation | the caller's operation id, 16 bytes |
 | 3 | actor | map: `1` issuer (text), `2` subject (text), `3` method (`1` OIDC, `2` agent signature, `3` operator or service-account bearer), `4` authenticated-at (seconds since the Unix epoch), `5` the principal id (16 bytes), present for an agent signature or service-account bearer and absent for OIDC or operator; see the closed code-3 rule below |
-| 4 | identity | map: `1` kind (`1` person, `2` agent), `2` id (16 bytes) |
+| 4 | identity | map: `1` kind (`1` person, `2` agent, `3` service account, `4` connector, `5` machine, `6` organisation), `2` id (16 bytes) |
 | 5 | recorded-at | seconds since the Unix epoch, by the service's clock |
 | 6 | change kind | a code from the table below |
 | 7 | change | the change's map, below |
@@ -43,6 +43,10 @@ A canonical CBOR map (RFC 8949 section 4.2: shortest heads, definite lengths, ke
 | 4 | bind login | `1` issuer (text), `2` subject (text) | a person |
 | 5 | lifecycle transition | `1` transition, `2` from, `3` to, `4` reason (text) | either |
 | 6 | link audit accepted | `1` source operation id (text), `2` change (`1` linked, `2` unlinked), `3` issuer, `4` subject, `5` observer (text), `6` observed-at (seconds) | a person |
+| 11 | found organisation | `1` profile, `2` founder (16 bytes) | an organisation |
+| 12 | attach organisation | `1` organisation (16 bytes) | a person or an agent |
+
+The organisation extension (DIRECTORY-109, 20 October 2026) adds identity kind `6`, change kinds `11` and `12`, and an optional key `2` organisation (16 bytes) on the maps of kinds `1` and `7`: a registration under an organisation carries it, and a registration written before the extension keeps its one-key map, byte for byte. Kind `11` founds an organisation naming its founder, and is written in one batch with the founder's kind-`1` registration (or, at first-run setup, with the kind-`7` setup and the organisation's activation). Kind `12` attaches a record written before the extension to the install's organisation, once, at the first boot under it, every record in one batch. An organisation record takes kinds `3`, `5` and `11` only. Snapshot version `6` stores each record's organisation and, for an organisation, its founder. Older readers refuse kinds 11 and 12 and the two-key registration map; the install that carries this extension is one-way, and its installer copies the directory and grant logs beside the data before the attaching batch runs.
 
 The first-administrator extension (28 September 2026, reviewed by Archie in Cambium post 70165f54c05389a20f1b03770e7e05683a40c548a7f6724cb604c81504e7ccd3) adds kind `7`, setup person, with map `1` profile, naming only a person. Kinds 1 through 6 and their signature-covered bytes remain unchanged. Older readers refuse kind 7; deployment requires a reader that supports it. Before the first live setup leaf is written, every installed log reader, including the server and development seed binary, must support kind 7. Once written, rollback to a reader without kind 7 is not supported; restoring an older executable alone is not recovery.
 

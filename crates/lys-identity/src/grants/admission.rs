@@ -97,6 +97,13 @@ fn answered_for_by(directory: &Projection, identity: IdentityId) -> Result<Perso
         IdentityId::Person(person) => Ok(person),
         // A connector's record names the administrator who approved its app,
         // and a machine's the administrator who asked for its code.
+        // An organisation's record names its founder; its administrator
+        // grant is the one grant it issues (DIRECTORY-109 R3).
+        IdentityId::Organisation(_) => record.founder().ok_or_else(|| {
+            GrantError::from(IdentityError::IdentityUnknown {
+                identity: identity.to_string(),
+            })
+        }),
         IdentityId::Agent(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
@@ -172,7 +179,8 @@ pub fn delegation_authority(
         IdentityId::Agent(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
-        | IdentityId::Machine(_) => {
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => {
             return Err(refused());
         }
     };
@@ -320,7 +328,10 @@ pub fn judge_root(
         window: request.window,
         model_version: model.version_on(kind),
         operation: request.operation,
-    })?;
+    })?
+    // The holder's organisation, read from the directory and never
+    // defaulted: a holder attached to none leaves the grant unmarked.
+    .with_organisation(directory.organisation_of(IdentityId::Person(request.holder)));
     Ok(if role { grant.as_role() } else { grant })
 }
 
@@ -419,6 +430,7 @@ pub fn judge_delegation(
             resource: Some(source.resource()),
             pass_on: source.pass_on(),
             mode: source.mode(),
+            organisation: source.organisation(),
         },
         id,
     )?;

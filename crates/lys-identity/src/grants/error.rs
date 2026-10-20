@@ -158,6 +158,19 @@ pub enum GrantError {
         /// The source grant.
         grant: String,
     },
+    /// A grant of one organisation was to be passed on to an identity of
+    /// another, or of none (DIRECTORY-109 R3).
+    #[error(
+        "OrganisationOutside: {grant} belongs to {organisation}, and {recipient} is not of it; a grant is passed on within its organisation"
+    )]
+    OrganisationOutside {
+        /// The source grant.
+        grant: String,
+        /// The organisation it belongs to.
+        organisation: String,
+        /// The recipient refused.
+        recipient: String,
+    },
     /// An agent was to be given acts no agent may hold.
     #[error(
         "WithheldFromAgents: `{relation}` carries {withheld}, which no agent may be given; a person may hold it"

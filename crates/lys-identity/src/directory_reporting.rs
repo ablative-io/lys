@@ -83,7 +83,8 @@ impl<S: LeafStore> Directory<S> {
                 IdentityId::Person(_)
                 | IdentityId::ServiceAccount(_)
                 | IdentityId::Connector(_)
-                | IdentityId::Machine(_) => {
+                | IdentityId::Machine(_)
+                | IdentityId::Organisation(_) => {
                     return Err(reused(operation));
                 }
             };
@@ -107,7 +108,10 @@ impl<S: LeafStore> Directory<S> {
                 });
             }
             IdentityId::Agent(_) => {}
-            IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_) => {
+            IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a reporting target must be a person or agent",
                 });

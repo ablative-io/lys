@@ -2,7 +2,7 @@
 
 use super::error::GrantError;
 use super::types::{Action, GrantId, GrantParts, PassOn, Resource, Source, Window};
-use crate::{IdentityId, PersonId};
+use crate::{IdentityId, OrganisationId, PersonId};
 use std::collections::BTreeSet;
 
 /// How a grant's actions may be exercised (ACCESS-001 R1, D3): outright, or
@@ -42,6 +42,7 @@ pub struct Grant {
     once: bool,
     mode: Mode,
     role: bool,
+    organisation: Option<OrganisationId>,
 }
 
 impl Grant {
@@ -87,8 +88,25 @@ impl Grant {
                 once: false,
                 mode: Mode::Outright,
                 role: false,
+                organisation: None,
             }),
         }
+    }
+
+    /// The grant marked as belonging to `organisation` (DIRECTORY-109 R3):
+    /// the holder's, read from the directory when it was judged, and never
+    /// defaulted. `None` keeps a grant written before organisations as it
+    /// was; the boot of DIRECTORY-109 R2 stamps every such grant once.
+    #[must_use]
+    pub fn with_organisation(mut self, organisation: Option<OrganisationId>) -> Self {
+        self.organisation = organisation;
+        self
+    }
+
+    /// The organisation the grant belongs to, when it carries one.
+    #[must_use]
+    pub fn organisation(&self) -> Option<OrganisationId> {
+        self.organisation
     }
 
     /// The one-time grant `parts` describe: spent by its first exercise,

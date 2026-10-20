@@ -13,12 +13,17 @@
 //! [`CONNECTOR_ENVELOPE`]; one issuing a held grant is version 4 under
 //! [`HELD_MODE_ENVELOPE`], one issuing a grant that names a role version
 //! 5 under [`ROLE_ENVELOPE`], and one naming a machine version 6 under
-//! [`MACHINE_ENVELOPE`] (ACCESS-005 R1), so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
+//! [`MACHINE_ENVELOPE`] (ACCESS-005 R1), and one naming an organisation,
+//! as caller or issuer, carrying a grant marked with one, or stamping one
+//! onto a grant, version 7 under [`ORGANISATION_ENVELOPE`] (DIRECTORY-109
+//! R3), so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
-//! revoke, `3` use) and `6` the change: the grant's own map; for a revocation
+//! revoke, `3` use, `4` stamp) and `6` the change: the grant's own map; for a revocation
 //! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
-//! browser, `2` api, `3` tool). A use's caller is the holder who exercised the
-//! grant and its recorded-at is when. Reading is strict: a message naming another envelope is refused
+//! browser, `2` api, `3` tool); for a stamp `1` grant id and `2` the
+//! organisation (16 bytes). A use's caller is the holder who exercised the
+//! grant and its recorded-at is when. A stamp's caller is the organisation
+//! itself. Reading is strict: a message naming another envelope is refused
 //! `EnvelopeMismatch`, and bytes that are not the exact canonical message are
 //! refused.
 
@@ -49,6 +54,9 @@ pub const ROLE_ENVELOPE: &str = "application/vnd.lys.grant-event.v5+cbor";
 /// Separate signed envelope for grant events that name a machine, as
 /// caller, holder, issuer or a kind a grant may be passed on to.
 pub const MACHINE_ENVELOPE: &str = "application/vnd.lys.grant-event.v6+cbor";
+/// Separate signed envelope for grant events that name an organisation:
+/// as caller or issuer, in a grant's key 16, or as a stamp (DIRECTORY-109 R3).
+pub const ORGANISATION_ENVELOPE: &str = "application/vnd.lys.grant-event.v7+cbor";
 
 const COSE_SIGN1_TAG: u64 = 18;
 const SIGNATURE_LEN: usize = 64;
@@ -63,12 +71,13 @@ fn kind_envelope(kind: super::types::RecipientKind) -> (u64, &'static str) {
         RecipientKind::ServiceAccount => (2, SERVICE_ACCOUNT_ENVELOPE),
         RecipientKind::Connector => (3, CONNECTOR_ENVELOPE),
         RecipientKind::Machine => (6, MACHINE_ENVELOPE),
+        RecipientKind::Organisation => (7, ORGANISATION_ENVELOPE),
     }
 }
 
 /// Whether the grants read events of `version`.
 fn version_read(version: u64) -> bool {
-    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5 | 6)
+    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5 | 6 | 7)
 }
 
 /// One change to the grants.
@@ -90,6 +99,15 @@ pub enum GrantChange {
         /// How the exercise arrived.
         route: Route,
     },
+    /// A grant written before organisations is marked with the one it
+    /// belongs to, once, at the first boot under DIRECTORY-109 R2. The
+    /// caller is the organisation itself.
+    Stamp {
+        /// The grant stamped.
+        grant: GrantId,
+        /// The organisation it belongs to.
+        organisation: crate::OrganisationId,
+    },
 }
 
 /// A grant change, before it is signed or after it is verified.
@@ -105,8 +123,8 @@ impl GrantEvent {
     /// Version two adds service-account principals. Events using only the
     /// original principal and recipient kinds retain their original bytes.
     /// Version three adds the connector, four a held mode, five a grant
-    /// naming a role and six the machine. Each event takes the version of
-    /// the newest kind or mode it names.
+    /// naming a role, six the machine and seven the organisation. Each
+    /// event takes the version of the newest kind, mode or mark it names.
     #[must_use]
     pub fn version(&self) -> u64 {
         self.newest().0
@@ -132,11 +150,17 @@ impl GrantEvent {
             if grant.names_role() {
                 named.push((5, ROLE_ENVELOPE));
             }
+            if grant.organisation().is_some() {
+                named.push((7, ORGANISATION_ENVELOPE));
+            }
             for named in named {
                 if named.0 > newest.0 {
                     newest = named;
                 }
             }
+        }
+        if let GrantChange::Stamp { .. } = &self.change {
+            newest = (7, ORGANISATION_ENVELOPE);
         }
         newest
     }
@@ -176,6 +200,13 @@ impl GrantEvent {
                 }
             }
             GrantChange::Use { .. } => {}
+            GrantChange::Stamp { organisation, .. } => {
+                if caller != IdentityId::Organisation(*organisation) {
+                    return Err(GrantError::EventMismatch {
+                        reason: "a stamp is written by the organisation it names",
+                    });
+                }
+            }
         }
         Ok(Self {
             operation,
@@ -214,7 +245,9 @@ impl GrantEvent {
     pub fn grant(&self) -> GrantId {
         match &self.change {
             GrantChange::Issue(grant) => grant.id(),
-            GrantChange::Revoke { grant, .. } | GrantChange::Use { grant, .. } => *grant,
+            GrantChange::Revoke { grant, .. }
+            | GrantChange::Use { grant, .. }
+            | GrantChange::Stamp { grant, .. } => *grant,
         }
     }
 }
@@ -225,14 +258,17 @@ pub(crate) const ISSUE: u64 = 1;
 pub(crate) const REVOKE: u64 = 2;
 /// The change kind code of a use.
 pub(crate) const USE: u64 = 3;
+/// The change kind code of a stamp.
+pub(crate) const STAMP: u64 = 4;
 
-/// The change kind's wire code: `1` issue, `2` revoke, `3` use.
+/// The change kind's wire code: `1` issue, `2` revoke, `3` use, `4` stamp.
 #[must_use]
 pub fn change_kind(change: &GrantChange) -> u64 {
     match change {
         GrantChange::Issue(_) => ISSUE,
         GrantChange::Revoke { .. } => REVOKE,
         GrantChange::Use { .. } => USE,
+        GrantChange::Stamp { .. } => STAMP,
     }
 }
 
@@ -267,6 +303,16 @@ pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
             bytes(&mut out, grant.as_bytes());
             uint(&mut out, 2);
             uint(&mut out, route_code(*route));
+        }
+        GrantChange::Stamp {
+            grant,
+            organisation,
+        } => {
+            map(&mut out, 2);
+            uint(&mut out, 1);
+            bytes(&mut out, grant.as_bytes());
+            uint(&mut out, 2);
+            bytes(&mut out, organisation.as_bytes());
         }
     }
     out
@@ -348,7 +394,17 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
                     .ok_or_else(|| malformed("a route code is 1 to 3"))?,
             }
         }
-        _ => return Err(malformed("a grant change kind is 1 to 3")),
+        STAMP => {
+            let [grant, organisation] = fields::<2>(change, "a stamp is a map of keys 1 and 2")?;
+            GrantChange::Stamp {
+                grant: GrantId::from_bytes(as_id(grant, "a grant id is 16 bytes")?),
+                organisation: crate::OrganisationId::from_bytes(as_id(
+                    organisation,
+                    "an organisation id is 16 bytes",
+                )?),
+            }
+        }
+        _ => return Err(malformed("a grant change kind is 1 to 4")),
     };
     let event = GrantEvent::new(
         OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),

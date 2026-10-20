@@ -485,6 +485,7 @@ async fn an_inactive_reporting_link_blocks_and_reinstatement_restores_agent_call
             OperationId::generate()?,
             Profile::new("Accountable person")?,
             now(),
+            Profile::new("Example organisation")?,
         )?;
         let mut agents = Vec::new();
         for name in ["Reporting parent", "Reporting child"] {

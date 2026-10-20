@@ -59,6 +59,7 @@ fn a_directory_event_never_names_a_connector_as_its_identity_or_a_reporting_targ
         1,
         Change::RegisterPerson {
             profile: Profile::new("app")?,
+            organisation: None,
         },
     );
     assert!(

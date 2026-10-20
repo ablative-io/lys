@@ -39,7 +39,8 @@ pub(crate) fn seen_agent(
                 IdentityId::Agent(own) => own == agent,
                 IdentityId::ServiceAccount(_)
                 | IdentityId::Connector(_)
-                | IdentityId::Machine(_) => false,
+                | IdentityId::Machine(_)
+                | IdentityId::Organisation(_) => false,
                 IdentityId::Person(person) => responsible == Some(person),
             };
         if sees {

@@ -33,7 +33,7 @@ An agent's responsible person must be registered, or the call is refused `Identi
 | --- | --- |
 | `Directory::record(id)` | the identity's record, or none |
 | `Directory::projection()` then `records()` | every identity, in id order |
-| `Record::profile()`, `state()`, `responsible()`, `reports_to()`, `reporting_gap()`, `bindings()`, `registered_by()`, `events()` | the record's parts, and the log indices of its events |
+| `Record::profile()`, `state()`, `responsible()`, `reports_to()`, `reporting_gap()`, `bindings()`, `registered_by()`, `events()`, `organisation()`, `founder()` | the record's parts, the log indices of its events, the organisation it belongs to and, for an organisation, who founded it (DIRECTORY-109) |
 
 A read answers only once any uncertain append is resolved. While one is held, every read and every change is refused `AppendUncertain` or `LogUnavailable`. Resolving it applies every leaf the log holds from that index on, whoever wrote it, before anything is answered. A leaf past the pin that is not a whole event this directory signed is refused `LeafNotAnEvent` before it is pinned, so it can be removed without equivocating. An event of any size is signed, and is read back whole.
 

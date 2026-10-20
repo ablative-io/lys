@@ -56,13 +56,17 @@ impl Projection {
         Arc::make_mut(&mut self.operations).insert(event.operation(), index);
         let registered_by = event.actor().binding().clone();
         match event.change() {
-            Change::SetupPerson { profile } => {
+            Change::SetupPerson {
+                profile,
+                organisation,
+            } => {
                 let person = match identity {
                     IdentityId::Person(person) => person,
                     IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => {
                         return Err(IdentityError::ChangeMismatch {
                             reason: "setup names a person",
                         });
@@ -70,19 +74,48 @@ impl Projection {
                 };
                 let mut record = fresh(profile, None, registered_by.clone(), index);
                 record.state = LifecycleState::Active;
+                record.organisation = *organisation;
                 record.bindings.push(registered_by.clone());
                 Arc::make_mut(&mut self.records).insert(identity, record);
                 Arc::make_mut(&mut self.bindings).insert(registered_by, person);
             }
-            Change::RegisterPerson { profile } => {
-                Arc::make_mut(&mut self.records)
-                    .insert(identity, fresh(profile, None, registered_by, index));
+            Change::RegisterPerson {
+                profile,
+                organisation,
+            } => {
+                let mut record = fresh(profile, None, registered_by, index);
+                record.organisation = *organisation;
+                Arc::make_mut(&mut self.records).insert(identity, record);
+            }
+            Change::FoundOrganisation { profile, founder } => {
+                let organisation = match identity {
+                    IdentityId::Organisation(organisation) => organisation,
+                    IdentityId::Person(_)
+                    | IdentityId::Agent(_)
+                    | IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_) => {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "a founding names an organisation",
+                        });
+                    }
+                };
+                let mut record = fresh(profile, None, registered_by, index);
+                record.organisation = Some(organisation);
+                record.founder = Some(*founder);
+                Arc::make_mut(&mut self.records).insert(identity, record);
+            }
+            Change::AttachOrganisation { organisation } => {
+                let record = self.held(identity)?;
+                record.organisation = Some(*organisation);
+                record.events.push(index);
             }
             Change::RegisterAgent {
                 responsible,
                 profile,
             } => {
-                let record = fresh(profile, Some(*responsible), registered_by, index);
+                let mut record = fresh(profile, Some(*responsible), registered_by, index);
+                record.organisation = self.organisation_of(IdentityId::Person(*responsible));
                 self.register_reporting(identity, record, IdentityId::Person(*responsible))?;
             }
             Change::ReportingRegistration {
@@ -90,7 +123,8 @@ impl Projection {
                 profile,
                 reports_to,
             } => {
-                let record = fresh(profile, Some(*responsible), registered_by, index);
+                let mut record = fresh(profile, Some(*responsible), registered_by, index);
+                record.organisation = self.organisation_of(IdentityId::Person(*responsible));
                 self.register_reporting(identity, record, *reports_to)?;
             }
             Change::ReportsToChanged { to, .. } => {
@@ -125,7 +159,8 @@ impl Projection {
             IdentityId::Agent(_)
             | IdentityId::ServiceAccount(_)
             | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => {}
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => {}
         }
         Ok(())
     }
@@ -161,6 +196,11 @@ impl Projection {
                     reason: "a machine never acquires a sign-in binding",
                 });
             }
+            IdentityId::Organisation(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "an organisation never acquires a sign-in binding",
+                });
+            }
         }
         Ok(())
     }
@@ -187,5 +227,7 @@ fn fresh(
         bindings: Vec::new(),
         registered_by,
         events: vec![index],
+        organisation: None,
+        founder: None,
     }
 }

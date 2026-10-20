@@ -329,6 +329,21 @@ directory::directory_refusals! {
         /// What failed.
         reason: String,
     },
+    /// The store could not be brought under the install's organisation at
+    /// boot (DIRECTORY-109 R2): nothing is served until it is.
+    #[error("OrganisationBootRefused: {reason}")]
+    OrganisationBootRefused {
+        /// What was not committed, and why.
+        reason: String,
+    },
+    /// An act is held while the upgrade is still reversible; the copy of
+    /// the stores before organisations, when the upgrade kept one, is the
+    /// put-back (DIRECTORY-109 R2).
+    #[error("UpgradePending: the upgrade is still reversible{}", kept_words(.previous_organisation))]
+    UpgradePending {
+        /// Where the directory and grant logs before organisations are kept.
+        previous_organisation: Option<String>,
+    },
     /// The issuer's administration API is not configured, could not be
     /// reached, or answered what could not be read.
     #[error("SignInProvidersUnavailable: {reason}")]
@@ -418,4 +433,13 @@ mod repair_tests {
         assert_eq!(error.to_string(), words);
         assert_eq!(error.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
     }
+}
+
+/// The words that name the kept copy on an `UpgradePending` refusal.
+fn kept_words(previous_organisation: &Option<String>) -> String {
+    previous_organisation
+        .as_deref()
+        .map_or_else(String::new, |copy| {
+            format!("; the directory and grant logs before organisations are kept at {copy}")
+        })
 }

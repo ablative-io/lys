@@ -58,7 +58,10 @@ pub struct DeploymentConfig {
 pub struct Deployment {
     /// The node the operator names for this install.
     pub node: String,
-    /// The compose project name.
+    /// The compose project name, and the name of the install's own
+    /// organisation, founded at first-run setup with the administrator as
+    /// founder or at the first boot of a store written before organisations
+    /// (DIRECTORY-109 R2).
     pub project: String,
     /// The private state directory, relative to the configuration file.
     pub state_dir: PathBuf,

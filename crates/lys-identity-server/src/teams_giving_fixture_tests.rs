@@ -25,7 +25,8 @@ fn seeded_team(
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Owner")?,
-        1,
+        lys_identity::Profile::new("Example organisation")?,
+    1,
     )?;
     let (giver, _) = directory.register_agent(
         actor.clone(),
@@ -87,7 +88,8 @@ fn member_directory() -> TestResult<(
         owner.clone(),
         OperationId::generate()?,
         Profile::new("Owner")?,
-        1,
+        lys_identity::Profile::new("Example organisation")?,
+    1,
     )?;
     let (agent, _) = directory.register_agent(
         owner.clone(),

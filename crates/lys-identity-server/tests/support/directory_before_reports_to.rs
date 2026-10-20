@@ -54,6 +54,7 @@ fn identity(value: IdentityId) -> Value {
         IdentityId::ServiceAccount(id) => (3, *id.as_bytes()),
         IdentityId::Connector(id) => (4, *id.as_bytes()),
         IdentityId::Machine(id) => (5, *id.as_bytes()),
+        IdentityId::Organisation(id) => (6, *id.as_bytes()),
     };
     array(vec![uint(kind), bytes(&id)])
 }
@@ -127,6 +128,7 @@ pub fn write(config: &Config) -> Result<Legacy, Box<dyn Error>> {
         IdentityId::Person(owner),
         Change::SetupPerson {
             profile: Profile::new("Earlier owner")?,
+            organisation: None,
         },
     )];
     for (index, agent) in agents.iter().enumerate() {

@@ -107,6 +107,7 @@ mod tests {
             actor.clone(),
             OperationId::generate()?,
             Profile::new("Owner")?,
+            Profile::new("Example organisation")?,
             1,
         )?;
         directory.bind_login(

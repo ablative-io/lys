@@ -42,6 +42,12 @@ fn each_identity_names_its_own_kind() {
         identity_kind(&IdentityId::Machine(MachineId::from_bytes([5; 16]))),
         "machine"
     );
+    assert_eq!(
+        identity_kind(&IdentityId::Organisation(
+            crate::OrganisationId::from_bytes([6; 16])
+        )),
+        "organisation"
+    );
 }
 
 #[test]

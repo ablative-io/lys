@@ -38,10 +38,10 @@ pub use seat::{AttachArgs, SeatArgs, SeatCommand, SeatImportCommand};
 mod sign_in;
 pub use sign_in::SignInArgs;
 
-#[path = "cli/launch.rs"]
-mod launch;
 #[path = "cli/enrol.rs"]
 mod enrol;
+#[path = "cli/launch.rs"]
+mod launch;
 pub use enrol::EnrolArgs;
 pub use launch::{AgentsArgs, HarnessArgs, LaunchOptions, RunArgs};
 

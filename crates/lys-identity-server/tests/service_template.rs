@@ -30,13 +30,20 @@ async fn preparation_keeps_its_signed_directory() -> Result<(), Box<dyn std::err
 
     let (service, leaf) = Service::start_with(|config| {
         let mut directory = open_directory(config)?;
-        directory.register_person(administrator()?, op(1), shown("Prepared")?, 1)?;
+        directory.found_organisation(
+            administrator()?,
+            op(1),
+            identity_contract::fixtures::organisation()?,
+            shown("Prepared")?,
+            1,
+        )?;
         let store = FileLeafStore::open(&config.log_dir)?;
         Ok(store.leaf(0)?.ok_or("prepared leaf missing")?)
     })
     .await?;
     let store = FileLeafStore::open(&service.dir.path().join("log"))?;
-    assert_eq!(store.extent(), 1);
+    // The founding and its founder: two leaves.
+    assert_eq!(store.extent(), 2);
     assert_eq!(store.leaf(0)?.ok_or("served leaf missing")?, leaf);
     Ok(())
 }

@@ -211,6 +211,9 @@ pub struct GrantView {
     /// the chain does not resolve. Admission refuses a grant ending after
     /// its source, so this is the grant's own end.
     pub effective_ends_at: Option<u64>,
+    /// The organisation it belongs to (DIRECTORY-109 R3), null for a grant
+    /// written before organisations and not yet stamped at boot.
+    pub organisation: Option<String>,
 }
 
 impl GrantView {
@@ -255,6 +258,7 @@ impl GrantView {
             last_use: LastUseView::from(&Usage::of(record, unreported)),
             standing,
             effective_ends_at,
+            organisation: grant.organisation().map(|held| held.to_string()),
         }
     }
 }

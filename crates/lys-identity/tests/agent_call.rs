@@ -42,6 +42,7 @@ fn an_agent_call_is_kept_with_a_receipt_and_read_back_on_reopen() -> TestResult 
         administrator.clone(),
         OperationId::from_bytes([1; 16]),
         Profile::new("Ada")?,
+        Profile::new("Example organisation")?,
         10,
     )?;
     let (agent, _) = directory.register_agent(

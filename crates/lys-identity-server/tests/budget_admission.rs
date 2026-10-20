@@ -159,12 +159,15 @@ fn prepare_agent(config: &lys_identity_server::Config) -> TestResult<(String, St
         config.administrator_binding()?,
         Provenance::new(AuthMethod::Oidc, at),
     );
-    let (person, _) = directory.register_person(
-        actor.clone(),
-        OperationId::generate()?,
-        Profile::new("Operator")?,
-        at,
-    )?;
+    let person = directory
+        .found_organisation(
+            actor.clone(),
+            OperationId::generate()?,
+            identity_contract::fixtures::organisation()?,
+            Profile::new("Operator")?,
+            at,
+        )?
+        .founder;
     directory.bind_login(
         actor.clone(),
         OperationId::generate()?,

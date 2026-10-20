@@ -4,14 +4,12 @@ use super::{
     Actor, AgentId, Change, Directory, IdentityError, IdentityEvent, IdentityId, LeafStore,
     OperationId, PersonId, Profile, Receipt, Transition,
 };
+use crate::id::OrganisationId;
 
 impl<S: LeafStore> Directory<S> {
-    /// Create one active person bound to the authenticated actor in one signed leaf.
-    ///
-    /// The service must admit the configured administrator before calling this.
-    /// Retrying the same operation, login and profile returns its original receipt,
-    /// including after a new authenticated session or a reopen. It never reactivates
-    /// a person whose state was subsequently changed.
+    /// Register a person under `organisation`, answered with their new
+    /// enduring id. First-run setup, which founds the install's own
+    /// organisation first, is [`Directory::setup_person`].
     ///
     /// # Errors
     /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
@@ -22,66 +20,21 @@ impl<S: LeafStore> Directory<S> {
     /// - `IdentityError::AppendRefused` if reconciliation proves this change was not committed.
     /// - `IdentityError::RandomSourceUnavailable` if the new person id cannot be generated.
     /// - `IdentityError::AlreadyRegistered` if the generated identity already exists.
-    /// - `IdentityError::AlreadyBootstrapped` if the login already belongs to a person.
-    pub fn setup_person(
-        &mut self,
-        actor: Actor,
-        operation: OperationId,
-        profile: Profile,
-        recorded_at: u64,
-    ) -> Result<(PersonId, Receipt), IdentityError> {
-        self.settle()?;
-        let change = Change::SetupPerson { profile };
-        if let Some((event, receipt)) = self.answered(operation)? {
-            if event.actor().binding() == actor.binding() && event.change() == &change {
-                match event.identity() {
-                    IdentityId::Person(person) => return Ok((person, receipt)),
-                    IdentityId::Agent(_)
-                    | IdentityId::ServiceAccount(_)
-                    | IdentityId::Connector(_)
-                    | IdentityId::Machine(_) => {}
-                }
-            }
-            return Err(IdentityError::OperationReused {
-                operation: operation.to_string(),
-            });
-        }
-        if let Some(person) = self.projection.person_for(actor.binding()) {
-            return Err(IdentityError::AlreadyBootstrapped {
-                person: person.to_string(),
-            });
-        }
-        let person = PersonId::generate()?;
-        let event = IdentityEvent::new(
-            operation,
-            actor,
-            IdentityId::Person(person),
-            recorded_at,
-            change,
-        )?;
-        Ok((person, self.commit(event)?))
-    }
-
-    /// Register a person, answered with their new enduring id.
-    ///
-    /// # Errors
-    /// - `IdentityError::LogUnavailable` if the directory is broken, the store cannot be reopened, or an adopted event is refused by the projection.
-    /// - `IdentityError::LeafNotAnEvent` if reconciliation finds a missing or invalid signed leaf.
-    /// - `IdentityError::OperationReused` if the operation already names a different request.
-    /// - `IdentityError::InstallEntry` if a retried operation names an install leaf.
-    /// - `IdentityError::DraftEntry` if a retried operation names a draft leaf.
-    /// - `IdentityError::AppendRefused` if reconciliation proves this change was not committed.
-    /// - `IdentityError::RandomSourceUnavailable` if the new person id cannot be generated.
-    /// - `IdentityError::AlreadyRegistered` if the generated identity already exists.
+    /// - `IdentityError::IdentityUnknown` if the organisation is absent.
+    /// - `IdentityError::ChangeMismatch` if the organisation is retired.
     pub fn register_person(
         &mut self,
         actor: Actor,
         operation: OperationId,
         profile: Profile,
+        organisation: OrganisationId,
         recorded_at: u64,
     ) -> Result<(PersonId, Receipt), IdentityError> {
         self.settle()?;
-        let change = Change::RegisterPerson { profile };
+        let change = Change::RegisterPerson {
+            profile,
+            organisation: Some(organisation),
+        };
         if let Some((IdentityId::Person(id), receipt)) =
             self.retry(operation, &actor, None, &change)?
         {

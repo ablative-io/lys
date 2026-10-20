@@ -39,6 +39,7 @@ fn a_suspended_administrator_has_no_administrator_authority() -> TestResult {
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Authority")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     admission.administrator(directory.projection()?, &actor)?;
@@ -102,6 +103,7 @@ fn a_suspended_link_audit_agent_cannot_borrow_its_active_persons_authority() -> 
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Authority")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     let (agent, _) = directory.register_agent(
@@ -146,6 +148,7 @@ fn an_active_bound_administrator_is_admitted() -> TestResult {
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Authority")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     assert!(admission.is_administrator(directory.projection()?, &actor)?);

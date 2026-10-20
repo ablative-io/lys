@@ -181,12 +181,15 @@ async fn authority_table(
                 actor.clone(),
                 OperationId::generate()?,
                 Profile::new("Owner")?,
+                Profile::new("Example organisation")?,
                 1,
             )?;
+            let organisation = identity_contract::fixtures::organisation_of(&mut directory, owner)?;
             let (bea, _) = directory.register_person(
                 actor.clone(),
                 OperationId::generate()?,
                 Profile::new("Person")?,
+                organisation,
                 2,
             )?;
             directory.bind_login(

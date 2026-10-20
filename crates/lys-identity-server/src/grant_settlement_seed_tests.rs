@@ -30,22 +30,26 @@ fn seeded_authority(config: &crate::Config) -> TestResult<SeededAuthority> {
     );
     let created_at = 1_800_000_000;
     let now = created_at + 10;
-    let (admin, _) = directory.register_person(
+    let founded = directory.found_organisation(
         setup_actor.clone(),
         OperationId::generate()?,
+        identity_contract::fixtures::organisation()?,
         Profile::new("Administrator")?,
         created_at,
     )?;
+    let (admin, organisation) = (founded.founder, founded.organisation);
     let (responsible, _) = directory.register_person(
         setup_actor.clone(),
         OperationId::generate()?,
         Profile::new("Responsible")?,
+        organisation,
         created_at,
     )?;
     let (asker, _) = directory.register_person(
         setup_actor.clone(),
         OperationId::generate()?,
         Profile::new("Asker")?,
+        organisation,
         created_at,
     )?;
     let (holder, _) = directory.register_agent(

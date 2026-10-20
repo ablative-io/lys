@@ -40,6 +40,7 @@ fn intent_to_b(scratch: &Scratch) -> Intent {
             .collect(),
         compose_changed: true,
         steps: Vec::new(),
+        organisation_copy: None,
     }
 }
 

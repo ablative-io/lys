@@ -51,6 +51,8 @@ mod product_draft;
 #[path = "directory_changes.rs"]
 mod changes;
 
+pub use crate::organisation::Founded;
+
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 
@@ -64,7 +66,7 @@ fn same_actor(recorded: &Actor, actor: &Actor) -> bool {
 /// The directory of people and agents over its log.
 pub struct Directory<S: LeafStore> {
     log: EventLog<S>,
-    projection: Projection,
+    pub(crate) projection: Projection,
     key: Ed25519Identity,
     folded: u64,
     broken: Broken,
@@ -257,7 +259,7 @@ impl<S: LeafStore> Directory<S> {
 
     /// The event and receipt an operation recorded, if it recorded one, both
     /// built from the log.
-    fn answered(
+    pub(crate) fn answered(
         &self,
         operation: OperationId,
     ) -> Result<Option<(IdentityEvent, Receipt)>, IdentityError> {

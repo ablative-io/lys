@@ -81,6 +81,7 @@ fn recovery_after_lys_is_placed_restores_the_runner_and_resumes_its_live_session
             files: Vec::new(),
             compose_changed: false,
             steps: vec![Step::Stopped],
+            organisation_copy: None,
         };
         intent.write(layout)?;
         swap::keep_binaries(layout, &mut intent)?;

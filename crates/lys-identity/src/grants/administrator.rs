@@ -74,6 +74,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 resource: None,
                 pass_on: &pass_on,
                 mode,
+                // Standing passed on carries the recipient's own
+                // organisation, read from the directory.
+                organisation: directory.organisation_of(request.recipient),
             },
             GrantId::generate()?,
         )?;

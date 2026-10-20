@@ -27,6 +27,7 @@ use axum::extract::{OriginalUri, Path, State};
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use lys_identity::projection::Projection;
 use lys_identity::{Actor, AgentId, IdentityId, LifecycleState, OperationId, PersonId};
 use serde::{Deserialize, Serialize};
 
@@ -450,10 +451,7 @@ fn may_add(
 }
 
 /// Refuse by name a member the directory does not hold or has retired.
-fn member_holds(
-    projection: &lys_identity::projection::Projection,
-    member: &str,
-) -> Result<(), ServerError> {
+fn member_holds(projection: &Projection, member: &str) -> Result<(), ServerError> {
     let identity = PersonId::from_str(member)
         .map(IdentityId::Person)
         .or_else(|_unread| AgentId::from_str(member).map(IdentityId::Agent))
@@ -550,11 +548,11 @@ async fn list(
     headers: HeaderMap,
 ) -> Result<Json<TeamsView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
-    with_readable_teams(&state, &actor, |store, person| {
+    with_readable_teams(&state, &actor, |store, person, people| {
         Ok(TeamsView {
             teams: store
                 .teams_iter()
-                .filter(|team| visible_to(team, person))
+                .filter(|team| people.contains(&team.created.owner) && visible_to(team, person))
                 .map(view)
                 .collect(),
         })
@@ -569,10 +567,10 @@ async fn one(
 ) -> Result<Json<TeamView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let id = team_id(&id)?;
-    with_readable_teams(&state, &actor, |store, person| {
+    with_readable_teams(&state, &actor, |store, person, people| {
         store
             .team(&id)
-            .filter(|team| visible_to(team, person))
+            .filter(|team| people.contains(&team.created.owner) && visible_to(team, person))
             .map(view)
             .ok_or(ServerError::Team(TeamError::Unknown))
     })
@@ -587,10 +585,28 @@ fn visible_to(team: &Team, person: Option<&str>) -> bool {
     })
 }
 
+/// The people of the caller's organisation, by id text: a team is of the
+/// organisation its owner belongs to, and a caller reads only those
+/// (DIRECTORY-109 R4). Empty for a caller of no organisation, who reads
+/// no team.
+fn organisation_people(projection: &Projection, actor: &Actor) -> BTreeSet<String> {
+    let Some(organisation) = crate::caller_admission::reading_organisation(projection, actor)
+    else {
+        return BTreeSet::new();
+    };
+    projection
+        .people(std::ops::Bound::Unbounded)
+        .filter(|(_, person)| {
+            projection.organisation_of(IdentityId::Person(*person)) == Some(organisation)
+        })
+        .map(|(id, _)| id.to_owned())
+        .collect()
+}
+
 fn with_readable_teams<T>(
     state: &AppState,
     actor: &Actor,
-    act: impl FnOnce(&TeamStore, Option<&str>) -> Result<T, ServerError>,
+    act: impl FnOnce(&TeamStore, Option<&str>, &BTreeSet<String>) -> Result<T, ServerError>,
 ) -> Result<T, ServerError> {
     with_directory(state, |directory| {
         let projection = directory.projection()?;
@@ -599,7 +615,8 @@ fn with_readable_teams<T>(
         } else {
             Some(own_person(projection, actor)?.to_string())
         };
-        with_teams(state, |store| act(store, person.as_deref()))
+        let people = organisation_people(projection, actor);
+        with_teams(state, |store| act(store, person.as_deref(), &people))
     })
 }
 

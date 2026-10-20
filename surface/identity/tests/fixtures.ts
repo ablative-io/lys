@@ -89,12 +89,14 @@ export const REVIEWER_VIEW: AgentView = {
   provenance: { registered_by: { provider: ISSUER, subject: 'ada' }, events: [], registration: null },
 };
 
+export const ORGANISATION = 'organisation-' + hex(7);
 export const ME: MeView = {
   person: { id: ADA, display_name: 'Ada (test person)', state: 'active' },
   signed_in: { provider: ISSUER, subject: 'ada' },
   sign_in_identities: [{ provider: ISSUER, subject: 'ada' }],
   service_accounts: [],
   getting_started: { host_declined: false },
+  organisation: { id: ORGANISATION, display_name: 'Example organisation' },
 };
 
 export const ROOT_G = 'grant-' + hex(31);

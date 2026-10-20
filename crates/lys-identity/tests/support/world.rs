@@ -124,21 +124,27 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
         std::fs::write(&key, [7; 32])?;
         std::fs::set_permissions(&key, std::fs::Permissions::from_mode(0o600))?;
         let mut directory = open_directory(&dir)?;
+        // Every person is registered under one organisation, founded by
+        // the administrator (DIRECTORY-109 R1).
+        let founded = directory.found_organisation(
+            administrator()?,
+            OperationId::generate()?,
+            Profile::new("Example organisation")?,
+            Profile::new("Admin")?,
+            T0,
+        )?;
+        let (organisation, admin) = (founded.organisation, founded.founder);
         let mut person = |name: &str| -> Result<PersonId, Box<dyn Error>> {
             let (id, _) = directory.register_person(
                 administrator()?,
                 OperationId::generate()?,
                 Profile::new(name)?,
+                organisation,
                 T0,
             )?;
             Ok(id)
         };
-        let (admin, dana, tom, lee) = (
-            person("Admin")?,
-            person("Dana")?,
-            person("Tom")?,
-            person("Lee")?,
-        );
+        let (dana, tom, lee) = (person("Dana")?, person("Tom")?, person("Lee")?);
         let mut agent = |responsible: PersonId, name: &str| -> Result<AgentId, Box<dyn Error>> {
             let (id, _) = directory.register_agent(
                 administrator()?,
@@ -240,7 +246,8 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
             IdentityId::Agent(_)
             | IdentityId::ServiceAccount(_)
             | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => self
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => self
                 .directory
                 .record(recipient)?
                 .and_then(|record| record.responsible())

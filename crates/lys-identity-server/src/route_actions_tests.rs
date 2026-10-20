@@ -101,6 +101,7 @@ async fn fixture_with(
                 actor.clone(),
                 OperationId::generate()?,
                 lys_identity::Profile::new("Owner")?,
+                lys_identity::Profile::new("Example organisation")?,
                 1,
             )?;
             let (agent, _) = directory.register_agent(

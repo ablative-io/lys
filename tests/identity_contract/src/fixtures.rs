@@ -41,6 +41,45 @@ pub fn shown(name: &str) -> Result<Profile, IdentityError> {
     Profile::new(name)
 }
 
+/// The organisation the fixtures found: a label, like every organisation's name.
+///
+/// # Errors
+/// Returns the underlying named setup or API refusal.
+pub fn organisation() -> Result<Profile, IdentityError> {
+    Profile::new("Example organisation")
+}
+
+/// The organisation `person` was registered under (DIRECTORY-109 R1).
+///
+/// # Errors
+/// Refuses a directory that cannot be read or a person under no organisation.
+pub fn organisation_of<S: lys_log_store::LeafStore>(
+    directory: &mut lys_identity::Directory<S>,
+    person: lys_identity::PersonId,
+) -> Result<lys_identity::OrganisationId, Box<dyn std::error::Error>> {
+    Ok(directory
+        .projection()?
+        .organisation_of(lys_identity::IdentityId::Person(person))
+        .ok_or("the person belongs to no organisation")?)
+}
+
+/// The one organisation `directory` holds, for a fixture that registers
+/// people into a seeded directory.
+///
+/// # Errors
+/// Refuses a directory that cannot be read, or one holding no organisation
+/// or more than one.
+pub fn the_organisation<S: lys_log_store::LeafStore>(
+    directory: &mut lys_identity::Directory<S>,
+) -> Result<lys_identity::OrganisationId, Box<dyn std::error::Error>> {
+    let mut held = directory.projection()?.organisations().map(|(id, _)| id);
+    let one = held.ok_or("the directory holds no organisation")?;
+    if held.next().is_some() {
+        return Err("the directory holds more than one organisation".into());
+    }
+    Ok(one)
+}
+
 /// A link the issuer observed under `source_operation_id`.
 ///
 /// # Errors

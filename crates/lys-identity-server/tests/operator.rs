@@ -47,6 +47,7 @@ async fn service_with_broker(
                     code_file: config.log_dir.with_file_name("setup-code"),
                     administrator_file: config.log_dir.with_file_name("administrator.json"),
                     email: None,
+                    organisation: "Example organisation".to_owned(),
                 });
             }
         },

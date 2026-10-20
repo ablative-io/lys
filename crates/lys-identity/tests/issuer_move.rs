@@ -51,6 +51,17 @@ fn signed_in(issuer: &str, subject: &str) -> Result<Actor, IdentityError> {
     ))
 }
 
+/// The organisation `person` was registered under.
+fn organisation_of(
+    directory: &mut Directory<FileLeafStore>,
+    person: PersonId,
+) -> Result<lys_identity::OrganisationId, Box<dyn std::error::Error>> {
+    Ok(directory
+        .projection()?
+        .organisation_of(lys_identity::IdentityId::Person(person))
+        .ok_or("the person belongs to no organisation")?)
+}
+
 /// The administrator set up under the earlier issuer, and a second person
 /// whose login the administrator bound under it.
 fn before_the_move(
@@ -61,12 +72,15 @@ fn before_the_move(
         administrator.clone(),
         OperationId::generate()?,
         Profile::new("Tom")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
+    let organisation = organisation_of(directory, tom)?;
     let (bea, _) = directory.register_person(
         administrator.clone(),
         OperationId::generate()?,
         Profile::new("Bea")?,
+        organisation,
         2,
     )?;
     directory.bind_login(
@@ -179,11 +193,13 @@ fn the_move_is_one_leaf_naming_the_install_the_service_and_the_build() -> Outcom
 fn a_move_onto_a_login_another_person_holds_is_refused_and_records_nothing() -> Outcome {
     let home = home()?;
     let mut directory = open(&home)?;
-    let (_, bea) = before_the_move(&mut directory)?;
+    let (tom, bea) = before_the_move(&mut directory)?;
+    let organisation = organisation_of(&mut directory, tom)?;
     let (someone, _) = directory.register_person(
         signed_in(EARLIER, "administrator")?,
         OperationId::generate()?,
         Profile::new("Someone")?,
+        organisation,
         5,
     )?;
     directory.bind_login(

@@ -1,5 +1,5 @@
-//! Enduring identifiers for people, agents, service accounts, connectors and
-//! machines.
+//! Enduring identifiers for people, agents, service accounts, connectors,
+//! machines and organisations.
 //!
 //! An identifier is sixteen bytes drawn from the operating system's secure
 //! random source when the identity is registered, and it never changes. It is
@@ -13,6 +13,7 @@ use rand::TryRngCore;
 use rand::rngs::OsRng;
 
 use crate::error::IdentityError;
+pub use crate::organisation::OrganisationId;
 
 /// The length in bytes of every identifier this directory writes.
 pub const ID_LEN: usize = 16;
@@ -282,7 +283,7 @@ impl FromStr for AgentId {
 }
 
 /// An identity Lys knows: a person, an agent, a service account, an
-/// approved app's connector or a machine.
+/// approved app's connector, a machine or an organisation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum IdentityId {
     /// A person.
@@ -297,6 +298,9 @@ pub enum IdentityId {
     /// A machine that joined with a connection code, answering to the
     /// administrator who asked for the code.
     Machine(MachineId),
+    /// An organisation, founded by one person, under which people and
+    /// agents are registered (DIRECTORY-109 R1).
+    Organisation(OrganisationId),
 }
 
 impl fmt::Display for IdentityId {
@@ -307,6 +311,7 @@ impl fmt::Display for IdentityId {
             Self::ServiceAccount(id) => id.fmt(f),
             Self::Connector(id) => id.fmt(f),
             Self::Machine(id) => id.fmt(f),
+            Self::Organisation(id) => id.fmt(f),
         }
     }
 }

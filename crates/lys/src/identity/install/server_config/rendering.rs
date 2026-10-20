@@ -88,6 +88,8 @@ fn base_configuration(layout: &Layout, config: &DeploymentConfig, carried: &Carr
             "code_file": state.join(super::super::setup_code::CODE_FILE).display().to_string(),
             "administrator_file": layout.administrator_file().display().to_string(),
             "email": config.deployment.admin_email,
+            // The install's own organisation, founded at setup (DIRECTORY-109 R2).
+            "organisation": config.deployment.project,
         })),
         ("password_policy", json!({
             "length_min": policy.length_min,

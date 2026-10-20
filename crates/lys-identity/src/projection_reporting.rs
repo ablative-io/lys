@@ -69,7 +69,8 @@ impl Projection {
                 }
                 IdentityId::ServiceAccount(_)
                 | IdentityId::Connector(_)
-                | IdentityId::Machine(_) => {
+                | IdentityId::Machine(_)
+                | IdentityId::Organisation(_) => {
                     return Err(IdentityError::AnswersToUnknown {
                         identity: next.to_string(),
                     });
@@ -93,7 +94,8 @@ impl Projection {
             IdentityId::Person(_)
             | IdentityId::ServiceAccount(_)
             | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => {
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a reporting change names an agent",
                 });
@@ -107,6 +109,18 @@ impl Projection {
         if self.resolve_reporting(to, Some(agent))? != responsible_to {
             return Err(IdentityError::ChangeMismatch {
                 reason: "the new accountable person differs from the reporting chain",
+            });
+        }
+        // An agent follows its person within one organisation and never
+        // across (DIRECTORY-109 R1, ruling 8).
+        let moving_to = self.organisation_of(IdentityId::Person(responsible_to));
+        if let (Some(current), Some(named)) = (record.organisation, moving_to)
+            && current != named
+        {
+            return Err(IdentityError::OrganisationMismatch {
+                identity: identity.to_string(),
+                organisation: current.to_string(),
+                named: named.to_string(),
             });
         }
         Ok(())
@@ -135,6 +149,11 @@ impl Projection {
             IdentityId::Machine(_) => {
                 return Err(IdentityError::ChangeMismatch {
                     reason: "a machine is not a reporting target",
+                });
+            }
+            IdentityId::Organisation(_) => {
+                return Err(IdentityError::ChangeMismatch {
+                    reason: "an organisation is not a reporting target",
                 });
             }
         };
@@ -323,6 +342,13 @@ impl Projection {
                     return Err(IdentityError::ChangeMismatch {
                         reason: "a machine is not a stored directory identity",
                     });
+                }
+                IdentityId::Organisation(_) => {
+                    if record.responsible.is_some() || record.reports_to.is_some() {
+                        return Err(IdentityError::ChangeMismatch {
+                            reason: "an organisation snapshot has an agent reporting edge",
+                        });
+                    }
                 }
             }
         }

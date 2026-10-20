@@ -64,6 +64,7 @@ fn snapshot_restores_reporting_indexes_gaps_and_shared_change_provenance()
             identity,
             Change::RegisterPerson {
                 profile: Profile::new("Person")?,
+                organisation: None,
             },
         )?;
         transition(&mut directory, identity, Transition::Activate)?;

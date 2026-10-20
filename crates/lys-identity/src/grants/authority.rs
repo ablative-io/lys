@@ -341,6 +341,129 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         )?)
     }
 
+    /// Issue the one grant Lys issues without a person asking (DIRECTORY-109
+    /// R3): the founder's administrator grant on a newly founded
+    /// organisation. The issuer and the event's caller are the organisation
+    /// itself; the holder is its founder, read from the directory; the
+    /// relation is [`super::shipped::ADMINISTRATOR_RELATION`], carrying the
+    /// four organisation acts, with pass-on of admitting, granting and
+    /// administering to people. The operation is derived from the
+    /// organisation's id, so the founding retried answers the same grant
+    /// and records nothing: a boot that finds an organisation without its
+    /// grant issues it here, which closes the gap between the directory
+    /// log's founding batch and this grant log's leaf.
+    ///
+    /// # Errors
+    /// Refuses an organisation the directory does not hold or that names no
+    /// founder, a model without the administrator relation, operation reuse
+    /// or a failed commit.
+    pub fn found_organisation(
+        &mut self,
+        directory: &Projection,
+        organisation: crate::OrganisationId,
+        at: u64,
+    ) -> Result<Recorded, GrantError> {
+        use super::shipped::{ADMINISTRATOR_RELATION, ORGANISATION_ACTIONS};
+        use super::types::{PassOn, RecipientKind, Relation, Window};
+
+        self.settle_for_change()?;
+        let identity = IdentityId::Organisation(organisation);
+        let founder = directory
+            .record(identity)
+            .and_then(crate::projection::Record::founder)
+            .ok_or_else(|| {
+                GrantError::from(crate::error::IdentityError::IdentityUnknown {
+                    identity: identity.to_string(),
+                })
+            })?;
+        let operation = crate::organisation::derived(
+            OperationId::from_bytes(*organisation.as_bytes()),
+            ADMINISTRATOR_RELATION,
+        );
+        let resource = Resource::new("organisation", &organisation.to_string())?;
+        let relation = Relation::new(ADMINISTRATOR_RELATION)?;
+        let passed = ORGANISATION_ACTIONS
+            .iter()
+            .filter(|action| **action != "organisation.read")
+            .map(|action| Action::new(action))
+            .collect::<Result<BTreeSet<_>, _>>()?;
+        let pass_on = PassOn::to(passed, BTreeSet::from([RecipientKind::Person]))?;
+        if let Some((event, receipt)) = self.answered(operation)? {
+            return match event.change() {
+                GrantChange::Issue(grant)
+                    if grant.parts().issuer == identity
+                        && grant.holder() == IdentityId::Person(founder)
+                        && grant.resource() == &resource =>
+                {
+                    self.answer(event, receipt)
+                }
+                _ => Err(Self::reused(operation)),
+            };
+        }
+        let actions = self.model.actions_on(resource.kind(), &relation)?.clone();
+        let grant = Grant::new(super::types::GrantParts {
+            id: GrantId::generate()?,
+            issuer: identity,
+            holder: IdentityId::Person(founder),
+            responsible: founder,
+            resource,
+            relation,
+            actions,
+            pass_on,
+            source: Source::Root,
+            window: Window::new(at, None)?,
+            model_version: self.model.version_on("organisation"),
+            operation,
+        })?
+        .with_organisation(Some(organisation));
+        self.commit(GrantEvent::new(
+            operation,
+            identity,
+            at,
+            GrantChange::Issue(Box::new(grant)),
+        )?)
+    }
+
+    /// Mark every grant that carries no organisation with `organisation`,
+    /// as one commit of one leaf per grant (DIRECTORY-109 R2): the install's
+    /// store written before organisations is brought under its organisation
+    /// once, at boot. Answers the count stamped; a book with nothing to
+    /// stamp commits nothing and answers zero.
+    ///
+    /// # Errors
+    /// Refuses a failed commit.
+    pub fn stamp_unmarked(
+        &mut self,
+        organisation: crate::OrganisationId,
+        at: u64,
+    ) -> Result<u64, GrantError> {
+        self.settle_for_change()?;
+        let unmarked: Vec<GrantId> = self
+            .book
+            .records()
+            .filter(|record| record.grant().organisation().is_none())
+            .map(|record| record.grant().id())
+            .collect();
+        if unmarked.is_empty() {
+            return Ok(0);
+        }
+        let caller = IdentityId::Organisation(organisation);
+        let mut events = Vec::with_capacity(unmarked.len());
+        for grant in &unmarked {
+            events.push(GrantEvent::new(
+                crate::organisation::derived(OperationId::from_bytes(*grant.as_bytes()), "stamp"),
+                caller,
+                at,
+                GrantChange::Stamp {
+                    grant: *grant,
+                    organisation,
+                },
+            )?);
+        }
+        self.commit_batch(events)?;
+        Ok(unmarked.len() as u64)
+    }
+
     /// Pass on part of a grant the caller holds.
     ///
     /// # Errors

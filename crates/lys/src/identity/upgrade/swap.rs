@@ -378,6 +378,7 @@ fn swap_in(
     // kept for a put-back while one is already short of it (DIRECTORY-107 R2).
     super::super::accept_loss::check_before(layout, "keep data")?;
     data_kept::keep(layout, intent)?;
+    data_kept::keep_for_organisations(layout, intent)?;
     keep_binaries(layout, intent)?;
     place_binaries(layout, plan.from, plan.names, intent)?;
     keep_configuration(layout, intent)?;

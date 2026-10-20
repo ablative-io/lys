@@ -242,6 +242,7 @@ fn old_install_migrates(version: u8) {
             draft.actor.clone(),
             OperationId::from_bytes([9; 16]),
             crate::Profile::new("Example").unwrap(),
+            crate::Profile::new("Example organisation").unwrap(),
             1,
         )
         .unwrap();
@@ -259,7 +260,9 @@ fn old_install_migrates(version: u8) {
             ))
             .unwrap();
     }
-    let fold = if version == 4 { 2 } else { 1 };
+    // Setup writes three leaves (the founding, the person, the activation);
+    // a version-four fixture adds the draft's.
+    let fold = if version == 4 { 4 } else { 3 };
     let state = crate::directory_state::encode(directory.projection().unwrap(), fold).unwrap();
     drop(directory);
     let Value::Array(mut fields) = crate::state_value::decode(&state).unwrap() else {

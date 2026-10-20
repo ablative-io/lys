@@ -76,6 +76,7 @@ pub use recovery::{GrantLedger, Uncertain};
 pub use schema::{ANY_KIND, AppSchema, KindSchema, LYS_APP, SchemaError, app_id, owner_of};
 pub use schema_diff::{Named, RoleChange, SchemaDiff, Standing, diff, stranded};
 pub use settlement::ProjectionDegraded;
+pub use shipped::{ADMINISTRATOR_RELATION, ORGANISATION_ACTIONS};
 pub use shipped::{
     AGENTS_NOT_MACHINES, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold,
     shipped_model,

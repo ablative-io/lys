@@ -2,7 +2,7 @@
 //!
 //! A grant is a canonical CBOR map (RFC 8949 section 4.2) with integer keys 1
 //! to 12, every one required; docs/design/identity/GRANT-CONTRACT.md gives
-//! each key and code. Decoding is strict: a key outside 1 to 15 is refused
+//! each key and code. Decoding is strict: a key outside 1 to 16 is refused
 //! `MemberUnknown`, a missing key `MemberMissing`, an unknown recipient kind
 //! `RecipientKindUnknown`, a malformed lineage `LineageMalformed`, and bytes
 //! that are not the canonical encoding of what they decode to
@@ -12,7 +12,10 @@
 //! written before the mode existed keeps its bytes (ACCESS-001 R1). Key 15,
 //! true, says the relation names a role of the resource's kind; absent, it
 //! names a relation, so a grant written before roles keeps its bytes
-//! (ACCESS-004 R1).
+//! (ACCESS-004 R1). Key 16, the organisation the grant belongs to (16
+//! bytes), is written when the grant carries one (DIRECTORY-109 R3);
+//! absent, the grant was written before organisations and carries none,
+//! which the judge never reads as any organisation's.
 
 use std::collections::BTreeSet;
 
@@ -59,6 +62,7 @@ pub(crate) fn write_identity(out: &mut Vec<u8>, identity: IdentityId) {
         IdentityId::ServiceAccount(id) => (3, *id.as_bytes()),
         IdentityId::Connector(id) => (4, *id.as_bytes()),
         IdentityId::Machine(id) => (5, *id.as_bytes()),
+        IdentityId::Organisation(id) => (6, *id.as_bytes()),
     };
     map(out, 2);
     uint(out, 1);
@@ -91,7 +95,10 @@ pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     let held = mode_code(grant.mode());
     map(
         out,
-        12 + u64::from(grant.is_once()) + u64::from(held.is_some()) + u64::from(grant.names_role()),
+        12 + u64::from(grant.is_once())
+            + u64::from(held.is_some())
+            + u64::from(grant.names_role())
+            + u64::from(grant.organisation().is_some()),
     );
     uint(out, 1);
     bytes(out, parts.id.as_bytes());
@@ -158,6 +165,10 @@ pub(crate) fn write_grant(out: &mut Vec<u8>, grant: &Grant) {
     if grant.names_role() {
         uint(out, 15);
         out.push(TRUE);
+    }
+    if let Some(organisation) = grant.organisation() {
+        uint(out, 16);
+        bytes(out, organisation.as_bytes());
     }
 }
 
@@ -237,8 +248,11 @@ pub(crate) fn read_identity(value: Value) -> Result<IdentityId, GrantError> {
         3 => Ok(IdentityId::ServiceAccount(ServiceAccountId::from_bytes(id))),
         4 => Ok(IdentityId::Connector(ConnectorId::from_bytes(id))),
         5 => Ok(IdentityId::Machine(MachineId::from_bytes(id))),
+        6 => Ok(IdentityId::Organisation(crate::OrganisationId::from_bytes(
+            id,
+        ))),
         _ => Err(malformed(
-            "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account, 4 for a connector or 5 for a machine",
+            "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account, 4 for a connector, 5 for a machine or 6 for an organisation",
         )),
     }
 }
@@ -299,12 +313,13 @@ fn read_window(value: Value) -> Result<Window, GrantError> {
     Window::new(as_uint(&starts, "a window start is seconds")?, ends)
 }
 
-/// What a grant map says beyond its twelve members: one-time, its mode and
-/// whether its relation names a role.
+/// What a grant map says beyond its twelve members: one-time, its mode,
+/// whether its relation names a role, and the organisation it belongs to.
 struct Marks {
     once: bool,
     mode: Mode,
     role: bool,
+    organisation: Option<crate::OrganisationId>,
 }
 
 /// Take every member of a grant map, refusing an unknown or a missing one by name.
@@ -316,6 +331,7 @@ fn members(value: Value) -> Result<([Value; 12], Marks), GrantError> {
     let mut once = None;
     let mut mode = None;
     let mut role = None;
+    let mut organisation = None;
     for (key, value) in pairs {
         let key = as_uint(&key, "a grant's keys are unsigned integers")?;
         if key == 13 {
@@ -344,6 +360,16 @@ fn members(value: Value) -> Result<([Value; 12], Marks), GrantError> {
             }
             continue;
         }
+        if key == 16 {
+            let id = as_id(value, "an organisation is key 16 once, 16 bytes")?;
+            if organisation
+                .replace(crate::OrganisationId::from_bytes(id))
+                .is_some()
+            {
+                return Err(malformed("an organisation is key 16 once, 16 bytes"));
+            }
+            continue;
+        }
         let slot = usize::try_from(key)
             .ok()
             .and_then(|key| key.checked_sub(1))
@@ -366,6 +392,7 @@ fn members(value: Value) -> Result<([Value; 12], Marks), GrantError> {
             once: once.is_some(),
             mode: mode.unwrap_or(Mode::Outright),
             role: role.is_some(),
+            organisation,
         },
     ))
 }
@@ -410,7 +437,8 @@ pub(crate) fn read_grant(value: Value) -> Result<Grant, GrantError> {
     } else {
         Grant::new(parts)
     }?
-    .with_mode(marks.mode);
+    .with_mode(marks.mode)
+    .with_organisation(marks.organisation);
     Ok(if marks.role { grant.as_role() } else { grant })
 }
 

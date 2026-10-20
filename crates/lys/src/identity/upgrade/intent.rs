@@ -8,6 +8,10 @@
 //! or after it, never a torn one. It is removed when the upgrade ends,
 //! finished or put back.
 //!
+//! The copy of the stores made before the first boot under organisations is
+//! named on the record too, so a put-back has it in hand without reading a
+//! log (DIRECTORY-109 R2).
+//!
 //! Invariants: a record present means an upgrade stopped part-way; every
 //! upgrade and every install reads it first and ends it, naming which way,
 //! before doing anything else. A step is recorded only after it completed.
@@ -80,6 +84,12 @@ pub struct Intent {
     pub compose_changed: bool,
     /// Each step completed, in order.
     pub steps: Vec<Step>,
+    /// Where the directory and grant logs were copied before the first
+    /// boot under organisations rewrote them (DIRECTORY-109 R2):
+    /// `data.previous-organisation/<rfc3339>/`, kept once and never
+    /// replaced by a later upgrade; absent when this upgrade made no copy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organisation_copy: Option<PathBuf>,
 }
 
 fn invalid(detail: impl Into<String>, layout: &Layout) -> IdentityError {

@@ -57,12 +57,16 @@ impl Table {
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    Profile::new("Example organisation")?,
                     1,
                 )?;
+                let organisation =
+                    identity_contract::fixtures::organisation_of(&mut directory, person)?;
                 let (other, _) = directory.register_person(
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Other")?,
+                    organisation,
                     1,
                 )?;
                 directory.bind_login(

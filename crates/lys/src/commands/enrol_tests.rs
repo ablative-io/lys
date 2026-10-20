@@ -143,10 +143,16 @@ impl Lys {
         let body = serde_json::to_vec(&json!({"operation": op()?, "display_name": name}))?;
         let at = u64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis())?;
         let nonce = hex(OperationId::generate()?.as_bytes());
-        let cose = sign_attestation(&payload("POST", "/agents", &body, at, &nonce), &self.creator_key)
-            .to_cose_bytes();
+        let cose = sign_attestation(
+            &payload("POST", "/agents", &body, at, &nonce),
+            &self.creator_key,
+        )
+        .to_cose_bytes();
         let header = format!("{} {at} {nonce} {}", self.creator, hex(&cose));
-        let answer = ok(self.service.post_signed("/agents", (HEADER, &header), body).await?)?;
+        let answer = ok(self
+            .service
+            .post_signed("/agents", (HEADER, &header), body)
+            .await?)?;
         Ok(answer["agent"].as_str().ok_or("no agent")?.to_owned())
     }
 
@@ -257,7 +263,11 @@ async fn with_a_door_the_seat_file_carries_cambiums_member_names() -> TestResult
     assert_eq!(members["doorUrl"], door.door_url.as_str());
     assert_eq!(members["handle"], door.handle.as_str());
     assert_eq!(members["device"], door.device.as_str());
-    assert!(members["privateKeyPem"].as_str().is_some_and(|pem| pem.contains("PRIVATE KEY")));
+    assert!(
+        members["privateKeyPem"]
+            .as_str()
+            .is_some_and(|pem| pem.contains("PRIVATE KEY"))
+    );
     assert_eq!(members["lysUrl"], lys.service.base.as_str());
     assert_eq!(members["lysAgentId"], agent.as_str());
     let seat = certified_seat(&out)?;

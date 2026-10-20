@@ -19,6 +19,7 @@ pub fn identity_kind(identity: &IdentityId) -> &'static str {
         IdentityId::ServiceAccount(_) => "service_account",
         IdentityId::Connector(_) => "connector",
         IdentityId::Machine(_) => "machine",
+        IdentityId::Organisation(_) => "organisation",
     }
 }
 

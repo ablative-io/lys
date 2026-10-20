@@ -110,12 +110,15 @@ fn registered() -> Result<Registered, Box<dyn Error>> {
         LoginBinding::new("https://issuer.test", "administrator")?,
         Provenance::new(AuthMethod::Oidc, 1_790_000_000),
     );
-    let (person, _) = directory.register_person(
-        administrator.clone(),
-        OperationId::from_bytes([1; 16]),
-        Profile::new("Ada")?,
-        10,
-    )?;
+    let person = directory
+        .found_organisation(
+            administrator.clone(),
+            OperationId::from_bytes([1; 16]),
+            Profile::new("Example organisation")?,
+            Profile::new("Ada")?,
+            10,
+        )?
+        .founder;
     let (agent, _) = directory.register_agent(
         administrator,
         OperationId::from_bytes([2; 16]),

@@ -173,6 +173,7 @@ fn person(directory: &mut Projection, subject: &str, at: u64) -> Result<PersonId
         at,
         Change::SetupPerson {
             profile: Profile::new("An example on the test bench")?,
+            organisation: None,
         },
     )?;
     let index = directory.records().count() as u64;

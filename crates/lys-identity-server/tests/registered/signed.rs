@@ -41,12 +41,15 @@ async fn signed_write(person_active: bool) -> TestResult {
             Provenance::new(AuthMethod::Oidc, 1),
         );
         let binding = LoginBinding::new(&config.issuer, LINK_AUDIT_SOURCE)?;
-        let (person, _) = directory.register_person(
-            admin.clone(),
-            OperationId::generate()?,
-            Profile::new("Source person")?,
-            1,
-        )?;
+        let person = directory
+            .found_organisation(
+                admin.clone(),
+                OperationId::generate()?,
+                identity_contract::fixtures::organisation()?,
+                Profile::new("Source person")?,
+                1,
+            )?
+            .founder;
         directory.bind_login(admin.clone(), OperationId::generate()?, person, binding, 2)?;
         let (agent, _) = directory.register_agent(
             admin.clone(),

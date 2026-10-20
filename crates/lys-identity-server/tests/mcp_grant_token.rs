@@ -54,6 +54,7 @@ impl Fixture {
                     actor.clone(),
                     OperationId::generate()?,
                     Profile::new("Owner")?,
+                    Profile::new("Example organisation")?,
                     1,
                 )?;
                 let parent = if chain {

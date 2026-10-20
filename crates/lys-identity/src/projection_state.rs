@@ -12,7 +12,7 @@ use ciborium::Value;
 use super::{Projection, Record};
 use crate::event::wire;
 use crate::id::IdentityId;
-use crate::id::{ID_LEN, PersonId};
+use crate::id::{ID_LEN, OrganisationId, PersonId};
 use crate::profile::Profile;
 use crate::state_value::{
     Unreadable, array, binding, bytes, identity, indexed, list, nullable, operation, read_binding,
@@ -30,10 +30,37 @@ fn record(id: IdentityId, record: &Record) -> Value {
         binding(&record.registered_by),
         array(record.events.iter().map(|index| uint(*index)).collect()),
         nullable(record.reports_to.map(identity)),
+        nullable(
+            record
+                .organisation
+                .map(|organisation| bytes(organisation.as_bytes())),
+        ),
+        nullable(record.founder.map(|founder| bytes(founder.as_bytes()))),
     ])
 }
 
+/// A record of eight fields (state versions 3 to 5) or ten (version 6, with
+/// its organisation and founder).
 fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
+    let mut parts = list(value, "a directory record")?;
+    let (organisation, founder) = if parts.len() == 10 {
+        let founder = parts.pop();
+        let organisation = parts.pop();
+        (
+            organisation
+                .and_then(read_nullable)
+                .map(|value| read_fixed::<ID_LEN>(value, "an organisation"))
+                .transpose()?
+                .map(OrganisationId::from_bytes),
+            founder
+                .and_then(read_nullable)
+                .map(|value| read_fixed::<ID_LEN>(value, "a founder"))
+                .transpose()?
+                .map(PersonId::from_bytes),
+        )
+    } else {
+        (None, None)
+    };
     let [
         id,
         name,
@@ -43,7 +70,7 @@ fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
         registered_by,
         events,
         reports_to,
-    ] = tuple::<8>(value, "a directory record")?;
+    ] = tuple::<8>(array(parts), "a directory record")?;
     let state = read_uint(&state, "a lifecycle state")?;
     let record = Record {
         profile: Profile::new(&read_text(name, "a display name")?)
@@ -65,6 +92,8 @@ fn read_record(value: Value) -> Result<(IdentityId, Record), Unreadable> {
             .iter()
             .map(|index| read_uint(index, "an event index"))
             .collect::<Result<_, _>>()?,
+        organisation,
+        founder,
     };
     Ok((read_identity(id)?, record))
 }
@@ -137,6 +166,9 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
                 IdentityId::Machine(_) => {
                     return Err("a machine cannot hold login bindings".to_owned());
                 }
+                IdentityId::Organisation(_) => {
+                    return Err("an organisation cannot hold login bindings".to_owned());
+                }
             };
             if taken {
                 return Err(format!("a login is bound twice, the second time to {id}"));
@@ -151,7 +183,8 @@ pub(crate) fn decode(value: Value) -> Result<Projection, Unreadable> {
             IdentityId::Agent(_)
             | IdentityId::ServiceAccount(_)
             | IdentityId::Connector(_)
-            | IdentityId::Machine(_) => {}
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => {}
         }
         if Arc::make_mut(&mut projection.records)
             .insert(id, record)
@@ -203,6 +236,9 @@ pub(crate) fn migrate_v2(value: Value) -> Result<Projection, Unreadable> {
             }
             IdentityId::Machine(_) => {
                 return Err("a machine is not a stored directory identity".to_owned());
+            }
+            IdentityId::Organisation(_) => {
+                return Err("a version-two directory holds no organisation".to_owned());
             }
         };
         let mut fields = Vec::from(fields);

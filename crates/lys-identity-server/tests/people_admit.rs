@@ -62,6 +62,7 @@ async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
                 code_file: config.log_dir.with_file_name("setup-code"),
                 administrator_file: config.log_dir.with_file_name("administrator.json"),
                 email: None,
+                organisation: "Example organisation".to_owned(),
             });
         },
         |config| {

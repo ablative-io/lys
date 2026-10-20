@@ -205,7 +205,10 @@ impl Table {
                 let seeded = match seeding {
                     Seeding::Commands(other_subject) => command_seed(config, other_subject)?,
                     Seeding::Configured => seed_configured(config, [ADMINISTRATOR, "bea-subject"])?,
+                    // Nobody seeded: no organisation exists, and the id here
+                    // names none; no test reads it.
                     Seeding::Nobody => Seeded {
+                        organisation: lys_identity::OrganisationId::from_bytes([0; 16]),
                         people: Vec::new(),
                         tree_size: 0,
                     },
@@ -407,6 +410,7 @@ fn command_seed(
         actor.clone(),
         OperationId::generate()?,
         Profile::new("Owner")?,
+        Profile::new("Example organisation")?,
         1,
     )?;
     let (agent, _) = directory.register_agent(
@@ -425,10 +429,12 @@ fn command_seed(
         3,
     )?;
     if let Some(subject) = other_subject {
+        let organisation = identity_contract::fixtures::organisation_of(&mut directory, owner)?;
         let (other, _) = directory.register_person(
             actor.clone(),
             OperationId::generate()?,
             Profile::new("Other")?,
+            organisation,
             4,
         )?;
         directory.bind_login(
@@ -447,7 +453,9 @@ fn command_seed(
             6,
         )?;
     }
+    let organisation = identity_contract::fixtures::organisation_of(&mut directory, owner)?;
     Ok(Seeded {
+        organisation,
         people: vec![SeededPerson {
             id: owner,
             display_name: "Owner".to_owned(),

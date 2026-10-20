@@ -159,7 +159,7 @@ macro_rules! budgets_feed_entries {
             let mut directory = $crate::routes::open_directory(&config)?;
             let binding = lys_identity::LoginBinding::new(&config.issuer, "owner")?;
             let actor = lys_identity::Actor::new(binding.clone(), lys_identity::Provenance::new(lys_identity::AuthMethod::Oidc, 1));
-            let (owner, _) = directory.setup_person(actor.clone(), lys_identity::OperationId::generate()?, lys_identity::Profile::new("Owner")?, 1)?;
+            let (owner, _) = directory.setup_person(actor.clone(), lys_identity::OperationId::generate()?, lys_identity::Profile::new("Owner")?, lys_identity::Profile::new("Example organisation")?, 1)?;
             let (agent, _) = directory.register_agent(actor.clone(), lys_identity::OperationId::generate()?, owner, lys_identity::Profile::new("Agent")?, 2)?;
             directory.transition(actor, lys_identity::OperationId::generate()?, lys_identity::IdentityId::Agent(agent), lys_identity::Transition::Activate, "", 3)?;
             let messages = Arc::new(Mutex::new(Vec::new()));

@@ -58,6 +58,9 @@ pub(super) struct Authority<'a> {
     pub resource: Option<&'a Resource>,
     pub pass_on: &'a PassOn,
     pub mode: Mode,
+    /// The organisation the authority belongs to, when it carries one: a
+    /// grant is passed on within it (DIRECTORY-109 R3).
+    pub organisation: Option<crate::OrganisationId>,
 }
 
 impl Authority<'_> {
@@ -95,6 +98,15 @@ pub(super) fn judge_pass_on(
     }
     active(directory, request.recipient)?;
     responsible_is(directory, request.recipient, request.responsible)?;
+    if let Some(organisation) = source.organisation
+        && directory.organisation_of(request.recipient) != Some(organisation)
+    {
+        return Err(GrantError::OrganisationOutside {
+            grant: source.name(),
+            organisation: organisation.to_string(),
+            recipient: request.recipient.to_string(),
+        });
+    }
     if source
         .resource
         .is_some_and(|resource| resource != &request.resource)
@@ -147,7 +159,11 @@ pub(super) fn judge_pass_on(
         model_version: within.model_version,
         operation: request.operation,
     })
-    .map(|grant| grant.with_mode(source.mode))
+    .map(|grant| {
+        grant
+            .with_mode(source.mode)
+            .with_organisation(source.organisation)
+    })
 }
 
 pub(super) fn recipients() -> BTreeSet<RecipientKind> {

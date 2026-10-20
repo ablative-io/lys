@@ -14,7 +14,10 @@ use super::{ADMINISTRATOR, TestResult, agent, grant, login, machine, seeded};
 const NOT_STORES: &[(&str, &str)] = &[
     ("install", "the receipt and acceptances themselves"),
     ("client.secret", "a credential the installer writes"),
-    ("issuer.key", "the test's own sign-in issuer's key, not the service's"),
+    (
+        "issuer.key",
+        "the test's own sign-in issuer's key, not the service's",
+    ),
     ("grant-model.json", "the configuration the installer writes"),
     (
         "sessions.json",

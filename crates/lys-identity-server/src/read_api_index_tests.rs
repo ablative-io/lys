@@ -29,6 +29,7 @@ fn a_persons_agent_view_does_not_visit_other_peoples_records() -> Result<(), Box
             1,
             Change::SetupPerson {
                 profile: Profile::new("Person")?,
+                organisation: None,
             },
         )?;
         projection.apply(&event, index)?;
@@ -87,6 +88,7 @@ fn personal_projection() -> Result<(Projection, PersonId), Box<dyn Error>> {
         1,
         Change::SetupPerson {
             profile: Profile::new("Person")?,
+            organisation: None,
         },
     )?;
     projection.apply(&event, 0)?;

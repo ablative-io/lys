@@ -5,10 +5,31 @@ use super::{
     LifecycleState, LinkObservation, LoginBinding, OperationId, PersonId, Profile, Provenance,
     Value, as_id, as_text, as_uint, cbor, encode_body, fields, malformed, reporting, wire,
 };
+use crate::id::OrganisationId;
 
 pub(super) fn decode_profile(value: Value) -> Result<Profile, IdentityError> {
     let [name] = fields::<1>(value, "a profile is a map of key 1")?;
     Profile::new(&as_text(name, "a display name is text")?)
+}
+
+/// A person registration's profile and organisation: a map of key 1 alone
+/// for a leaf written before organisations, of keys 1 and 2 after.
+fn decode_registration(
+    value: Value,
+    reason: &'static str,
+) -> Result<(Profile, Option<OrganisationId>), IdentityError> {
+    if matches!(&value, Value::Map(pairs) if pairs.len() == 2) {
+        let [shown, organisation] = fields::<2>(value, reason)?;
+        return Ok((
+            decode_profile(shown)?,
+            Some(OrganisationId::from_bytes(as_id(
+                organisation,
+                "an organisation is 16 bytes",
+            )?)),
+        ));
+    }
+    let [shown] = fields::<1>(value, reason)?;
+    Ok((decode_profile(shown)?, None))
 }
 
 fn state(value: &Value) -> Result<LifecycleState, IdentityError> {
@@ -20,15 +41,37 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
     const TEXT: &str = "a change field is text";
     match kind {
         wire::SETUP_PERSON => {
-            let [shown] = fields::<1>(value, "a setup is a map of key 1")?;
+            let (profile, organisation) =
+                decode_registration(value, "a setup is a map of key 1, or keys 1 and 2")?;
             Ok(Change::SetupPerson {
-                profile: decode_profile(shown)?,
+                profile,
+                organisation,
             })
         }
         wire::REGISTER_PERSON => {
-            let [shown] = fields::<1>(value, "a person registration is a map of key 1")?;
+            let (profile, organisation) = decode_registration(
+                value,
+                "a person registration is a map of key 1, or keys 1 and 2",
+            )?;
             Ok(Change::RegisterPerson {
+                profile,
+                organisation,
+            })
+        }
+        wire::FOUND_ORGANISATION => {
+            let [shown, founder] = fields::<2>(value, "a founding is a map of keys 1 and 2")?;
+            Ok(Change::FoundOrganisation {
                 profile: decode_profile(shown)?,
+                founder: PersonId::from_bytes(as_id(founder, "a founder is 16 bytes")?),
+            })
+        }
+        wire::ATTACH_ORGANISATION => {
+            let [organisation] = fields::<1>(value, "an attachment is a map of key 1")?;
+            Ok(Change::AttachOrganisation {
+                organisation: OrganisationId::from_bytes(as_id(
+                    organisation,
+                    "an organisation is 16 bytes",
+                )?),
             })
         }
         wire::REGISTER_AGENT => {
@@ -91,7 +134,7 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
                 &as_text(signature, TEXT)?,
             )?))
         }
-        _ => Err(malformed("a change kind is 1 to 10")),
+        _ => Err(malformed("a change kind is 1 to 12")),
     }
 }
 
@@ -176,6 +219,41 @@ pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, Identity
     })
 }
 
+/// The highest change kind the build before organisations (043cc007) read:
+/// its decoder answered any higher kind `EventMalformed` at the arm every
+/// kind it did not know fell to, and read a person registration as a map
+/// of exactly key 1.
+pub const HIGHEST_KIND_BEFORE_ORGANISATIONS: u64 = 10;
+
+/// The event `body` names as the build before organisations read it
+/// (DIRECTORY-109 R2): a founding or an attachment, a change kind above
+/// [`HIGHEST_KIND_BEFORE_ORGANISATIONS`], is refused `EventMalformed` with
+/// that build's words, and so is a person registration or setup naming an
+/// organisation, a map of two keys where it read one. So a store brought
+/// under an organisation is unreadable to a put-back, never silently read
+/// as narrower than it is; the copy the upgrade kept is the put-back.
+///
+/// # Errors
+/// - `IdentityError::EventMalformed` if the previous build would have refused the body, or this one does.
+/// - Every other refusal of [`decode_body`].
+pub fn decode_body_before_organisations(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
+    let event = decode_body(body)?;
+    match event.change() {
+        Change::FoundOrganisation { .. } | Change::AttachOrganisation { .. } => {
+            Err(malformed("a change kind is 1 to 10"))
+        }
+        Change::RegisterPerson {
+            organisation: Some(_),
+            ..
+        } => Err(malformed("a person registration is a map of key 1")),
+        Change::SetupPerson {
+            organisation: Some(_),
+            ..
+        } => Err(malformed("a setup is a map of key 1")),
+        _ => Ok(event),
+    }
+}
+
 /// The event an event body's bytes name, refused unless the bytes are its canonical encoding.
 ///
 /// # Errors
@@ -215,9 +293,10 @@ pub fn decode_body(body: &[u8]) -> Result<IdentityEvent, IdentityError> {
     let identity = match as_uint(&identity_kind, "an identity kind is a code")? {
         wire::PERSON => IdentityId::Person(PersonId::from_bytes(identity_id)),
         wire::AGENT => IdentityId::Agent(AgentId::from_bytes(identity_id)),
+        wire::ORGANISATION => IdentityId::Organisation(OrganisationId::from_bytes(identity_id)),
         _ => {
             return Err(malformed(
-                "a directory event's identity kind code is 1 for a person or 2 for an agent",
+                "a directory event's identity kind code is 1 for a person, 2 for an agent or 6 for an organisation",
             ));
         }
     };

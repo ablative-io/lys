@@ -41,16 +41,19 @@ fn receiver() -> Result<Receiver, Box<dyn Error>> {
         LoginBinding::new(ISSUER, "administrator")?,
         Provenance::new(AuthMethod::Oidc, 1_790_000_000),
     );
-    let (ada, _) = directory.register_person(
+    let founded = directory.found_organisation(
         administrator.clone(),
         OperationId::from_bytes([1; 16]),
+        Profile::new("Example organisation")?,
         Profile::new("Ada")?,
         10,
     )?;
+    let ada = founded.founder;
     let (grace, _) = directory.register_person(
         administrator,
         OperationId::from_bytes([2; 16]),
         Profile::new("Grace")?,
+        founded.organisation,
         11,
     )?;
     let source = Actor::new(

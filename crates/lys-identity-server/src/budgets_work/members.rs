@@ -34,6 +34,7 @@ fn directory(size: u64) -> TestResult<(Projection, Vec<String>)> {
             1,
             Change::SetupPerson {
                 profile: Profile::new("Operator")?,
+                organisation: None,
             },
         )?,
         0,

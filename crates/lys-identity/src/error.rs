@@ -197,6 +197,19 @@ pub enum IdentityError {
         /// The identity named.
         identity: String,
     },
+    /// A change would move a record across organisations, or name an
+    /// organisation other than the one it belongs to (DIRECTORY-109 R1).
+    #[error(
+        "OrganisationMismatch: {identity} belongs to {organisation}, not {named}; a record never moves across organisations"
+    )]
+    OrganisationMismatch {
+        /// The identity named.
+        identity: String,
+        /// The organisation it belongs to.
+        organisation: String,
+        /// The organisation the change named.
+        named: String,
+    },
     /// A login is already bound to a person.
     #[error("BindingTaken: the login {subject} at {issuer} is already bound to {person}")]
     BindingTaken {

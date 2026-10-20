@@ -298,6 +298,20 @@ impl GrantBook {
                 }
                 Ok(())
             }
+            GrantChange::Stamp { grant, .. } => {
+                let record = self
+                    .records
+                    .get(grant)
+                    .ok_or_else(|| GrantError::GrantUnknown {
+                        grant: grant.to_string(),
+                    })?;
+                if record.grant.organisation().is_some() {
+                    return Err(GrantError::EventMismatch {
+                        reason: "a stamp names a grant that carries no organisation yet",
+                    });
+                }
+                Ok(())
+            }
         }
     }
 
@@ -364,6 +378,14 @@ impl GrantBook {
                 }
                 if spent {
                     self.prune_live(*grant);
+                }
+            }
+            GrantChange::Stamp {
+                grant,
+                organisation,
+            } => {
+                if let Some(record) = self.records.get_mut(grant) {
+                    record.grant = record.grant.clone().with_organisation(Some(*organisation));
                 }
             }
         }

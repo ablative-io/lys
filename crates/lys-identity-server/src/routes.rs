@@ -446,8 +446,11 @@ pub(crate) fn identity_id(text: &str) -> Result<IdentityId, ServerError> {
         Some("connector") => lys_identity::ConnectorId::from_str(text).map(IdentityId::Connector),
         Some("machine") => lys_identity::MachineId::from_str(text).map(IdentityId::Machine),
         Some("person") => PersonId::from_str(text).map(IdentityId::Person),
+        Some("organisation") => {
+            lys_identity::OrganisationId::from_str(text).map(IdentityId::Organisation)
+        }
         _ => Err(lys_identity::IdentityError::IdentifierMalformed {
-            kind: "person, agent, service account, connector or machine",
+            kind: "person, agent, service account, connector, machine or organisation",
             text: text.to_owned(),
         }),
     };

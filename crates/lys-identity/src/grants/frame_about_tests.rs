@@ -93,12 +93,15 @@ fn fixture(others: usize) -> Result<Fixture, Box<dyn Error>> {
         LoginBinding::new("https://issuer.test", "administrator")?,
         Provenance::new(AuthMethod::Oidc, 1),
     );
-    let (person, _) = directory.register_person(
-        actor.clone(),
-        OperationId::generate()?,
-        Profile::new("holder")?,
-        1,
-    )?;
+    let person = directory
+        .found_organisation(
+            actor.clone(),
+            OperationId::generate()?,
+            Profile::new("Example organisation")?,
+            Profile::new("holder")?,
+            1,
+        )?
+        .founder;
     directory.transition(
         actor,
         OperationId::generate()?,

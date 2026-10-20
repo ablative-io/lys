@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use lys_log_store::{FileLeafStore, FrontierLog};
 
 use super::super::intent::{Intent, Step};
-use super::{keep, restore, restore_at};
+use super::{keep, keep_for_organisations, restore, restore_at};
 use crate::identity::install::layout::Layout;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -30,6 +30,7 @@ fn intent() -> Intent {
         files: Vec::new(),
         compose_changed: false,
         steps: Vec::new(),
+        organisation_copy: None,
     }
 }
 
@@ -297,5 +298,62 @@ fn the_record_names_the_kept_data_so_a_release_that_cannot_put_it_back_refuses_i
     );
     assert!(layout.data_previous_dir().is_dir());
     assert!(intent.has(Step::DataKept));
+    Ok(())
+}
+
+#[test]
+fn the_stores_before_organisations_are_kept_once_and_named_on_the_record() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let layout = Layout::at(dir.path().to_path_buf());
+    append(&layout.data_dir().join("directory-log"), 3)?;
+    append(&layout.data_dir().join("grant-log"), 2)?;
+    std::fs::write(layout.data_dir().join("sessions.json"), b"not a store")?;
+    let mut intent = intent();
+    intent.write(&layout)?;
+    keep_for_organisations(&layout, &mut intent)?;
+    let copy = intent
+        .organisation_copy
+        .clone()
+        .ok_or("the record names no organisation copy")?;
+    let name = copy
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("the copy has no name")?;
+    assert!(
+        chrono::DateTime::parse_from_rfc3339(name).is_ok(),
+        "the copy is named by the instant it was made: {name}"
+    );
+    assert_eq!(
+        copy.parent(),
+        Some(layout.root.join("data.previous-organisation").as_path())
+    );
+    assert_eq!(records(&copy.join("directory-log"))?, 3);
+    assert_eq!(records(&copy.join("grant-log"))?, 2);
+    assert!(
+        !copy.join("sessions.json").exists(),
+        "only the two stores are copied"
+    );
+    let read = Intent::read(&layout)?.ok_or("the record is gone")?;
+    assert_eq!(read.organisation_copy, Some(copy.clone()));
+    // A later upgrade finds the copy and leaves it: the record then names none.
+    append(&layout.data_dir().join("directory-log"), 4)?;
+    let mut later = intent();
+    keep_for_organisations(&layout, &mut later)?;
+    assert_eq!(later.organisation_copy, None);
+    assert_eq!(records(&copy.join("directory-log"))?, 3);
+    let folders = std::fs::read_dir(layout.root.join("data.previous-organisation"))?.count();
+    assert_eq!(folders, 1);
+    Ok(())
+}
+
+#[test]
+fn an_install_with_no_store_yet_keeps_nothing_for_organisations() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let layout = Layout::at(dir.path().to_path_buf());
+    std::fs::create_dir_all(layout.data_dir())?;
+    let mut intent = intent();
+    keep_for_organisations(&layout, &mut intent)?;
+    assert_eq!(intent.organisation_copy, None);
+    assert!(!layout.root.join("data.previous-organisation").exists());
     Ok(())
 }

@@ -58,7 +58,9 @@ async fn walk(table: &Table) -> TestResult {
     let roots = agent_roots(service, &table.ada).await?;
     assert!(!roots.is_empty(), "setup recorded no roots");
     assert!(
-        roots.iter().all(|root| root["resource"]["kind"] != "machine"),
+        roots
+            .iter()
+            .all(|root| root["resource"]["kind"] != "machine"),
         "{roots:?}"
     );
 
@@ -89,9 +91,17 @@ async fn walk(table: &Table) -> TestResult {
     ok(post(service, "/grants/agent-roots", auth, &json!({})).await?)?;
     let computers = own_computers(service, &table.ada).await?;
     assert_eq!(computers.len(), 1, "{computers:?}");
-    let machine = computers[0]["id"].as_str().ok_or("no machine id")?.to_owned();
+    let machine = computers[0]["id"]
+        .as_str()
+        .ok_or("no machine id")?
+        .to_owned();
     assert_eq!(computers[0]["named_by"], person.as_str(), "{computers:?}");
-    let runner = ok(get(service, &format!("/network/machines/{machine}/runner"), auth).await?)?;
+    let runner = ok(get(
+        service,
+        &format!("/network/machines/{machine}/runner"),
+        auth,
+    )
+    .await?)?;
     assert_eq!(runner["runner"]["kind"], "lys", "{runner}");
 
     let roots = agent_roots(service, &table.ada).await?;

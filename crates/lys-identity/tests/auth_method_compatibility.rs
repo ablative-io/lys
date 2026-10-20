@@ -23,6 +23,7 @@ fn event(method: AuthMethod) -> Result<IdentityEvent, Box<dyn Error>> {
         2,
         Change::RegisterPerson {
             profile: Profile::new("Compatibility fixture")?,
+            organisation: None,
         },
     )?)
 }

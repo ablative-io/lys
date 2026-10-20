@@ -147,16 +147,19 @@ async fn member_fixture() -> Result<(identity_contract::harness::Service, String
             Box::new(move || lys_log_store::FileLeafStore::open(&path)),
             key,
         )?;
-        directory.setup_person(
+        let (owner, _) = directory.setup_person(
             administrator.clone(),
             OperationId::generate()?,
             Profile::new("Owner")?,
+            Profile::new("Example organisation")?,
             1,
         )?;
+        let organisation = identity_contract::fixtures::organisation_of(&mut directory, owner)?;
         let (person, _) = directory.register_person(
             administrator.clone(),
             OperationId::generate()?,
             Profile::new("Member")?,
+            organisation,
             2,
         )?;
         directory.bind_login(

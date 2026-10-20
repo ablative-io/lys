@@ -75,11 +75,12 @@ pub(super) async fn service(heard: &Heard) -> Result<Service, Box<dyn Error>> {
                 .push(line.to_owned());
         })),
         |config| {
-            identity_contract::lys_identity_server::dev_seed::seed_configured(
+            let seeded = identity_contract::lys_identity_server::dev_seed::seed_configured(
                 config,
                 [OWNER, OTHER],
             )?;
-            // The owner and the administrator must be distinct active people.
+            // The owner and the administrator must be distinct active people
+            // of the one seeded organisation.
             let mut directory =
                 identity_contract::lys_identity_server::routes::open_directory(config)?;
             let at = crate::session::now();
@@ -89,6 +90,7 @@ pub(super) async fn service(heard: &Heard) -> Result<Service, Box<dyn Error>> {
                 actor.clone(),
                 OperationId::generate()?,
                 Profile::new("Administrator")?,
+                seeded.organisation,
                 at,
             )?;
             directory.bind_login(

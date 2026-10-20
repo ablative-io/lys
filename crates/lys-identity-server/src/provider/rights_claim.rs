@@ -73,7 +73,8 @@ pub(super) fn pass(
         IdentityId::Person(_)
         | IdentityId::Machine(_)
         | IdentityId::Connector(_)
-        | IdentityId::ServiceAccount(_) => Vec::new(),
+        | IdentityId::ServiceAccount(_)
+        | IdentityId::Organisation(_) => Vec::new(),
     };
     let expires_at = ends_at.min(at.saturating_add(provider.pass_seconds));
     if expires_at <= at {
@@ -145,9 +146,10 @@ pub(super) fn holder_of(directory: &Projection, holder: IdentityId) -> Result<Ho
         IdentityId::ServiceAccount(_) => "service_account",
         IdentityId::Connector(_) => "connector",
         IdentityId::Machine(_) => "machine",
+        IdentityId::Organisation(_) => "organisation",
     };
     let responsible = match holder {
-        IdentityId::Person(_) => None,
+        IdentityId::Person(_) | IdentityId::Organisation(_) => None,
         IdentityId::Agent(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)

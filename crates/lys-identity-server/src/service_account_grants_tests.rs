@@ -187,10 +187,12 @@ fn directory() -> Result<(Projection, PersonId), Box<dyn Error>> {
         let change = if index == 0 {
             Change::SetupPerson {
                 profile: Profile::new("owner")?,
+                organisation: None,
             }
         } else {
             Change::RegisterPerson {
                 profile: Profile::new("person")?,
+                organisation: None,
             }
         };
         projection.apply(

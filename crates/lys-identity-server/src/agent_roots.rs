@@ -97,7 +97,9 @@ fn issue_with(
         let own = |kind: &str, acts: &[&str]| -> std::collections::BTreeSet<Action> {
             carried
                 .iter()
-                .filter(|action| acts.contains(&action.as_str()) && agent_may_hold(kind, action.as_str()))
+                .filter(|action| {
+                    acts.contains(&action.as_str()) && agent_may_hold(kind, action.as_str())
+                })
                 .cloned()
                 .collect()
         };

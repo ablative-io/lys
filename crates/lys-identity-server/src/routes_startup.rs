@@ -413,6 +413,9 @@ fn sign_in_providers(
 }
 
 fn recover(state: &Shared) -> Result<(), ServerError> {
+    // Every person, agent and grant is under an organisation before any
+    // read of them is served (DIRECTORY-109 R2).
+    crate::organisation_boot::at_start(state)?;
     crate::teams_migration::at_start(state)?;
     crate::budgets_migration::advance(state)?;
     // A refused grant checkpoint holds the grants until the operator resets

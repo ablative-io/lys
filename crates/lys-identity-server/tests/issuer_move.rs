@@ -29,6 +29,7 @@ async fn set_up() -> Result<Service, Box<dyn Error>> {
             administrator,
             OperationId::generate()?,
             Profile::new("Tom")?,
+            Profile::new("Example organisation")?,
             1,
         )?;
         Ok(())

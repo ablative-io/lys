@@ -103,6 +103,8 @@ impl Accounts {
             bindings: Vec::new(),
             registered_by: created_by.clone(),
             events: Vec::new(),
+            organisation: None,
+            founder: None,
         });
         self.records.insert(
             identity,
@@ -129,6 +131,20 @@ impl Accounts {
             LifecycleState::Retired => 3,
         };
         account.states.get(index)
+    }
+
+    /// The organisation the account's owner belongs to: an account belongs
+    /// to its owner's organisation and to no other.
+    pub(super) fn organisation_of(
+        &self,
+        id: IdentityId,
+        directory: &Projection,
+    ) -> Option<crate::OrganisationId> {
+        let account = self.records.get(&id)?;
+        directory
+            .records
+            .get(&IdentityId::Person(account.owner))?
+            .organisation()
     }
 
     pub(super) fn records<'a>(

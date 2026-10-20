@@ -212,6 +212,11 @@ pub enum RecipientKind {
     Connector,
     /// A machine that joined with a connection code (ACCESS-005 R1).
     Machine,
+    /// An organisation (DIRECTORY-109 R1). It is never a recipient: a grant
+    /// is held by a person or by what answers to one, and an organisation
+    /// issues its founding grant rather than holding one. The kind exists
+    /// so every identity has one, and pass-on to it is refused by name.
+    Organisation,
 }
 
 impl RecipientKind {
@@ -224,6 +229,7 @@ impl RecipientKind {
             IdentityId::ServiceAccount(_) => Self::ServiceAccount,
             IdentityId::Connector(_) => Self::Connector,
             IdentityId::Machine(_) => Self::Machine,
+            IdentityId::Organisation(_) => Self::Organisation,
         }
     }
 }
@@ -236,6 +242,7 @@ impl fmt::Display for RecipientKind {
             Self::ServiceAccount => "service_account",
             Self::Connector => "connector",
             Self::Machine => "machine",
+            Self::Organisation => "organisation",
         })
     }
 }

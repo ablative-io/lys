@@ -73,6 +73,7 @@ fn named(
             IdentityId::ServiceAccount(_) => "service_account",
             IdentityId::Connector(_) => "connector",
             IdentityId::Machine(_) => "machine",
+            IdentityId::Organisation(_) => "organisation",
         },
         display_name: record.profile().display_name().to_owned(),
         degraded,
@@ -110,7 +111,10 @@ pub(crate) fn for_judged(
                 .is_some_and(|actions| actions.contains(action))
             || matches!(
                 grant.holder(),
-                IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_)
+                IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_)
             )
         {
             continue;

@@ -8,7 +8,22 @@
 //! only adds.
 
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
-pub const SHIPPED_VERSION: u64 = 5;
+pub const SHIPPED_VERSION: u64 = 6;
+
+/// The relation the organisation's founder holds on it (DIRECTORY-109 R3):
+/// every act of [`ORGANISATION_ACTIONS`].
+pub const ADMINISTRATOR_RELATION: &str = "administrator";
+
+/// The acts on an organisation, in name order: reading it, admitting a
+/// person into it, issuing a root on a resource it owns, and administering
+/// it (its name, its retirement, passing its administration on). The last
+/// three are withheld from agents.
+pub const ORGANISATION_ACTIONS: [&str; 4] = [
+    "organisation.administer",
+    "organisation.admit",
+    "organisation.grant",
+    "organisation.read",
+];
 
 /// The acts the first model named, kept so every grant made under it
 /// still resolves.
@@ -53,6 +68,10 @@ pub const ACTIONS: &[&str] = &[
     "machine.retire",
     "machine.runner.set",
     "machine.team.set",
+    "organisation.administer",
+    "organisation.admit",
+    "organisation.grant",
+    "organisation.read",
     "person.create",
     "person.email.set",
     "person.login.bind",
@@ -119,6 +138,9 @@ pub const WITHHELD_FROM_AGENTS: &[&str] = &[
     "configuration.zone.set",
     "grant",
     "identity.transition",
+    "organisation.administer",
+    "organisation.admit",
+    "organisation.grant",
     "person.email.set",
     "person.login.bind",
     "person.password.set",
@@ -175,6 +197,7 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "machine.runner.set",
     "machine.team.set",
     "operate",
+    "organisation.read",
     "person.create",
     "person.profile.set",
     "person.session.end",
@@ -301,6 +324,19 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("machine.retire", "Retire this computer"),
     ("machine.runner.set", "Choose this computer’s runner"),
     ("machine.team.set", "Choose this computer’s team"),
+    (
+        "organisation.administer",
+        "Administer this organisation: its name, its retirement, who administers it",
+    ),
+    (
+        "organisation.admit",
+        "Admit a person into this organisation",
+    ),
+    (
+        "organisation.grant",
+        "Give access to something this organisation owns",
+    ),
+    ("organisation.read", "Read this organisation"),
     ("person.create", "Register a person"),
     ("person.email.set", "Change this person’s email"),
     ("person.login.bind", "Link a login to this person"),
@@ -382,8 +418,9 @@ pub fn shipped_model() -> String {
             .into_iter()
             .chain(ACTIONS.iter().copied()),
     );
+    let administrator = quoted(&mut ORGANISATION_ACTIONS.iter().copied());
     let mut text = format!(
-        "{{\n  \"version\": {SHIPPED_VERSION},\n  \"relations\": {{\n    \"owner\": [{owner}],\n    \"editor\": [{editor}],\n    \"viewer\": [\"view\", \"{READ}\"],\n    \"reader\": [\"{READ}\"]"
+        "{{\n  \"version\": {SHIPPED_VERSION},\n  \"relations\": {{\n    \"owner\": [{owner}],\n    \"editor\": [{editor}],\n    \"viewer\": [\"view\", \"{READ}\"],\n    \"reader\": [\"{READ}\"],\n    \"{ADMINISTRATOR_RELATION}\": [{administrator}]"
     );
     for action in ACTIONS {
         for part in [",\n    \"", ONE, action, "\": [\"", action, "\"]"] {
@@ -397,8 +434,8 @@ pub fn shipped_model() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        ACTIONS, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS,
-        agent_may_hold, shipped_model,
+        ACTIONS, ADMINISTRATOR_RELATION, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, ORGANISATION_ACTIONS,
+        READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, shipped_model,
     };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
@@ -478,5 +515,33 @@ mod tests {
         }
         assert!(!agent_may_hold("person", "made.up"));
         assert!(!agent_may_hold("fixture.doc", "view"));
+    }
+
+    /// DIRECTORY-109 R3: the organisation's four acts ship under the
+    /// administrator relation; an agent may read its organisation and hold
+    /// nothing more of it.
+    #[test]
+    fn the_organisation_ships_four_acts_and_agents_may_only_read_it() -> Result<(), String> {
+        let model: Value = serde_json::from_str(&shipped_model()).map_err(|e| e.to_string())?;
+        let held = model["relations"][ADMINISTRATOR_RELATION]
+            .as_array()
+            .ok_or("no administrator relation")?
+            .iter()
+            .map(|value| value.as_str().unwrap_or_default())
+            .collect::<Vec<_>>();
+        assert_eq!(held, ORGANISATION_ACTIONS);
+        for action in ORGANISATION_ACTIONS {
+            assert!(ACTIONS.contains(&action), "{action} is shipped");
+        }
+        assert!(agent_may_hold("organisation", "organisation.read"));
+        for withheld in [
+            "organisation.admit",
+            "organisation.grant",
+            "organisation.administer",
+        ] {
+            assert!(!agent_may_hold("organisation", withheld), "{withheld}");
+            assert!(WITHHELD_FROM_AGENTS.contains(&withheld), "{withheld}");
+        }
+        Ok(())
     }
 }

@@ -139,12 +139,15 @@ fn public_reader(config: &lys_identity_server::config::Config) -> Result<String,
         Provenance::new(AuthMethod::Oidc, 1),
     );
     let binding = LoginBinding::new(&config.issuer, "registered-screen-reader")?;
-    let (person, _) = directory.register_person(
-        admin.clone(),
-        OperationId::generate()?,
-        Profile::new("Registered screen reader")?,
-        1,
-    )?;
+    let person = directory
+        .found_organisation(
+            admin.clone(),
+            OperationId::generate()?,
+            identity_contract::fixtures::organisation()?,
+            Profile::new("Registered screen reader")?,
+            1,
+        )?
+        .founder;
     directory.bind_login(admin, OperationId::generate()?, person, binding.clone(), 2)?;
     let sessions = Sessions::open(
         config.sessions_file.clone().ok_or("session file")?,

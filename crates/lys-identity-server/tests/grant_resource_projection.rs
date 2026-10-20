@@ -32,12 +32,15 @@ fn prepare(config: &lys_identity_server::Config) -> Result<PersonId, Box<dyn Err
         Provenance::new(AuthMethod::Oidc, 1),
     );
     let mut directory = open_directory(config)?;
-    let (person, _) = directory.register_person(
-        actor.clone(),
-        OperationId::generate()?,
-        Profile::new("Administrator")?,
-        1,
-    )?;
+    let person = directory
+        .found_organisation(
+            actor.clone(),
+            OperationId::generate()?,
+            identity_contract::fixtures::organisation()?,
+            Profile::new("Administrator")?,
+            1,
+        )?
+        .founder;
     directory.bind_login(
         actor.clone(),
         OperationId::generate()?,

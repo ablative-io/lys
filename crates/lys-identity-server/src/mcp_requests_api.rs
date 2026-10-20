@@ -265,7 +265,8 @@ fn declaration(
         IdentityId::Person(_)
         | IdentityId::ServiceAccount(_)
         | IdentityId::Connector(_)
-        | IdentityId::Machine(_) => None,
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => None,
     };
     server.cloned().ok_or_else(|| ServerError::McpBeyondRemit {
         approver: by.to_string(),

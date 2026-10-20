@@ -69,6 +69,10 @@ pub struct SetupSettings {
     /// email the setup page then takes.
     #[serde(default)]
     pub email: Option<String>,
+    /// The name of the install's own organisation, founded at setup with the
+    /// administrator as founder (DIRECTORY-109 R2): the install's project
+    /// name from `deployment.toml`, written by the installer.
+    pub organisation: String,
 }
 
 /// What a setup code lets the setup page do.
@@ -419,9 +423,13 @@ async fn make_administrator(
     }
     record_administrator(&settings.administrator_file, actor.binding())?;
     state.admission.set_administrator(actor.binding().clone())?;
+    let organisation = Profile::new(&settings.organisation)?;
     let (person, receipt) = with_directory(&state, |directory| {
-        Ok(directory.setup_person(actor.clone(), operation, profile, now())?)
+        Ok(directory.setup_person(actor.clone(), operation, profile, organisation, now())?)
     })?;
+    // The founder's administrator grant on the organisation the batch
+    // founded (DIRECTORY-109 R3), answered again on a retry.
+    crate::organisation_boot::founder_grant(&state, person)?;
     crate::import_bootstrap::ensure(&state)?;
     let own_computer_unnamed = crate::agent_roots::at_setup(&state)?;
     spend(settings)?;
@@ -466,9 +474,11 @@ pub async fn finish(
     let Json(body) = body.map_err(|refused| malformed(&refused))?;
     let operation = OperationId::from_str(&body.operation)?;
     let profile = Profile::new(&body.display_name)?;
+    let organisation = Profile::new(&settings(&state)?.organisation)?;
     let (person, receipt) = with_directory(&state, |directory| {
-        Ok(directory.setup_person(actor, operation, profile, now())?)
+        Ok(directory.setup_person(actor, operation, profile, organisation, now())?)
     })?;
+    crate::organisation_boot::founder_grant(&state, person)?;
     crate::import_bootstrap::ensure(&state)?;
     let own_computer_unnamed = crate::agent_roots::at_setup(&state)?;
     Ok(Json(PersonRegistered {

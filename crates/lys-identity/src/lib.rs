@@ -25,6 +25,7 @@ pub mod link_audit;
 pub mod log;
 pub mod message_service;
 pub mod operation;
+pub mod organisation;
 pub mod product_draft_event;
 pub mod profile;
 pub mod projection;
@@ -42,7 +43,9 @@ pub use binding::LoginBinding;
 pub use directory::Directory;
 pub use error::IdentityError;
 pub use event::{Change, IdentityEvent, LinkChange, LinkObservation};
-pub use id::{AgentId, ConnectorId, IdentityId, MachineId, PersonId, ServiceAccountId};
+pub use id::{
+    AgentId, ConnectorId, IdentityId, MachineId, OrganisationId, PersonId, ServiceAccountId,
+};
 pub use install_event::{InstallChange, InstallEvent};
 pub use lifecycle::{LifecycleState, Transition};
 pub use operation::OperationId;

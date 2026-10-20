@@ -26,6 +26,7 @@ fn request_snapshots_share_every_directory_index_and_isolate_later_writes()
             1,
             Change::SetupPerson {
                 profile: Profile::new("owner")?,
+                organisation: None,
             },
         )?,
         0,
@@ -55,6 +56,7 @@ fn request_snapshots_share_every_directory_index_and_isolate_later_writes()
             2,
             Change::RegisterPerson {
                 profile: Profile::new("other")?,
+                organisation: None,
             },
         )?,
         1,
@@ -90,6 +92,7 @@ fn a_directory_state_of_a_person_and_an_agent_keeps_its_bytes() -> Result<(), Bo
             1,
             Change::SetupPerson {
                 profile: Profile::new("owner")?,
+                organisation: None,
             },
         )?,
         0,

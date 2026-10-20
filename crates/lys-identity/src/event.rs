@@ -14,7 +14,7 @@
 
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
-use crate::id::{AgentId, IdentityId, PersonId};
+use crate::id::{AgentId, IdentityId, OrganisationId, PersonId};
 use crate::lifecycle::{LifecycleState, Transition};
 use crate::operation::OperationId;
 use crate::profile::Profile;
@@ -116,11 +116,32 @@ pub enum Change {
     SetupPerson {
         /// The person's display name.
         profile: Profile,
+        /// The organisation the person is registered under (DIRECTORY-109
+        /// R1). `None` only in a leaf written before organisations existed;
+        /// the first boot under them attaches every such record.
+        organisation: Option<OrganisationId>,
     },
     /// A person is registered with a display profile.
     RegisterPerson {
         /// How the person is shown.
         profile: Profile,
+        /// The organisation the person is registered under (DIRECTORY-109
+        /// R1). `None` only in a leaf written before organisations existed.
+        organisation: Option<OrganisationId>,
+    },
+    /// An organisation is founded by one person (DIRECTORY-109 R1). The
+    /// founder's own registration follows in the same batch.
+    FoundOrganisation {
+        /// The organisation's name, a label.
+        profile: Profile,
+        /// The person who founded it.
+        founder: PersonId,
+    },
+    /// A person or agent written before organisations existed is attached
+    /// to one, once, at the first boot under them (DIRECTORY-109 R2).
+    AttachOrganisation {
+        /// The organisation the record now belongs to.
+        organisation: OrganisationId,
     },
     /// An agent is registered with a direct edge to its accountable person.
     RegisterAgent {
@@ -190,7 +211,30 @@ pub struct IdentityEvent {
 fn reporting_target(target: IdentityId) -> bool {
     match target {
         IdentityId::Person(_) | IdentityId::Agent(_) => true,
-        IdentityId::ServiceAccount(_) | IdentityId::Connector(_) | IdentityId::Machine(_) => false,
+        IdentityId::ServiceAccount(_)
+        | IdentityId::Connector(_)
+        | IdentityId::Machine(_)
+        | IdentityId::Organisation(_) => false,
+    }
+}
+
+/// Refuse `change` if it does not fit an organisation: an organisation is
+/// founded, renamed and moved through its lifecycle, and nothing else.
+fn check_organisation_fit(change: &Change) -> Result<(), IdentityError> {
+    match change {
+        Change::FoundOrganisation { .. } | Change::ChangeProfile { .. } => Ok(()),
+        Change::Transition { .. } => Ok(()),
+        Change::SetupPerson { .. }
+        | Change::RegisterPerson { .. }
+        | Change::RegisterAgent { .. }
+        | Change::ReportingRegistration { .. }
+        | Change::ReportsToChanged { .. }
+        | Change::BindLogin { .. }
+        | Change::LinkAudit(_)
+        | Change::AgentCall(_)
+        | Change::AttachOrganisation { .. } => Err(IdentityError::ChangeMismatch {
+            reason: "an organisation is founded, renamed and moved through its lifecycle, and nothing else",
+        }),
     }
 }
 
@@ -210,6 +254,7 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
     }
     match identity {
         IdentityId::Person(_) | IdentityId::Agent(_) => {}
+        IdentityId::Organisation(_) => return check_organisation_fit(change),
         IdentityId::ServiceAccount(_) => {
             return Err(IdentityError::ChangeMismatch {
                 reason: "service account lifecycle belongs to the service-account log",
@@ -232,6 +277,9 @@ fn check_fit(identity: IdentityId, change: &Change) -> Result<(), IdentityError>
                 reason: "a person registration names a person",
             })
         }
+        (Change::FoundOrganisation { .. }, _) => Err(IdentityError::ChangeMismatch {
+            reason: "a founding names an organisation",
+        }),
         (
             Change::RegisterAgent { .. }
             | Change::ReportingRegistration { .. }
@@ -356,6 +404,8 @@ pub(crate) mod wire {
     /// A computer that joined with a connection code (ACCESS-005 R1),
     /// recorded with its join.
     pub(crate) const MACHINE: u64 = 5;
+    /// An organisation, a directory record of its own (DIRECTORY-109 R1).
+    pub(crate) const ORGANISATION: u64 = 6;
 
     /// A person is registered.
     pub(crate) const REGISTER_PERSON: u64 = 1;
@@ -377,11 +427,17 @@ pub(crate) mod wire {
     pub(crate) const REPORTS_TO_CHANGED: u64 = 9;
     /// A change an agent made through MCP.
     pub(crate) const AGENT_CALL: u64 = 10;
+    /// An organisation is founded by one person (DIRECTORY-109 R1).
+    pub(crate) const FOUND_ORGANISATION: u64 = 11;
+    /// A record written before organisations is attached to one (DIRECTORY-109 R2).
+    pub(crate) const ATTACH_ORGANISATION: u64 = 12;
 
     pub(crate) fn change(value: &Change) -> u64 {
         match value {
             Change::SetupPerson { .. } => SETUP_PERSON,
             Change::RegisterPerson { .. } => REGISTER_PERSON,
+            Change::FoundOrganisation { .. } => FOUND_ORGANISATION,
+            Change::AttachOrganisation { .. } => ATTACH_ORGANISATION,
             Change::RegisterAgent { .. } => REGISTER_AGENT,
             Change::ReportingRegistration { .. } => REPORTING_REGISTRATION,
             Change::ReportsToChanged { .. } => REPORTS_TO_CHANGED,

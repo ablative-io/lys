@@ -339,6 +339,12 @@ impl MembershipIndex {
                     "a use is not a grant change the stream carries",
                 ));
             }
+            GrantChange::Stamp { .. } => {
+                return Err(refusal(
+                    STREAM_INTEGRITY,
+                    "an organisation stamp is not a grant change the stream carries",
+                ));
+            }
         };
         if named != change || event.grant().to_string() != grant {
             return Err(refusal(

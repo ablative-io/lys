@@ -193,10 +193,13 @@ const REQUEST_END: &str = "-----END CERTIFICATE REQUEST-----";
 /// bytes `verify_certificate_request` reads; anything else is refused naming
 /// both forms.
 fn request_der(text: &str) -> Result<Vec<u8>, ServerError> {
-    let neither = |why: String| malformed(format!("request is neither PEM nor standard base64: {why}"));
+    let neither =
+        |why: String| malformed(format!("request is neither PEM nor standard base64: {why}"));
     let trimmed = text.trim();
     if !trimmed.starts_with("-----") {
-        return STANDARD.decode(trimmed).map_err(|error| neither(error.to_string()));
+        return STANDARD
+            .decode(trimmed)
+            .map_err(|error| neither(error.to_string()));
     }
     let lines: Vec<&str> = trimmed
         .lines()

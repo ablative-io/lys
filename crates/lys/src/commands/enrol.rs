@@ -257,9 +257,10 @@ fn asked(target: &Endpoint, asker: &Asker, route: &str, body: &[u8]) -> CliResul
         Transport::Loopback
     };
     let credential = match asker {
-        Asker::Agent { identity, id } => {
-            ("lys-agent-signature", signature(identity, id, &target.signed_path, body))
-        }
+        Asker::Agent { identity, id } => (
+            "lys-agent-signature",
+            signature(identity, id, &target.signed_path, body),
+        ),
         Asker::Person { pass } => ("authorization", format!("Bearer {}", pass.as_str())),
     };
     let credential = (credential.0, Zeroizing::new(credential.1));
@@ -280,7 +281,9 @@ fn asked(target: &Endpoint, asker: &Asker, route: &str, body: &[u8]) -> CliResul
     )
     .map_err(|unanswered| {
         let reason = named(&unanswered);
-        let (name, words) = reason.split_once(": ").unwrap_or(("enrol_unanswered", &reason));
+        let (name, words) = reason
+            .split_once(": ")
+            .unwrap_or(("enrol_unanswered", &reason));
         refused(name, format!("{words} (POST {route})"))
     })?;
     let answer: Value = serde_json::from_slice(&response.body).map_err(|_unread| {
@@ -345,7 +348,11 @@ fn certified(
         .get("pem")
         .and_then(Value::as_str)
         .ok_or_else(|| unreadable("carries no certificate PEM"))?;
-    if pem::decode_certificate(pem.as_bytes(), Path::new(route)).ok().as_deref() != Some(&der[..]) {
+    if pem::decode_certificate(pem.as_bytes(), Path::new(route))
+        .ok()
+        .as_deref()
+        != Some(&der[..])
+    {
         return Err(unreadable("carries a PEM that is not its DER"));
     }
     Ok((pem.to_owned(), operation.to_owned()))
@@ -355,14 +362,14 @@ fn certified(
 /// then linked into place, which refuses a path that already names anything.
 fn write_whole(out: &Path, bytes: &[u8]) -> CliResult<()> {
     let unwritten = |error: &std::io::Error| {
+        refused("seat_file_unwritten", format!("{}: {error}", out.display()))
+    };
+    let name = out.file_name().ok_or_else(|| {
         refused(
             "seat_file_unwritten",
-            format!("{}: {error}", out.display()),
+            format!("{} names no file", out.display()),
         )
-    };
-    let name = out
-        .file_name()
-        .ok_or_else(|| refused("seat_file_unwritten", format!("{} names no file", out.display())))?;
+    })?;
     let mut beside_name = std::ffi::OsString::from(".");
     beside_name.push(name);
     beside_name.push(format!(".enrol-{}", std::process::id()));
