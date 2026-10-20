@@ -169,7 +169,7 @@ async fn a_failed_proving_step_leaves_the_proof_unspent_and_the_same_proof_finis
     let before = leaves(&service).await?;
     rauthy.refuse_create_once();
     let (status, refused, cookie) = prove(&service, &token).await?;
-    assert_eq!(status, 503, "{refused}");
+    assert_eq!(status, 400, "{refused}");
     assert_eq!(refused["refusal"], "AccountRefused", "{refused}");
     assert_eq!(refused["receipt"]["completed"], json!([]), "{refused}");
     assert_eq!(refused["receipt"]["failed"], "account", "{refused}");

@@ -220,6 +220,9 @@ fn fixture_state(
         grant_setup: fixture_grant_setup(config, model, model_revision),
         secrets: None,
         mailer: None,
+        foundings: Mutex::new(crate::foundings_store::Foundings::open(
+            config.log_dir.with_file_name("foundings.json"),
+        )?),
         requests: None,
         mcp_requests: None,
         network: None,
