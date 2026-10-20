@@ -72,6 +72,12 @@ fn request_snapshots_share_every_directory_index_and_isolate_later_writes()
 /// person's record and an agent's, never regenerated (DIRECTORY-080 R1). It
 /// is pinned here because the state value's writer is private to the crate.
 const DIRECTORY_STATE: &str = include_str!("../tests/fixtures/directory-state-5215ed6c.hex");
+/// The same inputs as main 6e5a80aa writes them: state version 6, every
+/// record carrying its organisation and founder members (DIRECTORY-109 R1),
+/// both absent here. Never regenerated either; the 5215ed6c state above is
+/// still read, so a store written before organisations opens as it did.
+const DIRECTORY_STATE_ORGANISATIONS: &str =
+    include_str!("../tests/fixtures/directory-state-6e5a80aa.hex");
 /// The lowercase hexadecimal digits.
 const DIGITS: &[u8; 16] = b"0123456789abcdef";
 
@@ -115,22 +121,27 @@ fn a_directory_state_of_a_person_and_an_agent_keeps_its_bytes() -> Result<(), Bo
         written.push(char::from(DIGITS[usize::from(byte >> 4)]));
         written.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
     }
-    let fixture = DIRECTORY_STATE.trim();
     assert_eq!(
-        fixture, written,
+        DIRECTORY_STATE_ORGANISATIONS.trim(),
+        written,
         "today's writer no longer writes the fixture's directory state"
     );
-    let bytes = (0..fixture.len())
-        .step_by(2)
-        .map(|at| u8::from_str_radix(&fixture[at..at + 2], 16))
-        .collect::<Result<Vec<u8>, _>>()?;
-    let read = crate::directory_state::decode(&bytes, 2)?;
-    for id in [IdentityId::Person(person), agent] {
-        assert_eq!(
-            read.record(id),
-            directory.record(id),
-            "{id}: today's reader"
-        );
+    for (name, fixture) in [
+        ("before organisations", DIRECTORY_STATE.trim()),
+        ("with organisations", DIRECTORY_STATE_ORGANISATIONS.trim()),
+    ] {
+        let bytes = (0..fixture.len())
+            .step_by(2)
+            .map(|at| u8::from_str_radix(&fixture[at..at + 2], 16))
+            .collect::<Result<Vec<u8>, _>>()?;
+        let read = crate::directory_state::decode(&bytes, 2)?;
+        for id in [IdentityId::Person(person), agent] {
+            assert_eq!(
+                read.record(id),
+                directory.record(id),
+                "{id}: today's reader of the state {name}"
+            );
+        }
     }
     Ok(())
 }

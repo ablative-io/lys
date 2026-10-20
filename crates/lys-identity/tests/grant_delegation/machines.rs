@@ -84,7 +84,9 @@ fn a_machine_answers_to_its_code_issuer_and_holds_a_grant_signed_as_version_six(
     assert_eq!(record.state(), LifecycleState::Active);
     let given = request(92, dana, root, device, world.dana, "heron")?;
     let issued = world.grants.delegate(&projection, &given, T0)?;
-    assert_eq!(issued.event.version(), 6);
+    // The machine is version six; under an organisation (DIRECTORY-109 R3)
+    // the grant carries key 16, so the event is version seven.
+    assert_eq!(issued.event.version(), 7);
     let held = issued.event.grant();
     world.reopen(MemoryRelationships::default())?;
     let kept = world

@@ -58,7 +58,9 @@ fn delegated_service_account_survives_restart_and_reimport_then_revocation_stops
         window: Window::new(T0, None)?,
     };
     let issued = world.grants.delegate(&projection, &given, T0)?;
-    assert_eq!(issued.event.version(), 2);
+    // The service account is version two; under an organisation
+    // (DIRECTORY-109 R3) the grant carries key 16, so the event is version seven.
+    assert_eq!(issued.event.version(), 7);
     let held = issued.event.grant();
     let count = world.events();
     world.reopen(MemoryRelationships::default())?;
@@ -95,7 +97,7 @@ fn delegated_service_account_survives_restart_and_reimport_then_revocation_stops
     };
     let delivered = world.grants.delegate(&projection, &onward, T0 + 2)?;
     assert_eq!(delivered.event.caller(), service);
-    assert_eq!(delivered.event.version(), 2);
+    assert_eq!(delivered.event.version(), 7);
     assert_eq!(
         world
             .grants

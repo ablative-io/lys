@@ -235,13 +235,23 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
 }
 
 fn assert_member_refusals(refused: &mut impl FnMut(&[u8], &GrantError)) -> TestResult {
-    // Key 15 names a role (ACCESS-004 R1), so 16 is the first key outside
-    // the contract; 15 carrying anything but true is refused by its own rule.
-    for key in [0, 16, 40] {
+    // Key 15 names a role (ACCESS-004 R1) and 16 an organisation
+    // (DIRECTORY-109 R3), so 17 is the first key outside the contract; 15
+    // carrying anything but true, and 16 anything but 16 bytes, are refused
+    // by their own rules.
+    for key in [0, 17, 40] {
         let mut pairs = fixture();
         pairs.push((int(key), int(1)));
         refused(&bytes_of(pairs)?, &GrantError::MemberUnknown { key });
     }
+    let mut pairs = fixture();
+    pairs.push((int(16), int(1)));
+    refused(
+        &bytes_of(pairs)?,
+        &GrantError::GrantMalformed {
+            reason: "an organisation is key 16 once, 16 bytes",
+        },
+    );
     let mut pairs = fixture();
     pairs.push((int(15), int(1)));
     refused(

@@ -161,13 +161,15 @@ fn a_grant_held_by_and_passable_to_a_machine_is_kind_five_both_ways() -> TestRes
 }
 
 #[test]
-fn a_grant_naming_a_sixth_kind_is_refused_with_the_five_kinds_named() -> TestResult {
-    let refused = decode_grant(&body_with_kind(6)?);
+fn a_grant_naming_a_seventh_kind_is_refused_with_the_six_kinds_named() -> TestResult {
+    // Code 6 is the organisation since DIRECTORY-109; 7 is the first code no
+    // kind has.
+    let refused = decode_grant(&body_with_kind(7)?);
     assert!(
         matches!(
             &refused,
             Err(GrantError::GrantMalformed { reason }) if *reason
-                == "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account, 4 for a connector or 5 for a machine"
+                == "an identity kind code is 1 for a person, 2 for an agent, 3 for a service account, 4 for a connector, 5 for a machine or 6 for an organisation"
         ),
         "{refused:?}"
     );

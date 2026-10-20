@@ -73,7 +73,9 @@ fn a_connector_answers_to_its_approver_holds_a_grant_signed_as_version_three_and
         window: Window::new(T0, None)?,
     };
     let issued = world.grants.delegate(&projection, &given, T0)?;
-    assert_eq!(issued.event.version(), 3);
+    // The connector is version three; under an organisation (DIRECTORY-109
+    // R3) the grant carries key 16, so the event is version seven.
+    assert_eq!(issued.event.version(), 7);
     let held = issued.event.grant();
     world.reopen(MemoryRelationships::default())?;
     assert_eq!(
@@ -99,7 +101,7 @@ fn a_connector_answers_to_its_approver_holds_a_grant_signed_as_version_three_and
     };
     let delivered = world.grants.delegate(&projection, &onward, T0 + 1)?;
     assert_eq!(delivered.event.caller(), app);
-    assert_eq!(delivered.event.version(), 3);
+    assert_eq!(delivered.event.version(), 7);
     Ok(())
 }
 
