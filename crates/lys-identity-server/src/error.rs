@@ -339,7 +339,7 @@ directory::directory_refusals! {
     /// An act is held while the upgrade is still reversible; the copy of
     /// the stores before organisations, when the upgrade kept one, is the
     /// put-back (DIRECTORY-109 R2).
-    #[error("UpgradePending: the upgrade is still reversible{}", kept_words(.previous_organisation))]
+    #[error("UpgradePending: the upgrade is still reversible{}", kept_words(.previous_organisation.as_ref()))]
     UpgradePending {
         /// Where the directory and grant logs before organisations are kept.
         previous_organisation: Option<String>,
@@ -436,10 +436,8 @@ mod repair_tests {
 }
 
 /// The words that name the kept copy on an `UpgradePending` refusal.
-fn kept_words(previous_organisation: &Option<String>) -> String {
-    previous_organisation
-        .as_deref()
-        .map_or_else(String::new, |copy| {
-            format!("; the directory and grant logs before organisations are kept at {copy}")
-        })
+fn kept_words(previous_organisation: Option<&String>) -> String {
+    previous_organisation.map_or_else(String::new, |copy| {
+        format!("; the directory and grant logs before organisations are kept at {copy}")
+    })
 }

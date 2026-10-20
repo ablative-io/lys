@@ -273,8 +273,8 @@ async fn every_person(
                         record,
                         grouped.remove(person).unwrap_or_default(),
                     )),
-                    IdentityId::Person(_) => None,
-                    IdentityId::Agent(_)
+                    IdentityId::Person(_)
+                    | IdentityId::Agent(_)
                     | IdentityId::ServiceAccount(_)
                     | IdentityId::Connector(_)
                     | IdentityId::Machine(_)
