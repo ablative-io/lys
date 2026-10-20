@@ -228,7 +228,7 @@ fn grant_contract_refuses_each_case_by_name() -> TestResult {
     refused(&bytes_of(reordered)?, &GrantError::GrantNotCanonical);
     assert_eq!(
         cases,
-        3 + 1 + 1 + 12 + 4 + 3 + 5 + 1,
+        3 + 1 + 1 + 1 + 12 + 4 + 3 + 5 + 1,
         "every refusal case was counted"
     );
     Ok(())

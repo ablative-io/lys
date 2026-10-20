@@ -220,10 +220,18 @@ fn grant_wire_boundary_a_signed_grant_names_its_envelope_and_no_other_is_read() 
     let Value::Map(header) = protected else {
         return Err("the protected header is not a map".into());
     };
-    assert!(header.contains(&(
-        Value::Integer(3.into()),
-        Value::Text(GRANT_ENVELOPE.to_owned())
-    )));
+    // Dana's root is held under the install's organisation (DIRECTORY-109
+    // R3), so it carries key 16 and its event names the version-seven
+    // envelope; the version-one envelope is what a grant naming no
+    // organisation keeps.
+    assert!(
+        header.contains(&(
+            Value::Integer(3.into()),
+            Value::Text("application/vnd.lys.grant-event.v7+cbor".to_owned())
+        )),
+        "{header:?}"
+    );
+    assert_ne!(GRANT_ENVELOPE, "application/vnd.lys.grant-event.v7+cbor");
     let key = service_key(&world)?;
     let identity_event = world.directory.log()?.leaf(0)?.ok_or("no identity event")?;
     assert!(
