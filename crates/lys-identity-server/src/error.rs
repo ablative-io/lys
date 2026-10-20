@@ -410,6 +410,13 @@ directory::directory_refusals! {
     },
 }
 
+/// The words that name the kept copy on an `UpgradePending` refusal.
+fn kept_words(previous_organisation: Option<&String>) -> String {
+    previous_organisation.map_or_else(String::new, |copy| {
+        format!("; the directory and grant logs before organisations are kept at {copy}")
+    })
+}
+
 #[cfg(test)]
 mod repair_tests {
     use super::ServerError;
@@ -433,11 +440,4 @@ mod repair_tests {
         assert_eq!(error.to_string(), words);
         assert_eq!(error.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
     }
-}
-
-/// The words that name the kept copy on an `UpgradePending` refusal.
-fn kept_words(previous_organisation: Option<&String>) -> String {
-    previous_organisation.map_or_else(String::new, |copy| {
-        format!("; the directory and grant logs before organisations are kept at {copy}")
-    })
 }

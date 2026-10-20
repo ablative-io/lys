@@ -201,13 +201,8 @@ async fn a_store_before_organisations_is_brought_under_one_at_its_first_boot_and
 -> Outcome {
     let (say, said) = saying();
     let clock = Arc::new(ManualClock::new(1_800_000_100));
-    let (mut service, ()) = Service::start_clock_adjusted(
-        clock,
-        |_| {},
-        Some(say),
-        |config| store_before_organisations(config),
-    )
-    .await?;
+    let (mut service, ()) =
+        Service::start_clock_adjusted(clock, |_| {}, Some(say), store_before_organisations).await?;
     assert_eq!(
         organisation_line(&said)?,
         "organisation: 5 attached, 6 stamped, 1 administrator grants issued"
