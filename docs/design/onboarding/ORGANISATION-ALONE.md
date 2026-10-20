@@ -2,7 +2,8 @@
 
 Written by Flapjack on 20 October 2026 at Lys main 9f5dfcc2 and Cambium main 37c2ea4bb, from the tree as read.
 Every route and file:line below was read in those checkouts today; a step that does not exist says MISSING.
-Design page only. No brief is written from it until Waffles has read it.
+Design page only. Read whole by Waffles on 20 October 2026 and amended at 11:xx with his rulings (section "Rulings");
+the briefs cite this page, not the message.
 
 ## Tom's bar, in his words
 
@@ -144,7 +145,9 @@ at the first click.
 in the same log as people and agents; and a kind, `organisation`, in the grants model (`shipped.rs`) with its actions:
 `organisation.read`, `organisation.admit` (admit a person into it), `organisation.grant` (issue a root on a resource it
 owns), `organisation.administer` (change its name, retire it, pass administration on). A person record carries the
-organisation it was admitted into, or none for the install's own people (ours). A resource issued under an organisation
+organisation it was admitted into. Our own people are an organisation too: the install's, founded by the unattended
+install from `admin_email` (`crates/lys/src/identity/config.rs:70-74`) with our administrator as its founding person. One path,
+not two: a path we never walk is the path that breaks for Priya (Waffles, ruling 1). A resource issued under an organisation
 (a Cambium workspace, a team, a secret scope) carries the organisation's id; `organisation/{name}` in lys-secrets becomes
 that id rather than a free label.
 
@@ -169,8 +172,9 @@ ours, and nothing of hers reaches a resource that is not hers. A revoke by her o
   (`authority.rs:121`). It becomes a function of the resource: for a resource carrying an organisation id, the root authority
   is the holder of `organisation.grant` on that organisation; for an install-level resource, today's person. Our
   administrator stays root authority for our resources and is not one for Priya's.
-- Every read route that lists people, agents, teams and grants filters by the caller's organisation: ours see ours, Priya
-  sees hers. The install's directory projection stays one log; the view is partitioned.
+- Every read route that lists people, agents, teams and grants filters by the caller's organisation, with no special case
+  for ours: ours see ours, Priya sees hers. The install's directory projection stays one log; the view is partitioned.
+  `routes::administrator` stays for install-level acts only: apps, the settings zone, the issuer.
 - Teams: unchanged in authority (`teams_api.rs:7-9`), gain an organisation id.
 
 **Founding.** The first act of all, by a person who has no account: `POST /organisations/found` (unauthenticated) with an
@@ -192,12 +196,15 @@ stops serving one configured id and serves the workspace Lys names for the perso
 workspace's boot channel the first time an admitted person of that organisation enters (`place::boot_channel(store,
 workspace_id)`, `place.rs:160-178`, called per workspace rather than once at serve), and from then on that person's live
 prefix, channels, topics, drafts and search are scoped by that id as `oidc_admission.rs:166` scopes channels and topics
-today, extended to every read. `registry.workspace_id` stays as the install's own (ours) and the default for people with no
-organisation.
+today, extended to every read. `registry.workspace_id` becomes the install's own organisation's workspace, the one our people enter; no person is
+without an organisation.
 
 **The admission question the door asks.** `oidc_admission.rs:80` asks Lys the projection for one workspace id. It becomes
-"which workspaces does this subject read" (one call, answered from the grant projection), and the door admits the person to
-each and opens the one they came for (the sign-in link carries the organisation; a person of one organisation has one).
+"which resources of kind `cambium.workspace` may this subject read", and the route exists today: `POST /grants/which`
+(`crates/lys-identity-server/src/grants.rs:296`, `grants_batch.rs:1-14`: "answers, a page at a time after a cursor, the
+ids of a kind a subject may take an action on", open to an app through its credential for its own kinds). The door asks it
+once at sign-in and opens the person's workspace. The sign-in link carries nothing: a link that carries anything
+authority-shaped gets forwarded and goes wrong (Waffles, ruling 6). A person has one organisation and so one workspace.
 
 **The two credential files.** They stay the door's, written by its own connect flow (`lys_connect/credentials.rs:56-87`)
 after our administrator approves the door once (`apps_connect.rs:268`). That is the one act of ours in the whole path, done
@@ -219,7 +226,10 @@ writes each takes the next free id at that moment and keeps the order.
    beside `routes::administrator`; `judge_root`'s root authority per resource; the pass-on rule bounded to the organisation.
    Files: `crates/lys-identity-server/src/people_admit.rs` (:194-195, :327-343), `routes.rs` (:336-344),
    `crates/lys-identity/src/grants/admission.rs` (:273-281), `authority.rs` (:121, :314-332), `mode.rs` (:45-69),
-   `grants/handlers.rs` (:105-179), `agent_roots.rs` (:135, :151-158), `revocation.rs` (:71).
+   `grants/handlers.rs` (:105-179), `agent_roots.rs` (:135, :151-158), `revocation.rs` (:71); and Priya's screens, or she
+   has routes and no door: People and Access scoped to her organisation in `surface/identity/src/features/people/` and
+   `surface/identity/src/features/access/` (the add-person act names her organisation; the access screen gives only what
+   she holds under it; our administrator's screens show only ours).
 3. **IDENTITY-004 (lys): mail.** The install carries a `[mail]` section (SMTP host, port, user, from, TLS mode) in
    `deployment.toml`; `prepare.rs` writes it to the issuer as `RAUTHY_SMTP_*`; the compose template carries the keys; Lys
    itself sends its own mail through the same settings (one sender crate, one template per letter: founded, added, access
@@ -233,8 +243,9 @@ writes each takes the next free id at that moment and keeps the order.
    `crates/lys-identity-server/src/sign_in.rs` (:593-595), `sign_in_callback.rs` (:58-77), `sign_in_refusals.rs` (:31-34),
    `session_admission.rs` (:31, :56-57), `accounts.rs` (:148-170), a new `organisations_found.rs`, the surface sign-in page.
 5. **CORE-073 (cambium): a workspace per organisation in the one door.** The admission question becomes "which workspaces";
-   the boot channel per workspace at first entry; every read scoped by workspace, proven by a test that two organisations'
-   people never see one another's channels, topics, drafts, search or presence. Files: `crates/cambium-door/src/http/oidc_admission.rs`
+   the boot channel per workspace at first entry; every read scoped by workspace, proven red first, one test per surface, that two organisations'
+   people never see one another's channels, topics, drafts, search, presence, huddles, files or MCP seats, named one by
+   one. The admission question is `POST /grants/which` for kind `cambium.workspace`, action read (no Lys change needed). Files: `crates/cambium-door/src/http/oidc_admission.rs`
    (:29-101, :166-178, :243-285), `http/place.rs` (:160-178), `crates/cambium-server/src/boot/passes.rs` (:37-41), `crates/cambium-server/src/config/`
    (`types.rs:284-285`, `defaults.rs:158-159`), `boot/settings.rs` (:61, :165), `http/field_builtin.rs` (:308), the live
    prefix and search paths that read `workspace_id`.
@@ -242,7 +253,27 @@ writes each takes the next free id at that moment and keeps the order.
 Order: 1, 2 and 3 can be written at once and land in any order; 4 needs all three; 5 needs 1 and 2 on a published Lys and
 can be written now against their contract. No brief is written before Waffles reads this page.
 
-## Questions the page cannot settle from Tom's rules, each with a recommendation
+## Rulings (Waffles, 20 October 2026, by Tom's rules; the reasons are his)
+
+1. Our own people are an organisation too: the install's, founded by the unattended install from `admin_email`, our
+   administrator its founding person. One path, not two; `routes::administrator` for install-level acts only (apps, the
+   settings zone, the issuer); every people, teams and grants read filters by organisation with no special case.
+2. No standing power for our administrator inside an organisation; a grant Priya can revoke is the only way in.
+   "Without me" is the bar.
+3. Mail: the install's own SMTP, no mail API, with two rules. (a) One letter per act reaches the person, never two; the
+   issuer's own mail must be on, because forgot-password has to work with nobody from us present; if Rauthy's
+   first-password mail on `POST /users` duplicates Lys's letter and cannot be turned off per account, IDENTITY-004 decides
+   by test which one goes and says so. (b) The gate proves letters against a capturing SMTP sink in the test, every letter's
+   text asserted; no live mailbox in a test, ever.
+4. One door, many workspaces.
+5. An organisation of one is valid; the proven address is the confirmation.
+6. The sign-in link carries no organisation. The door asks Lys (`POST /grants/which`) and opens the person's workspace.
+7. Organisation names are labels; the id is the key. No uniqueness is claimed or enforced for a name beyond the founding
+   person's own: two organisations may share a name and are told apart by id everywhere.
+8. One person, one organisation. The person record carries one organisation id; if two are ever needed, that id becomes a
+   list in DIRECTORY-109 and nothing else on this page moves.
+
+## Questions the page could not settle from Tom's rules, each with the recommendation (all four taken above)
 
 1. **May our administrator act inside an organisation at all (support)?** Recommendation: no standing power. Priya may
    pass `organisation.administer` to one of ours by a grant she can revoke; that is the only way in, and it is on her record.
@@ -265,5 +296,9 @@ can be written now against their contract. No brief is written before Waffles re
   30 s, is on record); no measurement here.
 - The public path for a stranger (lys.ablative.com.au, Google through Rauthy with `auto_link`) was not walked today; the
   refusal at step 1 is read from the code, not seen in a browser.
-- Whether a person may belong to two organisations. The page assumes one; the record carries one id. If two are needed,
-  the id becomes a list in DIRECTORY-109 and nothing else on this page changes.
+- One person, one organisation (ruling 8): the record carries one id; a list if ever needed, nothing else moves.
+- The organisation's agents. Priya's people will enrol and start agents under AGENTS-017, and those agents need seats in
+  her workspace, not ours: the agent's responsible person carries the organisation, so the agent does; its roots
+  (`POST /grants/agent-roots`, `grants.rs:287`, `agent_roots.rs`), its machine and provisioning records, and the door's seat
+  for it (`cambium-door` agent seats under `http/agent_seat/`) must all be scoped by that organisation. Not a brief today;
+  named here so it is not forgotten, and it is the sixth brief once DIRECTORY-109 and CORE-073 have landed.
