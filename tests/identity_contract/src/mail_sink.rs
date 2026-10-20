@@ -38,9 +38,7 @@ impl Captured {
     pub fn header(&self, name: &str) -> Option<&str> {
         self.headers.iter().find_map(|line| {
             let (found, value) = line.split_once(':')?;
-            found
-                .eq_ignore_ascii_case(name)
-                .then(|| value.trim())
+            found.eq_ignore_ascii_case(name).then(|| value.trim())
         })
     }
 
@@ -123,7 +121,11 @@ impl MailSink {
 }
 
 /// One connection's conversation, from greeting to quit.
-async fn serve(stream: TcpStream, sender: mpsc::UnboundedSender<Captured>, refusing: Arc<AtomicBool>) {
+async fn serve(
+    stream: TcpStream,
+    sender: mpsc::UnboundedSender<Captured>,
+    refusing: Arc<AtomicBool>,
+) {
     let (read, mut write) = stream.into_split();
     let mut lines = BufReader::new(read).lines();
     if write.write_all(b"220 sink ESMTP\r\n").await.is_err() {
@@ -241,16 +243,15 @@ fn decoded(lines: &[String]) -> String {
         let mut rest = text.as_bytes();
         while let Some(at) = rest.iter().position(|byte| *byte == b'=') {
             bytes.extend_from_slice(&rest[..at]);
-            let hex = rest.get(at + 1..at + 3).and_then(|pair| std::str::from_utf8(pair).ok());
-            match hex.and_then(|pair| u8::from_str_radix(pair, 16).ok()) {
-                Some(byte) => {
-                    bytes.push(byte);
-                    rest = &rest[at + 3..];
-                }
-                None => {
-                    bytes.push(b'=');
-                    rest = &rest[at + 1..];
-                }
+            let hex = rest
+                .get(at + 1..at + 3)
+                .and_then(|pair| std::str::from_utf8(pair).ok());
+            if let Some(byte) = hex.and_then(|pair| u8::from_str_radix(pair, 16).ok()) {
+                bytes.push(byte);
+                rest = &rest[at + 3..];
+            } else {
+                bytes.push(b'=');
+                rest = &rest[at + 1..];
             }
         }
         bytes.extend_from_slice(rest);
