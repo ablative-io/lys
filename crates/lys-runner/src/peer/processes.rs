@@ -91,6 +91,40 @@ pub fn start_identity(pid: u32) -> Result<StartIdentity, RunnerError> {
     System.start(pid)
 }
 
+/// Whether `pid` names a process that is still running: one the kernel has
+/// and has not yet marked ended. A process that has exited and waits to be
+/// reaped (a zombie) still answers signal 0, so liveness is never read from
+/// the signal alone (AGENTS-018 R1).
+///
+/// # Errors
+/// - `RunnerError::Refused` with `peer_unproved` if the process exists but
+///   its record cannot be read.
+pub fn running(pid: u32) -> Result<bool, RunnerError> {
+    let Ok(id) = process_id(pid) else {
+        return Ok(false);
+    };
+    match rustix::process::test_kill_process(id) {
+        Err(rustix::io::Errno::SRCH) => return Ok(false),
+        Ok(()) | Err(rustix::io::Errno::PERM) => {}
+        Err(error) => return Err(unproved(format!("process {pid}: {error}"))),
+    }
+    not_ended(pid)
+}
+
+/// Whether the process `pid` names has not been marked ended by the kernel.
+#[cfg(target_os = "macos")]
+fn not_ended(pid: u32) -> Result<bool, RunnerError> {
+    /// `SZOMB` in the kernel's `proc_bsdinfo.pbi_status`.
+    const ZOMBIE: u32 = 5;
+    Ok(bsd_info(pid)?.pbi_status != ZOMBIE)
+}
+
+/// Whether the process `pid` names has not been marked ended by the kernel.
+#[cfg(target_os = "linux")]
+fn not_ended(pid: u32) -> Result<bool, RunnerError> {
+    Ok(stat_fields(pid)?.first().is_some_and(|state| state != "Z"))
+}
+
 fn process_id(pid: u32) -> Result<rustix::process::Pid, RunnerError> {
     i32::try_from(pid)
         .ok()

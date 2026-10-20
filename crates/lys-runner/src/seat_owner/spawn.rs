@@ -461,6 +461,13 @@ fn owner_still(owner: &Leader) -> Held {
         Err(rustix::io::Errno::SRCH) => return Held::NotOwner,
         Err(error) => return Held::Unknown(format!("signal 0 to {}: {error}", owner.pid)),
     }
+    // An owner that has exited and waits to be reaped still answers signal
+    // 0 and still reads a start identity; it holds nothing.
+    match peer::running(owner.pid) {
+        Ok(true) => {}
+        Ok(false) => return Held::NotOwner,
+        Err(error) => return Held::Unknown(error.to_string()),
+    }
     match peer::start_identity(owner.pid) {
         Ok(start) if start == owner.start => Held::Owner,
         Ok(_) => Held::NotOwner,

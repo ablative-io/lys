@@ -100,12 +100,9 @@ async fn a_started_owner_is_gone_when_the_table_drops_without_close() -> TestRes
     Ok(())
 }
 
-/// Whether any process has `pid`, asked of the kernel.
+/// Whether `pid` runs: a killed owner not yet reaped still answers signal 0.
 fn owner_alive(pid: u32) -> bool {
-    i32::try_from(pid)
-        .ok()
-        .and_then(rustix::process::Pid::from_raw)
-        .is_some_and(|pid| rustix::process::test_kill_process(pid).is_ok())
+    lys_runner::peer::running(pid).is_ok_and(|running| running)
 }
 
 /// The managed fixture starts through its owner and retains the same

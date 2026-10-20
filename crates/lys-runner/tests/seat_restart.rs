@@ -53,8 +53,10 @@ fn pid_of(pid: u32) -> Result<rustix::process::Pid, Box<dyn Error>> {
     Ok(rustix::process::Pid::from_raw(i32::try_from(pid)?).ok_or("pid 0")?)
 }
 
+/// Whether `pid` runs: a killed owner the runner has not reaped still
+/// answers signal 0, so the kernel's record is read (AGENTS-018 R1).
 fn alive(pid: u32) -> bool {
-    pid_of(pid).is_ok_and(|pid| rustix::process::test_kill_process(pid).is_ok())
+    lys_runner::peer::running(pid).is_ok_and(|running| running)
 }
 
 fn runner_with_owner(
