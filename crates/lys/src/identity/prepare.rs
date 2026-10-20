@@ -387,6 +387,10 @@ pub fn render_mail_env(
         ("SMTP_URL", host),
         ("SMTP_PORT", mail.port.to_string()),
         ("SMTP_FROM", mail.from.clone()),
+        // The issuer's own letters (a new account, a password reset) carry
+        // its subject prefix; "Rauthy IAM" would be a name the person was
+        // never told. The leg's record of 20 Oct 2026 showed the default.
+        ("EMAIL_SUB_PREFIX", "Lys".to_owned()),
     ];
     // The pinned issuer's modes are two flags, not one key: TLS from the
     // first byte is its default (with a downgrade to STARTTLS when TLS
