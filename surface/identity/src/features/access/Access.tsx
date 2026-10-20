@@ -15,7 +15,8 @@ import type { Reached, ReachedMap } from '../grants/check';
 import { CheckBox, resourcesSeen, WhoChoice } from '../grants/CheckBox';
 import { ActForm, ActPanel, ChangeButtons, grantColumns } from '../grants/GrantTable';
 import type { Act } from '../grants/GrantTable';
-import { isRootAuthority, IssueRoot, NOT_ROOT } from '../grants/IssueRoot';
+import { IssueRoot, mayGiveAccess, notRoot } from '../grants/IssueRoot';
+import { organisationActs } from '../grants/organisation-acts';
 import { modeWords } from '../grants/mode-words';
 import { grantNo, nameOf, readGrantWorld, resourceLabel, resourceName, voidOf } from '../grants/model';
 import type { GrantWorld } from '../grants/model';
@@ -147,9 +148,11 @@ function Body({ w, teams, mode, arg, reload }: { w: GrantWorld; teams: Teams; mo
   const groups = groupByTeam(scoped, held, teams.list, whose, (id) => nameOf(w, id));
   const close = () => setActing(null);
   const columns = [...grantColumns(w), { head: 'Change', cell: (g: Grant) => <ChangeButtons w={w} g={g} give open={(act, opener) => setActing({ grant: g, act, opener })} /> }];
-  // Only the administrator (the root authority) is offered Give access; anyone else who opens its address is told so in words, with no form.
-  const root = isRootAuthority(w.people);
-  const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} done={reload} /> : <ErrorWords problem={NOT_ROOT} />}</ActPanel>
+  // Give access is offered to whoever holds organisation.grant on their organisation, or the install's root authority (ACCESS-009 R4);
+  // anyone else who opens its address is told which right they do not hold, with no form.
+  const acts = organisationActs(w.me, w.list.grants);
+  const root = mayGiveAccess(acts, w.people);
+  const panel = issuing ? <ActPanel className="issue-root" label="Give access" opener={null} close={() => navigate('/access')}>{root ? <IssueRoot resources={[...seen.values()].map((entry) => entry.resource)} done={reload} /> : <ErrorWords problem={notRoot(acts)} />}</ActPanel>
     : acting ? <ActPanel label={acting.act === 'revoke' ? 'Revoke' : 'Give'} opener={acting.opener} close={close}><ActForm w={w} g={acting.grant} act={acting.act} done={reload} close={close} /></ActPanel> : null;
   return asking ? <div className="pane">
       <div className="seg">{segs.map(([k, l]) => <a key={k} href={'#/access/' + k} className={(mode === 'ask' ? 'can' : mode) === k ? 'on' : ''} aria-current={(mode === 'ask' ? 'can' : mode) === k ? 'page' : undefined}>{l}</a>)}</div>
@@ -186,10 +189,12 @@ export function Access() {
   const shown: typeof load = load.status === 'loading' && last.current ? { status: 'ok', data: last.current } : load;
   const issuing = mode === 'issue';
   const asking = mode !== '' && !issuing;
-  // Only the administrator (the root authority) is offered Give access; it appears once Lys has said who is signed in.
-  const root = shown.status === 'ok' && isRootAuthority(shown.data.w.people);
+  // Give access appears once Lys has said who is signed in and what they hold on their organisation (ACCESS-009 R4), which the head names.
+  const root = shown.status === 'ok' && mayGiveAccess(organisationActs(shown.data.w.me, shown.data.w.list.grants), shown.data.w.people);
+  const organisation = shown.status === 'ok' ? shown.data.w.me.organisation?.display_name : undefined;
+  const purpose = asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.';
   return <AccessLayout on={asking ? 'ask' : 'grants'}
-    subtitle={asking ? 'Ask it any way round. Every answer traces to a person, or says why not.' : 'Every grant you may see. Last used is an exercise seen where access is enforced; not seen means none was observed, never that it was never used.'}
+    subtitle={organisation ? `${organisation}. ${purpose}` : purpose}
     actions={asking ? null : issuing ? <a className="btn" href="#/access">Close the form</a> : root ? <a className="btn primary" href="#/access/issue">Give access</a> : null}>
     <Gate load={shown} title="Access" ok={({ w, teams }) => <Body w={w} teams={teams} mode={mode} arg={arg} reload={() => setRevision((value) => value + 1)} />} />
   </AccessLayout>;

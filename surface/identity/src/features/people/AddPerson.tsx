@@ -14,6 +14,8 @@ import type { ResourcesView } from '../access/Resources';
 import './add-agent.css';
 import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
+import { organisationActs, ORGANISATION_ADMIT } from '../grants/organisation-acts';
+import type { OrganisationActs } from '../grants/organisation-acts';
 
 /** Adding a person is one act, POST /people/admit: register them, make their sign-in account at the issuer by
  * email, bind it, activate them and, when one is chosen, issue their first grant. A fresh install has nothing to
@@ -182,7 +184,14 @@ export function missing(asking: Asking, granting: boolean): string {
   return '';
 }
 
-function PersonForm({ person, model, resources, names }: { person: string; model: GrantModel; resources: ResourcesView; names: Map<string, string> }) {
+/** Why the form is not open: the right not held, who holds it, and what to do instead (ADR-011). */
+function NotOpen({ acts }: { acts: OrganisationActs }) {
+  const add = <>You can add agents of your own: <a href="#/agents/new">Add an agent</a>.</>;
+  if (!acts.organisation) return <p>Lys names no organisation for you yet, so this form is not open to you: the Lys administrator brings the directory under one, and people are added within it. {add}</p>;
+  return <p>Adding a person to {acts.organisation.display_name} needs {ORGANISATION_ADMIT} there, which you do not hold, so this form is not open to you. Whoever holds it adds people: send them the person's name and email address. {add}</p>;
+}
+
+function PersonForm({ person, organisation, model, resources, names }: { person: string; organisation: string; model: GrantModel; resources: ResourcesView; names: Map<string, string> }) {
   const choices = grantable(resources);
   const key = 'lys.add-person.' + person;
   const [saved, setSaved] = useState(() => savedState(key));
@@ -228,6 +237,7 @@ function PersonForm({ person, model, resources, names }: { person: string; model
     check={<>Look for them in <a href="#/people">People and agents</a> first. If they are there, they were added; if not, clear it and add them again. Adding them again with the same email finds their sign-in account rather than making a second one.</>}
     cleared={() => { setSaved(savedState(key)); setFailure(null); setPending(null); }} /> : null;
   return <form aria-label="Add a person" className="add-person-form" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+    <p className="note">They join {organisation}.</p>
     <div className="form-grid">
     {pending && !(pending.given && pending.family)
       ? <label className="field wide">Name<input name="display_name" value={pending.name} readOnly disabled /></label>
@@ -264,13 +274,13 @@ function PersonForm({ person, model, resources, names }: { person: string; model
 
 export function AddPerson() {
   const load = useLoad(async () => {
-    const [me, people, model, resources, teams] = await Promise.all([api.me(), api.people(), api.model(), request<ResourcesView>('/resources'),
+    const [me, people, list, model, resources, teams] = await Promise.all([api.me(), api.people(), api.grants(), api.model(), request<ResourcesView>('/resources'),
       // Team names only make the choices readable; without them a team is said by its kind and id.
       request<{ teams: Team[] }>('/teams').then((answer) => answer.teams, () => [] as Team[])]);
-    return { me, people, model, resources, names: resourceNames(people as PeopleView, teams, null) };
+    return { me, acts: organisationActs(me, list.grants), model, resources, names: resourceNames(people as PeopleView, teams, null) };
   }, 'add-person');
   return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory. Access is optional; they can start with none." />
-    <DirectoryGate load={load} title="Add a person" ok={(data) => data.people.scope === 'directory'
-      ? <PersonForm person={data.me.person.id} model={data.model} resources={data.resources} names={data.names} /> : <p>Only the Lys administrator adds people, so this form is not open to you. To have someone added, send the administrator their name and email address. You can add agents of your own: <a href="#/agents/new">Add an agent</a>.</p>} />
+    <DirectoryGate load={load} title="Add a person" ok={(data) => data.acts.admit && data.acts.organisation
+      ? <PersonForm person={data.me.person.id} organisation={data.acts.organisation.display_name} model={data.model} resources={data.resources} names={data.names} /> : <NotOpen acts={data.acts} />} />
   </div>;
 }

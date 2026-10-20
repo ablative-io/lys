@@ -4,6 +4,7 @@ import { Teams } from '../teams/Teams';
 import { useEffect, useState } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router';
 import { api, useLoad } from '../../api';
+import { organisationActs } from '../grants/organisation-acts';
 import type { PeopleView } from '../../generated';
 import { Listing } from '../../shell/Listing';
 import type { Column } from '../../shell/Listing';
@@ -31,14 +32,16 @@ const VIEWS: [KindFilter, string, string][] = [
 
 const EVERYONE = 'Everyone who works here, human or not. Every agent has a person who answers for it.';
 
-/** The page's head, naming the caller's organisation (DIRECTORY-109 R4). Add person is offered only to the administrator, who alone may add one; `admin` is passed when the page already knows. */
-function PeopleHead({ admin }: { admin?: boolean }) {
+/** The page's head, naming the caller's organisation (DIRECTORY-109 R4). Add person is offered to whoever holds organisation.admit on it, read from their own grants (ACCESS-009 R4). */
+function PeopleHead() {
   const shell = useShell();
   const navigate = useNavigate();
-  const scope = useLoad(async () => admin ?? (await api.people()).scope === 'directory', 'people-head-admin:' + String(admin));
-  const me = useLoad(() => api.me(), 'people-head-me');
-  const mayAddPeople = scope.status === 'ok' && scope.data;
-  const organisation = me.status === 'ok' ? me.data.organisation?.display_name : undefined;
+  const acts = useLoad(async () => {
+    const [me, list] = await Promise.all([api.me(), api.grants()]);
+    return organisationActs(me, list.grants);
+  }, 'people-head-acts');
+  const mayAddPeople = acts.status === 'ok' && acts.data.admit;
+  const organisation = acts.status === 'ok' ? acts.data.organisation?.display_name : undefined;
   return (
     <>
       <PageHeader title="People and agents" subtitle={organisation ? `${organisation}. ${EVERYONE}` : EVERYONE} actions={<>
@@ -182,7 +185,7 @@ function DirectoryPage() {
       title="Directory"
       ok={(d) => (
         <div className="page fill">
-          <PeopleHead admin={d.view.scope === 'directory'} />
+          <PeopleHead />
           {d.teams.refused ? <p className="why-not">Teams cannot be read, so everyone is listed without their team. {d.teams.refused}</p> : null}
           <List view={d.view} teams={d.teams.teams} me={d.me.person.id} reach={reach} />
         </div>

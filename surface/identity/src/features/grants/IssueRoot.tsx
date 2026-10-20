@@ -13,6 +13,8 @@ import { MODE_HINTS, MODES, modeWords } from './mode-words';
 import { resourceNames, resourceWords } from '../people/agent-resource-names';
 import { LEVEL_NAMES, LevelPicker } from './LevelPicker';
 import { actionWords } from './action-words';
+import { organisationActs, ORGANISATION_GRANT } from './organisation-acts';
+import type { OrganisationActs } from './organisation-acts';
 
 /** The resource choice that opens a box for an id Lys holds no grant on yet. */
 const BY_ID = '\u0000by-id';
@@ -37,6 +39,20 @@ export const isRootAuthority = (people: PeopleView): boolean => people.scope ===
 
 /** The refusal POST /grants/roots answers anyone but the root authority, said before any form is drawn. */
 export const NOT_ROOT = new Refused(403, { refusal: 'RootAuthorityRefused', reason: 'only the administrator gives access directly' });
+
+/**
+ * Whether the signed-in person may give access directly (ACCESS-009 R4): a standing grant of theirs on their
+ * organisation carries organisation.grant, or they are the install's root authority, who roots its own kinds.
+ */
+export const mayGiveAccess = (acts: OrganisationActs, people: PeopleView): boolean => acts.grant || isRootAuthority(people);
+
+/**
+ * The refusal said to a person who may not give access directly, before any form is drawn: within an organisation it
+ * names the right they do not hold and who gives access there; outside one it is the install's own refusal.
+ */
+export const notRoot = (acts: OrganisationActs): Refused => acts.organisation
+  ? new Refused(403, { refusal: 'RootAuthorityRefused', reason: `you hold no ${ORGANISATION_GRANT} on ${acts.organisation.display_name}, so you cannot give access directly; whoever holds ${ORGANISATION_GRANT} there gives it, and access you hold that may be passed on is given from a person's file` })
+  : NOT_ROOT;
 
 /** A kind in words: `cambium.channel` is "Channel" under its app's name, `project` is "Project". */
 export const kindLabel = (kind: string): string => {
@@ -183,9 +199,10 @@ export async function readKinds(resources: ResourceRef[]): Promise<KindGroup[]> 
 }
 
 async function read(resources: ResourceRef[]) {
-  const people = await api.people();
-  if (!isRootAuthority(people)) throw NOT_ROOT;
-  const [me, model, kinds] = await Promise.all([api.me(), api.model(), readKinds(resources)]);
+  const [people, me, list] = await Promise.all([api.people(), api.me(), api.grants()]);
+  const acts = organisationActs(me, list.grants);
+  if (!mayGiveAccess(acts, people)) throw notRoot(acts);
+  const [model, kinds] = await Promise.all([api.model(), readKinds(resources)]);
   return { people, me, model, kinds };
 }
 

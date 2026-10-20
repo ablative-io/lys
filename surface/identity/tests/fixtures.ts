@@ -102,6 +102,8 @@ export const ME: MeView = {
 export const ROOT_G = 'grant-' + hex(31);
 export const LEDGER_G = 'grant-' + hex(32);
 export const SCRIBE_G = 'grant-' + hex(33);
+/** Ada's founding grant on Example organisation (DIRECTORY-109 R3): the administrator relation, standing from the founding. */
+export const FOUNDING_G = 'grant-' + hex(34);
 const at = (d: number, m: number) => new Date(2026, m - 1, d, 12, 0).getTime() / 1000;
 
 /**
@@ -123,6 +125,7 @@ export const GRANTS: Grant[] = [
   grant({ id: ROOT_G, holder: ADA, relation: 'owner', actions: ['edit', 'grant', 'view'], pass_on: { kind: 'to', actions: ['edit', 'view'], recipients: ['agent'] }, source: null, window: { starts_at: at(27, 9), ends_at: at(27, 10) } }),
   grant({ id: LEDGER_G, holder: ADA, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: null, resource: { kind: 'project', id: 'ledger' } }),
   grant({ id: SCRIBE_G, holder: SCRIBE, relation: 'viewer', actions: ['view'], pass_on: { kind: 'use_only' }, source: ROOT_G, window: { starts_at: at(27, 9), ends_at: at(4, 10) }, last_use: { seen: true, at: at(27, 9), route: 'tool', use_event: 5, recorded: 1, source: 'reported' } }),
+  grant({ id: FOUNDING_G, holder: ADA, relation: 'administrator', actions: ['organisation.administer', 'organisation.admit', 'organisation.grant', 'organisation.read'], pass_on: { kind: 'use_only' }, source: null, resource: { kind: 'organisation', id: ORGANISATION }, window: { starts_at: 0, ends_at: null } }),
 ];
 
 /**
