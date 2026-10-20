@@ -8,8 +8,8 @@ use lys_core::Ed25519Identity;
 use lys_identity::encoding::{decode_body, encode_body};
 use lys_identity::{
     Actor, AgentId, AuthMethod, Change, IdentityError, IdentityEvent, IdentityId, LifecycleState,
-    LinkChange, LinkObservation, LoginBinding, OperationId, PersonId, Profile, Provenance,
-    Transition, sign_event, verify_event,
+    LinkChange, LinkObservation, LoginBinding, OperationId, OrganisationId, PersonId, Profile,
+    Provenance, Transition, sign_event, verify_event,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -55,6 +55,7 @@ fn every_change() -> Result<Vec<IdentityEvent>, IdentityError> {
             person,
             Change::RegisterPerson {
                 profile: Profile::new("Ada")?,
+                organisation: Some(OrganisationId::from_bytes([3; 16])),
             },
         )?,
         event(
@@ -98,6 +99,7 @@ fn every_change() -> Result<Vec<IdentityEvent>, IdentityError> {
             person,
             Change::SetupPerson {
                 profile: Profile::new("Tom")?,
+                organisation: Some(OrganisationId::from_bytes([3; 16])),
             },
         )?,
         event(
@@ -660,6 +662,7 @@ mod receipts {
                 event.actor().clone(),
                 Change::RegisterPerson {
                     profile: Profile::new("Mallory")?,
+                    organisation: Some(OrganisationId::from_bytes([3; 16])),
                 },
             )?,
             receipt.coordinate(),
