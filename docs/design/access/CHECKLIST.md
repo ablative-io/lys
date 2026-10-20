@@ -28,3 +28,10 @@
 
 - [ ] **C613** — A machine is the fifth identity and grant holder, made at join, answering to the administrator who issued its code; old bytes stay readable (ACCESS-005 R1).
 - [ ] **C614** — The Network screen shows machines as holders and their grants; a machine never holds a kept responsibility (ACCESS-005 R2).
+
+## Organisation-scoped admission and roots (ACCESS-009)
+
+- [ ] **C800** — POST /people/admit and POST /people are judged by organisation.admit on the caller's own organisation through the grants engine; a body naming another organisation is refused organisation_not_own before any write; routes::administrator is not consulted.
+- [ ] **C801** — judge_root's root authority is a function of the resource: organisation.grant on the caller's organisation for organisation-owned kinds, the install's person for install-level kinds; every root records its organisation; a resource rooted under another organisation is refused resource_owned_elsewhere while any grant on it lives.
+- [ ] **C802** — A delegation to a recipient outside the issuer's organisation, directly or through an agent's, service account's, connector's or machine's owner, is refused recipient_outside_organisation; revocation keeps revocation.rs:71's rule.
+- [ ] **C803** — People and Access show the caller's organisation and only its records, from the partitioned routes without client filtering, with the add-person and root acts shown by GET /authority's organisation.admit and organisation.grant; no screen branches on the install's own organisation.

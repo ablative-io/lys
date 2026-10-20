@@ -16,6 +16,10 @@
         {
           "id": "S303",
           "text": "As the owner, I want a product deploy that widens a role to wait for me, so that nobody holds more because a release shipped."
+        },
+        {
+          "id": "S457",
+          "text": "As the administrator of my own organisation's Lys, I admit my people and give them our Cambium by grants I hold on my organisation, and the provider's administrator cannot do either inside it unless I pass them the right and I can take it back."
         }
       ]
     },
@@ -54,6 +58,10 @@
         {
           "id": "S308",
           "text": "As a clinician, I want a private place reached only by those granted it, so that a new colleague does not see every ward's channel on their first day."
+        },
+        {
+          "id": "S458",
+          "text": "As a person admitted into my organisation, what my administrator passes to me stays inside our organisation: I cannot be given anything by, or pass anything to, someone outside it, and my People and Access screens show only us."
         }
       ]
     }
