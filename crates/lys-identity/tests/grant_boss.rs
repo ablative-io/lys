@@ -135,7 +135,8 @@ fn a_child_leaving_the_boss_is_refused_by_the_effective_check() -> TestResult {
 fn revoking_the_boss_grant_immediately_refuses_the_child() -> TestResult {
     let (mut world, child, boss, request) = family()?;
     let grant = world.delegate(&request)?.event.grant();
-    world.revoke(
+    world.grants.revoke(
+        world.directory.projection()?,
         &RevokeRequest {
             operation: OperationId::generate()?,
             caller: IdentityId::Person(world.tom),

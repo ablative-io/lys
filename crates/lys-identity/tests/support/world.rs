@@ -14,7 +14,7 @@ use lys_core::Ed25519Identity;
 use lys_identity::grants::{
     Action, DelegateRequest, ExerciseRequest, GrantError, GrantId, Grants, MemoryRelationships,
     Model, PassOn, Permit, RecipientKind, Recorded, Relation, RelationshipStore, Resource,
-    RevokeRequest, RootRequest, Route, Window,
+    RootRequest, Route, Window,
 };
 use lys_identity::log::Reopen;
 use lys_identity::{
@@ -286,13 +286,6 @@ impl<S: LeafStore, R: RelationshipStore> World<S, R> {
     pub fn delegate(&mut self, request: &DelegateRequest) -> Result<Recorded, GrantError> {
         let directory = self.directory.projection()?;
         self.grants.delegate(directory, request, self.now)
-    }
-
-    /// Revoke `request.grant` at `at`, judged against the directory as a
-    /// route judges it (ACCESS-009 R2).
-    pub fn revoke(&mut self, request: &RevokeRequest, at: u64) -> Result<Recorded, GrantError> {
-        let directory = self.directory.projection()?;
-        self.grants.revoke(directory, request, at)
     }
 
     /// Whether `caller` may exercise `action` on [`alpha`] through `route`.

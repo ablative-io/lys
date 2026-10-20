@@ -284,7 +284,9 @@ fn grant_reinstate_rechecks_every_grant_and_resurrects_none() -> TestResult {
         grant: revoked,
         reason: "no longer needed".to_owned(),
     };
-    world.revoke(&request, now)?;
+    world
+        .grants
+        .revoke(world.directory.projection()?, &request, now)?;
     world.now = T0 + 150;
     let before = world.events();
     let now = world.now;

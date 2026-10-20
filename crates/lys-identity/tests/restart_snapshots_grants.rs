@@ -73,7 +73,9 @@ fn a_restart_of_the_grants_folds_only_the_leaves_after_the_snapshot() -> TestRes
         grant: lent,
         reason: "the root authority withdrew it".to_owned(),
     };
-    world.revoke(&revoke, T0 + 20)?;
+    world
+        .grants
+        .revoke(world.directory.projection()?, &revoke, T0 + 20)?;
     let size = world.events();
 
     let first = open(&world)?;

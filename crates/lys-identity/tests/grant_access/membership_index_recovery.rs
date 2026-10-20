@@ -120,7 +120,10 @@ fn revoke(world: &mut World<impl LeafStore>, grant: GrantId) -> Result<(), Grant
         grant,
         reason: "left the ward".to_owned(),
     };
-    world.revoke(&request, T0 + 20).map(drop)
+    world
+        .grants
+        .revoke(world.directory.projection()?, &request, T0 + 20)
+        .map(drop)
 }
 
 fn live(book: &GrantBook, holder: IdentityId) -> Vec<GrantId> {

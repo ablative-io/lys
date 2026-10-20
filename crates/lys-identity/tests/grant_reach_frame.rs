@@ -498,7 +498,11 @@ fn control_1_a_degraded_frame_refuses_a_revoked_ancestor_and_a_spent_hop_and_kee
         grant: root,
         reason: "the root authority withdrew it".to_owned(),
     };
-    let Err(GrantError::ProjectionPending { .. }) = world.revoke(&revoked, now) else {
+    let Err(GrantError::ProjectionPending { .. }) =
+        world
+            .grants
+            .revoke(world.directory.projection()?, &revoked, now)
+    else {
         return Err("the ancestor revoke commits while its projection fails".into());
     };
     let read = |caller| -> Result<ExerciseRequest, GrantError> {

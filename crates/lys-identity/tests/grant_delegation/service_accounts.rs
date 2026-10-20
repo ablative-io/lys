@@ -118,7 +118,8 @@ fn delegated_service_account_survives_restart_and_reimport_then_revocation_stops
             .delegate(&projection, &too_wide, T0 + 3)
             .is_err()
     );
-    world.revoke(
+    world.grants.revoke(
+        world.directory.projection()?,
         &RevokeRequest {
             operation: OperationId::from_bytes([95; 16]),
             caller: IdentityId::Person(world.dana),
