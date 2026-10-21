@@ -1,3 +1,4 @@
+#![cfg(test)]
 use crate::harness_control::Settings;
 use crate::harness_control::events::{Binding, Sessions, Transport};
 use crate::input::Input;

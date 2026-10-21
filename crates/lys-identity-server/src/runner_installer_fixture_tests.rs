@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The real installer route over a private fixture install and its held clients.
 
 use std::collections::BTreeMap;

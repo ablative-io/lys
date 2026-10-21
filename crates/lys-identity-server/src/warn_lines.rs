@@ -72,12 +72,10 @@ fn line(event: &Event<'_>) -> String {
     let metadata = event.metadata();
     if metadata.target() == "lys_identity_server::passfast" {
         {
-            use std::fmt::Write as _;
-            let _ = write!(
-                fields.rest,
-                " at_ms={}",
-                jiff::Timestamp::now().as_millisecond()
-            );
+            fields.rest.push_str(" at_ms=");
+            fields
+                .rest
+                .push_str(&jiff::Timestamp::now().as_millisecond().to_string());
         }
     }
     format!(
@@ -216,7 +214,7 @@ mod tests {
         tracing::subscriber::with_default(WarnLines::new(say), || {
             for cache in ["hit", "miss"] {
                 tracing::info!(target: "lys_identity_server::passfast", holder_kind = "person",
-                    app = "cambium", act = "pass", cache, elapsed_ms = 1, "token exchange");
+                    app = "fixture_product", act = "pass", cache, elapsed_ms = 1, "token exchange");
             }
         });
         let lines = heard.lock().map_err(|error| error.to_string())?;
@@ -228,7 +226,7 @@ mod tests {
         assert!(lines[0].contains("cache=hit"));
         assert!(lines[1].contains("cache=miss"));
         assert!(lines.iter().all(|line| line.contains("holder_kind=person")
-            && line.contains("app=cambium")
+            && line.contains("app=fixture_product")
             && line.contains("elapsed_ms=1")));
         Ok(())
     }

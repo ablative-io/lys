@@ -242,20 +242,28 @@ async fn next_page(
 }
 
 #[cfg(test)]
-async fn follow_with<Next, Page, Wait, Delay>(
-    state: &Arc<AppState>,
-    machine: &str,
-    next: Next,
-    wait: Wait,
-) where
-    Next: FnMut() -> Page + Send,
-    Page: Future<Output = Result<FeedPage, ServerError>> + Send,
-    Wait: FnMut(std::time::Duration) -> Delay + Send,
-    Delay: Future<Output = ()> + Send,
-{
-    let runner = bound_runner(state, machine)
-        .unwrap_or_else(|error| panic!("the fixture runner could not be bound: {error}"));
-    follow_binding_with(state, machine, &runner, next, wait).await;
+use follow_fixture::follow_with;
+
+/// The follow loop over a bound fixture runner, for the paused-clock tests.
+#[cfg(test)]
+mod follow_fixture {
+    use super::{AppState, Arc, FeedPage, Future, ServerError, bound_runner, follow_binding_with};
+
+    pub(super) async fn follow_with<Next, Page, Wait, Delay>(
+        state: &Arc<AppState>,
+        machine: &str,
+        next: Next,
+        wait: Wait,
+    ) where
+        Next: FnMut() -> Page + Send,
+        Page: Future<Output = Result<FeedPage, ServerError>> + Send,
+        Wait: FnMut(std::time::Duration) -> Delay + Send,
+        Delay: Future<Output = ()> + Send,
+    {
+        let runner = bound_runner(state, machine)
+            .unwrap_or_else(|error| panic!("the fixture runner could not be bound: {error}"));
+        follow_binding_with(state, machine, &runner, next, wait).await;
+    }
 }
 
 async fn follow_binding_with<Next, Page, Wait, Delay>(

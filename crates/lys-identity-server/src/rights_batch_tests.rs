@@ -1,3 +1,4 @@
+#![cfg(test)]
 use std::error::Error;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};

@@ -1,3 +1,4 @@
+#![cfg(test)]
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::sync::{Arc, Mutex};

@@ -1,5 +1,5 @@
-//! Transport assertions read the one visible JSON answer, including its kept leaf.
 #![cfg(test)]
+//! Transport assertions read the one visible JSON answer, including its kept leaf.
 use serde_json::Value;
 
 pub(crate) fn body(result: &Value) -> Value {

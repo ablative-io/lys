@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Fixtures read the public views; they start no server, runner or harness.
 
 use std::collections::BTreeMap;

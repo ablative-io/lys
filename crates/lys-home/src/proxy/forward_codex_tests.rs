@@ -1,3 +1,4 @@
+#![cfg(test)]
 use super::*;
 
 const RUN: &str = "0123456789abcdef0123456789abcdef";

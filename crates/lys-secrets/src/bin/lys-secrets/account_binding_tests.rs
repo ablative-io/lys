@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! Account draws retain the source handle's authority and never expose its value.
 use crate::files::{FileGrants, now_ms};
 use crate::values_tests::{Outcome, PERSON, broker, never_written, upstream, vouched};

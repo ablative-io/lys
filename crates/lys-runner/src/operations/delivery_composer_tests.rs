@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! A stalled composer may read the whole input burst together.
 
 use crate::Sessions;
