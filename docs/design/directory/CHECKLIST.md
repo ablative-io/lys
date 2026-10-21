@@ -699,3 +699,10 @@
 - [ ] **C822** — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, not_your_app or kind_not_registered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
 - [ ] **C823** — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
 - [ ] **C824** — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.
+
+## Lys names no product (DIRECTORY-114)
+
+- [ ] **C825** — An active agent's overview names each approved app by its registration: an access line where the agent holds a grant under the app's id, else the steps to use it there; with none approved, connect an app. DIRECTORY-114/R1.
+- [ ] **C826** — The note before any app's resources are held names no app and links Access to the one approved app, or to Access when more than one is. DIRECTORY-114/R2.
+- [ ] **C827** — Getting started's step is Connect an app, done when any app is approved, naming the first pending app when one asks. DIRECTORY-114/R3.
+- [ ] **C828** — The estate import shows evidence as written, and the seat import excludes a server entry holding only tool approvals by its shape, never a name. DIRECTORY-114/R4.

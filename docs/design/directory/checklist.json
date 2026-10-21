@@ -2590,6 +2590,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Lys names no product (DIRECTORY-114)",
+      "items": [
+        {
+          "id": "C825",
+          "text": "An active agent's overview names each approved app by its registration: an access line where the agent holds a grant under the app's id, else the steps to use it there; with none approved, connect an app. DIRECTORY-114/R1.",
+          "done": false
+        },
+        {
+          "id": "C826",
+          "text": "The note before any app's resources are held names no app and links Access to the one approved app, or to Access when more than one is. DIRECTORY-114/R2.",
+          "done": false
+        },
+        {
+          "id": "C827",
+          "text": "Getting started's step is Connect an app, done when any app is approved, naming the first pending app when one asks. DIRECTORY-114/R3.",
+          "done": false
+        },
+        {
+          "id": "C828",
+          "text": "The estate import shows evidence as written, and the seat import excludes a server entry holding only tool approvals by its shape, never a name. DIRECTORY-114/R4.",
+          "done": false
+        }
+      ]
     }
   ]
 }
