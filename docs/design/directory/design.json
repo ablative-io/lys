@@ -6390,74 +6390,346 @@
       "note": "tests of the sibling module, red first",
       "brief": "DIRECTORY-102"
     },
-    {"path": "surface/identity/src/features/dashboard/waiting.ts", "note": "GET /waiting's lines, count and rail words; an entry carries the request or draft it decides", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-touch.test.tsx", "note": "tests that the dashboard's side panels draw with no title attribute", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/DashboardOptions.tsx", "note": "the three dashboards A, B and C to decide between on the page, dev builds only", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts", "note": "Cherie's fixture, so the page can be looked at signed out in a dev build", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-options.css", "note": "the option strip and the three layouts", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-options.test.tsx", "note": "tests of the option strip and the three layouts", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/drafts/DraftDecide.tsx", "note": "Approve and Decline in a waiting draft's own row, on Drafts and the dashboard alike", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/Dashboard.tsx", "note": "the front page: one read of what waits, the agents, the week's figure with the person's limit, no heading of its own", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/WaitingOnYou.tsx", "note": "Waiting on you: each line of GET /waiting with its decision in the row", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard-waiting.test.tsx", "note": "tests of Waiting on you: rows, acts, count, refused parts", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/StopEverything.tsx", "note": "the stop symbol alone and the cord line", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/dashboard.css", "note": "the dashboard's own styles", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/drafts/Drafts.tsx", "note": "the drafts page, deciding in the row", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/shell/railItems.ts", "note": "the rail's entries: Dashboard first", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/dashboard.test.tsx", "note": "tests of the front page as Tom read it on 18 October 2026", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/agent-run.test.tsx", "note": "tests of an agent's run page", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/help.test.tsx", "note": "tests of the help pages", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/shell-places.test.tsx", "note": "tests of the shell's places", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/sign-in-landing.test.tsx", "note": "tests of where sign-in lands", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/tests/signed-out-walk.test.tsx", "note": "tests of the signed-out walk", "brief": "DIRECTORY-104"},
-    {"path": "surface/identity/src/features/dashboard/Widgets.tsx", "note": "the requests and drafts parts decide in their rows with DecisionForm and DraftDecide (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
-    {"path": "surface/identity/src/features/dashboard/canvas-parts.test.tsx", "note": "pins the acts in the widgets' rows and no Decide label (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
-    {"path": "surface/identity/src/features/runtime/CanvasWidgets.tsx", "note": "passes the person and the board re-read to the requests and drafts widgets (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
-    {"path": "surface/identity/tests/canvas-widgets.test.tsx", "note": "green against the widgets' new props (DIRECTORY-105 R1)", "brief": "DIRECTORY-105"},
-    {"path": "surface/identity/src/features/grants/AppFirst.tsx", "note": "CambiumFirst moved: the step before an agent holds any app access, by the apps list (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/file/AppNext.tsx", "note": "CambiumNext moved: the step after an agent is added, each approved app by its registered name and address (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/apps/ClientCredentials.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/file/AgentOverview.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/file/GiveAccess.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/grants/IssueRoot.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/import/EstateApproval.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/features/people/AddAgent.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/HelpDock.tsx", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/access.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/apps.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/people.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/start.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/trouble.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/concepts/types.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "surface/identity/src/shell/help/url.ts", "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)", "brief": "DIRECTORY-106"},
-    {"path": "crates/lys-identity-server/src/seat_import_profiles/servers.rs", "note": "the seat import excludes no server by a product word (DIRECTORY-106 R2)", "brief": "DIRECTORY-106"},
-    {"path": "crates/lys-identity/src/stores_receipt.rs", "note": "the receipt of every store's count and digest, one shape for the server and the lys binary (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity/src/stores_receipt_tests.rs", "note": "the receipt round-trips, writes by one rename and names every store opened at startup (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/stores_receipt.rs", "note": "the boot check against the receipt by each store's own comparison and class, the acceptance read, the loss epochs, the removal function and the receipt writes at boot, after removals and at clean stop (DIRECTORY-107 R2, R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/boot_refused.rs", "note": "the two-route server a refused boot serves: /health refused_to_start and the sign-in page, every other route 503 with the same words (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/tests/stores_receipt.rs", "note": "boot refuses a lost whole store by name and serves only /health and sign-in saying why; an own store's loss refuses only its routes; honest shrinks and recorded removals boot; a projection behind is re-projected, foreign is refused; acceptance serves; refusals carry the loss; the stream resets an old epoch (DIRECTORY-107 R2, R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/identity/accept_loss.rs", "note": "lys identity accept-loss: the recorded operator act naming each store (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/identity/upgrade/stores_receipt_tests.rs", "note": "install and upgrade refuse by store name against the receipt; accept-loss records exactly the named stores (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/network_store/journal.rs", "note": "no empty machines file unless the receipt allows it (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/grant_changes/identity.rs", "note": "no minted identity for a counted log; reset on an accepted loss (DIRECTORY-107 R2, R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/identity/install/server_config/rendering.rs", "note": "renders the receipt and acceptance file keys (DIRECTORY-107 R2)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/identity/install/runner_join_guard_tests.rs", "note": "install under a saved join is refused and changes nothing; no key minted for a counted one (DIRECTORY-107 R3)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/runner_dial.rs", "note": "the runner refusal carries the machines loss (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity-server/src/grant_changes/stream.rs", "note": "Reset{Rollback} for an earlier epoch of the same log, whatever the cursor (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/commands/launch_device.rs", "note": "machine_not_joined carries the computer loss when the view does (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys/src/commands/launch_device_tests.rs", "note": "the loss sentence on machine_not_joined (DIRECTORY-107 R4)", "brief": "DIRECTORY-107"},
-    {"path": "crates/lys-identity/src/organisation.rs", "note": "The organisation identity: OrganisationId, its profile and founder, folded from FoundOrganisation and the lifecycle transitions (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity/src/id.rs", "note": "IdentityId gains Organisation(OrganisationId) (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity/src/projection.rs", "note": "A person's and agent's record carries its organisation; organisation_of and the organisations held (DIRECTORY-109 R1).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity-server/src/organisation_boot.rs", "note": "At boot, the install's organisation is founded once and every record without one is attached to it in one durable batch (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity-server/tests/organisation_boot.rs", "note": "The boot batch: attaches every record once, nothing twice, refuses to serve on a failed commit (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity-server/src/admission.rs", "note": "First-run setup founds the install's organisation with the administrator as founder in the same batch (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity/src/grants/shipped.rs", "note": "The kind organisation, its four actions, the administrator role, and the three actions withheld from agents (DIRECTORY-109 R3).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity-server/tests/organisation_reads.rs", "note": "Two organisations, every read route answers only the caller's own (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity-server/src/grants_batch.rs", "note": "/grants/which answers only ids of the caller's organisation (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
-    {"path": "surface/identity/src/features/people/People.tsx", "note": "The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
-    {"path": "surface/identity/src/features/people/people-views.test.tsx", "note": "The organisation name shown in the People header (DIRECTORY-109 R4).", "brief": "DIRECTORY-109"},
-    {"path": "crates/lys-identity/src/grants/change_stream.rs", "note": "The grant log batch that stamps every unstamped grant with the install's organisation (DIRECTORY-109 R2).", "brief": "DIRECTORY-109"},
+    {
+      "path": "surface/identity/src/features/dashboard/waiting.ts",
+      "note": "GET /waiting's lines, count and rail words; an entry carries the request or draft it decides",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-touch.test.tsx",
+      "note": "tests that the dashboard's side panels draw with no title attribute",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/DashboardOptions.tsx",
+      "note": "the three dashboards A, B and C to decide between on the page, dev builds only",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-cherie.fixture.ts",
+      "note": "Cherie's fixture, so the page can be looked at signed out in a dev build",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-options.css",
+      "note": "the option strip and the three layouts",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-options.test.tsx",
+      "note": "tests of the option strip and the three layouts",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/drafts/DraftDecide.tsx",
+      "note": "Approve and Decline in a waiting draft's own row, on Drafts and the dashboard alike",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/Dashboard.tsx",
+      "note": "the front page: one read of what waits, the agents, the week's figure with the person's limit, no heading of its own",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/WaitingOnYou.tsx",
+      "note": "Waiting on you: each line of GET /waiting with its decision in the row",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard-waiting.test.tsx",
+      "note": "tests of Waiting on you: rows, acts, count, refused parts",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/StopEverything.tsx",
+      "note": "the stop symbol alone and the cord line",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/dashboard.css",
+      "note": "the dashboard's own styles",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/drafts/Drafts.tsx",
+      "note": "the drafts page, deciding in the row",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/shell/railItems.ts",
+      "note": "the rail's entries: Dashboard first",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/dashboard.test.tsx",
+      "note": "tests of the front page as Tom read it on 18 October 2026",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/agent-run.test.tsx",
+      "note": "tests of an agent's run page",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/help.test.tsx",
+      "note": "tests of the help pages",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/shell-places.test.tsx",
+      "note": "tests of the shell's places",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/sign-in-landing.test.tsx",
+      "note": "tests of where sign-in lands",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/tests/signed-out-walk.test.tsx",
+      "note": "tests of the signed-out walk",
+      "brief": "DIRECTORY-104"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/Widgets.tsx",
+      "note": "the requests and drafts parts decide in their rows with DecisionForm and DraftDecide (DIRECTORY-105 R1)",
+      "brief": "DIRECTORY-105"
+    },
+    {
+      "path": "surface/identity/src/features/dashboard/canvas-parts.test.tsx",
+      "note": "pins the acts in the widgets' rows and no Decide label (DIRECTORY-105 R1)",
+      "brief": "DIRECTORY-105"
+    },
+    {
+      "path": "surface/identity/src/features/runtime/CanvasWidgets.tsx",
+      "note": "passes the person and the board re-read to the requests and drafts widgets (DIRECTORY-105 R1)",
+      "brief": "DIRECTORY-105"
+    },
+    {
+      "path": "surface/identity/tests/canvas-widgets.test.tsx",
+      "note": "green against the widgets' new props (DIRECTORY-105 R1)",
+      "brief": "DIRECTORY-105"
+    },
+    {
+      "path": "surface/identity/src/features/grants/AppFirst.tsx",
+      "note": "CambiumFirst moved: the step before an agent holds any app access, by the apps list (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/file/AppNext.tsx",
+      "note": "CambiumNext moved: the step after an agent is added, each approved app by its registered name and address (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/apps/ClientCredentials.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/file/AgentOverview.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/file/GiveAccess.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/grants/IssueRoot.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/import/EstateApproval.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/features/people/AddAgent.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/HelpDock.tsx",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/access.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/apps.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/people.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/start.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/trouble.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/concepts/types.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "surface/identity/src/shell/help/url.ts",
+      "note": "names no product; reads the apps list or speaks of apps in general (DIRECTORY-106 R1)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "crates/lys-identity-server/src/seat_import_profiles/servers.rs",
+      "note": "the seat import excludes no server by a product word (DIRECTORY-106 R2)",
+      "brief": "DIRECTORY-106"
+    },
+    {
+      "path": "crates/lys-identity/src/stores_receipt.rs",
+      "note": "the receipt of every store's count and digest, one shape for the server and the lys binary (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity/src/stores_receipt_tests.rs",
+      "note": "the receipt round-trips, writes by one rename and names every store opened at startup (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/stores_receipt.rs",
+      "note": "the boot check against the receipt by each store's own comparison and class, the acceptance read, the loss epochs, the removal function and the receipt writes at boot, after removals and at clean stop (DIRECTORY-107 R2, R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/boot_refused.rs",
+      "note": "the two-route server a refused boot serves: /health refused_to_start and the sign-in page, every other route 503 with the same words (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/stores_receipt.rs",
+      "note": "boot refuses a lost whole store by name and serves only /health and sign-in saying why; an own store's loss refuses only its routes; honest shrinks and recorded removals boot; a projection behind is re-projected, foreign is refused; acceptance serves; refusals carry the loss; the stream resets an old epoch (DIRECTORY-107 R2, R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/identity/accept_loss.rs",
+      "note": "lys identity accept-loss: the recorded operator act naming each store (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/stores_receipt_tests.rs",
+      "note": "install and upgrade refuse by store name against the receipt; accept-loss records exactly the named stores (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/network_store/journal.rs",
+      "note": "no empty machines file unless the receipt allows it (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_changes/identity.rs",
+      "note": "no minted identity for a counted log; reset on an accepted loss (DIRECTORY-107 R2, R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/identity/install/server_config/rendering.rs",
+      "note": "renders the receipt and acceptance file keys (DIRECTORY-107 R2)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/identity/install/runner_join_guard_tests.rs",
+      "note": "install under a saved join is refused and changes nothing; no key minted for a counted one (DIRECTORY-107 R3)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_dial.rs",
+      "note": "the runner refusal carries the machines loss (DIRECTORY-107 R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grant_changes/stream.rs",
+      "note": "Reset{Rollback} for an earlier epoch of the same log, whatever the cursor (DIRECTORY-107 R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/commands/launch_device.rs",
+      "note": "machine_not_joined carries the computer loss when the view does (DIRECTORY-107 R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys/src/commands/launch_device_tests.rs",
+      "note": "the loss sentence on machine_not_joined (DIRECTORY-107 R4)",
+      "brief": "DIRECTORY-107"
+    },
+    {
+      "path": "crates/lys-identity/src/organisation.rs",
+      "note": "The organisation identity: OrganisationId, its profile and founder, folded from FoundOrganisation and the lifecycle transitions (DIRECTORY-109 R1).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity/src/id.rs",
+      "note": "IdentityId gains Organisation(OrganisationId) (DIRECTORY-109 R1).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity/src/projection.rs",
+      "note": "A person's and agent's record carries its organisation; organisation_of and the organisations held (DIRECTORY-109 R1).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity-server/src/organisation_boot.rs",
+      "note": "At boot, the install's organisation is founded once and every record without one is attached to it in one durable batch (DIRECTORY-109 R2).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/organisation_boot.rs",
+      "note": "The boot batch: attaches every record once, nothing twice, refuses to serve on a failed commit (DIRECTORY-109 R2).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity-server/src/admission.rs",
+      "note": "First-run setup founds the install's organisation with the administrator as founder in the same batch (DIRECTORY-109 R2).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/shipped.rs",
+      "note": "The kind organisation, its four actions, the administrator role, and the three actions withheld from agents (DIRECTORY-109 R3).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/organisation_reads.rs",
+      "note": "Two organisations, every read route answers only the caller's own (DIRECTORY-109 R4).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity-server/src/grants_batch.rs",
+      "note": "/grants/which answers only ids of the caller's organisation (DIRECTORY-109 R4).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "surface/identity/src/features/people/People.tsx",
+      "note": "The People header names the caller's organisation from /me; lists are the partitioned routes' answers (DIRECTORY-109 R4).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "surface/identity/src/features/people/people-views.test.tsx",
+      "note": "The organisation name shown in the People header (DIRECTORY-109 R4).",
+      "brief": "DIRECTORY-109"
+    },
+    {
+      "path": "crates/lys-identity/src/grants/change_stream.rs",
+      "note": "The grant log batch that stamps every unstamped grant with the install's organisation (DIRECTORY-109 R2).",
+      "brief": "DIRECTORY-109"
+    },
     {
       "path": "crates/lys/tests/rauthy_mail_leg.rs",
       "note": "The measured leg: the pinned issuer image against a capturing sink, recording whether POST /users sends a letter.",
@@ -6639,6 +6911,16 @@
     {
       "path": "scripts/design/SOURCE.md",
       "note": "states that the design scripts, render-brief.py among them, are copies of the design-system method at 3c3bac7"
+    },
+    {
+      "path": "crates/lys-identity-server/src/people_admit_app.rs",
+      "note": "POST /people/admit asked by an approved app's person pass: the actor held for the act, the first grant required on the app's own kind, the continue address from Lys's record of the app.",
+      "brief": "DIRECTORY-113"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/people_admit_app.rs",
+      "note": "A product admits a person through its person pass: the act whole, the refusals before any step, the continue address answered by the proof.",
+      "brief": "DIRECTORY-113"
     }
   ],
   "constraints": [

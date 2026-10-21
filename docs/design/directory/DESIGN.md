@@ -1490,6 +1490,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 - `docs/design/identity/mockup/index.v5.html` — the accepted mock-up, 1680 lines, sha256 e67622e19f450e2335029f293f18b4757801f3245758a8b667521afa120ab91f; the shell's definition; kept as the prior, never changed
 - `scripts/design/render-brief.py` — the brief renderer copied from the design-system method at 3c3bac7; joins every list field of a brief onto one line with ', ', blocked_by and depends_on included
 - `scripts/design/SOURCE.md` — states that the design scripts, render-brief.py among them, are copies of the design-system method at 3c3bac7
+- `crates/lys-identity-server/src/people_admit_app.rs` — POST /people/admit asked by an approved app's person pass: the actor held for the act, the first grant required on the app's own kind, the continue address from Lys's record of the app.
+- `crates/lys-identity-server/tests/people_admit_app.rs` — A product admits a person through its person pass: the act whole, the refusals before any step, the continue address answered by the proof.
 
 ## Constraints
 

@@ -150,6 +150,8 @@
 
 ## Person who signs in — Keeps their sign-in identities to themselves
 
+**S467.** As a person added from a product, I want the link I am given to sign me in to Lys once, let me set a password, and offer me the way on to that product, so that I arrive where I was invited.
+
 **S15.** As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in.
 
 **S16.** As a person who signs in with a provider account, I want refusals shown to other callers never to reveal my provider or subject, so that my sign-in account is not disclosed through someone else's refused request.
@@ -181,6 +183,8 @@
 **S461.** As a Person who signs in, I want the link in my founding letter to sign me in once and lead me to set a password or connect Google, so that I can come back tomorrow without a second letter.
 
 ## Directory administrator — Resolves a refused act
+
+**S466.** As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
 
 **S17.** As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched.
 

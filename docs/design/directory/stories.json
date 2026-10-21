@@ -316,6 +316,10 @@
       "role": "Keeps their sign-in identities to themselves",
       "stories": [
         {
+          "id": "S467",
+          "text": "As a person added from a product, I want the link I am given to sign me in to Lys once, let me set a password, and offer me the way on to that product, so that I arrive where I was invited."
+        },
+        {
           "id": "S15",
           "text": "As the responsible person, I want my agent's own machine account accepted as its binding, so that the agent can have its own service account without holding anyone's sign-in."
         },
@@ -381,6 +385,10 @@
       "name": "Directory administrator",
       "role": "Resolves a refused act",
       "stories": [
+        {
+          "id": "S466",
+          "text": "As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in."
+        },
         {
           "id": "S17",
           "text": "As a directory administrator, I want a sign-in identity refusal to show me the provider and subject involved, so that I can tell which account a refused act touched."

@@ -1,0 +1,113 @@
+---
+type: brief
+id: DIRECTORY-113
+cluster: directory
+title: A product adds a person through its own person pass: one act in Lys, a first grant on the product's own kind, and a link that continues to the product
+---
+
+# DIRECTORY-113: A product adds a person through its own person pass: one act in Lys, a first grant on the product's own kind, and a link that continues to the product
+
+> **Cluster:** directory
+> **Depends on:** DIRECTORY-112, ACCESS-009
+> **Checklist:**
+> - C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+> - C823 — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
+> - C824 — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.
+> **Stories:**
+> - S466 (Directory administrator, Resolves a refused act) — As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
+> - S467 (Person who signs in, Keeps their sign-in identities to themselves) — As a person added from a product, I want the link I am given to sign me in to Lys once, let me set a password, and offer me the way on to that product, so that I arrive where I was invited.
+
+## Purpose
+
+Tom, 22 October 2026, 08:15 to 08:16, by voice: "If you create somebody in Cambium, it automatically handles all the things it needs for Cambium." No shortcuts; a page in Lys prefilled for Cambium was offered and turned down. Today a person added in Cambium cannot get in: Cambium signs people in through Lys, and its first entry asks Lys whether the person may read cambium.workspace "ablative" (cambium-door http/oidc_admission.rs); Cambium's own invitation makes neither a Lys account nor that grant. Lys already admits a person in one act (POST /people/admit: register, account, bind, activate, a first grant, the letter, which on an install with no mail is the handed link of DIRECTORY-112), but only from a person's own Lys session: an approved app's person pass is refused there, because Lys's rule is that an app's pass never carries the person's administrator authority. This brief opens one act to that pass, narrowly: the person holding the pass admits into their own organisation exactly as from their Lys session, and the first grant is required and must be on a kind the asking app owns. The handed link then continues to that app, so the new person sets a password in Lys and goes straight on to Cambium. Cambium's half is IDENT-008 in the Cambium repository.
+
+## Task
+
+Let POST /people/admit be asked with an approved app's person pass (provider::app_person_actor), judged as the person whose sign-in issued it: organisation.admit on their own organisation as ACCESS-009 R1 has it, the steps run as that person exactly as from their Lys session, a first grant required and on a kind the asking app owns. Record on the admission the address the asking app's people go back to, taken from Lys's own record of the app and never from the body, answer it from the proof, and show it on the account page the handed link lands on. Every other route keeps refusing an app's pass the administrator's authority: the tests that say so stay as they are. Every red is written and shown red before its code through the gate on Dean's laptop; the whole of this brief and IDENT-008 are written before anything is built; the release is installed on the Mac.
+
+## Requirements
+
+### R1: Admission accepts an approved app's person pass, narrowly
+
+Behavioural and structural. WHEN POST /people/admit carries exactly one Authorization: Bearer pass that provider::app_person_actor accepts (an approved app's audience, a person holder, a live issuing session, no cookie and no operator header beside it), THE SYSTEM SHALL take the issuing session's actor as the caller and SHALL judge the act as people_admit::checked judges a session caller: an active person holding organisation.admit on their own organisation, a body naming another organisation refused organisation_not_own, the email checked. On this path the body's grant SHALL be required: absent or null is refused 400 with refusal app_admit_grant_required and the words 'a product admits a person only with their first grant on its own kind'; and its resource kind SHALL be one the asking app owns, judged by apps.admit_kind(Some(<app>), kind) before any step, refused NotYourApp or KindNotRegistered as that function names them. Both refusals are answered before the register step, the receipt's completed list empty and nothing recorded. The six steps SHALL then run unchanged, each inner route judging the same actor: a new task-local in people_admit_app.rs holds the actor for the act's duration, routes::signed_in returns it first as it returns drafts_apply's approver, and the inner calls are made with the request's headers less Authorization, so service_account_grants::caller resolves the person through signed_in and never reads the app's pass as a service account's credential. The task-local is set only by people_admit_app.rs and only around the steps of one admit; no other route reads an app pass as an administrator. The first grant's route is the body's (Cambium asks 'api'). The receipt, the grant and the letter are as from a session caller. Every other route SHALL keep refusing an app's pass as today: app_person_refusals_tests.rs is not weakened, and it gains /people/admit asked by an app pass with a grant on another app's kind, refused NotYourApp. The admit row in openapi_table.rs SHALL name app_admit_grant_required, NotYourApp and KindNotRegistered beside its existing refusals, and the openapi refusal test holds.
+
+**Acceptance:**
+- tests/people_admit_app.rs, on a table with the fake issuer, no mail settings and an approved app 'fixture_product' whose schema declares fixture_product.workspace: Ada (organisation.admit held) signs in, the token route issues her the app's person pass, and POST /people/admit with that pass and grant {route 'api', resource fixture_product.workspace 'ws-1', relation member} answers 200, every one of the six steps in receipt.completed in order, letter.handed one link at #/added/<token>; the grants log holds Bea's grant on fixture_product.workspace ws-1 with relation member, issued by Ada
+- The same pass with no grant answers 400 app_admit_grant_required with receipt.completed empty; with a grant on another app's kind answers 403 NotYourApp; with a grant on an undeclared kind of its own app answers 403 KindNotRegistered; after each the directory holds no new person and the issuer no new account
+- Bea's app pass (Bea holds no organisation.admit) asking the same act is refused as ACCESS-009 refuses a session caller without organisation.admit, nothing recorded
+- The same operation asked again with the same pass replays: the same person, the same leaves, no second account, as tests/people_admit.rs proves for a session caller
+- app_person_refusals_tests.rs's existing tests pass unchanged and the new NotYourApp test passes; GET /directory/people with an app pass is still 401 NotSignedIn
+
+**Files:**
+- create: crates/lys-identity-server/src/people_admit_app.rs
+- create: crates/lys-identity-server/tests/people_admit_app.rs
+- modify: crates/lys-identity-server/src/people_admit.rs
+- modify: crates/lys-identity-server/src/routes.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/app_person_refusals_tests.rs
+- modify: crates/lys-identity-server/src/lib.rs
+
+**Checklist:**
+- C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+
+**Stories:**
+- S466 (Directory administrator, Resolves a refused act) — As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
+
+### R2: An admission asked by a product continues to that product
+
+Behavioural. WHEN an admission asked by an app's person pass hands its link (DIRECTORY-112 R3), THE SYSTEM SHALL record on the admission in the foundings store a new member continue_to (serde default absent): the origin (scheme, host and port when not the scheme's default) of the first address of the asking app's sign-in return addresses in force, read from Lys's own record of the app (its sign-in settings in force, else its registration's redirects); the body SHALL NOT be able to name it. An app with no return address in force records none. POST /organisations/found/prove given that admission SHALL answer Proved with a new optional member continue_to, the recorded origin; for a founding, or an admission asked from a Lys session, the member is absent. Nothing else in the proof changes: one use, HandedLink, the digest spent last.
+
+**Acceptance:**
+- tests/people_admit_app.rs: with 'fixture_product' registered with return address https://app.test/callback, the admission's link posted to prove answers 200 with continue_to 'https://app.test'; the foundings store's record holds continue_to 'https://app.test'
+- An admission asked from Ada's Lys session cookie answers prove with no continue_to member (tests/organisations_handed.rs's admission test gains the assertion); a founding's prove answers none
+- A body carrying continue_to is refused by admit's deny_unknown_fields as RequestMalformed, nothing recorded
+
+**Files:**
+- modify: crates/lys-identity-server/src/foundings_store.rs
+- modify: crates/lys-identity-server/src/people_admit_handed.rs
+- modify: crates/lys-identity-server/src/people_admit_app.rs
+- modify: crates/lys-identity-server/src/organisations_prove.rs
+- modify: crates/lys-identity-server/tests/people_admit_app.rs
+- modify: crates/lys-identity-server/tests/organisations_handed.rs
+
+**Checklist:**
+- C823 — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
+
+**Stories:**
+- S467 (Person who signs in, Keeps their sign-in identities to themselves) — As a person added from a product, I want the link I am given to sign me in to Lys once, let me set a password, and offer me the way on to that product, so that I arrive where I was invited.
+
+### R3: The account page offers the way on to the product
+
+Behavioural. The proving page (surface/identity/src/features/found/Prove.tsx) SHALL pass the answer's continue_to to the account page in the router's navigation state, never in the address, so a link cannot put an address on Lys's page. The account page's added note SHALL, when the state carries continue_to and it is an https origin, end with a link whose text is 'Continue to <host>' and whose href is that origin; without it the note is as today. OrganisationProved in surface/identity/src/generated/index.ts gains continue_to?: string.
+
+**Acceptance:**
+- surface/identity/tests/prove.test.tsx: an admission answer carrying continue_to 'https://cambium.example.test' lands on the account page whose added note holds a link named 'Continue to cambium.example.test' with that href; an answer without it shows the note with no link
+- The account page opened at #/settings/account?added=1 with no navigation state shows no continue link, whatever the address carries
+
+**Files:**
+- modify: surface/identity/src/features/found/Prove.tsx
+- modify: surface/identity/src/features/people/Account.tsx
+- modify: surface/identity/src/generated/index.ts
+- modify: surface/identity/tests/prove.test.tsx
+
+**Checklist:**
+- C824 — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.
+
+**Stories:**
+- S467 (Person who signs in, Keeps their sign-in identities to themselves) — As a person added from a product, I want the link I am given to sign me in to Lys once, let me set a password, and offer me the way on to that product, so that I arrive where I was invited.
+
+## Boundaries
+
+- Only POST /people/admit accepts an app's person pass as its person's authority; no other administrator route does, and the refusal tests that say so stay as they are.
+- A product admits only with a first grant on a kind it owns: never a grant on Lys's own kinds or another app's.
+- The continue address comes from Lys's record of the app, never from a request or an address bar.
+- No mail account is configured, sought or written (Tom, 21 October); with mail settings the letter path is unchanged and carries no continue address.
+- The token exists in the answer's handed member once and as the store's digest; never a log, a refusal or a test's output.
+- No timer, deadline or fixed wait anywhere (Tom, 15 October).
+- No file over 500 lines of code; the app path is a file of its own.
+
+## Verification
+
+- Every red written and shown red at the brief commit through the gate on Dean's laptop, green at the fix commit; the whole gate (tokei, ast-grep, clippy, tsc, nextest, doc, vitest) at the landing sha, judged by its output.
+- The release carrying this brief installed on the Mac (lys identity upgrade from a staged release build), together with IDENT-008's Cambium release, and the path walked as IDENT-008 names it.
+- The closing note says plainly that R1 to R3 are done, or names what is not.

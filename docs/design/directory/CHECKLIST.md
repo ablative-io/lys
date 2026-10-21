@@ -693,3 +693,9 @@
 - [ ] **C819** — POST /people/admit on an install with no mail settings completes every step and hands a sign-in link recorded as an admission in the foundings store; the link signs the admitted person in once by HandedLink and is spent. DIRECTORY-112/R3.
 - [ ] **C820** — The founding page shows a handed link and the already-yours sentence; #/added/:proof signs in on a click and lands on the account page saying so; the add-person page confirms a handed answer and shows the link to give. DIRECTORY-112/R4.
 - [ ] **C821** — mail_unconfigured is off the found, prove and admit rows and the openapi refusal test holds; the variant is removed where nothing produces it; the mail setting's doc says what no mail now means. DIRECTORY-112/R5.
+
+## A product adds a person (DIRECTORY-113)
+
+- [ ] **C822** — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+- [ ] **C823** — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
+- [ ] **C824** — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.
