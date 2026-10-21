@@ -336,17 +336,39 @@ async fn an_app_pass_admits_only_with_a_first_grant_on_its_own_kind() -> TestRes
     table.administrator()?;
     let pass = table.pass("cambium", false, true)?;
     let admit = |grant: serde_json::Value| -> TestResult<serde_json::Value> {
-        Ok(json!({"operation": operation()?, "display_name": "Bea Example",
-            "email": "bea@example.test", "grant": grant}))
+        Ok(
+            json!({"operation": operation()?, "display_name": "Bea Example",
+            "email": "bea@example.test", "grant": grant}),
+        )
     };
-    let other = admit(json!({"route": "api", "resource": {"kind": "fixture_product.agent", "id": "a-1"}, "relation": "viewer"}))?;
-    let answer = table.send("POST", "/people/admit", &pass, &other, &[]).await?;
+    let other = admit(
+        json!({"route": "api", "resource": {"kind": "fixture_product.agent", "id": "a-1"}, "relation": "viewer"}),
+    )?;
+    let answer = table
+        .send("POST", "/people/admit", &pass, &other, &[])
+        .await?;
     refused(&answer, 403, "not_your_app");
     assert_eq!(answer.1["receipt"]["completed"], json!([]), "{}", answer.1);
-    let answer = table.send("POST", "/people/admit", &pass, &admit(serde_json::Value::Null)?, &[]).await?;
+    let answer = table
+        .send(
+            "POST",
+            "/people/admit",
+            &pass,
+            &admit(serde_json::Value::Null)?,
+            &[],
+        )
+        .await?;
     refused(&answer, 400, "app_admit_grant_required");
     assert_eq!(answer.1["receipt"]["completed"], json!([]), "{}", answer.1);
-    let undeclared = admit(json!({"route": "api", "resource": {"kind": "cambium.workspace", "id": "w-1"}, "relation": "member"}))?;
-    refused(&table.send("POST", "/people/admit", &pass, &undeclared, &[]).await?, 403, "kind_not_registered");
+    let undeclared = admit(
+        json!({"route": "api", "resource": {"kind": "cambium.workspace", "id": "w-1"}, "relation": "member"}),
+    )?;
+    refused(
+        &table
+            .send("POST", "/people/admit", &pass, &undeclared, &[])
+            .await?,
+        403,
+        "kind_not_registered",
+    );
     Ok(())
 }

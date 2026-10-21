@@ -116,11 +116,11 @@ describe("An agent's file", () => {
   });
 
   it('names the app an act came through beside the person who made it (DIRECTORY-113 Amendment 2)', async () => {
-    const through = { ...RECEIPTS[5].receipt.actor, through_app: 'cambium' };
+    const through = { ...RECEIPTS[5].receipt.actor, through_app: 'fixture_product' };
     await mount(`#/file/${SCRIBE}/record`, { ...SERVICE,
       '/receipts/5': ok({ ...RECEIPTS[5], receipt: { ...RECEIPTS[5].receipt, actor: through } }) });
     const steps = $$('.timeline .tl');
-    expect(steps[1].textContent).toContain(', through cambium');
+    expect(steps[1].textContent).toContain(', through fixture_product');
     expect(steps[0].textContent).not.toContain('through');
   });
 

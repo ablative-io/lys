@@ -266,8 +266,14 @@ async fn a_product_admits_a_person_as_the_person_whose_pass_it_holds() -> TestRe
     assert_eq!(actor["through_app"], APP, "{answer}");
     let (status, me) = service.get("/me", Some(&ada)).await?;
     assert_eq!(status, 200, "{me}");
-    assert_eq!(actor["subject"], me["signed_in"]["subject"], "{answer} {me}");
-    assert_eq!(actor["issuer"], me["signed_in"]["provider"], "{answer} {me}");
+    assert_eq!(
+        actor["subject"], me["signed_in"]["subject"],
+        "{answer} {me}"
+    );
+    assert_eq!(
+        actor["issuer"], me["signed_in"]["provider"],
+        "{answer} {me}"
+    );
     let person = answer["person"].as_str().ok_or("a person")?;
     let grant = answer["grant"].as_str().ok_or("a first grant")?;
     token_in(&answer)?;
@@ -293,13 +299,35 @@ async fn a_product_is_refused_before_any_step_without_a_grant_on_its_own_kind() 
     let pass = app_pass(&service, &ada).await?;
     let before = people(&service, &ada).await?;
     let asks = [
-        (bea(&OperationId::generate()?.to_string(), Value::Null), 400, "app_admit_grant_required"),
-        (bea(&OperationId::generate()?.to_string(), member_of("cambium.workspace")), 403, "not_your_app"),
-        (bea(&OperationId::generate()?.to_string(), member_of("fixture_product.room")), 403, "kind_not_registered"),
+        (
+            bea(&OperationId::generate()?.to_string(), Value::Null),
+            400,
+            "app_admit_grant_required",
+        ),
+        (
+            bea(
+                &OperationId::generate()?.to_string(),
+                member_of("cambium.workspace"),
+            ),
+            403,
+            "not_your_app",
+        ),
+        (
+            bea(
+                &OperationId::generate()?.to_string(),
+                member_of("fixture_product.room"),
+            ),
+            403,
+            "kind_not_registered",
+        ),
     ];
     for (asked, status, refusal) in asks {
         let (answered, answer) = admit_with(&service, &pass, &asked).await?;
-        assert_eq!((answered, answer["refusal"].as_str()), (status, Some(refusal)), "{answer}");
+        assert_eq!(
+            (answered, answer["refusal"].as_str()),
+            (status, Some(refusal)),
+            "{answer}"
+        );
         assert_eq!(answer["receipt"]["completed"], json!([]), "{answer}");
     }
     assert_eq!(people(&service, &ada).await?, before);
@@ -314,7 +342,10 @@ async fn a_person_without_organisation_admit_admits_nobody_through_a_product() -
     let (status, answer) = admit_with(
         &service,
         &pass,
-        &bea(&OperationId::generate()?.to_string(), member_of("fixture_product.workspace")),
+        &bea(
+            &OperationId::generate()?.to_string(),
+            member_of("fixture_product.workspace"),
+        ),
     )
     .await?;
     assert_eq!(status, 200, "{answer}");
@@ -343,7 +374,10 @@ async fn the_handed_link_goes_on_to_the_products_own_origin() -> TestResult {
     let (status, answer) = admit_with(
         &service,
         &pass,
-        &bea(&OperationId::generate()?.to_string(), member_of("fixture_product.workspace")),
+        &bea(
+            &OperationId::generate()?.to_string(),
+            member_of("fixture_product.workspace"),
+        ),
     )
     .await?;
     assert_eq!(status, 200, "{answer}");
@@ -359,9 +393,16 @@ async fn the_handed_link_goes_on_to_the_products_own_origin() -> TestResult {
     assert_eq!(status, 200, "{proved}");
     assert!(proved.get("continue_to").is_none(), "{proved}");
     // A body naming where to go is refused whole, nothing recorded.
-    let mut named = bea(&OperationId::generate()?.to_string(), member_of("fixture_product.workspace"));
+    let mut named = bea(
+        &OperationId::generate()?.to_string(),
+        member_of("fixture_product.workspace"),
+    );
     named["continue_to"] = json!("https://elsewhere.example.test");
     let (status, refused) = admit_with(&service, &pass, &named).await?;
-    assert_eq!((status, refused["refusal"].as_str()), (400, Some("RequestMalformed")), "{refused}");
+    assert_eq!(
+        (status, refused["refusal"].as_str()),
+        (400, Some("RequestMalformed")),
+        "{refused}"
+    );
     Ok(())
 }

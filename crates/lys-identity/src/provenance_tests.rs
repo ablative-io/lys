@@ -155,8 +155,8 @@ fn an_act_through_an_app_names_the_app_beside_the_person() {
     let binding = crate::LoginBinding::new("https://issuer.test", "ada").expect("binding");
     let person = super::Actor::new(binding, super::Provenance::new(super::AuthMethod::Oidc, 13));
     assert_eq!(person.through_app(), None);
-    let through = person.clone().with_through_app("cambium");
-    assert_eq!(through.through_app(), Some("cambium"));
+    let through = person.clone().with_through_app("fixture_product");
+    assert_eq!(through.through_app(), Some("fixture_product"));
     assert_eq!(through.binding(), person.binding());
     assert_eq!(through.provenance(), person.provenance());
     let drafted = through.clone().with_draft(super::DraftProvenance {
@@ -169,7 +169,7 @@ fn an_act_through_an_app_names_the_app_beside_the_person() {
         crate::LoginBinding::new("https://issuer.test", "ada").expect("binding"),
         super::Provenance::by_agent(agent, 13),
     )
-    .with_through_app("cambium");
+    .with_through_app("fixture_product");
     for actor in [through.clone(), drafted, signed] {
         let mut encoded = Vec::new();
         crate::encoding::actor(&mut encoded, &actor);
@@ -193,5 +193,5 @@ fn an_act_through_an_app_names_the_app_beside_the_person() {
     .expect("event");
     assert_eq!(event.version(), 2);
     let read = crate::encoding::decode_body(&crate::encoding::encode_body(&event)).expect("read");
-    assert_eq!(read.actor().through_app(), Some("cambium"));
+    assert_eq!(read.actor().through_app(), Some("fixture_product"));
 }

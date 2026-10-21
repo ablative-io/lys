@@ -113,12 +113,12 @@ mod tests {
     #[test]
     fn an_origin_keeps_the_scheme_host_and_a_port_only_when_it_is_not_the_default() {
         assert_eq!(
-            origin("https://cambium.example.test/identity/oidc/callback").as_deref(),
-            Some("https://cambium.example.test")
+            origin("https://app.example.test/identity/oidc/callback").as_deref(),
+            Some("https://app.example.test")
         );
         assert_eq!(
-            origin("https://cambium.example.test:443/x").as_deref(),
-            Some("https://cambium.example.test")
+            origin("https://app.example.test:443/x").as_deref(),
+            Some("https://app.example.test")
         );
         assert_eq!(
             origin("http://127.0.0.1:8611/callback").as_deref(),

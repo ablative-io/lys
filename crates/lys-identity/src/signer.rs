@@ -91,7 +91,9 @@ fn cose_sign1(protected: &[u8], payload: &[u8], signature: &[u8]) -> Vec<u8> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Entry {
     /// A change to one identity, made by a person the service authenticated.
-    Identity(IdentityEvent),
+    /// Boxed as the drafts are: an actor carries a draft and the app it came
+    /// through (DIRECTORY-113 Amendment 2).
+    Identity(Box<IdentityEvent>),
     /// A change to the install as a whole, recorded by the service itself.
     Install(InstallEvent),
     /// A prepared change or a decision bound to its hash.
@@ -129,7 +131,7 @@ impl SignedEvent {
     /// - `IdentityError::DraftEntry` if the message records an identity or product draft.
     pub fn event(&self) -> Result<&IdentityEvent, IdentityError> {
         match &self.entry {
-            Entry::Identity(event) => Ok(event),
+            Entry::Identity(event) => Ok(event.as_ref()),
             Entry::Install(_) => Err(IdentityError::InstallEntry),
             Entry::Draft(_) | Entry::ProductDraft(_) => Err(IdentityError::DraftEntry),
         }
@@ -154,7 +156,12 @@ pub fn sign_event(
 ) -> Result<SignedEvent, IdentityError> {
     let body = encode_body(&event);
     let media_type = content_type(&event);
-    Ok(seal(&body, media_type, Entry::Identity(event), service_key))
+    Ok(seal(
+        &body,
+        media_type,
+        Entry::Identity(Box::new(event)),
+        service_key,
+    ))
 }
 
 /// Sign the install event `event` with the directory service's key, as
@@ -300,7 +307,7 @@ pub fn verify_event(
     } else {
         let event = decode_body(&parts.payload)?;
         let media_type = content_type(&event);
-        (Entry::Identity(event), media_type)
+        (Entry::Identity(Box::new(event)), media_type)
     };
     if parts.protected != protected_header(&kid, media_type) {
         return Err(malformed(

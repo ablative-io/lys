@@ -80,7 +80,9 @@ pub(crate) struct AdmitBody {
 impl AdmitBody {
     /// The kind of the first grant asked for, if one is.
     pub(crate) fn first_grant_kind(&self) -> Option<&str> {
-        self.grant.as_ref().map(|grant| grant.resource.kind.as_str())
+        self.grant
+            .as_ref()
+            .map(|grant| grant.resource.kind.as_str())
     }
 }
 
