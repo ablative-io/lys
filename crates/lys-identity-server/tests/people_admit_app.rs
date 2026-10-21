@@ -260,6 +260,14 @@ async fn a_product_admits_a_person_as_the_person_whose_pass_it_holds() -> TestRe
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["receipt"]["completed"], json!(STEPS), "{answer}");
     assert!(answer["receipt"]["failed"].is_null(), "{answer}");
+    // The act is Ada's, signed as her session, and its record names the app
+    // it came through beside her (DIRECTORY-113 Amendment 2).
+    let actor = &answer["receipt"]["actor"];
+    assert_eq!(actor["through_app"], APP, "{answer}");
+    let (status, me) = service.get("/me", Some(&ada)).await?;
+    assert_eq!(status, 200, "{me}");
+    assert_eq!(actor["subject"], me["signed_in"]["subject"], "{answer} {me}");
+    assert_eq!(actor["issuer"], me["signed_in"]["provider"], "{answer} {me}");
     let person = answer["person"].as_str().ok_or("a person")?;
     let grant = answer["grant"].as_str().ok_or("a first grant")?;
     token_in(&answer)?;

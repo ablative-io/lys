@@ -80,6 +80,10 @@ pub struct Proved {
     pub organisation: String,
     /// The founder, now Active and signed in.
     pub person: String,
+    /// Where an admission asked by a product goes on to, the origin Lys
+    /// recorded for it (DIRECTORY-113 R2); absent for every other link.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub continue_to: Option<String>,
 }
 
 /// The founding the proof names, its digest and the ids as the directory
@@ -331,6 +335,7 @@ async fn steps(
             authority: AUTHORITY.to_owned(),
             organisation: proven.organisation.to_string(),
             person: founder.to_string(),
+            continue_to: None,
         },
     ))
 }
@@ -398,6 +403,7 @@ async fn admission_steps(
             authority: AUTHORITY.to_owned(),
             organisation: proven.organisation.to_string(),
             person: person.to_string(),
+            continue_to: proven.founding.continue_to.clone(),
         },
     ))
 }

@@ -115,6 +115,15 @@ describe("An agent's file", () => {
     expect($$('.card a[download]').map((a) => a.getAttribute('href'))).toEqual(['/api/receipts/4', '/api/receipts/5']);
   });
 
+  it('names the app an act came through beside the person who made it (DIRECTORY-113 Amendment 2)', async () => {
+    const through = { ...RECEIPTS[5].receipt.actor, through_app: 'cambium' };
+    await mount(`#/file/${SCRIBE}/record`, { ...SERVICE,
+      '/receipts/5': ok({ ...RECEIPTS[5], receipt: { ...RECEIPTS[5].receipt, actor: through } }) });
+    const steps = $$('.timeline .tl');
+    expect(steps[1].textContent).toContain(', through cambium');
+    expect(steps[0].textContent).not.toContain('through');
+  });
+
   it('says what each record line changed, from and to, read from the signed event, and names an earlier issuer’s sign-in', async () => {
     // A canonical CBOR writer for the few shapes the directory's event body uses.
     const head = (major: number, n: number): number[] => n < 24 ? [major << 5 | n] : n < 256 ? [major << 5 | 24, n] : n < 65536 ? [major << 5 | 25, n >> 8, n & 255] : [major << 5 | 26, n >>> 24, n >> 16 & 255, n >> 8 & 255, n & 255];

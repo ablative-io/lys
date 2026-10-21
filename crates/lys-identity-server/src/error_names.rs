@@ -101,6 +101,7 @@ fn server(error: &ServerError) -> &str {
         ServerError::NotSignedIn => "NotSignedIn",
         ServerError::NotAdmitted { .. } => "NotAdmitted",
         ServerError::OrganisationNotOwn { .. } => "organisation_not_own",
+        ServerError::AppAdmitGrantRequired => "app_admit_grant_required",
         ServerError::ProofRefused => "proof_refused",
         ServerError::AlreadyAdmitted => "already_admitted",
         ServerError::MailNotSent { .. } => "mail_not_sent",

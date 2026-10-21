@@ -142,7 +142,7 @@ export interface Receipt {
   version: number;
   operation: string;
   /** `ReceiptActorView`: `authentication` says how the actor authenticated when it was not their own sign-in, e.g. `operator`. */
-  actor: { issuer: string; subject: string; authenticated_at: number; authentication?: string; agent?: string; service_account?: string; launch?: string };
+  actor: { issuer: string; subject: string; authenticated_at: number; authentication?: string; agent?: string; service_account?: string; launch?: string; through_app?: string };
   identity: IdentityId;
   change_kind: number;
   payload_commitment: string;
@@ -328,4 +328,6 @@ export interface OrganisationProved {
   authority: string;
   organisation: string;
   person: string;
+  /** Where an admission a product asked for goes on to (DIRECTORY-113 R2). */
+  continue_to?: string;
 }

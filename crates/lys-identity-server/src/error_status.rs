@@ -274,6 +274,7 @@ impl ServerError {
             | Self::CertificateUnknown { .. } => StatusCode::NOT_FOUND,
             conflicting_refusals!() => StatusCode::CONFLICT,
             Self::SignInStateUnknown
+            | Self::AppAdmitGrantRequired
             | Self::RequestMalformed { .. }
             | Self::AccountRefused { .. }
             | Self::ProviderRefused { .. }

@@ -77,6 +77,13 @@ pub(crate) struct AdmitBody {
     grant: Option<FirstGrant>,
 }
 
+impl AdmitBody {
+    /// The kind of the first grant asked for, if one is.
+    pub(crate) fn first_grant_kind(&self) -> Option<&str> {
+        self.grant.as_ref().map(|grant| grant.resource.kind.as_str())
+    }
+}
+
 /// The first root grant: use only, from now, with no end.
 #[derive(Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -115,6 +122,11 @@ pub struct AdmitReceipt {
     /// issuer account is written at the issuer, and the letter is sent, so
     /// neither has one.
     pub logged: Vec<Logged>,
+    /// Whose act it was, as the register leaf was signed: the person, and
+    /// the app it came through when a product asked (DIRECTORY-113
+    /// Amendment 2). Absent until that leaf is written.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actor: Option<crate::directory_views::ReceiptActorView>,
 }
 
 /// Where one step was recorded.
@@ -212,13 +224,13 @@ fn parts_only(parts: axum::http::response::Parts) -> Response {
 /// organisation.admit on their own organisation, the one the body names if
 /// it names one (ACCESS-009 R1). The question is asked here and recorded
 /// nothing; the register step exercises the grant. The issuer is the one
-/// the caller signed in through.
-fn checked(
+/// the caller signed in through. The caller is the session's, or the person
+/// an approved app's pass speaks for (DIRECTORY-113 R1).
+pub(crate) fn checked(
     state: &Shared,
-    headers: &HeaderMap,
+    actor: &lys_identity::Actor,
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Result<(AdmitBody, OperationId, String, String, OrganisationId), ServerError> {
-    let actor = signed_in(state, headers)?;
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let operation = OperationId::from_str(&asked.operation)?;
     let email = crate::accounts::check_email(&asked.email)
@@ -227,7 +239,7 @@ fn checked(
     let organisation = crate::grants::with_grants(state, |mut judged| {
         crate::people_admission::organisation(
             &mut judged,
-            &actor,
+            actor,
             asked.organisation.as_deref(),
             crate::grants::Decision::Explain,
         )
@@ -244,7 +256,15 @@ pub(crate) async fn admit(
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Response {
     let mut receipt = AdmitReceipt::default();
-    let (asked, operation, email, issuer, organisation) = match checked(&state, &headers, asked) {
+    let app = match crate::provider::app_person(&state, &headers) {
+        Ok(app) => app,
+        Err(error) => return refused(error, &receipt).await,
+    };
+    if let Some((actor, app)) = app {
+        return crate::people_admit_app::admit(&state, &headers, &actor, &app, asked).await;
+    }
+    let checked = signed_in(&state, &headers).and_then(|actor| checked(&state, &actor, asked));
+    let (asked, operation, email, issuer, organisation) = match checked {
         Ok(checked) => checked,
         Err(error) => return refused(error, &receipt).await,
     };
@@ -255,8 +275,19 @@ pub(crate) async fn admit(
         email: &email,
         issuer: &issuer,
         organisation,
+        continue_to: None,
     };
-    match steps(&state, &headers, &act, &mut receipt).await {
+    let answered = steps(&state, &headers, &act, &mut receipt).await;
+    answer(answered, receipt).await
+}
+
+/// The act's answer: the person admitted, or the failed step's refusal
+/// beside the receipt.
+pub(crate) async fn answer(
+    answered: Result<Done, (&'static str, ServerError)>,
+    mut receipt: AdmitReceipt,
+) -> Response {
+    match answered {
         Ok(done) => Json(Admitted {
             person: done.person,
             subject: done.subject,
@@ -275,16 +306,18 @@ pub(crate) async fn admit(
 /// The act's checked words. The login is bound at the issuer the caller
 /// signed in through, the one whose accounts Lys administers, as first-run
 /// setup binds its own.
-struct Act<'a> {
-    asked: &'a AdmitBody,
-    operation: &'a OperationId,
-    email: &'a str,
-    issuer: &'a str,
-    organisation: OrganisationId,
+pub(crate) struct Act<'a> {
+    pub(crate) asked: &'a AdmitBody,
+    pub(crate) operation: &'a OperationId,
+    pub(crate) email: &'a str,
+    pub(crate) issuer: &'a str,
+    pub(crate) organisation: OrganisationId,
+    /// Where a handed link goes on to, when a product asked (DIRECTORY-113 R2).
+    pub(crate) continue_to: Option<String>,
 }
 
 /// What the steps answered.
-struct Done {
+pub(crate) struct Done {
     person: String,
     subject: String,
     grant: Option<String>,
@@ -293,7 +326,7 @@ struct Done {
 
 /// Run every step, recording each as it completes; the failing step's name
 /// beside its refusal.
-async fn steps(
+pub(crate) async fn steps(
     state: &Shared,
     headers: &HeaderMap,
     act: &Act<'_>,
@@ -305,6 +338,7 @@ async fn steps(
         email,
         issuer,
         organisation,
+        ref continue_to,
     } = *act;
     let [register, account, bind, activate, grant, letter] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
@@ -321,6 +355,7 @@ async fn steps(
     .map_err(at(register))?;
     let person = registered.0.person.clone();
     receipt.person = Some(person.clone());
+    receipt.actor = Some(registered.0.receipt.actor.clone());
     receipt.done(
         register,
         Some(("directory", registered.0.receipt.log.index)),
@@ -395,6 +430,7 @@ async fn steps(
             organisation,
             email,
             &operation.to_string(),
+            continue_to.clone(),
         )
         .map_err(at(letter))?;
         receipt.done(letter, None);

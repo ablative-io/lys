@@ -60,6 +60,13 @@ macro_rules! directory_refusals {
         /// The organisation the body named.
         organisation: String,
     },
+    /// A product asked to admit a person with no first grant (DIRECTORY-113
+    /// R1): a product admits only with the person's first grant on its own
+    /// kind.
+    #[error(
+        "app_admit_grant_required: a product admits a person only with their first grant on its own kind"
+    )]
+    AppAdmitGrantRequired,
     /// A proving link that Lys did not issue, or one already used
     /// (DIRECTORY-111 R2): one name and one text for both, so the link's
     /// standing is never read off the refusal.

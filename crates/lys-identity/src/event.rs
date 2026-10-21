@@ -328,7 +328,10 @@ impl IdentityEvent {
     /// OIDC and agent-signature events retain their exact v1 encoding.
     #[must_use]
     pub fn version(&self) -> u64 {
-        if self.actor.provenance().service_account().is_some() || self.actor.draft().is_some() {
+        if self.actor.provenance().service_account().is_some()
+            || self.actor.draft().is_some()
+            || self.actor.through_app().is_some()
+        {
             2
         } else {
             EVENT_VERSION

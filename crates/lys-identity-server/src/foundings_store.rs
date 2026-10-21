@@ -45,6 +45,11 @@ pub struct Founding {
     /// once (DIRECTORY-112 R3).
     #[serde(default)]
     pub kind: Kind,
+    /// Where an admission asked by a product goes on to: the origin of that
+    /// product's first return address in Lys's own record of it, never a
+    /// request's word (DIRECTORY-113 R2). Absent for every other link.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continue_to: Option<String>,
 }
 
 /// What a proving link proves.
@@ -263,6 +268,7 @@ mod tests {
             spent: false,
             handed: false,
             kind: Kind::Founding,
+            continue_to: None,
         }
     }
 

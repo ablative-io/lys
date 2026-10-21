@@ -351,6 +351,11 @@ async fn a_malformed_email_or_missing_member_is_refused_before_any_step() -> Tes
         admitted["receipt"]["completed"],
         json!(["register", "account", "bind", "activate", "letter"])
     );
+    // Asked from the person's own session, the act names no app
+    // (DIRECTORY-113 Amendment 2).
+    let actor = &admitted["receipt"]["actor"];
+    assert!(actor["subject"].is_string(), "{admitted}");
+    assert!(actor.get("through_app").is_none(), "{admitted}");
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     assert_eq!(people(&service, &ada).await?, before + 1);
     Ok(())

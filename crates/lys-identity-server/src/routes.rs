@@ -309,6 +309,10 @@ pub(crate) fn signed_in(state: &AppState, headers: &HeaderMap) -> Result<Actor, 
     if let Some(actor) = crate::drafts_apply::actor() {
         return Ok(actor);
     }
+    // The person an app's pass admits as, while that one act runs (DIRECTORY-113 R1).
+    if let Some(actor) = crate::people_admit_app::actor() {
+        return Ok(actor);
+    }
     if let Some(actor) = crate::mcp_oauth::native_actor(state, headers)? {
         return Ok(actor);
     }

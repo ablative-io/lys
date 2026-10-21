@@ -143,6 +143,7 @@ fn decode_change(kind: u64, value: Value) -> Result<Change, IdentityError> {
 /// is the operator; code 3 with a 16-byte key 5 is a service account.
 pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, IdentityError> {
     const SHAPE: &str = "an actor is a map of keys 1 to 4, or 1 to 5 when it names a principal";
+    let (value, through) = through_app(value)?;
     let (value, draft) = if matches!(&value,Value::Map(pairs) if pairs.len()==6) {
         let [issuer, subject, method, at, principal, origin] = fields::<6>(value, SHAPE)?;
         let Value::Array(parts) = origin else {
@@ -212,11 +213,43 @@ pub(crate) fn decode_actor(value: Value, version: u64) -> Result<Actor, Identity
         )?,
         provenance,
     );
-    Ok(if let Some(draft) = draft {
+    let actor = if let Some(draft) = draft {
         actor.with_draft(draft)
     } else {
         actor
+    };
+    Ok(match through {
+        Some(app) => actor.with_through_app(&app),
+        None => actor,
     })
+}
+
+/// An actor's map with the app it came through under key 7 (DIRECTORY-113
+/// Amendment 2) answered apart, and the map as it reads without it: keys 5
+/// and 6 kept only as the shapes before it write them.
+fn through_app(value: Value) -> Result<(Value, Option<String>), IdentityError> {
+    const SHAPE: &str = "an actor through an app is a map of keys 1 to 7";
+    if !matches!(&value, Value::Map(pairs) if pairs.len() == 7) {
+        return Ok((value, None));
+    }
+    let [issuer, subject, method, at, principal, origin, app] = fields::<7>(value, SHAPE)?;
+    let app = as_text(app, "an app is text")?;
+    if app.is_empty() {
+        return Err(malformed("an app is named"));
+    }
+    let mut pairs = vec![
+        (1.into(), issuer),
+        (2.into(), subject),
+        (3.into(), method),
+        (4.into(), at),
+    ];
+    if origin != Value::Null {
+        pairs.push((5.into(), principal));
+        pairs.push((6.into(), origin));
+    } else if principal != Value::Null {
+        pairs.push((5.into(), principal));
+    }
+    Ok((Value::Map(pairs), Some(app)))
 }
 
 /// The highest change kind the build before organisations (043cc007) read:

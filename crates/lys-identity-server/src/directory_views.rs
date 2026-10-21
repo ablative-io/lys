@@ -42,6 +42,10 @@ pub struct ReceiptActorView {
     /// The verified pass's session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<String>,
+    /// The approved app the person acted through, named beside them
+    /// (DIRECTORY-113 Amendment 2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub through_app: Option<String>,
     /// The issuer its login was authenticated at.
     pub issuer: String,
     /// The subject that login names.
@@ -131,6 +135,7 @@ pub(crate) fn receipt_view(receipt: &Receipt) -> DirectoryReceiptView {
                 .provenance()
                 .run()
                 .map(|(_, session)| session.to_owned()),
+            through_app: actor.through_app().map(str::to_owned),
             issuer: actor.binding().issuer().to_owned(),
             subject: actor.binding().subject().to_owned(),
             authenticated_at: actor.provenance().authenticated_at(),

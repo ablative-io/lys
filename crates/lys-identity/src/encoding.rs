@@ -209,16 +209,21 @@ fn change(out: &mut Vec<u8>, value: &Change) {
 }
 
 /// The actor's map: keys 1 to 4, and the agent's id under key 5 when an agent
-/// signed the request. An OIDC actor is written as it always was.
+/// signed the request; a draft under key 6, and the app the act came through
+/// under key 7, each with the keys before it written. An OIDC actor is
+/// written as it always was.
 pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
     let provenance = value.provenance();
     let principal = provenance
         .agent()
         .map(|id| *id.as_bytes())
         .or_else(|| provenance.service_account().map(|id| *id.as_bytes()));
+    let through = value.through_app();
     map(
         out,
-        if value.draft().is_some() {
+        if through.is_some() {
+            7
+        } else if value.draft().is_some() {
             6
         } else if principal.is_some() {
             5
@@ -245,7 +250,7 @@ pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
             text(out, session);
         }
     }
-    if value.draft().is_some() || principal.is_some() {
+    if through.is_some() || value.draft().is_some() || principal.is_some() {
         uint(out, 5);
         if let Some(principal) = principal {
             bytes(out, &principal);
@@ -263,6 +268,13 @@ pub(crate) fn actor(out: &mut Vec<u8>, value: &Actor) {
         } else {
             out.push(0xf6);
         }
+    } else if through.is_some() {
+        uint(out, 6);
+        out.push(0xf6);
+    }
+    if let Some(app) = through {
+        uint(out, 7);
+        text(out, app);
     }
 }
 

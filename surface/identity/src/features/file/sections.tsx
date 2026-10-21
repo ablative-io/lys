@@ -226,6 +226,7 @@ function RecordView({ receipts }: { receipts: ReceiptAnswer[] }) {
                       {' '}
                       · by <Actor actor={r.receipt.actor} me={me.status === 'ok' ? me.data : null} />
                       {r.receipt.actor.authentication === 'operator' ? ', with the operator token' : ''}
+                      {r.receipt.actor.through_app ? `, through ${r.receipt.actor.through_app}` : ''}
                     </span>
                   </div>
                 </div>

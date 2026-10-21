@@ -8,7 +8,10 @@
  *
  * At #/added/:proof (DIRECTORY-112) the same page signs in a person whose
  * admission link was handed to them on an install with no mail settings,
- * landing on their account page told so.
+ * landing on their account page told so. An admission a product asked for
+ * answers where to go on to (DIRECTORY-113 R3); it is carried to the
+ * account page in the navigation's state, never the address, so no link
+ * can put an address on Lys's page.
  */
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -38,8 +41,8 @@ export function Prove({ admission = false }: { admission?: boolean }) {
     setBusy(true);
     setRefusal(null);
     try {
-      await request<OrganisationProved>('/organisations/found/prove', { proof });
-      navigate(admission ? ADDED : FOUNDED);
+      const proved = await request<OrganisationProved>('/organisations/found/prove', { proof });
+      navigate(admission ? ADDED : FOUNDED, proved.continue_to ? { state: { continueTo: proved.continue_to } } : undefined);
     } catch (failure) {
       setRefusal({ name: failure instanceof Refused ? failure.refusal.refusal : '', words: foundingReasonOf(failure) });
     } finally {

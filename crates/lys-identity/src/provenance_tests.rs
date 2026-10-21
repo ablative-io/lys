@@ -145,3 +145,53 @@ fn a_handed_link_is_code_seven_with_no_principal_and_the_person_signed_in() {
     );
     assert!(wire::method_from(7, Some(AgentId::from_bytes([9; 16]))).is_err());
 }
+
+/// DIRECTORY-113 Amendment 2: an act a product asked for names the app it
+/// came through beside the person, never in their place, under actor key 7;
+/// it round-trips alone, with a draft and with a principal, and its event is
+/// version 2.
+#[test]
+fn an_act_through_an_app_names_the_app_beside_the_person() {
+    let binding = crate::LoginBinding::new("https://issuer.test", "ada").expect("binding");
+    let person = super::Actor::new(binding, super::Provenance::new(super::AuthMethod::Oidc, 13));
+    assert_eq!(person.through_app(), None);
+    let through = person.clone().with_through_app("cambium");
+    assert_eq!(through.through_app(), Some("cambium"));
+    assert_eq!(through.binding(), person.binding());
+    assert_eq!(through.provenance(), person.provenance());
+    let drafted = through.clone().with_draft(super::DraftProvenance {
+        draft: crate::OperationId::from_bytes([1; 16]),
+        application: crate::OperationId::from_bytes([2; 16]),
+        drafted_by: None,
+    });
+    let agent = AgentId::from_bytes([9; 16]);
+    let signed = super::Actor::new(
+        crate::LoginBinding::new("https://issuer.test", "ada").expect("binding"),
+        super::Provenance::by_agent(agent, 13),
+    )
+    .with_through_app("cambium");
+    for actor in [through.clone(), drafted, signed] {
+        let mut encoded = Vec::new();
+        crate::encoding::actor(&mut encoded, &actor);
+        let value = crate::encoding::cbor(&encoded, "actor").expect("CBOR");
+        assert!(matches!(&value, ciborium::Value::Map(pairs) if pairs.len() == 7));
+        assert_eq!(
+            crate::encoding::decode_actor(value, 2).expect("actor"),
+            actor
+        );
+    }
+    let event = crate::IdentityEvent::new(
+        crate::OperationId::from_bytes([3; 16]),
+        through,
+        crate::IdentityId::Person(crate::PersonId::from_bytes([4; 16])),
+        1,
+        crate::Change::RegisterPerson {
+            profile: crate::Profile::new("Bea Example").expect("profile"),
+            organisation: Some(crate::OrganisationId::from_bytes([5; 16])),
+        },
+    )
+    .expect("event");
+    assert_eq!(event.version(), 2);
+    let read = crate::encoding::decode_body(&crate::encoding::encode_body(&event)).expect("read");
+    assert_eq!(read.actor().through_app(), Some("cambium"));
+}

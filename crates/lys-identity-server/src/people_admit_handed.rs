@@ -17,7 +17,8 @@ use crate::organisations_found::foundings;
 use crate::routes::AppState;
 
 /// Mint and record `person`'s admission link and answer the letter view
-/// that hands it.
+/// that hands it; `continue_to` is where an admission asked by a product
+/// goes on to (DIRECTORY-113 R2).
 ///
 /// # Errors
 /// Names the operating system's refusal to give random bytes, or a
@@ -28,6 +29,7 @@ pub(crate) fn hand(
     organisation: OrganisationId,
     email: &str,
     operation: &str,
+    continue_to: Option<String>,
 ) -> Result<LetterView, ServerError> {
     let token = new_token()?;
     let admission = Founding {
@@ -38,6 +40,7 @@ pub(crate) fn hand(
         spent: false,
         handed: true,
         kind: Kind::Admission,
+        continue_to,
     };
     let mut held = foundings(state)?;
     let replaced = held

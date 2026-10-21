@@ -199,6 +199,15 @@ pub(crate) fn app_person_actor(
     state: &AppState,
     headers: &HeaderMap,
 ) -> Result<Option<lys_identity::Actor>, ServerError> {
+    Ok(app_person(state, headers)?.map(|(actor, _app)| actor))
+}
+
+/// An approved app's person pass: its issuing session's actor and the app
+/// whose audience it carries (DIRECTORY-113 names the app that admits).
+pub(crate) fn app_person(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<(lys_identity::Actor, String)>, ServerError> {
     let Some(value) = headers.get(header::AUTHORIZATION) else {
         return Ok(None);
     };
@@ -262,7 +271,7 @@ pub(crate) fn app_person_actor(
         }
         Ok(())
     })?;
-    Ok(Some(actor))
+    Ok(Some((actor, app)))
 }
 
 #[cfg(test)]

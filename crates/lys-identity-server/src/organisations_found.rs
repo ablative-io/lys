@@ -331,6 +331,7 @@ async fn steps(
         spent: false,
         handed: mailer.is_none(),
         kind: Kind::Founding,
+        continue_to: None,
     };
     foundings(state)
         .map_err(at(proof))?

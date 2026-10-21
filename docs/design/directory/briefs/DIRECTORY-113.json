@@ -132,6 +132,12 @@
       "by": "Waffles",
       "subject": "The file lists name the seams the code needed, and the refusal names are the wire's",
       "ruling": "Written against the tree: the refusal names are the wire's (not_your_app, kind_not_registered), and R1 and R2 name the seams the code needed: provider/bearer.rs answers the pass's app beside its actor (app_person), the new refusal is declared in error/directory.rs, error_names.rs and error_status.rs, and organisations_found.rs writes the new founding member as absent. The product's limits are judged before the person's authority, so a product asking outside its own kind is refused without reading the person's organisation."
+    },
+    {
+      "date": "2026-10-22",
+      "by": "Waffles",
+      "subject": "Every record of an act a product asked for names the product it came through",
+      "ruling": "Tom, 08:40: the act is the signed-in person's, and the record must also say it came through the product, no corner cut. The person stays the actor (P8: the one who answers for it); the app is carried beside them, never in their place. lys-identity's Actor gains through (the approved app's id, set only by people_admit_app.rs from the pass's own audience, never a request's word), written in the signed actor map under key 7 and read back, and an event carrying it is version 2, as a draft's is. Every directory leaf of the act (register, bind, activate) is signed with it. The receipt view names it as through_app, and the admission's receipt carries the register leaf's actor as signed, so the answer shows whose act it was and what it came through. A build before this one refuses a leaf carrying key 7 by name, as it refuses every newer shape. The grant leaf names the same person as issuer and is tied to the act by its derived operation; the grant log's format is unchanged. Seams: lys-identity provenance.rs (Actor::through_app, with_through_app), encoding.rs and encoding_read.rs (key 7), event.rs (version), with provenance_tests.rs proving the round trip; lys-identity-server directory_views.rs (through_app), people_admit.rs (the receipt's actor), people_admit_app.rs (the app set on the held actor), and surface/identity features/file/sections.tsx saying \", through <app>\" on the record line (tests/file.test.tsx); tests/people_admit_app.rs proves the answer's actor is the person and names the app, and tests/people_admit.rs proves that an act from the person's own session names none."
     }
   ]
 }

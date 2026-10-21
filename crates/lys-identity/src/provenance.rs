@@ -12,7 +12,8 @@
 //! The service never claims the person signed anything: a person holds no key
 //! the directory can speak for. An agent registered by a person records that
 //! person, and an agent that signed a request is named beside the person who
-//! answers for it, never in their place (P8).
+//! answers for it, never in their place (P8). An act a product asked for
+//! names the app it came through the same way: beside the person.
 
 use crate::binding::LoginBinding;
 use crate::error::IdentityError;
@@ -182,6 +183,7 @@ pub struct Actor {
     binding: LoginBinding,
     provenance: Provenance,
     draft: Option<Box<DraftProvenance>>,
+    through_app: Option<String>,
 }
 
 /// The prepared act's origin, separate from the approver's authentication.
@@ -208,6 +210,20 @@ impl Actor {
         self.draft.as_deref()
     }
 
+    /// Attach the approved app the person acted through (DIRECTORY-113
+    /// Amendment 2): named beside them, never in their place.
+    #[must_use]
+    pub fn with_through_app(mut self, app: &str) -> Self {
+        self.through_app = Some(app.to_owned());
+        self
+    }
+
+    /// The approved app this person acted through, when a product asked.
+    #[must_use]
+    pub fn through_app(&self) -> Option<&str> {
+        self.through_app.as_deref()
+    }
+
     /// The human named by `binding`, one of their logins, authenticated as
     /// `provenance` says.
     #[must_use]
@@ -216,6 +232,7 @@ impl Actor {
             binding,
             provenance,
             draft: None,
+            through_app: None,
         }
     }
 
