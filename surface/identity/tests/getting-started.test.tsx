@@ -13,7 +13,7 @@ import type { Machine, NameMachine } from '../src/features/network/contract';
 let root: Root | null = null;
 beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
 afterEach(() => { if (root) act(() => root?.unmount()); root = null; document.body.innerHTML = ''; });
-const empty: Standing = { machines: 0, cambium: null, apps: true, google: false, read: true, administrator: true, declined: false };
+const empty: Standing = { machines: 0, app: null, asking: null, apps: true, google: false, read: true, administrator: true, declined: false };
 const KEY = 'lys.getting-started.not-this-computer.' + ADA;
 const me = (declined: boolean) => ok({ ...ME, getting_started: { host_declined: declined } });
 
@@ -54,7 +54,7 @@ describe('Getting started on an empty install', () => {
   it('lists every step a fresh Lys still needs, in order, with this computer’s own name offered', async () => {
     const { posted } = await open(service());
     const panel = $('[aria-label="Getting started"]');
-    expect([...panel?.querySelectorAll('li > b') ?? []].map((title) => title.textContent)).toEqual(['Choose where agents run', 'Let people sign in with Google', 'Connect Cambium', 'Add your first agent']);
+    expect([...panel?.querySelectorAll('li > b') ?? []].map((title) => title.textContent)).toEqual(['Choose where agents run', 'Let people sign in with Google', 'Connect an app', 'Add your first agent']);
     expect(panel?.textContent).toContain('0 of 4 done');
     expect(($('[aria-label="Run agents on the Lys computer"] [name="name"]') as HTMLInputElement | null)?.value).toBe('Ada’s MacBook Pro');
     expect(posted).toEqual([]);
@@ -72,7 +72,7 @@ describe('Getting started on an empty install', () => {
 
   it('hides the step when /me says it was declined, from any browser, and counts it as answered', async () => {
     await open(service(), undefined, { ...empty, declined: true });
-    expect(titles()).toEqual(['Let people sign in with Google', 'Connect Cambium', 'Add your first agent']);
+    expect(titles()).toEqual(['Let people sign in with Google', 'Connect an app', 'Add your first agent']);
     expect($('[aria-label="Getting started"]')?.textContent).toContain('1 of 4 done');
     expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
   });
@@ -126,9 +126,9 @@ describe('Getting started on an empty install', () => {
   });
 
   it('finishes once every required step is done or answered, leaving Google optional', async () => {
-    await open(service(), undefined, { ...empty, cambium: 'approved', declined: true });
+    await open(service(), undefined, { ...empty, app: 'approved', declined: true });
     expect(titles()).toEqual(['Let people sign in with Google', 'Add your first agent']);
-    await reopen(service(), { ...empty, cambium: 'approved', google: true, declined: true });
+    await reopen(service(), { ...empty, app: 'approved', google: true, declined: true });
     expect(titles()).toEqual(['Add your first agent']);
     expect($('[aria-label="Getting started"]')?.textContent).toContain('3 of 4 done');
   });
@@ -160,16 +160,38 @@ describe('Getting started on an empty install', () => {
 
   it('takes a member to their own installer without offering the server or Google setup', async () => {
     const { posted } = await open(service(), undefined, { ...empty, administrator: false, declined: true });
-    expect(titles()).toEqual(['Add your own computer', 'Connect Cambium', 'Add your first agent']);
+    expect(titles()).toEqual(['Add your own computer', 'Connect an app', 'Add your first agent']);
     expect(document.body.textContent).toContain('Another computer, then download its installer');
     expect($('[aria-label="Getting started"] a')?.getAttribute('href')).toBe('#/network');
     expect($('[aria-label="Run agents on the Lys computer"]')).toBeNull();
     expect(document.body.textContent).not.toContain('Lys runs on');
     expect($('[aria-label="Getting started"] a')?.textContent).toBe('Computers');
     // A member cannot connect an app: the step says who does, with no link to a page they cannot use.
-    expect([...document.querySelectorAll('[aria-label="Getting started"] li')].find((li) => li.querySelector('b')?.textContent === 'Connect Cambium')?.textContent).toBe('Connect CambiumCambium is not connected to Lys yet. An administrator connects it on Apps; once it is, this step is done.');
+    expect([...document.querySelectorAll('[aria-label="Getting started"] li')].find((li) => li.querySelector('b')?.textContent === 'Connect an app')?.textContent).toBe('Connect an appNo app is connected to Lys yet. An administrator connects one on Apps; once it is, this step is done.');
     expect(document.body.textContent).not.toContain('Let people sign in with Google');
     expect(posted).toEqual([]);
+  });
+
+  it('reads any approved app as the step done, whatever its id', async () => {
+    serve({ ...service(), '/apps': ok({ apps: [{ id: 'pending_fixture', name: 'Pending Fixture', state: 'pending' }, { id: 'fixture_product', name: 'Fixture Product', state: 'approved' }] }) }, []);
+    const standing = await readStanding();
+    expect([standing.app, standing.asking]).toEqual(['approved', null]);
+  });
+
+  it('names the first app that has asked to connect, and sends the administrator to Apps to review it', async () => {
+    serve({ ...service(), '/apps': ok({ apps: [{ id: 'fixture_product', name: 'Fixture Product', state: 'pending' }, { id: 'other_fixture', state: 'pending' }] }) }, []);
+    const standing = await readStanding();
+    expect([standing.app, standing.asking]).toEqual(['pending', 'Fixture Product']);
+    await reopen(service(), standing);
+    const step = [...document.querySelectorAll('[aria-label="Getting started"] li')].find((li) => li.querySelector('b')?.textContent === 'Connect an app');
+    expect(step?.textContent).toBe('Connect an appFixture Product has asked to connect. Review what it asks for and approve it on Apps.');
+    expect(step?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
+  });
+
+  it('asks the administrator to connect an app when none has asked', async () => {
+    await open(service());
+    const step = [...document.querySelectorAll('[aria-label="Getting started"] li')].find((li) => li.querySelector('b')?.textContent === 'Connect an app');
+    expect(step?.textContent).toBe('Connect an appConnect an app to Lys on Apps.');
   });
 
   it('never reads provider settings for a member', async () => {
@@ -192,7 +214,7 @@ describe('Getting started on an empty install', () => {
     expect($('[aria-label="Run agents on the Lys computer"] p')?.textContent).toContain('Lys runs on the computer it was installed on. Should your agents run there too?');
   });
 
-  it('offers Connect Cambium only when Apps can be read, and still lists the other steps when it cannot', async () => {
+  it('offers Connect an app only when Apps can be read, and still lists the other steps when it cannot', async () => {
     serve({ ...service(), '/apps': refused(403, 'NotAdmitted', 'Only the administrator.') }, []);
     const standing = await readStanding();
     expect([standing.apps, standing.read]).toEqual([false, true]);

@@ -71,9 +71,10 @@ fn live_shape(seat: &str) -> TestResult {
         assert!(!excluded.reason.is_empty());
         if member.contains(".channel") || member.contains("#env.") {
             assert!(excluded.reason.starts_with("no Lys owner"));
-        } else if member.ends_with("mcp_servers.argus") {
-            assert!(excluded.reason.starts_with("retired"));
-            assert!(servers.iter().all(|server| server["name"] != "argus"));
+        } else if excluded.reason.starts_with("approvals_only") {
+            // An entry holding only tool approvals starts nothing: it is excluded by its shape, and no server is made of it.
+            let name = member.rsplit('.').next().ok_or("member has no name")?;
+            assert!(servers.iter().all(|server| server["name"] != name));
         } else {
             assert!(excluded.reason.starts_with("harness_ui_state"));
         }
@@ -203,4 +204,29 @@ fn seat_import_ui_and_environment_exclusions_keep_unknown_refusals() {
     assert_eq!(sorted.refusals.len(), 1);
     assert_eq!(sorted.refusals[0].member, "claude.settings#unknownSetting");
     assert_eq!(sorted.excluded.len(), 4);
+}
+
+#[test]
+fn seat_import_excludes_a_tools_only_server_by_its_shape_whatever_its_name() {
+    let sorted = codex_profile(
+        "codex.profile",
+        &json!({"mcp_servers":{
+            "fixture_server":{"tools":{"look":{"approval_mode":"approve"}}},
+            "other_fixture":{"tools":{"look":{"approval_mode":"approve"}},"colour":"blue"}
+        }}),
+    );
+    assert!(sorted.excluded.iter().any(|(member, reason)| {
+        member == "codex.profile#mcp_servers.fixture_server" && reason.starts_with("approvals_only")
+    }));
+    assert!(
+        sorted
+            .parts
+            .mcp_servers
+            .iter()
+            .all(|server| server.name != "fixture_server")
+    );
+    assert!(sorted.refusals.iter().any(|refusal| {
+        refusal.member == "codex.profile#mcp_servers.other_fixture"
+            && refusal.name == "import_member_unsupported"
+    }));
 }

@@ -37,13 +37,12 @@ Behavioural. CambiumNext.tsx becomes AppNext.tsx (export AppNext, same props). W
 - The same with a standing grant on fixture_product.space for the agent shows the single line 'Scribe has access in Fixture Product' and no section
 - Two approved apps with a grant under only one: one access line for the first, one section for the second, in the apps list's order
 - No approved app (one pending): the administrator sees 'No app is connected to this Lys yet.' with Apps linked; a person who is not the administrator sees no link to Apps
-- Nothing is rendered while /apps or /grants has not answered; a refused /apps shows its words
+- A refused /apps shows its words under 'Use <agent> in an app'; nothing is rendered while /apps or /grants has not answered, as today
 
 **Files:**
 - create: surface/identity/src/features/file/AppNext.tsx
 - create: surface/identity/src/features/file/app-next.test.tsx
 - modify: surface/identity/src/features/file/AgentOverview.tsx
-- modify: surface/identity/tests/file.test.tsx
 - delete: surface/identity/src/features/file/CambiumNext.tsx
 - delete: surface/identity/src/features/file/cambium-next.test.tsx
 
@@ -58,7 +57,7 @@ Behavioural. CambiumNext.tsx becomes AppNext.tsx (export AppNext, same props). W
 Behavioural. CambiumFirst.tsx becomes AppsFirst.tsx (export AppsFirst and anyAppResource, unchanged in what it decides). WHEN an agent would be given access and no app's resources are held (AddAgent.tsx, sections.tsx, Delegate.tsx, as today), THE SYSTEM SHALL read /apps and say: when at least one app is approved, for the administrator 'An app is approved. Give yourself access to it on Access first; what it shares appears here once you hold it.' with Access linked to #/access/issue?app=<id> of the first approved app in the apps list's order when exactly one is approved and to #/access/issue when more than one is, and for anyone else 'Ask an administrator for access to an app; what it shares appears here once you hold it.'; when none is approved, for the administrator 'Connect an app on Apps first; what it shares appears here once it is approved.' and for anyone else 'No app is connected to Lys yet. An administrator connects one on Apps.' The data attribute is data-apps-first with values access and apps. The administrator is read as today (/directory/people answers). Nothing is said until both reads answer.
 
 **Acceptance:**
-- tests/requests-wanted.test.tsx and tests/surface-polish-details.test.tsx assert data-apps-first and the new words where they asserted data-cambium-first, every case kept
+- tests/file.test.tsx asserts data-apps-first and the new words where it asserted data-cambium-first, every case kept (connect first, approved for the administrator and for anyone else, not connected, /apps refused, pending, silent once an app resource is held)
 - One approved app 'fixture_product': the administrator's Access link is #/access/issue?app=fixture_product; two approved apps: the link is #/access/issue
 - No approved app: the administrator's note links to #/apps; anyone else's has no link
 
@@ -67,8 +66,7 @@ Behavioural. CambiumFirst.tsx becomes AppsFirst.tsx (export AppsFirst and anyApp
 - modify: surface/identity/src/features/people/AddAgent.tsx
 - modify: surface/identity/src/features/file/sections.tsx
 - modify: surface/identity/src/features/grants/Delegate.tsx
-- modify: surface/identity/tests/requests-wanted.test.tsx
-- modify: surface/identity/tests/surface-polish-details.test.tsx
+- modify: surface/identity/tests/file.test.tsx
 - delete: surface/identity/src/features/grants/CambiumFirst.tsx
 
 **Checklist:**
@@ -79,7 +77,7 @@ Behavioural. CambiumFirst.tsx becomes AppsFirst.tsx (export AppsFirst and anyApp
 
 ### R3: Getting started asks for an app, not for one product
 
-Behavioural. Getting started's standing carries app: 'approved' | 'pending' | null in place of cambium: approved when any app in /apps is approved, else pending when any is pending, else null. The step's key is 'app' and its title 'Connect an app'; it is done when app is approved. For anyone but the administrator it says 'No app is connected to Lys yet. An administrator connects one on Apps; once it is, this step is done.'; for the administrator, when an app is pending, '<name of the first pending app> has asked to connect. Review what it asks for and approve it on Apps.', else 'Connect an app to Lys on Apps.', Apps linked. The step is offered only when /apps answered, as today. dashboard-cherie.fixture.ts writes app: null. A person who dismissed the old step's key 'cambium' sees the new step once more: the dismissed key is not carried across, and this is said in the closing note.
+Behavioural. Getting started's standing carries app: 'approved' | 'pending' | null in place of cambium (approved when any app in /apps is approved, else pending when any is pending, else null) and asking: string | null, the first pending app's registered name (its id when nameless) when app is pending, else null. The step's key is 'app' and its title 'Connect an app'; it is done when app is approved. For anyone but the administrator it says 'No app is connected to Lys yet. An administrator connects one on Apps; once it is, this step is done.'; for the administrator, when an app is pending, '<asking> has asked to connect. Review what it asks for and approve it on Apps.', else 'Connect an app to Lys on Apps.', Apps linked. The step is offered only when /apps answered, as today. dashboard-cherie.fixture.ts writes app: null and asking: null.
 
 **Acceptance:**
 - tests/getting-started.test.tsx: every case that read 'Connect Cambium' reads 'Connect an app'; a pending app named 'Fixture Product' shows 'Fixture Product has asked to connect.'; one approved app of any id marks the step done

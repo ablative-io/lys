@@ -33,12 +33,13 @@ describe("Readable surface details", () => {
     expect(label?.getAttribute("title")).toBe(id);
   });
   it("keeps the complete estate evidence in a title and the Access navigation above it", async () => {
-    const evidence = "Cambium /conversation/places opaqueKey123 in workspace ablative; used by this crew.";
+    // The plan's producer owns its sentences: Lys shows them as written and rewrites no product's words.
+    const evidence = "  Read from the fixture product's place handover in workspace ablative; used by this crew.  ";
     const plan = {
       version: 1,
       agents: [{ display_name: "Scribe" }],
       resources: [
-        { kind: "cambium.place", id: "handover", relation: "reader", actions: ["read"], seats: ["Scribe"], evidence },
+        { kind: "fixture_product.place", id: "handover", relation: "reader", actions: ["read"], seats: ["Scribe"], evidence },
       ],
     };
     await mount("#/access/import", {
@@ -47,9 +48,8 @@ describe("Readable surface details", () => {
     });
     expect($(".page > .tabs")).not.toBeNull();
     expect($('[title="' + evidence + '"]')?.textContent).toBe(
-      "From the Cambium place handover in workspace ablative. used by this crew.",
+      "Read from the fixture product's place handover in workspace ablative; used by this crew.",
     );
-    expect(text()).not.toContain("opaqueKey123");
   });
 
   it("names context use without losing the refusal reason", () => {

@@ -231,55 +231,65 @@ describe('Naming the actor of a record line', () => {
 });
 
 describe('An agent\'s access on an install with no app yet', () => {
-  it('says to connect Cambium on Apps first, linking there, while no app resource exists', async () => {
+  const NOT_YET = 'No app is connected to Lys yet. An administrator connects one on Apps.';
+  it('says to connect an app on Apps first, linking there, while no app resource exists', async () => {
     await mount('#/file/' + SCRIBE + '/access');
-    const note = $('[data-cambium-first]');
-    expect(note?.textContent).toBe('Connect Cambium on Apps first; its channels appear here once it is approved.');
+    const note = $('[data-apps-first]');
+    expect(note?.getAttribute('data-apps-first')).toBe('apps');
+    expect(note?.textContent).toBe('Connect an app on Apps first; what it shares appears here once it is approved.');
     expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
     unmountAll(); document.body.innerHTML = '';
   });
 
-  it('once Cambium is approved, sends the person to Access for Cambium access of their own, never round to Apps again', async () => {
-    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
-    const note = $('[data-cambium-first]');
-    expect(note?.textContent).toBe('Cambium is approved. Give yourself Cambium access on Access first; its channels appear here once you hold them.');
-    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue?app=cambium');
-    expect(note?.textContent).not.toContain('Connect Cambium');
+  it('once one app is approved, sends the person to Access for that app, never round to Apps again', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'fixture_product', name: 'Fixture Product', state: 'approved' }] }) });
+    const note = $('[data-apps-first]');
+    expect(note?.getAttribute('data-apps-first')).toBe('access');
+    expect(note?.textContent).toBe('An app is approved. Give yourself access to it on Access first; what it shares appears here once you hold it.');
+    expect(note?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue?app=fixture_product');
+    expect(note?.textContent).not.toContain('Connect an app');
+    unmountAll(); document.body.innerHTML = '';
+  });
+
+  it('with more than one app approved, sends the person to Access without choosing an app for them', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [
+      { id: 'fixture_product', name: 'Fixture Product', state: 'approved' }, { id: 'other_fixture', name: 'Other Fixture', state: 'approved' }] }) });
+    expect($('[data-apps-first]')?.querySelector('a')?.getAttribute('href')).toBe('#/access/issue');
     unmountAll(); document.body.innerHTML = '';
   });
 
   // Only the administrator gives access or connects an app, so anyone else is told who does it, never sent to a page they cannot use.
   const notAdministrator = { ...SERVICE, '/directory/people': refused(403, 'NotAdmitted', 'only the administrator reads the whole directory') };
-  it('once Cambium is approved, tells someone who is not the administrator to ask one for Cambium access', async () => {
-    await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
-    const note = $('[data-cambium-first]');
-    expect(note?.textContent).toBe('Cambium is approved. Ask an administrator for Cambium access; its channels appear here once you hold it.');
+  it('once an app is approved, tells someone who is not the administrator to ask one for access', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': ok({ apps: [{ id: 'fixture_product', name: 'Fixture Product', state: 'approved' }] }) });
+    const note = $('[data-apps-first]');
+    expect(note?.textContent).toBe('Ask an administrator for access to an app; what it shares appears here once you hold it.');
     expect(note?.querySelector('a')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
   });
 
-  it('before Cambium is connected, tells someone who is not the administrator that an administrator connects it', async () => {
+  it('before any app is connected, tells someone who is not the administrator that an administrator connects one', async () => {
     await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': ok({ apps: [] }) });
-    expect($('[data-cambium-first]')?.textContent).toBe('Cambium is not connected to Lys yet. An administrator connects it on Apps; its channels appear here once it is.');
-    expect($('[data-cambium-first] a')).toBeNull();
+    expect($('[data-apps-first]')?.textContent).toBe(NOT_YET);
+    expect($('[data-apps-first] a')).toBeNull();
     unmountAll(); document.body.innerHTML = '';
   });
 
-  it('tells someone /apps refuses that an administrator connects Cambium, never sending them to Apps', async () => {
+  it('tells someone /apps refuses that an administrator connects one, never sending them to Apps', async () => {
     await mount('#/file/' + SCRIBE + '/access', { ...notAdministrator, '/apps': refused(403, 'NotAdmitted', 'apps are not admitted') });
-    expect($('[data-cambium-first]')?.textContent).toBe('Cambium is not connected to Lys yet. An administrator connects it on Apps; its channels appear here once it is.');
+    expect($('[data-apps-first]')?.textContent).toBe(NOT_YET);
     unmountAll(); document.body.innerHTML = '';
   });
 
-  it('while Cambium is only waiting for approval, still says to connect it on Apps', async () => {
-    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'pending' }] }) });
-    expect($('[data-cambium-first]')?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
+  it('while an app is only waiting for approval, still says to connect one on Apps', async () => {
+    await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/apps': ok({ apps: [{ id: 'fixture_product', name: 'Fixture Product', state: 'pending' }] }) });
+    expect($('[data-apps-first]')?.querySelector('a')?.getAttribute('href')).toBe('#/apps');
     unmountAll(); document.body.innerHTML = '';
   });
 
-  it('says nothing about Cambium once an app resource is granted', async () => {
-    const appGrant = { ...GRANTS[0], id: 'grant-' + 'c'.repeat(32), resource: { kind: 'cambium.channel', id: 'general' } };
+  it('says nothing about apps once an app resource is granted', async () => {
+    const appGrant = { ...GRANTS[0], id: 'grant-' + 'c'.repeat(32), resource: { kind: 'fixture_product.channel', id: 'general' } };
     await mount('#/file/' + SCRIBE + '/access', { ...SERVICE, '/grants': ok({ grants: [...GRANTS, appGrant], revision: 7 }) });
-    expect($('[data-cambium-first]')).toBeNull();
+    expect($('[data-apps-first]')).toBeNull();
   });
 });
