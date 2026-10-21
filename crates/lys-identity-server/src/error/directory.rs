@@ -60,12 +60,6 @@ macro_rules! directory_refusals {
         /// The organisation the body named.
         organisation: String,
     },
-    /// The install has no mail settings, so a person admitted now would
-    /// receive nothing (DIRECTORY-110 R4).
-    #[error(
-        "mail_unconfigured: a person admitted now would receive nothing: Lys has no mail settings; add the [mail] table to deployment.toml and run lys identity upgrade"
-    )]
-    MailUnconfigured,
     /// A proving link that Lys did not issue, or one already used
     /// (DIRECTORY-111 R2): one name and one text for both, so the link's
     /// standing is never read off the refusal.

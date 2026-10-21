@@ -37,6 +37,8 @@ enum StoredMethod {
     AgentPass,
     /// The person proved their address by a letter's link (DIRECTORY-111 R2).
     AddressProof,
+    /// The person followed a link handed on the screen (DIRECTORY-112 R2).
+    HandedLink,
 }
 
 /// An actor, as stored.
@@ -158,6 +160,7 @@ impl StoredActor {
             }
             AuthMethod::Oidc => (StoredMethod::Oidc, None),
             AuthMethod::AddressProof => (StoredMethod::AddressProof, None),
+            AuthMethod::HandedLink => (StoredMethod::HandedLink, None),
             AuthMethod::AgentSignature(agent) => {
                 (StoredMethod::AgentSignature, Some(agent.to_string()))
             }
@@ -187,6 +190,7 @@ impl StoredActor {
         let method = match (&self.method, &self.agent) {
             (StoredMethod::Oidc, None) => AuthMethod::Oidc,
             (StoredMethod::AddressProof, None) => AuthMethod::AddressProof,
+            (StoredMethod::HandedLink, None) => AuthMethod::HandedLink,
             (StoredMethod::AgentSignature, Some(agent)) => {
                 AuthMethod::AgentSignature(agent.parse::<AgentId>().map_err(|error| {
                     unavailable(path, &format!("a stored agent does not read: {error}"))

@@ -4,6 +4,10 @@
  * email, posted once to Lys with a fresh operation id. The answer is the
  * same to everyone and names no identity: Lys wrote to the address, and
  * the letter's link proves it. A refusal is shown in words.
+ *
+ * On an install with no mail settings (DIRECTORY-112) the answer hands the
+ * link instead, and the page shows it; an address that already signs in is
+ * told so here, since no letter can.
  */
 import { useRef, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -17,7 +21,6 @@ import { LysMark } from '../../shell/LysMark';
 /** A founding refusal in the words a person reads, without its name. */
 export function foundingReasonOf(failure: unknown): string {
   if (failure instanceof Refused) {
-    if (failure.refusal.refusal === 'mail_unconfigured') return 'This Lys cannot send mail yet, so nobody can found an organisation here. Ask whoever runs it.';
     if (failure.status === 0) return 'Lys could not be reached. Check your connection and try again.';
     return failure.refusal.reason.replace(/^[A-Za-z_]+: /, '');
   }
@@ -28,7 +31,7 @@ export function Found() {
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [written, setWritten] = useState<{ email: string; organisation: string } | null>(null);
+  const [written, setWritten] = useState<{ email: string; organisation: string; letter: OrganisationFounded['letter'] } | null>(null);
   // One operation per page: asking again with the same words sends nothing twice.
   const operation = useRef(operationId());
 
@@ -45,8 +48,8 @@ export function Found() {
     setBusy(true);
     setError('');
     try {
-      await request<OrganisationFounded>('/organisations/found', { operation: operation.current, organisation, display_name, email });
-      setWritten({ email, organisation });
+      const answer = await request<OrganisationFounded>('/organisations/found', { operation: operation.current, organisation, display_name, email });
+      setWritten({ email, organisation, letter: answer.letter });
     } catch (failure) {
       setError(foundingReasonOf(failure));
     } finally {
@@ -54,6 +57,21 @@ export function Found() {
     }
   }
 
+  if (written?.letter.handed !== undefined) {
+    return <div className="page sign-in found">
+      <LysMark />
+      <h1 ref={heading} tabIndex={-1}>Your link</h1>
+      <p role="status" className="sub">This Lys cannot send email, so your link is here instead of in a letter. Open it to finish founding {written.organisation}; it works once.</p>
+      <p><a className="handed-link" href={written.letter.handed}>{written.letter.handed}</a></p>
+    </div>;
+  }
+  if (written && written.letter.letter === 'already_yours' && !written.letter.sent) {
+    return <div className="page sign-in found">
+      <LysMark />
+      <h1 ref={heading} tabIndex={-1}>Found an organisation</h1>
+      <p role="status" className="sub">That address already signs in to Lys. <a href="#/sign-in">Sign in instead</a>.</p>
+    </div>;
+  }
   if (written) {
     return <div className="page sign-in found">
       <LysMark />

@@ -5,6 +5,10 @@
  * On success the founder is signed in by the answer's cookie and lands on
  * their account page to set a password; a refusal is shown in words with
  * the way back to sign-in.
+ *
+ * At #/added/:proof (DIRECTORY-112) the same page signs in a person whose
+ * admission link was handed to them on an install with no mail settings,
+ * landing on their account page told so.
  */
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -19,19 +23,23 @@ import { foundingReasonOf } from './Found';
 /** Where a proven founder lands: their account page, told how they are signed in. */
 export const FOUNDED = '/settings/account?founded=1';
 
-export function Prove() {
+/** Where a person signed in by a handed admission link lands. */
+export const ADDED = '/settings/account?added=1';
+
+export function Prove({ admission = false }: { admission?: boolean }) {
   const { proof = '' } = useParams();
   const navigate = useNavigate();
   const heading = useRef<HTMLHeadingElement>(null);
   const [busy, setBusy] = useState(false);
   const [refusal, setRefusal] = useState<{ name: string; words: string } | null>(null);
+  const act = admission ? 'Sign in' : 'Finish founding';
 
   async function finish() {
     setBusy(true);
     setRefusal(null);
     try {
       await request<OrganisationProved>('/organisations/found/prove', { proof });
-      navigate(FOUNDED);
+      navigate(admission ? ADDED : FOUNDED);
     } catch (failure) {
       setRefusal({ name: failure instanceof Refused ? failure.refusal.refusal : '', words: foundingReasonOf(failure) });
     } finally {
@@ -41,9 +49,9 @@ export function Prove() {
 
   return <div className="page sign-in found">
     <LysMark />
-    <h1 ref={heading} tabIndex={-1}>Finish founding</h1>
-    <p className="sub">This link proves your email address. Press the button to finish founding your organisation and sign in.</p>
+    <h1 ref={heading} tabIndex={-1}>{admission ? 'Sign in to Lys' : 'Finish founding'}</h1>
+    <p className="sub">{admission ? 'This link signs you in to Lys once. Press the button to finish and sign in.' : 'This link proves your email address. Press the button to finish founding your organisation and sign in.'}</p>
     {refusal ? <p role="alert" className="why-not">{refusal.words}{refusal.name === 'proof_refused' || refusal.name === 'already_admitted' ? <> <a href="#/sign-in">Go to sign in</a>.</> : null}</p> : null}
-    <Act symbol="enter" name={busy ? 'Finishing…' : 'Finish founding'} word={busy ? 'Finishing…' : 'Finish founding'} tone="primary" disabled={busy || !proof} onClick={finish} />
+    <Act symbol="enter" name={busy ? 'Finishing…' : act} word={busy ? 'Finishing…' : act} tone="primary" disabled={busy || !proof} onClick={finish} />
   </div>;
 }

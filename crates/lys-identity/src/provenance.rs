@@ -42,6 +42,11 @@ pub enum AuthMethod {
     /// (DIRECTORY-111 R2): the session this begins is the person signed in,
     /// as a sign-in through the issuer is.
     AddressProof,
+    /// The person followed a link Lys handed them on the screen, because the
+    /// install has no mail settings (DIRECTORY-112 R2): the session this
+    /// begins is the person signed in, and the record says the link was
+    /// handed, never sent.
+    HandedLink,
 }
 
 impl AuthMethod {
@@ -50,7 +55,7 @@ impl AuthMethod {
     /// operator or a service account.
     #[must_use]
     pub fn is_person_signed_in(self) -> bool {
-        matches!(self, Self::Oidc | Self::AddressProof)
+        matches!(self, Self::Oidc | Self::AddressProof | Self::HandedLink)
     }
 }
 
@@ -127,7 +132,8 @@ impl Provenance {
             | AuthMethod::Operator
             | AuthMethod::ServiceAccountBearer(_)
             | AuthMethod::Founding
-            | AuthMethod::AddressProof => None,
+            | AuthMethod::AddressProof
+            | AuthMethod::HandedLink => None,
             AuthMethod::AgentSignature(agent) | AuthMethod::AgentPass(agent) => Some(agent),
         }
     }
@@ -142,7 +148,8 @@ impl Provenance {
             | AuthMethod::AgentSignature(_)
             | AuthMethod::AgentPass(_)
             | AuthMethod::Founding
-            | AuthMethod::AddressProof => None,
+            | AuthMethod::AddressProof
+            | AuthMethod::HandedLink => None,
         }
     }
 

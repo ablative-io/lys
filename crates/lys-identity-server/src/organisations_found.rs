@@ -18,6 +18,13 @@
 //! asked again after its letter went answers the same and mints nothing, so
 //! the link in the letter stays the one that proves. The proof is
 //! `organisations_prove.rs`.
+//!
+//! An install with no mail settings (DIRECTORY-112 R1) runs the same steps
+//! and hands the link in the answer's letter view in place of the letter,
+//! the founding recorded as handed; an address that already signs in is
+//! told so on the screen, since no letter can carry the difference. With no
+//! letters-sent record to read, the same operation asked again hands a
+//! fresh link for the same founding.
 
 use axum::Json;
 use axum::extract::State;
@@ -33,7 +40,7 @@ use std::str::FromStr;
 use std::sync::MutexGuard;
 
 use crate::error::ServerError;
-use crate::foundings_store::{Founding, Foundings, digest, new_token};
+use crate::foundings_store::{Founding, Foundings, Kind, digest, new_token};
 use crate::mail::LetterView;
 use crate::mail_letters::Letter;
 use crate::people_admit::{derived, refused};
@@ -151,16 +158,10 @@ struct Asked {
     email: String,
 }
 
-/// The words checked before any step: the install can write, the body is
-/// whole, the operation and the email are well formed and the names are
-/// ones the directory takes.
-fn checked(
-    state: &AppState,
-    asked: Result<Json<FoundBody>, JsonRejection>,
-) -> Result<Asked, ServerError> {
-    if state.mailer.is_none() {
-        return Err(ServerError::MailUnconfigured);
-    }
+/// The words checked before any step: the body is whole, the operation
+/// and the email are well formed and the names are ones the directory
+/// takes.
+fn checked(asked: Result<Json<FoundBody>, JsonRejection>) -> Result<Asked, ServerError> {
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let operation = OperationId::from_str(&asked.operation)?;
     let email = crate::accounts::check_email(&asked.email)
@@ -184,7 +185,7 @@ pub(crate) async fn found(
     asked: Result<Json<FoundBody>, JsonRejection>,
 ) -> Response {
     let mut receipt = FoundingReceipt::default();
-    let asked = match checked(&state, asked) {
+    let asked = match checked(asked) {
         Ok(asked) => asked,
         Err(error) => return refused(error, &receipt).await,
     };
@@ -234,10 +235,7 @@ async fn steps(
 ) -> Result<LetterView, (&'static str, ServerError)> {
     let [found, proof, letter] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
-    let mailer = state
-        .mailer
-        .as_ref()
-        .ok_or((found, ServerError::MailUnconfigured))?;
+    let mailer = state.mailer.as_ref();
     let operation = asked.operation.to_string();
     let address = state.oidc.public_origin().to_owned();
 
@@ -251,21 +249,31 @@ async fn steps(
             organisation: asked.organisation.display_name().to_owned(),
             address,
         };
-        let wrote = mailer
-            .send_once(&operation, &yours)
-            .await
-            .map_err(at(letter))?;
+        let wrote = match mailer {
+            Some(mailer) => mailer
+                .send_once(&operation, &yours)
+                .await
+                .map_err(at(letter))?,
+            None => LetterView::unsent(
+                yours.name(),
+                Some(asked.email.clone()),
+                "This address already signs in to Lys",
+            ),
+        };
         receipt.done(letter);
         return Ok(wrote);
     }
 
     // Asked again after its letter went: the same answer and nothing
     // minted, so the link already in the letter stays the one that proves.
-    if let Some(by) = mailer
-        .recorded_by(&operation, "founded")
-        .await
-        .map_err(at(found))?
-    {
+    let recorded = match mailer {
+        Some(mailer) => mailer
+            .recorded_by(&operation, "founded")
+            .await
+            .map_err(at(found))?,
+        None => None,
+    };
+    if let Some(by) = recorded {
         for step in STEPS {
             receipt.done(step);
         }
@@ -275,6 +283,7 @@ async fn steps(
             sent: true,
             by,
             reason: None,
+            handed: None,
         });
     }
 
@@ -320,6 +329,8 @@ async fn steps(
         email: asked.email.clone(),
         operation: founding_operation,
         spent: false,
+        handed: mailer.is_none(),
+        kind: Kind::Founding,
     };
     foundings(state)
         .map_err(at(proof))?
@@ -327,16 +338,22 @@ async fn steps(
         .map_err(at(proof))?;
     receipt.done(proof);
 
-    let proving = Letter::Founded {
-        name: asked.founder.display_name().to_owned(),
-        email: asked.email.clone(),
-        link: format!("{address}/#/found/{token}"),
-        organisation: asked.organisation.display_name().to_owned(),
+    let link = format!("{address}/#/found/{token}");
+    let wrote = match mailer {
+        Some(mailer) => {
+            let proving = Letter::Founded {
+                name: asked.founder.display_name().to_owned(),
+                email: asked.email.clone(),
+                link,
+                organisation: asked.organisation.display_name().to_owned(),
+            };
+            mailer
+                .send_once(&operation, &proving)
+                .await
+                .map_err(at(letter))?
+        }
+        None => LetterView::handed("founded", asked.email.clone(), link),
     };
-    let wrote = mailer
-        .send_once(&operation, &proving)
-        .await
-        .map_err(at(letter))?;
     receipt.done(letter);
     Ok(wrote)
 }

@@ -37,6 +37,26 @@ pub struct Founding {
     pub operation: String,
     /// Whether the proof was used.
     pub spent: bool,
+    /// Whether the link was handed on the screen because the install has no
+    /// mail settings, not sent in a letter (DIRECTORY-112 R1).
+    #[serde(default)]
+    pub handed: bool,
+    /// A founding, or a person's admission whose handed link signs them in
+    /// once (DIRECTORY-112 R3).
+    #[serde(default)]
+    pub kind: Kind,
+}
+
+/// What a proving link proves.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Kind {
+    /// An organisation and its founder, both Registered until proven.
+    #[default]
+    Founding,
+    /// A person admitted into an organisation, already Active and bound:
+    /// `founder` names the person, `organisation` where they were admitted.
+    Admission,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -128,14 +148,30 @@ impl Foundings {
         self.stored.foundings.get(digest)
     }
 
-    /// The unspent founding for `email`, with its digest, if one waits.
+    /// The unspent founding for `email`, with its digest, if one waits; an
+    /// admission's link is never a founding.
     #[must_use]
     pub fn unspent_for_email(&self, email: &str) -> Option<(&str, &Founding)> {
         self.stored
             .foundings
             .iter()
-            .find(|(_, founding)| !founding.spent && founding.email == email)
+            .find(|(_, founding)| {
+                !founding.spent && founding.kind == Kind::Founding && founding.email == email
+            })
             .map(|(digest, founding)| (digest.as_str(), founding))
+    }
+
+    /// The digest of `person`'s unspent admission link, if one waits
+    /// (DIRECTORY-112 R3).
+    #[must_use]
+    pub fn unspent_admission_for(&self, person: &str) -> Option<&str> {
+        self.stored
+            .foundings
+            .iter()
+            .find(|(_, founding)| {
+                !founding.spent && founding.kind == Kind::Admission && founding.founder == person
+            })
+            .map(|(digest, _)| digest.as_str())
     }
 
     /// Record `founding` under `digest`, dropping `replaced` (the digest of
@@ -225,6 +261,8 @@ mod tests {
             email: email.to_owned(),
             operation: operation.to_owned(),
             spent: false,
+            handed: false,
+            kind: Kind::Founding,
         }
     }
 

@@ -37,6 +37,7 @@ export function App() {
         <Route path="/sign-in" element={<SignInScreen />} />
         <Route path="/found" element={<Found />} />
         <Route path="/found/:proof" element={<Prove />} />
+        <Route path="/added/:proof" element={<Prove admission />} />
         <Route path="/window/:session" element={<TerminalWindow />} />
         <Route path="*" element={
           <ShellProvider>

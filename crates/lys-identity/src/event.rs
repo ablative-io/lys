@@ -464,12 +464,16 @@ pub(crate) mod wire {
     /// The person proved their address by a letter's link (DIRECTORY-111
     /// R2); no principal.
     pub(crate) const ADDRESS_PROOF: u64 = 6;
+    /// The person followed a link handed on the screen (DIRECTORY-112 R2);
+    /// no principal.
+    pub(crate) const HANDED_LINK: u64 = 7;
 
     pub(crate) fn method(value: AuthMethod) -> u64 {
         match value {
             AuthMethod::Oidc => OIDC,
             AuthMethod::Founding => FOUNDING,
             AuthMethod::AddressProof => ADDRESS_PROOF,
+            AuthMethod::HandedLink => HANDED_LINK,
             AuthMethod::AgentSignature(_) => AGENT_SIGNATURE,
             AuthMethod::AgentPass(_) => AGENT_PASS,
             AuthMethod::Operator | AuthMethod::ServiceAccountBearer(_) => {
@@ -489,6 +493,7 @@ pub(crate) mod wire {
             (OIDC, None) => Ok(AuthMethod::Oidc),
             (FOUNDING, None) => Ok(AuthMethod::Founding),
             (ADDRESS_PROOF, None) => Ok(AuthMethod::AddressProof),
+            (HANDED_LINK, None) => Ok(AuthMethod::HandedLink),
             (AGENT_SIGNATURE, Some(agent)) => Ok(AuthMethod::AgentSignature(agent)),
             (AGENT_PASS, Some(agent)) => Ok(AuthMethod::AgentPass(agent)),
             (OPERATOR_OR_SERVICE_ACCOUNT, None) => Ok(AuthMethod::Operator),
@@ -500,11 +505,12 @@ pub(crate) mod wire {
             (ADDRESS_PROOF, Some(_)) => {
                 Err("an address-proof actor carries no agent id under key 5")
             }
+            (HANDED_LINK, Some(_)) => Err("a handed-link actor carries no agent id under key 5"),
             (AGENT_SIGNATURE, None) => {
                 Err("an agent-signature actor carries the agent's id under key 5")
             }
             (AGENT_PASS, None) => Err("an agent-pass actor carries the agent's id under key 5"),
-            _ => Err("an authentication method code is 1 to 6"),
+            _ => Err("an authentication method code is 1 to 7"),
         }
     }
 

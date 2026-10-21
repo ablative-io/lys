@@ -22,7 +22,6 @@ macro_rules! server_refusals {
             | ServerError::NotSignedIn
             | ServerError::NotAdmitted { .. }
             | ServerError::OrganisationNotOwn { .. }
-            | ServerError::MailUnconfigured
             | ServerError::MailNotSent { .. }
             | ServerError::ProofRefused
             | ServerError::AlreadyAdmitted

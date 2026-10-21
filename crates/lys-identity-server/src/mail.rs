@@ -87,7 +87,15 @@ pub struct LetterView {
     /// Why it did not go, when it did not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// The link the letter would have carried, handed here because the
+    /// install has no mail settings (DIRECTORY-112 R1, R3); absent whenever
+    /// the install has mail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub handed: Option<String>,
 }
+
+/// Why a handed link is in the answer and not in a letter.
+pub const HANDED_REASON: &str = "Lys has no mail settings, so the link is handed here";
 
 impl LetterView {
     /// A letter sent, or found already sent, for this act, by `by`.
@@ -99,6 +107,7 @@ impl LetterView {
             sent: true,
             by,
             reason: None,
+            handed: None,
         }
     }
 
@@ -111,6 +120,17 @@ impl LetterView {
             sent: false,
             by: Sender::Lys,
             reason: Some(reason.into()),
+            handed: None,
+        }
+    }
+
+    /// A letter that did not go because the install has no mail settings,
+    /// its link handed in the answer instead (DIRECTORY-112 R1, R3).
+    #[must_use]
+    pub fn handed(letter: &'static str, to: String, link: String) -> Self {
+        Self {
+            handed: Some(link),
+            ..Self::unsent(letter, Some(to), HANDED_REASON)
         }
     }
 }

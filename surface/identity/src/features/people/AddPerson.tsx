@@ -29,7 +29,7 @@ interface PendingPerson { name: string; given?: string; family?: string; email: 
 type Asking = { given: string; family: string; email: string; kind: string; id: string; relation: string };
 interface Logged { step: string; log: string; index: number }
 /** The letter the act owed: who sent it (Lys, or the sign-in service when it made the account) and where. */
-interface Letter { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string }
+interface Letter { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string; handed?: string }
 interface Admitted { person: string; logged: Logged[]; letter: Letter }
 const STEPS = ['register', 'account', 'bind', 'activate', 'grant', 'letter'];
 /** Each step as the act under way, for saying where a refusal stopped. */
@@ -58,12 +58,13 @@ function restored(key: string): PendingPerson | null {
 /** The letter member of an answer, when it is one: which letter, to whom, whether it went and who sent it. */
 function letterOf(value: unknown): Letter | null {
   if (!object(value) || typeof value.letter !== 'string' || typeof value.sent !== 'boolean' || (value.by !== 'lys' && value.by !== 'issuer')
-    || (value.to !== undefined && typeof value.to !== 'string') || (value.reason !== undefined && typeof value.reason !== 'string')) return null;
+    || (value.to !== undefined && typeof value.to !== 'string') || (value.reason !== undefined && typeof value.reason !== 'string')
+    || (value.handed !== undefined && typeof value.handed !== 'string')) return null;
   return { letter: value.letter, sent: value.sent, by: value.by as 'lys' | 'issuer', ...(typeof value.to === 'string' ? { to: value.to } : {}),
-    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}) };
+    ...(typeof value.reason === 'string' ? { reason: value.reason } : {}), ...(typeof value.handed === 'string' ? { handed: value.handed } : {}) };
 }
 
-/** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named, the letter sent. */
+/** The act's answer, confirmed for `operation`: every step completed, none failed, each written step's leaf named, the letter sent or its link handed (DIRECTORY-112). */
 function confirmed(answer: unknown, operation: string, granting: boolean): Admitted {
   const steps = granting ? STEPS : STEPS.filter((step) => step !== 'grant');
   const unconfirmed = new Refused(200, { refusal: 'UnconfirmedReceipt', reason: 'The answer did not confirm this person was added. The original request is saved.' });
@@ -75,7 +76,7 @@ function confirmed(answer: unknown, operation: string, granting: boolean): Admit
     || !logged.every((leaf: unknown) => object(leaf) && typeof leaf.step === 'string' && typeof leaf.log === 'string'
       && typeof leaf.index === 'number' && Number.isSafeInteger(leaf.index) && leaf.index >= 0)) throw unconfirmed;
   const letter = letterOf(answer.letter);
-  if (!letter || !letter.sent) throw unconfirmed;
+  if (!letter || (!letter.sent && letter.handed === undefined)) throw unconfirmed;
   return { person: answer.person, logged: logged as Logged[], letter };
 }
 
@@ -116,6 +117,7 @@ function RefusedReceipt({ stopped }: { stopped: Stopped }) {
 
 /** Who wrote to the person, as the receipt says it: Lys itself, or the sign-in service when it made their account. */
 function wrote(letter: Letter, name: string, email: string): string {
+  if (letter.handed !== undefined) return name + ' is added. This Lys cannot send email, so give them this link; opening it signs them in once, and they set a password there.';
   return letter.by === 'issuer'
     ? name + ' is added. The sign-in service wrote to them at ' + email + ' with their first sign-in.'
     : name + ' is added. Lys wrote to them at ' + email + '.';
@@ -125,12 +127,18 @@ function Receipt({ admitted, name, email }: { admitted: Admitted; name: string; 
   const granted = admitted.logged.some((leaf) => leaf.step === 'grant');
   return <section aria-label="Receipt" className="note">
     <p role="status">{wrote(admitted.letter, name, admitted.letter.to ?? email)}</p>
+    {admitted.letter.handed !== undefined ? <div className="field">
+      <label htmlFor="add-person-handed">Their sign-in link</label>
+      <input id="add-person-handed" aria-label="Their sign-in link" type="text" readOnly value={admitted.letter.handed} onFocus={(event) => event.currentTarget.select()} />
+    </div> : null}
     {granted ? null : <p>They have no access yet. Give it from Access once there is something to give.</p>}
     <p><a href={'#/file/' + encodeURIComponent(admitted.person)}>Open their file</a></p>
     <details><summary>What Lys recorded</summary><ul>
       {admitted.logged.map((leaf) => <li key={leaf.log + leaf.index}>{WORDS[leaf.step] ?? leaf.step}: {leaf.log} log, entry {leaf.index}</li>)}
       <li>Sign-in account: the issuer account for their email, found or made there; the issuer keeps that record</li>
-      <li>Letter: {admitted.letter.by === 'issuer' ? 'the sign-in service wrote to them when it made their account' : 'Lys wrote to them'}; the send is recorded beside the directory, not in a log</li>
+      {admitted.letter.handed !== undefined
+        ? <li>Letter: handed to you here to give them; nothing was sent</li>
+        : <li>Letter: {admitted.letter.by === 'issuer' ? 'the sign-in service wrote to them when it made their account' : 'Lys wrote to them'}; the send is recorded beside the directory, not in a log</li>}
     </ul></details>
   </section>;
 }

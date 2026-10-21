@@ -19,8 +19,10 @@
 //! letter, never two. When the account step made their account, the sign-in
 //! service's own letter on a new account is the added letter, and Lys records
 //! it as sent by the issuer; when the account was already held, Lys writes
-//! the added letter itself. An install with no mail settings admits nobody:
-//! the act is refused as `mail_unconfigured` before its first step. A letter
+//! the added letter itself. An install with no mail settings sends no
+//! letter: the letter step hands a sign-in link in the answer instead, for
+//! the admitter to give the person (DIRECTORY-112 R3, `people_admit_handed`).
+//! A letter
 //! that does not go leaves every step before it recorded and is answered as
 //! `mail_not_sent`; asking again with the same operation sends it.
 //! Nothing here calls a product or holds a lock across the issuer's answer.
@@ -31,7 +33,7 @@ use axum::extract::rejection::JsonRejection;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use lys_identity::OperationId;
+use lys_identity::{OperationId, OrganisationId, PersonId};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -215,17 +217,14 @@ fn checked(
     state: &Shared,
     headers: &HeaderMap,
     asked: Result<Json<AdmitBody>, JsonRejection>,
-) -> Result<(AdmitBody, OperationId, String, String), ServerError> {
+) -> Result<(AdmitBody, OperationId, String, String, OrganisationId), ServerError> {
     let actor = signed_in(state, headers)?;
-    if state.mailer.is_none() {
-        return Err(ServerError::MailUnconfigured);
-    }
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let operation = OperationId::from_str(&asked.operation)?;
     let email = crate::accounts::check_email(&asked.email)
         .map_err(|_refused| malformed(format!("{} is not an email", asked.email)))?
         .to_owned();
-    crate::grants::with_grants(state, |mut judged| {
+    let organisation = crate::grants::with_grants(state, |mut judged| {
         crate::people_admission::organisation(
             &mut judged,
             &actor,
@@ -234,7 +233,7 @@ fn checked(
         )
     })?;
     let issuer = actor.binding().issuer().to_owned();
-    Ok((asked, operation, email, issuer))
+    Ok((asked, operation, email, issuer, organisation))
 }
 
 /// POST /people/admit: the six steps, in order, as one act; the fifth, the
@@ -245,7 +244,7 @@ pub(crate) async fn admit(
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Response {
     let mut receipt = AdmitReceipt::default();
-    let (asked, operation, email, issuer) = match checked(&state, &headers, asked) {
+    let (asked, operation, email, issuer, organisation) = match checked(&state, &headers, asked) {
         Ok(checked) => checked,
         Err(error) => return refused(error, &receipt).await,
     };
@@ -255,6 +254,7 @@ pub(crate) async fn admit(
         operation: &operation,
         email: &email,
         issuer: &issuer,
+        organisation,
     };
     match steps(&state, &headers, &act, &mut receipt).await {
         Ok(done) => Json(Admitted {
@@ -280,6 +280,7 @@ struct Act<'a> {
     operation: &'a OperationId,
     email: &'a str,
     issuer: &'a str,
+    organisation: OrganisationId,
 }
 
 /// What the steps answered.
@@ -303,6 +304,7 @@ async fn steps(
         operation,
         email,
         issuer,
+        organisation,
     } = *act;
     let [register, account, bind, activate, grant, letter] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
@@ -385,10 +387,24 @@ async fn steps(
         granted = Some(recorded.grant);
     }
 
-    let mailer = state
-        .mailer
-        .as_ref()
-        .ok_or((letter, ServerError::MailUnconfigured))?;
+    let Some(mailer) = state.mailer.as_ref() else {
+        let person_id = PersonId::from_str(&person).map_err(|error| (letter, error.into()))?;
+        let wrote = crate::people_admit_handed::hand(
+            state,
+            person_id,
+            organisation,
+            email,
+            &operation.to_string(),
+        )
+        .map_err(at(letter))?;
+        receipt.done(letter, None);
+        return Ok(Done {
+            person,
+            subject,
+            grant: granted,
+            letter: wrote,
+        });
+    };
     let added = Letter::Added {
         name: asked.display_name.clone(),
         email: email.to_owned(),

@@ -184,7 +184,7 @@ fn an_oidc_method_that_names_an_agent_is_refused() -> TestResult {
 #[test]
 fn an_unassigned_method_is_refused() -> TestResult {
     for body in [encode_body(&by_oidc()?), encode_body(&by_agent()?)] {
-        refused_as_malformed(&with_method(body, 7)?, "method code");
+        refused_as_malformed(&with_method(body, 8)?, "method code");
     }
     Ok(())
 }

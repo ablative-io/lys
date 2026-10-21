@@ -11,8 +11,8 @@ mod founding;
 use std::error::Error;
 
 use founding::{
-    ADMIN_EMAIL, BEA, FOUND, TestResult, accounts_for, file_under, found, foundings, leaves,
-    prove, table,
+    ADMIN_EMAIL, BEA, FOUND, TestResult, accounts_for, file_under, found, foundings, leaves, prove,
+    table,
 };
 use identity_contract::harness::Service;
 use lys_identity::OperationId;
@@ -83,7 +83,8 @@ async fn admit_bea(service: &Service, ada: &str) -> Result<Value, Box<dyn Error>
 }
 
 #[tokio::test]
-async fn without_mail_the_founding_hands_the_link_and_the_link_signs_the_founder_in() -> TestResult {
+async fn without_mail_the_founding_hands_the_link_and_the_link_signs_the_founder_in() -> TestResult
+{
     let (service, rauthy, _ada, mut sink) = table(false).await?;
     let before = leaves(&service).await?;
     let (status, answer) = service
@@ -95,16 +96,25 @@ async fn without_mail_the_founding_hands_the_link_and_the_link_signs_the_founder
     let link = handed(&answer)?;
     let token = token_after(&link, "/#/found/")?;
     assert!(!answer.to_string().contains("person-"), "{answer}");
-    assert!(leaves(&service).await? > before, "the founding was recorded");
+    assert!(
+        leaves(&service).await? > before,
+        "the founding was recorded"
+    );
     let stored = entries(&service)?;
     assert_eq!(stored.len(), 1, "{stored:?}");
     assert_eq!(stored[0]["handed"], true, "{stored:?}");
     assert_eq!(stored[0]["spent"], false, "{stored:?}");
     assert!(
-        !foundings(&service)?.ok_or("the file")?.to_string().contains(&token),
+        !foundings(&service)?
+            .ok_or("the file")?
+            .to_string()
+            .contains(&token),
         "the token is stored"
     );
-    assert!(sink.taken().is_none(), "a letter went with no mail settings");
+    assert!(
+        sink.taken().is_none(),
+        "a letter went with no mail settings"
+    );
     assert!(
         file_under(service.dir.path(), "letters-sent.jsonl").is_none(),
         "a letters-sent record was made with no mail settings"
@@ -147,7 +157,11 @@ async fn without_mail_a_second_founding_for_the_address_hands_a_fresh_link_and_t
         .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
         .await?;
     assert_eq!(status, 200, "{second}");
-    assert_eq!(leaves(&service).await?, after_first, "a second founding was recorded");
+    assert_eq!(
+        leaves(&service).await?,
+        after_first,
+        "a second founding was recorded"
+    );
     let first_link = handed(&first)?;
     let second_link = handed(&second)?;
     assert_ne!(first_link, second_link);
@@ -155,7 +169,8 @@ async fn without_mail_a_second_founding_for_the_address_hands_a_fresh_link_and_t
     let (status, refused, _) = prove(&service, &token_after(&first_link, "/#/found/")?).await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "proof_refused");
-    let (status, proved, cookie) = prove(&service, &token_after(&second_link, "/#/found/")?).await?;
+    let (status, proved, cookie) =
+        prove(&service, &token_after(&second_link, "/#/found/")?).await?;
     assert_eq!(status, 200, "{proved}");
     assert!(cookie.is_some());
     assert!(sink.taken().is_none());
@@ -188,7 +203,7 @@ async fn without_mail_an_admitted_person_is_handed_a_link_that_signs_them_in_onc
     let admitted = admit_bea(&service, &ada).await?;
     assert_eq!(
         admitted["receipt"]["completed"],
-        json!(["register", "account", "bind", "activate", "grant", "letter"]),
+        json!(["register", "account", "bind", "activate", "letter"]),
         "{admitted}"
     );
     assert_eq!(admitted["letter"]["letter"], "added", "{admitted}");
@@ -201,7 +216,10 @@ async fn without_mail_an_admitted_person_is_handed_a_link_that_signs_them_in_onc
     assert_eq!(stored[0]["kind"], "admission", "{stored:?}");
     assert_eq!(stored[0]["handed"], true, "{stored:?}");
     assert_eq!(stored[0]["founder"], person, "{stored:?}");
-    assert!(sink.taken().is_none(), "a letter went with no mail settings");
+    assert!(
+        sink.taken().is_none(),
+        "a letter went with no mail settings"
+    );
     assert_eq!(accounts_for(&rauthy, BEA)?, 1);
     let (status, ada_me) = service.get("/me", Some(&ada)).await?;
     assert_eq!(status, 200, "{ada_me}");
@@ -231,7 +249,8 @@ async fn without_mail_an_admitted_person_is_handed_a_link_that_signs_them_in_onc
 }
 
 #[tokio::test]
-async fn without_mail_a_retired_persons_handed_link_is_refused_and_nothing_recorded() -> TestResult {
+async fn without_mail_a_retired_persons_handed_link_is_refused_and_nothing_recorded() -> TestResult
+{
     let (service, _rauthy, ada, mut sink) = table(false).await?;
     let admitted = admit_bea(&service, &ada).await?;
     let token = token_after(&handed(&admitted)?, "/#/added/")?;

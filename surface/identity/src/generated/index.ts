@@ -319,7 +319,7 @@ export interface WaitingEntryView {
 /** `organisations_found.rs` `Founded`: POST /organisations/found. One shape to everyone, naming no identity (DIRECTORY-111). */
 export interface OrganisationFounded {
   operation: string;
-  letter: { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string };
+  letter: { letter: string; to?: string; sent: boolean; by: 'lys' | 'issuer'; reason?: string; handed?: string };
 }
 
 /** `organisations_prove.rs` `Proved`: POST /organisations/found/prove, what POST /sign-in answers with the organisation and person added. */

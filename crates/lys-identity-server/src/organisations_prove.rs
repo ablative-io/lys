@@ -15,6 +15,13 @@
 //! the steps completed; the digest stays unspent so the same proof asked
 //! again finishes what is left. The found and bind leaves are the founding
 //! actor's; from the activate on they are the founder's own.
+//!
+//! On an install with no mail settings (DIRECTORY-112 R2, R3) the letter
+//! step records nothing, and a link that was handed begins its session as
+//! `HandedLink`, never `AddressProof`. A handed admission link runs two
+//! steps only, session and spend: the admitted person must be Active and
+//! bound at this install's issuer, else the proof is refused as any
+//! unknown proof is and nothing is recorded.
 
 use axum::Json;
 use axum::extract::State;
@@ -30,12 +37,15 @@ use std::str::FromStr;
 
 use crate::admission::AUTHORITY;
 use crate::error::ServerError;
-use crate::foundings_store::{Founding, digest};
+use crate::foundings_store::{Founding, Kind, digest};
 use crate::mail_letters::Letter;
 use crate::organisations_found::{FoundingReceipt, founding_actor, foundings, step_operation};
 use crate::people_admit::refused;
 use crate::routes::{AppState, Shared, with_directory};
 use crate::sessions_api::SessionLogin;
+
+/// A handed admission link's steps, in order (DIRECTORY-112 R3).
+pub const ADMISSION_STEPS: [&str; 2] = ["session", "spend"];
 
 /// The proving act's steps, in order.
 pub const STEPS: [&str; 8] = [
@@ -86,15 +96,12 @@ fn malformed(reason: String) -> ServerError {
     ServerError::RequestMalformed { reason }
 }
 
-/// The proof checked before any step: the install can write, the body is
-/// whole, the digest names an unspent founding.
+/// The proof checked before any step: the body is whole, the digest names
+/// an unspent founding or admission.
 fn checked(
     state: &AppState,
     asked: Result<Json<ProveBody>, JsonRejection>,
 ) -> Result<Proven, ServerError> {
-    if state.mailer.is_none() {
-        return Err(ServerError::MailUnconfigured);
-    }
     let Json(asked) = asked.map_err(|rejected| malformed(rejected.body_text()))?;
     let digest = digest(&asked.proof);
     let founding = foundings(state)?
@@ -125,7 +132,11 @@ pub(crate) async fn prove(
         Err(error) => return refused(error, &receipt).await,
     };
     receipt.operation = proven.operation.to_string();
-    match steps(&state, &proven, &mut receipt).await {
+    let answered = match proven.founding.kind {
+        Kind::Founding => steps(&state, &proven, &mut receipt).await,
+        Kind::Admission => admission_steps(&state, &proven, &mut receipt).await,
+    };
+    match answered {
         Ok((cookie, answer)) => ([(header::SET_COOKIE, cookie)], Json(answer)).into_response(),
         Err((step, error)) => {
             receipt.failed = Some(step.to_owned());
@@ -212,10 +223,6 @@ async fn steps(
         spend,
     ] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
-    let mailer = state
-        .mailer
-        .as_ref()
-        .ok_or((account, ServerError::MailUnconfigured))?;
     let now = crate::session::now();
     let operation = &proven.operation;
     let founder = proven.founder;
@@ -258,7 +265,7 @@ async fn steps(
 
     let own = Actor::new(
         binding.clone(),
-        Provenance::new(AuthMethod::AddressProof, now),
+        Provenance::new(signed_in_by(&proven.founding), now),
     );
     let step = step_operation(operation, activate_step).map_err(at(activate_step))?;
     activate(
@@ -287,7 +294,7 @@ async fn steps(
     crate::organisation_boot::founder_grant(state, founder).map_err(at(grant))?;
     receipt.done(grant);
 
-    if made {
+    if let (true, Some(mailer)) = (made, state.mailer.as_ref()) {
         let added = Letter::Added {
             name,
             email: proven.founding.email.clone(),
@@ -324,6 +331,73 @@ async fn steps(
             authority: AUTHORITY.to_owned(),
             organisation: proven.organisation.to_string(),
             person: founder.to_string(),
+        },
+    ))
+}
+
+/// How the proof signs the person in: by a handed link when the link was
+/// handed on the screen, by address proof when a letter carried it.
+fn signed_in_by(founding: &Founding) -> AuthMethod {
+    if founding.handed {
+        AuthMethod::HandedLink
+    } else {
+        AuthMethod::AddressProof
+    }
+}
+
+/// The admitted person's binding at this install's issuer, when they are
+/// Active; anything else is refused as an unknown proof is.
+fn admitted_binding(state: &AppState, person: PersonId) -> Result<LoginBinding, ServerError> {
+    let issuer = state.oidc.issuer().to_owned();
+    with_directory(state, |directory| {
+        let projection = directory.projection()?;
+        let record = projection
+            .record(IdentityId::Person(person))
+            .filter(|record| record.state() == LifecycleState::Active)
+            .ok_or(ServerError::ProofRefused)?;
+        record
+            .bindings()
+            .iter()
+            .find(|binding| binding.issuer() == issuer)
+            .cloned()
+            .ok_or(ServerError::ProofRefused)
+    })
+}
+
+/// A handed admission link's two steps: the session begun for the admitted
+/// person's binding by `HandedLink`, then the digest spent, last.
+async fn admission_steps(
+    state: &Shared,
+    proven: &Proven,
+    receipt: &mut FoundingReceipt,
+) -> Result<(String, Proved), (&'static str, ServerError)> {
+    let [session, spend] = ADMISSION_STEPS;
+    let at = |step: &'static str| move |error: ServerError| (step, error);
+    let person = proven.founder;
+    let binding = admitted_binding(state, person).map_err(at(session))?;
+    let own = Actor::new(
+        binding.clone(),
+        Provenance::new(AuthMethod::HandedLink, crate::session::now()),
+    );
+    let cookie = crate::session_admission::begin(state, own)
+        .await
+        .map_err(at(session))?;
+    receipt.done(session);
+    foundings(state)
+        .map_err(at(spend))?
+        .spend(&proven.digest)
+        .map_err(at(spend))?;
+    receipt.done(spend);
+    Ok((
+        cookie,
+        Proved {
+            signed_in: SessionLogin {
+                issuer: binding.issuer().to_owned(),
+                subject: binding.subject().to_owned(),
+            },
+            authority: AUTHORITY.to_owned(),
+            organisation: proven.organisation.to_string(),
+            person: person.to_string(),
         },
     ))
 }
