@@ -1,5 +1,5 @@
 /**
- * The help registry's shape, after aion's console help (features/help/registry/types.ts): every explainable
+ * The help registry's shape: every explainable
  * thing is a concept with a stable dotted id, a one-sentence summary, a plain explanation, the steps that do it
  * and the concepts worth reading next. The id is what the address carries (`?topic=`), so renaming one breaks a
  * link and is done deliberately.

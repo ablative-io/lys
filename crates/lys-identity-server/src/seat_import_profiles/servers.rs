@@ -97,10 +97,12 @@ impl Sorted {
                 );
                 return;
             }
-            (None, None) if name == "argus" => {
+            // Tool approvals alone start nothing: the entry is left over from a server the profile no longer starts,
+            // known by its shape and never by its name.
+            (None, None) if !members.is_empty() && members.keys().all(|key| key == "tools") => {
                 self.exclude(
                     &path,
-                    "retired: Argus is retired; this server entry is excluded",
+                    "approvals_only: this entry holds tool approvals for a server it does not start; the approvals are not carried",
                 );
                 return;
             }

@@ -12,7 +12,8 @@ const count = (n: number, one: string, many: string) => n.toLocaleString('en-AU'
 type Resource = { kind: string; id: string; relation: string; actions: string[]; seats: string[]; evidence: string };
 type Plan = { version: 1; resources: Resource[]; agents: { display_name: string }[] };
 type Receipt = { operation: string; grant: string; receipt: { caller: string } };
-export const evidenceWords = (resource: Resource): string => resource.evidence.replace(/^Cambium \/conversation\/places .*?workspace ([^.;]+)[.;]\s*/, 'From the Cambium place ' + resource.id + ' in workspace $1. ');
+/** A resource's evidence as the plan writes it: the plan's producer owns its sentences, and Lys rewrites no app's words. */
+export const evidenceWords = (resource: Resource): string => resource.evidence.trim();
 
 export function planOf(value: unknown): Plan {
   const plan = value as Plan;

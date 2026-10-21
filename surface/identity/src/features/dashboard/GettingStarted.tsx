@@ -14,12 +14,15 @@ import { Act } from '../../shell/Act';
 import type { NetworkView } from '../network/contract';
 import type { ProvidersView } from '../connections/SignInProviders';
 
-interface AppsView { apps: { id: string; state: string }[] }
+interface AppsView { apps: { id: string; name?: string; state: string }[] }
 /**
  * What Getting started reads. `google` is true only when Google is set up and switched on, as Settings → Services
  * and sign-in providers shows it. Only administrators read or see that step.
  */
-interface Standing { machines: number; cambium: string | null; /** Whether `/apps` answered: Connect Cambium is offered only then. */ apps: boolean; google: boolean; read: boolean; administrator: boolean;
+interface Standing { machines: number;
+  /** 'approved' when any app is approved, else 'pending' when any has asked to connect, else null. */ app: 'approved' | 'pending' | null;
+  /** The first app that has asked to connect, by its registered name (its id when nameless), while app is pending. */ asking: string | null;
+  /** Whether `/apps` answered: Connect an app is offered only then. */ apps: boolean; google: boolean; read: boolean; administrator: boolean;
   /** Whether the person said the Lys computer is not for agents, as Lys keeps it. */ declined: boolean }
 
 /** Where a browser kept "Not this one" before Lys kept it; read once, moved to Lys, then removed. */
@@ -56,9 +59,12 @@ async function readStanding(): Promise<Standing> {
   ]);
   const machines = network ? network.machines.filter((machine) => machine.state !== 'retired'
     && (administrator || machine.named_by === people.people[0]?.id)).length : 0;
-  const cambium = apps?.apps.find((app) => app.id === 'cambium')?.state ?? null;
+  const listed = apps?.apps ?? [];
+  const pending = listed.find((app) => app.state === 'pending');
+  const app = listed.some((entry) => entry.state === 'approved') ? 'approved' : pending ? 'pending' : null;
+  const asking = app === 'pending' && pending ? (pending.name?.trim() ? pending.name : pending.id) : null;
   const google = providers?.providers.some((provider) => provider.provider === 'google' && provider.enabled) ?? false;
-  return { machines, cambium, apps: apps !== null, google, read: network !== null, administrator, declined };
+  return { machines, app, asking, apps: apps !== null, google, read: network !== null, administrator, declined };
 }
 
 /** The question about the computer Lys runs on, named by its own name: a name, and Yes; or Not this one, which leaves agents to other computers. */
@@ -111,9 +117,9 @@ export function GettingStarted({ person, agents, standing, reread }: { person: s
     ...(standing.administrator ? [{ key: 'google', done: standing.google, optional: true, title: 'Let people sign in with Google',
       body: <p>So nobody needs a Lys password: add Google under <a href="#/connections">Settings → services and sign-in providers</a>.</p> }] : []),
     // Offered only when Apps could be read; an administrator connects it there, and anyone else is told who does.
-    ...(standing.apps ? [{ key: 'cambium', done: standing.cambium === 'approved', title: 'Connect Cambium',
-      body: !standing.administrator ? <p>Cambium is not connected to Lys yet. An administrator connects it on Apps; once it is, this step is done.</p>
-        : <p>{standing.cambium === 'pending' ? 'Cambium has asked to connect. Review what it asks for and approve it on ' : 'Connect your team’s chat to Lys on '}<a href="#/apps">Apps</a>.</p> }] : []),
+    ...(standing.apps ? [{ key: 'app', done: standing.app === 'approved', title: 'Connect an app',
+      body: !standing.administrator ? <p>No app is connected to Lys yet. An administrator connects one on Apps; once it is, this step is done.</p>
+        : <p>{standing.asking ? standing.asking + ' has asked to connect. Review what it asks for and approve it on ' : 'Connect an app to Lys on '}<a href="#/apps">Apps</a>.</p> }] : []),
     { key: 'agent', done: agents > 0, title: 'Add your first agent',
       body: <p>Choose Claude Code or Codex, a folder and a computer: <a href="#/agents/new">Add an agent</a>.</p> },
   ];

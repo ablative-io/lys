@@ -50,6 +50,7 @@ describe("Readable surface details", () => {
     expect($('[title="' + evidence + '"]')?.textContent).toBe(
       "Read from the fixture product's place handover in workspace ablative; used by this crew.",
     );
+    expect(text()).toContain(evidence.trim());
   });
 
   it("names context use without losing the refusal reason", () => {

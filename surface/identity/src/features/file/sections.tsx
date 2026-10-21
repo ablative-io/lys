@@ -26,7 +26,7 @@ import { calledBy, firstName } from '../people/directory';
 import type { FileData } from './IdentityFile';
 import { clock } from './time';
 import './file.css';
-import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
+import { AppsFirst, anyAppResource } from '../grants/AppsFirst';
 
 function Profile({ data }: { data: FileData }) {
   const { x, agent, agents } = data;
@@ -112,7 +112,7 @@ function Access({ data, reload, giveQuery }: { data: FileData; reload: () => voi
     <>
       <GiveAccess key={x.id + giveQuery} x={x} w={w} query={giveQuery} reload={reload} />
       <GrantTable w={w} grants={held} done={reload} give={false} />
-      {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <CambiumFirst /> : null}
+      {x.kind === 'agent' && !anyAppResource(w.list.grants.map((g) => g.resource)) ? <AppsFirst /> : null}
       {/* After the grant table, the two panels share the width as two halves. */}
       <div className="access-halves">
         <div>

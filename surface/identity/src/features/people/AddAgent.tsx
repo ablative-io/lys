@@ -25,7 +25,7 @@ import { keepRecord, releaseRecord } from '../../kept';
 import { Act } from '../../shell/Act';
 import { PageHeader } from '../../shell/PageHeader';
 import './add-agent.css';
-import { CambiumFirst, anyAppResource } from '../grants/CambiumFirst';
+import { AppsFirst, anyAppResource } from '../grants/AppsFirst';
 
 function reportingChoices(people: PeopleView) {
   return people.people.flatMap((person) => [{ ...person, kind: 'person', owner: person.id }, ...person.agents.map((agent) => ({ ...agent, kind: 'agent', owner: person.id }))]);
@@ -198,7 +198,7 @@ function Form({ me, people, teams, search, capability, runOptions, grants, later
           : !grants.problem ? <p>Lys cannot offer access for agents here yet, so this agent is added with none. You can give it access afterwards, on its own page.</p> : null}
         {unpickable ? <p>Some kinds of access cannot be given one at a time, so they are not offered here.</p> : null}
         {!options.length && !grants.problem ? <p>{chosen?.display_name ?? 'The one this agent answers to'} has no access in Lys to pass on.</p> : null}
-        {!grants.problem && !anyAppResource(options.map((option) => option.grant.resource)) ? <CambiumFirst /> : null}
+        {!grants.problem && !anyAppResource(options.map((option) => option.grant.resource)) ? <AppsFirst /> : null}
         {grants.problem ? <ErrorWords problem={grants.problem} /> : null}
       </>}
     </fieldset>

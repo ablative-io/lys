@@ -24,9 +24,9 @@
   .agent-facts dd { margin-bottom: 14px; }
 }
 /* The step after an agent is added: where it is used next, as numbered acts. */
-.cambium-next { max-width: 760px; margin: 16px 0 20px; padding: 12px 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
-.cambium-next h2 { font-size: 14px; margin: 0 0 6px; }
-.cambium-next ol { margin: 0; padding-left: 20px; }
-.cambium-next li { margin: 4px 0; }
-.cambium-next p { margin: 0; }
-.cambium-next.done { padding: 8px 16px; }
+.app-next { max-width: 760px; margin: 16px 0 20px; padding: 12px 16px; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--surface-card); }
+.app-next h2 { font-size: 14px; margin: 0 0 6px; }
+.app-next ol { margin: 0; padding-left: 20px; }
+.app-next li { margin: 4px 0; }
+.app-next p { margin: 0; }
+.app-next.done { padding: 8px 16px; }

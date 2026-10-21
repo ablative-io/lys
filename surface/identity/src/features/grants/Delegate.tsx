@@ -14,7 +14,7 @@ import { appKind, appKindProblem, givenOnText, givesTo, grantNo, nameOf, named, 
 import type { GrantWorld } from './model';
 import type { Role } from '../roles/contract';
 import { Act } from '../../shell/Act';
-import { CambiumFirst, anyAppResource } from './CambiumFirst';
+import { AppsFirst, anyAppResource } from './AppsFirst';
 import { LevelPicker } from './LevelPicker';
 import { legibleRecipients, StuckRecord } from './StuckRecord';
 import { PendingWords, RefusedWords } from './Outcome';
@@ -271,7 +271,7 @@ export function Delegate({ w, source, to, initialChoices = [], done, close }: { 
           : !carried.length ? <div className="note">{noActions}{heldWords ? <div>{heldWords}</div> : null}</div>
           : <ActionPicker model={w.model} resource={source.resource} actions={carried} value={picked} onChange={setPicked} disabled={locked} />}
         <div className="note">{app ? 'Each choice gives exactly the actions shown.' : 'Each ticked action is given on its own; an agent is never given a wider relation.'}</div>
-        {anyAppResource(w.list.grants.map((grant) => grant.resource)) ? null : <CambiumFirst />}
+        {anyAppResource(w.list.grants.map((grant) => grant.resource)) ? null : <AppsFirst />}
       </div> : <div className="field">
         <LevelPicker model={w.model} relations={Object.fromEntries(relations)} value={relation} onChange={setRelation} allowed={(acts) => withinPassOn(source, acts)} disabled={locked} />
         {kindProblem ? <div className="note">{kindProblem}</div> : null}

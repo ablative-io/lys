@@ -1,7 +1,7 @@
 import { conceptById } from './concepts';
 
 /**
- * The help's state lives in the address, after aion's console (features/help/lib/url-state.ts), so a help page can
+ * The help's state lives in the address, so a help page can
  * be linked and survives a reload. It sits in the query before the `#`, outside the hash router's own path and
  * query: opening help never changes the route a screen reads, so no screen reloads or loses what was typed in it,
  * and moving between screens keeps the help as it was.

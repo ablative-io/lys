@@ -17,7 +17,7 @@ function ConceptRow({ concept, brief }: { concept: Concept; brief?: boolean }) {
 }
 
 /**
- * Everything the help explains: every topic by track (aion's HelpTrackIndex); what is on this page is the numbered layer's, one press away in the head,
+ * Everything the help explains: every topic by track; what is on this page is the numbered layer's, one press away in the head,
  * narrowed in place by what is typed: every word typed must appear in a concept's name, sentence, explanation or steps.
  */
 function TrackIndex() {
@@ -38,7 +38,7 @@ function TrackIndex() {
   );
 }
 
-/** One concept's sheet (aion's HelpSheetView): what it is, the steps that do it, and what to read next. */
+/** One concept's sheet: what it is, the steps that do it, and what to read next. */
 function Sheet({ concept }: { concept: Concept }) {
   const track = TRACKS.find(([id]) => id === concept.track)?.[1] ?? '';
   const related = concept.related.map(conceptById).filter((c): c is Concept => c !== undefined);
@@ -69,7 +69,7 @@ function Sheet({ concept }: { concept: Concept }) {
   );
 }
 
-/** The full help (aion's help dock), beside the screen; what it shows is the address's `topic`. */
+/** The full help, beside the screen; what it shows is the address's `topic`. */
 export function HelpDock() {
   const shell = useShell();
   const chosen = shell.helpSel ? conceptById(shell.helpSel) : undefined;

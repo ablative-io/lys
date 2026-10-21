@@ -54,7 +54,7 @@ export const notRoot = (acts: OrganisationActs): Refused => acts.organisation
   ? new Refused(403, { refusal: 'RootAuthorityRefused', reason: `you hold no ${ORGANISATION_GRANT} on ${acts.organisation.display_name}, so you cannot give access directly; whoever holds ${ORGANISATION_GRANT} there gives it, and access you hold that may be passed on is given from a person's file` })
   : NOT_ROOT;
 
-/** A kind in words: `cambium.channel` is "Channel" under its app's name, `project` is "Project". */
+/** A kind in words: `fixture_product.channel` is "Channel" under its app's name, `project` is "Project". */
 export const kindLabel = (kind: string): string => {
   const words = kind.slice(kind.indexOf('.') + 1).replaceAll('_', ' ').replaceAll('.', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
