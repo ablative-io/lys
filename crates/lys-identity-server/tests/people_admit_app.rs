@@ -200,7 +200,9 @@ async fn admit_with(
 
 /// The act admitting Bea, with `grant` as its first grant.
 fn bea(operation: &str, grant: Value) -> Value {
-    json!({"operation": operation, "display_name": "Bea", "email": BEA, "grant": grant})
+    let mut asked = json!({"operation": operation, "display_name": "Bea", "email": BEA});
+    asked["grant"] = grant;
+    asked
 }
 
 /// A member grant on `kind` `ws-1`, asked on the API route.
