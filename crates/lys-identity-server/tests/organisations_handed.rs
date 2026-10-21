@@ -3,7 +3,8 @@
 //! Founding and admission on an install with no mail settings (DIRECTORY-112):
 //! the link a letter would have carried is handed in the answer, the proof
 //! signs the person in as begun by a handed link, an admitted person's
-//! handed link signs them in once, and nothing is refused mail_unconfigured.
+//! handed link signs them in once, and nothing is refused `mail_unconfigured`.
+//! With mail settings, the letter carries the link and no answer hands it.
 
 #[path = "founding/table.rs"]
 mod founding;
@@ -12,7 +13,7 @@ use std::error::Error;
 
 use founding::{
     ADMIN_EMAIL, BEA, FOUND, TestResult, accounts_for, file_under, found, foundings, leaves, prove,
-    table,
+    table, token_in,
 };
 use identity_contract::harness::Service;
 use lys_identity::OperationId;
@@ -276,5 +277,26 @@ async fn without_mail_a_retired_persons_handed_link_is_refused_and_nothing_recor
     assert_eq!(leaves(&service).await?, before);
     assert_eq!(entries(&service)?[0]["spent"], false);
     assert!(sink.taken().is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn with_mail_the_letter_carries_the_link_and_no_answer_hands_it() -> TestResult {
+    let (service, _rauthy, _ada, mut sink) = table(true).await?;
+    let (status, answer) = service
+        .post(FOUND, None, &found(&OperationId::generate()?.to_string()))
+        .await?;
+    assert_eq!(status, 200, "{answer}");
+    assert_eq!(answer["letter"]["sent"], true, "{answer}");
+    assert!(answer["letter"]["handed"].is_null(), "{answer}");
+    assert_eq!(entries(&service)?[0]["handed"], false);
+    let letter = sink.next().await.ok_or("the founded letter")?;
+    let (status, proved, cookie) = prove(&service, &token_in(&letter)?).await?;
+    assert_eq!(status, 200, "{proved}");
+    assert!(cookie.is_some());
+    assert!(
+        !a_session_by_handed_link(&service)?,
+        "a sent link is never a handed one"
+    );
     Ok(())
 }

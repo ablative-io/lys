@@ -80,7 +80,7 @@ fn pass_session_actor_round_trips_without_a_time() -> Result<(), Box<dyn Error>>
 }
 
 /// A session begun by a handed link (DIRECTORY-112 R2) is stored as
-/// handed_link and reads back as the person signed in.
+/// `handed_link` and reads back as the person signed in.
 #[test]
 fn handed_link_session_actor_reads_back_as_the_person_signed_in() -> Result<(), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
