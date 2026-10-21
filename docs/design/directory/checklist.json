@@ -2576,7 +2576,7 @@
       "items": [
         {
           "id": "C822",
-          "text": "POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.",
+          "text": "POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, not_your_app or kind_not_registered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.",
           "done": false
         },
         {

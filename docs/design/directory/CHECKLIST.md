@@ -696,6 +696,6 @@
 
 ## A product adds a person (DIRECTORY-113)
 
-- [ ] **C822** — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+- [ ] **C822** — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, not_your_app or kind_not_registered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
 - [ ] **C823** — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
 - [ ] **C824** — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.

@@ -10,7 +10,7 @@ title: A product adds a person through its own person pass: one act in Lys, a fi
 > **Cluster:** directory
 > **Depends on:** DIRECTORY-112, ACCESS-009
 > **Checklist:**
-> - C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+> - C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, not_your_app or kind_not_registered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
 > - C823 — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
 > - C824 — The proving page carries continue_to to the account page in navigation state, and the added note offers 'Continue to <host>' only from that state. DIRECTORY-113/R3.
 > **Stories:**
@@ -29,14 +29,14 @@ Let POST /people/admit be asked with an approved app's person pass (provider::ap
 
 ### R1: Admission accepts an approved app's person pass, narrowly
 
-Behavioural and structural. WHEN POST /people/admit carries exactly one Authorization: Bearer pass that provider::app_person_actor accepts (an approved app's audience, a person holder, a live issuing session, no cookie and no operator header beside it), THE SYSTEM SHALL take the issuing session's actor as the caller and SHALL judge the act as people_admit::checked judges a session caller: an active person holding organisation.admit on their own organisation, a body naming another organisation refused organisation_not_own, the email checked. On this path the body's grant SHALL be required: absent or null is refused 400 with refusal app_admit_grant_required and the words 'a product admits a person only with their first grant on its own kind'; and its resource kind SHALL be one the asking app owns, judged by apps.admit_kind(Some(<app>), kind) before any step, refused NotYourApp or KindNotRegistered as that function names them. Both refusals are answered before the register step, the receipt's completed list empty and nothing recorded. The six steps SHALL then run unchanged, each inner route judging the same actor: a new task-local in people_admit_app.rs holds the actor for the act's duration, routes::signed_in returns it first as it returns drafts_apply's approver, and the inner calls are made with the request's headers less Authorization, so service_account_grants::caller resolves the person through signed_in and never reads the app's pass as a service account's credential. The task-local is set only by people_admit_app.rs and only around the steps of one admit; no other route reads an app pass as an administrator. The first grant's route is the body's (Cambium asks 'api'). The receipt, the grant and the letter are as from a session caller. Every other route SHALL keep refusing an app's pass as today: app_person_refusals_tests.rs is not weakened, and it gains /people/admit asked by an app pass with a grant on another app's kind, refused NotYourApp. The admit row in openapi_table.rs SHALL name app_admit_grant_required, NotYourApp and KindNotRegistered beside its existing refusals, and the openapi refusal test holds.
+Behavioural and structural. WHEN POST /people/admit carries exactly one Authorization: Bearer pass that provider::app_person_actor accepts (an approved app's audience, a person holder, a live issuing session, no cookie and no operator header beside it), THE SYSTEM SHALL take the issuing session's actor as the caller and SHALL judge the act as people_admit::checked judges a session caller: an active person holding organisation.admit on their own organisation, a body naming another organisation refused organisation_not_own, the email checked. On this path the body's grant SHALL be required: absent or null is refused 400 with refusal app_admit_grant_required and the words 'a product admits a person only with their first grant on its own kind'; and its resource kind SHALL be one the asking app owns, judged by apps.admit_kind(Some(<app>), kind) before any step, refused not_your_app or kind_not_registered, the names those AppErrors carry on the wire. Both refusals are answered before the register step, the receipt's completed list empty and nothing recorded. The six steps SHALL then run unchanged, each inner route judging the same actor: a new task-local in people_admit_app.rs holds the actor for the act's duration, routes::signed_in returns it first as it returns drafts_apply's approver, and the inner calls are made with the request's headers less Authorization, so service_account_grants::caller resolves the person through signed_in and never reads the app's pass as a service account's credential. The task-local is set only by people_admit_app.rs and only around the steps of one admit; no other route reads an app pass as an administrator. The first grant's route is the body's (Cambium asks 'api'). The receipt, the grant and the letter are as from a session caller. Every other route SHALL keep refusing an app's pass as today: app_person_refusals_tests.rs is not weakened, and it gains /people/admit asked by an app pass with a grant on another app's kind, refused not_your_app. The admit row in openapi_table.rs SHALL name app_admit_grant_required, not_your_app and kind_not_registered beside its existing refusals, and the openapi refusal test holds.
 
 **Acceptance:**
 - tests/people_admit_app.rs, on a table with the fake issuer, no mail settings and an approved app 'fixture_product' whose schema declares fixture_product.workspace: Ada (organisation.admit held) signs in, the token route issues her the app's person pass, and POST /people/admit with that pass and grant {route 'api', resource fixture_product.workspace 'ws-1', relation member} answers 200, every one of the six steps in receipt.completed in order, letter.handed one link at #/added/<token>; the grants log holds Bea's grant on fixture_product.workspace ws-1 with relation member, issued by Ada
-- The same pass with no grant answers 400 app_admit_grant_required with receipt.completed empty; with a grant on another app's kind answers 403 NotYourApp; with a grant on an undeclared kind of its own app answers 403 KindNotRegistered; after each the directory holds no new person and the issuer no new account
+- The same pass with no grant answers 400 app_admit_grant_required with receipt.completed empty; with a grant on another app's kind answers 403 not_your_app; with a grant on an undeclared kind of its own app answers 403 kind_not_registered; after each the directory holds no new person and the issuer no new account
 - Bea's app pass (Bea holds no organisation.admit) asking the same act is refused as ACCESS-009 refuses a session caller without organisation.admit, nothing recorded
 - The same operation asked again with the same pass replays: the same person, the same leaves, no second account, as tests/people_admit.rs proves for a session caller
-- app_person_refusals_tests.rs's existing tests pass unchanged and the new NotYourApp test passes; GET /directory/people with an app pass is still 401 NotSignedIn
+- app_person_refusals_tests.rs's existing tests pass unchanged and the new not_your_app test passes; GET /directory/people with an app pass is still 401 NotSignedIn
 
 **Files:**
 - create: crates/lys-identity-server/src/people_admit_app.rs
@@ -46,9 +46,14 @@ Behavioural and structural. WHEN POST /people/admit carries exactly one Authoriz
 - modify: crates/lys-identity-server/src/openapi_table.rs
 - modify: crates/lys-identity-server/src/app_person_refusals_tests.rs
 - modify: crates/lys-identity-server/src/lib.rs
+- modify: crates/lys-identity-server/src/provider/bearer.rs
+- modify: crates/lys-identity-server/src/provider.rs
+- modify: crates/lys-identity-server/src/error/directory.rs
+- modify: crates/lys-identity-server/src/error_names.rs
+- modify: crates/lys-identity-server/src/error_status.rs
 
 **Checklist:**
-- C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, NotYourApp or KindNotRegistered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
+- C822 — POST /people/admit accepts an approved app's person pass as its person's authority, requires a first grant on a kind the asking app owns, refuses app_admit_grant_required, not_your_app or kind_not_registered before any step, and runs the six steps as that person; no other route gives an app pass administrator authority. DIRECTORY-113/R1.
 
 **Stories:**
 - S466 (Directory administrator, Resolves a refused act) — As a Directory administrator working in a product such as Cambium, I want adding a person there to make their Lys account and give them the product's access in one act, so that I never leave the product and they can get in.
@@ -69,6 +74,7 @@ Behavioural. WHEN an admission asked by an app's person pass hands its link (DIR
 - modify: crates/lys-identity-server/src/organisations_prove.rs
 - modify: crates/lys-identity-server/tests/people_admit_app.rs
 - modify: crates/lys-identity-server/tests/organisations_handed.rs
+- modify: crates/lys-identity-server/src/organisations_found.rs
 
 **Checklist:**
 - C823 — An admission asked by an app's person pass records continue_to, the origin of the app's first return address in force from Lys's own record, and the proof answers it; absent for foundings and session-asked admissions. DIRECTORY-113/R2.
@@ -111,3 +117,12 @@ Behavioural. The proving page (surface/identity/src/features/found/Prove.tsx) SH
 - Every red written and shown red at the brief commit through the gate on Dean's laptop, green at the fix commit; the whole gate (tokei, ast-grep, clippy, tsc, nextest, doc, vitest) at the landing sha, judged by its output.
 - The release carrying this brief installed on the Mac (lys identity upgrade from a staged release build), together with IDENT-008's Cambium release, and the path walked as IDENT-008 names it.
 - The closing note says plainly that R1 to R3 are done, or names what is not.
+
+## Amendments
+
+### Amendment 1: The file lists name the seams the code needed, and the refusal names are the wire's
+
+- **Date:** 2026-10-22
+- **By:** Waffles
+
+Written against the tree: the refusal names are the wire's (not_your_app, kind_not_registered), and R1 and R2 name the seams the code needed: provider/bearer.rs answers the pass's app beside its actor (app_person), the new refusal is declared in error/directory.rs, error_names.rs and error_status.rs, and organisations_found.rs writes the new founding member as absent. The product's limits are judged before the person's authority, so a product asking outside its own kind is refused without reading the person's organisation.

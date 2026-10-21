@@ -81,3 +81,36 @@ describe('Signing in by a handed link (DIRECTORY-112 R4)', () => {
     expect(alert?.querySelector('a')?.getAttribute('href')).toBe('#/sign-in');
   });
 });
+
+describe('Going on to the product that asked (DIRECTORY-113 R3)', () => {
+  const PROVED = { signed_in: { issuer: 'https://issuer.test', subject: 'subject-bea' }, authority: 'a', organisation: 'organisation-' + '1'.repeat(32), person: 'person-' + '2'.repeat(32) };
+
+  it('offers the way on to the origin the proof answers, carried in navigation state', async () => {
+    await mount('#/added/' + TOKEN, {
+      ...SERVICE,
+      '/me': ok(ME),
+      'POST /organisations/found/prove': ok({ ...PROVED, continue_to: 'https://cambium.example.test' }),
+    });
+    await click($('button[aria-label="Sign in"]'));
+    await settle();
+    expect(location.hash).toBe('#/settings/account?added=1');
+    const onward = $('.added-note a');
+    expect(onward?.textContent).toBe('Continue to cambium.example.test');
+    expect(onward?.getAttribute('href')).toBe('https://cambium.example.test');
+  });
+
+  it('offers no way on when the proof answers none', async () => {
+    await mount('#/added/' + TOKEN, { ...SERVICE, '/me': ok(ME), 'POST /organisations/found/prove': ok(PROVED) });
+    await click($('button[aria-label="Sign in"]'));
+    await settle();
+    expect($('.added-note')).not.toBeNull();
+    expect($('.added-note a')).toBeNull();
+  });
+
+  it('offers no way on from the address alone, whatever it carries', async () => {
+    await mount('#/settings/account?added=1&continueTo=https://elsewhere.example.test', { ...SERVICE, '/me': ok(ME) });
+    await settle();
+    expect($('.added-note')).not.toBeNull();
+    expect($('.added-note a')).toBeNull();
+  });
+});

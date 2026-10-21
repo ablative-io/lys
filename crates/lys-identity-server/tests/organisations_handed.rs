@@ -126,6 +126,8 @@ async fn without_mail_the_founding_hands_the_link_and_the_link_signs_the_founder
     assert_eq!(status, 200, "{proved}");
     let cookie = cookie.ok_or("a session cookie")?;
     assert_eq!(proved["signed_in"]["issuer"], service.issuer.issuer());
+    // A founding goes on to nowhere but Lys (DIRECTORY-113 R2).
+    assert!(proved.get("continue_to").is_none(), "{proved}");
     let person = proved["person"].as_str().ok_or("the person")?.to_owned();
     let (status, me) = service.get("/me", Some(&cookie)).await?;
     assert_eq!(status, 200, "{me}");
@@ -231,6 +233,8 @@ async fn without_mail_an_admitted_person_is_handed_a_link_that_signs_them_in_onc
     let cookie = cookie.ok_or("a session cookie")?;
     assert_eq!(proved["person"], person, "{proved}");
     assert_eq!(proved["organisation"], organisation, "{proved}");
+    // Admitted from a Lys session, the link goes on to nowhere but Lys.
+    assert!(proved.get("continue_to").is_none(), "{proved}");
     let (status, me) = service.get("/me", Some(&cookie)).await?;
     assert_eq!(status, 200, "{me}");
     assert_eq!(me["person"]["id"], person, "{me}");
