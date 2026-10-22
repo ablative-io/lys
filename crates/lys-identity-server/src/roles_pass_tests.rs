@@ -64,7 +64,8 @@ async fn role_changes_are_given_to_an_agent_and_refused_until_they_are() -> Test
             "assigner",
             "role.holder.assign",
             format!("/roles/{}/holders", table.role),
-            json!({"operation":operation()?, "holder":table.agent, "ends_at":null}),
+            // The agent already holds the role, so it assigns the person.
+            json!({"operation":operation()?, "holder":table.person, "ends_at":null}),
         ),
         (
             table.role.as_str(),

@@ -75,7 +75,7 @@ pub(super) struct Table {
     pub(super) agent: String,
     pub(super) role: String,
     pub(super) assignment: String,
-    person: String,
+    pub(super) person: String,
     pass: String,
     cookie: String,
     client: reqwest::Client,

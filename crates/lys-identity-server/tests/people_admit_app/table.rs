@@ -52,7 +52,6 @@ pub(super) async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Err
             config.teams_dir = None;
             config.stops_dir = None;
             config.budgets_dir = None;
-            config.policies_dir = None;
             config.goals_dir = None;
             config.reviews_dir = None;
             config.administrator = None;

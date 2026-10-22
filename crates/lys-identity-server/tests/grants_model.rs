@@ -143,11 +143,11 @@ async fn assert_current_model(
     let withheld = model["withheld_from_agents"]
         .as_array()
         .ok_or("the model did not answer withheld_from_agents")?;
-    assert!(withheld.contains(&json!("grant")), "{model}");
-    assert!(
-        withheld.contains(&json!("agent.certificate.issue")),
-        "{model}"
-    );
+    // Only a person's credentials are withheld; authority may be given
+    // (AGENTS-019 R1).
+    assert!(withheld.contains(&json!("person.password.set")), "{model}");
+    assert!(withheld.contains(&json!("person.sign-in.set")), "{model}");
+    assert!(!withheld.contains(&json!("grant")), "{model}");
     // Passing on part of a grant held is an agent's to hold since AGENTS-015 R1.
     assert!(!withheld.contains(&json!("grant.delegate")), "{model}");
     for declared in model["kinds"]
