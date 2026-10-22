@@ -537,7 +537,11 @@ mod tests {
         }
         // AGENTS-019 R1: a person's credentials stay out of every agent's
         // reach; authority itself is a person's to give.
-        for credential in ["person.login.bind", "person.password.set", "person.sign-in.set"] {
+        for credential in [
+            "person.login.bind",
+            "person.password.set",
+            "person.sign-in.set",
+        ] {
             assert!(!agent_may_hold("person", credential), "{credential}");
         }
         for authority in ["grant", "role.create", "secret.scope", "organisation.admit"] {
@@ -561,7 +565,8 @@ mod tests {
     /// administrator relation. A person may give an agent any of them
     /// (AGENTS-019 R1); no machine holds more than reading it.
     #[test]
-    fn the_organisation_ships_four_acts_agents_may_be_given_them_and_machines_only_read() -> Result<(), String> {
+    fn the_organisation_ships_four_acts_agents_may_be_given_them_and_machines_only_read()
+    -> Result<(), String> {
         let model: Value = serde_json::from_str(&shipped_model()).map_err(|e| e.to_string())?;
         let held = model["relations"][ADMINISTRATOR_RELATION]
             .as_array()

@@ -94,7 +94,10 @@ async fn role_changes_are_given_to_an_agent_and_refused_until_they_are() -> Test
         .ok_or("no holders")?
         .iter()
         .any(|holder| holder["ended_by"] == table.agent.as_str());
-    assert!(ended, "the agent ended the assignment it was given to end: {view}");
+    assert!(
+        ended,
+        "the agent ended the assignment it was given to end: {view}"
+    );
     Ok(())
 }
 

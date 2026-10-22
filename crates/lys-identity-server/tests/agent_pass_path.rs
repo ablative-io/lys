@@ -293,7 +293,12 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         )
         .await?;
     let email = mcp_answer::body(&email["result"]);
-    for refusal in ["NotHeld", "WithheldFromAgents", "Undeclared", "ResponsibilityKept"] {
+    for refusal in [
+        "NotHeld",
+        "WithheldFromAgents",
+        "Undeclared",
+        "ResponsibilityKept",
+    ] {
         assert_ne!(email["body"]["refusal"], refusal, "{email}");
     }
     eprintln!(
@@ -313,7 +318,10 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         .await?;
     let password = mcp_answer::body(&password["result"]);
     assert_eq!(password["status"], 403, "{password}");
-    assert_eq!(password["body"]["refusal"], "WithheldFromAgents", "{password}");
+    assert_eq!(
+        password["body"]["refusal"], "WithheldFromAgents",
+        "{password}"
+    );
 
     let other = held.seeded.people[1].id.to_string();
     let (_, outside) = held

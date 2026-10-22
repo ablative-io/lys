@@ -318,11 +318,11 @@ pub(crate) fn app_agent(
         lys_identity::Provenance::new(lys_identity::AuthMethod::AgentPass(agent), now()),
     );
     crate::apps_api::with_apps(state, |apps, directory| {
-        let approved = apps
-            .app(audience)
-            .ok_or(crate::apps_error::AppError::CredentialRefused {
-                reason: "no approved app holds that audience",
-            })?;
+        let approved =
+            apps.app(audience)
+                .ok_or(crate::apps_error::AppError::CredentialRefused {
+                    reason: "no approved app holds that audience",
+                })?;
         if !matches!(approved.standing(), crate::apps_state::Standing::Approved) {
             return Err(crate::apps_error::AppError::AppNotApproved {
                 app: audience.to_owned(),
