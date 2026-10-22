@@ -56,9 +56,7 @@ pub enum AgentActsError {
     },
     /// An agent asked to decide a draft it drafted itself: the one who
     /// prepares an act never approves it (AGENTS-019 R4).
-    #[error(
-        "own_draft: agent `{agent}` drafted `{draft}`, so someone else decides it"
-    )]
+    #[error("own_draft: agent `{agent}` drafted `{draft}`, so someone else decides it")]
     OwnDraft {
         /// The agent that drafted it and asked to decide it.
         agent: String,

@@ -107,10 +107,14 @@ fn a_use_naming_its_act_is_version_eight_and_reads_back_whole() -> TestResult {
     assert_eq!(bare.exercised(), None);
     assert_eq!(decode_event_body(&encode_event_body(&bare))?, bare);
     // Only a use names what it exercised.
-    assert!(issued(&["read"])?.with_exercised(Exercised {
-        action: Action::new("read")?,
-        resource: Resource::new("account", "bea")?,
-    }).is_err());
+    assert!(
+        issued(&["read"])?
+            .with_exercised(Exercised {
+                action: Action::new("read")?,
+                resource: Resource::new("account", "bea")?,
+            })
+            .is_err()
+    );
     Ok(())
 }
 
@@ -125,7 +129,10 @@ fn the_book_notes_an_agents_moved_acts_and_the_snapshot_keeps_them() -> TestResu
     let noted = book.acted_by(agent_id);
     // A read is never noted; each email change is, oldest first.
     assert_eq!(
-        noted.iter().map(|one| (one.index, one.at)).collect::<Vec<_>>(),
+        noted
+            .iter()
+            .map(|one| (one.index, one.at))
+            .collect::<Vec<_>>(),
         [(2, 20), (3, 30)]
     );
     assert_eq!(noted[0].exercised.action.as_str(), "person.email.set");
@@ -156,7 +163,10 @@ fn a_book_with_no_notes_writes_its_state_as_before() -> TestResult {
     };
     assert_eq!(members.first(), Some(&ciborium::Value::from(3_u64)));
     assert_eq!(crate::grants::state::decode(&state, 2)?, book);
-    assert_eq!(Acted::default().encode(), ciborium::Value::Array(Vec::new()));
+    assert_eq!(
+        Acted::default().encode(),
+        ciborium::Value::Array(Vec::new())
+    );
     Ok(())
 }
 
@@ -168,7 +178,13 @@ fn the_listed_acts_are_the_ones_r1_moved() {
     assert_eq!(sorted, ACTED_FOR_THEIR_PERSON, "sorted, each once");
     assert_eq!(ACTED_FOR_THEIR_PERSON.len(), 29);
     for act in ACTED_FOR_THEIR_PERSON {
-        assert!(AGENTS_NOT_MACHINES.contains(act), "{act} is an agent's, never a machine's");
-        assert!(!WITHHELD_FROM_AGENTS.contains(act), "{act} may be given to an agent");
+        assert!(
+            AGENTS_NOT_MACHINES.contains(act),
+            "{act} is an agent's, never a machine's"
+        );
+        assert!(
+            !WITHHELD_FROM_AGENTS.contains(act),
+            "{act} may be given to an agent"
+        );
     }
 }

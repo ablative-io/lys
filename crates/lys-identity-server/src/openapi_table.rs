@@ -141,7 +141,8 @@ pub(crate) fn token_scope(
 const CREDENTIALS: &str = "a person's credentials and sign-in: no agent ever holds or sets them";
 const SCREENS: &str = "a person's own screens and browser sessions: an agent has its own, GET /agent/grants and what-can-I-do";
 const ROOTS: &str = "a root grant is a person's to give their own agent, never an agent's (AGENTS-019 amendment, 22 October 2026)";
-const DECISIONS: &str = "an access request is a person's to decide (AGENTS-019 amendment, 22 October 2026)";
+const DECISIONS: &str =
+    "an access request is a person's to decide (AGENTS-019 amendment, 22 October 2026)";
 
 /// The routes a person reaches that no agent is ever given, each with why
 /// (AGENTS-019 R4). Every other route a person reaches admits an agent's

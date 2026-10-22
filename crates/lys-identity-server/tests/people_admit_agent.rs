@@ -26,9 +26,7 @@ use serde_json::{Value, json};
 
 #[path = "people_admit_app/table.rs"]
 mod table;
-use table::{
-    APP, BEA, STEPS, accounts_for, admit_with, bea, member_of, people, table, table_on,
-};
+use table::{APP, BEA, STEPS, accounts_for, admit_with, bea, member_of, people, table, table_on};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -226,7 +224,10 @@ async fn change_as(
         .post(format!("{}/mcp", service.base))
         .header(HEADER, format!("{agent} {at} {nonce} {}", hex(&cose)))
         .header(reqwest::header::CONTENT_TYPE, "application/json")
-        .header(reqwest::header::ACCEPT, "application/json, text/event-stream")
+        .header(
+            reqwest::header::ACCEPT,
+            "application/json, text/event-stream",
+        )
         .body(bytes)
         .send()
         .await?;
@@ -266,19 +267,27 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     assert_eq!(status, 200, "{me}");
     let account = json!({"kind": "account", "id": bea_person});
     let (status, root) = service
-        .post("/grants/roots", Some(&ada), &json!({
+        .post(
+            "/grants/roots",
+            Some(&ada),
+            &json!({
             "operation": OperationId::generate()?.to_string(), "route": "api",
             "holder": me["person"]["id"], "resource": account, "relation": "owner",
             "pass_on": {"kind": "to", "actions": ["person.email.set"], "recipients": ["agent"]},
-            "window": {"starts_at": 0, "ends_at": null}}))
+            "window": {"starts_at": 0, "ends_at": null}}),
+        )
         .await?;
     assert_eq!(status, 200, "{root}");
     let (status, passed) = service
-        .post("/grants", Some(&ada), &json!({
+        .post(
+            "/grants",
+            Some(&ada),
+            &json!({
             "operation": OperationId::generate()?.to_string(), "route": "api",
             "source": root["grant"], "recipient": agent, "responsible": me["person"]["id"],
             "resource": account, "relation": "only.person.email.set",
-            "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}}))
+            "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}}),
+        )
         .await?;
     assert_eq!(status, 200, "{passed}");
     let key = certified(&service, &ada, &agent).await?;
@@ -296,9 +305,11 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     // which her dashboard names Helper.
     let (agents, lines) = dashboard(&service, &ada).await?;
     assert!(
-        agents.as_array().is_some_and(|agents| agents.iter().any(|row| {
-            row["agent"]["id"] == agent.as_str() && row["agent"]["display_name"] == "Helper"
-        })),
+        agents
+            .as_array()
+            .is_some_and(|agents| agents.iter().any(|row| {
+                row["agent"]["id"] == agent.as_str() && row["agent"]["display_name"] == "Helper"
+            })),
         "{agents}"
     );
     let line = |kind: &str| {
@@ -312,13 +323,18 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     let admission = &lines[admission];
     assert_eq!(admission["agent"], agent.as_str(), "{admission}");
     assert_eq!(admission["subject"]["kind"], "organisation", "{admission}");
-    assert_eq!(admission["subject"]["id"], me["organisation"]["id"], "{admission}");
+    assert_eq!(
+        admission["subject"]["id"], me["organisation"]["id"],
+        "{admission}"
+    );
     assert!(admission["index"].as_u64().is_some(), "{admission}");
     assert!(admission["at"].as_u64().is_some(), "{admission}");
     let email = &lines[email];
     assert_eq!(email["subject"], account, "{email}");
     assert!(
-        email["sentence"].as_str().is_some_and(|words| !words.is_empty()),
+        email["sentence"]
+            .as_str()
+            .is_some_and(|words| !words.is_empty()),
         "{email}"
     );
     assert!(

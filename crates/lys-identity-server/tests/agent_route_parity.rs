@@ -117,7 +117,12 @@ async fn discovery_names_the_admission_a_held_grant_opens() -> TestResult {
     assert_eq!(status, 200, "{me}");
     let organisation = json!({"kind": "organisation", "id": me["organisation"]["id"]});
     world
-        .give(&world.stranger.id, &organisation, "organisation.admit", false)
+        .give(
+            &world.stranger.id,
+            &organisation,
+            "organisation.admit",
+            false,
+        )
         .await?;
     let asked = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
         "params": {"name": "what-can-I-do", "arguments": {}}});

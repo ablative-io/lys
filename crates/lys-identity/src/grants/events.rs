@@ -424,8 +424,10 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
         USE => {
             let named = matches!(&change, Value::Map(pairs) if pairs.len() == 4);
             let [grant, route] = if named {
-                let [grant, route, action, resource] =
-                    fields::<4>(change, "a use naming what it exercised is a map of keys 1 to 4")?;
+                let [grant, route, action, resource] = fields::<4>(
+                    change,
+                    "a use naming what it exercised is a map of keys 1 to 4",
+                )?;
                 exercised = Some(exercise::read(action, resource)?);
                 [grant, route]
             } else {
