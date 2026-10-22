@@ -267,6 +267,24 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
     let bea_person = admitted["person"].as_str().ok_or("a person")?.to_owned();
     let bea_subject = admitted["subject"].as_str().ok_or("a subject")?.to_owned();
 
+    // Without a grant on Bea's account, the agent's own signed MCP call to
+    // change her email is refused and changes nothing.
+    let key = certified(&service, &ada, &agent).await?;
+    let email_path = format!("/directory/people/{bea_person}/account/email");
+    let refused = change_as(
+        &service,
+        (agent.as_str(), key.as_ref()),
+        &email_path,
+        &json!({"email": "bea.new@example.test"}),
+    )
+    .await?;
+    assert!(refused.to_string().contains("NotHeld"), "{refused}");
+    assert_eq!(
+        accounts_for(&rauthy, "bea.new@example.test")?,
+        0,
+        "{refused}"
+    );
+
     // Ada passes the agent the change of Bea's email, from a root of her own,
     // and the agent changes it through its own signed MCP call.
     let (status, me) = service.get("/me", Some(&ada)).await?;
@@ -296,11 +314,10 @@ async fn what_an_agent_did_for_its_person_is_on_their_dashboard_and_no_one_elses
         )
         .await?;
     assert_eq!(status, 200, "{passed}");
-    let key = certified(&service, &ada, &agent).await?;
     let reply = change_as(
         &service,
         (agent.as_str(), key.as_ref()),
-        &format!("/directory/people/{bea_person}/account/email"),
+        &email_path,
         &json!({"email": "bea.new@example.test"}),
     )
     .await?;

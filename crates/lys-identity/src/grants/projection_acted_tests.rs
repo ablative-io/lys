@@ -3,6 +3,7 @@
 //! it is applied, kept by the snapshot, and read without the log (AGENTS-019
 //! R5); the use event naming the act is version 8 and reads back whole.
 
+use std::collections::BTreeSet;
 use std::error::Error;
 
 use super::{ACTED_FOR_THEIR_PERSON, Acted};
@@ -13,7 +14,7 @@ use crate::grants::events::{
 use crate::grants::projection::GrantBook;
 use crate::grants::{
     AGENTS_NOT_MACHINES, Action, Grant, GrantChange, GrantEvent, GrantId, GrantParts, PassOn,
-    Relation, Resource, Route, Source, WITHHELD_FROM_AGENTS, Window,
+    RecipientKind, Relation, Resource, Route, Source, WITHHELD_FROM_AGENTS, Window,
 };
 use crate::{AgentId, IdentityId, OperationId, PersonId};
 
@@ -22,39 +23,77 @@ type TestResult = Result<(), Box<dyn Error>>;
 const PERSON: [u8; 16] = [0xd1; 16];
 const AGENT: [u8; 16] = [0xa7; 16];
 const GRANT: [u8; 16] = [0x61; 16];
+const ROOT: [u8; 16] = [0x60; 16];
 
 fn agent() -> IdentityId {
     IdentityId::Agent(AgentId::from_bytes(AGENT))
 }
 
-/// A root grant to the agent of `actions` on Bea's account.
-fn issued(actions: &[&str]) -> Result<GrantEvent, Box<dyn Error>> {
-    let person = PersonId::from_bytes(PERSON);
-    let operation = OperationId::from_bytes([1; 16]);
+/// A grant of `actions` on Bea's account, issued by `issuer` to `holder`
+/// under `operation`, from `source`, passing on `pass_on`.
+fn grant(
+    (id, operation): ([u8; 16], u8),
+    (issuer, holder): (IdentityId, IdentityId),
+    actions: &[&str],
+    source: Source,
+    pass_on: PassOn,
+) -> Result<GrantEvent, Box<dyn Error>> {
+    let operation = OperationId::from_bytes([operation; 16]);
     let grant = Grant::new(GrantParts {
-        id: GrantId::from_bytes(GRANT),
-        issuer: IdentityId::Person(person),
-        holder: agent(),
-        responsible: person,
+        id: GrantId::from_bytes(id),
+        issuer,
+        holder,
+        responsible: PersonId::from_bytes(PERSON),
         resource: Resource::new("account", "bea")?,
         relation: Relation::new("helper")?,
-        actions: actions
-            .iter()
-            .copied()
-            .map(Action::new)
-            .collect::<Result<_, _>>()?,
-        pass_on: PassOn::UseOnly,
-        source: Source::Root,
+        actions: names(actions)?,
+        pass_on,
+        source,
         window: Window::new(0, None)?,
         model_version: 1,
         operation,
     })?;
     Ok(GrantEvent::new(
         operation,
-        IdentityId::Person(person),
+        issuer,
         1,
         GrantChange::Issue(Box::new(grant)),
     )?)
+}
+
+fn names(actions: &[&str]) -> Result<BTreeSet<Action>, Box<dyn Error>> {
+    Ok(actions
+        .iter()
+        .copied()
+        .map(Action::new)
+        .collect::<Result<_, _>>()?)
+}
+
+fn person() -> IdentityId {
+    IdentityId::Person(PersonId::from_bytes(PERSON))
+}
+
+/// The person's root of `actions` on Bea's account, passable on to agents,
+/// and the agent's grant of them passed on from it: leaves 0 and 1.
+fn book_with(actions: &[&str]) -> Result<GrantBook, Box<dyn Error>> {
+    let root = grant(
+        (ROOT, 1),
+        (person(), person()),
+        actions,
+        Source::Root,
+        PassOn::to(names(actions)?, [RecipientKind::Agent].into())?,
+    )?;
+    let passed = grant(
+        (GRANT, 5),
+        (person(), agent()),
+        actions,
+        Source::Grant(GrantId::from_bytes(ROOT)),
+        PassOn::UseOnly,
+    )?;
+    let mut book = GrantBook::new();
+    book.apply(&root, 0)?;
+    book.apply(&passed, 1)?;
+    Ok(book)
 }
 
 /// `caller`'s use of the grant at `at`, naming `action` on Bea's account.
@@ -108,23 +147,28 @@ fn a_use_naming_its_act_is_version_eight_and_reads_back_whole() -> TestResult {
     assert_eq!(decode_event_body(&encode_event_body(&bare))?, bare);
     // Only a use names what it exercised.
     assert!(
-        issued(&["read"])?
-            .with_exercised(Exercised {
-                action: Action::new("read")?,
-                resource: Resource::new("account", "bea")?,
-            })
-            .is_err()
+        grant(
+            (ROOT, 1),
+            (person(), person()),
+            &["read"],
+            Source::Root,
+            PassOn::UseOnly
+        )?
+        .with_exercised(Exercised {
+            action: Action::new("read")?,
+            resource: Resource::new("account", "bea")?,
+        })
+        .is_err()
     );
     Ok(())
 }
 
 #[test]
 fn the_book_notes_an_agents_moved_acts_and_the_snapshot_keeps_them() -> TestResult {
-    let mut book = GrantBook::new();
-    book.apply(&issued(&["read", "person.email.set"])?, 0)?;
-    book.apply(&used(agent(), 2, 10, "read")?, 1)?;
-    book.apply(&used(agent(), 3, 20, "person.email.set")?, 2)?;
-    book.apply(&used(agent(), 4, 30, "person.email.set")?, 3)?;
+    let mut book = book_with(&["read", "person.email.set"])?;
+    book.apply(&used(agent(), 2, 10, "read")?, 2)?;
+    book.apply(&used(agent(), 3, 20, "person.email.set")?, 3)?;
+    book.apply(&used(agent(), 4, 30, "person.email.set")?, 4)?;
     let agent_id = AgentId::from_bytes(AGENT);
     let noted = book.acted_by(agent_id);
     // A read is never noted; each email change is, oldest first.
@@ -133,7 +177,7 @@ fn the_book_notes_an_agents_moved_acts_and_the_snapshot_keeps_them() -> TestResu
             .iter()
             .map(|one| (one.index, one.at))
             .collect::<Vec<_>>(),
-        [(2, 20), (3, 30)]
+        [(3, 20), (4, 30)]
     );
     assert_eq!(noted[0].exercised.action.as_str(), "person.email.set");
     assert_eq!(noted[0].exercised.resource.to_string(), "account:bea");
@@ -141,12 +185,12 @@ fn the_book_notes_an_agents_moved_acts_and_the_snapshot_keeps_them() -> TestResu
     assert!(book.acted_by(AgentId::from_bytes([0x0b; 16])).is_empty());
 
     // The state names version 7 and reopens to the same book, notes and all.
-    let state = crate::grants::state::encode(&book, 4)?;
+    let state = crate::grants::state::encode(&book, 5)?;
     let ciborium::Value::Array(members) = ciborium::from_reader(state.as_slice())? else {
         return Err("a grant state is an array".into());
     };
     assert_eq!(members.first(), Some(&ciborium::Value::from(7_u64)));
-    let reopened = crate::grants::state::decode(&state, 4)?;
+    let reopened = crate::grants::state::decode(&state, 5)?;
     assert_eq!(reopened, book);
     assert_eq!(reopened.acted_by(agent_id), noted);
     Ok(())
@@ -154,15 +198,14 @@ fn the_book_notes_an_agents_moved_acts_and_the_snapshot_keeps_them() -> TestResu
 
 #[test]
 fn a_book_with_no_notes_writes_its_state_as_before() -> TestResult {
-    let mut book = GrantBook::new();
-    book.apply(&issued(&["read"])?, 0)?;
-    book.apply(&used(agent(), 2, 10, "read")?, 1)?;
-    let state = crate::grants::state::encode(&book, 2)?;
+    let mut book = book_with(&["read"])?;
+    book.apply(&used(agent(), 2, 10, "read")?, 2)?;
+    let state = crate::grants::state::encode(&book, 3)?;
     let ciborium::Value::Array(members) = ciborium::from_reader(state.as_slice())? else {
         return Err("a grant state is an array".into());
     };
     assert_eq!(members.first(), Some(&ciborium::Value::from(3_u64)));
-    assert_eq!(crate::grants::state::decode(&state, 2)?, book);
+    assert_eq!(crate::grants::state::decode(&state, 3)?, book);
     assert_eq!(
         Acted::default().encode(),
         ciborium::Value::Array(Vec::new())

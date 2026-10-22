@@ -47,6 +47,8 @@ fn refused(reason: impl Into<String>) -> ServerError {
     }
 }
 
+#[path = "accounts_agent.rs"]
+mod agent;
 #[path = "accounts_own.rs"]
 mod own;
 #[path = "accounts_policy.rs"]
@@ -320,6 +322,7 @@ async fn account_of(
     Path(person): Path<String>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
+    agent::exercised(&state, &actor, &person, "read")?;
     crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     shown(api(&state)?, &id).await
@@ -339,6 +342,7 @@ async fn set_email(
     body: Result<Json<NewEmail>, JsonRejection>,
 ) -> Result<Json<Value>, ServerError> {
     let actor = signed_in(&state, &headers)?;
+    agent::exercised(&state, &actor, &person, "person.email.set")?;
     crate::routes::administrator(&state, &actor)?;
     let id = account_id(&state, &person)?;
     let email = check_email(&body_of(body)?.email)?.to_owned();
