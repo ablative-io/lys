@@ -31,6 +31,7 @@ fn intent() -> Intent {
         compose_changed: false,
         steps: Vec::new(),
         organisation_copy: None,
+        clients_placed: crate::identity::install::layout::PlacedClients::default(),
     }
 }
 

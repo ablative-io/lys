@@ -41,6 +41,7 @@ fn intent_to_b(scratch: &Scratch) -> Intent {
         compose_changed: true,
         steps: Vec::new(),
         organisation_copy: None,
+        clients_placed: crate::identity::install::layout::PlacedClients::default(),
     }
 }
 

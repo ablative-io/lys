@@ -381,6 +381,7 @@ impl Scratch {
             units: &self.units,
             engine,
             render: &Fixed,
+            clients: None,
         };
         upgrade(&self.layout, from, package, &mut parts, &mut |line| {
             said.push(line.to_string());

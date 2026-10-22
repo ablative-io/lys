@@ -18,7 +18,79 @@ pub struct ClientRelease {
 pub struct ClientSet {
     /// The releases the build record will serve.
     pub releases: std::collections::BTreeMap<String, ClientRelease>,
-    files: Vec<(PathBuf, Vec<u8>)>,
+    /// The one commit every release shares.
+    commit: String,
+    files: Vec<ClientFile>,
+}
+
+/// One executable read from a platform's folder.
+struct ClientFile {
+    platform: String,
+    name: &'static str,
+    bytes: Vec<u8>,
+}
+
+/// What one attempt placed under `clients/`, kept on the upgrade's intent
+/// record so a refused attempt removes exactly what it placed and nothing
+/// that was there before it (DIRECTORY-115 R1).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlacedClients {
+    /// Files the attempt wrote, in the order it wrote them.
+    pub files: Vec<PathBuf>,
+    /// Directories the attempt made, parents first.
+    pub directories: Vec<PathBuf>,
+    /// The `clients/<platform>/<commit>` directories among them: the
+    /// releases the attempt made, named when they are removed.
+    pub releases: Vec<PathBuf>,
+}
+
+impl PlacedClients {
+    /// Whether the attempt placed nothing: every file was already there with the same bytes.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty() && self.directories.is_empty()
+    }
+
+    /// Removes every file and directory the attempt placed, deepest first,
+    /// naming each release directory removed. A path already gone is passed over.
+    ///
+    /// # Errors
+    /// Returns a named filesystem failure at the first path that could not be removed.
+    pub fn remove(&self, say: &mut dyn FnMut(&str)) -> IdentityResult<()> {
+        for file in &self.files {
+            let made = file
+                .parent()
+                .is_some_and(|parent| self.directories.iter().any(|dir| dir == parent));
+            match std::fs::remove_file(file) {
+                Ok(()) if made => {}
+                Ok(()) => say(&format!("client file removed: {}", file.display())),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(client_error(file, error.to_string())),
+            }
+        }
+        for directory in self.directories.iter().rev() {
+            match std::fs::remove_dir(directory) {
+                Ok(()) if self.releases.contains(directory) => {
+                    say(&format!("client release removed: {}", directory.display()));
+                }
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(client_error(directory, error.to_string())),
+            }
+        }
+        Ok(())
+    }
+
+    /// Makes `dir` when it is absent and records that this attempt made it.
+    fn make_dir(&mut self, dir: &std::path::Path) -> IdentityResult<()> {
+        if dir.is_dir() {
+            return Ok(());
+        }
+        std::fs::create_dir(dir).map_err(|error| client_error(dir, error.to_string()))?;
+        self.directories.push(dir.to_path_buf());
+        Ok(())
+    }
 }
 
 fn client_error(path: &std::path::Path, detail: impl Into<String>) -> IdentityError {
@@ -116,6 +188,7 @@ pub fn prepare_clients(
     };
     let mut set = ClientSet {
         releases: std::collections::BTreeMap::new(),
+        commit: commit.to_owned(),
         files: Vec::new(),
     };
     for (platform, folder) in folders {
@@ -135,8 +208,11 @@ pub fn prepare_clients(
                 ));
             }
             files.insert(name.to_owned(), format!("{:x}", Sha256::digest(&bytes)));
-            set.files
-                .push((PathBuf::from(&platform).join(commit).join(name), bytes));
+            set.files.push(ClientFile {
+                platform: platform.clone(),
+                name,
+                bytes,
+            });
         }
         set.releases.insert(
             platform,
@@ -150,30 +226,53 @@ pub fn prepare_clients(
 }
 
 impl ClientSet {
-    /// Place immutable releases, refusing any different bytes already at the same commit.
+    /// Place immutable releases, recording in `placed` every file and
+    /// directory this attempt makes. A file already holding the same bytes is
+    /// left as it is. One holding different bytes is refused by name when
+    /// `clients.json` names its commit for its platform (the bytes are a
+    /// served release), and replaced, with a note, when it does not: it was
+    /// placed by an attempt that did not finish (DIRECTORY-115 R2).
     ///
     /// # Errors
-    /// Returns a named filesystem failure or an existing release digest mismatch.
-    pub fn place(&self, layout: &Layout) -> IdentityResult<()> {
-        for (relative, bytes) in &self.files {
-            let target = layout.root.join("clients").join(relative);
-            let parent = target
-                .parent()
-                .ok_or_else(|| client_error(&target, "client file has no parent"))?;
-            std::fs::create_dir_all(parent)
-                .map_err(|error| client_error(parent, error.to_string()))?;
+    /// Returns a named filesystem failure or a served release's digest mismatch.
+    pub fn place(
+        &self,
+        layout: &Layout,
+        placed: &mut PlacedClients,
+        say: &mut dyn FnMut(&str),
+    ) -> IdentityResult<()> {
+        let served = client_releases(layout)?;
+        let root = layout.root.join("clients");
+        for file in &self.files {
+            let platform_dir = root.join(&file.platform);
+            let release_dir = platform_dir.join(&self.commit);
+            placed.make_dir(&root)?;
+            placed.make_dir(&platform_dir)?;
+            if !release_dir.is_dir() {
+                placed.make_dir(&release_dir)?;
+                placed.releases.push(release_dir.clone());
+            }
+            let target = release_dir.join(file.name);
+            let is_served = served
+                .get(&file.platform)
+                .is_some_and(|release| release.commit == self.commit);
             match std::fs::read(&target) {
-                Ok(held) if held == *bytes => continue,
-                Ok(_) => {
+                Ok(held) if held == file.bytes => continue,
+                Ok(_) if is_served => {
                     return Err(client_error(
                         &target,
                         "client_release_changed: the same platform and commit already hold different bytes",
                     ));
                 }
+                Ok(_) => say(&format!(
+                    "client_release_replaced: {} was placed by an earlier attempt that did not finish",
+                    target.display()
+                )),
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(client_error(&target, error.to_string())),
             }
-            crate::identity::upgrade::swap::place_file(&target, bytes, false)?;
+            crate::identity::upgrade::swap::place_file(&target, &file.bytes, false)?;
+            placed.files.push(target.clone());
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -225,9 +324,36 @@ pub fn client_releases(
 
 #[cfg(test)]
 mod client_tests {
-    use super::{Layout, prepare_clients};
+    use super::{ClientSet, Layout, PlacedClients, prepare_clients};
 
     const COMMIT: &str = "0123456789abcdef0123456789abcdef01234567";
+    const OLDER: &str = "89abcdef0123456789abcdef0123456789abcdef";
+    const REPLACED: &str = "was placed by an earlier attempt that did not finish";
+
+    type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+    /// Places `set` silently, as a finished attempt leaves it.
+    fn place(set: &ClientSet, layout: &Layout) -> TestResult<PlacedClients> {
+        let mut placed = PlacedClients::default();
+        set.place(layout, &mut placed, &mut |_| {})?;
+        Ok(placed)
+    }
+
+    /// `clients.json` names `set`'s releases: they are served.
+    fn served(set: &ClientSet, layout: &Layout) -> TestResult {
+        let manifest = set.manifest(layout)?;
+        crate::identity::upgrade::swap::place_file(&manifest.target, &manifest.bytes, false)?;
+        Ok(())
+    }
+
+    fn host_file(layout: &Layout, commit: &str, name: &str) -> std::path::PathBuf {
+        layout
+            .root
+            .join("clients")
+            .join(super::host_platform())
+            .join(commit)
+            .join(name)
+    }
 
     fn host_pair() -> Result<tempfile::TempDir, Box<dyn std::error::Error>> {
         let folder = tempfile::tempdir()?;
@@ -244,8 +370,13 @@ mod client_tests {
         let install = tempfile::tempdir()?;
         let set = prepare_clients(None, source.path(), &format!("{COMMIT}; stated"))?;
         let layout = Layout::at(install.path().to_path_buf());
-        set.place(&layout)?;
+        let placed = place(&set, &layout)?;
         let platform = super::host_platform();
+        assert_eq!(
+            placed.releases,
+            [layout.root.join("clients").join(&platform).join(COMMIT)]
+        );
+        assert_eq!(placed.files.len(), 2);
         assert_eq!(set.releases[&platform].commit, COMMIT);
         for name in ["lys", "lys-containment-entry"] {
             assert_eq!(
@@ -351,7 +482,7 @@ mod client_tests {
             "0123456789abcdef0123456789abcdef01234567",
         )?;
         let layout = Layout::at(install.path().to_path_buf());
-        set.place(&layout)?;
+        place(&set, &layout)?;
         assert_eq!(set.releases.len(), 2);
         for platform in platforms {
             for name in ["lys", "lys-containment-entry"] {
@@ -403,7 +534,8 @@ mod client_tests {
             "0123456789abcdef0123456789abcdef01234567",
         )?;
         let layout = Layout::at(install.path().to_path_buf());
-        first.place(&layout)?;
+        place(&first, &layout)?;
+        served(&first, &layout)?;
         assert_eq!(first.releases.len(), 1);
         assert!(first.releases.contains_key(&super::host_platform()));
         std::fs::write(source.path().join("lys"), "changed executable")?;
@@ -412,11 +544,92 @@ mod client_tests {
             source.path(),
             "0123456789abcdef0123456789abcdef01234567",
         )?;
-        let error = changed
-            .place(&layout)
+        let error = place(&changed, &layout)
             .err()
             .ok_or("immutable release overwritten")?;
         assert!(error.to_string().contains("client_release_changed"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_stranded_client_release_the_manifest_does_not_name_is_replaced_and_noted() -> TestResult {
+        let source = host_pair()?;
+        let install = tempfile::tempdir()?;
+        let layout = Layout::at(install.path().to_path_buf());
+        let stranded = prepare_clients(None, source.path(), COMMIT)?;
+        place(&stranded, &layout)?;
+        // The manifest names an older commit: the bytes at COMMIT were merely placed.
+        let older = prepare_clients(None, source.path(), OLDER)?;
+        place(&older, &layout)?;
+        served(&older, &layout)?;
+        std::fs::write(source.path().join("lys"), "rebuilt executable")?;
+        let rebuilt = prepare_clients(None, source.path(), COMMIT)?;
+        let mut said = Vec::new();
+        let mut placed = PlacedClients::default();
+        rebuilt.place(&layout, &mut placed, &mut |line| said.push(line.to_owned()))?;
+        let target = host_file(&layout, COMMIT, "lys");
+        assert_eq!(std::fs::read_to_string(&target)?, "rebuilt executable");
+        assert_eq!(
+            said,
+            [format!(
+                "client_release_replaced: {} {REPLACED}",
+                target.display()
+            )]
+        );
+        assert_eq!(placed.files, [target]);
+        assert!(placed.directories.is_empty() && placed.releases.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(host_file(&layout, OLDER, "lys"))?,
+            "lys",
+            "the served release is untouched"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_served_client_release_with_different_bytes_is_refused_by_name() -> TestResult {
+        let source = host_pair()?;
+        let install = tempfile::tempdir()?;
+        let layout = Layout::at(install.path().to_path_buf());
+        let served_set = prepare_clients(None, source.path(), COMMIT)?;
+        place(&served_set, &layout)?;
+        served(&served_set, &layout)?;
+        std::fs::write(source.path().join("lys-containment-entry"), "rebuilt entry")?;
+        let rebuilt = prepare_clients(None, source.path(), COMMIT)?;
+        let mut said = Vec::new();
+        let mut placed = PlacedClients::default();
+        let error = rebuilt
+            .place(&layout, &mut placed, &mut |line| said.push(line.to_owned()))
+            .err()
+            .ok_or("a served release was replaced")?;
+        assert!(
+            error.to_string().contains("client_release_changed"),
+            "{error}"
+        );
+        assert!(said.is_empty(), "{said:?}");
+        assert!(placed.is_empty(), "{placed:?}");
+        assert_eq!(
+            std::fs::read_to_string(host_file(&layout, COMMIT, "lys-containment-entry"))?,
+            "lys-containment-entry"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_client_release_with_the_same_bytes_is_a_no_op_served_or_not() -> TestResult {
+        let source = host_pair()?;
+        let install = tempfile::tempdir()?;
+        let layout = Layout::at(install.path().to_path_buf());
+        let first = prepare_clients(None, source.path(), COMMIT)?;
+        place(&first, &layout)?;
+        let again = prepare_clients(None, source.path(), COMMIT)?;
+        let mut said = Vec::new();
+        let mut placed = PlacedClients::default();
+        again.place(&layout, &mut placed, &mut |line| said.push(line.to_owned()))?;
+        assert!(placed.is_empty() && said.is_empty(), "{placed:?} {said:?}");
+        served(&first, &layout)?;
+        again.place(&layout, &mut placed, &mut |line| said.push(line.to_owned()))?;
+        assert!(placed.is_empty() && said.is_empty(), "{placed:?} {said:?}");
         Ok(())
     }
 }

@@ -16,28 +16,27 @@ use crate::identity::install::layout::{BINARIES, Layout};
 
 #[test]
 fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction() -> TestResult {
-    use crate::identity::install::layout::{client_releases, prepare_clients};
+    use crate::identity::install::layout::{PlacedClients, client_releases, prepare_clients};
     let scratch = Scratch::new()?;
     let inputs = scratch.work().join("clients");
-    for platform in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
-        let folder = inputs.join(platform);
-        std::fs::create_dir_all(&folder)?;
-        for name in ["lys", "lys-containment-entry"] {
-            std::fs::write(folder.join(name), format!("{name}/{A}"))?;
+    let write = |commit: &str| -> TestResult {
+        for platform in ["aarch64-apple-darwin", "x86_64-apple-darwin"] {
+            let folder = inputs.join(platform);
+            std::fs::create_dir_all(&folder)?;
+            for name in ["lys", "lys-containment-entry"] {
+                std::fs::write(folder.join(name), format!("{name}/{commit}"))?;
+            }
         }
-    }
+        Ok(())
+    };
+    write(A)?;
     let old = prepare_clients(Some(&inputs), &inputs, A)?;
-    old.place(&scratch.layout)?;
+    old.place(&scratch.layout, &mut PlacedClients::default(), &mut |_| {})?;
     let manifest = old.manifest(&scratch.layout)?;
     super::swap::place_file(&manifest.target, &manifest.bytes, false)?;
     record_build(&scratch.layout, &BINARIES, &mut |_| {})?;
-    for platform in old.releases.keys() {
-        for name in ["lys", "lys-containment-entry"] {
-            std::fs::write(inputs.join(platform).join(name), format!("{name}/{B}"))?;
-        }
-    }
+    write(B)?;
     let next = prepare_clients(Some(&inputs), &inputs, B)?;
-    next.place(&scratch.layout)?;
     let new = scratch.work().join("b");
     build(&new, B, Behaviour::Serves)?;
     let mut engine = Recorder::default();
@@ -50,6 +49,7 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
         units: &scratch.units,
         engine: &mut engine,
         render: &render,
+        clients: Some(&next),
     };
     let record = upgrade(&scratch.layout, &new, None, &mut parts, &mut |_| {})?;
     // The sign-in service is given what the install declares once the new build runs, once.
@@ -60,16 +60,11 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
         std::fs::read(scratch.layout.config_previous_dir().join("clients.json"))?,
         manifest.bytes.as_slice()
     );
+    let c = "cccccccccccccccccccccccccccccccccccccccc";
     let failing = scratch.work().join("c");
-    build(
-        &failing,
-        "cccccccccccccccccccccccccccccccccccccccc",
-        Behaviour::ExitsEarly,
-    )?;
-    let mut failed = next;
-    for release in failed.releases.values_mut() {
-        release.commit = "cccccccccccccccccccccccccccccccccccccccc".to_owned();
-    }
+    build(&failing, c, Behaviour::ExitsEarly)?;
+    write(c)?;
+    let failed = prepare_clients(Some(&inputs), &inputs, c)?;
     let render = super::ClientRender {
         base: &Fixed,
         clients: &failed,
@@ -79,6 +74,7 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
         units: &scratch.units,
         engine: &mut engine,
         render: &render,
+        clients: Some(&failed),
     };
     assert!(upgrade(&scratch.layout, &failing, None, &mut parts, &mut |_| {}).is_err());
     // A build that was put back is never settled: the one settling is the successful upgrade above, and the
@@ -86,17 +82,18 @@ fn client_sets_are_recorded_snapshotted_and_restored_by_the_upgrade_transaction(
     assert_eq!(engine.settled, 1);
     for (platform, release) in client_releases(&scratch.layout)? {
         assert_eq!(release.commit, B);
+        let releases = scratch.layout.root.join("clients").join(&platform);
         assert_eq!(
-            std::fs::read_to_string(
-                scratch
-                    .layout
-                    .root
-                    .join("clients")
-                    .join(platform)
-                    .join(A)
-                    .join("lys")
-            )?,
+            std::fs::read_to_string(releases.join(A).join("lys"))?,
             format!("lys/{A}")
+        );
+        assert_eq!(
+            std::fs::read_to_string(releases.join(B).join("lys"))?,
+            format!("lys/{B}")
+        );
+        assert!(
+            !releases.join(c).exists(),
+            "{platform}: the refused release stayed"
         );
     }
     Ok(())
@@ -291,6 +288,7 @@ fn refusals_are_named_and_stop_nothing() -> TestResult {
         units: &scratch.units,
         engine: &mut engine,
         render: &Fixed,
+        clients: None,
     };
     let refused = upgrade(&nowhere, &empty, None, &mut parts, &mut |_| {});
     refusals.push(refused.err().map(|error| error.kind()));
@@ -334,6 +332,9 @@ fn a_version_line_gives_its_commit_and_dirty_state() -> TestResult {
 
 #[path = "upgrade/runner_tests.rs"]
 mod runner;
+
+#[path = "upgrade/clients_rollback_tests.rs"]
+mod clients_rollback;
 
 #[test]
 fn an_upgrade_that_fails_after_migrating_puts_back_the_data_and_the_previous_build_starts()

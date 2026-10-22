@@ -84,6 +84,7 @@ fn window(layout: &Layout, from: &Path, surface: &Path, verifier: &Path) -> Prob
         units: &units,
         engine: &mut Compose,
         render: &templates,
+        clients: None,
     };
     upgrade::upgrade(layout, from, Some(surface), &mut parts, &mut |line| {
         println!("{line}");

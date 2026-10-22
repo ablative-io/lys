@@ -194,7 +194,9 @@ fn record_clients(
     clients: &layout::ClientSet,
     emitter: &mut Emitter,
 ) -> IdentityResult<()> {
-    clients.place(layout)?;
+    clients.place(layout, &mut layout::PlacedClients::default(), &mut |line| {
+        emitter.note(line);
+    })?;
     let manifest = clients.manifest(layout)?;
     if manifest.target.exists() {
         let bytes = std::fs::read(&manifest.target).map_err(|error| {

@@ -35,6 +35,7 @@ fn upgrade_command_child() -> TestResult {
         units: &units,
         engine: &mut Recorder::default(),
         render: &Fixed,
+        clients: None,
     };
     let result = upgrade(
         &Layout::at(PathBuf::from(root)),
@@ -82,6 +83,7 @@ fn recovery_after_lys_is_placed_restores_the_runner_and_resumes_its_live_session
             compose_changed: false,
             steps: vec![Step::Stopped],
             organisation_copy: None,
+            clients_placed: crate::identity::install::layout::PlacedClients::default(),
         };
         intent.write(layout)?;
         swap::keep_binaries(layout, &mut intent)?;

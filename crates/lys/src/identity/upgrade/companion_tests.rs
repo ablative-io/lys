@@ -29,6 +29,7 @@ fn upgrade_places_the_helper_beside_lys_and_rollback_restores_the_pair()
         compose_changed: false,
         steps: Vec::new(),
         organisation_copy: None,
+        clients_placed: crate::identity::install::layout::PlacedClients::default(),
     };
     check(&layout, &from)?;
     swap::keep_binaries(&layout, &mut intent)?;

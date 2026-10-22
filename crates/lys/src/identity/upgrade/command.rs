@@ -67,8 +67,8 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
             base: &templates,
             clients: &clients,
         },
+        clients: Some(&clients),
     };
-    clients.place(&layout)?;
     let mut session_outcomes = Vec::new();
     let record = upgrade(
         &layout,

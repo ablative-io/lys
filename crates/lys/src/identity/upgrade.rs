@@ -28,8 +28,12 @@
 //! and rendered. When a step, a start or a readiness fails, what was started
 //! is stopped, the previous binaries, files and screens are put back and
 //! started and waited on for ready, and the upgrade fails naming the binary
-//! and its log. An upgrade writes only `bin/`, `bin.previous/`, those four
-//! rendered files, `config.previous/`, the screens, the logs, the process
+//! and its log. The client releases are placed inside the same transaction,
+//! after the intent record and before anything is stopped, and a put-back
+//! removes exactly the files and directories the attempt made, so a refused
+//! upgrade leaves `clients/` as it found it (DIRECTORY-115 R1). An upgrade
+//! writes only `bin/`, `bin.previous/`, those four rendered files,
+//! `config.previous/`, the screens, `clients/`, the logs, the process
 //! files, `install/` and, once, `data.previous-organisation/`, the copy of
 //! the directory and grant logs made before the first boot under
 //! organisations rewrites them (DIRECTORY-109 R2): never `data/`, a
@@ -62,7 +66,7 @@ pub mod swap;
 pub use command::{Options, run};
 pub use record::{BuildRecord, SurfaceBuild, record_build};
 
-use intent::Intent;
+use intent::{Intent, Step};
 use render::Render;
 
 /// How a started process is known to be ready: its log gains `says` after
@@ -191,6 +195,9 @@ pub struct Parts<'a> {
     pub engine: &'a mut dyn Engine,
     /// The new build's templates.
     pub render: &'a dyn Render,
+    /// The client releases to place inside the transaction; absent for
+    /// service-only fixtures.
+    pub clients: Option<&'a install::layout::ClientSet>,
 }
 
 /// Read deployment configuration and verify the installed issuer authority.
@@ -370,15 +377,7 @@ pub fn upgrade(
     if parts.runner.is_some() {
         companion::check(layout, from)?;
     }
-    let mut restart = parts
-        .runner
-        .map(|_| runner::Restart::prepare(layout))
-        .transpose()?;
-    if let Some(restart) = &mut restart {
-        swap::recover_with_runner(layout, parts.units, parts.engine, restart, say)?;
-    } else {
-        swap::recover(layout, parts.units, parts.engine, say)?;
-    }
+    let mut restart = recovered(layout, parts, say)?;
     let mut all_units = parts.units.to_vec();
     if let Some(restart) = &restart {
         all_units.push(restart.unit.clone());
@@ -414,10 +413,14 @@ pub fn upgrade(
     if let Some(restart) = &restart {
         restart.retain()?;
     }
-    if let Err(error) = intent.write(layout) {
+    if let Err(error) = intent
+        .write(layout)
+        .and_then(|()| place_clients(layout, parts.clients, &mut intent, say))
+    {
         if let Some(restart) = &restart {
             restart.cancel()?;
         }
+        Intent::clear(layout)?;
         return Err(error);
     }
     let plan = swap::Plan {
@@ -504,7 +507,48 @@ fn planned_intent(
         compose_changed: files.iter().any(|file| file.compose && !file.in_place()),
         steps: Vec::new(),
         organisation_copy: None,
+        clients_placed: install::layout::PlacedClients::default(),
     }
+}
+
+/// Ends an upgrade stopped part-way, with the runner read first when the
+/// incoming build has one, and answers that runner for the swap.
+fn recovered(
+    layout: &Layout,
+    parts: &mut Parts<'_>,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<Option<runner::Restart>> {
+    let mut restart = parts
+        .runner
+        .map(|_| runner::Restart::prepare(layout))
+        .transpose()?;
+    if let Some(restart) = &mut restart {
+        swap::recover_with_runner(layout, parts.units, parts.engine, restart, say)?;
+    } else {
+        swap::recover(layout, parts.units, parts.engine, say)?;
+    }
+    Ok(restart)
+}
+
+/// Places the client releases as a step of the transaction, after the
+/// intent record is written and before anything is stopped. What the
+/// attempt made is on the record once the step is; a refusal here removes
+/// it, so nothing placed outlives the attempt (DIRECTORY-115 R1).
+fn place_clients(
+    layout: &Layout,
+    clients: Option<&install::layout::ClientSet>,
+    intent: &mut Intent,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<()> {
+    let Some(clients) = clients else {
+        return Ok(());
+    };
+    let placed = clients.place(layout, &mut intent.clients_placed, say);
+    if let Err(error) = placed.and_then(|()| intent.done(layout, Step::ClientsPlaced)) {
+        intent.clients_placed.remove(say)?;
+        return Err(error);
+    }
+    Ok(())
 }
 
 fn finish_upgrade(

@@ -77,6 +77,7 @@ impl Running {
             units: &self.scratch.units,
             engine: &mut Recorder::default(),
             render: &Fixed,
+            clients: None,
         };
         upgrade(&self.scratch.layout, from, None, &mut parts, &mut |line| {
             said.push(line.to_owned());

@@ -116,6 +116,7 @@ fn an_upgrade_over_a_receipt_naming_an_absent_store_is_refused_by_name_and_chang
         units: &scratch.units,
         engine: &mut engine,
         render: &Fixed,
+        clients: None,
     };
     let new = scratch.work().join("b");
     let refused = upgrade(&scratch.layout, &new, None, &mut parts, &mut |_| {})

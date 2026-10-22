@@ -91,3 +91,12 @@ WHEN `lys identity upgrade` finishes THE SYSTEM SHALL list, in its notes and in 
 - The whole gate (tokei, ast-grep, fmt, clippy pedantic, nextest, cargo test --doc, tsc, vitest) at the landing sha, judged by its output.
 - Walked on the Mac: an upgrade made to refuse after placement leaves clients/aarch64-apple-darwin without the new commit's directory, and the next upgrade at the same commit proceeds.
 - Hospital line in the handback, never in a commit: if this code were used in a hospital, the worst credible failure is an identity server that cannot be upgraded to a security fix until someone finds and moves a stranded directory by hand, and it could harm about everyone that server signs in.
+
+## Amendments
+
+### Amendment 1: R1's file list: where the transaction lives
+
+- **Date:** 2026-10-23
+- **By:** Waffles
+
+R1 named crates/lys/src/identity/upgrade/runner.rs as the transaction; that file is the process runner (Restart), untouched. The transaction is upgrade.rs (Parts gains `clients: Option<&ClientSet>`, placement after the intent record and before the swap as `place_clients`), swap.rs (`back` removes what the intent names) and intent.rs (`Step::ClientsPlaced`, `clients_placed: PlacedClients`), so those three are modified in runner.rs's place. install/layout.rs exports PlacedClients. Every fixture that builds Parts or Intent takes the new field: examples/upgrade_window.rs, scratch_tests.rs, runner_tests.rs, runner_recovery_tests.rs, render_tests.rs, stores_receipt_tests.rs, companion_tests.rs, intent_tests.rs, data_kept_tests.rs and upgrade_tests.rs (which also mounts clients_rollback_tests.rs and now passes its client set through Parts). The install command's own first placement keeps its place outside a transaction, as the boundary says, and only takes the new signature. A replaced stranded file (R2) counts as placed by the attempt and is removed on rollback; a directory that existed before is left, as R1 says.

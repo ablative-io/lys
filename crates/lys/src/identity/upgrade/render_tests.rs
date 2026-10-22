@@ -469,6 +469,7 @@ fn an_identity_json_reading_back_another_session_length_stops_before_the_start()
         units: &scratch.units,
         engine: &mut engine,
         render: &Lasting(2_592_000),
+        clients: None,
     };
     let refused = upgrade(&scratch.layout, &next, None, &mut parts, &mut |line| {
         said.push(line.to_string());

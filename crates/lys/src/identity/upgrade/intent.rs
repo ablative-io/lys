@@ -22,13 +22,16 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::super::error::{ErrorKind, IdentityError, IdentityResult};
-use super::super::install::layout::Layout;
+use super::super::install::layout::{Layout, PlacedClients};
 use super::super::private_files;
 
 /// One step of an upgrade, recorded once it has completed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Step {
+    /// The client releases were placed under `clients/`, before anything
+    /// was stopped; what they made is on the record (DIRECTORY-115 R1).
+    ClientsPlaced,
     /// The service and then the broker were stopped.
     Stopped,
     /// `data/` was copied whole to `data.previous/`.
@@ -90,6 +93,10 @@ pub struct Intent {
     /// replaced by a later upgrade; absent when this upgrade made no copy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organisation_copy: Option<PathBuf>,
+    /// The client files and directories this upgrade placed, removed when
+    /// the previous build is put back; absent when it placed none.
+    #[serde(default, skip_serializing_if = "PlacedClients::is_empty")]
+    pub clients_placed: PlacedClients,
 }
 
 fn invalid(detail: impl Into<String>, layout: &Layout) -> IdentityError {

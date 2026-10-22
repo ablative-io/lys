@@ -6,7 +6,8 @@
 //! compose files are copied to `config.previous/` and the new ones placed;
 //! the screens are moved to `surface.previous/` and the new ones placed;
 //! the compose services are brought to a changed definition; the broker and
-//! then the service are started and waited on for ready. Back: whatever the
+//! then the service are started and waited on for ready. Back: the client
+//! files and directories the attempt placed are removed, whatever the
 //! record and the disk say was replaced is put back, and the previous build
 //! is started and waited on for ready.
 //!
@@ -443,6 +444,7 @@ pub fn back(
         restart.stop(say)?;
     }
     stop_all(units, say)?;
+    intent.clients_placed.remove(say)?;
     let (bin, kept_bin) = (layout.bin_dir(), layout.bin_previous_dir());
     if kept_bin.exists() && (intent.has(Step::BinariesKept) || !bin.exists()) {
         remove_dir(&bin)?;
