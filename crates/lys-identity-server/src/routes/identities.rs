@@ -340,7 +340,14 @@ pub(crate) async fn transition(
         other => return Err(malformed(format!("{other} is not a transition"))),
     };
     let (id, op) = (identity_id(&id)?, operation(&body.operation)?);
-    if !app_pass && !crate::routes::is_administrator(&state, &actor)? {
+    // An agent's own call reaches here judged by route_actions on its
+    // grants for identity.transition; inside an admission it is the act's
+    // activate step, judged by organisation.admit (AGENTS-019 R2). Either
+    // way it is admitted as `administrator()` admits it, as bind_login does.
+    let agent = with_directory(&state, |directory| {
+        crate::routes::admitted_agent(directory.projection()?, &actor)
+    })?;
+    if !app_pass && !agent && !crate::routes::is_administrator(&state, &actor)? {
         if let (IdentityId::Agent(agent), Transition::Activate) = (id, moved) {
             crate::routes::responsible_or_administrator(&state, &headers, &agent.to_string())?;
         } else {
