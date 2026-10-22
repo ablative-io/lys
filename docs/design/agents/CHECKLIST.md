@@ -99,3 +99,13 @@
 - [ ] **C814** — Every test fixture that starts a seat owner ends that owner's process group and waits for its exit when the fixture is dropped, on return, on panic and on close, with the pid and group read from the runner's record of the start (AGENTS-018 R1).
 - [ ] **C815** — A seat owner watches its own folder as an event (kqueue EVFILT_VNODE on macOS, inotify on Linux) and, when the folder is removed or renamed away, ends its harness's group, writes one line to stderr and exits 0 (AGENTS-018 R2).
 - [ ] **C816** — A seat owner whose folder cannot be watched refuses to start by name, owner_dir_unwatched, so no owner runs unwatched (AGENTS-018 R2).
+
+## Everything but a person's credentials can be given to an AI (AGENTS-019)
+
+- [ ] **C829** — WITHHELD_FROM_AGENTS names exactly person.password.set, person.sign-in.set and person.login.bind; the other twenty-nine acts it named are in AGENT_MAY_HOLD and in AGENTS_NOT_MACHINES, so a person can give them to an agent and no machine ever holds them (AGENTS-019 R1).
+- [ ] **C830** — A grant to an agent of an act moved by R1 stands only on the giving person's own live grant of that act, and withdrawing the giver's grant ends the agent's with it; an agent never approves or declines a request it made, refused own_request (AGENTS-019 R1).
+- [ ] **C831** — An agent holding organisation.admit on its organisation admits a person through POST /people/admit by its relayed signature or by an approved app's agent pass, the first grant asked held to the agent's own chain, every leaf signed as the agent and naming its responsible person; without the grant it is refused NotHeld naming who can give it (AGENTS-019 R2).
+- [ ] **C832** — An agent holding person.profile.set or person.email.set changes another person's profile or email through MCP; POST /directory/people/{id}/account/password and the person's own sign-in routes refuse an agent WithheldFromAgents by name (AGENTS-019 R3).
+- [ ] **C833** — Every Lys route that is not public either admits an agent's signature judged by its declared scope, or is on HUMAN_ONLY with its reason, or is a kept responsibility; tests/agent_route_parity.rs fails a route on none of the three or on two (AGENTS-019 R4).
+- [ ] **C834** — what-can-I-do lists for an agent every route whose declared scope its live grants reach, administrator-body routes included (AGENTS-019 R4).
+- [ ] **C835** — A person's dashboard acted-by-agents list carries every act their agents did under an act moved by R1 and every admission an agent made for them, newest first, in plain words, beside the registrations and starts it lists today (AGENTS-019 R5).

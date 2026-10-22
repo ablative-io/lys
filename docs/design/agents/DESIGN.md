@@ -221,6 +221,7 @@ The seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path th
 | `crates/lys/Cargo.toml` | the lys crate's test dependencies on the identity contract harness and the server, for enrol's reds | AGENTS-017 |
 | `surface/identity/src/features/file/IdentityFile.tsx` | the agent file's head menu names the emergency act Withdraw | AGENTS-017 |
 | `crates/lys-core/Cargo.toml` | serde_json for the seat file reader and writer | AGENTS-017 |
+| `docs/design/identity/GRANT-CONTRACT.md` | the grant contract: which acts an agent may be given, and which are kept from every agent | AGENTS-019 |
 
 ## Inventory
 

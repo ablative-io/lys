@@ -1,0 +1,179 @@
+{
+  "id": "AGENTS-019",
+  "cluster": "agents",
+  "title": "A person can give their AI everything but a person's credentials: adding people, changing their details, and every route the screens reach, each act the AI's own and on the person's dashboard",
+  "depends_on": [
+    "AGENTS-015",
+    "DIRECTORY-113"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C829",
+    "C830",
+    "C831",
+    "C832",
+    "C833",
+    "C834",
+    "C835"
+  ],
+  "stories": [
+    "S468",
+    "S469",
+    "S470"
+  ],
+  "design_anchor": [],
+  "purpose": "Tom, 22 October 2026, by voice: at 11:57, \"the most important thing to anybody is gonna be that their AI is able to use it ... full delegatable responsibilities\"; at 12:06, \"we need to be able to assign everything to AI. ... add a person, edit details, that kind of thing, that's gonna be a big thing.\" His standing rule, 23 September 2026 10:19: \"If a human can do it through the UI, then I want an agent to be able to do it\", with who may do it the permission system's to rule. Measured on the live install at 12:2x on 22 October: Waffles' own Lys MCP connection (an agent) read GET /people and was answered 403 NotHeld, \"holds no grant of read on person:all\", with can_grant naming Tom. So Lys already judges an agent by its own grants on every route with a declared scope (crates/lys-identity-server/src/route_actions.rs:13-60; routes.rs:330-356, admitted_agent), and delegation is a grant away for those routes. Three things stop the rest. First, crates/lys-identity/src/grants/shipped.rs:137-170, WITHHELD_FROM_AGENTS, names thirty-two acts no agent may be given whatever grant they come from, among them organisation.admit (adding a person) and person.email.set (changing a person's details); it arrived as a work-in-progress default on 2 October (5632a461), with no ruling of Tom's behind it, and AGENTS-015 R1 already moved five acts out of it, held to the giver's chain. Second, 42 routes that a person reaches declare no scope (crates/lys-identity-server/src/openapi_table.rs), so route_actions refuses an agent on them as Undeclared, whatever it holds. Third, discovery hides administrator-body routes from a non-administrator agent (mcp_endpoint/discovery.rs:168-176), so an agent given organisation.admit is not shown /people/admit. Decided here by Waffles under Tom's rule 13 (10 October: the decisions a brief leaves open are Waffles' to make by Tom's rules, with a stated reason): every act becomes one a person can give an agent, held to that person's own rights, except setting another person's password, sign-in or login. The reason for that exception is the standing rule that no seat ever holds a person's credential. Nothing an agent does with authority a person gave it is invisible to that person (AGENTS-015).",
+  "task": "Shrink WITHHELD_FROM_AGENTS to the three credential acts and let a person give an agent every other act, held to the giver's own live grant; let an agent holding organisation.admit admit a person through /people/admit as itself; let an agent change another person's profile and email; give every person-reachable route a declared scope or a place on one closed human-only list, with a parity test; show an agent every route its grants reach; and put every act an agent did with moved authority on its person's dashboard. Every red is written and shown red before its code; the whole brief is written before anything is built.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "A person can give an agent every act but a person's credentials, held to the giver's own grant",
+      "spec": "Structural and behavioural. In crates/lys-identity/src/grants/shipped.rs, WITHHELD_FROM_AGENTS SHALL name exactly person.password.set, person.sign-in.set, person.login.bind; the twenty-nine other acts it names at 448c6751 (agent.certificate.issue, agent.certificate.withdraw, agent.policy.set, budget.set, configuration.zone.set, grant, identity.transition, organisation.administer, organisation.admit, organisation.grant, person.email.set, request.approve, request.decline, role.create, role.holder.assign, role.holder.end, role.holder.move, role.revise, runtime.stop-everything, secret.add, secret.drop, secret.recipients, secret.replace, secret.retire, secret.scope, service-account.create, service-account.retire, team.budget.set, seat.import) SHALL move to AGENT_MAY_HOLD, kept in its sorted order, and SHALL be added to AGENTS_NOT_MACHINES, so that a machine still never holds any of them (machine_may_hold is unchanged in shape). The doc comment above WITHHELD_FROM_AGENTS SHALL say the three are kept because no seat ever holds or sets a person's credential (Tom's standing rule), and nothing else. WHEN a grant of a moved act is issued or passed on to an agent THE SYSTEM SHALL require it to stand on a live grant of the same act held by the giving person, through the source relation (ADR-078's delegated grant, the same chain grant.delegate walks; crates/lys-identity-server/src/grants.rs and who_can_grant.rs), refusing a root grant of a moved act to an agent by name, moved_act_needs_giver, so withdrawing the giver's grant ends the agent's on the same revoke event. WHEN an agent asks POST /requests/{id}/approve or /decline for a request whose recorded asker is that agent THE SYSTEM SHALL refuse own_request by name, as provisioning_review_own_version refuses an agent's review of its own version. shipped_model()'s version follows its own rule at shipped.rs:11 and the test that holds it. Red first: crates/lys-identity-server/tests/agent_roots.rs's withheld-list assertion (:304) is changed to the three acts and is red at 448c6751; a new test there gives an agent organisation.admit passed on from the administrator's own grant and asserts the grant stands, then withdraws the administrator's grant and asserts the agent's is gone; a root grant of organisation.admit to an agent is refused moved_act_needs_giver; an agent's approval of its own request is refused own_request.",
+      "acceptance": [
+        "WITHHELD_FROM_AGENTS is exactly the three credential acts, and shipped.rs's test that every shipped act is classified once still passes.",
+        "A grant of a moved act to an agent stands only on the giver's own live grant, and ends when the giver's grant is withdrawn, shown by the new test in agent_roots.rs.",
+        "A machine is refused every moved act, MachineRefused, as before.",
+        "An agent approving or declining its own request is refused own_request."
+      ],
+      "checklist": [
+        "C829",
+        "C830"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity/src/grants/shipped.rs",
+          "crates/lys-identity-server/src/grants.rs",
+          "crates/lys-identity-server/src/who_can_grant.rs",
+          "crates/lys-identity-server/src/requests_api.rs",
+          "crates/lys-identity-server/tests/agent_roots.rs",
+          "docs/design/identity/GRANT-CONTRACT.md"
+        ],
+        "delete": []
+      },
+      "stories": [
+        "S468",
+        "S470"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "An agent holding organisation.admit adds a person as itself",
+      "spec": "Behavioural. POST /people/admit (crates/lys-identity-server/src/openapi_table.rs:166) SHALL admit an agent's signature (class G) and SHALL declare the right it is judged by as organisation.admit on the caller's organisation, the same right people_admission::organisation (people_admission.rs:30-70) asks, so that the route and its handler ask one right, not person.create and organisation.admit. In people_admit.rs admit (:255), WHEN the caller is an agent, by its relayed MCP signature (routes::signed_in, routes.rs:330-341) or by an approved app's agent pass (crate::agent_pass::holder), THE SYSTEM SHALL judge checked() with the agent's own Actor: caller_within (caller_admission.rs:29) answers the agent's organisation, organisation.admit is decided on the agent's grants, and the first grant asked, when there is one, SHALL be passed on from a live grant of the agent's that covers it, refused by who_can_grant's named refusal when the agent holds none. An approved app's agent pass SHALL keep DIRECTORY-113 R1's narrowing: the first grant asked is on a kind the asking app owns (people_admit_app.rs owned_kind), and the handed link's origin is the app's, so Cambium's door, asking with a seat's kept agent pass, admits as the seat's agent exactly as it admits as a person today. Every leaf the act writes SHALL be signed as the agent, naming its responsible person beside it, as DIRECTORY-113 Amendment 2 names the app beside the person. Red first: crates/lys-identity-server/tests/people_admit_agent.rs, on the harness Service: an agent given organisation.admit by the administrator admits 'Bea Example' <bea@example.test> through a relayed MCP call to /people/admit and the answer carries her person id and the handed link; the same agent without the grant is refused NotHeld with can_grant naming the administrator; an agent asking for a first grant it does not hold is refused by name; an approved app's agent pass admits with a first grant on the app's own kind and is refused not_your_app on another kind. All red at 448c6751, because organisation.admit is withheld from agents.",
+      "acceptance": [
+        "An agent holding organisation.admit admits a person through MCP and through an approved app's agent pass; the receipt and every leaf name the agent and its responsible person.",
+        "Without the grant the agent is refused NotHeld, can_grant naming who may give it; nothing is recorded.",
+        "A first grant the agent cannot give is refused by name before any step; nothing is recorded."
+      ],
+      "checklist": [
+        "C831"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/people_admit_agent.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/people_admit.rs",
+          "crates/lys-identity-server/src/people_admit_app.rs"
+        ],
+        "delete": []
+      },
+      "stories": [
+        "S468"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "An agent edits a person's details; nobody's password or sign-in is ever an agent's",
+      "spec": "Behavioural. POST /identities/{id}/profile is already class G and judged by person.profile.set (openapi_table.rs:163); POST /directory/people/{id}/account/email SHALL become class G, judged by person.email.set on the person. POST /directory/people/{id}/account/password, POST /people/{id}/logins, the sign-in provider routes and the caller's own account routes (/me/account, /me/account/email, /me/account/password) SHALL refuse an agent with WithheldFromAgents, naming the act, before anything is read or written. Red first: crates/lys-identity-server/tests/people_details_agent.rs: an agent given person.profile.set and person.email.set on Bea changes her display name and her email through relayed MCP calls, and each change's leaf names the agent; the same agent asking to set Bea's password is refused WithheldFromAgents naming person.password.set. The email change is red at 448c6751.",
+      "acceptance": [
+        "An agent with the grants changes another person's display name and email through MCP.",
+        "An agent asking to set anyone's password, sign-in or login is refused WithheldFromAgents by name, whatever it holds."
+      ],
+      "checklist": [
+        "C832"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/people_details_agent.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/openapi_table.rs"
+        ],
+        "delete": []
+      },
+      "stories": [
+        "S468",
+        "S470"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "Every route a person reaches is one an agent can be given, or is on one closed human-only list",
+      "spec": "Structural. openapi_table.rs SHALL gain HUMAN_ONLY, a list of (method, path, reason): POST /setup (first-run setup, before any grant exists); GET /me/account, POST /me/account/email, POST /me/account/password, POST /directory/people/{id}/account/password, POST /people/{id}/logins, GET and POST /sign-in-providers (a person's credentials and sign-in); GET /me, PUT /me/getting-started, GET /dashboard, GET and PUT /canvas, POST /canvas/layouts and /canvas/layouts/remove, GET /sessions and POST /sessions/{id}/end (a person's own screens and browser sessions; an agent has its own: GET /agent/grants and what-can-I-do). Every other route that is not public SHALL admit an agent's signature (class G) and declare its scope. The routes with none at 448c6751 SHALL take these: GET /drafts and GET /waiting, read on draft; POST /drafts/{id}/approve, /refuse and /correct, draft.decide on the draft, an agent never deciding a draft it drafted (own_draft); GET /operations/{operation}, read on operation; POST /grants/{id}/tokens, grant.delegate on the grant; POST /grants/agent-roots, grant on the agent; POST /budgets/person/{id}/confirm, budget.set on the person; GET /security-events, read on configuration; POST /alarms/{id}/acknowledge, alarm.acknowledge on the alarm; POST /agents/{id}/goals, agent.goal.set on the agent; POST /teams/{id}/goals, team.goal.set on the team; GET /words, GET /agents/{id}/words and POST /words/preview, read on words; POST /words/templates/{name}, /words/{slot}, /agents/{id}/words/{slot} and /runtime/sessions/{id}/words/{slot}, words.set on the layer they set; GET /schedules and /schedules/{id}, read on schedule; POST /schedules, /schedules/{id}/change and /schedules/{id}/stop, schedule.set on the schedule; POST /seats/{name}/retire, seat.retire on the seat. A new action (draft.decide, alarm.acknowledge, agent.goal.set, team.goal.set, words.set, schedule.set, seat.retire) and a new kind (draft, operation, alarm, words, schedule) SHALL be added to shipped.rs's ACTIONS, ACTION_SENTENCES and AGENT_MAY_HOLD, and to the permission schema it renders. kept-responsibilities.json is unchanged. mcp_endpoint/discovery.rs SHALL list for an agent every route whose declared scope its live grants reach, administrator body or not (the admin_only filter at :168-176 applies to people only). A new test, crates/lys-identity-server/tests/agent_route_parity.rs, SHALL read TABLE, HUMAN_ONLY and the kept responsibilities, and fail naming any non-public route that is on none of {G with a declared scope, HUMAN_ONLY, kept}, or on two, and any HUMAN_ONLY row without a reason. It is red at 448c6751, naming every S, C and A route, the 42 with no scope among them.",
+      "acceptance": [
+        "agent_route_parity.rs passes: every non-public route is admitted to an agent by its scope, human-only with a reason, or kept.",
+        "An agent holding words.set sets a slot on an agent it may reach, through MCP; one holding nothing is refused NotHeld naming the scope, never Undeclared.",
+        "what-can-I-do for an agent holding organisation.admit lists POST /people/admit."
+      ],
+      "checklist": [
+        "C833",
+        "C834"
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/tests/agent_route_parity.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/openapi_table.rs",
+          "crates/lys-identity-server/src/mcp_endpoint/discovery.rs",
+          "crates/lys-identity/src/grants/shipped.rs",
+          "crates/lys-identity-server/src/drafts_api.rs"
+        ],
+        "delete": []
+      },
+      "stories": [
+        "S468"
+      ]
+    },
+    {
+      "id": "R5",
+      "title": "What an agent did with authority a person gave it is on that person's dashboard",
+      "spec": "Behavioural. acted_by_agents on GET /dashboard (crates/lys-identity-server/src/dashboard_api.rs:16, :232, acted() at :320), which lists today what the caller's agents registered and started for them (AGENTS-016 R5), SHALL also list every leaf signed by an agent whose responsible person is the caller and whose act is one R1 moved or a person's admission (R2), newest first in the same list, each an ActedLine whose kind names the act and whose subject is the resource acted on, with the time and its receipt index. ActedByAgents.tsx (surface/identity/src/features/dashboard) SHALL say each new line in plain words from ACTION_SENTENCES, '<agent> <sentence> for you, <time>.', keeping Stop for a started line and Withdraw on every line as today. Red first: a dashboard test where an agent admits Bea for the administrator lists that admission in acted_by_agents with the agent's name; the screen's vitest shows the line. Both red at 448c6751.",
+      "acceptance": [
+        "An agent's admission of a person and change of a person's email both appear in the responsible person's acted-by-agents list, newest first, with the agent named.",
+        "Another person's dashboard shows none of them."
+      ],
+      "checklist": [
+        "C835"
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/dashboard_api.rs",
+          "surface/identity/src/features/dashboard/ActedByAgents.tsx",
+          "surface/identity/src/features/dashboard/contract.ts"
+        ],
+        "delete": []
+      },
+      "stories": [
+        "S469"
+      ]
+    }
+  ],
+  "boundaries": [
+    "An agent acts as itself under its own grants, never as a person: no route signs as a person for an agent, and no seat holds a person's credential",
+    "Nothing moves out of the kept responsibilities (kept-responsibilities.json): a deployment still keeps first-run setup, root grants and sign-in providers for people",
+    "Machines gain nothing: every moved act joins AGENTS_NOT_MACHINES",
+    "No grant is given by this brief: each act becomes givable, and giving it stays a person's act on the screens or through grant.delegate",
+    "No fixed waits (Tom, 15 October 2026) in any test or code this brief adds",
+    "Cambium's door is not changed here; IDENT-009 is its half"
+  ],
+  "verification": [
+    "gate -stages nextest -crates lys-identity,lys-identity-server -test 'binary(agent_roots) | binary(people_admit_agent) | binary(people_details_agent) | binary(agent_route_parity)' (the red run first, then the green, both records on the handback)",
+    "The whole Lys gate on the final commit, judged by its parsed failures",
+    "On the installed release: the administrator gives an agent organisation.admit from the screens, the agent admits a person through Lys's MCP, and the admission shows in the administrator's acted-by-agents list on the dashboard"
+  ],
+  "amendments": []
+}

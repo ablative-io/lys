@@ -360,6 +360,46 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "Everything but a person's credentials can be given to an AI (AGENTS-019)",
+      "items": [
+        {
+          "id": "C829",
+          "text": "WITHHELD_FROM_AGENTS names exactly person.password.set, person.sign-in.set and person.login.bind; the other twenty-nine acts it named are in AGENT_MAY_HOLD and in AGENTS_NOT_MACHINES, so a person can give them to an agent and no machine ever holds them (AGENTS-019 R1).",
+          "done": false
+        },
+        {
+          "id": "C830",
+          "text": "A grant to an agent of an act moved by R1 stands only on the giving person's own live grant of that act, and withdrawing the giver's grant ends the agent's with it; an agent never approves or declines a request it made, refused own_request (AGENTS-019 R1).",
+          "done": false
+        },
+        {
+          "id": "C831",
+          "text": "An agent holding organisation.admit on its organisation admits a person through POST /people/admit by its relayed signature or by an approved app's agent pass, the first grant asked held to the agent's own chain, every leaf signed as the agent and naming its responsible person; without the grant it is refused NotHeld naming who can give it (AGENTS-019 R2).",
+          "done": false
+        },
+        {
+          "id": "C832",
+          "text": "An agent holding person.profile.set or person.email.set changes another person's profile or email through MCP; POST /directory/people/{id}/account/password and the person's own sign-in routes refuse an agent WithheldFromAgents by name (AGENTS-019 R3).",
+          "done": false
+        },
+        {
+          "id": "C833",
+          "text": "Every Lys route that is not public either admits an agent's signature judged by its declared scope, or is on HUMAN_ONLY with its reason, or is a kept responsibility; tests/agent_route_parity.rs fails a route on none of the three or on two (AGENTS-019 R4).",
+          "done": false
+        },
+        {
+          "id": "C834",
+          "text": "what-can-I-do lists for an agent every route whose declared scope its live grants reach, administrator-body routes included (AGENTS-019 R4).",
+          "done": false
+        },
+        {
+          "id": "C835",
+          "text": "A person's dashboard acted-by-agents list carries every act their agents did under an act moved by R1 and every admission an agent made for them, newest first, in plain words, beside the registrations and starts it lists today (AGENTS-019 R5).",
+          "done": false
+        }
+      ]
     }
   ]
 }

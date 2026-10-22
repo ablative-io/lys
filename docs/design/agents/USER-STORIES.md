@@ -22,6 +22,12 @@
 
 **S453.** As the owner, I want to give an agent its roots in one choice and to review a profile's content once for all my agents, so that setting up a second agent is minutes, not a morning.
 
+**S468.** As Tom, I want to give my AI the right to add people to the organisation and to change their details, and have it do so as itself, so that onboarding a person is something I can hand over whole.
+
+**S469.** As Tom, I want every act my AI does with authority I gave it to be on my dashboard, with who, what and when, so that handing it everything never means losing sight of what was done in my name.
+
+**S470.** As a person giving an AI authority, I want it never to hold or set anyone's password or sign-in, and never to be able to give more than I hold, so that delegating is safe by construction rather than by trust.
+
 ## Archie — an agent
 
 **S403.** As an agent, I want to read and set my own variables with a revision, so that my focus survives a compaction and nobody overwrites it blind.

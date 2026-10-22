@@ -774,6 +774,11 @@
       "path": "crates/lys-core/Cargo.toml",
       "note": "serde_json for the seat file reader and writer",
       "brief": "AGENTS-017"
+    },
+    {
+      "path": "docs/design/identity/GRANT-CONTRACT.md",
+      "note": "the grant contract: which acts an agent may be given, and which are kept from every agent",
+      "brief": "AGENTS-019"
     }
   ],
   "principles": [
