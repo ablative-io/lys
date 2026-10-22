@@ -4,7 +4,7 @@
  * agent's stop; Withdraw, on every line, is the emergency act behind the agent file's confirmation, headed Withdraw,
  * its receipt saying the registrar cannot certify the agent again. A registered line has no session and shows
  * Withdraw alone. AGENTS-019 R5: an act an agent took with a grant is said in its shipped sentence, '<agent>
- * <sentence> for you, <time>.', with Withdraw for the agent that acted and no Stop. No lines, no heading. No clocks:
+ * used its grant for you, <time>: <sentence>.', with Withdraw for the agent that acted and no Stop. No lines, no heading. No clocks:
  * every wait is the page changing.
  */
 import { createRoot } from 'react-dom/client';
@@ -140,8 +140,8 @@ describe('Acted for you by your agents, on the Dashboard', () => {
     const rows = [...container.querySelectorAll('[data-acted-line]')];
     expect(rows.map((row) => row.getAttribute('data-acted-line'))).toEqual(['person.email.set', 'organisation.admit', 'started', 'registered']);
     expect(rows.map((row) => row.querySelector('[data-acted-words]')?.textContent)).toEqual([
-      expect.stringMatching(/^Helper change this person’s email for you, .+\.$/),
-      expect.stringMatching(/^Helper admit a person into this organisation for you, .+\.$/),
+      expect.stringMatching(/^Helper used its grant for you, .+: Change this person’s email\.$/),
+      expect.stringMatching(/^Helper used its grant for you, .+: Admit a person into this organisation\.$/),
       expect.stringMatching(/^Scribe started Runner for you, /),
       expect.stringMatching(/^Scribe registered Helper for you, /),
     ]);
