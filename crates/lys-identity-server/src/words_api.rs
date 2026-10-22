@@ -2,8 +2,10 @@
 //! asks (R3): the administrator sets the workspace layer and the templates;
 //! an agent's responsible person or the administrator sets its layer and
 //! its sessions' layers; anyone who may read the agent reads its slots
-//! resolved. A preview renders a slot for a session with the numbers the
-//! caller supplies and sends nothing.
+//! resolved. An agent given `words.set`, or reading, on the words by its
+//! own grant, judged at the door, does the same (AGENTS-019 R4). A preview
+//! renders a slot for a session with the numbers the caller supplies and
+//! sends nothing.
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -148,9 +150,18 @@ fn named(state: &AppState, actor: &lys_identity::Actor) -> Result<String, Server
     }
 }
 
-/// The administrator, by name.
+/// An agent the door admitted by its own grant of the route's act on these
+/// words (AGENTS-019 R4), by name; none for every other caller.
+fn agent(state: &AppState, actor: &lys_identity::Actor) -> Result<Option<String>, ServerError> {
+    Ok(crate::routes::door_agent(state, actor)?.map(|agent| agent.to_string()))
+}
+
+/// The administrator, or an agent given the act, by name.
 fn administrator(state: &AppState, headers: &HeaderMap) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
+    if let Some(agent) = agent(state, &actor)? {
+        return Ok(agent);
+    }
     if !is_administrator(state, &actor)? {
         return Err(ServerError::NotAdmitted {
             reason: "only the administrator sets the workspace's words and templates",
@@ -159,11 +170,14 @@ fn administrator(state: &AppState, headers: &HeaderMap) -> Result<String, Server
     named(state, &actor)
 }
 
-/// The caller admitted to an agent's words: its responsible person or the
-/// administrator, by name.
+/// The caller admitted to an agent's words: its responsible person, the
+/// administrator or an agent given the act, by name.
 fn over_agent(state: &AppState, headers: &HeaderMap, agent: &str) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
     let agent_id = AgentId::from_str(agent).map_err(|_unread| ServerError::AgentNotVisible)?;
+    if let Some(given) = self::agent(state, &actor)? {
+        return Ok(given);
+    }
     if is_administrator(state, &actor)? {
         return named(state, &actor);
     }

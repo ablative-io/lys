@@ -59,6 +59,22 @@ scopes! {
     tree: "GET", "/tree", "team", "all", "read";
     teams_list: "GET", "/teams", "team", "all", "read";
     teams_create: "POST", "/teams", "team", "all", "team.create";
+    drafts_list: "GET", "/drafts", "draft", "all", "read";
+    draft_refuse: "POST", "/drafts/one/refuse", "draft", "one", "draft.decide";
+    operation: "GET", "/operations/one", "operation", "one", "read";
+    grant_tokens: "POST", "/grants/one/tokens", "grant", "one", "grant.delegate";
+    budget_confirm: "POST", "/budgets/person/one/confirm", "person", "one", "budget.set";
+    security_events: "GET", "/security-events", "configuration", "all", "read";
+    alarm_acknowledge: "POST", "/alarms/one/acknowledge", "alarm", "one", "alarm.acknowledge";
+    agent_goal_set: "POST", "/agents/one/goals", "agent", "one", "agent.goal.set";
+    team_goal_set: "POST", "/teams/one/goals", "team", "one", "team.goal.set";
+    words_read: "GET", "/words", "words", "all", "read";
+    words_template: "POST", "/words/templates/one", "words", "all", "words.set";
+    agent_words: "POST", "/agents/one/words/two", "words", "one", "words.set";
+    schedules_create: "POST", "/schedules", "schedule", "all", "schedule.set";
+    schedule_read: "GET", "/schedules/one", "schedule", "one", "read";
+    seat_retire: "POST", "/seats/one/retire", "seat", "one", "seat.retire";
+    people_admit: "POST", "/people/admit", "organisation", "all", "organisation.admit";
 }
 
 #[test]

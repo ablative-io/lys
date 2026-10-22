@@ -17,6 +17,7 @@ use lys_log_store::FileLeafStore;
 use serde::{Deserialize, Serialize};
 
 use crate::error::ServerError;
+use crate::error_agent_acts::AgentActsError;
 use crate::routes::{AppState, hex, signed_in, with_directory};
 
 /// The resource and action the prepared mutation names.
@@ -274,8 +275,9 @@ async fn create(
     })
 }
 
-/// The signed-in person's own session, the only caller who may decide a
-/// draft or list the drafts they may decide.
+/// The signed-in person's own session, or an agent the guarded router
+/// admitted on its own `draft.decide` or `read` grant (AGENTS-019 R4): the
+/// callers who may decide a draft or list the drafts they may decide.
 pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, ServerError> {
     signature_boundary(headers)?;
     if headers.contains_key(crate::agent_signature::HEADER) {
@@ -284,6 +286,9 @@ pub(crate) fn personal(state: &AppState, headers: &HeaderMap) -> Result<Actor, S
         });
     }
     let actor = signed_in(state, headers)?;
+    if crate::routes::door_agent(state, &actor)?.is_some() {
+        return Ok(actor);
+    }
     if !actor.provenance().method().is_person_signed_in() {
         return Err(ServerError::NotAdmitted {
             reason: "only the responsible person's session may decide a draft",
@@ -313,13 +318,30 @@ fn responsible(
     draft: OperationId,
 ) -> Result<IdentityId, ServerError> {
     let projection = directory.projection()?;
-    let person = crate::read_api::own_person(projection, actor)?;
-    let held =
+    let found = |draft: OperationId| {
         projection
             .draft(draft)
             .ok_or_else(|| lys_identity::IdentityError::DraftNotFound {
                 draft: draft.to_string(),
-            })?;
+            })
+    };
+    // An agent admitted on its own `draft.decide` grant decides for the
+    // draft's responsible person, never a draft it made itself.
+    if crate::routes::admitted_agent(projection, actor)?
+        && let Some(agent) = actor.provenance().agent()
+    {
+        let held = found(draft)?;
+        if held.created.actor.provenance().agent() == Some(agent) {
+            return Err(AgentActsError::OwnDraft {
+                agent: agent.to_string(),
+                draft: draft.to_string(),
+            }
+            .into());
+        }
+        return Ok(held.created.reviewer);
+    }
+    let person = crate::read_api::own_person(projection, actor)?;
+    let held = found(draft)?;
     if !decides(held, person) {
         if by_app {
             return Err(crate::provider::app_person_refused("draft"));

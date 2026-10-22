@@ -8,8 +8,9 @@
 
 use std::str::FromStr;
 
+use lys_identity::grants::shipped::ORGANISATION_GRANT;
 use lys_identity::grants::{Action, ExerciseRequest, GrantError, Resource, Route};
-use lys_identity::{Actor, OrganisationId};
+use lys_identity::{Actor, IdentityId, OrganisationId};
 use lys_log_store::LeafStore;
 
 use crate::error::ServerError;
@@ -52,21 +53,47 @@ pub(crate) fn organisation<S: LeafStore>(
     }
     let resource = Resource::new("organisation", &organisation.to_string())?;
     judged.apps.admit_kind(None, resource.kind())?;
-    judged.apps.admit_action(resource.kind(), ADMIT)?;
+    // An agent admits only holding the right to give the first grant as well
+    // (AGENTS-019 amendment, 22 October 2026), asked first and recorded by
+    // the grant it gives; a person's one right stands.
+    if matches!(caller, IdentityId::Agent(_)) {
+        asked(
+            judged,
+            (caller, &resource, ORGANISATION_GRANT),
+            Decision::Explain,
+            "an agent admitting a person needs organisation.admit and organisation.grant on its own organisation",
+        )?;
+    }
+    asked(
+        judged,
+        (caller, &resource, ADMIT),
+        decision,
+        "admitting a person needs organisation.admit on the caller's own organisation",
+    )?;
+    Ok(organisation)
+}
+
+/// Decide `act` on `resource` for `caller`, refused `NotAdmitted` for
+/// `refused` when no live grant of the caller's carries it.
+fn asked<S: LeafStore>(
+    judged: &mut Judged<'_, S>,
+    (caller, resource, act): (IdentityId, &Resource, &str),
+    decision: Decision,
+    refused: &'static str,
+) -> Result<(), ServerError> {
+    judged.apps.admit_action(resource.kind(), act)?;
     let request = ExerciseRequest {
         caller,
         route: Route::Api,
-        resource,
-        action: Action::new(ADMIT)?,
+        resource: resource.clone(),
+        action: Action::new(act)?,
     };
     let at = crate::session::now();
     match crate::grants::decide(judged, &request, at, None, decision) {
-        Ok(_) => Ok(organisation),
+        Ok(_) => Ok(()),
         Err(
             GrantError::NotHeld { .. } | GrantError::Revoked { .. } | GrantError::Expired { .. },
-        ) => Err(ServerError::NotAdmitted {
-            reason: "admitting a person needs organisation.admit on the caller's own organisation",
-        }),
+        ) => Err(ServerError::NotAdmitted { reason: refused }),
         Err(error) => Err(error.into()),
     }
 }

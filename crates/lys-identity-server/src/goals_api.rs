@@ -1,7 +1,9 @@
 //! The goal routes: the person responsible for an agent, a team's owner or
 //! the administrator sets goals, expectations and deliverables on it, each
 //! with its words, its deadline and its reminders, and reads them with
-//! their standing and every reminder fired.
+//! their standing and every reminder fired. An agent given `agent.goal.set`
+//! or `team.goal.set` on the holder by its own grant, judged at the door,
+//! sets them as the administrator does (AGENTS-019 R4).
 //!
 //! An item is marked met, missed or dropped only by its responsible person
 //! or by the holder of a grant of the action the item names on its holder.
@@ -109,7 +111,8 @@ pub(crate) fn goals(state: &AppState) -> Result<&Goals, ServerError> {
 
 /// The holder the caller may set and read goals on, and the person
 /// responsible for them: an agent's responsible person or a team's owner,
-/// or the administrator.
+/// or the administrator, or an agent the door admitted by its own grant of
+/// the route's act on the holder (AGENTS-019 R4).
 fn holder(
     state: &AppState,
     headers: &HeaderMap,
@@ -117,10 +120,15 @@ fn holder(
     id: &str,
 ) -> Result<(Holder, String), ServerError> {
     let actor = signed_in(state, headers)?;
-    let administrator = crate::routes::is_administrator(state, &actor)?;
-    let person = with_directory(state, |directory| {
-        own_person(directory.projection()?, &actor)
-    })?;
+    let given = crate::routes::door_agent(state, &actor)?.is_some();
+    let administrator = given || crate::routes::is_administrator(state, &actor)?;
+    let person = if given {
+        None
+    } else {
+        Some(with_directory(state, |directory| {
+            own_person(directory.projection()?, &actor)
+        })?)
+    };
     let responsible = match kind {
         HolderKind::Agent => {
             let agent = AgentId::from_str(id).map_err(|_unread| ServerError::AgentNotVisible)?;
@@ -131,14 +139,17 @@ fn holder(
                     .ok_or(ServerError::AgentNotVisible)?;
                 Ok(record.responsible())
             })?;
-            if !administrator && responsible != Some(person) {
+            if !administrator && (responsible.is_none() || responsible != person) {
                 return Err(ServerError::AgentNotVisible);
             }
-            responsible.unwrap_or(person).to_string()
+            responsible
+                .or(person)
+                .ok_or(ServerError::AgentNotVisible)?
+                .to_string()
         }
         HolderKind::Team => {
             let owner = team(state, id)?.created.owner;
-            if !administrator && owner != person.to_string() {
+            if !administrator && person.is_none_or(|person| owner != person.to_string()) {
                 return Err(ServerError::NotAdmitted {
                     reason: "only the team's owner or the administrator sets and reads its goals",
                 });
@@ -288,9 +299,13 @@ async fn set(
     let operation = OperationId::from_str(&body.operation)?;
     checked(&body)?;
     let (holder, responsible) = holder(state, headers, kind, id)?;
-    let set_by = with_directory(state, |directory| {
-        own_person(directory.projection()?, &actor)
-    })?;
+    let set_by = match crate::routes::door_agent(state, &actor)? {
+        Some(agent) => agent.to_string(),
+        None => with_directory(state, |directory| {
+            own_person(directory.projection()?, &actor)
+        })?
+        .to_string(),
+    };
     let at = now();
     if body.deadline.is_some_and(|deadline| deadline <= at) {
         return Err(malformed("the deadline has passed"));
@@ -306,7 +321,7 @@ async fn set(
         judged_by: body.judged_by,
         reminders: body.reminders,
         responsible,
-        set_by: set_by.to_string(),
+        set_by,
         at,
     };
     let goals = goals(state)?;

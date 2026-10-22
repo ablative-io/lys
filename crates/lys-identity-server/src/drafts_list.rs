@@ -6,7 +6,9 @@
 //! `POST /drafts/{id}/approve` or `/refuse`: the signed-in person's own
 //! session, when they are the draft's responsible person. No one else is
 //! shown another person's drafts, the administrator included, since the
-//! decisions admit no one else either.
+//! decisions admit no one else either. An agent admitted at the door on its
+//! own `draft` grant is shown the drafts its responsible person decides, the
+//! ones its own `draft.decide` grants may then decide (AGENTS-019 R4).
 //!
 //! `state` chooses the rows: `waiting`, the default, answers the drafts still
 //! awaiting a decision; `decided` those approved, refused or corrected; `all`
@@ -205,9 +207,18 @@ pub(crate) fn listed(
         .map(|page| page.members(state))
         .transpose()?
         .flatten();
+    let agent = crate::routes::door_agent(state, &actor)?;
     with_directory(state, |directory| {
         let projection = directory.projection()?;
-        let person = own_person(projection, &actor)?;
+        // An agent admitted on its own `draft` read grant lists the drafts
+        // its responsible person decides (AGENTS-019 R4).
+        let person = match agent {
+            Some(agent) => projection
+                .record(IdentityId::Agent(agent))
+                .and_then(lys_identity::projection::Record::responsible)
+                .ok_or(ServerError::NoPerson)?,
+            None => own_person(projection, &actor)?,
+        };
         let responsible = person_summary(person, person_record(projection, person)?);
         let rows = projection
             .drafts()

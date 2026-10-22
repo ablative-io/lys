@@ -1,4 +1,5 @@
-//! Recovery events are visible only to the administrator, without bearer codes.
+//! Recovery events are visible only to the administrator, or an agent given
+//! reading on the configuration, without bearer codes.
 
 use crate::error::ServerError;
 use crate::routes::{AppState, is_administrator, signed_in};
@@ -68,7 +69,10 @@ async fn list(
 ) -> Result<Json<RecoveryEvents>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let administrator = is_administrator(&state, &actor)?;
-    let events = if administrator {
+    // An agent reads them by its own grant of reading the configuration,
+    // judged at the door (AGENTS-019 R4).
+    let given = crate::routes::door_agent(&state, &actor)?.is_some();
+    let events = if administrator || given {
         recovery_events::read(&directory(&state))
             .map_err(unavailable)?
             .into_iter()

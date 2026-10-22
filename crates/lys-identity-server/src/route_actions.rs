@@ -61,6 +61,20 @@ pub(crate) fn admit(
             .into_response(),
         ));
     }
+    // A route a person keeps from every agent (AGENTS-019 R4) is refused by
+    // its reason, whatever the agent holds.
+    if let Some(reason) = crate::openapi_table::human_only(method, path) {
+        return Err(Box::new(
+            crate::error::ServerError::NotAdmitted { reason }.into_response(),
+        ));
+    }
+    // Admitting a person is judged by its handler alone, for a run pass as
+    // for a relayed MCP call: it asks `organisation.grant` of an agent and
+    // exercises `organisation.admit` once, in the register step, on the
+    // caller's own organisation, so one admission records one use.
+    if method == "POST" && path == "/people/admit" {
+        return Ok(());
+    }
     let refusal = crate::grants_reads::with_read_grants(
         state,
         None,

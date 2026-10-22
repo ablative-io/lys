@@ -1,8 +1,10 @@
 //! The schedules routes (AGENTS-001 R4): the administrator, or the person
 //! responsible for every agent a schedule names, sets, changes and stops
-//! it and reads it with every occurrence and delivery; and the task that
-//! fires each occurrence when it falls due, through each recipient's
-//! sessions' runners, under the runner's operation ids.
+//! it and reads it with every occurrence and delivery, as does an agent
+//! given `schedule.set`, or reading, on it by its own grant, judged at the
+//! door (AGENTS-019 R4); and the task that fires each occurrence when it
+//! falls due, through each recipient's sessions' runners, under the
+//! runner's operation ids.
 
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -117,10 +119,14 @@ fn agents_of(state: &AppState, recipients: &[Recipient]) -> Result<Vec<String>, 
         .collect()
 }
 
-/// The caller admitted over every agent in `agents`: the administrator, or
-/// the person responsible for each of them; by name.
+/// The caller admitted over every agent in `agents`: the administrator, the
+/// person responsible for each of them, or an agent the door admitted by its
+/// own grant of the route's act on the schedule (AGENTS-019 R4); by name.
 fn over(state: &AppState, headers: &HeaderMap, agents: &[String]) -> Result<String, ServerError> {
     let actor = signed_in(state, headers)?;
+    if let Some(agent) = crate::routes::door_agent(state, &actor)? {
+        return Ok(agent.to_string());
+    }
     if is_administrator(state, &actor)? {
         return match with_directory(state, |directory| {
             own_person(directory.projection()?, &actor)
@@ -155,7 +161,7 @@ async fn read_all(
 ) -> Result<Json<View>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let items = crate::schedules_store::items(schedules(&state)?)?;
-    if is_administrator(&state, &actor)? {
+    if is_administrator(&state, &actor)? || crate::routes::door_agent(&state, &actor)?.is_some() {
         return Ok(Json(View { schedules: items }));
     }
     let mut visible = Vec::new();

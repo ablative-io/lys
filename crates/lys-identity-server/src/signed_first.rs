@@ -119,6 +119,8 @@ async fn check(
     // takes no agent signature knew only a person's session, and an agent's
     // call to it answered NotSignedIn (12 Oct 2026): it is judged here as a
     // run pass's call is, through the agent's own grants for the route's action.
+    // So is every route an agent is given by its declared scope (AGENTS-019
+    // R4); only a route whose own handler judges the agent is served as it is.
     if request
         .extensions()
         .get::<crate::agent_signature::TokenPrincipal>()
@@ -127,9 +129,14 @@ async fn check(
         return next.run(request).await;
     }
     if crate::agent_signature::relayed_agent().is_some() {
-        let signed_door = door(&doors, matched.as_ref(), request.method())
-            .is_some_and(|auth| auth.iter().any(|door| matches!(door, Auth::AgentSignature)));
-        if !signed_door {
+        let handler = matched.as_ref().is_some_and(|matched| {
+            let path = matched.as_str();
+            crate::openapi_table::handler_judges(
+                pass_method(request.method()),
+                path.strip_prefix(NESTED).unwrap_or(path),
+            )
+        });
+        if !handler {
             let method = pass_method(request.method());
             let path = request
                 .uri()

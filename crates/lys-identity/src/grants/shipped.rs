@@ -8,7 +8,7 @@
 //! only adds.
 
 /// The shipped model's version. Raise it whenever [`ACTIONS`] gains one.
-pub const SHIPPED_VERSION: u64 = 6;
+pub const SHIPPED_VERSION: u64 = 7;
 
 /// The relation the organisation's founder holds on it (DIRECTORY-109 R3):
 /// every act of [`ORGANISATION_ACTIONS`].
@@ -43,6 +43,7 @@ pub const ACTIONS: &[&str] = &[
     "agent.certificate.issue",
     "agent.certificate.withdraw",
     "agent.create",
+    "agent.goal.set",
     "agent.mcp-request.approve",
     "agent.mcp-request.create",
     "agent.policy.set",
@@ -56,8 +57,10 @@ pub const ACTIONS: &[&str] = &[
     "agent.stop",
     "agent.usage.report",
     "agent.wake",
+    "alarm.acknowledge",
     "budget.set",
     "configuration.zone.set",
+    "draft.decide",
     "grant.check",
     "grant.delegate",
     "grant.reach",
@@ -101,8 +104,10 @@ pub const ACTIONS: &[&str] = &[
     "runtime-session.keys",
     "runtime-session.resize",
     "runtime.stop-everything",
+    "schedule.set",
     "seat.import",
     "seat.restart",
+    "seat.retire",
     "seat.send",
     "seat.start",
     "seat.stop",
@@ -118,11 +123,13 @@ pub const ACTIONS: &[&str] = &[
     "skill.keep",
     "team.budget.set",
     "team.create",
+    "team.goal.set",
     "team.member.add",
     "team.member.confirm",
     "team.member.remove",
     "team.parent.set",
     "team.retire",
+    "words.set",
     "write",
 ];
 
@@ -146,6 +153,7 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "agent.certificate.issue",
     "agent.certificate.withdraw",
     "agent.create",
+    "agent.goal.set",
     "agent.mcp-request.approve",
     "agent.mcp-request.create",
     "agent.policy.set",
@@ -159,8 +167,10 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "agent.stop",
     "agent.usage.report",
     "agent.wake",
+    "alarm.acknowledge",
     "budget.set",
     "configuration.zone.set",
+    "draft.decide",
     "edit",
     "grant",
     "grant.check",
@@ -205,8 +215,10 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "runtime-session.keys",
     "runtime-session.resize",
     "runtime.stop-everything",
+    "schedule.set",
     "seat.import",
     "seat.restart",
+    "seat.retire",
     "seat.send",
     "seat.start",
     "seat.stop",
@@ -222,12 +234,14 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "skill.keep",
     "team.budget.set",
     "team.create",
+    "team.goal.set",
     "team.member.add",
     "team.member.confirm",
     "team.member.remove",
     "team.parent.set",
     "team.retire",
     "view",
+    "words.set",
     "write",
 ];
 
@@ -245,15 +259,20 @@ pub fn agent_may_hold(kind: &str, action: &str) -> bool {
 /// left [`WITHHELD_FROM_AGENTS`] so an agent can set up, review and start
 /// agents for its person (AGENTS-015 R1), and the twenty-nine that left it
 /// when everything but a person's credentials became givable to an agent
-/// (AGENTS-019 R1). Each stays a responsibility no machine holds, as before.
+/// (AGENTS-019 R1), and the seven acts that gave every route a person
+/// reaches a scope an agent can be given (AGENTS-019 R4). Each stays a
+/// responsibility no machine holds, as before.
 pub const AGENTS_NOT_MACHINES: &[&str] = &[
     "agent.certificate.issue",
     "agent.certificate.withdraw",
+    "agent.goal.set",
     "agent.policy.set",
     "agent.provisioning.review",
     "agent.provisioning.set",
+    "alarm.acknowledge",
     "budget.set",
     "configuration.zone.set",
+    "draft.decide",
     "grant",
     "grant.delegate",
     "grant.revoke",
@@ -271,7 +290,9 @@ pub const AGENTS_NOT_MACHINES: &[&str] = &[
     "role.holder.move",
     "role.revise",
     "runtime.stop-everything",
+    "schedule.set",
     "seat.import",
+    "seat.retire",
     "secret.add",
     "secret.drop",
     "secret.recipients",
@@ -281,6 +302,8 @@ pub const AGENTS_NOT_MACHINES: &[&str] = &[
     "service-account.create",
     "service-account.retire",
     "team.budget.set",
+    "team.goal.set",
+    "words.set",
 ];
 
 /// Whether a machine may hold `action` on an object of `kind` (ACCESS-005
@@ -310,6 +333,7 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
         "Withdraw this agent’s certificate",
     ),
     ("agent.create", "Register an agent"),
+    ("agent.goal.set", "Set a goal for this agent"),
     (
         "agent.mcp-request.approve",
         "Approve this agent’s tool access request",
@@ -335,8 +359,10 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("agent.stop", "Stop this agent"),
     ("agent.usage.report", "Report this agent’s usage"),
     ("agent.wake", "Wake this agent"),
+    ("alarm.acknowledge", "Acknowledge this alarm"),
     ("budget.set", "Set this budget"),
     ("configuration.zone.set", "Set the network zone"),
+    ("draft.decide", "Approve, refuse or correct this draft"),
     ("grant.check", "Check and record use of this access"),
     ("grant.delegate", "Pass on this access"),
     ("grant.reach", "See what someone can access"),
@@ -407,7 +433,9 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
         "runtime.stop-everything",
         "Stop every running agent on every computer, and let agents start again",
     ),
+    ("schedule.set", "Set, change or stop this schedule"),
     ("seat.restart", "Restart this seat with a new session"),
+    ("seat.retire", "Retire this seat"),
     ("seat.send", "Send a message to this seat"),
     ("seat.start", "Start this seat"),
     ("seat.stop", "Stop this seat"),
@@ -423,11 +451,13 @@ pub const ACTION_SENTENCES: &[(&str, &str)] = &[
     ("skill.keep", "Keep this skill"),
     ("team.budget.set", "Set this team’s budget"),
     ("team.create", "Create a team"),
+    ("team.goal.set", "Set a goal for this team"),
     ("team.member.add", "Add a team member"),
     ("team.member.confirm", "Confirm this team member"),
     ("team.member.remove", "Remove this team member"),
     ("team.parent.set", "Choose this team’s parent"),
     ("team.retire", "Retire this team"),
+    ("words.set", "Set the words sent to agents"),
     ("write", "Write to this resource"),
     ("seat.import", "Import configuration into this seat"),
 ];

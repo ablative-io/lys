@@ -206,6 +206,14 @@ pub(crate) async fn reissue(
     headers: HeaderMap,
 ) -> Result<Json<AgentRoots>, ServerError> {
     let actor = signed_in(&state, &headers)?;
+    // A root is a person's to give their own agent, never an agent's
+    // (AGENTS-019 amendment, 22 October 2026): refused by name.
+    if let Some(agent) = actor.provenance().agent() {
+        return Err(GrantError::RootAuthorityRefused {
+            caller: agent.to_string(),
+        }
+        .into());
+    }
     state.admission.configured_administrator(&actor)?;
     let owner = administrator(&state)?.ok_or(ServerError::NoPerson)?;
     Ok(Json(AgentRoots {

@@ -40,7 +40,12 @@ pub(super) async fn confirm(
         kind: HolderKind::Person,
         id,
     };
-    let by = authorised(&state, &actor, &holder)?;
+    // An agent the door admitted holds budget.set on the person by its own
+    // grant (AGENTS-019 R4), recorded by its own name.
+    let by = match crate::routes::door_agent(&state, &actor)? {
+        Some(agent) => agent.to_string(),
+        None => authorised(&state, &actor, &holder)?,
+    };
     with_budgets_mut(&state, |store| {
         if !store.held().unconfirmed.iter().any(|pending| {
             pending.requested.holder == holder && pending.requested.measure == body.measure

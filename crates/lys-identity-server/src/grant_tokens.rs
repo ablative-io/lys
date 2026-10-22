@@ -237,16 +237,29 @@ async fn issue(
     if headers.contains_key(HEADER) {
         return Err(TokenError::Responsible);
     }
-    let actor = state
-        .sessions
-        .actor(crate::routes::cookie_header(&headers))?;
+    // An agent the door admitted holds grant.delegate on this grant by its
+    // own grant (AGENTS-019 R4); every other caller is the grant's
+    // responsible person, by their own session.
+    let given = match crate::routes::signed_in(&state, &headers) {
+        Ok(actor) => crate::routes::door_agent(&state, &actor)?.map(|_| actor),
+        Err(_) => None,
+    };
+    let admitted = given.is_some();
+    let actor = match given {
+        Some(actor) => actor,
+        None => state
+            .sessions
+            .actor(crate::routes::cookie_header(&headers))?,
+    };
     let id = crate::grant_contract::grant_id(&id)?;
     let at = crate::session::now();
     crate::grants::with_grants(&state, |judged| {
         Ok((|| {
             let caller = crate::caller_admission::active_caller(judged.directory, &actor)?;
             let grant = judged.grants.book().grant(id).ok_or(TokenError::Unknown)?;
-            responsible(caller, grant.responsible())?;
+            if !admitted {
+                responsible(caller, grant.responsible())?;
+            }
             let lineage = effective(judged.grants.book(), judged.directory, id, at)
                 .map_err(ServerError::from)?;
             if lineage.ends.is_some_and(|(end, _)| body.expires_at > end) {

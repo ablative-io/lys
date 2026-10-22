@@ -95,7 +95,12 @@ pub(crate) async fn retire(
             .cloned()
             .ok_or_else(|| SeatError::Unknown { name: name.clone() }.into())
     })?;
-    let by = crate::launch_api::start_caller(&state, &headers, &actor, &held.added.agent)?;
+    // An agent the door admitted holds seat.retire on the seat by its own
+    // grant (AGENTS-019 R4), recorded by its own name.
+    let by = match crate::routes::door_agent(&state, &actor)? {
+        Some(agent) => agent.to_string(),
+        None => crate::launch_api::start_caller(&state, &headers, &actor, &held.added.agent)?,
+    };
     with_seats(&state, |store| {
         let current = store
             .seat(&name)

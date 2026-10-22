@@ -379,6 +379,23 @@ pub(crate) fn admitted_agent(
     Ok(false)
 }
 
+/// The agent `actor` is when the guarded router admitted it: its run pass,
+/// or its relayed MCP message, with the route's declared act exercised
+/// through its own grants before the handler (`route_actions::admit`). A
+/// route an agent is given by its scope serves that agent within the act
+/// the door judged, as it serves the administrator or the responsible
+/// person (AGENTS-019 R4); none for every other caller.
+///
+/// # Errors
+/// Refuses an inactive agent, or a directory that cannot be read.
+pub(crate) fn door_agent(state: &AppState, actor: &Actor) -> Result<Option<AgentId>, ServerError> {
+    with_directory(state, |directory| {
+        Ok(admitted_agent(directory.projection()?, actor)?
+            .then(|| actor.provenance().agent())
+            .flatten())
+    })
+}
+
 /// Whether the caller is an administrator, retaining operational refusals.
 pub(crate) fn is_administrator(state: &AppState, actor: &Actor) -> Result<bool, ServerError> {
     with_directory(state, |directory| {

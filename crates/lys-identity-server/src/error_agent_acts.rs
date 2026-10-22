@@ -1,6 +1,6 @@
-//! The refusals of an agent's own acts on agents (AGENTS-015, AGENTS-016), each keeping
-//! its name, its words and its status together, as the seats' refusals do
-//! (`error_seat.rs`).
+//! The refusals of an agent's own acts on agents (AGENTS-015, AGENTS-016)
+//! and on drafts (AGENTS-019), each keeping its name, its words and its
+//! status together, as the seats' refusals do (`error_seat.rs`).
 
 use axum::http::StatusCode;
 
@@ -54,6 +54,17 @@ pub enum AgentActsError {
         /// The agent the certificate was asked for.
         agent: String,
     },
+    /// An agent asked to decide a draft it drafted itself: the one who
+    /// prepares an act never approves it (AGENTS-019 R4).
+    #[error(
+        "own_draft: agent `{agent}` drafted `{draft}`, so someone else decides it"
+    )]
+    OwnDraft {
+        /// The agent that drafted it and asked to decide it.
+        agent: String,
+        /// The draft.
+        draft: String,
+    },
 }
 
 impl AgentActsError {
@@ -63,6 +74,7 @@ impl AgentActsError {
             Self::AgentNotYours { .. } => "agent_not_yours",
             Self::AgentCreateRevoked { .. } => "agent_create_revoked",
             Self::CertificateNotFirst { .. } => "certificate_not_first",
+            Self::OwnDraft { .. } => "own_draft",
         }
     }
 
@@ -70,7 +82,8 @@ impl AgentActsError {
         match self {
             Self::ReviewOwnVersion { .. }
             | Self::AgentNotYours { .. }
-            | Self::AgentCreateRevoked { .. } => StatusCode::FORBIDDEN,
+            | Self::AgentCreateRevoked { .. }
+            | Self::OwnDraft { .. } => StatusCode::FORBIDDEN,
             Self::CertificateNotFirst { .. } => StatusCode::CONFLICT,
         }
     }

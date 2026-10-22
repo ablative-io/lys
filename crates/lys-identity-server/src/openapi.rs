@@ -27,6 +27,7 @@ use serde_json::Value;
 
 use crate::error::ServerError;
 use crate::openapi_table::{E, TABLE};
+pub use crate::openapi_table::{HUMAN_ONLY, Reach, reaches};
 use crate::openapi_typed::typed;
 use crate::openapi_types::types;
 use crate::routes::AppState;

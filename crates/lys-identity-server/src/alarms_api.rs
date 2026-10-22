@@ -1,4 +1,5 @@
-//! Alarm reads are confined to the caller's agents; a person acknowledges.
+//! Alarm reads are confined to the caller's agents; a person acknowledges,
+//! or an agent given `alarm.acknowledge` on the alarm (AGENTS-019 R4).
 
 use super::alarms::AlarmStore;
 use super::alarms_state::{Alarm, AlarmError, unavailable};
@@ -211,17 +212,31 @@ async fn acknowledge(
             )));
         }
     }
-    let person = with_directory(&state, |directory| {
-        let actor = signed_in(&state, &headers)?;
-        Ok(crate::read_api::own_person(directory.projection()?, &actor)?.to_string())
-    })
-    .map_err(response)?;
-    let visible = visible(&state, &headers, &Uri::from_static("/alarms")).map_err(response)?;
+    // An agent the door admitted holds alarm.acknowledge on this alarm by its
+    // own grant (AGENTS-019 R4), recorded by its own name; a person
+    // acknowledges an alarm of their own agents.
+    let actor = signed_in(&state, &headers).map_err(response)?;
+    let given = crate::routes::door_agent(&state, &actor).map_err(response)?;
+    let by = match given {
+        Some(agent) => agent.to_string(),
+        None => with_directory(&state, |directory| {
+            Ok(crate::read_api::own_person(directory.projection()?, &actor)?.to_string())
+        })
+        .map_err(response)?,
+    };
+    let visible = match given {
+        Some(_) => None,
+        None => Some(visible(&state, &headers, &Uri::from_static("/alarms")).map_err(response)?),
+    };
     let alarm = with_store(&state, |store, ()| {
-        if !visible.contains(&store.get(&id)?.agent) {
+        let held = store.get(&id)?;
+        if visible
+            .as_ref()
+            .is_some_and(|visible| !visible.contains(&held.agent))
+        {
             return Err(AlarmError::Unknown);
         }
-        store.acknowledge(&id, &person, crate::session::now())
+        store.acknowledge(&id, &by, crate::session::now())
     })
     .map_err(response)?;
     state.changes.signal().map_err(response)?;
