@@ -13,7 +13,7 @@ use lys_log_store::LeafStore;
 use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
-use super::events::{GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
+use super::events::{Exercised, GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
 use super::permission::{Relationship, RelationshipStore, relationships_of};
 use super::projection::Changed;
 use super::receipt::GrantReceipt;
@@ -232,7 +232,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     }
 
     /// Record in the grant log that `holder` exercised `grant` through
-    /// `route` at `at`, answering the use event's index. The event needs no
+    /// `route` at `at`, naming the act and the resource it was asked on
+    /// (AGENTS-019 R5), answering the use event's index. The event needs no
     /// projection: it changes no relationship.
     pub(super) fn record_use(
         &mut self,
@@ -240,13 +241,15 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         grant: GrantId,
         route: Route,
         at: u64,
+        exercised: Exercised,
     ) -> Result<u64, GrantError> {
         let event = GrantEvent::new(
             OperationId::generate()?,
             holder,
             at,
             GrantChange::Use { grant, route },
-        )?;
+        )?
+        .with_exercised(exercised)?;
         self.book.check(&event)?;
         let operation = event.operation();
         let signed = sign_grant_event(event, &self.key)?;

@@ -3,7 +3,9 @@
  * heading, in plain words. A started line's Stop ends that run through the runtime session's end and never the
  * agent's stop; Withdraw, on every line, is the emergency act behind the agent file's confirmation, headed Withdraw,
  * its receipt saying the registrar cannot certify the agent again. A registered line has no session and shows
- * Withdraw alone. No lines, no heading. No clocks: every wait is the page changing.
+ * Withdraw alone. AGENTS-019 R5: an act an agent took with a grant is said in its shipped sentence, '<agent>
+ * <sentence> for you, <time>.', with Withdraw for the agent that acted and no Stop. No lines, no heading. No clocks:
+ * every wait is the page changing.
  */
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
@@ -25,6 +27,12 @@ const FINAL = 'Its certificates are withdrawn for good: the agent that registere
 const LINES: ActedLine[] = [
   { kind: 'started', acting_agent: SCRIBE, agent: RUNNER, at: AT + 60, session: SESSION },
   { kind: 'registered', acting_agent: SCRIBE, agent: HELPER, at: AT },
+];
+const ACTS: ActedLine[] = [
+  { kind: 'person.email.set', acting_agent: HELPER, agent: HELPER, at: AT + 120, subject: { kind: 'account', id: `person-${hex(7)}` },
+    index: 44, sentence: 'Change this person’s email' },
+  { kind: 'organisation.admit', acting_agent: HELPER, agent: HELPER, at: AT + 90, subject: { kind: 'organisation', id: `organisation-${hex(1)}` },
+    index: 41, sentence: 'Admit a person into this organisation' },
 ];
 
 let root: Root | null = null;
@@ -125,6 +133,21 @@ describe('Acted for you by your agents, on the Dashboard', () => {
     expect(posted[0].body).toMatchObject({ reason: 'I did not ask for this' });
     expect(container.textContent).toContain('The agent’s access is suspended.');
     expect(container.querySelector('[data-withdraw-final]')?.textContent).toContain('cannot certify it again');
+  });
+
+  it('says what an agent did with a grant in its shipped sentence, newest first, with Withdraw for that agent and no Stop', async () => {
+    const { container } = await drawn([...ACTS, ...LINES]);
+    const rows = [...container.querySelectorAll('[data-acted-line]')];
+    expect(rows.map((row) => row.getAttribute('data-acted-line'))).toEqual(['person.email.set', 'organisation.admit', 'started', 'registered']);
+    expect(rows.map((row) => row.querySelector('[data-acted-words]')?.textContent)).toEqual([
+      expect.stringMatching(/^Helper change this person’s email for you, .+\.$/),
+      expect.stringMatching(/^Helper admit a person into this organisation for you, .+\.$/),
+      expect.stringMatching(/^Scribe started Runner for you, /),
+      expect.stringMatching(/^Scribe registered Helper for you, /),
+    ]);
+    const acts = rows.slice(0, 2);
+    expect(acts.map((row) => row.querySelector('button[data-act="stop"]'))).toEqual([null, null]);
+    expect(acts.map((row) => row.querySelector('button[data-act="withdraw"]')?.getAttribute('aria-label'))).toEqual(['Withdraw Helper', 'Withdraw Helper']);
   });
 
   it('draws no heading when no agent acted for the person', async () => {

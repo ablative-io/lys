@@ -120,6 +120,9 @@ pub struct GrantBook {
     /// derived on apply and on decode, never stored, and pruned when a grant
     /// or one it derives from is revoked or spent.
     live: live::Live,
+    /// Each agent's uses of the acts its person's dashboard lists
+    /// (AGENTS-019 R5), noted on apply and kept by the snapshot.
+    acted: acted::Acted,
     operations: HashMap<OperationId, u64>,
     refused: BTreeMap<u64, (OperationId, GrantError)>,
 }
@@ -191,6 +194,14 @@ impl GrantBook {
             .into_iter()
             .flatten()
             .filter_map(|id| self.records.get(id))
+    }
+
+    /// What `agent` did with the acts its responsible person's dashboard
+    /// lists (AGENTS-019 R5), oldest first: noted as each use was applied,
+    /// so it is read from the book and never from the log.
+    #[must_use]
+    pub fn acted_by(&self, agent: crate::id::AgentId) -> &[ActedUse] {
+        self.acted.of(agent)
     }
 
     /// Every grant on `resource`, in id order.
@@ -379,6 +390,7 @@ impl GrantBook {
                 if spent {
                     self.prune_live(*grant);
                 }
+                self.acted.note(event, index);
             }
             GrantChange::Stamp {
                 grant,
@@ -423,6 +435,10 @@ pub(crate) mod state;
 
 #[path = "projection_live.rs"]
 mod live;
+
+#[path = "projection_acted.rs"]
+pub(crate) mod acted;
+pub use acted::{ACTED_FOR_THEIR_PERSON, ActedUse};
 
 #[cfg(test)]
 #[path = "projection_index_tests.rs"]

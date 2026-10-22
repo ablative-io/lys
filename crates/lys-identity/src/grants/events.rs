@@ -16,11 +16,14 @@
 //! [`MACHINE_ENVELOPE`] (ACCESS-005 R1), and one naming an organisation,
 //! as caller or issuer, carrying a grant marked with one, or stamping one
 //! onto a grant, version 7 under [`ORGANISATION_ENVELOPE`] (DIRECTORY-109
-//! R3), so no earlier event's bytes change. The body is a canonical CBOR map: `1` version, `2`
+//! R3), and a use naming the act it exercised version 8 under
+//! [`EXERCISED_ENVELOPE`] (AGENTS-019 R5), so no earlier event's bytes
+//! change. The body is a canonical CBOR map: `1` version, `2`
 //! operation id, `3` caller, `4` recorded-at, `5` change kind (`1` issue, `2`
 //! revoke, `3` use, `4` stamp) and `6` the change: the grant's own map; for a revocation
 //! `1` grant id and `2` reason; for a use `1` grant id and `2` route (`1`
-//! browser, `2` api, `3` tool); for a stamp `1` grant id and `2` the
+//! browser, `2` api, `3` tool), and, when it names what it exercised, `3`
+//! the action and `4` the resource; for a stamp `1` grant id and `2` the
 //! organisation (16 bytes). A use's caller is the holder who exercised the
 //! grant and its recorded-at is when. A stamp's caller is the organisation
 //! itself. Reading is strict: a message naming another envelope is refused
@@ -77,7 +80,7 @@ fn kind_envelope(kind: super::types::RecipientKind) -> (u64, &'static str) {
 
 /// Whether the grants read events of `version`.
 fn version_read(version: u64) -> bool {
-    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5 | 6 | 7)
+    matches!(version, GRANT_EVENT_VERSION | 2 | 3 | 4 | 5 | 6 | 7 | 8)
 }
 
 /// One change to the grants.
@@ -117,14 +120,16 @@ pub struct GrantEvent {
     caller: IdentityId,
     recorded_at: u64,
     change: GrantChange,
+    exercised: Option<Exercised>,
 }
 
 impl GrantEvent {
     /// Version two adds service-account principals. Events using only the
     /// original principal and recipient kinds retain their original bytes.
     /// Version three adds the connector, four a held mode, five a grant
-    /// naming a role, six the machine and seven the organisation. Each
-    /// event takes the version of the newest kind, mode or mark it names.
+    /// naming a role, six the machine, seven the organisation and eight a
+    /// use naming what it exercised. Each event takes the version of the
+    /// newest kind, mode or mark it names.
     #[must_use]
     pub fn version(&self) -> u64 {
         self.newest().0
@@ -161,6 +166,9 @@ impl GrantEvent {
         }
         if let GrantChange::Stamp { .. } = &self.change {
             newest = (7, ORGANISATION_ENVELOPE);
+        }
+        if self.exercised.is_some() {
+            newest = (8, EXERCISED_ENVELOPE);
         }
         newest
     }
@@ -213,7 +221,30 @@ impl GrantEvent {
             caller,
             recorded_at,
             change,
+            exercised: None,
         })
+    }
+
+    /// This use, naming the act it exercised and the resource it was asked
+    /// on (AGENTS-019 R5).
+    ///
+    /// # Errors
+    /// - `GrantError::EventMismatch` if the event is not a use.
+    pub fn with_exercised(mut self, exercised: Exercised) -> Result<Self, GrantError> {
+        if !matches!(self.change, GrantChange::Use { .. }) {
+            return Err(GrantError::EventMismatch {
+                reason: "only a use names what it exercised",
+            });
+        }
+        self.exercised = Some(exercised);
+        Ok(self)
+    }
+
+    /// What a use exercised, when it names it: a use written before
+    /// AGENTS-019 R5 names only its grant and route.
+    #[must_use]
+    pub fn exercised(&self) -> Option<&Exercised> {
+        self.exercised.as_ref()
     }
 
     /// The operation id the caller gave the change.
@@ -298,11 +329,14 @@ pub fn encode_event_body(event: &GrantEvent) -> Vec<u8> {
             text(&mut out, reason);
         }
         GrantChange::Use { grant, route } => {
-            map(&mut out, 2);
+            map(&mut out, if event.exercised.is_some() { 4 } else { 2 });
             uint(&mut out, 1);
             bytes(&mut out, grant.as_bytes());
             uint(&mut out, 2);
             uint(&mut out, route_code(*route));
+            if let Some(exercised) = &event.exercised {
+                exercise::write(&mut out, exercised);
+            }
         }
         GrantChange::Stamp {
             grant,
@@ -377,6 +411,7 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
         }
     }
     let [_, operation, caller, recorded_at, kind, change] = fields::<6>(value, SHAPE)?;
+    let mut exercised = None;
     let change = match as_uint(&kind, "a change kind is a code")? {
         ISSUE => GrantChange::Issue(Box::new(read_grant(change)?)),
         REVOKE => {
@@ -387,7 +422,15 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
             }
         }
         USE => {
-            let [grant, route] = fields::<2>(change, "a use is a map of keys 1 and 2")?;
+            let named = matches!(&change, Value::Map(pairs) if pairs.len() == 4);
+            let [grant, route] = if named {
+                let [grant, route, action, resource] =
+                    fields::<4>(change, "a use naming what it exercised is a map of keys 1 to 4")?;
+                exercised = Some(exercise::read(action, resource)?);
+                [grant, route]
+            } else {
+                fields::<2>(change, "a use is a map of keys 1 and 2")?
+            };
             GrantChange::Use {
                 grant: GrantId::from_bytes(as_id(grant, "a grant id is 16 bytes")?),
                 route: route_from(as_uint(&route, "a route is a code")?)
@@ -406,19 +449,26 @@ pub fn decode_event_body(body: &[u8]) -> Result<GrantEvent, GrantError> {
         }
         _ => return Err(malformed("a grant change kind is 1 to 4")),
     };
-    let event = GrantEvent::new(
+    let mut event = GrantEvent::new(
         OperationId::from_bytes(as_id(operation, "an operation id is 16 bytes")?),
         read_identity(caller)?,
         as_uint(&recorded_at, "a recorded time is seconds")?,
         change,
     )?;
+    if let Some(exercised) = exercised {
+        event = event.with_exercised(exercised)?;
+    }
     if encode_event_body(&event) != body {
         return Err(GrantError::EventNotCanonical);
     }
     Ok(event)
 }
 
+#[path = "events_exercised.rs"]
+mod exercise;
 #[path = "events_signing.rs"]
 mod signing;
+
+pub use exercise::{EXERCISED_ENVELOPE, Exercised};
 
 pub use signing::{SignedGrantEvent, sign_grant_event, verify_grant_event};

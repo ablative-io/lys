@@ -18,8 +18,12 @@ use crate::state_value::{
 /// key 15 (ACCESS-004 R1), refused the same way by a reader older than roles.
 /// Version 6 holds a grant marked with its organisation, its key 16
 /// (DIRECTORY-109 R3), refused the same way by a reader older than
-/// organisations.
-const STATE_VERSION: u64 = 6;
+/// organisations. Version 7 holds each agent's noted uses of the acts its
+/// person's dashboard lists, the book's fourth member (AGENTS-019 R5),
+/// refused the same way by a reader older than the notes.
+const STATE_VERSION: u64 = 7;
+/// The state version a grant marked with its organisation needs.
+const ORGANISATION_VERSION: u64 = 6;
 /// The state version a grant naming a role needs.
 const ROLE_VERSION: u64 = 5;
 /// The state version a held mode needs.
@@ -32,8 +36,10 @@ const STATE_READ_FROM: u64 = 3;
 /// The state of `book`, the fold of the first `folded` leaves, or why a
 /// refusal it keeps has no stable form.
 pub(crate) fn encode(book: &GrantBook, folded: u64) -> Result<Vec<u8>, Unreadable> {
-    let version = if state::holds_an_organisation(book) {
+    let version = if state::holds_an_act(book) {
         STATE_VERSION
+    } else if state::holds_an_organisation(book) {
+        ORGANISATION_VERSION
     } else if state::holds_a_role(book) {
         ROLE_VERSION
     } else if state::holds_a_held_mode(book) {
@@ -48,8 +54,8 @@ pub(crate) fn encode(book: &GrantBook, folded: u64) -> Result<Vec<u8>, Unreadabl
     ]))
 }
 
-/// The book a state holds, refused unless it is version 3 to 6 and the fold
-/// of exactly `size` leaves.
+/// The book a state holds, refused unless it is version 3 to 7 and the fold
+/// of exactly `size` leaves, and unless only a version 7 state notes acts.
 pub(crate) fn decode(bytes: &[u8], size: u64) -> Result<GrantBook, Unreadable> {
     let [version, folded, book] = tuple::<3>(decode_value(bytes)?, "a grant state")?;
     let version = read_uint(&version, "a state version")?;
@@ -59,5 +65,11 @@ pub(crate) fn decode(bytes: &[u8], size: u64) -> Result<GrantBook, Unreadable> {
         ));
     }
     check_folded(read_uint(&folded, "a folded count")?, size)?;
-    state::decode(book)
+    let book = state::decode(book)?;
+    if version < STATE_VERSION && state::holds_an_act(&book) {
+        return Err(format!(
+            "grant state version {version} notes agents' acts, which only version {STATE_VERSION} holds"
+        ));
+    }
+    Ok(book)
 }

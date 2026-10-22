@@ -14,10 +14,12 @@
 //! or empty, and the rest of the dashboard is still answered.
 //!
 //! Beside the agents, `acted_by_agents` lists every agent of the caller's
-//! that an agent registered and every start of one an agent gave, newest
-//! first (AGENTS-016 R5), read from the records already written: the actor
-//! of the registration event in the directory's log and the giver of each
-//! launch record. Nothing new is stored for it.
+//! that an agent registered and every start of one an agent gave (AGENTS-016
+//! R5), read from the records already written: the actor of the registration
+//! event in the directory's log and the giver of each launch record. It also
+//! lists every act one of the caller's agents took with a grant a person may
+//! now give it (AGENTS-019 R5), read from the grant book's notes of those
+//! uses, never by walking the grant log. Newest first.
 //!
 //! The dashboard never waits on a runner. An agent's sessions are the ones
 //! `GET /runtime/live` lists for it, as the runners last reported them, and
@@ -47,6 +49,10 @@ use crate::read_views::AgentSummary;
 use crate::routes::start::StartService;
 use crate::routes::{AppState, signed_in, with_directory};
 use crate::runtime_api::SessionView;
+
+#[path = "dashboard_acted.rs"]
+mod acted_lines;
+pub use acted_lines::{ActedKind, ActedLine, ActedSubject};
 
 #[path = "alarms.rs"]
 pub mod alarms;
@@ -177,33 +183,6 @@ pub struct DashboardAgent {
     pub goals: GoalsPart,
 }
 
-/// One thing an agent did for the caller (AGENTS-016 R5).
-#[derive(Debug, Serialize, utoipa::ToSchema)]
-pub struct ActedLine {
-    /// `registered` for an agent an agent registered; `started` for a
-    /// start of the caller's agent an agent gave.
-    pub kind: ActedKind,
-    /// The agent that acted.
-    pub acting_agent: String,
-    /// The agent registered or started.
-    pub agent: String,
-    /// When, in seconds since the Unix epoch.
-    pub at: u64,
-    /// The session a start runs as; absent for a registration.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub session: Option<String>,
-}
-
-/// What an agent did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum ActedKind {
-    /// It registered the agent.
-    Registered,
-    /// It started the agent.
-    Started,
-}
-
 /// What waits on the caller.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct Waiting {
@@ -227,8 +206,9 @@ pub struct DashboardView {
     pub waiting: Waiting,
     /// The caller's open alarms, read from the same log as the alarm routes.
     pub alarms: AlarmsPart,
-    /// Every agent of the caller's an agent registered and every start of
-    /// one an agent gave, newest first.
+    /// Every agent of the caller's an agent registered, every start of one
+    /// an agent gave, and every act one of the caller's agents took with a
+    /// grant a person may now give it, newest first.
     pub acted_by_agents: ActedPart,
     /// Counters and continuation of the agents, absent when no query was supplied.
     #[serde(flatten)]
@@ -314,62 +294,6 @@ fn memberships(state: &AppState, agents: &[AgentSummary]) -> Result<Vec<Vec<Stri
     })
 }
 
-/// Every agent of the caller's an agent registered, from the actor of its
-/// registration event, and every start of one an agent gave, from its
-/// launch record, newest first.
-fn acted(
-    state: &AppState,
-    headers: &HeaderMap,
-    starts: &StartService,
-) -> Result<Vec<ActedLine>, ServerError> {
-    let actor = signed_in(state, headers)?;
-    let (mine, mut lines) = with_directory(state, |directory| {
-        let projection = directory.projection()?;
-        let person = own_person(projection, &actor)?;
-        let mut mine = Vec::new();
-        for entry in projection.agents_of(person) {
-            if let (lys_identity::IdentityId::Agent(agent), _) = entry? {
-                mine.push(*agent);
-            }
-        }
-        let mut lines = Vec::new();
-        for agent in &mine {
-            if let Some((by, at)) = crate::agent_acts::registrar(directory, *agent)? {
-                lines.push(ActedLine {
-                    kind: ActedKind::Registered,
-                    acting_agent: by.to_string(),
-                    agent: agent.to_string(),
-                    at,
-                    session: None,
-                });
-            }
-        }
-        Ok((mine, lines))
-    })?;
-    let mine: std::collections::BTreeSet<String> = mine.iter().map(ToString::to_string).collect();
-    let unavailable = |error: lys_identity::start::StartError| ServerError::RuntimeUnavailable {
-        reason: format!("the launch records cannot be read: {error}"),
-    };
-    let mut launches = starts.launches().map_err(unavailable)?;
-    launches.settle().map_err(unavailable)?;
-    for record in launches.records() {
-        if mine.contains(&record.agent)
-            && let Ok(by) = record.given_by.parse::<lys_identity::AgentId>()
-        {
-            lines.push(ActedLine {
-                kind: ActedKind::Started,
-                acting_agent: by.to_string(),
-                agent: record.agent.clone(),
-                at: record.given_at,
-                session: Some(crate::runner_sessions::launch_session(&record.id)),
-            });
-        }
-    }
-    // Newest first; at the same instant a start follows the registration it needs.
-    lines.sort_by_key(|line| std::cmp::Reverse((line.at, line.kind == ActedKind::Started)));
-    Ok(lines)
-}
-
 /// What waits on the caller, each counted from its own route's answer.
 fn waiting(state: &AppState, headers: &HeaderMap) -> Waiting {
     let requests = crate::requests_api::listed(state, headers, Ok(Query(ListQuery::default())))
@@ -443,7 +367,7 @@ async fn dashboard(
             .ok_or_else(|| ServerError::RuntimeUnavailable {
                 reason: "this router serves no launch records, so the starts an agent gave cannot be read".to_owned(),
             })
-            .and_then(|Extension(starts)| acted(&state, &headers, &starts))
+            .and_then(|Extension(starts)| acted_lines::acted(&state, &headers, &starts))
             .map_err(Refusal::from)
             .into(),
         page,

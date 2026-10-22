@@ -2,7 +2,8 @@
 
 use super::usage;
 use super::{
-    ExerciseRequest, Frame, Grant, GrantError, GrantId, Grants, Permit, RelationshipStore,
+    ExerciseRequest, Exercised, Frame, Grant, GrantError, GrantId, Grants, Permit,
+    RelationshipStore,
 };
 use crate::projection::Projection;
 use lys_log_store::LeafStore;
@@ -117,7 +118,11 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         self.book
             .grant(permit.grant)
             .map_or(Ok(()), Grant::exercisable)?;
-        let used = self.record_use(request.caller, permit.grant, request.route, at);
+        let exercised = Exercised {
+            action: request.action.clone(),
+            resource: request.resource.clone(),
+        };
+        let used = self.record_use(request.caller, permit.grant, request.route, at, exercised);
         if let Err(error) = &used {
             usage::note(&mut self.unreported, permit.grant, request.route, at, error);
         }

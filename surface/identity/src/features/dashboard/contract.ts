@@ -30,8 +30,15 @@ export interface Waiting {
   product_drafts?: number | PartRefused;
 }
 
-/** One thing an agent of the person's did for them (AGENTS-016 R5): registered an agent, or started one, with the session it runs as. */
-export interface ActedLine { kind: 'registered' | 'started'; acting_agent: string; agent: string; at: number; session?: string }
+/**
+ * One thing an agent did for the person. `kind` is `registered` or `started` (AGENTS-016 R5), or the act an agent took
+ * with a grant, by its action's name, such as `organisation.admit` (AGENTS-019 R5). An act's line carries the resource
+ * it was taken on, its use's index in the grant log and its shipped sentence; its `agent` is the agent that acted.
+ */
+export interface ActedLine {
+  kind: string; acting_agent: string; agent: string; at: number; session?: string;
+  subject?: { kind: string; id: string }; index?: number; sentence?: string;
+}
 
 export interface DashboardAnswer extends Paged {
   agents: DashboardAgent[]; waiting: Waiting; alarms: AlarmSummary | PartRefused;
@@ -42,8 +49,12 @@ export interface DashboardAnswer extends Paged {
 const actedLine = (line: unknown): line is ActedLine => {
   if (!line || typeof line !== 'object') return false;
   const each = line as Partial<ActedLine>;
-  return (each.kind === 'registered' || each.kind === 'started') && typeof each.acting_agent === 'string' && typeof each.agent === 'string'
+  const said = typeof each.acting_agent === 'string' && typeof each.agent === 'string'
     && Number.isSafeInteger(each.at) && (each.session === undefined || typeof each.session === 'string');
+  if (each.kind === 'registered' || each.kind === 'started') return said;
+  return said && typeof each.kind === 'string' && each.kind.length > 0 && !!each.subject && typeof each.subject === 'object'
+    && typeof each.subject.kind === 'string' && typeof each.subject.id === 'string' && Number.isSafeInteger(each.index)
+    && (each.sentence === undefined || typeof each.sentence === 'string');
 };
 
 export const refusedPart = (part: unknown): part is PartRefused =>
@@ -92,7 +103,7 @@ export async function readDashboard(): Promise<DashboardAnswer> {
   }
   const acted = answer.acted_by_agents;
   if (acted !== undefined && !refusedPart(acted) && !(Array.isArray(acted) && acted.every(actedLine))) {
-    answer.acted_by_agents = { refusal: 'ActedUnreadable', reason: 'The service did not answer what your agents registered and started for you as a list.' };
+    answer.acted_by_agents = { refusal: 'ActedUnreadable', reason: 'The service did not answer what your agents did for you as a list.' };
   }
   return answer;
 }

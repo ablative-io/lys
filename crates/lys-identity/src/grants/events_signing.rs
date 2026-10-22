@@ -1,9 +1,10 @@
 //! Sealing grant events and verifying their signed envelopes.
 
 use super::{
-    CONNECTOR_ENVELOPE, COSE_SIGN1_TAG, GRANT_ENVELOPE, GrantError, GrantEvent, HELD_MODE_ENVELOPE,
-    KEY_LEN, MACHINE_ENVELOPE, ORGANISATION_ENVELOPE, ROLE_ENVELOPE, SERVICE_ACCOUNT_ENVELOPE,
-    SIGNATURE_LEN, Value, as_uint, cbor, decode_event_body, encode_event_body, malformed,
+    CONNECTOR_ENVELOPE, COSE_SIGN1_TAG, EXERCISED_ENVELOPE, GRANT_ENVELOPE, GrantError, GrantEvent,
+    HELD_MODE_ENVELOPE, KEY_LEN, MACHINE_ENVELOPE, ORGANISATION_ENVELOPE, ROLE_ENVELOPE,
+    SERVICE_ACCOUNT_ENVELOPE, SIGNATURE_LEN, Value, as_uint, cbor, decode_event_body,
+    encode_event_body, malformed,
 };
 use crate::encoding::{
     MAJOR_ARRAY, MAJOR_NEGATIVE, MAJOR_TAG, bytes, head, map, payload_commitment, text, uint,
@@ -168,6 +169,7 @@ pub fn verify_grant_event(
         ROLE_ENVELOPE,
         MACHINE_ENVELOPE,
         ORGANISATION_ENVELOPE,
+        EXERCISED_ENVELOPE,
     ]
     .contains(&content_type.as_str())
     {

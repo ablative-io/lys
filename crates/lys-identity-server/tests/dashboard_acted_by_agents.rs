@@ -137,8 +137,15 @@ async fn the_dashboard_lists_what_an_agent_registered_and_started_for_its_person
     assert!(!refused_as(&started, "not_permitted"), "{}", started.1);
     let record = ok(&started)?["launch_record"].clone();
 
-    // Bea's dashboard: the start, then the registration, newest first.
-    let lines = acted(&world, &world.bea).await?;
+    // Bea's dashboard: the start, then the registration, newest first. The
+    // acts the creator took with its grants, its certificate issue among
+    // them, are listed beside these (AGENTS-019 R5); this test reads the two.
+    let every = acted(&world, &world.bea).await?;
+    let lines: Vec<Value> = every
+        .iter()
+        .filter(|line| line["kind"] == "started" || line["kind"] == "registered")
+        .cloned()
+        .collect();
     assert_eq!(lines.len(), 2, "{lines:?}");
     let (start, registration) = (&lines[0], &lines[1]);
     assert_eq!(start["kind"], "started", "{lines:?}");
@@ -172,10 +179,10 @@ async fn the_dashboard_lists_what_an_agent_registered_and_started_for_its_person
 
     // The stranger acted on nothing: no line names it.
     assert!(
-        lines
+        every
             .iter()
             .all(|line| line["acting_agent"] != world.stranger.id.as_str()),
-        "{lines:?}"
+        "{every:?}"
     );
     // Ada's agents were all registered and started by people: no lines.
     assert!(acted(&world, &world.ada).await?.is_empty());

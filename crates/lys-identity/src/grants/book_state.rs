@@ -2,10 +2,13 @@
 //!
 //! Every grant in its canonical encoding with the index that issued it, its
 //! revocation, its last observed use and its count of recorded uses; every
-//! operation with the index it made; and every refused event's index,
-//! operation and refusal in its stable encoded form. The lineage and resource
-//! indexes are not written: each is the grants' own sources and resources,
-//! rebuilt on reading exactly as [`GrantBook::apply`] builds them.
+//! operation with the index it made; every refused event's index,
+//! operation and refusal in its stable encoded form; and, when there are
+//! any, each agent's noted uses of the acts its person's dashboard lists
+//! (AGENTS-019 R5), a fourth member a book with none does not write. The
+//! lineage and resource indexes are not written: each is the grants' own
+//! sources and resources, rebuilt on reading exactly as
+//! [`GrantBook::apply`] builds them.
 
 use ciborium::Value;
 
@@ -100,6 +103,12 @@ pub(crate) fn holds_a_role(book: &GrantBook) -> bool {
         .any(|record| record.grant.names_role())
 }
 
+/// Whether `book` notes any agent's use of an act its person's dashboard
+/// lists, so its state is written at version 7 (AGENTS-019 R5).
+pub(crate) fn holds_an_act(book: &GrantBook) -> bool {
+    !book.acted.is_empty()
+}
+
 /// Whether any grant in `book` carries its organisation, so its state is
 /// written at version 6 (DIRECTORY-109 R3).
 pub(crate) fn holds_an_organisation(book: &GrantBook) -> bool {
@@ -120,7 +129,7 @@ pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
             ]))
         })
         .collect::<Result<Vec<_>, Unreadable>>()?;
-    Ok(array(vec![
+    let mut members = vec![
         array(book.records.values().map(record).collect()),
         indexed(
             book.operations
@@ -130,14 +139,27 @@ pub(crate) fn encode(book: &GrantBook) -> Result<Value, Unreadable> {
             |op| operation(*op),
         ),
         array(refused),
-    ]))
+    ];
+    if holds_an_act(book) {
+        members.push(book.acted.encode());
+    }
+    Ok(array(members))
 }
 
 /// The book a state value holds, with its lineage, resource and live indexes
 /// rebuilt.
 pub(crate) fn decode(value: Value) -> Result<GrantBook, Unreadable> {
-    let [records, operations, refused] = tuple::<3>(value, "a grant book")?;
+    let mut members = list(value, "a grant book")?;
+    let acted = match members.len() {
+        3 => None,
+        4 => members.pop(),
+        found => return Err(format!("a grant book holds {found} items, not 3 or 4")),
+    };
+    let [records, operations, refused] = tuple::<3>(Value::Array(members), "a grant book")?;
     let mut book = GrantBook::new();
+    if let Some(acted) = acted {
+        book.acted = super::acted::Acted::decode(acted)?;
+    }
     for held in list(records, "the grant records")? {
         let held = read_record(held)?;
         let id = held.grant.id();

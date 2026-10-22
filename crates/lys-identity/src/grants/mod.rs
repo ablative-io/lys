@@ -60,8 +60,8 @@ pub use created::CreatedRequest;
 pub use delegation::{ADMINISTRATOR, PassOnRequest};
 pub use error::GrantError;
 pub use events::{
-    GrantChange, GrantEvent, SignedGrantEvent, decode_event_body, encode_event_body,
-    sign_grant_event, verify_grant_event,
+    EXERCISED_ENVELOPE, Exercised, GrantChange, GrantEvent, SignedGrantEvent, decode_event_body,
+    encode_event_body, sign_grant_event, verify_grant_event,
 };
 pub use frame::Frame;
 pub use lineage::{CREATED_RIGHTS, Lineage};
@@ -70,7 +70,9 @@ pub use permission::{
     MemoryRelationships, ObjectRef, Relationship, RelationshipStore, SCHEMA, parent_relation,
     placement,
 };
-pub use projection::{GrantBook, GrantRecord, LastUse, Revocation};
+pub use projection::{
+    ACTED_FOR_THEIR_PERSON, ActedUse, GrantBook, GrantRecord, LastUse, Revocation,
+};
 pub use reading::{ReadPlan, ReadStamp, Reading};
 pub use receipt::{GrantReceipt, verify_grant_receipt};
 pub use recovery::{GrantLedger, Uncertain};

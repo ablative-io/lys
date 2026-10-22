@@ -30,6 +30,15 @@ pub(super) const STEPS: [&str; 6] = ["register", "account", "bind", "activate", 
 /// A service with a fake issuer, no mail settings, Lys's provider on, Ada
 /// as the first-run administrator of Acme, and the fixture app approved.
 pub(super) async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
+    table_on(GRANT_MODEL, false).await
+}
+
+/// The same table on `model`; when `agents_sign`, the certificates folder
+/// is kept, so an agent's key can be certified and sign its own calls.
+pub(super) async fn table_on(
+    model: &str,
+    agents_sign: bool,
+) -> Result<(Service, FakeRauthy, String), Box<dyn Error>> {
     let rauthy = FakeRauthy::start().await?;
     let broker = identity_contract::app_custody::start().await?;
     let settings = SignInProvidersSettings {
@@ -37,13 +46,15 @@ pub(super) async fn table() -> Result<(Service, FakeRauthy, String), Box<dyn Err
         api_key_file: rauthy.api_key_file(),
     };
     let (service, ()) = Service::start_adjusted(
-        GRANT_MODEL,
+        model,
         None,
         None,
         Some(settings),
         move |config| {
             config.requests_dir = None;
-            config.certificates_dir = None;
+            if !agents_sign {
+                config.certificates_dir = None;
+            }
             config.network_file = None;
             config.roles_file = None;
             config.provisioning_file = None;
