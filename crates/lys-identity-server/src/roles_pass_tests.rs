@@ -41,11 +41,11 @@ async fn role_read_requires_the_named_roles_read_grant() -> TestResult {
     Ok(())
 }
 
-/// Creating, revising, assigning, moving and ending roles are withheld from
-/// agents: passing any of them to an agent is refused by name, and the
-/// agent stays refused at the route.
+/// Creating, revising, assigning, moving and ending roles are a person's to
+/// give an agent (AGENTS-019 R1): before each is given the agent is refused
+/// NotHeld at its route, and once given the agent does it.
 #[tokio::test]
-async fn role_changes_are_withheld_from_agents() -> TestResult {
+async fn role_changes_are_given_to_an_agent_and_refused_until_they_are() -> TestResult {
     let table = Table::fresh(true).await?;
     let mut create = version_body()?;
     create["name"] = json!("Reviewer");
@@ -82,15 +82,19 @@ async fn role_changes_are_withheld_from_agents() -> TestResult {
         ),
     ];
     for (resource, relation, action, path, body) in cases {
-        let (status, answer) = table.give(resource, relation, action).await?;
-        assert_eq!(status, 403, "{action}: {answer}");
-        assert_eq!(
-            answer["refusal"], "WithheldFromAgents",
-            "{action}: {answer}"
-        );
         refused(&table, Method::POST, &path, Some(&body)).await?;
+        let (status, answer) = table.give(resource, relation, action).await?;
+        assert_eq!(status, 200, "{action}: {answer}");
+        let (status, answer) = table.call(Method::POST, &path, Some(&body)).await?;
+        assert_eq!(status, 200, "{action}: {answer}");
     }
-    assert!(table.role_view(&table.role).await?["holders"][0]["ended_by"].is_null());
+    let view = table.role_view(&table.role).await?;
+    let ended = view["holders"]
+        .as_array()
+        .ok_or("no holders")?
+        .iter()
+        .any(|holder| holder["ended_by"] == table.agent.as_str());
+    assert!(ended, "the agent ended the assignment it was given to end: {view}");
     Ok(())
 }
 

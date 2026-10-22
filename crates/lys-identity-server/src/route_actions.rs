@@ -50,6 +50,17 @@ pub(crate) fn admit(
     }
     let (resource, action) = crate::openapi_table::token_scope(method, path)
         .map_err(|error| Box::new(error.into_response()))?;
+    // A person's credential is never an agent's, whatever it holds
+    // (AGENTS-019 R3): refused by that name before any grant is read.
+    if lys_identity::grants::WITHHELD_FROM_AGENTS.contains(&action.as_str()) {
+        return Err(Box::new(
+            crate::error::ServerError::from(GrantError::WithheldFromAgents {
+                relation: action.to_string(),
+                withheld: action.to_string(),
+            })
+            .into_response(),
+        ));
+    }
     let refusal = crate::grants_reads::with_read_grants(
         state,
         None,

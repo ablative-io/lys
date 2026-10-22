@@ -258,6 +258,15 @@ pub(crate) async fn admit(
     asked: Result<Json<AdmitBody>, JsonRejection>,
 ) -> Response {
     let mut receipt = AdmitReceipt::default();
+    // An approved app's agent pass admits as the agent, narrowed as a
+    // person's app pass is (AGENTS-019 R2).
+    match crate::provider::app_agent(&state, &headers) {
+        Ok(Some((actor, app))) => {
+            return crate::people_admit_app::admit(&state, &headers, &actor, &app, asked).await;
+        }
+        Ok(None) => {}
+        Err(error) => return refused(error, &receipt).await,
+    }
     let app = match crate::provider::app_person(&state, &headers) {
         Ok(app) => app,
         Err(error) => return refused(error, &receipt).await,

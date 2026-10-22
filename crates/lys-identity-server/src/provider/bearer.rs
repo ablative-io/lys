@@ -274,6 +274,67 @@ pub(crate) fn app_person(
     Ok(Some((actor, app)))
 }
 
+/// An approved app's agent pass: the agent it was issued to, as its own
+/// actor, and the app whose audience it carries (AGENTS-019 R2). None for
+/// any other credential, a person's pass included; a pass that does not
+/// verify, is no longer retained, or names an app that is not approved is
+/// refused by name.
+pub(crate) fn app_agent(
+    state: &AppState,
+    headers: &HeaderMap,
+) -> Result<Option<(lys_identity::Actor, String)>, ServerError> {
+    let Some(pass) = presented_pass(headers) else {
+        return Ok(None);
+    };
+    let payload = pass.split('.').nth(1).ok_or(ServerError::NotSignedIn)?;
+    let claims: serde_json::Value =
+        serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).map_err(|error| {
+            ServerError::Provider(ProviderError::PassRefused {
+                refusal: format!("agent_payload_invalid: {error}"),
+            })
+        })?)
+        .map_err(|error| {
+            ServerError::Provider(ProviderError::PassRefused {
+                refusal: format!("agent_claims_invalid: {error}"),
+            })
+        })?;
+    let (Some(audience), Some(subject)) = (claims["aud"].as_str(), claims["sub"].as_str()) else {
+        return Ok(None);
+    };
+    if audience == "lys" || !subject.starts_with("agent-") {
+        return Ok(None);
+    }
+    if headers.contains_key(header::COOKIE) || headers.contains_key("lys-operator") {
+        return Err(ProviderError::PassRefused {
+            refusal: "mixed_credentials".to_owned(),
+        }
+        .into());
+    }
+    let IdentityId::Agent(agent) = pass_holder(state, pass, audience)? else {
+        return Ok(None);
+    };
+    let actor = lys_identity::Actor::new(
+        lys_identity::LoginBinding::new(state.oidc.issuer(), &agent.to_string())?,
+        lys_identity::Provenance::new(lys_identity::AuthMethod::AgentPass(agent), now()),
+    );
+    crate::apps_api::with_apps(state, |apps, directory| {
+        let approved = apps
+            .app(audience)
+            .ok_or(crate::apps_error::AppError::CredentialRefused {
+                reason: "no approved app holds that audience",
+            })?;
+        if !matches!(approved.standing(), crate::apps_state::Standing::Approved) {
+            return Err(crate::apps_error::AppError::AppNotApproved {
+                app: audience.to_owned(),
+            }
+            .into());
+        }
+        crate::caller_admission::active_caller(directory, &actor)?;
+        Ok(())
+    })?;
+    Ok(Some((actor, audience.to_owned())))
+}
+
 #[cfg(test)]
 #[path = "personal_pass_authority_tests.rs"]
 mod personal_pass_authority_tests;

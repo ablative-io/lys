@@ -191,18 +191,18 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     assert_eq!(refused["refusal"], "ActionsOutside", "{refused}");
 
     let before = revision(&service, &cookie).await?;
-    // No root may let an agent be passed a withheld act.
+    // No root may let an agent be passed a person's credential (AGENTS-019 R1).
     let (status, refused) = post(
         &service,
         "/grants/roots",
         auth,
-        &json!({"operation": op()?, "route": "api", "holder": person, "resource": source["resource"], "relation": "editor", "pass_on": {"kind": "to", "actions": ["agent.stop", "grant.delegate", "request.approve", "role.create"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}}),
+        &json!({"operation": op()?, "route": "api", "holder": person, "resource": source["resource"], "relation": "editor", "pass_on": {"kind": "to", "actions": ["agent.stop", "grant.delegate", "person.password.set", "role.create"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}}),
     )
     .await?;
     assert_eq!(status, 403, "{refused}");
     assert_eq!(refused["refusal"], "WithheldFromAgents", "{refused}");
     // Nor may an agent's grant let it pass one on.
-    let onward = json!({"kind": "to", "actions": ["agent.stop", "request.approve"], "recipients": ["agent"]});
+    let onward = json!({"kind": "to", "actions": ["agent.stop", "person.sign-in.set"], "recipients": ["agent"]});
     let (status, refused) =
         post(&service, "/grants", auth, &give("only.agent.stop", onward)?).await?;
     assert_eq!(status, 403, "{refused}");
@@ -259,47 +259,17 @@ async fn only_the_administrator_may_ask_for_agent_roots() -> TestResult {
     Ok(())
 }
 
-/// AGENTS-015 R1: an agent may be given what it needs to set up, review and
-/// start agents, allow them on a computer and pass on or take back what it
-/// gave; every act that hands out authority, mints an identity or decides on
-/// access stays withheld. AGENTS-016 R4 admits an agent to issue the first
-/// certificate of an agent it registered, read from the registration record
-/// and never from a grant, so both certificate acts stay on this list.
+/// AGENTS-019 R1, after Tom's "assign everything to AI" (22 October 2026):
+/// a person may give an agent every shipped act but a person's credentials,
+/// so exactly setting a password, a sign-in and a bound login stay withheld.
+/// The acts AGENTS-015 R1 released, and the twenty-nine this brief releases,
+/// are each one a person may give.
 #[test]
-fn the_withheld_list_keeps_exactly_the_acts_an_agent_never_holds() {
+fn the_withheld_list_keeps_exactly_a_persons_credentials() {
     let kept = [
-        "agent.certificate.issue",
-        "agent.certificate.withdraw",
-        "agent.policy.set",
-        "budget.set",
-        "configuration.zone.set",
-        "grant",
-        "identity.transition",
-        "organisation.administer",
-        "organisation.admit",
-        "organisation.grant",
-        "person.email.set",
         "person.login.bind",
         "person.password.set",
         "person.sign-in.set",
-        "request.approve",
-        "request.decline",
-        "role.create",
-        "role.holder.assign",
-        "role.holder.end",
-        "role.holder.move",
-        "role.revise",
-        "runtime.stop-everything",
-        "secret.add",
-        "secret.drop",
-        "secret.recipients",
-        "secret.replace",
-        "secret.retire",
-        "secret.scope",
-        "service-account.create",
-        "service-account.retire",
-        "team.budget.set",
-        "seat.import",
     ];
     assert_eq!(WITHHELD_FROM_AGENTS, kept);
     for released in [
@@ -308,6 +278,13 @@ fn the_withheld_list_keeps_exactly_the_acts_an_agent_never_holds() {
         "machine.agent.set",
         "grant.delegate",
         "grant.revoke",
+        "agent.certificate.issue",
+        "grant",
+        "organisation.admit",
+        "person.email.set",
+        "request.approve",
+        "secret.add",
+        "runtime.stop-everything",
     ] {
         assert!(!WITHHELD_FROM_AGENTS.contains(&released), "{released}");
     }

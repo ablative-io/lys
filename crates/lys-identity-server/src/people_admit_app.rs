@@ -1,6 +1,7 @@
 //! POST /people/admit asked with an approved app's person pass
-//! (DIRECTORY-113 R1): the act is judged as the person the pass speaks for,
-//! exactly as from their own Lys session, and narrowly. A product admits only
+//! (DIRECTORY-113 R1), or its agent pass (AGENTS-019 R2): the act is judged
+//! as the person the pass speaks for, exactly as from their own Lys session,
+//! or as the agent it was issued to, by the agent's own grants, and narrowly. A product admits only
 //! with the person's first grant, on a kind the asking app owns; both are
 //! checked before any step, so a refusal records nothing.
 //!

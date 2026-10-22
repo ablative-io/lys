@@ -218,6 +218,10 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     let resource = json!({"kind": "person", "id": person});
     let root = held.ok("/grants/roots", &json!({"operation": operation()?, "route": "api", "holder": person, "resource": resource, "relation": "owner", "pass_on": {"kind": "to", "actions": ["person.profile.set"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}})).await?;
     held.ok("/grants", &json!({"operation": operation()?, "route": "api", "source": root["grant"], "recipient": held.agent(), "responsible": person, "resource": resource, "relation": "only.person.profile.set", "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}})).await?;
+    // And one on the person's account: changing their email (AGENTS-019 R3).
+    let account = json!({"kind": "account", "id": person});
+    let root = held.ok("/grants/roots", &json!({"operation": operation()?, "route": "api", "holder": person, "resource": account, "relation": "owner", "pass_on": {"kind": "to", "actions": ["person.email.set"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}})).await?;
+    held.ok("/grants", &json!({"operation": operation()?, "route": "api", "source": root["grant"], "recipient": held.agent(), "responsible": person, "resource": account, "relation": "only.person.email.set", "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}})).await?;
 
     // An agent changes a person's record only within a team they share.
     let team = operation()?;
@@ -272,6 +276,44 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         "{inside}"
     );
     eprintln!("proof: inside its grant, POST /identities/{{person}}/profile answered 200");
+
+    // The email change passes the agent's grant: whatever this issuer-less
+    // service answers next, it is not a refusal of the agent. A password is
+    // a person's credential and is refused the agent by that name.
+    let account_call = |path: String, body: Value| json!({"name": "change", "arguments": {"method": "POST", "path": path, "body": body}});
+    let (_, email) = held
+        .mcp(
+            &url,
+            signed,
+            "tools/call",
+            account_call(
+                format!("/directory/people/{person}/account/email"),
+                json!({"email": "changed@example.test"}),
+            ),
+        )
+        .await?;
+    let email = mcp_answer::body(&email["result"]);
+    for refusal in ["NotHeld", "WithheldFromAgents", "Undeclared", "ResponsibilityKept"] {
+        assert_ne!(email["body"]["refusal"], refusal, "{email}");
+    }
+    eprintln!(
+        "proof: inside its grant, the email change answered {} {}",
+        email["status"], email["body"]["refusal"]
+    );
+    let (_, password) = held
+        .mcp(
+            &url,
+            signed,
+            "tools/call",
+            account_call(
+                format!("/directory/people/{person}/account/password"),
+                json!({"password": "Not-Ever-An-Agents-0001"}),
+            ),
+        )
+        .await?;
+    let password = mcp_answer::body(&password["result"]);
+    assert_eq!(password["status"], 403, "{password}");
+    assert_eq!(password["body"]["refusal"], "WithheldFromAgents", "{password}");
 
     let other = held.seeded.people[1].id.to_string();
     let (_, outside) = held

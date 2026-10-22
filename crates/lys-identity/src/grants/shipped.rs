@@ -126,56 +126,29 @@ pub const ACTIONS: &[&str] = &[
     "write",
 ];
 
-/// The acts no agent may be given, whatever grant they come from: each
-/// hands out authority, changes an agent's confinement, mints an identity
-/// or decides on access. Setting up and reviewing a profile (never one's
-/// own version), allowing agents on a computer, and passing on or taking
-/// back part of a grant held are an agent's to hold when a person gives
-/// them (AGENTS-015 R1): each is held to the giver's own chain. Every
-/// other shipped action is one an agent may hold; an act Lys does not ship
-/// is never one.
+/// The acts no agent may be given, whatever grant they come from: setting
+/// a person's password, their sign-in or the login bound to them. No seat
+/// ever holds or sets a person's credential (Tom's standing rule). Every
+/// other shipped act is one a person may give an agent (AGENTS-019 R1,
+/// after Tom's "assign everything to AI", 22 October 2026), always passed
+/// on from that person's own grant, so it ends when theirs does; an act Lys
+/// does not ship is never one.
 pub const WITHHELD_FROM_AGENTS: &[&str] = &[
-    "agent.certificate.issue",
-    "agent.certificate.withdraw",
-    "agent.policy.set",
-    "budget.set",
-    "configuration.zone.set",
-    "grant",
-    "identity.transition",
-    "organisation.administer",
-    "organisation.admit",
-    "organisation.grant",
-    "person.email.set",
     "person.login.bind",
     "person.password.set",
     "person.sign-in.set",
-    "request.approve",
-    "request.decline",
-    "role.create",
-    "role.holder.assign",
-    "role.holder.end",
-    "role.holder.move",
-    "role.revise",
-    "runtime.stop-everything",
-    "secret.add",
-    "secret.drop",
-    "secret.recipients",
-    "secret.replace",
-    "secret.retire",
-    "secret.scope",
-    "service-account.create",
-    "service-account.retire",
-    "team.budget.set",
-    "seat.import",
 ];
 
 /// The acts an agent may hold, each decided: with [`WITHHELD_FROM_AGENTS`]
 /// it names every shipped act exactly once, so a new act cannot ship
 /// undecided.
 pub const AGENT_MAY_HOLD: &[&str] = &[
+    "agent.certificate.issue",
+    "agent.certificate.withdraw",
     "agent.create",
     "agent.mcp-request.approve",
     "agent.mcp-request.create",
+    "agent.policy.set",
     "agent.provisioning.review",
     "agent.provisioning.set",
     "agent.reports-to.set",
@@ -186,13 +159,17 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "agent.stop",
     "agent.usage.report",
     "agent.wake",
+    "budget.set",
+    "configuration.zone.set",
     "edit",
+    "grant",
     "grant.check",
     "grant.delegate",
     "grant.reach",
     "grant.revoke",
     "grant.who",
     "grant.why",
+    "identity.transition",
     "launch-record.start-again",
     "launch-record.withdraw",
     "machine.agent.set",
@@ -201,14 +178,25 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "machine.runner.set",
     "machine.team.set",
     "operate",
+    "organisation.administer",
+    "organisation.admit",
+    "organisation.grant",
     "organisation.read",
     "person.create",
+    "person.email.set",
     "person.profile.set",
     "person.session.end",
     "read",
+    "request.approve",
     "request.create",
+    "request.decline",
     "request.reconcile",
     "review.keep",
+    "role.create",
+    "role.holder.assign",
+    "role.holder.end",
+    "role.holder.move",
+    "role.revise",
     "runtime-session.compact",
     "runtime-session.end",
     "runtime-session.found.report",
@@ -216,12 +204,23 @@ pub const AGENT_MAY_HOLD: &[&str] = &[
     "runtime-session.input-bytes",
     "runtime-session.keys",
     "runtime-session.resize",
+    "runtime.stop-everything",
+    "seat.import",
     "seat.restart",
     "seat.send",
     "seat.start",
     "seat.stop",
+    "secret.add",
+    "secret.drop",
+    "secret.recipients",
+    "secret.replace",
+    "secret.retire",
+    "secret.scope",
+    "service-account.create",
+    "service-account.retire",
     "session.end",
     "skill.keep",
+    "team.budget.set",
     "team.create",
     "team.member.add",
     "team.member.confirm",
@@ -242,16 +241,46 @@ pub fn agent_may_hold(kind: &str, action: &str) -> bool {
     !kind.contains('.') && AGENT_MAY_HOLD.contains(&action)
 }
 
-/// The acts a person may give an agent but never a machine (AGENTS-015 R1):
-/// they left [`WITHHELD_FROM_AGENTS`] so an agent can set up, review and
-/// start agents for its person, and they stay a responsibility no machine
-/// holds, as before.
+/// The acts a person may give an agent but never a machine: the five that
+/// left [`WITHHELD_FROM_AGENTS`] so an agent can set up, review and start
+/// agents for its person (AGENTS-015 R1), and the twenty-nine that left it
+/// when everything but a person's credentials became givable to an agent
+/// (AGENTS-019 R1). Each stays a responsibility no machine holds, as before.
 pub const AGENTS_NOT_MACHINES: &[&str] = &[
+    "agent.certificate.issue",
+    "agent.certificate.withdraw",
+    "agent.policy.set",
     "agent.provisioning.review",
     "agent.provisioning.set",
+    "budget.set",
+    "configuration.zone.set",
+    "grant",
     "grant.delegate",
     "grant.revoke",
+    "identity.transition",
     "machine.agent.set",
+    "organisation.administer",
+    "organisation.admit",
+    "organisation.grant",
+    "person.email.set",
+    "request.approve",
+    "request.decline",
+    "role.create",
+    "role.holder.assign",
+    "role.holder.end",
+    "role.holder.move",
+    "role.revise",
+    "runtime.stop-everything",
+    "seat.import",
+    "secret.add",
+    "secret.drop",
+    "secret.recipients",
+    "secret.replace",
+    "secret.retire",
+    "secret.scope",
+    "service-account.create",
+    "service-account.retire",
+    "team.budget.set",
 ];
 
 /// Whether a machine may hold `action` on an object of `kind` (ACCESS-005
@@ -439,7 +468,8 @@ pub fn shipped_model() -> String {
 mod tests {
     use super::{
         ACTIONS, ADMINISTRATOR_RELATION, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, ORGANISATION_ACTIONS,
-        READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, shipped_model,
+        READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold,
+        shipped_model,
     };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
@@ -505,8 +535,14 @@ mod tests {
                 "{allowed} is not shipped"
             );
         }
-        for authority in ["grant", "role.create", "secret.scope"] {
-            assert!(!agent_may_hold("directory", authority));
+        // AGENTS-019 R1: a person's credentials stay out of every agent's
+        // reach; authority itself is a person's to give.
+        for credential in ["person.login.bind", "person.password.set", "person.sign-in.set"] {
+            assert!(!agent_may_hold("person", credential), "{credential}");
+        }
+        for authority in ["grant", "role.create", "secret.scope", "organisation.admit"] {
+            assert!(agent_may_hold("directory", authority), "{authority}");
+            assert!(!machine_may_hold("directory", authority), "{authority}");
         }
         for read_only in [
             "grant.check",
@@ -522,10 +558,10 @@ mod tests {
     }
 
     /// DIRECTORY-109 R3: the organisation's four acts ship under the
-    /// administrator relation; an agent may read its organisation and hold
-    /// nothing more of it.
+    /// administrator relation. A person may give an agent any of them
+    /// (AGENTS-019 R1); no machine holds more than reading it.
     #[test]
-    fn the_organisation_ships_four_acts_and_agents_may_only_read_it() -> Result<(), String> {
+    fn the_organisation_ships_four_acts_agents_may_be_given_them_and_machines_only_read() -> Result<(), String> {
         let model: Value = serde_json::from_str(&shipped_model()).map_err(|e| e.to_string())?;
         let held = model["relations"][ADMINISTRATOR_RELATION]
             .as_array()
@@ -538,13 +574,15 @@ mod tests {
             assert!(ACTIONS.contains(&action), "{action} is shipped");
         }
         assert!(agent_may_hold("organisation", "organisation.read"));
-        for withheld in [
+        assert!(machine_may_hold("organisation", "organisation.read"));
+        for given in [
             "organisation.admit",
             "organisation.grant",
             "organisation.administer",
         ] {
-            assert!(!agent_may_hold("organisation", withheld), "{withheld}");
-            assert!(WITHHELD_FROM_AGENTS.contains(&withheld), "{withheld}");
+            assert!(agent_may_hold("organisation", given), "{given}");
+            assert!(!WITHHELD_FROM_AGENTS.contains(&given), "{given}");
+            assert!(!machine_may_hold("organisation", given), "{given}");
         }
         Ok(())
     }

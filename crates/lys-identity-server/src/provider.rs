@@ -78,7 +78,7 @@ pub(crate) mod rights_cache;
 mod rights_cached;
 mod rights_claim;
 pub(crate) use agent_issue::{AgentAppPass, agent_app_pass, revoke as revoke_agent_app_pass};
-pub(crate) use bearer::{app_person, app_person_actor, personal_actor};
+pub(crate) use bearer::{app_agent, app_person, app_person_actor, personal_actor};
 pub(crate) use bearer::{pass_holder, presented_pass, product_person};
 pub use endpoints::{api_keys, routes};
 pub(crate) use grant_binding::signed_binding;
