@@ -10,7 +10,7 @@
 //! opens, and an agent never decides a draft it made itself.
 
 #[path = "support/agent_starts_agent.rs"]
-mod support;
+pub mod support;
 
 #[path = "../src/mcp_test_answer.rs"]
 mod mcp_answer;
