@@ -86,7 +86,7 @@ fn a_use_naming_its_act_is_version_eight_and_reads_back_whole() -> TestResult {
         signed
             .bytes()
             .windows(EXERCISED_ENVELOPE.len())
-            .any(|window| window == EXERCISED_ENVELOPE),
+            .any(|window| window == EXERCISED_ENVELOPE.as_bytes()),
         "the protected header names the version 8 content type"
     );
     assert_eq!(
