@@ -43,7 +43,7 @@ async fn role_read_requires_the_named_roles_read_grant() -> TestResult {
 
 /// Creating, revising, assigning, moving and ending roles are a person's to
 /// give an agent (AGENTS-019 R1): before each is given the agent is refused
-/// NotHeld at its route, and once given the agent does it.
+/// `NotHeld` at its route, and once given the agent does it.
 #[tokio::test]
 async fn role_changes_are_given_to_an_agent_and_refused_until_they_are() -> TestResult {
     let table = Table::fresh(true).await?;
