@@ -706,3 +706,7 @@
 - [ ] **C826** — The note before any app's resources are held names no app and links Access to the one approved app, or to Access when more than one is. DIRECTORY-114/R2.
 - [ ] **C827** — Getting started's step is Connect an app, done when any app is approved, naming the first pending app when one asks. DIRECTORY-114/R3.
 - [ ] **C828** — The estate import shows evidence as written, and the seat import excludes a server entry holding only tool approvals by its shape, never a name. DIRECTORY-114/R4.
+
+## DIRECTORY-115: a refused upgrade leaves no client release behind
+
+- [ ] **C829** — A refused upgrade removes the client releases it placed, a release the manifest does not name is replaced rather than refused, and the report lists every unreferenced release directory. DIRECTORY-115/R1-R3.

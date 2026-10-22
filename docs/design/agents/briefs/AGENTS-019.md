@@ -154,3 +154,26 @@ Behavioural. acted_by_agents on GET /dashboard (crates/lys-identity-server/src/d
 - gate -stages nextest -crates lys-identity,lys-identity-server -test 'binary(agent_roots) | binary(people_admit_agent) | binary(people_details_agent) | binary(agent_route_parity)' (the red run first, then the green, both records on the handback)
 - The whole Lys gate on the final commit, judged by its parsed failures
 - On the installed release: the administrator gives an agent organisation.admit from the screens, the agent admits a person through Lys's MCP, and the admission shows in the administrator's acted-by-agents list on the dashboard
+
+## Amendments
+
+### Amendment 1: Roots go only to persons
+
+- **Date:** 2026-10-22
+- **By:** Waffles
+
+POST /grants/agent-roots is never an agent's act: a root grant is given by a person to their own agent, so the route refuses an agent caller by name and R4 lists it human-only with that reason rather than giving it a scope.
+
+### Amendment 2: Admitting asks two rights
+
+- **Date:** 2026-10-22
+- **By:** Waffles
+
+An agent admits a person only holding organisation.admit and organisation.grant on its organisation: admission hands the new person their first grant, so the agent must also hold the right to give one. R2's single right stands for a person caller.
+
+### Amendment 3: Request decisions stay persons'
+
+- **Date:** 2026-10-22
+- **By:** Waffles
+
+POST /requests/{id}/approve and /decline remain a person's decision in this brief; R1's own_request refusal stands, and opening request decisions to agents is later work, not this brief's.

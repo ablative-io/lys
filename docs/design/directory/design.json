@@ -6789,6 +6789,21 @@
       "path": "crates/lys-identity-server/tests/organisations_handed.rs",
       "note": "The no-mail path on the founding table: the link handed in the answer, the proof signed in as handed_link, admission's handed link signing the person in once, nothing refused mail_unconfigured.",
       "brief": "DIRECTORY-112"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/clients_rollback_tests.rs",
+      "note": "A refused upgrade removes the client releases it placed; the report lists unreferenced release directories.",
+      "brief": "DIRECTORY-115"
+    },
+    {
+      "path": "crates/lys/src/identity/upgrade/command.rs",
+      "note": "The upgrade command: client releases placed inside the transaction, unreferenced releases reported.",
+      "brief": "DIRECTORY-115"
+    },
+    {
+      "path": "crates/lys/src/identity/install/layout/clients.rs",
+      "note": "Client release placement: a served release is never replaced; a stranded one is.",
+      "brief": "DIRECTORY-115"
     }
   ],
   "inventory": [
@@ -6914,13 +6929,11 @@
     },
     {
       "path": "crates/lys-identity-server/src/people_admit_app.rs",
-      "note": "POST /people/admit asked by an approved app's person pass: the actor held for the act, the first grant required on the app's own kind, the continue address from Lys's record of the app.",
-      "brief": "DIRECTORY-113"
+      "note": "POST /people/admit asked by an approved app's person pass: the actor held for the act, the first grant required on the app's own kind, the continue address from Lys's record of the app."
     },
     {
       "path": "crates/lys-identity-server/tests/people_admit_app.rs",
-      "note": "A product admits a person through its person pass: the act whole, the refusals before any step, the continue address answered by the proof.",
-      "brief": "DIRECTORY-113"
+      "note": "A product admits a person through its person pass: the act whole, the refusals before any step, the continue address answered by the proof."
     }
   ],
   "constraints": [

@@ -2615,6 +2615,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "DIRECTORY-115: a refused upgrade leaves no client release behind",
+      "items": [
+        {
+          "id": "C829",
+          "text": "A refused upgrade removes the client releases it placed, a release the manifest does not name is replaced rather than refused, and the report lists every unreferenced release directory. DIRECTORY-115/R1-R3.",
+          "done": false
+        }
+      ]
     }
   ]
 }

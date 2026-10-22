@@ -660,6 +660,10 @@
         {
           "id": "S268",
           "text": "As the person who installed Lys, I want the runner's record of used operations to stay the same size however long it runs, while no operation is ever accepted twice, so that a runner that has run for a year starts and answers as fast as on its first day."
+        },
+        {
+          "id": "S468",
+          "text": "As the installer of the identity stack, I want a refused upgrade to leave nothing behind and the next build at the same commit to install, so that I never move directories aside by hand to upgrade."
         }
       ]
     },

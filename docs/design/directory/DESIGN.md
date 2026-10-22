@@ -1457,6 +1457,9 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `surface/identity/src/features/found/Found.tsx` | The public founding form outside the shell: three fields, the written-to sentence, refusals in words, no identity shown. | DIRECTORY-111 |
 | `surface/identity/src/features/found/Prove.tsx` | The proving page outside the shell: one button that posts the proof, never on load; lands on the account page. | DIRECTORY-111 |
 | `crates/lys-identity-server/tests/organisations_handed.rs` | The no-mail path on the founding table: the link handed in the answer, the proof signed in as handed_link, admission's handed link signing the person in once, nothing refused mail_unconfigured. | DIRECTORY-112 |
+| `crates/lys/src/identity/upgrade/clients_rollback_tests.rs` | A refused upgrade removes the client releases it placed; the report lists unreferenced release directories. | DIRECTORY-115 |
+| `crates/lys/src/identity/upgrade/command.rs` | The upgrade command: client releases placed inside the transaction, unreferenced releases reported. | DIRECTORY-115 |
+| `crates/lys/src/identity/install/layout/clients.rs` | Client release placement: a served release is never replaced; a stranded one is. | DIRECTORY-115 |
 
 ## Inventory
 
