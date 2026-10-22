@@ -191,6 +191,18 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
         (POST, "/agents", Some(agent_registration), Some(agent_made)),
         (
             POST,
+            "/pair",
+            Some(api.schema::<crate::pair::AskBody>()),
+            Some(api.schema::<crate::pair::Asked>()),
+        ),
+        (
+            GET,
+            "/pair/{wait}",
+            None,
+            Some(api.schema::<crate::pair_store::Answer>()),
+        ),
+        (
+            POST,
             "/agents/{id}/reports-to",
             Some(api.schema::<crate::reporting_api::ReportsToBody>()),
             Some(api.schema::<crate::reporting_views::ReportsToChanged>()),

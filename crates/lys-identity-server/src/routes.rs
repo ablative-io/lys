@@ -85,6 +85,9 @@ pub struct AppState {
     /// The foundings waiting on their proof, kept beside the directory log
     /// (DIRECTORY-111); never held across an await.
     pub foundings: Mutex<crate::foundings_store::Foundings>,
+    /// The pairings waiting on a person's decision, kept beside the
+    /// directory log (AGENTS-020); never held across an await.
+    pub pairings: Mutex<crate::pair_store::PairStore>,
     /// The access requests, when the configuration names their file.
     pub requests: Option<Mutex<crate::requests_store::RequestStore>>,
     /// Requests for declared MCP servers, recorded without changing provisioning.

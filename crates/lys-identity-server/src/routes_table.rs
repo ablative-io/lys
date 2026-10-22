@@ -87,6 +87,7 @@ pub fn router(state: Shared) -> Router {
         .merge(crate::seats_api::routes())
         .merge(crate::seat_import_api::routes())
         .merge(crate::agent_app_pass::routes())
+        .merge(crate::pair::routes())
         .layer(axum::middleware::from_fn_with_state(
             std::sync::Arc::clone(&state),
             crate::changes::observe,

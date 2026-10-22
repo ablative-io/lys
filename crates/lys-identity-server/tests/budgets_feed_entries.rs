@@ -205,6 +205,7 @@ macro_rules! budgets_feed_entries {
                 },
                 secrets: None, mailer: None,
                 foundings: Mutex::new($crate::foundings_store::Foundings::open(config.log_dir.with_file_name("foundings.json"))?),
+                pairings: Mutex::new($crate::pair_store::PairStore::beside(&config.log_dir)?),
                 requests: None, mcp_requests: None, network: Some(Mutex::new(network)),
                 joins: None, roles: None, provisioning: None, certificates: None,
                 runtime: Some(Mutex::new($crate::runtime_store::RuntimeStore::open(&path.join("runtime"), Arc::clone(&key))?)),

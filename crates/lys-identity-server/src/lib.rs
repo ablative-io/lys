@@ -15,6 +15,11 @@ pub mod agent_pass;
 mod agent_pass_recovery;
 pub mod agent_pass_store;
 mod agent_seat;
+pub mod pair;
+pub mod pair_store;
+#[cfg(test)]
+#[path = "pair_tests.rs"]
+mod pair_tests;
 
 pub mod agent_policy_api;
 pub mod agent_policy_store;

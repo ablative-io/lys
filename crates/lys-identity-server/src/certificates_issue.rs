@@ -192,7 +192,7 @@ const REQUEST_END: &str = "-----END CERTIFICATE REQUEST-----";
 /// standard base64 DER taken before AGENTS-017 R1. Both decode to the same
 /// bytes `verify_certificate_request` reads; anything else is refused naming
 /// both forms.
-fn request_der(text: &str) -> Result<Vec<u8>, ServerError> {
+pub(crate) fn request_der(text: &str) -> Result<Vec<u8>, ServerError> {
     let neither =
         |why: String| malformed(format!("request is neither PEM nor standard base64: {why}"));
     let trimmed = text.trim();

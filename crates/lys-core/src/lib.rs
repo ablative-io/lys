@@ -41,6 +41,7 @@ pub mod delegation;
 pub mod error;
 pub mod keys;
 pub mod merkle;
+pub mod pairing_words;
 #[cfg(feature = "unstable-anchor")]
 pub mod receipt;
 pub mod seal;

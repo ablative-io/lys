@@ -287,6 +287,7 @@ async fn make_state(
         foundings: Mutex::new(crate::foundings_store::Foundings::open(
             config.log_dir.with_file_name("foundings.json"),
         )?),
+        pairings: Mutex::new(crate::pair_store::PairStore::beside(&config.log_dir)?),
         requests: primary.requests.map(Mutex::new),
         mcp_requests: primary.mcp_requests,
         network: primary.network.map(Mutex::new),

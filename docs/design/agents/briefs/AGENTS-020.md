@@ -116,3 +116,12 @@ WHEN `lys agent pair --lys <api> --name <name> --seat <path>` runs THE SYSTEM SH
 - The whole gate (tokei, ast-grep, fmt, clippy pedantic, nextest, cargo test --doc, tsc, vitest) at the landing sha, judged by its output.
 - Walked on the install with Tom: `lys agent pair` on this laptop says four words, Tom types them on his dashboard, names the agent and approves, and the command writes the seat file and prints the agent's id; then Cambium's seat brief walks the same code from an MCP seat.
 - Hospital line in the handback, never in a commit: if this code were used in a hospital, the worst credible failure is a pairing approved for the wrong agent because two agents asked at once and the words were confused, so a stranger's agent acts as the ward's, and it could harm about everyone that agent may reach.
+
+## Amendments
+
+### Amendment 1: R1's file list: the word list, the state, the router and the tables
+
+- **Date:** 2026-10-23
+- **By:** Waffles
+
+lys-core holds no word list for handed links (DIRECTORY-112's handed link is a token a person clicks), so the brief's "one added beside it" is crates/lys-core/src/pairing_words.rs, exported from lys-core's lib.rs: two hundred and fifty-six common short English words, no two alike aloud and none with a spelling variant a listener might type (Tom's ruling of 23 Oct), one per byte, so four bytes from the operating system make a code. The store is a field of AppState (routes.rs: `pairings: Mutex<PairStore>`), opened beside foundings.json as pairings.json with no new configuration key, so routes_startup.rs, grant_settlement_seed_tests.rs and tests/budgets_feed_entries.rs set it; routes_table.rs merges the pair routes; openapi_table.rs and openapi_types.rs carry the two routes' rows, since tests/openapi.rs refuses any declared route without an entry; error_status.rs maps pair_unknown to 404 and pair_request_invalid to 400 (pair_declined keeps the named refusal's 409); certificates_issue.rs opens request_der to the crate so the pairing reads a request exactly as the certificate route does. The pairings file is written whole as one durable operation per ask, decision or taken answer, the shape foundings.json uses, never leaf by leaf.
