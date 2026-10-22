@@ -361,7 +361,11 @@ async fn the_administrator_disables_sessions_and_reenables_without_password_or_m
     assert_eq!(user["email_verified"], false);
     assert_eq!(user["groups"], json!(["group"]));
     assert_eq!(user["user_values"], json!({"saved": "kept"}));
-    assert!(user.get("password").is_none());
+    // The sign-in service reads a null password as "unchanged" (update_of sends it so).
+    assert!(
+        user.get("password").is_none_or(Value::is_null),
+        "no password may be set: {user}"
+    );
     let (status, answer) = table
         .service
         .post(&path, Some(&table.cookie), &json!({"enabled": true}))
