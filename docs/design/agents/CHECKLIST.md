@@ -113,3 +113,7 @@
 ## AGENTS-020: an agent with no identity pairs with its person by a spoken code
 
 - [ ] **C836** — An unknown key asks Lys for four words, a signed-in person enters them, names the agent and gives its roots, Lys certifies the key and answers the approved apps, and `lys agent pair` does the agent's side. AGENTS-020/R1-R4.
+
+## AGENTS-021: one Lys plugin for both hosts, installed by one line that names the Lys it reaches
+
+- [ ] **C837** — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.

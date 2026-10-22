@@ -1,0 +1,132 @@
+---
+type: brief
+id: AGENTS-021
+cluster: agents
+title: One Lys plugin for Claude Code and Codex, installed by one line that names the Lys it reaches, with skills that match the served tools
+---
+
+# AGENTS-021: One Lys plugin for Claude Code and Codex, installed by one line that names the Lys it reaches, with skills that match the served tools
+
+> **Cluster:** agents
+> **Checklist:**
+> - C837 — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.
+> **Stories:**
+> - S472 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.
+
+## Purpose
+
+Tom, 23 Oct 2026 09:13 to 09:26 by voice, on Cambium's plugin: "an easy one-liner install, like just handles the install for you... an installer thing that you can NPX... we also need skill documentation, all the other stuff that goes with the plug-in"; "you would want it to be like, set them what their endpoint was that they connected to"; "people who are gonna be using it are not tech savvy, even in the slightest"; and, asked directly: "Do we need to do something similar for the Lys MCP server? ... think about all of the missing stuff in the cracks." Cambium's plugin now has that shape (Cambium MCP-004 R5, 23 Oct: plugins/cambium serves both hosts, `npx cambium-mcp install` adds the marketplace and the plugin to every host on PATH through the hosts' own commands, judged by their words). Lys today has two plugin trees: plugin/ for Claude Code (commands, skills, config/lys-mcp.json) and plugins/lys for Codex (the commands exported as skills), both at version 0.1.0, both pointing a Streamable HTTP MCP server at the one central address https://lys.ablative.com.au/api/mcp written into config/lys-mcp.json, and installed by two host-specific commands run from a checkout of this repository (`claude plugin marketplace add ./` or `codex plugin marketplace add .`, then the host's install). A person with no checkout, no git credentials and no knowledge of either host's plugin commands cannot install it; a person whose organisation runs its own Lys cannot point the plugin at it without editing a file inside the plugin; and two trees drift. The Lys server itself stays what it is: remote, Streamable HTTP, OAuth through the host (the host opens Lys for the person to sign in and consent; agent mode uses the connected agent's own grants). Nothing here adds a Lys binary, a seat file or a stdio bridge; the host owns sign-in, and a bridge would have to take that from it.
+
+## Task
+
+Make the Lys plugin one tree that both hosts load, installed by one line that names the Lys it reaches, with every skill matched to the served tools and routes. In: the single plugin tree and both marketplace files; the npm package `lys-plugin` (an installer only, no Lys binary) and its `install` gesture with `--lys <url>`; the skills audit against the four tools and routes.json; the READMEs; the tests. Out: the Lys MCP server's transport and sign-in (HTTP and OAuth stay; AGENTS-020's pairing is a different path for agents with keys); any change to Lys routes; Cambium's plugin (done in its own repository); a shared installer across products (each product installs itself).
+
+## Requirements
+
+### R1: One plugin tree serves Claude Code and Codex; the second tree is retired
+
+THE SYSTEM SHALL hold one plugin tree, plugins/lys, that Claude Code and Codex both load: a portable root plugin.json (name lys, version 0.2.0, skills ./skills/, mcpServers ./config/lys-mcp.json, interface block) with .claude-plugin/plugin.json and .codex-plugin/plugin.json as the two hosts' copies at the same version, one skills/ folder that both hosts read (the seven command workflows stay exported as skills, as plugins/lys already does; plugin/commands is folded into them, not kept beside them), agents/ with the two companion roles, config/lys-mcp.json and config/routes.json. The root .claude-plugin/marketplace.json and .agents/plugins/marketplace.json SHALL both point at ./plugins/lys and nothing else. The plugin/ tree SHALL be deleted in the same change, and no file under the repository SHALL name it afterwards. WHEN `claude plugin validate plugins/lys` and the Codex plugin add run against the tree THE SYSTEM SHALL pass both, the two hosts listing the same skills by name.
+
+**Acceptance:**
+- surface/identity or crates tests are not the venue; this is a tree: tests/plugin/one-tree.test.ts (bun, under plugins/lys/tests) reads the three manifests and asserts one name, one version, one skills path, one mcpServers path; reads both marketplace files and asserts both sources are ./plugins/lys; asserts plugin/ does not exist and `git grep -n 'plugin/'` over the tree (excluding plugins/) finds no reference.
+- `claude plugin validate plugins/lys` passes (warnings on LICENSE and icon are named, not hidden); `codex plugin add lys@lys-local` from a marketplace added at the repository root answers "Added plugin `lys`"; the two hosts' skill lists, read from the installed caches, are byte-equal in names.
+
+**Files:**
+- create: plugins/lys/plugin.json
+- create: plugins/lys/.claude-plugin/plugin.json
+- create: plugins/lys/tests/one-tree.test.ts
+- create: .agents/plugins/marketplace.json
+- modify: .claude-plugin/marketplace.json
+- modify: plugins/lys/.codex-plugin/plugin.json
+- modify: plugins/lys/README.md
+- delete: plugin/README.md
+- delete: plugin/agents
+- delete: plugin/commands
+- delete: plugin/config
+- delete: plugin/scripts
+- delete: plugin/skills
+
+**Checklist:**
+- C837 — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.
+
+**Stories:**
+- S472 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.
+
+### R2: `npx lys-plugin install [--lys <url>]` installs the plugin into every host on the computer and names the Lys it reaches
+
+THE SYSTEM SHALL publish an npm package `lys-plugin` that carries no Lys binary: a Node installer, Node 20 or later, nothing else. WHEN a person runs `npx lys-plugin install` THE SYSTEM SHALL, for each of claude and codex found on PATH, add the marketplace ablative-io/lys and install lys@lys-local through that host's own commands (`claude plugin marketplace add ablative-io/lys --json`, `claude plugin install lys@lys-local --json`; `codex plugin marketplace add ablative-io/lys`, `codex plugin add lys@lys-local`), judge each step by the host's own words (Claude's --json line with outcome ok; Codex's "Added marketplace `lys-local`", "Marketplace `lys-local` is already added", "Added plugin `lys`") and never by an exit code alone, print each host's words as they come, name and skip a host that is not on PATH, and fail by name (install_no_host) when neither is. WHEN `--lys <url>` is given THE SYSTEM SHALL make the installed plugin reach that Lys's /api/mcp instead of the central one, through the host's own plugin-option facility where the host has one (Claude Code: the plugin's declared option saved with `claude plugin configure lys --values-stdin`; Codex: its equivalent, named by the builder from `codex plugin --help` of the pinned version, or, where Codex has none, the installer writes the installed plugin's config/lys-mcp.json copy and says so); the plugin tree in git SHALL carry the central address only as the declared default, and a second install with another `--lys` SHALL replace the first's address and say what it replaced. The same install twice SHALL answer the hosts' "already" words and change nothing.
+
+**Acceptance:**
+- plugins/lys/installer/tests/install.test.ts: fake claude and codex scripts answering from files (never through the shell's quoting) log their arguments; both present → four commands in order and the five report lines; one absent → named and skipped; neither → install_no_host; a host answering outcome error or no proving sentence → install_failed naming host, command, exit code and the host's last lines; `--lys https://lys.example.test` → the option saved with that URL and the report naming it; a second `--lys` → the replacement named.
+- The built installer run against the real claude and codex with CLAUDE_CONFIG_DIR and CODEX_HOME pointed at scratch folders installs both, idempotently, and the installed plugin's server URL reads back as the `--lys` given; recorded in the handback with the hosts' versions.
+- `npm pack` of lys-plugin is under 100 kB and lists no dependency; `npx lys-plugin install` from a clean npm cache runs the installer (proved after Tom publishes; the publish itself is his npm login's act).
+
+**Files:**
+- create: plugins/lys/installer/package.json
+- create: plugins/lys/installer/bin/lys-plugin.js
+- create: plugins/lys/installer/src/install.js
+- create: plugins/lys/installer/tests/install.test.ts
+- create: plugins/lys/installer/README.md
+- modify: plugins/lys/plugin.json
+- modify: plugins/lys/config/lys-mcp.json
+- modify: plugins/lys/README.md
+
+**Checklist:**
+- C837 — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.
+
+**Stories:**
+- S472 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.
+
+### R3: Every skill matches the four served tools and the live routes; the READMEs say the one line
+
+THE SYSTEM SHALL have every skill under plugins/lys/skills name only the four tools the server serves (what-can-I-do, read, change, drafts) by their bare names with the host-prefix note, every route a skill names present in config/routes.json as the server publishes it, and no command name, path or tool that the server does not serve (the audit is a test, not a reading). The two READMEs (plugins/lys/README.md for both hosts, plugins/lys/installer/README.md for npm) SHALL open with the one line `npx lys-plugin install`, give the two-command form per host beneath it, say that sign-in is the host's OAuth consent at Lys, that `--lys <url>` names an organisation's own Lys, and that nothing is pasted (no token, no seat file).
+
+**Acceptance:**
+- plugins/lys/tests/skills-match-tools.test.ts: for every skills/*/SKILL.md, every backticked tool name is one of the four; every backticked route path appears in config/routes.json; no SKILL.md names /lys:<command> (the Claude command form) or a path under /api/me.
+- plugins/lys/tests/readme-says-the-line.test.ts: both READMEs contain `npx lys-plugin install`, `--lys`, and the words OAuth and consent; neither contains a token, a key or a seat file path.
+
+**Files:**
+- create: plugins/lys/tests/skills-match-tools.test.ts
+- create: plugins/lys/tests/readme-says-the-line.test.ts
+- modify: plugins/lys/skills
+- modify: plugins/lys/README.md
+- modify: plugins/lys/installer/README.md
+
+**Checklist:**
+- C837 — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.
+
+**Stories:**
+- S472 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.
+
+### R4: Standing bars: no fixed wait, no Lys service touched, the host keeps sign-in, nothing silent
+
+THE SYSTEM SHALL write no sleep, timeout, poll interval or fixed wait anywhere in the installer or the tests (a host's exit is the event; Tom: no fixed waits, ever). THE SYSTEM SHALL never install, upgrade, restart or stop a Lys or Cambium service from the plugin or the installer. THE SYSTEM SHALL keep sign-in the host's: the plugin declares the remote server and its OAuth metadata as today and holds no token, key, pass or seat file. Every failure SHALL be a sentence naming its cause (install_failed, install_no_host, a host's own words); nothing is retried silently and no address is replaced without saying so.
+
+**Acceptance:**
+- grep of the change for setTimeout, setInterval, sleep and AbortSignal.timeout finds no addition; grep for token, privateKey, LYS_AGENT_PASS and .seat.json under plugins/lys finds only the README sentences that forbid pasting them.
+- plugins/lys/installer/tests/install.test.ts covers every refusal by name (listed in R2) and asserts the installer's stdout and stderr contain no URL other than the marketplace source and the `--lys` given.
+
+**Files:**
+- modify: plugins/lys/installer/src/install.js
+
+**Checklist:**
+- C837 — One plugin tree plugins/lys serves Claude Code and Codex (plugin/ retired), `npx lys-plugin install [--lys <url>]` adds the marketplace and the plugin to every host on PATH through the hosts' own commands judged by their words, and every skill matches the four served tools and routes.json. AGENTS-021/R1-R4.
+
+**Stories:**
+- S472 (A person starting an agent on their own computer, types one word and expects the agent to start, whether or not the Lys console is up) — As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.
+
+## Boundaries
+
+- SHALL NOT change the Lys MCP server's transport, routes or sign-in: Streamable HTTP at <lys>/api/mcp with the host's OAuth stays; no stdio bridge, no Lys binary, no seat file for the plugin.
+- SHALL NOT install Cambium's plugin or share an installer with it; each product installs itself (Tom, 15 Oct: each product independent, native integration).
+- SHALL NOT keep two plugin trees: plugin/ goes in this change, and its commands live on as skills.
+- SHALL NOT add a sleep, timeout, poll or fixed wait; the host's exit and its words are the events.
+- SHALL NOT publish to npm from any machine but Tom's (his npm login): the package is built and handed to him with the receipts file, as Cambium's was.
+
+## Verification
+
+- Red first: every new test file written and shown red at the brief commit through `bun test plugins/lys` before the code, its failing lines kept in the handback.
+- Plugin proof: `claude plugin validate plugins/lys`; `claude plugin marketplace add` and `plugin install` with CLAUDE_CONFIG_DIR in a scratch folder; `codex plugin marketplace add` and `plugin add` with CODEX_HOME in a scratch folder; both read by their own words, never by exit code.
+- Installer proof: `bun test plugins/lys` (one-tree, skills-match-tools, readme-says-the-line, install); the built installer run against the real hosts in scratch config folders with and without `--lys`; `npm pack` size and dependency count read from its output.
+- The Lys gate (`sh scripts/design/gate.sh` after `python3 scripts/design/render-cluster.py docs/design/agents`) parsed for failures; the repository's tsc and biome legs where the installer is TypeScript-checked; every file under the 500-line gate.
+- Walked with Tom: a computer with Claude Code and Codex and no checkout runs `npx lys-plugin install`, opens a new session, authenticates the Lys server through the host's consent at Lys, and `$setup` or the setup skill answers who it is; then the same with `--lys` pointed at a second Lys.

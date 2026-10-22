@@ -81,3 +81,5 @@
 **S450.** As a person whose agent sets up an assistant for me, I want it to be able to start that assistant without me at a screen, and I want to see on my dashboard every agent it registered or started, with Stop beside each, so that nothing acts in my name that I cannot see and stop.
 
 **S471.** As a person starting an agent on my own computer, I want to install it with one generic command and then give it its identity by typing four words it says to me, so that nothing has to be known up front and the agent is mine from its first act.
+
+**S472.** As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands.

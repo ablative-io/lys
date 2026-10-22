@@ -819,6 +819,116 @@
       "path": "crates/lys/src/cli/pair.rs",
       "note": "The pair command's arguments.",
       "brief": "AGENTS-020"
+    },
+    {
+      "path": "plugins/lys/plugin.json",
+      "note": "The one Lys plugin's portable manifest, read by both hosts.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/.claude-plugin/plugin.json",
+      "note": "Claude Code's copy of the plugin manifest, at the same version.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/.codex-plugin/plugin.json",
+      "note": "Codex's copy of the plugin manifest, at the same version.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/tests/one-tree.test.ts",
+      "note": "One tree, one version, both marketplaces point at it, plugin/ gone.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/tests/skills-match-tools.test.ts",
+      "note": "Every skill names only the four served tools and routes in routes.json.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/tests/readme-says-the-line.test.ts",
+      "note": "Both READMEs open with the one install line and paste nothing.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": ".agents/plugins/marketplace.json",
+      "note": "Codex's marketplace file at the repository root, pointing at plugins/lys.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "note": "Claude Code's marketplace file at the repository root, pointing at plugins/lys.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/README.md",
+      "note": "The plugin's README for both hosts: the one line, the two-command form, sign-in is the host's consent.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/config/lys-mcp.json",
+      "note": "The remote Lys MCP server declaration; the central address is the declared default only.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/skills",
+      "note": "The skills both hosts load; the command workflows live here as skills.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/installer/package.json",
+      "note": "The lys-plugin npm package: an installer, no Lys binary, no dependency.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/installer/bin/lys-plugin.js",
+      "note": "The npx entry: install [--lys <url>].",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/installer/src/install.js",
+      "note": "Adds the marketplace and the plugin to every host on PATH through the hosts' own commands, judged by their words.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/installer/tests/install.test.ts",
+      "note": "Fake hosts answering from files prove every path and every refusal by name.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugins/lys/installer/README.md",
+      "note": "The npm README: the one line and what it does.",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/README.md",
+      "note": "Retired: the Claude-only tree's README (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/agents",
+      "note": "Retired: the Claude-only tree's companion roles (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/commands",
+      "note": "Retired: the Claude-only command files, folded into skills (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/config",
+      "note": "Retired: the Claude-only tree's server config (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/scripts",
+      "note": "Retired: the Claude-only tree's scripts (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
+    },
+    {
+      "path": "plugin/skills",
+      "note": "Retired: the Claude-only tree's skills, kept once under plugins/lys (deleted by AGENTS-021).",
+      "brief": "AGENTS-021"
     }
   ],
   "principles": [

@@ -230,6 +230,28 @@ The seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path th
 | `crates/lys/src/commands/pair.rs` | `lys agent pair`: the agent's side of pairing for an agent that is not a product seat. | AGENTS-020 |
 | `crates/lys/src/commands/pair_tests.rs` | `lys agent pair` proved against a test server. | AGENTS-020 |
 | `crates/lys/src/cli/pair.rs` | The pair command's arguments. | AGENTS-020 |
+| `plugins/lys/plugin.json` | The one Lys plugin's portable manifest, read by both hosts. | AGENTS-021 |
+| `plugins/lys/.claude-plugin/plugin.json` | Claude Code's copy of the plugin manifest, at the same version. | AGENTS-021 |
+| `plugins/lys/.codex-plugin/plugin.json` | Codex's copy of the plugin manifest, at the same version. | AGENTS-021 |
+| `plugins/lys/tests/one-tree.test.ts` | One tree, one version, both marketplaces point at it, plugin/ gone. | AGENTS-021 |
+| `plugins/lys/tests/skills-match-tools.test.ts` | Every skill names only the four served tools and routes in routes.json. | AGENTS-021 |
+| `plugins/lys/tests/readme-says-the-line.test.ts` | Both READMEs open with the one install line and paste nothing. | AGENTS-021 |
+| `.agents/plugins/marketplace.json` | Codex's marketplace file at the repository root, pointing at plugins/lys. | AGENTS-021 |
+| `.claude-plugin/marketplace.json` | Claude Code's marketplace file at the repository root, pointing at plugins/lys. | AGENTS-021 |
+| `plugins/lys/README.md` | The plugin's README for both hosts: the one line, the two-command form, sign-in is the host's consent. | AGENTS-021 |
+| `plugins/lys/config/lys-mcp.json` | The remote Lys MCP server declaration; the central address is the declared default only. | AGENTS-021 |
+| `plugins/lys/skills` | The skills both hosts load; the command workflows live here as skills. | AGENTS-021 |
+| `plugins/lys/installer/package.json` | The lys-plugin npm package: an installer, no Lys binary, no dependency. | AGENTS-021 |
+| `plugins/lys/installer/bin/lys-plugin.js` | The npx entry: install [--lys <url>]. | AGENTS-021 |
+| `plugins/lys/installer/src/install.js` | Adds the marketplace and the plugin to every host on PATH through the hosts' own commands, judged by their words. | AGENTS-021 |
+| `plugins/lys/installer/tests/install.test.ts` | Fake hosts answering from files prove every path and every refusal by name. | AGENTS-021 |
+| `plugins/lys/installer/README.md` | The npm README: the one line and what it does. | AGENTS-021 |
+| `plugin/README.md` | Retired: the Claude-only tree's README (deleted by AGENTS-021). | AGENTS-021 |
+| `plugin/agents` | Retired: the Claude-only tree's companion roles (deleted by AGENTS-021). | AGENTS-021 |
+| `plugin/commands` | Retired: the Claude-only command files, folded into skills (deleted by AGENTS-021). | AGENTS-021 |
+| `plugin/config` | Retired: the Claude-only tree's server config (deleted by AGENTS-021). | AGENTS-021 |
+| `plugin/scripts` | Retired: the Claude-only tree's scripts (deleted by AGENTS-021). | AGENTS-021 |
+| `plugin/skills` | Retired: the Claude-only tree's skills, kept once under plugins/lys (deleted by AGENTS-021). | AGENTS-021 |
 
 ## Inventory
 

@@ -170,6 +170,10 @@
         {
           "id": "S471",
           "text": "As a person starting an agent on my own computer, I want to install it with one generic command and then give it its identity by typing four words it says to me, so that nothing has to be known up front and the agent is mine from its first act."
+        },
+        {
+          "id": "S472",
+          "text": "As a person setting up my agent, I want one line that installs Lys for it in Claude Code and Codex and points it at my organisation's Lys, so that I never edit a config file or learn a host's plugin commands."
         }
       ]
     }
