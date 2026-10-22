@@ -109,3 +109,7 @@
 - [ ] **C833** — Every Lys route that is not public either admits an agent's signature judged by its declared scope, or is on HUMAN_ONLY with its reason, or is a kept responsibility; tests/agent_route_parity.rs fails a route on none of the three or on two (AGENTS-019 R4).
 - [ ] **C834** — what-can-I-do lists for an agent every route whose declared scope its live grants reach, administrator-body routes included (AGENTS-019 R4).
 - [ ] **C835** — A person's dashboard acted-by-agents list carries every act their agents did under an act moved by R1 and every admission an agent made for them, newest first, in plain words, beside the registrations and starts it lists today (AGENTS-019 R5).
+
+## AGENTS-020: an agent with no identity pairs with its person by a spoken code
+
+- [ ] **C836** — An unknown key asks Lys for four words, a signed-in person enters them, names the agent and gives its roots, Lys certifies the key and answers the approved apps, and `lys agent pair` does the agent's side. AGENTS-020/R1-R4.

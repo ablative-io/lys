@@ -222,6 +222,14 @@ The seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path th
 | `surface/identity/src/features/file/IdentityFile.tsx` | the agent file's head menu names the emergency act Withdraw | AGENTS-017 |
 | `crates/lys-core/Cargo.toml` | serde_json for the seat file reader and writer | AGENTS-017 |
 | `docs/design/identity/GRANT-CONTRACT.md` | the grant contract: which acts an agent may be given, and which are kept from every agent | AGENTS-019 |
+| `crates/lys-identity-server/src/pair.rs` | Pairing routes: an unknown key asks for a code, the held wait answers the decision. | AGENTS-020 |
+| `crates/lys-identity-server/src/pair_store.rs` | Undecided pairings kept by code until a person decides. | AGENTS-020 |
+| `crates/lys-identity-server/src/pair_tests.rs` | Pairing routes proved end to end with the server's own notification. | AGENTS-020 |
+| `surface/identity/src/features/pair/PairPage.tsx` | The Pair page: four words, the agent's name, its roots, Approve and Decline. | AGENTS-020 |
+| `surface/identity/src/features/pair/pair-page.test.tsx` | The Pair page proved. | AGENTS-020 |
+| `crates/lys/src/commands/pair.rs` | `lys agent pair`: the agent's side of pairing for an agent that is not a product seat. | AGENTS-020 |
+| `crates/lys/src/commands/pair_tests.rs` | `lys agent pair` proved against a test server. | AGENTS-020 |
+| `crates/lys/src/cli/pair.rs` | The pair command's arguments. | AGENTS-020 |
 
 ## Inventory
 

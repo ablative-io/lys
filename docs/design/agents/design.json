@@ -779,6 +779,46 @@
       "path": "docs/design/identity/GRANT-CONTRACT.md",
       "note": "the grant contract: which acts an agent may be given, and which are kept from every agent",
       "brief": "AGENTS-019"
+    },
+    {
+      "path": "crates/lys-identity-server/src/pair.rs",
+      "note": "Pairing routes: an unknown key asks for a code, the held wait answers the decision.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "crates/lys-identity-server/src/pair_store.rs",
+      "note": "Undecided pairings kept by code until a person decides.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "crates/lys-identity-server/src/pair_tests.rs",
+      "note": "Pairing routes proved end to end with the server's own notification.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "surface/identity/src/features/pair/PairPage.tsx",
+      "note": "The Pair page: four words, the agent's name, its roots, Approve and Decline.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "surface/identity/src/features/pair/pair-page.test.tsx",
+      "note": "The Pair page proved.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "crates/lys/src/commands/pair.rs",
+      "note": "`lys agent pair`: the agent's side of pairing for an agent that is not a product seat.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "crates/lys/src/commands/pair_tests.rs",
+      "note": "`lys agent pair` proved against a test server.",
+      "brief": "AGENTS-020"
+    },
+    {
+      "path": "crates/lys/src/cli/pair.rs",
+      "note": "The pair command's arguments.",
+      "brief": "AGENTS-020"
     }
   ],
   "principles": [

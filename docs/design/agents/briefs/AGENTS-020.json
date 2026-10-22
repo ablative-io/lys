@@ -1,0 +1,136 @@
+{
+  "id": "AGENTS-020",
+  "cluster": "agents",
+  "title": "An agent with no identity pairs with its person by a spoken code: it asks Lys for the code, the person enters it signed in, names the agent and gives its roots, and Lys certifies the key and tells it which apps to reach",
+  "depends_on": [
+    "AGENTS-017",
+    "DIRECTORY-114"
+  ],
+  "blocked_by": [],
+  "checklist": [
+    "C836"
+  ],
+  "stories": [
+    "S471"
+  ],
+  "design_anchor": [],
+  "purpose": "Tom, 22 Oct 2026 20:1x, typed: \"how do people install it for their agents, we need to make that effortless. we'd talked about creating a generic mcp entrypoint so you didnt have to have the details up front. then the ai would connect to their identity or create a new one\"; and: \"the mcp server still needs to be stdio for claude to receive notifications, just need to make it so you can connect to an identity during runtime\". Today an agent gets its identity in one of two ways, both needing details up front on the computer it runs on: `lys agent enrol` (AGENTS-017 R1, R5: commands/enrol.rs) needs a registered agent id and either the registering agent's signature or the responsible person's app pass on that computer; Cambium's `cambium-mcp --take <door_url> <code>` needs the door's address and a take code a person minted by founding the seat first. Neither lets an agent that was just started with nothing say \"I have no identity\" and get one from the person in front of it. The person's side of founding already exists: the dashboard registers an agent, reviews its profile and gives it roots (AGENTS-017 R4), and /apps lists the organisation's approved apps with their addresses (DIRECTORY-114 R1). What is missing is the pairing: a code the agent can say and the person can type.",
+  "task": "Add pairing to Lys: an unknown key asks for a pairing code; a signed-in person enters the code, names the agent, gives its roots and approves; Lys certifies the key and answers the agent its identity and the approved apps it may reach. In: the pairing routes and their store, the dashboard's Pair page, the CLI's `lys agent pair` for an agent that is not an MCP seat, the tests. Out: any product's seat server (Cambium's MCP learns the client side in its own brief), a device-code OAuth grant for people, pairing an agent to a person who has no Lys yet (founding an organisation stays the founding path of DIRECTORY-111; the Pair page sends a stranger there and back).",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "An unknown key asks for a pairing code and waits for the person's decision without polling",
+      "spec": "WHEN a caller with no identity POSTs /pair with a PKCS#10 request over a fresh key and the name it proposes THE SYSTEM SHALL answer a pairing code of four lowercase dictionary words (from the word list lys-core already holds for handed links, or one added beside it), a wait id, and the address to tell the person (<lys origin>/pair). THE SYSTEM SHALL keep the request, keyed by the code, until it is decided; a code is never reused while it is undecided. WHEN the caller GETs /pair/{wait} THE SYSTEM SHALL hold the request open until the pairing is decided and then answer it (R3), or refuse at once by name if the wait id is unknown or already answered; no poll interval and no fixed deadline is written anywhere (Tom: no fixed waits, ever); the holding is the server's own event. A pairing the person has not decided is listed on the person's dashboard until they decide it; nothing expires it by a timer.",
+      "acceptance": [
+        "crates/lys-identity-server/src/pair_tests.rs: POST /pair with a valid request answers four words, a wait id and the pair address; a second POST answers a different code; GET /pair/{wait} on an undecided pairing does not answer until a decision is written, then answers it (proved with the server's own notification, no sleep); an unknown wait id is refused pair_unknown.",
+        "crates/lys-identity-server/src/pair_tests.rs: a request that is not a valid PKCS#10 over an Ed25519 key is refused pair_request_invalid before anything is kept."
+      ],
+      "files": {
+        "create": [
+          "crates/lys-identity-server/src/pair.rs",
+          "crates/lys-identity-server/src/pair_store.rs",
+          "crates/lys-identity-server/src/pair_tests.rs"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/lib.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C836"
+      ],
+      "stories": [
+        "S471"
+      ]
+    },
+    {
+      "id": "R2",
+      "title": "A signed-in person enters the code, names the agent, gives its roots and approves, on one page",
+      "spec": "WHEN a signed-in person opens /pair THE SYSTEM SHALL show one field for the four words and, once a code matches an undecided pairing, the agent's proposed name (editable), the roots choice AGENTS-017 R4 already draws, and Approve and Decline. WHEN the person approves THE SYSTEM SHALL register the agent under that person exactly as the dashboard's register act does (the same route, the same review of the reviewed profile if one is named, the same grant of roots), certify the pairing's key through the same path POST /agents/{id}/certificates uses, and record the decision so R1's wait answers. WHEN the person declines THE SYSTEM SHALL record the decline so the wait answers pair_declined and keeps nothing of the key. A stranger who opens /pair is sent to sign in or to found an organisation (DIRECTORY-111) and returns to /pair with the code kept in the page's state, never in the URL.",
+      "acceptance": [
+        "surface/identity/src/features/pair/pair-page.test.tsx: entering a known code shows the proposed name and the roots choice; Approve posts to /pair/{code}/approve with the name and roots and shows 'Paired: <name> can now act as itself'; Decline posts to /pair/{code}/decline; an unknown code shows 'No agent is waiting with these words'.",
+        "crates/lys-identity-server/src/pair_tests.rs: approve registers the agent under the signed-in person, issues a certificate with a serial in the log, and the held GET /pair/{wait} answers the certificate, the agent id and the person's handle; decline answers pair_declined and the key is not kept; a person who is not signed in is refused on both.",
+        "A code kept in the page's state survives the sign-in round trip (test with the sign-in return path)."
+      ],
+      "files": {
+        "create": [
+          "surface/identity/src/features/pair/PairPage.tsx",
+          "surface/identity/src/features/pair/pair-page.test.tsx"
+        ],
+        "modify": [
+          "crates/lys-identity-server/src/pair.rs",
+          "crates/lys-identity-server/src/pair_tests.rs",
+          "surface/identity/src/routes.tsx"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C836"
+      ],
+      "stories": [
+        "S471"
+      ]
+    },
+    {
+      "id": "R3",
+      "title": "The answer tells the agent who it is and which approved apps it may reach",
+      "spec": "WHEN a pairing is approved THE SYSTEM SHALL answer the waiting agent: its agent id, its handle, the certificate PEM and serial, the Lys API address, the responsible person's handle, and the organisation's approved apps as /apps answers them (DIRECTORY-114: id, name, address) so the agent can reach each product's door without being told any address up front. The answer carries no key material of anyone else and no secret the agent did not make.",
+      "acceptance": [
+        "crates/lys-identity-server/src/pair_tests.rs: with two approved apps and one pending, the answer lists the two approved with their addresses and not the pending one; the certificate verifies against the issuer; the serial is in the log."
+      ],
+      "files": {
+        "create": [],
+        "modify": [
+          "crates/lys-identity-server/src/pair.rs",
+          "crates/lys-identity-server/src/pair_tests.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C836"
+      ],
+      "stories": [
+        "S471"
+      ]
+    },
+    {
+      "id": "R4",
+      "title": "`lys agent pair` does the agent's side for an agent that is not a product seat",
+      "spec": "WHEN `lys agent pair --lys <api> --name <name> --seat <path>` runs THE SYSTEM SHALL make the key where it runs (as enrol does), POST /pair, print the four words and the address for the person, hold GET /pair/{wait} until it answers, and write the seat file (lys_core::seat_file, 0600, never overwriting) with the certificate, serial, agent id and Lys address; a decline is printed by name and nothing is written. The printed words are the only thing the person needs to hear.",
+      "acceptance": [
+        "crates/lys/src/commands/pair_tests.rs: against a test server the command prints the four words, writes the seat file after approval, and refuses seat_file_exists before making a key when the path exists; a decline prints pair_declined and writes nothing."
+      ],
+      "files": {
+        "create": [
+          "crates/lys/src/commands/pair.rs",
+          "crates/lys/src/commands/pair_tests.rs",
+          "crates/lys/src/cli/pair.rs"
+        ],
+        "modify": [
+          "crates/lys/src/cli.rs",
+          "crates/lys/src/commands/agent_pass.rs"
+        ],
+        "delete": []
+      },
+      "checklist": [
+        "C836"
+      ],
+      "stories": [
+        "S471"
+      ]
+    }
+  ],
+  "boundaries": [
+    "No product's name or address is written into Lys outside tests and fixtures (the no-app-names rule stands); the apps answered come from /apps as the organisation approved them.",
+    "No sleep, timeout, poll interval or expiry timer: the wait is held by the server's own event, and an undecided pairing stays listed until a person decides it.",
+    "No pairing without a signed-in person: a code alone never registers, certifies or reaches anything; a stranger is sent to sign in or found, and back.",
+    "Nothing changes in enrol, in certificates for already-registered agents, or in any product's seat server; every file stays under 500 lines of code."
+  ],
+  "verification": [
+    "Red first: every new test written and shown red at the brief commit through `cargo nextest run -p lys-identity-server -p lys -E 'test(pair)'` and the identity surface's vitest on pair-page.test.tsx, on Dean's laptop, green at the fix commit, judged by the runs' output lines and never by an exit code.",
+    "The whole gate (tokei, ast-grep, fmt, clippy pedantic, nextest, cargo test --doc, tsc, vitest) at the landing sha, judged by its output.",
+    "Walked on the install with Tom: `lys agent pair` on this laptop says four words, Tom types them on his dashboard, names the agent and approves, and the command writes the seat file and prints the agent's id; then Cambium's seat brief walks the same code from an MCP seat.",
+    "Hospital line in the handback, never in a commit: if this code were used in a hospital, the worst credible failure is a pairing approved for the wrong agent because two agents asked at once and the words were confused, so a stranger's agent acts as the ward's, and it could harm about everyone that agent may reach."
+  ],
+  "amendments": []
+}

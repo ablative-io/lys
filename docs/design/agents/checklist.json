@@ -400,6 +400,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "AGENTS-020: an agent with no identity pairs with its person by a spoken code",
+      "items": [
+        {
+          "id": "C836",
+          "text": "An unknown key asks Lys for four words, a signed-in person enters them, names the agent and gives its roots, Lys certifies the key and answers the approved apps, and `lys agent pair` does the agent's side. AGENTS-020/R1-R4.",
+          "done": false
+        }
+      ]
     }
   ]
 }

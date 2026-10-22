@@ -79,3 +79,5 @@
 **S449.** As a person whose agent registers agents for me, I want a crash in the middle to leave at most an agent with no rights that the next try finishes, never rights on an agent that does not exist, so that nothing invisible accumulates in my name.
 
 **S450.** As a person whose agent sets up an assistant for me, I want it to be able to start that assistant without me at a screen, and I want to see on my dashboard every agent it registered or started, with Stop beside each, so that nothing acts in my name that I cannot see and stop.
+
+**S471.** As a person starting an agent on my own computer, I want to install it with one generic command and then give it its identity by typing four words it says to me, so that nothing has to be known up front and the agent is mine from its first act.
