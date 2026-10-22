@@ -182,7 +182,13 @@ async fn an_agent_without_organisation_admit_is_refused_before_any_step() -> Tes
 
 /// Lowercase hex of `bytes`.
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut text = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        text.push(char::from(DIGITS[usize::from(byte >> 4)]));
+        text.push(char::from(DIGITS[usize::from(byte & 0x0f)]));
+    }
+    text
 }
 
 /// A key for `agent`, certified by Ada's session over it.
