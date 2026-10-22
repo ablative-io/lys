@@ -84,6 +84,11 @@ pub(crate) fn holds<'a>(
     .into())
 }
 
+/// The act an agent's profile write exercises on the person, the one the
+/// route declares (AGENTS-019 R4), so what an agent is told opens the route
+/// is what it is judged by.
+const PROFILE_SET: &str = "person.profile.set";
+
 pub(super) fn profile(
     state: &AppState,
     actor: &Actor,
@@ -107,18 +112,18 @@ pub(super) fn profile(
                 caller: IdentityId::Agent(agent),
                 route: Route::Api,
                 resource: Resource::new("person", &person.to_string())?,
-                action: Action::new("write")?,
+                action: Action::new(PROFILE_SET)?,
             }])
         },
         |mut judged| {
             crate::caller_admission::active_caller(judged.directory, actor)?;
             judged.apps.admit_kind(None, "person")?;
-            judged.apps.admit_action("person", "write")?;
+            judged.apps.admit_action("person", PROFILE_SET)?;
             let request = ExerciseRequest {
                 caller: IdentityId::Agent(agent),
                 route: Route::Api,
                 resource: Resource::new("person", &person.to_string())?,
-                action: Action::new("write")?,
+                action: Action::new(PROFILE_SET)?,
             };
             decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;
             if judged.directory.record(id).is_none() {

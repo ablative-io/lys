@@ -71,7 +71,9 @@ pub(crate) fn admit(
     // Admitting a person is judged by its handler alone, for a run pass as
     // for a relayed MCP call: it asks `organisation.grant` of an agent and
     // exercises `organisation.admit` once, in the register step, on the
-    // caller's own organisation, so one admission records one use.
+    // caller's own organisation, so one admission records one use. The
+    // giving paths (a person's profile, an account's sign-in) judge a run
+    // pass here alone instead: `grants::decide_as` never judges it again.
     if method == "POST" && path == "/people/admit" {
         return Ok(());
     }

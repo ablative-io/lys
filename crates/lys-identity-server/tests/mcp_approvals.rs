@@ -27,6 +27,12 @@ async fn a_lead_approves_from_its_own_latest_reviewed_profile() -> TestResult {
     assert_eq!(approved["profile_version"], 1);
     assert_eq!(approved["state"], "approved");
     assert_eq!(approved["decision"]["by"], fixture.lead);
+    // The lead's approval asks no grant, so its kept record names the person
+    // the lead answers to (AGENTS-019 R4).
+    assert_eq!(
+        approved["decision"]["responsible"],
+        fixture.lead_responsible
+    );
     assert_eq!(approved["decision"]["note"], body["note"]);
     assert_eq!(approved["decision"]["profile_version"], 2);
     assert!(

@@ -217,7 +217,7 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
     let person = held.person();
     let resource = json!({"kind": "person", "id": person});
     let root = held.ok("/grants/roots", &json!({"operation": operation()?, "route": "api", "holder": person, "resource": resource, "relation": "owner", "pass_on": {"kind": "to", "actions": ["person.profile.set"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}})).await?;
-    held.ok("/grants", &json!({"operation": operation()?, "route": "api", "source": root["grant"], "recipient": held.agent(), "responsible": person, "resource": resource, "relation": "only.person.profile.set", "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}})).await?;
+    let profile_grant = held.ok("/grants", &json!({"operation": operation()?, "route": "api", "source": root["grant"], "recipient": held.agent(), "responsible": person, "resource": resource, "relation": "only.person.profile.set", "pass_on": {"kind": "use_only"}, "window": {"starts_at": 0, "ends_at": null}})).await?;
     // And one on the person's account: changing their email (AGENTS-019 R3).
     let account = json!({"kind": "account", "id": person});
     let root = held.ok("/grants/roots", &json!({"operation": operation()?, "route": "api", "holder": person, "resource": account, "relation": "owner", "pass_on": {"kind": "to", "actions": ["person.email.set"], "recipients": ["agent"]}, "window": {"starts_at": 0, "ends_at": null}})).await?;
@@ -276,6 +276,18 @@ async fn an_agent_lys_starts_acts_inside_its_grant_through_mcp_and_its_pass_ends
         "{inside}"
     );
     eprintln!("proof: inside its grant, POST /identities/{{person}}/profile answered 200");
+    // The run pass's profile change is judged by its handler alone, so the
+    // one act records one use of the grant (AGENTS-019 R4).
+    let grant = profile_grant["grant"].as_str().ok_or("no profile grant")?;
+    let (status, read) = held
+        .service
+        .get(&format!("/grants/{grant}"), Some(&held.ada))
+        .await?;
+    assert_eq!(status, 200, "{read}");
+    assert_eq!(
+        read["last_use"]["recorded"], 1,
+        "one profile change, one use: {read}"
+    );
 
     // The email change passes the agent's grant: whatever this issuer-less
     // service answers next, it is not a refusal of the agent. A password is

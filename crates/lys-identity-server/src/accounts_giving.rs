@@ -9,6 +9,11 @@ use crate::grants::{Decision, decide_as};
 use crate::routes::AppState;
 use crate::session::now;
 
+/// The act an account's sign-in change exercises, the one the route
+/// declares (AGENTS-019 R4). It is a person's credential act, withheld from
+/// every agent (R1), so no agent's grant ever reaches it.
+const SIGN_IN_SET: &str = "person.sign-in.set";
+
 fn admitted(
     state: &AppState,
     actor: &Actor,
@@ -27,19 +32,19 @@ fn admitted(
                 caller: IdentityId::Agent(agent),
                 route: Route::Api,
                 resource: Resource::new("account", &person.to_string())?,
-                action: Action::new("write")?,
+                action: Action::new(SIGN_IN_SET)?,
             }])
         },
         |mut judged| {
             crate::caller_admission::active_caller(judged.directory, actor)?;
             let agent = actor.provenance().agent().ok_or(ServerError::NoPerson)?;
             judged.apps.admit_kind(None, "account")?;
-            judged.apps.admit_action("account", "write")?;
+            judged.apps.admit_action("account", SIGN_IN_SET)?;
             let request = ExerciseRequest {
                 caller: IdentityId::Agent(agent),
                 route: Route::Api,
                 resource: Resource::new("account", &person.to_string())?,
-                action: Action::new("write")?,
+                action: Action::new(SIGN_IN_SET)?,
             };
             let at = now();
             decide_as(actor, &mut judged, &request, at, None, Decision::Explain)?;

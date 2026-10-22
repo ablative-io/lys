@@ -56,6 +56,9 @@ pub struct McpRequestView {
 pub struct McpDecisionView {
     /// The approver's identity.
     pub by: String,
+    /// The person the approving agent answers to, when an agent approved.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub responsible: Option<String>,
     /// The approver's words.
     pub note: String,
     /// The newly reviewed profile version.
@@ -72,6 +75,7 @@ fn view<S: LeafStore>(
         request.state = McpRequestState::Approved;
         McpDecisionView {
             by: record.by.clone(),
+            responsible: record.responsible.clone(),
             note: record.note.clone(),
             profile_version: record.version.number,
             decided_at: record.at,
@@ -290,6 +294,21 @@ async fn approve(
         .map_or(uri.path(), axum::http::uri::PathAndQuery::as_str);
     let (seen, by) =
         crate::mcp_approval_sight::seen_target(&state, &headers, &id, ("POST", path, &bytes))?;
+    // A lead's approval asks no grant (its reach and remit admit it), so the
+    // record names the person the approving agent answers to (AGENTS-019 R4).
+    let responsible = match by {
+        IdentityId::Agent(agent) => Some(
+            crate::routes::with_directory(&state, |directory| {
+                Ok(directory
+                    .projection()?
+                    .record(IdentityId::Agent(agent))
+                    .and_then(lys_identity::projection::Record::responsible))
+            })?
+            .ok_or(ServerError::NoPerson)?
+            .to_string(),
+        ),
+        _ => None,
+    };
     let administrator = matches!(by, IdentityId::Person(_))
         && crate::routes::is_administrator(&state, &signed_in(&state, &headers)?)?;
     let agent = seen.agent.to_string();
@@ -363,6 +382,7 @@ async fn approve(
                 operation,
                 request,
                 by: by.to_string(),
+                responsible: responsible.clone(),
                 note,
                 from_version,
                 version: version.clone(),
@@ -412,6 +432,7 @@ mod tests {
             operation,
             request: asked.id.clone(),
             by,
+            responsible: None,
             note: "approved".to_owned(),
             from_version: 1,
             version,

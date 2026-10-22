@@ -29,6 +29,11 @@ pub(crate) struct Intended {
     pub request: String,
     /// The approving identity.
     pub by: String,
+    /// The person the approving agent answers to, when an agent approved:
+    /// a lead's approval asks no grant, so its record names who answers for
+    /// it (AGENTS-019 R4). Absent in a record kept before it was written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub responsible: Option<String>,
     /// The approver's words.
     pub note: String,
     /// The latest recorded profile over which the approval is written.

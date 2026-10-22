@@ -145,7 +145,7 @@ impl Table {
                 &json!({
                     "operation": operation()?, "route": "api", "holder": self.person,
                     "resource": resource, "relation": "writer",
-                    "pass_on": {"kind": "to", "actions": ["write"], "recipients": ["agent"]},
+                    "pass_on": {"kind": "to", "actions": ["person.profile.set"], "recipients": ["agent"]},
                     "window": {"starts_at": 0, "ends_at": null},
                 }),
             )
@@ -207,7 +207,7 @@ impl Table {
 
     async fn fresh() -> TestResult<Self> {
         let (service, (person, agent, key)) = Service::start_adjusted(
-            r#"{"version":1,"relations":{"writer":["write"]}}"#,
+            r#"{"version":1,"relations":{"writer":["person.profile.set"]}}"#,
             None,
             None,
             None,

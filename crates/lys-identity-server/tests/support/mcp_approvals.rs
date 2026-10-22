@@ -26,6 +26,8 @@ pub struct Fixture {
     pub service: Service,
     pub administrator: String,
     pub lead: String,
+    /// The person the lead answers to.
+    pub lead_responsible: String,
     pub lead_auth: Certified,
     pub narrow: String,
     pub narrow_auth: Certified,
@@ -133,6 +135,7 @@ impl Fixture {
         let fixture = Self {
             target: seeded.people[0].agents[0].id.to_string(),
             lead: seeded.people[1].agents[0].id.to_string(),
+            lead_responsible: seeded.people[1].id.to_string(),
             narrow: narrow.to_string(),
             outside: outside.to_string(),
             service,

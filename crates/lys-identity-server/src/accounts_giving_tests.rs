@@ -52,7 +52,9 @@ struct Table {
 }
 
 impl Table {
-    async fn grant(&self, person: &str) -> TestResult<String> {
+    /// Giving the agent `person.sign-in.set` on `person`'s account, from a
+    /// root the owner holds: the answer of the step that refuses it.
+    async fn give_sign_in(&self, person: &str) -> TestResult<(u16, Value)> {
         let resource = json!({"kind": "account", "id": person});
         let (status, root) = self
             .service
@@ -62,14 +64,15 @@ impl Table {
                 &json!({
                     "operation": operation()?, "route": "api", "holder": self.person,
                     "resource": resource, "relation": "writer",
-                    "pass_on": {"kind": "to", "actions": ["write"], "recipients": ["agent"]},
+                    "pass_on": {"kind": "to", "actions": ["person.sign-in.set"], "recipients": ["agent"]},
                     "window": {"starts_at": 0, "ends_at": null},
                 }),
             )
             .await?;
-        assert_eq!(status, 200, "{root}");
-        let (status, answer) = self
-            .service
+        if status != 200 {
+            return Ok((status, root));
+        }
+        self.service
             .post(
                 "/grants",
                 Some(&self.cookie),
@@ -80,12 +83,7 @@ impl Table {
                     "window": {"starts_at": 0, "ends_at": null},
                 }),
             )
-            .await?;
-        assert_eq!(status, 200, "{answer}");
-        Ok(answer["grant"]
-            .as_str()
-            .ok_or("grant id is missing")?
-            .to_owned())
+            .await
     }
 
     async fn team(&self, members: &[&str]) -> TestResult<String> {
@@ -119,7 +117,7 @@ impl Table {
             json!({"api": issuer.base, "api_key_file": issuer.keys.path().join("api.key")}),
         )?;
         let (service, (person, target, agent, key)) = Service::start_adjusted(
-            r#"{"version":1,"relations":{"writer":["write"]}}"#,
+            r#"{"version":1,"relations":{"writer":["person.sign-in.set"]}}"#,
             None,
             None,
             Some(settings),
@@ -312,36 +310,35 @@ async fn a_signed_account_write_refuses_an_administrator_cookie() -> TestResult 
     Ok(())
 }
 
+/// Whether `answer` is an agent's refusal of a sign-in change: the act is a
+/// person's credential, withheld from every agent (AGENTS-019 R1, R4).
+fn refused_to_agents(answer: &Value) -> bool {
+    matches!(
+        answer["refusal"].as_str(),
+        Some("NotHeld" | "WithheldFromAgents")
+    )
+}
+
 #[tokio::test]
-async fn account_write_needs_a_live_grant_and_current_holding() -> TestResult {
+async fn an_agent_never_changes_a_sign_in_and_is_never_given_the_act() -> TestResult {
     let table = Table::fresh().await?;
-    let (status, answer) = table.enabled(&table.target, false, false).await?;
-    assert_eq!(status, 403, "{answer}");
-    assert_eq!(answer["refusal"], "NotHeld", "{answer}");
-    let grant = table.grant(&table.target).await?;
-    let (status, answer) = table.enabled(&table.target, false, false).await?;
-    assert_eq!(status, 403, "{answer}");
-    assert_eq!(answer["refusal"], "HoldingNotHeld", "{answer}");
     table.team(&[&table.agent, &table.target]).await?;
-    let (status, answer) = table
-        .service
-        .post(
-            &format!("/grants/{grant}/revoke"),
-            Some(&table.cookie),
-            &json!({"operation": operation()?, "route": "api", "reason": "Revoked"}),
-        )
-        .await?;
-    assert_eq!(status, 200, "{answer}");
     let (status, answer) = table.enabled(&table.target, false, false).await?;
     assert_eq!(status, 403, "{answer}");
-    assert_eq!(answer["refusal"], "Revoked", "{answer}");
+    assert!(refused_to_agents(&answer), "{answer}");
+    let (status, answer) = table.give_sign_in(&table.target).await?;
+    assert_ne!(status, 200, "{answer}");
+    assert_eq!(answer["refusal"], "WithheldFromAgents", "{answer}");
+    let (status, answer) = table.enabled(&table.target, false, false).await?;
+    assert_eq!(status, 403, "{answer}");
+    assert!(refused_to_agents(&answer), "{answer}");
     assert_eq!(table.issuer.users.lock().await["target"]["enabled"], true);
     Ok(())
 }
 
 #[tokio::test]
-async fn a_held_account_grant_disables_sessions_and_reenables_without_password_or_mail()
--> TestResult {
+async fn the_administrator_disables_sessions_and_reenables_without_password_or_mail() -> TestResult
+{
     let table = Table::fresh().await?;
     let target_cookie = table
         .service
@@ -350,9 +347,11 @@ async fn a_held_account_grant_disables_sessions_and_reenables_without_password_o
             email: "person@example.test".to_owned(),
         })
         .await?;
-    table.grant(&table.target).await?;
-    table.team(&[&table.agent, &table.target]).await?;
-    let (status, answer) = table.enabled(&table.target, false, false).await?;
+    let path = format!("/directory/people/{}/account/enabled", table.target);
+    let (status, answer) = table
+        .service
+        .post(&path, Some(&table.cookie), &json!({"enabled": false}))
+        .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["enabled"], false);
     let (status, answer) = table.service.get("/me", Some(&target_cookie)).await?;
@@ -363,7 +362,10 @@ async fn a_held_account_grant_disables_sessions_and_reenables_without_password_o
     assert_eq!(user["groups"], json!(["group"]));
     assert_eq!(user["user_values"], json!({"saved": "kept"}));
     assert!(user.get("password").is_none());
-    let (status, answer) = table.enabled(&table.target, true, false).await?;
+    let (status, answer) = table
+        .service
+        .post(&path, Some(&table.cookie), &json!({"enabled": true}))
+        .await?;
     assert_eq!(status, 200, "{answer}");
     assert_eq!(answer["enabled"], true);
     let (status, answer) = table.service.get("/me", Some(&target_cookie)).await?;
@@ -391,18 +393,10 @@ async fn a_held_account_grant_disables_sessions_and_reenables_without_password_o
 #[tokio::test]
 async fn an_agent_cannot_disable_its_responsible_administrator() -> TestResult {
     let table = Table::fresh().await?;
-    table.grant(&table.person).await?;
     table.team(&[&table.agent, &table.person]).await?;
     let (status, answer) = table.enabled(&table.person, false, false).await?;
     assert_eq!(status, 403, "{answer}");
-    assert_eq!(answer["refusal"], "NotAdmitted", "{answer}");
-    assert!(
-        answer["reason"]
-            .as_str()
-            .ok_or("refusal words missing")?
-            .contains("responsible"),
-        "{answer}"
-    );
+    assert!(refused_to_agents(&answer), "{answer}");
     assert_eq!(
         table.issuer.users.lock().await[ADMINISTRATOR]["enabled"],
         true

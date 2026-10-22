@@ -35,7 +35,7 @@ const JUDGED: &[(&str, &str, &str, &str, &str)] = &[
         "/identities/{id}/profile",
         "people_giving.rs",
         "profile",
-        "write on the person exercised, use recorded",
+        "person.profile.set on the person exercised, use recorded; a run pass is judged at the door alone (grants::decide_as)",
     ),
     (
         "post",
@@ -196,7 +196,7 @@ const JUDGED: &[(&str, &str, &str, &str, &str)] = &[
         "/directory/people/{id}/account/enabled",
         "accounts_giving.rs",
         "admitted",
-        "write on the account exercised before the change, use recorded",
+        "person.sign-in.set on the account, withheld from every agent, so an agent is always refused",
     ),
     (
         "get",
