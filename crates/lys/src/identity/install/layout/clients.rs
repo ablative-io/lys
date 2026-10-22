@@ -322,6 +322,53 @@ pub fn client_releases(
     }
 }
 
+/// Every `clients/<platform>/<commit>` directory under `layout` that
+/// `clients.json` does not name for its platform, sorted: the pile an
+/// upgrade reports and never prunes (DIRECTORY-115 R3). An install with no
+/// `clients/` holds none.
+///
+/// # Errors
+/// Returns a named manifest or filesystem failure.
+pub fn unreferenced_releases(layout: &Layout) -> IdentityResult<Vec<PathBuf>> {
+    let served = client_releases(layout)?;
+    let root = layout.root.join("clients");
+    let directories = |dir: &std::path::Path| -> IdentityResult<Vec<PathBuf>> {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(client_error(dir, error.to_string())),
+        };
+        let mut found = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|error| client_error(dir, error.to_string()))?;
+            if entry
+                .file_type()
+                .map_err(|error| client_error(&entry.path(), error.to_string()))?
+                .is_dir()
+            {
+                found.push(entry.path());
+            }
+        }
+        found.sort();
+        Ok(found)
+    };
+    let mut unreferenced = Vec::new();
+    for platform_dir in directories(&root)? {
+        let named = platform_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|platform| served.get(platform))
+            .map(|release| release.commit.as_str());
+        for release_dir in directories(&platform_dir)? {
+            let commit = release_dir.file_name().and_then(|name| name.to_str());
+            if commit != named {
+                unreferenced.push(release_dir);
+            }
+        }
+    }
+    Ok(unreferenced)
+}
+
 #[cfg(test)]
 mod client_tests {
     use super::{ClientSet, Layout, PlacedClients, prepare_clients};

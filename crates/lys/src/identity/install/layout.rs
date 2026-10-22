@@ -282,4 +282,5 @@ pub const ESTATE_PLAN: &str = include_str!("../../../../../docs/estate/approval-
 mod clients;
 pub use clients::{
     ClientRelease, ClientSet, PlacedClients, client_releases, host_platform, prepare_clients,
+    unreferenced_releases,
 };

@@ -101,6 +101,7 @@ pub fn run(options: &Options, json: bool) -> IdentityResult<()> {
         emitter.field("build", "build", value);
     }
     report_service(&layout, &mut emitter)?;
+    report_unreferenced(&layout, &mut emitter)?;
     require_resumed(&layout, &session_outcomes)?;
     let address =
         install::ports::PersonAddress::load(&layout, install::ports::Ports::load(&layout)?)?;
@@ -154,6 +155,44 @@ fn report_service(layout: &Layout, emitter: &mut Emitter) -> IdentityResult<()> 
         &layout.logs_dir().join("identity.log"),
     )?);
     Ok(())
+}
+
+/// Names every release directory the manifest does not, one line each
+/// through `say`, and answers them: the pile is shown, never pruned
+/// (DIRECTORY-115 R3).
+pub(super) fn say_unreferenced(
+    layout: &Layout,
+    say: &mut dyn FnMut(&str),
+) -> IdentityResult<Vec<PathBuf>> {
+    let unreferenced = install::layout::unreferenced_releases(layout)?;
+    for directory in &unreferenced {
+        say(&format!(
+            "client release unreferenced: {}: clients.json does not name it; nothing deletes it",
+            directory.display()
+        ));
+    }
+    Ok(unreferenced)
+}
+
+/// [`say_unreferenced`] into the upgrade's notes and, in JSON, the paths
+/// under `clients_unreferenced` (an empty list when every release is named).
+pub(super) fn report_unreferenced(
+    layout: &Layout,
+    emitter: &mut Emitter,
+) -> IdentityResult<Vec<PathBuf>> {
+    let unreferenced = say_unreferenced(layout, &mut |line| emitter.note(line))?;
+    if emitter.is_json() {
+        let paths: Vec<String> = unreferenced
+            .iter()
+            .map(|directory| directory.display().to_string())
+            .collect();
+        emitter.field(
+            "clients unreferenced",
+            "clients_unreferenced",
+            serde_json::json!(paths),
+        );
+    }
+    Ok(unreferenced)
 }
 
 fn require_resumed(layout: &Layout, session_outcomes: &[String]) -> IdentityResult<()> {

@@ -7,10 +7,12 @@
 
 use std::path::{Path, PathBuf};
 
+use super::super::command::{report_unreferenced, say_unreferenced};
 use super::super::scratch::{
     A, B, Behaviour, Fixed, Recorder, Scratch, TestResult, build, ready_lines,
 };
 use super::super::{BuildRecord, ClientRender, Parts, record_build, upgrade};
+use crate::commands::output::Emitter;
 use crate::identity::error::IdentityResult;
 use crate::identity::install::layout::{
     BINARIES, ClientSet, Layout, PlacedClients, client_releases, prepare_clients,
@@ -194,5 +196,62 @@ fn clients_rollback_leaves_a_finished_upgrade_serving_what_it_placed() -> TestRe
         "{said:?}"
     );
     assert_eq!(scratch.running()?, ready_lines(B));
+    Ok(())
+}
+
+/// DIRECTORY-115 R3: every release directory the manifest does not name is
+/// listed, one note per directory and the paths under `clients_unreferenced`.
+#[test]
+fn clients_rollback_report_names_every_release_directory_the_manifest_does_not() -> TestResult {
+    let scratch = Scratch::new()?;
+    serving_a(&scratch)?;
+    for commit in [B, C] {
+        placed(&inputs(&scratch, commit)?, &scratch.layout)?;
+    }
+    let mut said = Vec::new();
+    let listed = say_unreferenced(&scratch.layout, &mut |line| said.push(line.to_owned()))?;
+    let expected = [
+        release_dir(&scratch.layout, B),
+        release_dir(&scratch.layout, C),
+    ];
+    assert_eq!(listed, expected);
+    assert_eq!(
+        said,
+        expected
+            .iter()
+            .map(|dir| format!(
+                "client release unreferenced: {}: clients.json does not name it; nothing deletes it",
+                dir.display()
+            ))
+            .collect::<Vec<_>>()
+    );
+    let mut emitter = Emitter::new(true);
+    assert_eq!(
+        report_unreferenced(&scratch.layout, &mut emitter)?,
+        expected
+    );
+    let value = emitter.into_value().ok_or("JSON mode renders one object")?;
+    assert_eq!(
+        value["clients_unreferenced"],
+        serde_json::json!(expected.map(|dir| dir.display().to_string()))
+    );
+    Ok(())
+}
+
+#[test]
+fn clients_rollback_report_is_empty_and_silent_when_every_release_is_named() -> TestResult {
+    let scratch = Scratch::new()?;
+    serving_a(&scratch)?;
+    let mut said = Vec::new();
+    let listed = say_unreferenced(&scratch.layout, &mut |line| said.push(line.to_owned()))?;
+    assert!(listed.is_empty() && said.is_empty(), "{listed:?} {said:?}");
+    let mut emitter = Emitter::new(true);
+    assert!(report_unreferenced(&scratch.layout, &mut emitter)?.is_empty());
+    let value = emitter.into_value().ok_or("JSON mode renders one object")?;
+    assert_eq!(value["clients_unreferenced"], serde_json::json!([]));
+    // An install with no clients/ at all lists nothing either.
+    let bare = Layout::at(scratch.work().join("bare"));
+    std::fs::create_dir_all(&bare.root)?;
+    assert!(say_unreferenced(&bare, &mut |_| {})?.is_empty());
     Ok(())
 }

@@ -104,6 +104,12 @@
       "by": "Waffles",
       "subject": "R1's file list: where the transaction lives",
       "ruling": "R1 named crates/lys/src/identity/upgrade/runner.rs as the transaction; that file is the process runner (Restart), untouched. The transaction is upgrade.rs (Parts gains `clients: Option<&ClientSet>`, placement after the intent record and before the swap as `place_clients`), swap.rs (`back` removes what the intent names) and intent.rs (`Step::ClientsPlaced`, `clients_placed: PlacedClients`), so those three are modified in runner.rs's place. install/layout.rs exports PlacedClients. Every fixture that builds Parts or Intent takes the new field: examples/upgrade_window.rs, scratch_tests.rs, runner_tests.rs, runner_recovery_tests.rs, render_tests.rs, stores_receipt_tests.rs, companion_tests.rs, intent_tests.rs, data_kept_tests.rs and upgrade_tests.rs (which also mounts clients_rollback_tests.rs and now passes its client set through Parts). The install command's own first placement keeps its place outside a transaction, as the boundary says, and only takes the new signature. A replaced stranded file (R2) counts as placed by the attempt and is removed on rollback; a directory that existed before is left, as R1 says."
+    },
+    {
+      "date": "2026-10-23",
+      "by": "Waffles",
+      "subject": "R3's file list: where the walk lives",
+      "ruling": "The walk of clients/<platform>/<commit> against clients.json is `unreferenced_releases` in crates/lys/src/identity/install/layout/clients.rs, beside `client_releases` which reads the manifest, exported through install/layout.rs; upgrade/command.rs keeps the saying (`say_unreferenced`, one line per directory) and the JSON field (`report_unreferenced`, `clients_unreferenced`, an empty list when every release is named). Both files are modified in addition to R3's two."
     }
   ]
 }
