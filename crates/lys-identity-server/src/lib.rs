@@ -146,6 +146,7 @@ pub mod grants;
 pub mod grants_batch;
 pub mod grants_reach;
 mod grants_reads;
+mod grants_use;
 pub mod grants_refusals;
 pub mod harness_catalogue;
 /// The harness description the tests of a start are built on, loaded once for every test module here.

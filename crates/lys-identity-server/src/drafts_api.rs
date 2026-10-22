@@ -8,9 +8,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, Uri, header};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::draft_event::{
-    Approved, Correction, DraftEvent, Refused, RequestEvidence, RequestSignature,
-};
+use lys_identity::draft_event::{Approved, Correction, DraftEvent, Refused};
 use lys_identity::projection::draft::DraftRecord;
 use lys_identity::{Actor, Directory, IdentityId, OperationId, PersonId, Provenance};
 use lys_log_store::FileLeafStore;
@@ -179,7 +177,7 @@ fn creation_hash(text: &str) -> Result<[u8; 32], ServerError> {
 
 #[path = "drafts_prepare.rs"]
 mod prepared;
-use prepared::creation;
+use prepared::{creation, decision_evidence, signed_by};
 
 async fn create(
     State(state): State<Arc<AppState>>,
@@ -233,40 +231,9 @@ async fn create(
                     message.to_vec(),
                 )
             };
-        let words: Vec<_> = text.split_ascii_whitespace().collect();
-        let [author, signed_at, nonce, signature] = words.as_slice() else {
-            return Err(malformed(
-                "the verified signature header does not contain four fields",
-            ));
-        };
-        if *author != agent.to_string() {
-            return Err(malformed(
-                "the verified agent differs from the signature header",
-            ));
-        }
-        let signed_at_ms = signed_at
-            .parse()
-            .map_err(|error| malformed(format!("the signing time does not read: {error}")))?;
-        let payload = crate::agent_signature::payload(
-            "POST",
-            &signed_path,
-            &signed_body,
-            signed_at_ms,
-            nonce,
-        );
-        created.evidence = Some(RequestEvidence {
-            agent,
-            method: "POST".to_owned(),
-            path: signed_path,
-            body: signed_body,
-            signed_at_ms,
-            nonce: (*nonce).to_owned(),
-            cose_sign1: unhex(signature)?,
-        });
-        created.request_signature = Some(RequestSignature {
-            header: text.as_bytes().to_vec(),
-            payload,
-        });
+        let (evidence, signature) = signed_by(agent, &text, signed_path, signed_body)?;
+        created.evidence = Some(evidence);
+        created.request_signature = Some(signature);
         let event = DraftEvent::Created(Arc::new(created));
         let draft = event.operation();
         let hash =
@@ -381,6 +348,7 @@ async fn approve(
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
     let (actor, by_app) = decider(&state, &headers)?;
+    let evidence = decision_evidence(&actor)?;
     let body: DraftApproveBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
@@ -415,7 +383,7 @@ async fn approve(
                 draft,
                 draft_hash: hash,
                 application,
-                evidence: None,
+                evidence,
             }))
         };
         let answer = append(directory, event, draft, hash, None)?;
@@ -440,6 +408,7 @@ async fn refuse(
     bytes: Bytes,
 ) -> Result<Json<DraftAnswer>, ServerError> {
     let (actor, by_app) = decider(&state, &headers)?;
+    let evidence = decision_evidence(&actor)?;
     let body: DraftRefuseBody = crate::signed_json::read(&state, &headers, &bytes)?;
     let draft = OperationId::from_str(&id)?;
     let hash = creation_hash(&body.creation_hash)?;
@@ -452,7 +421,7 @@ async fn refuse(
             draft,
             draft_hash: hash,
             reason: body.reason,
-            evidence: None,
+            evidence,
         }));
         append(directory, event, draft, hash, None)
     })
@@ -471,13 +440,10 @@ async fn correct(
     with_directory(&state, |directory| {
         let reviewer = responsible(directory, (&actor, false), draft)?;
         let at = crate::session::now();
-        let corrected = Arc::new(creation(
-            body.replacement,
-            actor.clone(),
-            reviewer,
-            at,
-            Some(draft),
-        )?);
+        let mut corrected = creation(body.replacement, actor.clone(), reviewer, at, Some(draft))?;
+        // An agent's correction is its own draft, carrying its signed message.
+        corrected.evidence = decision_evidence(&actor)?;
+        let corrected = Arc::new(corrected);
         let corrected_hash = lys_identity::encoding::payload_commitment(
             &lys_identity::draft_event::encode(&DraftEvent::Created(Arc::clone(&corrected))),
         );

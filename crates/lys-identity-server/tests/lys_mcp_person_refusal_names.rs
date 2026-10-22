@@ -151,7 +151,7 @@ async fn a_connection_missing_a_grant_names_its_resource_action_route_and_granto
 }
 
 #[tokio::test]
-async fn an_undeclared_security_events_scope_names_the_route_and_service_declaration_needed()
+async fn an_undeclared_sign_in_providers_scope_names_the_route_and_service_declaration_needed()
 -> Result {
     let (service, _) = Service::start_with(|config| {
         Ok(
@@ -168,15 +168,18 @@ async fn an_undeclared_security_events_scope_names_the_route_and_service_declara
     let client = Client::builder().redirect(Policy::none()).build()?;
     let tokens = connection(&service, &cookie, &client).await?;
     let token = tokens["access_token"].as_str().ok_or("no access token")?;
-    let answer = read(&client, &service, token, "/security-events").await?;
+    let answer = read(&client, &service, token, "/sign-in-providers").await?;
     assert_eq!(answer["status"], 403);
     assert_eq!(answer["body"]["refusal"], "TokenScopeUndeclared");
     assert_eq!(
-        answer["body"]["fields"]["route"], "/security-events",
+        answer["body"]["fields"]["route"], "/sign-in-providers",
         "undeclared scope refusal must name its route: {answer}"
     );
     assert_eq!(answer["body"]["fields"]["resource_kind"], "http_route");
-    assert_eq!(answer["body"]["fields"]["resource_id"], "/security-events");
+    assert_eq!(
+        answer["body"]["fields"]["resource_id"],
+        "/sign-in-providers"
+    );
     assert_eq!(answer["body"]["fields"]["action"], "GET");
     assert_eq!(
         answer["body"]["fields"]["missing"],

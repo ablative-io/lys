@@ -59,7 +59,7 @@ async fn sibling_grant_refusals_name_the_same_declared_resource_and_action() -> 
 
 #[tokio::test]
 async fn a_refusal_on_a_route_without_a_scope_never_invents_a_grant() -> Result {
-    let answer = refused("TokenScopeUndeclared", "/security-events", json!({})).await?;
+    let answer = refused("TokenScopeUndeclared", "/sign-in-providers", json!({})).await?;
     assert_eq!(
         answer["body"]["fields"]["missing"],
         "declared_resource_action_scope"
@@ -85,7 +85,7 @@ async fn a_scope_refused_before_relay_still_names_the_requested_route() -> Resul
     let router = register(Router::new(), "http://localhost")?;
     let mut request = super::test_support::request(&json!({
         "jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{
-            "name":"read", "arguments":{"path":"/security-events"}
+            "name":"read", "arguments":{"path":"/sign-in-providers"}
         }
     }))?;
     request.headers_mut().insert(
@@ -98,7 +98,7 @@ async fn a_scope_refused_before_relay_still_names_the_requested_route() -> Resul
     let answer = crate::mcp_test_answer::body(&response["result"]);
     assert_eq!(answer["status"], 403);
     assert_eq!(answer["body"]["refusal"], "TokenScopeUndeclared");
-    assert_eq!(answer["body"]["fields"]["route"], "/security-events");
+    assert_eq!(answer["body"]["fields"]["route"], "/sign-in-providers");
     assert_eq!(answer["body"]["fields"]["resource_kind"], "http_route");
     assert_eq!(answer["body"]["fields"]["action"], "GET");
     Ok(())

@@ -165,16 +165,16 @@ fn inventory(
         }
     }
     let mut routes = BTreeMap::new();
-    // An agent is shown every route its live grants reach, administrator
-    // body or not, and none a person keeps from every agent (AGENTS-019 R4);
-    // the administrator's routes are hidden from people who are not one.
+    // An agent is shown no route a person keeps from every agent (AGENTS-019
+    // R4); the administrator's routes are hidden from everyone who is not
+    // one, since their handlers still ask for the administrator.
     let agent = matches!(holder, IdentityId::Agent(_));
     for row in crate::openapi_table::TABLE {
         let admin_only = row.4.iter().any(|set| {
             *set == crate::openapi_refusals::ADMIN || *set == crate::openapi_refusals::ADMIN_BODY
         }) && !row.4.contains(&crate::openapi_refusals::GRANT_ASKED)
             && !crate::openapi_table::judged_by_handler(row);
-        if admin_only && !administrator && !agent {
+        if admin_only && !administrator {
             continue;
         }
         if agent && row.5.is_some() && crate::openapi_table::listed_human_only(row) {

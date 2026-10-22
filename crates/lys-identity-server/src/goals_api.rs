@@ -390,13 +390,18 @@ pub(crate) fn judge(state: &AppState, asker: IdentityId, item: &Item) -> Result<
                 };
                 Ok(vec![request])
             },
-            |held| {
+            |mut held| {
                 let request = ExerciseRequest {
                     caller: asker,
                     route: Route::Api,
                     resource: Resource::new(kind, &item.goal.holder.id)?,
                     action: Action::new(action)?,
                 };
+                // An agent's judgement is an act on its own grant, so its
+                // use is recorded (AGENTS-019 R4); a person's is asked.
+                if matches!(asker, IdentityId::Agent(_)) {
+                    return crate::grants_use::exercised(&mut held, &request);
+                }
                 Ok(crate::grants::allowed(held.grants.explain(
                     held.directory,
                     &request,

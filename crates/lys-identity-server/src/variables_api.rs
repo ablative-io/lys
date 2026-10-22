@@ -26,7 +26,6 @@ use crate::grants::caller;
 use crate::read_api::own_person;
 use crate::routes::{AppState, is_administrator, signed_in, with_directory};
 use crate::runtime_api::with_runtime;
-use crate::session::now;
 use crate::variables_state::{Read, Scope, VariablesError};
 use crate::variables_store::{Patch, VariablesKept};
 
@@ -199,19 +198,15 @@ pub(crate) fn admit(
                 };
                 Ok(vec![request])
             },
-            |held| {
+            |mut held| {
                 let request = ExerciseRequest {
                     caller: asker,
                     route: Route::Api,
                     resource: Resource::new("agent", agent)?,
                     action: Action::new(action)?,
                 };
-                Ok(crate::grants::allowed(held.grants.explain(
-                    held.directory,
-                    &request,
-                    now(),
-                    None,
-                ))?)
+                // An act on its own grant: its use is recorded (AGENTS-019 R4).
+                crate::grants_use::exercised(&mut held, &request)
             },
         )?;
         if granted {
