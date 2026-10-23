@@ -404,6 +404,10 @@
         {
           "id": "S465",
           "text": "As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account."
+        },
+        {
+          "id": "S473",
+          "text": "As a Directory administrator adding a person to Cambium, I want the access choices to be Cambium's own (member, administrator, owner, reader) with Cambium's usual first access already chosen, so that the person I add can post the moment they sign in instead of being refused on every act and told to ask on the request page."
         }
       ]
     },

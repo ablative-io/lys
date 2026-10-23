@@ -710,3 +710,7 @@
 ## DIRECTORY-115: a refused upgrade leaves no client release behind
 
 - [ ] **C829** — A refused upgrade removes the client releases it placed, a release the manifest does not name is replaced rather than refused, and the report lists every unreferenced release directory. DIRECTORY-115/R1-R3.
+
+## DIRECTORY-116: Add a person offers the app's own relations and its first grant
+
+- [ ] **C838** — For an app kind, Add a person lists the app's own schema relations worded by the app's action words with its declared first grant preselected, refuses an undeclared relation by name before any step is written, and a second Add for an admitted email issues the chosen grant. DIRECTORY-116/R1-R3.

@@ -194,6 +194,8 @@
 
 **S465.** As a Directory administrator, I want to add a person when Lys cannot send email and be given the link that signs them in once, so that I can hand it to them myself and they can set a password, with nothing waiting on a mail account.
 
+**S473.** As a Directory administrator adding a person to Cambium, I want the access choices to be Cambium's own (member, administrator, owner, reader) with Cambium's usual first access already chosen, so that the person I add can post the moment they sign in instead of being refused on every act and told to ask on the request page.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.
