@@ -714,3 +714,7 @@
 ## DIRECTORY-116: Add a person offers the app's own relations and its first grant
 
 - [ ] **C838** — For an app kind, Add a person lists the app's own schema relations worded by the app's action words with its declared first grant preselected, refuses an undeclared relation by name before any step is written, and a second Add for an admitted email issues the chosen grant. DIRECTORY-116/R1-R3.
+
+## DIRECTORY-117: A replayed act is the same act in whatever second it is authenticated
+
+- [ ] **C840** — A retried operation is answered as the first act when the same binding, method, app acted through and draft provenance ask for the same change on the same identity, whatever second each request was authenticated in; the admit replay test crosses a second boundary and is green on its first attempt. DIRECTORY-117/R1.

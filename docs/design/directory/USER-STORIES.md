@@ -196,6 +196,8 @@
 
 **S473.** As a Directory administrator adding a person to Cambium, I want the access choices to be Cambium's own (member, administrator, owner, reader) with Cambium's usual first access already chosen, so that the person I add can post the moment they sign in instead of being refused on every act and told to ask on the request page.
 
+**S475.** As an agent admitting a person for the organisation I am given admit on, I want my admit asked again after a cut connection to be answered as the act I already did, so that a retry seconds later never tells me the person's registration failed when it did not.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.

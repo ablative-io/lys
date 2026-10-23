@@ -1460,6 +1460,8 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/upgrade/clients_rollback_tests.rs` | A refused upgrade removes the client releases it placed; the report lists unreferenced release directories. | DIRECTORY-115 |
 | `crates/lys/src/identity/upgrade/command.rs` | The upgrade command: client releases placed inside the transaction, unreferenced releases reported. | DIRECTORY-115 |
 | `crates/lys/src/identity/install/layout/clients.rs` | Client release placement: a served release is never replaced; a stranded one is. | DIRECTORY-115 |
+| `crates/lys-identity/src/directory_retry_tests.rs` | a retry at another second is the same act; other actors and words are not (DIRECTORY-117 R1) | DIRECTORY-117 |
+| `crates/lys-identity-server/tests/people_admit_agent.rs` | the admit replay crosses a second boundary (DIRECTORY-117 R1) | DIRECTORY-117 |
 
 ## Inventory
 

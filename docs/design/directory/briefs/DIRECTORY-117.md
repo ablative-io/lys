@@ -1,0 +1,55 @@
+---
+type: brief
+id: DIRECTORY-117
+cluster: directory
+title: A replayed act is the same act in whatever second it is authenticated
+---
+
+# DIRECTORY-117: A replayed act is the same act in whatever second it is authenticated
+
+> **Cluster:** directory
+> **Checklist:**
+> - C840 — A retried operation is answered as the first act when the same binding, method, app acted through and draft provenance ask for the same change on the same identity, whatever second each request was authenticated in; the admit replay test crosses a second boundary and is green on its first attempt. DIRECTORY-117/R1.
+> **Stories:**
+> - S475 (Directory administrator, Resolves a refused act) — As an agent admitting a person for the organisation I am given admit on, I want my admit asked again after a cut connection to be answered as the act I already did, so that a retry seconds later never tells me the person's registration failed when it did not.
+
+## Purpose
+
+Found 23 Oct 2026 on every Lys gate since 22 Oct: crates/lys-identity-server/tests/people_admit_agent.rs an_agent_given_organisation_admit_admits_a_person_as_itself is red on its first attempt and green on its second, always at the replay (line 140): the same admit asked again under the same operation is refused 409 `OperationReused: <derived register operation> already names a different change`. The cause is in the directory, not the test. Directory::retry (crates/lys-identity/src/directory.rs line 282) answers a retried operation only when same_actor (line 59) holds, and same_actor is whole-Actor equality unless the actor is a service account; an Actor carries Provenance::Authenticated { method, authenticated_at } and authenticated_at is the second the request was authenticated in (provider/bearer.rs line 318 builds the agent-pass actor with now() on every request). So a replay in the same second is the same act and a replay in the next second is 'a different change'. The test flakes on the second boundary; a real agent retrying an admit after a cut connection, which is seconds later, is refused every time, and the receipt names the register step as failed although the person is registered. The product draft already has the right rule (product_draft_event_tests.rs: a_retry_at_another_time_is_the_same_act_and_other_words_are_not); the directory does not. Tom, 1 Oct: a test that fails only sometimes is a defect to fix, never a retry to lean on.
+
+## Task
+
+Make the directory answer a retried operation on who asked and what they asked, never on the second they were authenticated in, so the admit replay is the same act whenever it is asked, and make the people_admit_agent test prove it across a second boundary.
+
+## Requirements
+
+### R1: A retried operation is answered when the same actor asks for the same change, whenever they ask
+
+WHEN an operation already answered is asked again THE SYSTEM SHALL answer the first receipt when the actor is the same person or agent (the same login binding, the same authentication method, the same through_app and the same draft provenance) asking for the same change on the same identity, and SHALL NOT compare the instant the actor was authenticated at; the recorded leaf keeps the instant of the first act. WHEN the binding, the method, the app acted through, the draft provenance, the identity or the change differs THE SYSTEM SHALL refuse OperationReused as today. The rule is one function, same_actor, used by Directory::retry and directory_reporting.rs; the service-account branch keeps its present meaning.
+
+**Acceptance:**
+- crates/lys-identity/src/directory_retry_tests.rs: register a person under an operation with an actor authenticated at second 4; the same registration asked again by the same binding and method authenticated at second 90 answers the first receipt and records no leaf; the same operation asked by another binding, by the same binding with another method, through another app, or for another display name is refused OperationReused.
+- crates/lys-identity-server/tests/people_admit_agent.rs an_agent_given_organisation_admit_admits_a_person_as_itself: the replay is asked after the test has read the clock cross a second boundary (the fixture waits on the clock reading, not on a sleep), and is green on its first attempt across ten gate runs; the gate's nextest leg reports no flaky test in lys-identity-server.
+
+**Files:**
+- create: crates/lys-identity/src/directory_retry_tests.rs
+- modify: crates/lys-identity/src/directory.rs
+- modify: crates/lys-identity/src/lib.rs
+- modify: crates/lys-identity-server/tests/people_admit_agent.rs
+
+**Checklist:**
+- C840 — A retried operation is answered as the first act when the same binding, method, app acted through and draft provenance ask for the same change on the same identity, whatever second each request was authenticated in; the admit replay test crosses a second boundary and is green on its first attempt. DIRECTORY-117/R1.
+
+**Stories:**
+- S475 (Directory administrator, Resolves a refused act) — As an agent admitting a person for the organisation I am given admit on, I want my admit asked again after a cut connection to be answered as the act I already did, so that a retry seconds later never tells me the person's registration failed when it did not.
+
+## Boundaries
+
+- The recorded leaf and its receipt are unchanged: the first act's instant stays the one recorded.
+- No change to what counts as a different change: binding, method, app acted through, draft provenance, identity and change still decide.
+- No retry loop and no sleep anywhere: the test crosses the second boundary by reading the clock, and the server never waits.
+
+## Verification
+
+- cargo nextest run -p lys-identity -p lys-identity-server -E 'test(/retry/) | test(/people_admit/)'
+- The full Lys gate on the landing commit: nextest with no flaky event.

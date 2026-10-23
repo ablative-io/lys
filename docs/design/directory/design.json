@@ -6804,6 +6804,16 @@
       "path": "crates/lys/src/identity/install/layout/clients.rs",
       "note": "Client release placement: a served release is never replaced; a stranded one is.",
       "brief": "DIRECTORY-115"
+    },
+    {
+      "path": "crates/lys-identity/src/directory_retry_tests.rs",
+      "note": "a retry at another second is the same act; other actors and words are not (DIRECTORY-117 R1)",
+      "brief": "DIRECTORY-117"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/people_admit_agent.rs",
+      "note": "the admit replay crosses a second boundary (DIRECTORY-117 R1)",
+      "brief": "DIRECTORY-117"
     }
   ],
   "inventory": [

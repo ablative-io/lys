@@ -2635,6 +2635,16 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "DIRECTORY-117: A replayed act is the same act in whatever second it is authenticated",
+      "items": [
+        {
+          "id": "C840",
+          "text": "A retried operation is answered as the first act when the same binding, method, app acted through and draft provenance ask for the same change on the same identity, whatever second each request was authenticated in; the admit replay test crosses a second boundary and is green on its first attempt. DIRECTORY-117/R1.",
+          "done": false
+        }
+      ]
     }
   ]
 }
