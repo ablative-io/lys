@@ -254,6 +254,46 @@ async fn asking_again_answers_the_same_person_and_makes_nothing_twice() -> TestR
 }
 
 #[tokio::test]
+async fn adding_an_admitted_email_again_adds_the_grant_and_makes_no_second_person() -> TestResult {
+    let (service, rauthy, ada) = table().await?;
+    let before = people(&service, &ada).await?;
+    let first_op = OperationId::generate()?.to_string();
+    let (status, first) = service
+        .post("/people/admit", Some(&ada), &admit(&first_op, "alpha"))
+        .await?;
+    assert_eq!(status, 200, "{first}");
+    // Added again under a new operation with another first grant: the person
+    // and their account stand, the steps that made them are already done,
+    // and the grant asked for is added to what they hold.
+    let again_op = OperationId::generate()?.to_string();
+    let (status, again) = service
+        .post("/people/admit", Some(&ada), &admit(&again_op, "beta"))
+        .await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(again["person"], first["person"], "{again}");
+    assert_eq!(again["subject"], first["subject"], "{again}");
+    assert_ne!(again["grant"], first["grant"], "{again}");
+    assert_eq!(again["receipt"]["completed"], json!(STEPS), "{again}");
+    assert!(again["receipt"]["failed"].is_null(), "{again}");
+    let logged: Vec<Value> = again["receipt"]["logged"]
+        .as_array()
+        .ok_or("leaves")?
+        .iter()
+        .map(|leaf| leaf["step"].clone())
+        .collect();
+    assert_eq!(logged, [json!("grant")], "{again}");
+    assert_eq!(accounts_for(&rauthy, BEA)?, 1);
+    assert_eq!(people(&service, &ada).await?, before + 1);
+    for (answer, relation) in [(&first, "alpha"), (&again, "beta")] {
+        let grant = answer["grant"].as_str().ok_or("a grant")?;
+        let (status, held) = service.get(&format!("/grants/{grant}"), Some(&ada)).await?;
+        assert_eq!(status, 200, "{held}");
+        assert!(held.to_string().contains(relation), "{held}");
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn a_failed_step_is_named_with_the_steps_completed_before_it() -> TestResult {
     let (service, rauthy, ada) = table().await?;
     let before = people(&service, &ada).await?;

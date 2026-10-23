@@ -348,11 +348,35 @@ pub(crate) async fn steps(
         operation,
         email,
         issuer,
-        organisation,
-        ref continue_to,
+        ..
     } = *act;
-    let [register, account, bind, activate, grant, letter] = STEPS;
+    let [register, account, bind, activate, _, _] = STEPS;
     let at = |step: &'static str| move |error: ServerError| (step, error);
+    let api = crate::sign_in_providers::api(state).map_err(at(account))?;
+    // An email already admitted, an issuer account whose login is bound to
+    // a person, is not registered again (DIRECTORY-116 R3): the person
+    // stands, the four steps that made them are already done, and the act
+    // goes on to the grant asked for, which is added to what they hold.
+    // The same act asked again replays its own leaves, so only an operation
+    // the directory has not answered takes this way.
+    let replay = crate::routes::with_directory(state, |directory| {
+        let first = OperationId::from_str(&derived(operation, register))?;
+        Ok(directory.projection()?.operation(first).is_some())
+    })
+    .map_err(at(register))?;
+    if let Some((person, subject)) = if replay {
+        None
+    } else {
+        admitted_already(state, api, issuer, email)
+            .await
+            .map_err(at(register))?
+    } {
+        receipt.person = Some(person.clone());
+        for step in [register, account, bind, activate] {
+            receipt.done(step, None);
+        }
+        return granted_and_written(state, headers, act, receipt, person, subject, false).await;
+    }
     let registered = crate::routes::register_person(
         State(Arc::clone(state)),
         headers.clone(),
@@ -372,7 +396,6 @@ pub(crate) async fn steps(
         Some(("directory", registered.0.receipt.log.index)),
     );
 
-    let api = crate::sign_in_providers::api(state).map_err(at(account))?;
     let name = crate::accounts::AccountName {
         display: &asked.display_name,
         given: asked.given_name.as_deref(),
@@ -412,6 +435,53 @@ pub(crate) async fn steps(
     .await
     .map_err(at(activate))?;
     receipt.done(activate, Some(("directory", activated.0.receipt.log.index)));
+    granted_and_written(state, headers, act, receipt, person, subject, made).await
+}
+
+/// The person `email` is already admitted as, with their issuer subject:
+/// an issuer account under the email whose login at `issuer` is bound to a
+/// person. An account with no bound person is not an admission.
+async fn admitted_already(
+    state: &Shared,
+    api: &crate::sign_in_providers::SignInProviders,
+    issuer: &str,
+    email: &str,
+) -> Result<Option<(String, String)>, ServerError> {
+    let Some(account) = crate::accounts::find_by_email(api, email).await? else {
+        return Ok(None);
+    };
+    let Some(subject) = account.get("id").and_then(Value::as_str) else {
+        return Ok(None);
+    };
+    let binding = lys_identity::LoginBinding::new(issuer, subject)?;
+    let person = crate::routes::with_directory(state, |directory| {
+        Ok(directory.projection()?.person_for(&binding))
+    })?;
+    Ok(person.map(|person| (person.to_string(), subject.to_owned())))
+}
+
+/// The grant and the letter, the act's last two steps, for `person` bound
+/// to the issuer `subject`; `made` says the account was made in this act.
+async fn granted_and_written(
+    state: &Shared,
+    headers: &HeaderMap,
+    act: &Act<'_>,
+    receipt: &mut AdmitReceipt,
+    person: String,
+    subject: String,
+    made: bool,
+) -> Result<Done, (&'static str, ServerError)> {
+    let Act {
+        asked,
+        operation,
+        email,
+        organisation,
+        ref continue_to,
+        ..
+    } = *act;
+    let [_, _, _, _, grant, letter] = STEPS;
+    let at = |step: &'static str| move |error: ServerError| (step, error);
+    let api = crate::sign_in_providers::api(state).map_err(at(letter))?;
 
     let mut granted = None;
     if let Some(first) = asked.grant.as_ref() {
