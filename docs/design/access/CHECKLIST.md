@@ -42,3 +42,7 @@
 - [ ] **C805** — evaluate_with refuses a right with a revoked grant (grant_revoked) and every right of a holder cut off at or after the pass's iat (holder_cut_off) when the view is Ready, and decides from the pass alone, saying so, when it is not (ACCESS-010 R2).
 - [ ] **C806** — Stopping an agent, suspending or retiring an identity and revoking an agent's passes each write a holder cut-off to the grant log, carried as a holder_cut_off frame and in the baseline (ACCESS-010 R3).
 - [ ] **C807** — D3 says a revoke reaches every product when the change stream delivers it, and that before Ready a hot route is decided from an unexpired pass, with no number of seconds as the bound (ACCESS-010 R4).
+
+## Requests that outlive the model (ACCESS-011)
+
+- [ ] **C839** — GET /requests answers every request as it stands: one whose relation the current model does not define for its kind is listed with no actions and standing relation_unknown, refused on approve by name, declinable, and shown on the page as one that cannot be granted; no single request ever refuses the queue (ACCESS-011 R1 to R3).

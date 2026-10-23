@@ -24,6 +24,10 @@
         {
           "id": "S459",
           "text": "As Tom, when I revoke a grant or stop an agent, I want every product to stop honouring it as soon as Lys's change stream reaches it, without anyone being refused while Lys is out of reach, so that taking access away is real and never locks people out by mistake."
+        },
+        {
+          "id": "S474",
+          "text": "As the person who decides access, my Requests page always opens: a request that asks for something the model no longer defines is shown to me as one I cannot grant, and I can decline it, while everything else in the queue waits for my decision as before."
         }
       ]
     },

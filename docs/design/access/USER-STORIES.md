@@ -12,6 +12,8 @@
 
 **S459.** As Tom, when I revoke a grant or stop an agent, I want every product to stop honouring it as soon as Lys's change stream reaches it, without anyone being refused while Lys is out of reach, so that taking access away is real and never locks people out by mistake.
 
+**S474.** As the person who decides access, my Requests page always opens: a request that asks for something the model no longer defines is shown to me as one I cannot grant, and I can decline it, while everything else in the queue waits for my decision as before.
+
 ## Hermes — a product lead (liminal)
 
 **S304.** As a product lead, I want one library that verifies a pass, reaches through parents and refuses in one shape, so that I do not implement permissions a fourth way.

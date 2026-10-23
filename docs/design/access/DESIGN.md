@@ -97,6 +97,8 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `tests/identity_contract/src/lib.rs` | Named by ACCESS-009 R2. | ACCESS-009 |
 | `surface/identity/src/features/grants/organisation-acts.ts` | What a person holds on their own organisation, read from their own grants (ACCESS-009 R4). | ACCESS-009 |
 | `surface/identity/src/features/grants/IssueRoot.tsx` | Give access opens to organisation.grant or the install's root authority; the refusal names the right (ACCESS-009 R4). | ACCESS-009 |
+| `surface/identity/src/features/requests/` | The Requests page: the queue, the ask form and the decision form; every request is shown as it stands, one that outlived the model as not grantable (ACCESS-011). | ACCESS-011 |
+| `surface/identity/src/generated/grants.ts` | The generated request and grant view types the surface reads; RequestView carries standing (ACCESS-011). | ACCESS-011 |
 
 ## Inventory
 
