@@ -249,10 +249,29 @@ struct Seen {
     takes: AtomicUsize,
 }
 
+/// How the proxy cuts the first hold.
+#[derive(Clone, Copy)]
+enum Cut {
+    /// As Cloudflare does past its own limit: 524, no body, connection closed.
+    Timeout,
+    /// As Lys does for a planned restart: 503 `LysGoingAway` naming the
+    /// instant it returns; `gone` makes the proxy stop listening after it,
+    /// so the agent finds nobody at the announced instant.
+    GoingAway { at: u64, gone: bool },
+}
+
+fn now_ms() -> Result<u64, Box<dyn Error>> {
+    Ok(u64::try_from(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis(),
+    )?)
+}
+
 /// A proxy that cuts the first hold on `GET /pair/{wait}` the way Cloudflare
 /// does, a 524 with no body, and carries every other exchange to Lys whole.
 /// Answers the base the command is given.
-fn cutting_proxy(upstream: &str) -> Result<(String, Arc<Seen>), Box<dyn Error>> {
+fn cutting_proxy(upstream: &str, cut: Cut) -> Result<(String, Arc<Seen>), Box<dyn Error>> {
     let authority = upstream
         .strip_prefix("http://")
         .and_then(|rest| rest.split('/').next())
@@ -273,7 +292,17 @@ fn cutting_proxy(upstream: &str) -> Result<(String, Arc<Seen>), Box<dyn Error>> 
         for client in listener.incoming().flatten() {
             let authority = authority.clone();
             let counted = Arc::clone(&counted);
-            std::thread::spawn(move || carry(client, &authority, &counted));
+            let Ok((request, _)) = request_line(&client) else {
+                continue;
+            };
+            let last = is_hold(&request)
+                && counted.holds.load(Ordering::SeqCst) == 0
+                && matches!(cut, Cut::GoingAway { gone: true, .. });
+            std::thread::spawn(move || carry(client, &authority, &counted, cut));
+            if last {
+                // The listener is dropped with this thread: nobody answers after the cut.
+                return;
+            }
         }
     });
     Ok((format!("http://127.0.0.1:{port}{path}"), seen))
@@ -283,22 +312,47 @@ fn cutting_proxy(upstream: &str) -> Result<(String, Arc<Seen>), Box<dyn Error>> 
 /// the way a proxy cuts it: a 524 with no body and the connection closed. The
 /// carry ends when either side closes; an error on the way is the carry's
 /// end too, and the connection thread that called it has nobody to tell.
-fn carry(mut client: TcpStream, authority: &str, seen: &Seen) -> std::io::Result<()> {
+/// The request line a client has sent, left unread on the socket, and how
+/// many bytes were peeked for it.
+fn request_line(client: &TcpStream) -> std::io::Result<(String, usize)> {
     let mut head = [0_u8; 512];
     let peeked = client.peek(&mut head)?;
     let line = String::from_utf8_lossy(&head[..peeked]);
-    let request = line.lines().next().unwrap_or_default().to_owned();
-    let hold =
-        request.starts_with("GET ") && request.contains("/pair/") && !request.contains("/taken");
+    Ok((line.lines().next().unwrap_or_default().to_owned(), peeked))
+}
+
+fn is_hold(request: &str) -> bool {
+    request.starts_with("GET ") && request.contains("/pair/") && !request.contains("/taken")
+}
+
+fn carry(mut client: TcpStream, authority: &str, seen: &Seen, cut: Cut) -> std::io::Result<()> {
+    let (request, peeked) = request_line(&client)?;
+    let hold = is_hold(&request);
     if request.starts_with("POST ") && request.contains("/taken") {
         seen.takes.fetch_add(1, Ordering::SeqCst);
     }
     if hold && seen.holds.fetch_add(1, Ordering::SeqCst) == 0 {
         let mut consumed = vec![0_u8; peeked];
         client.read_exact(&mut consumed)?;
-        return client.write_all(
-            b"HTTP/1.1 524 A Timeout Occurred\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-        );
+        let answer = match cut {
+            Cut::Timeout => {
+                "HTTP/1.1 524 A Timeout Occurred\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                    .to_owned()
+            }
+            Cut::GoingAway { at, .. } => {
+                let body = json!({
+                    "kind": "going_away", "expected_return": at, "refusal": "LysGoingAway",
+                    "reason": "Lys is stopping for planned maintenance. It will reconnect at the announced return."
+                })
+                .to_string();
+                format!(
+                    "HTTP/1.1 503 Service Unavailable\r\ncontent-type: application/json\r\n\
+                     content-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+            }
+        };
+        return client.write_all(answer.as_bytes());
     }
     let upstream = TcpStream::connect(authority)?;
     let mut up = upstream.try_clone()?;
@@ -320,7 +374,7 @@ fn carry(mut client: TcpStream, authority: &str, seen: &Seen) -> std::io::Result
 async fn pair_holds_again_when_a_proxy_cuts_the_wait_and_tells_lys_the_answer_is_taken()
 -> TestResult {
     let lys = Lys::up().await?;
-    let (base, seen) = cutting_proxy(&lys.service.base)?;
+    let (base, seen) = cutting_proxy(&lys.service.base, Cut::Timeout)?;
     let dir = tempfile::tempdir()?;
     let seat = dir.path().join("cut.seat.json");
     let (handle, rx) = Lys::paired_at(&base, "Pancake", &seat);
@@ -351,5 +405,57 @@ async fn pair_holds_again_when_a_proxy_cuts_the_wait_and_tells_lys_the_answer_is
         )
         .await?;
     assert_eq!(gone.0, 404, "{}", gone.1);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pair_holds_again_at_the_instant_lys_announces_for_its_planned_return() -> TestResult {
+    let lys = Lys::up().await?;
+    // Lys says it is back now: the hold is taken up again without a wait.
+    let cut = Cut::GoingAway {
+        at: now_ms()?,
+        gone: false,
+    };
+    let (base, seen) = cutting_proxy(&lys.service.base, cut)?;
+    let dir = tempfile::tempdir()?;
+    let seat = dir.path().join("returned.seat.json");
+    let (handle, rx) = Lys::paired_at(&base, "Pikelet", &seat);
+    let told = told(rx).await?;
+    let approved = lys.decide(&told.code, true).await?;
+    let paired = handle.await??;
+    assert_eq!(paired.agent, approved["agent"], "{approved}");
+    assert!(
+        seen.holds.load(Ordering::SeqCst) >= 2,
+        "the hold Lys sent away was not held again: {} hold(s)",
+        seen.holds.load(Ordering::SeqCst)
+    );
+    assert_eq!(seen.takes.load(Ordering::SeqCst), 1);
+    certified_seat(&seat)?;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pair_refuses_lys_not_returned_when_nobody_answers_at_the_announced_instant() -> TestResult
+{
+    let lys = Lys::up().await?;
+    let cut = Cut::GoingAway {
+        at: now_ms()?,
+        gone: true,
+    };
+    let (base, seen) = cutting_proxy(&lys.service.base, cut)?;
+    let dir = tempfile::tempdir()?;
+    let seat = dir.path().join("not-returned.seat.json");
+    let (handle, rx) = Lys::paired_at(&base, "Crumpet", &seat);
+    told(rx).await?;
+    let refusal = handle
+        .await?
+        .expect_err("a pairing with nobody at the announced return wrote a seat file");
+    assert!(refusal.contains("lys_not_returned"), "{refusal}");
+    assert_eq!(seen.holds.load(Ordering::SeqCst), 1, "{refusal}");
+    assert!(
+        !seat.exists(),
+        "a seat file was written: {}",
+        seat.display()
+    );
     Ok(())
 }

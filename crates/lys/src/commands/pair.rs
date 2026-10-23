@@ -12,7 +12,11 @@
 //! as Cloudflare answers a request held past its own limit) is held again
 //! at once, on that event; Lys reads the answer without consuming it, and
 //! the agent says it has it with `POST /pair/{wait}/taken` once the seat
-//! file is written. A decline is printed by its name, `pair_declined`, and nothing is
+//! file is written. A planned Lys restart answers the hold `LysGoingAway`
+//! with the instant Lys says it returns; the hold is taken up again at that
+//! instant, Lys's own announcement, as the runner does, and Lys not being
+//! there at the instant it named is refused `lys_not_returned`.
+//! A decline is printed by its name, `pair_declined`, and nothing is
 //! written; a path that already names anything is refused `seat_file_exists`
 //! before a key is made, and again at the link, never overwritten. What is
 //! printed is the words, the address, the path, the agent, the serial and
@@ -20,6 +24,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use lys_core::ca::{certificate_subject_public_key, create_certificate_request};
 use lys_core::keys::Ed25519Identity;
@@ -224,11 +229,28 @@ fn answered(base: &str, method: &str, route: &str, body: &[u8]) -> CliResult<Val
 
 /// Hold `GET route` open until Lys answers it. A hold a proxy cuts, by
 /// closing the connection or by answering a 5xx with no JSON, is held again
-/// at once: that close is the event, and there is no clock. A decline is
-/// taken before it is answered, so nothing of it stays in Lys.
+/// at once: that close is the event, and there is no clock. A planned Lys
+/// restart answers the hold `LysGoingAway` naming the instant Lys returns;
+/// the hold is taken up again at that instant, Lys's own announcement, and
+/// Lys unreachable there is refused `lys_not_returned`. A decline is taken
+/// before it is answered, so nothing of it stays in Lys.
 fn held(base: &str, route: &str) -> CliResult<Value> {
+    let mut announced: Option<u64> = None;
     loop {
-        let response = match exchanged(base, "GET", route, b"")? {
+        let exchanged = exchanged(base, "GET", route, b"")?;
+        if let (Err(Unanswered::Exchange(Failure::Unreachable(detail))), Some(at)) =
+            (&exchanged, announced)
+        {
+            return Err(refused(
+                "lys_not_returned",
+                format!(
+                    "Lys announced its return at {at} and was not reachable there ({detail}); \
+                     the pairing is kept by Lys, and `lys agent pair` run again makes new \
+                     words (GET {route})"
+                ),
+            ));
+        }
+        let response = match exchanged {
             Err(Unanswered::Exchange(Failure::Uncertain(detail))) => {
                 eprintln!("The hold on GET {route} was cut ({detail}); holding again.");
                 continue;
@@ -244,17 +266,52 @@ fn held(base: &str, route: &str) -> CliResult<Value> {
             );
             continue;
         }
-        if answer
+        let answer = answer.ok();
+        let refusal = answer
             .as_ref()
-            .ok()
             .and_then(|answer| answer.get("refusal"))
-            .and_then(Value::as_str)
-            == Some("pair_declined")
-        {
+            .and_then(Value::as_str);
+        if refusal == Some("LysGoingAway") {
+            let at = answer
+                .as_ref()
+                .and_then(|answer| answer.get("expected_return"))
+                .and_then(Value::as_u64)
+                .ok_or_else(|| {
+                    unreadable(route, "says Lys is going away and names no expected_return")
+                })?;
+            eprintln!(
+                "Lys is going away for a planned restart and says it returns at {at}; \
+                 holding again then."
+            );
+            until(at)?;
+            announced = Some(at);
+            continue;
+        }
+        if refusal == Some("pair_declined") {
             taken(base, route);
         }
         return read(&response, "GET", route);
     }
+}
+
+/// Waits for the instant Lys announced, `at` in milliseconds since the epoch:
+/// Lys's own word for when it is back, never a clock of this command's. An
+/// instant already past is now.
+fn until(at: u64) -> CliResult<()> {
+    let clock_failed = |error: &dyn std::fmt::Display| {
+        refused(
+            "pair_clock_failed",
+            format!("{error} (reading the time until {at})"),
+        )
+    };
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| clock_failed(&error))?;
+    let now = u64::try_from(now.as_millis()).map_err(|error| clock_failed(&error))?;
+    if at > now {
+        std::thread::sleep(Duration::from_millis(at - now));
+    }
+    Ok(())
 }
 
 /// Tell Lys the answer on `route` is held here, so the pairing leaves its
