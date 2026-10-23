@@ -72,16 +72,16 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
     match &started.refused {
         // A refused start never says it is listening: the installer's wait
         // ends on this line as a failure, naming the stores (DIRECTORY-107 R2).
-        Some(refused) => println!(
-            "lys-identity-server {refused} Serving only /health and the sign-in page on {}.",
+        Some(refused) => say(&format!(
+            "{refused} Serving only /health and the sign-in page on {}.",
             config.listen
-        ),
-        None => println!(
-            "lys-identity-server listening on {}, ready in {} ms (configuration {configured} ms, service {service} ms, bind {} ms)",
+        )),
+        None => say(&format!(
+            "listening on {}, ready in {} ms (configuration {configured} ms, service {service} ms, bind {} ms)",
             config.listen,
             ms(began),
             ms(bind_began)
-        ),
+        )),
     }
     // The connection's address is the person's own, carried to the issuer
     // so its failed sign-in count is per person.
@@ -122,7 +122,7 @@ async fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     let config_path = PathBuf::from(first);
-    println!("lys-identity-server build {BUILD}");
+    println!("{} lys-identity-server build {BUILD}", instant());
     match serve(config_path, began).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
