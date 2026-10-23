@@ -7,9 +7,12 @@
 //! and each step ends on Lys's answer or the command's return.
 
 use std::error::Error;
+use std::io::{Read as _, Write as _};
+use std::net::{TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, mpsc};
 
 use identity_contract::fake_issuer::Login;
 use identity_contract::harness::{ADMINISTRATOR, Service};
@@ -94,12 +97,20 @@ impl Lys {
         tokio::task::JoinHandle<Result<Paired, String>>,
         mpsc::Receiver<Told>,
     ) {
+        Self::paired_at(&self.service.base, name, seat)
+    }
+
+    /// As [`Lys::paired`], reaching Lys at `url`.
+    fn paired_at(
+        url: &str,
+        name: &str,
+        seat: &Path,
+    ) -> (
+        tokio::task::JoinHandle<Result<Paired, String>>,
+        mpsc::Receiver<Told>,
+    ) {
         let (tx, rx) = mpsc::channel();
-        let (url, name, seat) = (
-            self.service.base.clone(),
-            name.to_owned(),
-            seat.to_path_buf(),
-        );
+        let (url, name, seat) = (url.to_owned(), name.to_owned(), seat.to_path_buf());
         let handle = tokio::task::spawn_blocking(move || {
             pair(
                 &Pair {
@@ -229,5 +240,115 @@ async fn pair_refuses_an_existing_seat_path_before_making_a_key() -> TestResult 
         "words were asked for before the path was checked"
     );
     assert_eq!(std::fs::read(&seat)?, b"taken");
+    Ok(())
+}
+
+/// What a proxy in front of Lys saw: holds on `GET /pair/{wait}` and takes.
+struct Seen {
+    holds: AtomicUsize,
+    takes: AtomicUsize,
+}
+
+/// A proxy that cuts the first hold on `GET /pair/{wait}` the way Cloudflare
+/// does, a 524 with no body, and carries every other exchange to Lys whole.
+/// Answers the base the command is given.
+fn cutting_proxy(upstream: &str) -> Result<(String, Arc<Seen>), Box<dyn Error>> {
+    let authority = upstream
+        .strip_prefix("http://")
+        .and_then(|rest| rest.split('/').next())
+        .ok_or("the fixture's base is not http://")?
+        .to_owned();
+    let path = upstream
+        .strip_prefix("http://")
+        .and_then(|rest| rest.find('/').map(|at| rest[at..].to_owned()))
+        .unwrap_or_default();
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    let seen = Arc::new(Seen {
+        holds: AtomicUsize::new(0),
+        takes: AtomicUsize::new(0),
+    });
+    let counted = Arc::clone(&seen);
+    std::thread::spawn(move || {
+        for client in listener.incoming().flatten() {
+            let authority = authority.clone();
+            let counted = Arc::clone(&counted);
+            std::thread::spawn(move || carry(client, &authority, &counted));
+        }
+    });
+    Ok((format!("http://127.0.0.1:{port}{path}"), seen))
+}
+
+fn carry(mut client: TcpStream, authority: &str, seen: &Seen) {
+    let mut head = [0_u8; 512];
+    let Ok(peeked) = client.peek(&mut head) else {
+        return;
+    };
+    let line = String::from_utf8_lossy(&head[..peeked]);
+    let request = line.lines().next().unwrap_or_default().to_owned();
+    let hold =
+        request.starts_with("GET ") && request.contains("/pair/") && !request.contains("/taken");
+    if request.starts_with("POST ") && request.contains("/taken") {
+        seen.takes.fetch_add(1, Ordering::SeqCst);
+    }
+    if hold && seen.holds.fetch_add(1, Ordering::SeqCst) == 0 {
+        let mut consumed = vec![0_u8; peeked];
+        let _ = client.read_exact(&mut consumed);
+        let _ = client.write_all(
+            b"HTTP/1.1 524 A Timeout Occurred\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+        );
+        return;
+    }
+    let Ok(upstream) = TcpStream::connect(authority) else {
+        return;
+    };
+    let (Ok(mut up), Ok(mut down)) = (upstream.try_clone(), client.try_clone()) else {
+        return;
+    };
+    let to_lys = std::thread::spawn(move || {
+        let _ = std::io::copy(&mut client, &mut up);
+        let _ = up.shutdown(std::net::Shutdown::Write);
+    });
+    let mut from_lys = upstream;
+    let _ = std::io::copy(&mut from_lys, &mut down);
+    let _ = down.shutdown(std::net::Shutdown::Write);
+    let _ = to_lys.join();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn pair_holds_again_when_a_proxy_cuts_the_wait_and_tells_lys_the_answer_is_taken()
+-> TestResult {
+    let lys = Lys::up().await?;
+    let (base, seen) = cutting_proxy(&lys.service.base)?;
+    let dir = tempfile::tempdir()?;
+    let seat = dir.path().join("cut.seat.json");
+    let (handle, rx) = Lys::paired_at(&base, "Pancake", &seat);
+    let told = told(rx).await?;
+    // The first hold is cut by the proxy before any decision; the command
+    // holds again, and that second hold is the one the decision answers.
+    let approved = lys.decide(&told.code, true).await?;
+    let paired = handle.await??;
+    assert_eq!(paired.agent, approved["agent"], "{approved}");
+    assert!(
+        seen.holds.load(Ordering::SeqCst) >= 2,
+        "the cut hold was not held again: {} hold(s)",
+        seen.holds.load(Ordering::SeqCst)
+    );
+    assert_eq!(
+        seen.takes.load(Ordering::SeqCst),
+        1,
+        "the answer was not taken once"
+    );
+    let written = certified_seat(&seat)?;
+    assert_eq!(written.lys_url.as_deref(), Some(base.as_str()));
+    // Taken, the pairing is gone from Lys: the person's lookup finds nothing.
+    let gone = lys
+        .service
+        .get(
+            &format!("/pair/{}/waiting", told.code.replace(' ', "%20")),
+            Some(&lys.ada),
+        )
+        .await?;
+    assert_eq!(gone.0, 404, "{}", gone.1);
     Ok(())
 }

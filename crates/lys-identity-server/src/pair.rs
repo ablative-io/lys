@@ -6,11 +6,15 @@
 //! proposes, keeps them durably (`pair_store`) and answers the four words,
 //! the wait id and the address to tell the person. `GET /pair/{wait}` is
 //! held by the store's own event until the pairing is decided, then answers
-//! the approved [`Answer`] once, or `pair_declined`; an unknown or already
-//! answered wait is refused at once as `pair_unknown`. No poll interval and
-//! no deadline anywhere: a pairing waits until a person decides it.
+//! the approved [`Answer`], or `pair_declined`; the answer is read, never
+//! consumed, so a hold a proxy cut (Cloudflare closes a held request at its
+//! own limit) reads the same answer when the agent holds again. The agent
+//! says it has its answer with `POST /pair/{wait}/taken`, which removes the
+//! pairing; from then on, as for a wait never asked, the wait is refused at
+//! once as `pair_unknown`. No poll interval and no deadline anywhere: a
+//! pairing waits until a person decides it.
 //!
-//! Both routes are public: a code alone registers, certifies and reaches
+//! The agent's routes are public: a code alone registers, certifies and reaches
 //! nothing; only a signed-in person's decision does. The person's side,
 //! `GET /pair/{code}/waiting`, `POST /pair/{code}/approve` and
 //! `POST /pair/{code}/decline`, is `pair_decide` (R2, R3).
@@ -52,11 +56,20 @@ pub struct Asked {
     pub address: String,
 }
 
+/// What `POST /pair/{wait}/taken` answers.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[schema(as = PairTaken)]
+pub struct Taken {
+    /// The wait id the pairing was held on, now gone.
+    pub wait: String,
+}
+
 /// The pairing routes.
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/pair", post(ask))
         .route("/pair/{wait}", get(wait))
+        .route("/pair/{wait}/taken", post(taken))
         .route("/pair/{code}/waiting", get(crate::pair_decide::waiting))
         .route("/pair/{code}/approve", post(crate::pair_decide::approve))
         .route("/pair/{code}/decline", post(crate::pair_decide::decline))
@@ -112,16 +125,16 @@ async fn wait(
     Path(wait): Path<String>,
 ) -> Result<Json<Answer>, ServerError> {
     loop {
-        // Taken and subscribed under one hold of the lock, so no decision
+        // Read and subscribed under one hold of the lock, so no decision
         // can fall between the look and the wait.
-        let (taken, changed) = {
-            let mut store = pairings(&state)?;
-            match store.take(&wait)? {
+        let (decided, changed) = {
+            let store = pairings(&state)?;
+            match store.decided(&wait)? {
                 Some(decision) => (Some(decision), None),
                 None => (None, Some(store.subscribe())),
             }
         };
-        match taken {
+        match decided {
             Some(Decision::Approved { answer }) => return Ok(Json(*answer)),
             Some(Decision::Declined) => {
                 return Err(refused(
@@ -140,4 +153,14 @@ async fn wait(
                 })?;
         }
     }
+}
+
+/// `POST /pair/{wait}/taken`: the agent has its answer; the decided pairing
+/// is removed. An undecided, unknown or already taken wait is `pair_unknown`.
+async fn taken(
+    State(state): State<Arc<AppState>>,
+    Path(wait): Path<String>,
+) -> Result<Json<Taken>, ServerError> {
+    pairings(&state)?.taken(&wait)?;
+    Ok(Json(Taken { wait }))
 }

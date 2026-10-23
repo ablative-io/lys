@@ -229,11 +229,20 @@ async fn pair_wait_holds_until_the_decision_is_written_then_answers_it() -> Test
         .decide(&code, Decision::Declined)?;
     let answered = held.await?.map_err(|error| error.to_string())?;
     refused(&answered, 409, "pair_declined");
-    // Answered once, the wait is gone.
+    // Read, not consumed: a hold cut and held again reads the same answer,
+    // until the agent says it has it; then the wait is gone.
     let again = table
         .send("GET", &format!("/pair/{wait}"), None, false)
         .await?;
-    refused(&again, 404, "pair_unknown");
+    refused(&again, 409, "pair_declined");
+    let (status, taken) = table
+        .send("POST", &format!("/pair/{wait}/taken"), None, false)
+        .await?;
+    assert_eq!((status, taken["wait"].as_str()), (200, Some(wait.as_str())));
+    let gone = table
+        .send("GET", &format!("/pair/{wait}"), None, false)
+        .await?;
+    refused(&gone, 404, "pair_unknown");
 
     let (code, wait, _) = table.ask("Pancake").await?;
     let answer = Answer {
@@ -266,6 +275,14 @@ async fn pair_wait_holds_until_the_decision_is_written_then_answers_it() -> Test
         .await?;
     assert_eq!(status, 200, "{got}");
     assert_eq!(got, serde_json::to_value(&answer)?);
+    // An undecided wait cannot be taken.
+    let (_, wait, _) = table.ask("Undecided").await?;
+    let route = format!("/pair/{wait}/taken");
+    refused(
+        &table.send("POST", &route, None, false).await?,
+        404,
+        "pair_unknown",
+    );
     Ok(())
 }
 

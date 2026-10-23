@@ -73,7 +73,7 @@ pub enum Decision {
     Declined,
 }
 
-/// One pairing, from the ask to the taken answer.
+/// One pairing, from the ask to the answer the agent says it has.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Pairing {
@@ -255,36 +255,51 @@ impl PairStore {
         Ok(())
     }
 
-    /// The decision on the pairing `wait` names, taken: a decided pairing
-    /// is removed in the same durable write, so the answer is given once.
-    /// `None` while the person has not decided.
+    /// The decision on the pairing `wait` names, read: `None` while the
+    /// person has not decided. Reading consumes nothing, so a hold a proxy
+    /// cut after the decision reads the same answer when it holds again;
+    /// the pairing leaves only when the agent says it has its answer
+    /// ([`PairStore::taken`]).
     ///
     /// # Errors
     /// `pair_unknown` when no pairing holds the wait id (never asked, or
-    /// already answered); a write that did not reach the disk leaves the
-    /// memory as the file is.
-    pub fn take(&mut self, wait: &str) -> Result<Option<Decision>, ServerError> {
+    /// already taken).
+    pub fn decided(&self, wait: &str) -> Result<Option<Decision>, ServerError> {
+        self.stored
+            .pairings
+            .values()
+            .find(|pairing| pairing.wait == wait)
+            .map(|pairing| pairing.decision.clone())
+            .ok_or_else(|| refused("pair_unknown", "no pairing waits under this id"))
+    }
+
+    /// The agent has its answer: the decided pairing `wait` names is
+    /// removed, durably. Given once: a second call is `pair_unknown`.
+    ///
+    /// # Errors
+    /// `pair_unknown` when no decided pairing holds the wait id; a write
+    /// that did not reach the disk leaves the memory as the file is.
+    pub fn taken(&mut self, wait: &str) -> Result<(), ServerError> {
         let Some(code) = self
             .stored
             .pairings
             .values()
-            .find(|pairing| pairing.wait == wait)
+            .find(|pairing| pairing.wait == wait && pairing.decision.is_some())
             .map(|pairing| pairing.code.clone())
         else {
-            return Err(refused("pair_unknown", "no pairing waits under this id"));
+            return Err(refused(
+                "pair_unknown",
+                "no decided pairing waits under this id",
+            ));
         };
         let Some(pairing) = self.stored.pairings.remove(&code) else {
             return Err(refused("pair_unknown", "no pairing waits under this id"));
-        };
-        let Some(decision) = pairing.decision.clone() else {
-            self.stored.pairings.insert(code, pairing);
-            return Ok(None);
         };
         if let Err(error) = self.save() {
             self.stored.pairings.insert(code, pairing);
             return Err(error);
         }
-        Ok(Some(decision))
+        Ok(())
     }
 
     /// How many waits are subscribed to the next change.

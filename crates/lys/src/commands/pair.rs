@@ -8,7 +8,11 @@
 //!
 //! The hold is Lys's own: the request is answered when the person decides,
 //! and not before. No poll interval and no deadline (Tom: no fixed waits,
-//! ever). A decline is printed by its name, `pair_declined`, and nothing is
+//! ever). A hold a proxy cuts (a closed connection, or a 5xx with no JSON,
+//! as Cloudflare answers a request held past its own limit) is held again
+//! at once, on that event; Lys reads the answer without consuming it, and
+//! the agent says it has it with `POST /pair/{wait}/taken` once the seat
+//! file is written. A decline is printed by its name, `pair_declined`, and nothing is
 //! written; a path that already names anything is refused `seat_file_exists`
 //! before a key is made, and again at the link, never overwritten. What is
 //! printed is the words, the address, the path, the agent, the serial and
@@ -27,12 +31,12 @@ use zeroize::Zeroizing;
 use crate::cli::PairArgs;
 use crate::commands::enrol::{absent, write_whole};
 use crate::commands::error::CliResult;
-use crate::commands::mcp_bridge::tls::{Transport, TrustPath, post};
+use crate::commands::mcp_bridge::tls::{Transport, TrustPath, Unanswered, post};
 use crate::commands::mcp_bridge::{endpoint, named};
 use crate::commands::output::Emitter;
 use crate::commands::pem;
 use crate::commands::seat_client::refused;
-use crate::identity::loopback_http::Request;
+use crate::identity::loopback_http::{Failure, Request, Response};
 
 /// One pairing: where Lys is, the name proposed and where the seat file goes.
 pub struct Pair<'a> {
@@ -146,7 +150,7 @@ pub fn pair(pair: &Pair<'_>, told: &mut dyn FnMut(&Told)) -> CliResult<Paired> {
         address: text(&asked, "address", "/pair")?,
     });
     let route = format!("/pair/{wait}");
-    let answer = answered(base, "GET", &route, b"")?;
+    let answer = held(base, &route)?;
     let certificate_pem = text(&answer, "certificate_pem", &route)?;
     let der = pem::decode_certificate(certificate_pem.as_bytes(), Path::new(&route))
         .map_err(|_unread| unreadable(&route, "carries a certificate PEM that cannot be read"))?;
@@ -183,6 +187,7 @@ pub fn pair(pair: &Pair<'_>, told: &mut dyn FnMut(&Told)) -> CliResult<Paired> {
         .to_json()
         .map_err(|error| refused("seat_file_unwritten", error.to_string()))?;
     write_whole(pair.seat, written.as_bytes())?;
+    taken(base, &route);
     Ok(Paired {
         path: pair.seat.to_path_buf(),
         agent,
@@ -210,9 +215,64 @@ fn text(answer: &Value, key: &str, route: &str) -> CliResult<String> {
 }
 
 /// Send `method` `route` to Lys at `base` and read its answer: the JSON it
-/// answered 200 with, or its refusal by its own name with the route. A GET
-/// Lys holds open is held here too: the transport has no clock.
+/// answered 200 with, or its refusal by its own name with the route.
 fn answered(base: &str, method: &str, route: &str, body: &[u8]) -> CliResult<Value> {
+    let response = exchanged(base, method, route, body)?
+        .map_err(|unanswered| unanswered_refused(&unanswered, method, route))?;
+    read(&response, method, route)
+}
+
+/// Hold `GET route` open until Lys answers it. A hold a proxy cuts, by
+/// closing the connection or by answering a 5xx with no JSON, is held again
+/// at once: that close is the event, and there is no clock. A decline is
+/// taken before it is answered, so nothing of it stays in Lys.
+fn held(base: &str, route: &str) -> CliResult<Value> {
+    loop {
+        let response = match exchanged(base, "GET", route, b"")? {
+            Err(Unanswered::Exchange(Failure::Uncertain(detail))) => {
+                eprintln!("The hold on GET {route} was cut ({detail}); holding again.");
+                continue;
+            }
+            Err(unanswered) => return Err(unanswered_refused(&unanswered, "GET", route)),
+            Ok(response) => response,
+        };
+        let answer: Result<Value, _> = serde_json::from_slice(&response.body);
+        if response.status >= 500 && answer.is_err() {
+            eprintln!(
+                "GET {route} was answered {} with no JSON by a proxy; holding again.",
+                response.status
+            );
+            continue;
+        }
+        if answer
+            .as_ref()
+            .ok()
+            .and_then(|answer| answer.get("refusal"))
+            .and_then(Value::as_str)
+            == Some("pair_declined")
+        {
+            taken(base, route);
+        }
+        return read(&response, "GET", route);
+    }
+}
+
+/// Tell Lys the answer on `route` is held here, so the pairing leaves its
+/// store. A refusal is printed and changes nothing: the seat file is written.
+fn taken(base: &str, route: &str) {
+    if let Err(refusal) = answered(base, "POST", &format!("{route}/taken"), b"") {
+        eprintln!("Lys was not told the answer was taken: {refusal}");
+    }
+}
+
+/// `method` `route` sent to Lys at `base`, with whatever came back, or why
+/// nothing did.
+fn exchanged(
+    base: &str,
+    method: &str,
+    route: &str,
+    body: &[u8],
+) -> CliResult<Result<Response, Unanswered>> {
     let target = endpoint(&format!("{base}{route}"))?;
     let transport = if target.secure {
         Transport::Tls(TrustPath::system()?)
@@ -223,7 +283,7 @@ fn answered(base: &str, method: &str, route: &str, body: &[u8]) -> CliResult<Val
         ("content-type", b"application/json"),
         ("accept", b"application/json"),
     ];
-    let response = post(
+    Ok(post(
         &transport,
         &target.authority,
         &Request {
@@ -232,14 +292,23 @@ fn answered(base: &str, method: &str, route: &str, body: &[u8]) -> CliResult<Val
             headers: &headers,
             body,
         },
-    )
-    .map_err(|unanswered| {
-        let reason = named(&unanswered);
-        let (name, words) = reason
-            .split_once(": ")
-            .unwrap_or(("pair_unanswered", &reason));
-        refused(name, format!("{words} ({method} {route})"))
-    })?;
+    ))
+}
+
+fn unanswered_refused(
+    unanswered: &Unanswered,
+    method: &str,
+    route: &str,
+) -> crate::commands::error::CliError {
+    let reason = named(unanswered);
+    let (name, words) = reason
+        .split_once(": ")
+        .unwrap_or(("pair_unanswered", &reason));
+    refused(name, format!("{words} ({method} {route})"))
+}
+
+/// The JSON Lys answered 200 with, or its refusal by its own name.
+fn read(response: &Response, method: &str, route: &str) -> CliResult<Value> {
     let answer: Value = serde_json::from_slice(&response.body).map_err(|_unread| {
         refused(
             "pair_answer_unreadable",

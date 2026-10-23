@@ -202,6 +202,12 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::pair_store::Answer>()),
         ),
         (
+            POST,
+            "/pair/{wait}/taken",
+            None,
+            Some(api.schema::<crate::pair::Taken>()),
+        ),
+        (
             GET,
             "/pair/{code}/waiting",
             None,
