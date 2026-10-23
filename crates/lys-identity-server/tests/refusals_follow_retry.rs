@@ -1,16 +1,15 @@
-//! Follow retries and continuation driven by a paused clock.
+//! A follow continues past a skipped entry and ends, once, on a refused page.
 
-/// Test the follow loop with a paused clock and explicit timer polls.
+/// Test the follow loop with scripted pages and explicit polls.
 #[macro_export]
 macro_rules! refusals_follow_retry {
     () => {
         use std::collections::VecDeque;
         use std::error::Error;
-        use std::future::{Future, poll_fn, ready};
-        use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-        use std::sync::{Arc, Mutex, MutexGuard};
+        use std::future::{poll_fn, ready};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{Mutex, MutexGuard};
         use std::task::{Context, Poll, Waker};
-        use std::time::Duration;
         use $crate::budgets_feed::entry_tests::{entry, fixture, page};
         use $crate::error::ServerError;
 
@@ -43,30 +42,18 @@ macro_rules! refusals_follow_retry {
                 page(vec![entry(4, "good")], "cursor-4"),
             ]));
             let calls = AtomicUsize::new(0);
-            let delays = AtomicUsize::new(0);
-            let mut follow = Box::pin(super::follow_with(
-                &table.state,
-                "machine",
-                || {
-                    calls.fetch_add(1, Ordering::SeqCst);
-                    let answer = held(&script).pop_front();
-                    let mut answer = answer.map(Ok);
-                    poll_fn(move |_| match answer.take() {
-                        Some(page) => Poll::Ready(page),
-                        None => Poll::Pending,
-                    })
-                },
-                |_| {
-                    delays.fetch_add(1, Ordering::SeqCst);
-                    std::future::pending::<()>()
-                },
-            ));
+            let mut follow = Box::pin(super::follow_with(&table.state, "machine", || {
+                calls.fetch_add(1, Ordering::SeqCst);
+                let answer = held(&script).pop_front();
+                let mut answer = answer.map(Ok);
+                poll_fn(move |_| match answer.take() {
+                    Some(page) => Poll::Ready(page),
+                    None => Poll::Pending,
+                })
+            }));
             // IO on the signed runner channel completes on its own signal.
             let polled = poll_fn(|context| match follow.as_mut().poll(context) {
-                Poll::Ready(()) => Poll::Ready(Err(refused("follow_ended"))),
-                Poll::Pending if delays.load(Ordering::SeqCst) > 0 => {
-                    Poll::Ready(Err(refused("entry_ended_follow")))
-                }
+                Poll::Ready(ended) => Poll::Ready(Err(refused(&format!("follow_ended_{ended:?}")))),
                 Poll::Pending if calls.load(Ordering::SeqCst) == 3 => Poll::Ready(Ok(())),
                 Poll::Pending => Poll::Pending,
             })
@@ -74,11 +61,6 @@ macro_rules! refusals_follow_retry {
             assert!(
                 polled.is_ok(),
                 "a skipped entry ended the follow: {polled:?}"
-            );
-            assert_eq!(
-                delays.load(Ordering::SeqCst),
-                0,
-                "entry refusals do not restart the follow"
             );
             $crate::budgets_api::with_budgets(&table.state, |store| {
                 assert_eq!(store.held().uses.len(), 3);
@@ -99,183 +81,72 @@ macro_rules! refusals_follow_retry {
         }
 
         #[tokio::test]
-        async fn refusals_follow_restarts_every_refusal_on_a_paused_clock() -> TestResult {
+        async fn refusals_follow_ends_once_on_a_refused_page_and_names_the_event_that_begins_it_again()
+        -> TestResult {
             let table = fixture().await?;
-            for error in [
-                refused("runner_request_unsigned"),
-                refused("runner_socket_unavailable"),
-                ServerError::RuntimeSessionUnknown,
-            ] {
-                let mut invalid = page(Vec::new(), "invalid");
-                invalid.format = "bad-format".to_owned();
-                let script = Mutex::new(VecDeque::from([
-                    Err(error),
-                    Ok(invalid),
-                    Ok(page(Vec::new(), "recovered")),
-                    Err(refused("runner_answer_unexpected")),
-                ]));
-                let clock = Arc::new(AtomicU64::new(0));
+            let mut invalid = page(Vec::new(), "invalid");
+            invalid.format = "bad-format".to_owned();
+            let scripts = [
+                vec![Err(refused("runner_request_unsigned"))],
+                vec![Err(refused("runner_socket_unavailable"))],
+                vec![Err(ServerError::RuntimeSessionUnknown)],
+                vec![Ok(invalid)],
+                vec![Ok(page(Vec::new(), "kept")), Err(refused("runner_answer_unexpected"))],
+            ];
+            let mut ended = 0;
+            for script in scripts {
+                let asked = script.len();
+                let script = Mutex::new(VecDeque::from(script));
                 let calls = AtomicUsize::new(0);
-                let delays = Mutex::new(Vec::new());
-                let mut follow = Box::pin(super::follow_with(
-                    &table.state,
-                    "machine",
-                    || {
-                        calls.fetch_add(1, Ordering::SeqCst);
-                        ready(
-                            held(&script)
-                                .pop_front()
-                                .unwrap_or_else(|| Err(refused("done"))),
-                        )
-                    },
-                    |delay: Duration| {
-                        held(&delays).push(delay);
-                        let deadline = clock.load(Ordering::SeqCst) + delay.as_secs() * 1000;
-                        let clock = Arc::clone(&clock);
-                        poll_fn(move |_| {
-                            if clock.load(Ordering::SeqCst) >= deadline {
-                                Poll::Ready(())
-                            } else {
-                                Poll::Pending
-                            }
-                        })
-                    },
-                ));
-                poll_recovery(&mut follow, &clock, &calls, &delays, &table)?;
-                $crate::budgets_api::with_budgets(&table.state, |store| {
-                    assert_eq!(
-                        store
-                            .held()
-                            .refusals
-                            .cursors
-                            .get("machine")
-                            .map(String::as_str),
-                        Some("recovered")
-                    );
-                    Ok(())
-                })?;
+                let mut follow = Box::pin(super::follow_with(&table.state, "machine", || {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    ready(
+                        held(&script)
+                            .pop_front()
+                            .unwrap_or_else(|| Err(refused("asked_again_after_the_end"))),
+                    )
+                }));
+                let mut context = Context::from_waker(Waker::noop());
+                let outcome = follow.as_mut().poll(&mut context);
+                assert_eq!(
+                    outcome,
+                    Poll::Ready(super::Ended::Lost),
+                    "a refused page did not end the follow"
+                );
+                assert_eq!(
+                    calls.load(Ordering::SeqCst),
+                    asked,
+                    "the follow asked again after the refusal"
+                );
+                ended += 1;
                 drop(follow);
             }
+            $crate::budgets_api::with_budgets(&table.state, |store| {
+                assert_eq!(
+                    store
+                        .held()
+                        .refusals
+                        .cursors
+                        .get("machine")
+                        .map(String::as_str),
+                    Some("kept"),
+                    "the page kept before the refusal moved the cursor"
+                );
+                Ok(())
+            })?;
             {
                 let messages = table.messages.lock().map_err(|error| error.to_string())?;
                 let refusals: Vec<_> = messages
                     .iter()
                     .filter(|line| line.starts_with("refusals: "))
                     .collect();
-                assert_eq!(
-                    refusals.len(),
-                    9,
-                    "each refusal, including page validation, was named"
-                );
+                assert_eq!(refusals.len(), ended, "one line per ended follow: {refusals:?}");
                 for message in refusals {
                     assert!(message.contains($crate::runner_links::AGAIN), "{message}");
-                    assert!(message.contains("begun again"), "{message}");
-                    assert!(message.contains("retry in "), "{message}");
+                    assert!(!message.contains("retry in"), "{message}");
                 }
             }
             table.finish().await
-        }
-
-        #[tokio::test]
-        async fn refusals_follow_backoff_doubles_and_caps_at_sixty_seconds() -> TestResult {
-            let table = fixture().await?;
-            let clock = Arc::new(AtomicU64::new(0));
-            let calls = AtomicUsize::new(0);
-            let delays = Mutex::new(Vec::new());
-            let mut follow = Box::pin(super::follow_with(
-                &table.state,
-                "machine",
-                || {
-                    calls.fetch_add(1, Ordering::SeqCst);
-                    ready(Err(refused("runner_request_unsigned")))
-                },
-                |delay: Duration| {
-                    held(&delays).push(delay.as_secs());
-                    let deadline = clock.load(Ordering::SeqCst) + delay.as_secs();
-                    let clock = Arc::clone(&clock);
-                    poll_fn(move |_| {
-                        if clock.load(Ordering::SeqCst) >= deadline {
-                            Poll::Ready(())
-                        } else {
-                            Poll::Pending
-                        }
-                    })
-                },
-            ));
-            let mut context = Context::from_waker(Waker::noop());
-            for seconds in [1, 2, 4, 8, 16, 32, 60, 60] {
-                assert!(
-                    follow.as_mut().poll(&mut context).is_pending(),
-                    "the refused follow ended"
-                );
-                assert_eq!(held(&delays).last(), Some(&seconds));
-                clock.store(clock.load(Ordering::SeqCst) + seconds, Ordering::SeqCst);
-            }
-            assert_eq!(calls.load(Ordering::SeqCst), 8);
-            assert_eq!(*held(&delays), [1, 2, 4, 8, 16, 32, 60, 60]);
-            drop(follow);
-            table.finish().await
-        }
-        fn poll_recovery<F: Future>(
-            follow: &mut std::pin::Pin<Box<F>>,
-            clock: &AtomicU64,
-            calls: &AtomicUsize,
-            delays: &Mutex<Vec<Duration>>,
-            table: &$crate::budgets_feed::entry_tests::Fixture,
-        ) -> TestResult {
-            let mut context = Context::from_waker(Waker::noop());
-            assert!(
-                follow.as_mut().poll(&mut context).is_pending(),
-                "a refused follow ended instead of scheduling a retry"
-            );
-            assert_eq!(calls.load(Ordering::SeqCst), 1);
-            assert_eq!(*held(delays), [Duration::from_secs(1)]);
-            assert!(
-                !table
-                    .state
-                    .runners
-                    .links()
-                    .begin($crate::runner_links::Link::Feed, "machine"),
-                "the retry retained the follow link"
-            );
-            clock.store(999, Ordering::SeqCst);
-            assert!(follow.as_mut().poll(&mut context).is_pending());
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                1,
-                "no retry before the deadline"
-            );
-            clock.store(1000, Ordering::SeqCst);
-            assert!(follow.as_mut().poll(&mut context).is_pending());
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                2,
-                "the refused follow restarted at one second"
-            );
-            assert_eq!(
-                *held(delays),
-                [Duration::from_secs(1), Duration::from_secs(2)]
-            );
-            clock.store(2999, Ordering::SeqCst);
-            assert!(follow.as_mut().poll(&mut context).is_pending());
-            assert_eq!(calls.load(Ordering::SeqCst), 2);
-            clock.store(3000, Ordering::SeqCst);
-            assert!(follow.as_mut().poll(&mut context).is_pending());
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                4,
-                "a successful page was followed immediately"
-            );
-            assert_eq!(
-                *held(delays),
-                [
-                    Duration::from_secs(1),
-                    Duration::from_secs(2),
-                    Duration::from_secs(1)
-                ],
-                "success reset the backoff"
-            );
-            Ok(())
         }
     };
 }

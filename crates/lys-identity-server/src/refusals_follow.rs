@@ -4,13 +4,13 @@
 //! feed was last read: the runner is asked for the page after that cursor,
 //! answering once an entry is committed after it, and the refusals on the
 //! page are kept with the cursor after them before the next page is asked.
-//! Every refused page or failed connection is named and tried again after
-//! a backoff, from the last durable cursor. The task retains its link while
-//! backing off, so another runner request cannot start a second follow.
+//! A refused page or a failed connection ends the follow, said once with
+//! why, and releases its link; it is begun again from the last durable
+//! cursor when that runner next answers a request (`runner_links::ensure`),
+//! never on a clock (DIRECTORY-119 R1).
 
 use std::future::Future;
 use std::sync::Arc;
-use std::time::Duration;
 
 use lys_runner::tracking_store::FeedPage;
 use lys_runner::{Act, Answer};
@@ -55,7 +55,7 @@ pub fn follow_at_start(state: &Arc<AppState>) {
 }
 
 /// Follow `machine`'s runner's feed on a task of its own, unless it is
-/// followed already, including while its task is backing off.
+/// followed already.
 pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
     if state.budgets.is_none() || state.network.is_none() {
         return;
@@ -78,26 +78,25 @@ pub fn ensure(state: &Arc<AppState>, machine: &str, runner: RunnerRecord) {
 async fn follow(state: &Arc<AppState>, machine: &str, mut runner: RunnerRecord) {
     loop {
         let link = FeedLink { state, machine };
-        follow_binding_with(
-            state,
-            machine,
-            &runner,
-            || async {
-                let page = next_page(state, machine, runner.clone()).await?;
-                check_binding(state, machine, &runner)?;
-                crate::dashboard_api::alarms::follow::tick_with_clock(
-                    state,
-                    machine,
-                    runner.clone(),
-                    crate::dashboard_api::alarms::follow::now_ms,
-                )
-                .await?;
-                Ok(page)
-            },
-            tokio::time::sleep,
-        )
+        let ended = follow_binding_with(state, machine, &runner, || async {
+            let page = next_page(state, machine, runner.clone()).await?;
+            check_binding(state, machine, &runner)?;
+            crate::dashboard_api::alarms::follow::tick_with_clock(
+                state,
+                machine,
+                runner.clone(),
+                crate::dashboard_api::alarms::follow::now_ms,
+            )
+            .await?;
+            Ok(page)
+        })
         .await;
         drop(link);
+        if ended == Ended::Lost {
+            // The runner's next answered request begins the follow again
+            // (runner_links::ensure); nothing here waits for it.
+            return;
+        }
         let current = match bound_runner(state, machine) {
             Ok(current) => current,
             Err(error) => {
@@ -249,69 +248,70 @@ use follow_fixture::follow_with;
 mod follow_fixture {
     use super::{AppState, Arc, FeedPage, Future, ServerError, bound_runner, follow_binding_with};
 
-    pub(super) async fn follow_with<Next, Page, Wait, Delay>(
+    pub(super) async fn follow_with<Next, Page>(
         state: &Arc<AppState>,
         machine: &str,
         next: Next,
-        wait: Wait,
-    ) where
+    ) -> super::Ended
+    where
         Next: FnMut() -> Page + Send,
         Page: Future<Output = Result<FeedPage, ServerError>> + Send,
-        Wait: FnMut(std::time::Duration) -> Delay + Send,
-        Delay: Future<Output = ()> + Send,
     {
         let runner = bound_runner(state, machine)
             .unwrap_or_else(|error| panic!("the fixture runner could not be bound: {error}"));
-        follow_binding_with(state, machine, &runner, next, wait).await;
+        follow_binding_with(state, machine, &runner, next).await
     }
 }
 
-async fn follow_binding_with<Next, Page, Wait, Delay>(
+/// How a follow ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ended {
+    /// The machine's runner binding changed: the follow is begun again at
+    /// once under the current binding.
+    Rebound,
+    /// A page was refused or the runner could not be reached: the follow is
+    /// over until that runner next answers a request.
+    Lost,
+}
+
+async fn follow_binding_with<Next, Page>(
     state: &Arc<AppState>,
     machine: &str,
     runner: &RunnerRecord,
     mut next: Next,
-    mut wait: Wait,
-) where
+) -> Ended
+where
     Next: FnMut() -> Page + Send,
     Page: Future<Output = Result<FeedPage, ServerError>> + Send,
-    Wait: FnMut(std::time::Duration) -> Delay + Send,
-    Delay: Future<Output = ()> + Send,
 {
-    let mut backoff = Duration::from_secs(1);
     loop {
         if let Err(error) = check_binding(state, machine, runner) {
             (state.say)(&format!(
                 "refusals: machine {machine}'s feed stopped: {error}"
             ));
-            return;
+            return Ended::Rebound;
         }
         let page = next().await;
         if let Err(error) = check_binding(state, machine, runner) {
             (state.say)(&format!(
                 "refusals: machine {machine}'s feed stopped: {error}"
             ));
-            return;
+            return Ended::Rebound;
         }
         let result = match page {
             Ok(page) => crate::budgets_feed::keep_page(state, machine, page).await,
             Err(error) => Err(error),
         };
-        match result {
-            Ok(()) => backoff = Duration::from_secs(1),
-            Err(ended) => {
+        if let Err(ended) = result {
+            (state.say)(&format!(
+                "refusals: the feed of machine {machine}'s runner is no longer followed: {ended}{AGAIN}"
+            ));
+            if let Err(error) = crate::budgets_act::feed_end(state, machine, &ended).await {
                 (state.say)(&format!(
-                    "refusals: the feed of machine {machine}'s runner is no longer followed: {ended}{AGAIN}; retry in {} s",
-                    backoff.as_secs()
+                    "controls: held words on machine {machine} could not receive the feed refusal: {error}"
                 ));
-                if let Err(error) = crate::budgets_act::feed_end(state, machine, &ended).await {
-                    (state.say)(&format!(
-                        "controls: held words on machine {machine} could not receive the feed refusal: {error}"
-                    ));
-                }
-                wait(backoff).await;
-                backoff = (backoff * 2).min(Duration::from_secs(60));
             }
+            return Ended::Lost;
         }
     }
 }
@@ -442,25 +442,19 @@ mod binding_tests {
                     state: &table.state,
                     machine: "machine",
                 };
-                follow_binding_with(
-                    &table.state,
-                    "machine",
-                    &runner,
-                    || {
-                        calls.fetch_add(1, Ordering::SeqCst);
-                        let answer = answer.take();
-                        async move {
-                            let answer = answer.ok_or(ServerError::RuntimeSessionUnknown)?;
-                            answer
-                                .await
-                                .map_err(|error| ServerError::RuntimeUnavailable {
-                                    reason: error.to_string(),
-                                })
-                        }
-                    },
-                    |_| std::future::pending::<()>(),
-                )
-                .await;
+                follow_binding_with(&table.state, "machine", &runner, || {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    let answer = answer.take();
+                    async move {
+                        let answer = answer.ok_or(ServerError::RuntimeSessionUnknown)?;
+                        answer
+                            .await
+                            .map_err(|error| ServerError::RuntimeUnavailable {
+                                reason: error.to_string(),
+                            })
+                    }
+                })
+                .await
             });
             let mut context = Context::from_waker(Waker::noop());
             assert!(follow.as_mut().poll(&mut context).is_pending());

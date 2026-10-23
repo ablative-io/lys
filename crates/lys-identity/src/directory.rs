@@ -56,11 +56,16 @@ pub use crate::organisation::Founded;
 /// Why the directory stopped answering, if it has.
 type Broken = Option<String>;
 
+/// Whether `actor` is who `recorded` was: the same login binding, the same
+/// authentication method, the same app acted through and the same draft
+/// provenance. The instant the actor was authenticated at is not who they
+/// are: a retry of the same act seconds later is the same act
+/// (DIRECTORY-117 R1), and the recorded leaf keeps the first act's instant.
 fn same_actor(recorded: &Actor, actor: &Actor) -> bool {
-    recorded == actor
-        || (actor.provenance().service_account().is_some()
-            && recorded.binding() == actor.binding()
-            && recorded.provenance().method() == actor.provenance().method())
+    recorded.binding() == actor.binding()
+        && recorded.provenance().method() == actor.provenance().method()
+        && recorded.through_app() == actor.through_app()
+        && recorded.draft() == actor.draft()
 }
 
 /// The directory of people and agents over its log.
@@ -388,5 +393,35 @@ impl<S: LeafStore> Directory<S> {
             return Ok(None);
         }
         self.log.entry(index)
+    }
+}
+
+#[cfg(test)]
+mod same_actor_tests {
+    use super::same_actor;
+    use crate::{Actor, AuthMethod, LoginBinding, Provenance};
+
+    fn actor(subject: &str, method: AuthMethod, at: u64) -> Actor {
+        Actor::new(
+            LoginBinding::new("https://issuer.example.test", subject).unwrap(),
+            Provenance::new(method, at),
+        )
+    }
+
+    #[test]
+    fn a_retry_at_another_second_is_the_same_actor_and_another_who_is_not() {
+        let first = actor("ada", AuthMethod::Oidc, 4);
+        assert!(same_actor(&first, &actor("ada", AuthMethod::Oidc, 90)));
+        assert!(!same_actor(&first, &actor("bea", AuthMethod::Oidc, 4)));
+        assert!(!same_actor(&first, &actor("ada", AuthMethod::Operator, 4)));
+        assert!(!same_actor(
+            &first,
+            &actor("ada", AuthMethod::Oidc, 4).with_through_app("fixture_product")
+        ));
+        let through = actor("ada", AuthMethod::Oidc, 4).with_through_app("fixture_product");
+        assert!(same_actor(
+            &through,
+            &actor("ada", AuthMethod::Oidc, 61).with_through_app("fixture_product")
+        ));
     }
 }

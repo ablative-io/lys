@@ -20,6 +20,17 @@ const VERSION: &str = concat!(
     ")"
 );
 
+/// The instant a line is said, RFC 3339 in UTC with milliseconds, so every
+/// line of identity.log can be placed in time (DIRECTORY-118 R1).
+fn instant() -> String {
+    let now = jiff::Timestamp::now();
+    format!(
+        "{}.{:03}Z",
+        now.strftime("%Y-%m-%dT%H:%M:%S"),
+        now.subsec_millisecond()
+    )
+}
+
 /// Milliseconds since `since`, for the start's own timing line.
 fn ms(since: Instant) -> u128 {
     since.elapsed().as_millis()
@@ -33,7 +44,7 @@ async fn serve(config_path: PathBuf, began: Instant) -> Result<(), ServerError> 
     planned_stop::retire_previous_plan(&config_path)?;
     let configured = ms(began);
     let say: lys_identity_server::routes::Say =
-        Arc::new(|line: &str| println!("lys-identity-server {line}"));
+        Arc::new(|line: &str| println!("{} lys-identity-server {line}", instant()));
     // Warn and above reach identity.log through the same sink (DIRECTORY-095).
     lys_identity_server::warn_lines::install(Arc::clone(&say)).map_err(|refused| {
         ServerError::ConfigInvalid {
@@ -117,6 +128,27 @@ async fn main() -> ExitCode {
         Err(error) => {
             eprintln!("{error}");
             ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(test)]
+mod instant_tests {
+    #[test]
+    fn the_instant_is_rfc3339_utc_with_milliseconds() {
+        let said = super::instant();
+        let bytes = said.as_bytes();
+        assert_eq!(said.len(), 24, "{said}");
+        for (index, byte) in bytes.iter().enumerate() {
+            let expected = match index {
+                4 | 7 => b'-' == *byte,
+                10 => b'T' == *byte,
+                13 | 16 => b':' == *byte,
+                19 => b'.' == *byte,
+                23 => b'Z' == *byte,
+                _ => byte.is_ascii_digit(),
+            };
+            assert!(expected, "{said} at {index}");
         }
     }
 }
