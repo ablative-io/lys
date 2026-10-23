@@ -159,6 +159,14 @@ function grantable(view: ResourcesView): Map<string, string[]> {
   return new Map([...kinds].sort(([a], [b]) => a.localeCompare(b)).map(([kind, ids]) => [kind, ids.sort()]));
 }
 
+/** The relations a first grant may name on `kind`: an app kind's are the app's own, as its approved schema declares
+ * them in the grant model (DIRECTORY-116 R1); one of Lys's own kinds offers Lys's model relations. */
+export const relationsOf = (model: GrantModel, kind: string): Record<string, string[]> => model.kinds?.[kind]?.relations ?? model.relations;
+
+/** A relation choice in words: an app's relation by its own name, then what it carries; Lys's own by what it carries. */
+export const relationWords = (model: GrantModel, resource: { kind: string; id: string }, relation: string, actions: string[]): string =>
+  resource.kind.includes('.') ? relation.replaceAll('_', ' ') + ': ' + actionWords(model, resource, actions) : actionWords(model, resource, actions);
+
 /** A kind said as words: an app's `app.kind` reads as two words, underscores as spaces. */
 export const kindWords = (kind: string) => kind.replaceAll('_', ' ').replaceAll('.', ' ');
 
@@ -256,7 +264,7 @@ function PersonForm({ person, organisation, model, resources, names }: { person:
       </select></label>
       <label className="field">As<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
         <option value="" disabled>Choose what they may do</option>
-        {Object.entries(model.relations).map(([relation, actions]) => <option key={relation} value={relation} >{actionWords(model, { kind: asking.kind, id: asking.id }, actions)}</option>)}
+        {Object.entries(relationsOf(model, asking.kind)).map(([relation, actions]) => <option key={relation} value={relation}>{relationWords(model, { kind: asking.kind, id: asking.id }, relation, actions)}</option>)}
       </select></label>
     </> : null}
     </div>

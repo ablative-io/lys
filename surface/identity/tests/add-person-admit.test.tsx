@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/App';
-import { ADA, BEA, SERVICE, ok, refused } from './fixtures';
+import { ADA, BEA, MODEL, SERVICE, ok, refused } from './fixtures';
 import type { Route } from './fixtures';
 import { choose, serve, type } from './harness';
 
@@ -54,6 +54,40 @@ function admitted(body: unknown) {
     },
   };
 }
+
+/** The grant model with Cambium's workspace kind as its approved schema declares it, and one such workspace Lys holds a grant on. */
+const CAMBIUM_MODEL = { ...MODEL, kinds: { ...MODEL.kinds, 'cambium.workspace': { agents: [], relations: {
+  administrator: ['configure', 'invite', 'post', 'read', 'seat_found'], member: ['edit_own', 'post', 'read', 'seat_found'],
+  owner: ['configure', 'invite', 'ownership_transfer', 'post', 'read'], reader: ['read'] } } } };
+const CAMBIUM_RESOURCES = ok({ kinds: ['cambium.workspace', 'workspace'], revision: 1, judged_at: 1790000000, resources: [
+  { kind: 'cambium.workspace', id: 'ablative', standing: 1, ended: 0, holders: 1 },
+  { kind: 'workspace', id: 'ward-7', standing: 2, ended: 0, holders: 2 },
+] });
+
+const options = (entry: HTMLFormElement) => [...entry.querySelectorAll('select[name="relation"] option')].map((option) => (option as HTMLOptionElement).value).filter(Boolean);
+
+describe('Add a person to an app', () => {
+  it("offers an app kind the app's own relations, never Lys's, and sends the chosen one by name", async () => {
+    const { entry, posted } = await form({ '/grants/model': ok(CAMBIUM_MODEL), '/resources': CAMBIUM_RESOURCES, 'POST /people/admit': (body) => ok(admitted(body)) });
+    await type(entry.querySelector('input[name="given_name"]'), 'Dean');
+    await type(entry.querySelector('input[name="family_name"]'), 'Whiting');
+    await type(entry.querySelector('input[name="email"]'), 'dean@example.test');
+    await choose(entry.querySelector('select[name="kind"]'), 'cambium.workspace');
+    await choose(entry.querySelector('select[name="resource"]'), 'ablative');
+    expect(options(entry)).toEqual(['administrator', 'member', 'owner', 'reader']);
+    const member = entry.querySelector('select[name="relation"] option[value="member"]');
+    expect(member?.textContent).toBe('member: edit_own; post; read; seat_found');
+    await choose(entry.querySelector('select[name="kind"]'), 'workspace');
+    expect(options(entry)).toEqual(['editor', 'owner', 'viewer']);
+    await choose(entry.querySelector('select[name="kind"]'), 'cambium.workspace');
+    await choose(entry.querySelector('select[name="resource"]'), 'ablative');
+    await choose(entry.querySelector('select[name="relation"]'), 'member');
+    await submit(entry);
+    expect(posted.map((call) => call.path)).toEqual(['/people/admit']);
+    const sent = posted[0]?.body as Record<string, unknown>;
+    expect(sent.grant).toEqual({ route: 'browser', resource: { kind: 'cambium.workspace', id: 'ablative' }, relation: 'member' });
+  });
+});
 
 describe('Add a person in one act', () => {
   it('asks for the name, the email and the first grant, and sends one admit', async () => {
