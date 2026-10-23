@@ -1462,6 +1462,11 @@ Brought forward as step-2 work under the identity line lead's ruling: DIRECTORY-
 | `crates/lys/src/identity/install/layout/clients.rs` | Client release placement: a served release is never replaced; a stranded one is. | DIRECTORY-115 |
 | `crates/lys-identity/src/directory_retry_tests.rs` | a retry at another second is the same act; other actors and words are not (DIRECTORY-117 R1) | DIRECTORY-117 |
 | `crates/lys-identity-server/tests/people_admit_agent.rs` | the admit replay crosses a second boundary (DIRECTORY-117 R1) | DIRECTORY-117 |
+| `crates/lys-identity-server/src/sign_in_refusals.rs` | a refusal naming an email or handle says it on the line (DIRECTORY-118 R1) | DIRECTORY-118 |
+| `crates/lys-identity-server/tests/sign_in_refusal_lines.rs` | refusal lines name the email or handle (DIRECTORY-118 R1) | DIRECTORY-118 |
+| `crates/lys-identity-server/tests/said_lines_stamped.rs` | every line through the real sink begins with its instant (DIRECTORY-118 R1) | DIRECTORY-118 |
+| `crates/lys-identity-server/src/runner_links.rs` | ensure begins the follow again on the runner's next answer (DIRECTORY-119 R1) | DIRECTORY-119 |
+| `crates/lys-identity-server/tests/refusals_follow_retry.rs` | follow ends once on failure and resumes on the runner's answer (DIRECTORY-119 R1) | DIRECTORY-119 |
 
 ## Inventory
 

@@ -1,0 +1,53 @@
+{
+  "id": "DIRECTORY-119",
+  "cluster": "directory",
+  "title": "A runner's feed is begun again when that runner next answers, never on a backoff clock",
+  "depends_on": [],
+  "blocked_by": [],
+  "checklist": [
+    "C842"
+  ],
+  "stories": [
+    "S477"
+  ],
+  "design_anchor": [],
+  "purpose": "Found 23 Oct 2026 on the installed Lys: of identity.log's last 400 lines, 224 were one line, twice over, for two machines whose runners are gone: 'refusals: the feed of machine <op>'s runner is no longer followed: <why>; it is begun again when that runner next answers a request; retry in 60 s'. The line says the right rule (runner_links.rs line 88, AGAIN: the follow is begun again when that runner next answers a request, and runner_links::ensure is called after every request a runner answers) and then the loop does the opposite: refusals_follow.rs lines 280 to 316 keep the follow task alive, wait a backoff doubling from 1 s to 60 s, and ask again, forever, saying the line each time. That is a fixed wait (Tom, 15 Oct: no sleep, no poll interval, no retry-in, ever; ready is the event that says ready), it fills the log with a line nobody can act on, and while the task holds its link the event the words promise cannot start a second follow. The feed's own tests drive this backoff with a paused clock (tests/refusals_follow_retry.rs).",
+  "task": "Make a feed that cannot be read end its follow on that event, once, with its link released, and be begun again only when its runner next answers a request, through the ensure already written; remove the backoff, the wait and the 'retry in' words.",
+  "requirements": [
+    {
+      "id": "R1",
+      "title": "End on the failure; begin again on the runner's next answer",
+      "spec": "WHEN a page of a runner's feed is refused or the connection to the runner fails THE SYSTEM SHALL say once that the feed is no longer followed, naming the machine and why, hand the refusal to the held words as today (budgets_act::feed_end), release the follow's link and end the task; it SHALL NOT wait, back off or ask again from that task. WHEN that runner next answers any request THE SYSTEM SHALL begin the follow again from the last durable cursor through runner_links::ensure, as the AGAIN words already promise. WHEN the service starts THE SYSTEM SHALL follow each live machine that names a runner once, as today, and a machine whose runner does not answer is said once and left until it answers. No sleep, timer, backoff or interval remains in refusals_follow.rs; the words 'retry in' are gone from the line.",
+      "acceptance": [
+        "crates/lys-identity-server/tests/refusals_follow_retry.rs rewritten without a paused clock: a page refused ends the follow after exactly one said line, the link is free (ensure can begin a follow for that machine), and no further page is asked however long the test polls; a runner answering a request afterwards begins the follow from the last durable cursor and the next page is kept.",
+        "The same file: a feed whose page is kept keeps asking for the next page with no wait between pages, as today.",
+        "The installed identity.log after the next upgrade: one line per lost runner, never a repeat, and no line containing 'retry in'."
+      ],
+      "files": {
+        "modify": [
+          "crates/lys-identity-server/src/refusals_follow.rs",
+          "crates/lys-identity-server/src/runner_links.rs",
+          "crates/lys-identity-server/tests/refusals_follow_retry.rs"
+        ],
+        "create": [],
+        "delete": []
+      },
+      "checklist": [
+        "C842"
+      ],
+      "stories": [
+        "S477"
+      ]
+    }
+  ],
+  "boundaries": [
+    "The cursor, the page shape and keep_page are unchanged; only when the follow runs changes.",
+    "A follow in progress is never ended by this change: only a failed page or connection ends it.",
+    "No new event is invented: the runner's next answered request, already routed to ensure, is the one."
+  ],
+  "verification": [
+    "cargo nextest run -p lys-identity-server -E 'test(/refusals_follow/) | test(/runner_links/)'",
+    "ast-grep over refusals_follow.rs finds no sleep or timer; the full Lys gate on the landing commit."
+  ],
+  "amendments": []
+}

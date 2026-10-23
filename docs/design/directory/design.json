@@ -6814,6 +6814,31 @@
       "path": "crates/lys-identity-server/tests/people_admit_agent.rs",
       "note": "the admit replay crosses a second boundary (DIRECTORY-117 R1)",
       "brief": "DIRECTORY-117"
+    },
+    {
+      "path": "crates/lys-identity-server/src/sign_in_refusals.rs",
+      "note": "a refusal naming an email or handle says it on the line (DIRECTORY-118 R1)",
+      "brief": "DIRECTORY-118"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/sign_in_refusal_lines.rs",
+      "note": "refusal lines name the email or handle (DIRECTORY-118 R1)",
+      "brief": "DIRECTORY-118"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/said_lines_stamped.rs",
+      "note": "every line through the real sink begins with its instant (DIRECTORY-118 R1)",
+      "brief": "DIRECTORY-118"
+    },
+    {
+      "path": "crates/lys-identity-server/src/runner_links.rs",
+      "note": "ensure begins the follow again on the runner's next answer (DIRECTORY-119 R1)",
+      "brief": "DIRECTORY-119"
+    },
+    {
+      "path": "crates/lys-identity-server/tests/refusals_follow_retry.rs",
+      "note": "follow ends once on failure and resumes on the runner's answer (DIRECTORY-119 R1)",
+      "brief": "DIRECTORY-119"
     }
   ],
   "inventory": [

@@ -198,6 +198,10 @@
 
 **S475.** As an agent admitting a person for the organisation I am given admit on, I want my admit asked again after a cut connection to be answered as the act I already did, so that a retry seconds later never tells me the person's registration failed when it did not.
 
+**S476.** As a Directory administrator reading identity.log for why a person could not sign in, I want every line to say when it was said and whom it refused, so that I can find their attempt among everyone's and tell them what happened.
+
+**S477.** As a Directory administrator reading identity.log, I want a lost runner to be said once and its feed to come back when the runner does, so that the log is not hundreds of copies of the same line and the service never sits on a clock.
+
 ## Release reviewer — Decides from the record whether the release proof is complete
 
 **S110.** As the release reviewer, I want every command, result, ref and hash recorded with every unmet requirement named, so that completion rests on recorded evidence and never on a health check.

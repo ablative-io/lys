@@ -2645,6 +2645,26 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "DIRECTORY-118: Every line Lys says carries the instant it was said, and a sign-in refusal names who was refused",
+      "items": [
+        {
+          "id": "C841",
+          "text": "Every line Lys says and every WARN event it routes begins with the RFC 3339 UTC instant it was said, from the one sink; a sign-in refusal that names an email or handle says it on its line, never a password. DIRECTORY-118/R1.",
+          "done": false
+        }
+      ]
+    },
+    {
+      "name": "DIRECTORY-119: A runner's feed is begun again when that runner next answers, never on a backoff clock",
+      "items": [
+        {
+          "id": "C842",
+          "text": "A feed that cannot be read ends its follow on that failure, once, link released, and is begun again only when its runner next answers a request through ensure; no backoff, wait or 'retry in' remains. DIRECTORY-119/R1.",
+          "done": false
+        }
+      ]
     }
   ]
 }

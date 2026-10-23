@@ -718,3 +718,11 @@
 ## DIRECTORY-117: A replayed act is the same act in whatever second it is authenticated
 
 - [ ] **C840** — A retried operation is answered as the first act when the same binding, method, app acted through and draft provenance ask for the same change on the same identity, whatever second each request was authenticated in; the admit replay test crosses a second boundary and is green on its first attempt. DIRECTORY-117/R1.
+
+## DIRECTORY-118: Every line Lys says carries the instant it was said, and a sign-in refusal names who was refused
+
+- [ ] **C841** — Every line Lys says and every WARN event it routes begins with the RFC 3339 UTC instant it was said, from the one sink; a sign-in refusal that names an email or handle says it on its line, never a password. DIRECTORY-118/R1.
+
+## DIRECTORY-119: A runner's feed is begun again when that runner next answers, never on a backoff clock
+
+- [ ] **C842** — A feed that cannot be read ends its follow on that failure, once, link released, and is begun again only when its runner next answers a request through ensure; no backoff, wait or 'retry in' remains. DIRECTORY-119/R1.
