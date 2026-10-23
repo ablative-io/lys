@@ -4,6 +4,7 @@ import { Refused, api, operationId, request, send, useLoad } from '../../api';
 import type { MeView, PeopleView } from '../../generated';
 import { Gate, RefusedPage } from '../signin/Gate';
 import { PageHeader } from '../../shell/PageHeader';
+import { Act } from '../../shell/Act';
 import { AgentGrantPicker } from '../people/AgentGrantPicker';
 import type { GrantGroup } from '../people/AgentGrantPicker';
 import { grantOptionKey, grantOptions, newAgentGrants, readGrantChoices } from '../people/agent-grants';
@@ -80,7 +81,7 @@ export function PairPage() {
         <label>The four words the agent said
           <input name="code" value={code} onChange={(event) => setCode(event.target.value)} autoComplete="off" spellCheck={false} placeholder="four words, with spaces" />
         </label>
-        <button type="submit" className="btn" disabled={busy || !normalise(code)}>Find the agent</button>
+        <Act symbol="search" name="Find the agent" word="Find" tone="primary" type="submit" disabled={busy || !normalise(code)} />
       </form>
       {found.state === 'unknown' ? <p role="status" data-pair-unknown>No agent is waiting with these words.</p> : null}
       {found.state === 'refused' ? (found.refused instanceof Refused ? <RefusedPage refused={found.refused} title="Pair an agent" /> : <p role="alert">{String(found.refused)}</p>) : null}
@@ -155,8 +156,8 @@ function DecideForm({ me, people, teams, grants, waiting, decided }: { me: MeVie
       {pickable && grants.model ? <AgentGrantPicker model={grants.model} groups={groups} selected={selected} change={setSelected} disabled={busy} /> : null}
       {grants.problem ? <ErrorWords problem={grants.problem} /> : null}
       <p className="pair-actions">
-        <button type="submit" className="btn" disabled={busy || !name.trim()}>Approve</button>
-        <button type="button" className="btn" onClick={() => { void decline(); }} disabled={busy}>Decline</button>
+        <Act symbol="approve" name="Approve the pairing" word="Approve" tone="primary" type="submit" disabled={busy || !name.trim()} />{' '}
+        <Act symbol="decline" name="Decline the pairing" word="Decline" tone="danger" onClick={() => { void decline(); }} disabled={busy} />
       </p>
       {problem ? <ErrorWords problem={problem} /> : null}
     </form>

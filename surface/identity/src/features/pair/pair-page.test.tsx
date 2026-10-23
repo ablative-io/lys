@@ -20,7 +20,7 @@ const ROUTES = {
   ['/pair/' + encodeURIComponent('no such words here') + '/waiting']: refused(404, 'pair_unknown', 'no agent is waiting with these words'),
 };
 
-const button = (words: string) => $$('button').find((each) => each.textContent?.includes(words)) ?? null;
+const button = (name: string) => $$('button').find((each) => each.getAttribute('aria-label') === name) ?? null;
 
 async function findAgent(words: string) {
   await type($('input[name="code"]'), words);
@@ -41,7 +41,7 @@ describe('Pair page', () => {
     expect(text()).toContain('It proposed the name Pancake');
     expect($('table.agent-grants')).not.toBeNull();
     await type(name, 'Pancake the Second');
-    await click(button('Approve'));
+    await click(button('Approve the pairing'));
     await settle();
     const approval = page.posted.find((entry) => entry.path === PATH + '/approve');
     expect(approval).toBeTruthy();
@@ -57,7 +57,7 @@ describe('Pair page', () => {
   it('Decline posts to /pair/{code}/decline and says nothing of the key was kept', async () => {
     const page = await mount('#/pair', ROUTES);
     await findAgent(CODE);
-    await click(button('Decline'));
+    await click(button('Decline the pairing'));
     await settle();
     expect(page.posted.some((entry) => entry.path === PATH + '/decline')).toBe(true);
     expect(page.posted.some((entry) => entry.path === PATH + '/approve')).toBe(false);
