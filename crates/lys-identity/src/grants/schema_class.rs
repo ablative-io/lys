@@ -124,6 +124,9 @@ impl AppSchema {
                 if !kind.roles.is_empty() {
                     body["roles"] = super::roles::to_json(&kind.roles);
                 }
+                if let Some(first) = &kind.first_grant {
+                    body["first_grant"] = json!(first.to_string());
+                }
                 (name.clone(), body)
             })
             .collect();

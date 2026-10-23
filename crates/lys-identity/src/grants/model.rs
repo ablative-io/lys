@@ -44,6 +44,9 @@ pub struct KindModel {
     pub agents: BTreeSet<Action>,
     /// Each role of the kind, with the actions it carries (ACCESS-004 R1).
     pub roles: BTreeMap<Relation, BTreeSet<Action>>,
+    /// The relation a newly admitted person is given first, when the app
+    /// declares one (DIRECTORY-116 R2).
+    pub first_grant: Option<Relation>,
 }
 
 /// What a grant naming a role that has left its kind is judged as: nothing.

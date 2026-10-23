@@ -11,6 +11,10 @@ pub struct KindView {
     pub agents: Vec<String>,
     /// Each relation with every action it actually carries.
     pub relations: BTreeMap<String, Vec<String>>,
+    /// The relation a person newly admitted to the app is given first, when
+    /// its schema declares one (DIRECTORY-116 R2); absent when it declares none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_grant: Option<String>,
 }
 
 /// The permission model grants are judged against.
@@ -42,6 +46,7 @@ impl From<&Model> for ModelView {
                     (
                         kind.clone(),
                         KindView {
+                            first_grant: declared.first_grant.as_ref().map(ToString::to_string),
                             agents: declared
                                 .agents
                                 .iter()

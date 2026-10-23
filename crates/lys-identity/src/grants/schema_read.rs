@@ -76,7 +76,15 @@ pub(super) fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError>
     only(
         body,
         pointer,
-        &["actions", "relations", "parents", "hot", "agents", "roles"],
+        &[
+            "actions",
+            "relations",
+            "parents",
+            "hot",
+            "agents",
+            "roles",
+            "first_grant",
+        ],
     )?;
     let actions_at = format!("{pointer}/actions");
     let listed = body
@@ -125,6 +133,7 @@ pub(super) fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError>
         .map(|(_, relation, _)| relation.as_str())
         .collect();
     let roles = roles::roles(body, pointer, &actions, &named)?;
+    let first_grant = first_grant(body, pointer, &named)?;
     let parents = match body.get("parents") {
         Some(value) => strings(value, &format!("{pointer}/parents"), "parents")?,
         None => Vec::new(),
@@ -142,7 +151,40 @@ pub(super) fn raw_kind(pointer: &str, value: &Value) -> Result<Raw, SchemaError>
         hot,
         agents,
         roles,
+        first_grant,
     })
+}
+
+/// The kind's `first_grant`, the relation a newly admitted person is given
+/// first (DIRECTORY-116 R2): one name among the kind's own relations, or
+/// none when the kind declares none.
+fn first_grant(
+    body: &Map<String, Value>,
+    pointer: &str,
+    named: &BTreeSet<&str>,
+) -> Result<Option<Relation>, SchemaError> {
+    let Some(value) = body.get("first_grant") else {
+        return Ok(None);
+    };
+    let at = format!("{pointer}/first_grant");
+    let name = value
+        .as_str()
+        .ok_or_else(|| invalid(&at, "`first_grant` names one relation of the kind"))?;
+    if !named.contains(name) {
+        let declared = if named.is_empty() {
+            "it declares no relation".to_owned()
+        } else {
+            format!(
+                "its relations are {}",
+                named.iter().copied().collect::<Vec<_>>().join(", ")
+            )
+        };
+        return Err(invalid(
+            &at,
+            format!("the first grant `{name}` is not a relation of this kind; {declared}"),
+        ));
+    }
+    relation(&at, name).map(Some)
 }
 
 /// The pointer of the parent entry through which `kinds` returns to a kind

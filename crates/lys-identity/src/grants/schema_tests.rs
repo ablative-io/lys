@@ -266,3 +266,56 @@ fn a_change_names_what_it_adds_and_removes_and_what_it_strands() -> Outcome {
     assert_eq!(counted, expected);
     Ok(())
 }
+
+#[test]
+fn a_declared_first_grant_reads_back_and_names_a_relation_of_its_kind() -> Outcome {
+    let mut schema = workspace();
+    schema["kinds"]["notes.workspace"]["first_grant"] = json!("member");
+    let parsed = AppSchema::parse("notes", &schema)?;
+    let first = |kind: &str| {
+        parsed.kinds()[kind]
+            .first_grant
+            .as_ref()
+            .map(Relation::as_str)
+    };
+    assert_eq!(first("notes.workspace"), Some("member"));
+    assert_eq!(first("notes.channel"), None);
+    let written = parsed.to_json();
+    assert_eq!(
+        written["kinds"]["notes.workspace"]["first_grant"],
+        json!("member")
+    );
+    assert!(
+        written["kinds"]["notes.channel"]
+            .get("first_grant")
+            .is_none()
+    );
+    assert_eq!(AppSchema::parse("notes", &written)?, parsed);
+    let models = parsed.kind_models(4);
+    let modelled = models["notes.workspace"]
+        .first_grant
+        .as_ref()
+        .map(Relation::as_str);
+    assert_eq!(modelled, Some("member"));
+    Ok(())
+}
+
+#[test]
+fn a_first_grant_naming_no_relation_of_its_kind_is_refused_by_name() -> Outcome {
+    let mut schema = workspace();
+    schema["kinds"]["notes.workspace"]["first_grant"] = json!("poster");
+    let (pointer, reason) = refused("notes", &schema)?;
+    assert_eq!(pointer, "/kinds/notes.workspace/first_grant");
+    assert!(reason.contains("`poster`"), "{reason}");
+    assert!(reason.contains("member, owner"), "{reason}");
+    Ok(())
+}
+
+#[test]
+fn a_first_grant_that_is_not_one_name_is_refused_at_it() -> Outcome {
+    let mut schema = workspace();
+    schema["kinds"]["notes.workspace"]["first_grant"] = json!(["member"]);
+    let (pointer, _) = refused("notes", &schema)?;
+    assert_eq!(pointer, "/kinds/notes.workspace/first_grant");
+    Ok(())
+}

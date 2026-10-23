@@ -67,6 +67,27 @@ const CAMBIUM_RESOURCES = ok({ kinds: ['cambium.workspace', 'workspace'], revisi
 const options = (entry: HTMLFormElement) => [...entry.querySelectorAll('select[name="relation"] option')].map((option) => (option as HTMLOptionElement).value).filter(Boolean);
 
 describe('Add a person to an app', () => {
+  const value = (entry: HTMLFormElement) => (entry.querySelector('select[name="relation"]') as HTMLSelectElement).value;
+  const DECLARED = { ...CAMBIUM_MODEL, kinds: { ...CAMBIUM_MODEL.kinds, 'cambium.workspace': { agents: [], first_grant: 'member', relations: {
+    administrator: ['configure', 'invite', 'post', 'read', 'seat_found'], member: ['edit_own', 'post', 'read', 'seat_found'], reader: ['read'] } } } };
+
+  it("preselects the app's declared first grant under As, says it is the app's usual first access, and leaves the choice open", async () => {
+    const { entry } = await form({ '/grants/model': ok(DECLARED), '/resources': CAMBIUM_RESOURCES, '/apps': ok({ apps: [{ id: 'cambium', name: 'Cambium', state: 'approved' }] }) });
+    await choose(entry.querySelector('select[name="kind"]'), 'cambium.workspace');
+    expect(value(entry)).toBe('member');
+    expect(entry.textContent).toContain("Cambium's usual first access");
+    await choose(entry.querySelector('select[name="relation"]'), 'reader');
+    expect(value(entry)).toBe('reader');
+    expect(entry.textContent).not.toContain('usual first access');
+  });
+
+  it('preselects nothing and requires a choice when the app declares no first grant', async () => {
+    const { entry } = await form({ '/grants/model': ok(CAMBIUM_MODEL), '/resources': CAMBIUM_RESOURCES });
+    await choose(entry.querySelector('select[name="kind"]'), 'cambium.workspace');
+    expect(value(entry)).toBe('');
+    expect(entry.textContent).not.toContain('usual first access');
+  });
+
   it("offers an app kind the app's own relations, never Lys's, and sends the chosen one by name", async () => {
     const { entry, posted } = await form({ '/grants/model': ok(CAMBIUM_MODEL), '/resources': CAMBIUM_RESOURCES, 'POST /people/admit': (body) => ok(admitted(body)) });
     await type(entry.querySelector('input[name="given_name"]'), 'Dean');

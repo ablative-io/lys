@@ -169,6 +169,9 @@ pub struct KindSchema {
     pub agents: BTreeSet<Action>,
     /// Each role, with the actions it carries (ACCESS-004 R1).
     pub roles: BTreeMap<Relation, BTreeSet<Action>>,
+    /// The relation a person newly admitted to the app is given first, when
+    /// the app declares one (DIRECTORY-116 R2); Add a person preselects it.
+    pub first_grant: Option<Relation>,
 }
 
 /// An app's schema, checked.
@@ -189,6 +192,7 @@ struct Raw {
     hot: BTreeSet<Action>,
     agents: BTreeSet<Action>,
     roles: BTreeMap<Relation, BTreeSet<Action>>,
+    first_grant: Option<Relation>,
 }
 
 #[path = "schema_read.rs"]
@@ -318,6 +322,7 @@ impl AppSchema {
                         hot: kind.hot,
                         agents: kind.agents,
                         roles: kind.roles,
+                        first_grant: kind.first_grant,
                     },
                 )
             })
@@ -373,6 +378,7 @@ impl AppSchema {
             hot: BTreeSet::new(),
             agents: BTreeSet::new(),
             roles: BTreeMap::new(),
+            first_grant: None,
         };
         Self {
             app: LYS_APP.to_owned(),
@@ -424,6 +430,7 @@ impl AppSchema {
                     parents: kind.parents.clone(),
                     agents: kind.agents.clone(),
                     roles: kind.roles.clone(),
+                    first_grant: kind.first_grant.clone(),
                 };
                 (name.clone(), model)
             })

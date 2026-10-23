@@ -25,7 +25,8 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
             "custodian": ["grant_delegate", "read", "send"],
             "participant": ["read", "send"]
         },
-        "parents": []
+        "parents": [],
+        "first_grant": "participant"
     }}});
     let files = json!({"kinds": {&document: {
         "actions": ["delete", "read"],
@@ -84,7 +85,8 @@ async fn the_grant_model_answers_both_approved_apps_and_only_their_current_kinds
             "relations": {
                 "custodian": ["grant_delegate", "read", "send"],
                 "participant": ["read", "send"], "reader": ["read"]
-            }
+            },
+            "first_grant": "participant"
         }),
         "{current}"
     );
@@ -130,7 +132,8 @@ async fn assert_current_model(
                 "relations": {
                     "custodian": ["grant_delegate", "read", "send"],
                     "participant": ["read", "send"]
-                }
+                },
+                "first_grant": "participant"
             },
             document: {
                 "agents": ["read"],

@@ -9,6 +9,7 @@ import { identity } from '../access/Resources';
 import { actionWords } from '../grants/action-words';
 import { resourceNames, resourceWords } from './agent-resource-names';
 import type { PeopleView } from '../../generated';
+import type { AppRecord } from '../apps/Apps';
 import type { Team } from '../teams/contract';
 import type { ResourcesView } from '../access/Resources';
 import './add-agent.css';
@@ -167,6 +168,16 @@ export const relationsOf = (model: GrantModel, kind: string): Record<string, str
 export const relationWords = (model: GrantModel, resource: { kind: string; id: string }, relation: string, actions: string[]): string =>
   resource.kind.includes('.') ? relation.replaceAll('_', ' ') + ': ' + actionWords(model, resource, actions) : actionWords(model, resource, actions);
 
+/** The relation an app declares as a newly admitted person's first on `kind`; none when it declares none (DIRECTORY-116 R2). */
+export const firstGrantOf = (model: GrantModel, kind: string): string => model.kinds?.[kind]?.first_grant ?? '';
+
+/** The app a kind belongs to, by the name Lys holds for it, else by its prefix. */
+export const appOf = (apps: Map<string, string>, kind: string): string => {
+  const dot = kind.indexOf('.');
+  const prefix = dot < 0 ? kind : kind.slice(0, dot);
+  return apps.get(prefix) ?? prefix;
+};
+
 /** A kind said as words: an app's `app.kind` reads as two words, underscores as spaces. */
 export const kindWords = (kind: string) => kind.replaceAll('_', ' ').replaceAll('.', ' ');
 
@@ -196,7 +207,7 @@ function NotOpen({ acts }: { acts: OrganisationActs }) {
   return <p>Adding a person to {acts.organisation.display_name} needs {ORGANISATION_ADMIT} there, which you do not hold, so this form is not open to you. Whoever holds it adds people: send them the person's name and email address. {add}</p>;
 }
 
-function PersonForm({ person, organisation, model, resources, names }: { person: string; organisation: string; model: GrantModel; resources: ResourcesView; names: Map<string, string> }) {
+function PersonForm({ person, organisation, model, resources, names, apps }: { person: string; organisation: string; model: GrantModel; resources: ResourcesView; names: Map<string, string>; apps: Map<string, string> }) {
   const choices = grantable(resources);
   const key = 'lys.add-person.' + person;
   const [saved, setSaved] = useState(() => savedState(key));
@@ -213,6 +224,8 @@ function PersonForm({ person, organisation, model, resources, names }: { person:
   // A saved request is sent again as it was saved, whatever the fields now hold.
   // The first grant is optional; when a kind is chosen, the resource and how they hold it must be chosen too.
   const granting = Boolean(asking.kind);
+  // The app's declared first grant is preselected when its kind is chosen; the person adding may change it.
+  const usual = granting && asking.relation !== '' && asking.relation === firstGrantOf(model, asking.kind);
   const lacking = pending === null ? missing(asking, granting) : '';
   const complete = pending !== null || !lacking;
   const set = (field: keyof typeof asking) => (event: { target: { value: string } }) => setAsking({ ...asking, [field]: event.target.value });
@@ -251,7 +264,7 @@ function PersonForm({ person, organisation, model, resources, names }: { person:
         <label className="field">Last name<input name="family_name" autoComplete="family-name" required value={asking.family} disabled={locked} onChange={set('family')} /></label>
       </>}
     <label className="field wide">Email<input name="email" type="email" autoComplete="email" required value={asking.email} disabled={locked} onChange={set('email')} /><span className="hint">Their sign-in name. Lys makes their sign-in account with it, or finds the one they already have.</span></label>
-    <label className="field wide">Give them access to<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '', relation: '' })}>
+    <label className="field wide">Give them access to<select name="kind" value={asking.kind} disabled={locked} onChange={(event) => setAsking({ ...asking, kind: event.target.value, id: '', relation: firstGrantOf(model, event.target.value) })}>
       <option value="">No access yet</option>
       {[...choices.keys()].map((kind) => <option key={kind} value={kind}>{kindWords(kind)}</option>)}
     </select></label>
@@ -265,7 +278,7 @@ function PersonForm({ person, organisation, model, resources, names }: { person:
       <label className="field">As<select name="relation" value={asking.relation} disabled={locked} onChange={set('relation')}>
         <option value="" disabled>Choose what they may do</option>
         {Object.entries(relationsOf(model, asking.kind)).map(([relation, actions]) => <option key={relation} value={relation}>{relationWords(model, { kind: asking.kind, id: asking.id }, relation, actions)}</option>)}
-      </select></label>
+      </select>{usual ? <span className="hint">{appOf(apps, asking.kind)}&apos;s usual first access</span> : null}</label>
     </> : null}
     </div>
     <div className="add-person-act">
@@ -279,13 +292,15 @@ function PersonForm({ person, organisation, model, resources, names }: { person:
 
 export function AddPerson() {
   const load = useLoad(async () => {
-    const [me, people, list, model, resources, teams] = await Promise.all([api.me(), api.people(), api.grants(), api.model(), request<ResourcesView>('/resources'),
+    const [me, people, list, model, resources, teams, apps] = await Promise.all([api.me(), api.people(), api.grants(), api.model(), request<ResourcesView>('/resources'),
       // Team names only make the choices readable; without them a team is said by its kind and id.
-      request<{ teams: Team[] }>('/teams').then((answer) => answer.teams, () => [] as Team[])]);
-    return { me, acts: organisationActs(me, list.grants), model, resources, names: resourceNames(people as PeopleView, teams, null) };
+      request<{ teams: Team[] }>('/teams').then((answer) => answer.teams, () => [] as Team[]),
+      // App names only make the declared first grant readable; without them an app is said by its kinds' prefix.
+      request<{ apps: AppRecord[] }>('/apps').then((answer) => new Map(answer.apps.map((app) => [app.id, app.name])), () => new Map<string, string>())]);
+    return { me, acts: organisationActs(me, list.grants), model, resources, names: resourceNames(people as PeopleView, teams, null), apps };
   }, 'add-person');
   return <div className="page"><PageHeader breadcrumb={<a href="#/people">People and agents</a>} title="Add a person" subtitle="Add someone to the directory. Access is optional; they can start with none." />
     <DirectoryGate load={load} title="Add a person" ok={(data) => data.acts.admit && data.acts.organisation
-      ? <PersonForm person={data.me.person.id} organisation={data.acts.organisation.display_name} model={data.model} resources={data.resources} names={data.names} /> : <NotOpen acts={data.acts} />} />
+      ? <PersonForm person={data.me.person.id} organisation={data.acts.organisation.display_name} model={data.model} resources={data.resources} names={data.names} apps={data.apps} /> : <NotOpen acts={data.acts} />} />
   </div>;
 }

@@ -172,8 +172,9 @@ export interface GrantModel {
   relations: Record<string, string[]>;
   /** The acts no agent may be given; a screen never offers them. */
   withheld_from_agents: string[];
-  /** Each app kind's declared agent actions and relation carriers. */
-  kinds: Record<string, { agents: string[]; relations: Record<string, string[]> }>;
+  /** Each app kind's declared agent actions and relation carriers, and the relation a newly admitted person is
+   * given first when the app declares one (`first_grant`, DIRECTORY-116 R2). */
+  kinds: Record<string, { agents: string[]; relations: Record<string, string[]>; first_grant?: string }>;
 }
 
 /** A missing declaration is a failed read, never the app refusing agent access. */
