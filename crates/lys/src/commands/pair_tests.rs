@@ -279,11 +279,13 @@ fn cutting_proxy(upstream: &str) -> Result<(String, Arc<Seen>), Box<dyn Error>> 
     Ok((format!("http://127.0.0.1:{port}{path}"), seen))
 }
 
-fn carry(mut client: TcpStream, authority: &str, seen: &Seen) {
+/// Carries one client connection to Lys, except the first hold, which is cut
+/// the way a proxy cuts it: a 524 with no body and the connection closed. The
+/// carry ends when either side closes; an error on the way is the carry's
+/// end too, and the connection thread that called it has nobody to tell.
+fn carry(mut client: TcpStream, authority: &str, seen: &Seen) -> std::io::Result<()> {
     let mut head = [0_u8; 512];
-    let Ok(peeked) = client.peek(&mut head) else {
-        return;
-    };
+    let peeked = client.peek(&mut head)?;
     let line = String::from_utf8_lossy(&head[..peeked]);
     let request = line.lines().next().unwrap_or_default().to_owned();
     let hold =
@@ -293,26 +295,25 @@ fn carry(mut client: TcpStream, authority: &str, seen: &Seen) {
     }
     if hold && seen.holds.fetch_add(1, Ordering::SeqCst) == 0 {
         let mut consumed = vec![0_u8; peeked];
-        let _ = client.read_exact(&mut consumed);
-        let _ = client.write_all(
+        client.read_exact(&mut consumed)?;
+        return client.write_all(
             b"HTTP/1.1 524 A Timeout Occurred\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
         );
-        return;
     }
-    let Ok(upstream) = TcpStream::connect(authority) else {
-        return;
-    };
-    let (Ok(mut up), Ok(mut down)) = (upstream.try_clone(), client.try_clone()) else {
-        return;
-    };
-    let to_lys = std::thread::spawn(move || {
-        let _ = std::io::copy(&mut client, &mut up);
-        let _ = up.shutdown(std::net::Shutdown::Write);
+    let upstream = TcpStream::connect(authority)?;
+    let mut up = upstream.try_clone()?;
+    let mut down = client.try_clone()?;
+    let to_lys = std::thread::spawn(move || -> std::io::Result<()> {
+        std::io::copy(&mut client, &mut up)?;
+        up.shutdown(std::net::Shutdown::Write)
     });
     let mut from_lys = upstream;
-    let _ = std::io::copy(&mut from_lys, &mut down);
-    let _ = down.shutdown(std::net::Shutdown::Write);
-    let _ = to_lys.join();
+    std::io::copy(&mut from_lys, &mut down)?;
+    down.shutdown(std::net::Shutdown::Write)?;
+    match to_lys.join() {
+        Ok(copied) => copied,
+        Err(_) => Err(std::io::Error::other("the copy towards Lys panicked")),
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]
