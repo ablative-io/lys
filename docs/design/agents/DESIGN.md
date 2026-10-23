@@ -201,6 +201,7 @@ The seat file (AGENTS-017 R1 and R5) is one JSON file, mode 0600, at the path th
 | `crates/lys-identity-server/src/agent_acts.rs` | actor and responsible on both appends (AGENTS-016 R3) | AGENTS-016 |
 | `crates/lys-identity/src/grants/created.rs` | the five grants appended only where not already standing (AGENTS-016 R3) | AGENTS-016 |
 | `crates/lys-identity-server/src/certificates_issue.rs` | admits the registrar's first certificate, refuses certificate_not_first and agent_not_yours (AGENTS-016 R4) | AGENTS-016 |
+| `crates/lys-core/src/ca/authority.rs` | issue_certificate_for_pairing: the common name is the proposed name kept at the ask, the subject the agent id (AGENTS-020 R2) | AGENTS-020 |
 | `crates/lys-identity-server/src/certificates_api.rs` | the agent branch of the issue route (AGENTS-016 R4) | AGENTS-016 |
 | `crates/lys-identity-server/tests/dashboard_acted_by_agents.rs` | the registered and started lines on GET /dashboard (AGENTS-016 R5) | AGENTS-016 |
 | `surface/identity/src/features/dashboard/dashboard-acted.test.tsx` | the lines, the heading and Stop (AGENTS-016 R5) | AGENTS-016 |

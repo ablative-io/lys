@@ -29,7 +29,8 @@
         ],
         "create": [
           "crates/lys-identity-server/src/requests_outlived_tests.rs"
-        ]
+        ],
+        "delete": []
       },
       "checklist": [
         "C839"
@@ -50,7 +51,9 @@
           "crates/lys-identity-server/src/requests_decide.rs",
           "crates/lys-identity-server/src/requests_api.rs",
           "crates/lys-identity-server/src/openapi_table.rs"
-        ]
+        ],
+        "create": [],
+        "delete": []
       },
       "checklist": [
         "C839"
@@ -75,7 +78,8 @@
         ],
         "create": [
           "surface/identity/src/features/requests/requests.test.tsx"
-        ]
+        ],
+        "delete": []
       },
       "checklist": [
         "C839"

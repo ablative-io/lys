@@ -143,6 +143,7 @@ const SCREENS: &str = "a person's own screens and browser sessions: an agent has
 const ROOTS: &str = "a root grant is a person's to give their own agent, never an agent's (AGENTS-019 amendment, 22 October 2026)";
 const DECISIONS: &str =
     "an access request is a person's to decide (AGENTS-019 amendment, 22 October 2026)";
+const PAIRING: &str = "a pairing is a person's to decide: the agent is registered under the signed-in person, who answers for it (AGENTS-020 amendment, 23 October 2026)";
 
 /// The routes a person reaches that no agent is ever given, each with why
 /// (AGENTS-019 R4). Every other route a person reaches admits an agent's
@@ -168,6 +169,9 @@ pub const HUMAN_ONLY: &[(Method, &str, &str)] = &[
     (POST, "/grants/agent-roots", ROOTS),
     (POST, "/requests/{id}/approve", DECISIONS),
     (POST, "/requests/{id}/decline", DECISIONS),
+    (GET, "/pair/{code}/waiting", PAIRING),
+    (POST, "/pair/{code}/approve", PAIRING),
+    (POST, "/pair/{code}/decline", PAIRING),
 ];
 
 /// Why the route `method path`, a concrete path, is a person's alone; none
@@ -286,7 +290,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/pair" "An agent with no identity asks for a pairing code over its fresh key: the four words to tell its person, the wait id and the address where the person enters them" P [&["pair_request_invalid"]];
     GET "/pair/{wait}" "The waiting agent's answer, held open until its person decides: its identity, certificate and the organisation's approved apps, or the decline; an unknown or already answered wait is refused at once" P [&["pair_unknown", "pair_declined"]];
     GET "/pair/{code}/waiting" "The agent waiting with these four words, for the signed-in person who will decide" S [SIGNED, &["pair_unknown"]];
-    POST "/pair/{code}/approve" "Approve a pairing: register the agent under the signed-in person, activate it, give it the roots named, certify its key and answer its wait with its identity and the organisation's approved apps" S [SIGNED_BODY, REPORTING, &["pair_unknown", "pair_request_invalid", "NotAdmitted", "ProfileInvalid", "TransitionRefused", "PolicyUnavailable", "CertificateReused", "CertificatesUnavailable", "AgentNotVisible", "DirectoryUnavailable", "apps_unavailable", "AppsUnavailable"], &["ExpiryBeyondSource", "UseOnly", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents", "MachineRefused", "OrganisationOutside", "RelationUnknown", "RootAuthorityRefused", "kind_not_registered", "app_not_approved", "app_retired", "ProjectionPending", "OperationUnresolved", "PermissionEngineUnavailable"]];
+    POST "/pair/{code}/approve" "Approve a pairing: register the agent under the signed-in person, activate it, give it the roots named, certify its key and answer its wait with its identity and the organisation's approved apps" S [SIGNED_BODY, REPORTING, &["pair_unknown", "pair_request_invalid", "NotAdmitted", "ProfileInvalid", "TransitionRefused", "PolicyUnavailable", "CertificateReused", "CertificatesUnavailable", "AgentNotVisible", "DirectoryUnavailable", "apps_unavailable"], &["ExpiryBeyondSource", "UseOnly", "NotHolder", "IdentityNotActive", "ResponsibleMismatch", "SourceUnknown", "ActionsOutside", "PassOnBeyondSource", "RecipientRefused", "WithheldFromAgents", "MachineRefused", "OrganisationOutside", "RelationUnknown", "RootAuthorityRefused", "kind_not_registered", "app_not_approved", "app_retired", "ProjectionPending", "OperationUnresolved", "PermissionEngineUnavailable"]];
     POST "/pair/{code}/decline" "Decline a pairing: the agent's wait answers pair_declined and nothing of its key is kept" S [SIGNED, &["pair_unknown"]];
     GET "/me" "The signed-in caller and their organisation" C [SIGNED, &["NoPerson", "SetupRequired"]];
     PUT "/me/getting-started" "Keep the caller's getting-started answers, read back on GET /me" C [SIGNED_BODY, &["NoPerson", "DirectoryUnavailable"]];

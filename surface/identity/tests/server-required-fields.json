@@ -46,6 +46,7 @@
   "POST /network/machines/{id}/team": ["operation", "team"],
   "POST /oauth/jwks/rotate": ["operation"],
   "POST /organisations/found": ["display_name", "email", "operation", "organisation"],
+  "POST /pair/{code}/approve": ["activate", "certificate", "display_name", "operation"],
   "POST /people": ["display_name", "operation"],
   "POST /people/admit": ["display_name", "email", "operation"],
   "POST /people/{id}/logins": ["issuer", "operation", "subject"],

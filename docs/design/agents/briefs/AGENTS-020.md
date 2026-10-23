@@ -145,3 +145,10 @@ The person's routes are GET /pair/{code}/waiting (the agent waiting with these w
 - **By:** Waffles the Terrible
 
 A pairing's PKCS#10 request is made before the agent has an id, under the name it proposed, and lys-core's authority refuses a request whose common name is not the subject issued for. R2 therefore adds CertificateAuthority::issue_certificate_for_pairing in crates/lys-core/src/ca/authority.rs (the request's common name must equal the proposed name kept at the ask, so the one request the person approved is certified and no other; the subject is the agent id Lys gave) and certificates_issue::issued_for_pairing in crates/lys-identity-server/src/certificates_issue.rs, the same claims, signing key and log entry as POST /agents/{id}/certificates. The decision routes live in crates/lys-identity-server/src/pair_decide.rs beside pair.rs, with their rows in openapi_table.rs and openapi_types.rs. Enrol and every certificate of an already registered agent are unchanged.
+
+### Amendment 4: The three deciding routes are a person's alone; decline takes no body
+
+- **Date:** 2026-10-23
+- **By:** Waffles the Terrible
+
+GET /pair/{code}/waiting, POST /pair/{code}/approve and POST /pair/{code}/decline sit on HUMAN_ONLY (openapi_table.rs) with the reason PAIRING: a pairing is a person's to decide, since approval registers the agent under the signed-in person, who answers for it; an agent calling any of the three is refused with that reason, as it is for an access request's approve and decline (AGENTS-019). POST /pair/{code}/decline takes no body, the four words being in the path, so it is listed on NO_BODY (tests/shared/openapi_unnamed.rs). The surface's required-field contract (surface/identity/tests/server-required-fields.json) names POST /pair/{code}/approve with activate, certificate, display_name and operation; grants defaults to none. The approve row's unavailable-apps refusal is apps_unavailable, the name the apps store produces; AppsUnavailable was never produced and is gone from the row.

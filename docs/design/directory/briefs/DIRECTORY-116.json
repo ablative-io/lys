@@ -27,7 +27,9 @@
           "surface/identity/src/features/people/AddPerson.tsx",
           "surface/identity/src/features/people/people-add-person.test.tsx",
           "surface/identity/src/features/grants/IssueRoot.tsx"
-        ]
+        ],
+        "create": [],
+        "delete": []
       },
       "checklist": [
         "C838"
@@ -53,7 +55,8 @@
         "create": [
           "crates/lys-identity-server/src/apps_schema.rs",
           "crates/lys-identity-server/src/apps_schema_tests.rs"
-        ]
+        ],
+        "delete": []
       },
       "checklist": [
         "C838"
@@ -77,7 +80,8 @@
         ],
         "create": [
           "crates/lys-identity-server/src/people_admit_tests.rs"
-        ]
+        ],
+        "delete": []
       },
       "checklist": [
         "C838"

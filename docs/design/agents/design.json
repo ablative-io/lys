@@ -676,6 +676,11 @@
       "brief": "AGENTS-016"
     },
     {
+      "path": "crates/lys-core/src/ca/authority.rs",
+      "note": "issue_certificate_for_pairing: the common name is the proposed name kept at the ask, the subject the agent id (AGENTS-020 R2)",
+      "brief": "AGENTS-020"
+    },
+    {
       "path": "crates/lys-identity-server/src/certificates_api.rs",
       "note": "the agent branch of the issue route (AGENTS-016 R4)",
       "brief": "AGENTS-016"
