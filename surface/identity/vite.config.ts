@@ -28,7 +28,7 @@ export default defineConfig({
     include: ['src/features/provisioning/*.test.tsx', 'tests/**/*.test.tsx', 'src/features/runtime/*.test.tsx', 'src/features/budgets/*.test.tsx', 'src/features/network-self-service.test.tsx',
       'src/features/file/*.test.tsx', 'src/features/people/*.test.tsx', 'src/features/apps/*.test.tsx', 'src/features/network/*.test.tsx', 'src/features/secrets/*.test.tsx',
       'src/features/connections/*.test.tsx', 'src/features/proxy/*.test.tsx', 'src/features/dashboard/*.test.tsx', 'src/features/usage/*.test.tsx',
-      'src/features/requests/*.test.tsx',
+      'src/features/requests/*.test.tsx', 'src/features/pair/*.test.tsx',
       'tests/acceptance/grants.spec.ts', 'tests/acceptance/agent-control.spec.ts'],
     setupFiles: ['tests/setup.ts'],
     testTimeout: 0,

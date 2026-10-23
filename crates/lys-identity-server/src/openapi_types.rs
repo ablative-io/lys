@@ -202,6 +202,24 @@ fn sign_in_and_identities(api: &mut Api) -> Vec<Entry> {
             Some(api.schema::<crate::pair_store::Answer>()),
         ),
         (
+            GET,
+            "/pair/{code}/waiting",
+            None,
+            Some(api.schema::<crate::pair_decide::Waiting>()),
+        ),
+        (
+            POST,
+            "/pair/{code}/approve",
+            Some(api.schema::<crate::pair_decide::ApproveBody>()),
+            Some(api.schema::<crate::pair_decide::Approved>()),
+        ),
+        (
+            POST,
+            "/pair/{code}/decline",
+            None,
+            Some(api.schema::<crate::pair_decide::Declined>()),
+        ),
+        (
             POST,
             "/agents/{id}/reports-to",
             Some(api.schema::<crate::reporting_api::ReportsToBody>()),

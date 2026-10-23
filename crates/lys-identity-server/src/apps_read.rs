@@ -75,7 +75,7 @@ pub(crate) fn read_view(who: &Acting, app: &crate::apps_state::App) -> AppRead {
 
 /// The origin of `app`'s first sign-in redirect, when it is an http or https
 /// address.
-fn address(app: &crate::apps_state::App) -> Option<String> {
+pub(crate) fn address(app: &crate::apps_state::App) -> Option<String> {
     let first = app.sign_in.as_ref()?.redirects.first()?;
     let parsed = reqwest::Url::parse(first).ok()?;
     matches!(parsed.scheme(), "http" | "https").then(|| parsed.origin().ascii_serialization())

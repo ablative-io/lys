@@ -36,6 +36,7 @@ pub mod seat_import;
 pub mod agent_pass;
 // `lys agent enrol` (AGENTS-017).
 pub mod enrol;
+pub mod pair;
 
 pub mod launch;
 pub mod launch_catalog;

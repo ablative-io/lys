@@ -40,6 +40,9 @@ pub use sign_in::SignInArgs;
 
 #[path = "cli/enrol.rs"]
 mod enrol;
+#[path = "cli/pair.rs"]
+mod pair;
+pub use pair::PairArgs;
 #[path = "cli/launch.rs"]
 mod launch;
 pub use enrol::EnrolArgs;
@@ -443,6 +446,11 @@ pub enum AgentCommand {
     /// mode 0600, never replacing one (AGENTS-017 R1). Prints the path, the
     /// agent and the serial; never key material.
     Enrol(EnrolArgs),
+
+    /// Pair this agent with its person by four spoken words: make its key
+    /// here, ask Lys for the words, wait for the person to approve it on
+    /// Lys's Pair page, and write its seat file (AGENTS-020 R4).
+    Pair(PairArgs),
 }
 
 #[cfg(test)]

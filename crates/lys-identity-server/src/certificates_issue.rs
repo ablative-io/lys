@@ -162,26 +162,29 @@ fn claims(state: &AppState, seen: &SeenAgent, at: u64) -> Result<Value, ServerEr
     }))
 }
 
-/// The certificate over `request` for `agent`, carrying `claims`.
+/// The certificate over `request` for `agent`, carrying `claims`. A pairing's
+/// request (AGENTS-020) was made under the name the agent proposed, `asked_as`,
+/// before it had an id; every other request names the agent itself.
 fn certificate(
     state: &AppState,
     request: &[u8],
-    agent: &str,
+    (agent, asked_as): (&str, Option<&str>),
     claims: &Value,
 ) -> Result<Vec<u8>, ServerError> {
     let key = load_service_key(&state.grant_setup.key_file)?;
     let mut oid = LYS_OID_ARC.to_vec();
     oid.push(CLAIMS_COMPONENT);
     let carried = serde_json::to_vec(claims).map_err(unavailable)?;
-    CertificateAuthority::new(key)
-        .issue_certificate_for_request(
-            request,
-            agent,
-            VALID_FOR,
-            vec![encode_extension(&oid, carried)],
-        )
-        .map(|certified| certified.der_bytes)
-        .map_err(|error| malformed(format!("the request was refused: {error}")))
+    let extensions = vec![encode_extension(&oid, carried)];
+    let authority = CertificateAuthority::new(key);
+    match asked_as {
+        Some(proposed) => {
+            authority.issue_certificate_for_pairing(request, proposed, agent, VALID_FOR, extensions)
+        }
+        None => authority.issue_certificate_for_request(request, agent, VALID_FOR, extensions),
+    }
+    .map(|certified| certified.der_bytes)
+    .map_err(|error| malformed(format!("the request was refused: {error}")))
 }
 
 /// The RFC 7468 boundaries of a PKCS#10 request, as `lys ca request` writes it.
@@ -395,12 +398,37 @@ pub(crate) fn issued(
     issued_by(state, seen, request, serial, (at, None))
 }
 
+/// [`issued`] for a pairing (AGENTS-020 R2): the request was made under the
+/// name the agent proposed, `proposed`, before it had an id.
+pub(crate) fn issued_for_pairing(
+    state: &AppState,
+    seen: &SeenAgent,
+    request: &[u8],
+    proposed: &str,
+    serial: String,
+    at: u64,
+) -> Result<Issued, ServerError> {
+    issued_as(state, seen, (request, Some(proposed)), serial, (at, None))
+}
+
 /// [`issued`], naming in its claims the agent that issued it, when an agent
 /// did, beside the person responsible (AGENTS-016 R4).
 fn issued_by(
     state: &AppState,
     seen: &SeenAgent,
     request: &[u8],
+    serial: String,
+    (at, by): (u64, Option<lys_identity::AgentId>),
+) -> Result<Issued, ServerError> {
+    issued_as(state, seen, (request, None), serial, (at, by))
+}
+
+/// [`issued_by`], over a request made under `asked_as` when it was not made
+/// under the agent's own id.
+fn issued_as(
+    state: &AppState,
+    seen: &SeenAgent,
+    (request, asked_as): (&[u8], Option<&str>),
     serial: String,
     (at, by): (u64, Option<lys_identity::AgentId>),
 ) -> Result<Issued, ServerError> {
@@ -413,7 +441,7 @@ fn issued_by(
     if let Some(by) = by {
         claims["issued_by"] = json!({ "actor": by.to_string(), "responsible": person });
     }
-    let der = certificate(state, request, &agent, &claims)?;
+    let der = certificate(state, request, (&agent, asked_as), &claims)?;
     Ok(Issued {
         serial,
         agent,

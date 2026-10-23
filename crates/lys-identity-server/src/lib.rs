@@ -16,6 +16,7 @@ mod agent_pass_recovery;
 pub mod agent_pass_store;
 mod agent_seat;
 pub mod pair;
+pub mod pair_decide;
 pub mod pair_store;
 #[cfg(test)]
 #[path = "pair_tests.rs"]

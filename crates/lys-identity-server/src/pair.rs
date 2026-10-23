@@ -11,7 +11,9 @@
 //! no deadline anywhere: a pairing waits until a person decides it.
 //!
 //! Both routes are public: a code alone registers, certifies and reaches
-//! nothing; only a signed-in person's decision (R2) does.
+//! nothing; only a signed-in person's decision does. The person's side,
+//! `GET /pair/{code}/waiting`, `POST /pair/{code}/approve` and
+//! `POST /pair/{code}/decline`, is `pair_decide` (R2, R3).
 
 use std::sync::{Arc, MutexGuard};
 
@@ -55,6 +57,9 @@ pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/pair", post(ask))
         .route("/pair/{wait}", get(wait))
+        .route("/pair/{code}/waiting", get(crate::pair_decide::waiting))
+        .route("/pair/{code}/approve", post(crate::pair_decide::approve))
+        .route("/pair/{code}/decline", post(crate::pair_decide::decline))
 }
 
 /// The pairings, one caller at a time.

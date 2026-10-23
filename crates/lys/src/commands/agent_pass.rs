@@ -36,6 +36,7 @@ pub const GRANT_CREDENTIAL_HEADER: &str = "lys-grant-token";
 pub fn run(args: AgentArgs, json: bool) -> CliResult<()> {
     match args.command {
         AgentCommand::Enrol(enrol) => crate::commands::enrol::run(&enrol, json),
+        AgentCommand::Pair(pair) => crate::commands::pair::run(&pair, json),
         AgentCommand::Pass {
             agent,
             audience,

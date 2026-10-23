@@ -136,7 +136,7 @@ fn view(proven: Proven) -> CertificateView {
 
 /// `der`, standard base64 as the store keeps it, framed as a PEM `CERTIFICATE`
 /// wrapped at 64 characters: the same base64, so no bytes are decoded here.
-fn certificate_pem(der: &str) -> String {
+pub(crate) fn certificate_pem(der: &str) -> String {
     let mut pem = String::with_capacity(der.len() + der.len() / 64 + 64);
     pem.push_str("-----BEGIN CERTIFICATE-----\n");
     for (index, character) in der.chars().enumerate() {

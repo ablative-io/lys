@@ -56,9 +56,15 @@ WHEN a signed-in person opens /pair THE SYSTEM SHALL show one field for the four
 **Files:**
 - create: surface/identity/src/features/pair/PairPage.tsx
 - create: surface/identity/src/features/pair/pair-page.test.tsx
+- create: crates/lys-identity-server/src/pair_decide.rs
 - modify: crates/lys-identity-server/src/pair.rs
 - modify: crates/lys-identity-server/src/pair_tests.rs
 - modify: surface/identity/src/routes.tsx
+- modify: crates/lys-core/src/ca/authority.rs
+- modify: crates/lys-identity-server/src/certificates_issue.rs
+- modify: crates/lys-identity-server/src/openapi_table.rs
+- modify: crates/lys-identity-server/src/openapi_types.rs
+- modify: crates/lys-identity-server/src/lib.rs
 
 **Checklist:**
 - C836 — An unknown key asks Lys for four words, a signed-in person enters them, names the agent and gives its roots, Lys certifies the key and answers the approved apps, and `lys agent pair` does the agent's side. AGENTS-020/R1-R4.
@@ -125,3 +131,17 @@ WHEN `lys agent pair --lys <api> --name <name> --seat <path>` runs THE SYSTEM SH
 - **By:** Waffles
 
 lys-core holds no word list for handed links (DIRECTORY-112's handed link is a token a person clicks), so the brief's "one added beside it" is crates/lys-core/src/pairing_words.rs, exported from lys-core's lib.rs: two hundred and fifty-six common short English words, no two alike aloud and none with a spelling variant a listener might type (Tom's ruling of 23 Oct), one per byte, so four bytes from the operating system make a code. The store is a field of AppState (routes.rs: `pairings: Mutex<PairStore>`), opened beside foundings.json as pairings.json with no new configuration key, so routes_startup.rs, grant_settlement_seed_tests.rs and tests/budgets_feed_entries.rs set it; routes_table.rs merges the pair routes; openapi_table.rs and openapi_types.rs carry the two routes' rows, since tests/openapi.rs refuses any declared route without an entry; error_status.rs maps pair_unknown to 404 and pair_request_invalid to 400 (pair_declined keeps the named refusal's 409); certificates_issue.rs opens request_der to the crate so the pairing reads a request exactly as the certificate route does. The pairings file is written whole as one durable operation per ask, decision or taken answer, the shape foundings.json uses, never leaf by leaf.
+
+### Amendment 2: R2, R3, R4 as built
+
+- **Date:** 2026-10-23
+- **By:** Waffles the Terrible
+
+The person's routes are GET /pair/{code}/waiting (the agent waiting with these words), POST /pair/{code}/approve and POST /pair/{code}/decline, all for a signed-in person; the agent's GET /pair/{wait} stands. The approve body carries the registration's operation, an activate operation, a certificate operation (the serial) and the display name, plus the roots as the dashboard's register act makes them (operation, source grant, resource, relation, window), so nothing is derived from another id and a retry carries the same ids. Lys keeps no handles: the answer's handle is the name the person gave the agent and person is the responsible person's display name. The Pair page keeps the typed words in this tab's sessionStorage (lys.pair.code), never in the address, and looks them up again on return from sign-in. The CLI is lys agent pair --lys <api> --name <name> --seat <path>; it prints the words and the address the moment Lys gives them (one JSON line in --json mode) and the seat file's path, agent, serial and apps at the end.
+
+### Amendment 3: R2's file list grows by the certificate path, found at the first build
+
+- **Date:** 2026-10-23
+- **By:** Waffles the Terrible
+
+A pairing's PKCS#10 request is made before the agent has an id, under the name it proposed, and lys-core's authority refuses a request whose common name is not the subject issued for. R2 therefore adds CertificateAuthority::issue_certificate_for_pairing in crates/lys-core/src/ca/authority.rs (the request's common name must equal the proposed name kept at the ask, so the one request the person approved is certified and no other; the subject is the agent id Lys gave) and certificates_issue::issued_for_pairing in crates/lys-identity-server/src/certificates_issue.rs, the same claims, signing key and log entry as POST /agents/{id}/certificates. The decision routes live in crates/lys-identity-server/src/pair_decide.rs beside pair.rs, with their rows in openapi_table.rs and openapi_types.rs. Enrol and every certificate of an already registered agent are unchanged.

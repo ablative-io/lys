@@ -5,6 +5,7 @@ import { Connections } from './features/connections/Connections';
 import { SecretsPage } from './features/secrets/SecretsPage';
 import { Reviews } from './features/reviews/Reviews';
 import { Requests } from './features/requests/Requests';
+import { PairPage } from './features/pair/PairPage';
 import { Navigate, Route, Routes, useParams } from 'react-router';
 import { You } from './features/me/You';
 import { Dashboard } from './features/dashboard/Dashboard';
@@ -50,6 +51,7 @@ export function AppRoutes() {
       <Route path="/people/:agent" element={<People />} />
       <Route path="/reviews" element={<Reviews />} />
       <Route path="/requests/:request?" element={<Requests />} />
+      <Route path="/pair" element={<PairPage />} />
       <Route path="/agents/new" element={<AddAgent />} />
       <Route path="/people/new" element={<AddPerson />} />
       <Route path="/people" element={<People />} />

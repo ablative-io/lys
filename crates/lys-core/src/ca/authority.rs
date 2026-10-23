@@ -180,15 +180,52 @@ impl CertificateAuthority {
         ttl: Duration,
         extensions: Vec<CustomExtension>,
     ) -> TrustResult<CertifiedKey> {
+        self.issue_over_request(request_der, subject, subject, ttl, extensions)
+    }
+
+    /// [`Self::issue_certificate_for_request`] for a pairing (AGENTS-020): the
+    /// holder made its request before it had a name, under the name it
+    /// proposed, and asked the authority to give it one. The request's common
+    /// name must equal `proposed`, the name kept when the request was taken,
+    /// so the certificate is issued over the one request the person approved
+    /// and no other; the certificate's subject is the name the authority
+    /// gave, `subject`. Every other property of
+    /// [`Self::issue_certificate_for_request`] holds unchanged.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::issue_certificate_for_request`], with the common-name
+    /// disagreement measured against `proposed`.
+    pub fn issue_certificate_for_pairing(
+        &self,
+        request_der: &[u8],
+        proposed: &str,
+        subject: &str,
+        ttl: Duration,
+        extensions: Vec<CustomExtension>,
+    ) -> TrustResult<CertifiedKey> {
+        self.issue_over_request(request_der, proposed, subject, ttl, extensions)
+    }
+
+    /// Issue over a verified request whose common name must be `asked_as`,
+    /// naming `subject`.
+    fn issue_over_request(
+        &self,
+        request_der: &[u8],
+        asked_as: &str,
+        subject: &str,
+        ttl: Duration,
+        extensions: Vec<CustomExtension>,
+    ) -> TrustResult<CertifiedKey> {
         validate_issuance(subject, ttl)?;
         let (issued_at, expires_at) = validity_window(ttl, self.creation_time()?)?;
 
         let request = verify_certificate_request(request_der)?;
-        if request.common_name() != subject {
+        if request.common_name() != asked_as {
             return Err(TrustError::CertificateGeneration {
                 reason: format!(
                     "certificate-signing request asks for common name {:?} but issuance was \
-                     requested for subject {subject:?}",
+                     requested for subject {asked_as:?}",
                     request.common_name()
                 ),
             });

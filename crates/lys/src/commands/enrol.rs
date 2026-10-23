@@ -227,7 +227,7 @@ fn named_agent(file: &Path) -> Option<String> {
 }
 
 /// Refuse a seat file path that already names anything, before a key is made.
-fn absent(out: &Path) -> CliResult<()> {
+pub(crate) fn absent(out: &Path) -> CliResult<()> {
     match fs::symlink_metadata(out) {
         Ok(_) => Err(exists(out)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -238,7 +238,7 @@ fn absent(out: &Path) -> CliResult<()> {
     }
 }
 
-fn exists(out: &Path) -> crate::commands::error::CliError {
+pub(crate) fn exists(out: &Path) -> crate::commands::error::CliError {
     refused(
         "seat_file_exists",
         format!(
@@ -360,7 +360,7 @@ fn certified(
 
 /// Write `bytes` at `out` whole, mode 0600: into a new file beside it, flushed,
 /// then linked into place, which refuses a path that already names anything.
-fn write_whole(out: &Path, bytes: &[u8]) -> CliResult<()> {
+pub(crate) fn write_whole(out: &Path, bytes: &[u8]) -> CliResult<()> {
     let unwritten = |error: &std::io::Error| {
         refused("seat_file_unwritten", format!("{}: {error}", out.display()))
     };
