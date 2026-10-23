@@ -99,6 +99,12 @@ The design page docs/design/PERMISSIONS-ACROSS-THE-STACK-2026-10-06.md (decision
 | `surface/identity/src/features/grants/IssueRoot.tsx` | Give access opens to organisation.grant or the install's root authority; the refusal names the right (ACCESS-009 R4). | ACCESS-009 |
 | `surface/identity/src/features/requests/` | The Requests page: the queue, the ask form and the decision form; every request is shown as it stands, one that outlived the model as not grantable (ACCESS-011). | ACCESS-011 |
 | `surface/identity/src/generated/grants.ts` | The generated request and grant view types the surface reads; RequestView carries standing (ACCESS-011). | ACCESS-011 |
+| `crates/lys-identity-server/src/requests_outlived_tests.rs` | A request whose relation the model no longer defines is listed, refused on approve by name and declinable (ACCESS-011). | ACCESS-011 |
+| `crates/lys-identity-server/src/route_actions_tests.rs` | The route-action test fixture with one app kind; holds the request test modules (ACCESS-011). | ACCESS-011 |
+| `crates/lys-identity-server/src/requests_api.rs` | The access request routes: ask and list; a request is weighed with its standing under the model as it stands (ACCESS-011). | ACCESS-011 |
+| `crates/lys-identity-server/src/requests_views.rs` | The request view on the wire, with standing (ACCESS-011). | ACCESS-011 |
+| `crates/lys-identity-server/src/requests_decide.rs` | Approve and decline; approve refuses an outlived request by name (ACCESS-011). | ACCESS-011 |
+| `surface/identity/vite.config.ts` | The identity surface's build and test configuration; the vitest include list names each feature folder with tests. | ACCESS-011 |
 
 ## Inventory
 

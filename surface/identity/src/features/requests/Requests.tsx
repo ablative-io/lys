@@ -141,10 +141,12 @@ function Detail({ model, describe, decider, entry, on, person, mayDecide, change
     <h2>{entry.asked_by_name ?? 'Name unavailable'} · {entry.relation} on {on}</h2>
     <p><strong>{STATE[entry.state] ?? 'Decided'}</strong> · Asked {clock(entry.asked_at)}</p>
     <p>{entry.why}</p>
-    <p className="note">Allows {model ? actionWords(model, entry.resource, entry.actions) : 'permission descriptions are unavailable'}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
+    {entry.standing === 'relation_unknown'
+      ? <p className="why-not" data-outlived>Cannot be granted as the model stands: {entry.resource.kind} no longer defines {entry.relation}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>
+      : <p className="note">Allows {model ? actionWords(model, entry.resource, entry.actions) : 'permission descriptions are unavailable'}. {entry.ends_at === null ? 'No expiry requested.' : 'Until ' + clock(entry.ends_at) + '.'}</p>}
     {entry.decision ? <p>{STATE[entry.state] ?? 'Decided'} by {decider ?? 'someone outside your view'}, {clock(entry.decision.decided_at)}: {entry.decision.note}{entry.decision.grant ? <> · <Link to={'/file/' + encodeURIComponent(entry.asked_by) + '/access'}>View granted access</Link></> : null}</p>
       : <p className="note">Can be reviewed by {entry.approvers.map((each) => each.display_name).join(', ') || 'no currently eligible person'}.</p>}
     {entry.state === 'waiting' && entry.held_by ? <HeldApproval entry={entry} changed={changed} /> : null}
-    {entry.state === 'waiting' && !entry.held_by && mayDecide ? <DecisionForm entry={entry} person={person} canIssueRoot={entry.can_issue_root === true} changed={changed} describe={describe} /> : null}
+    {entry.state === 'waiting' && !entry.held_by && mayDecide ? <DecisionForm entry={entry} person={person} canIssueRoot={entry.can_issue_root === true} declineOnly={entry.standing === 'relation_unknown'} changed={changed} describe={describe} /> : null}
   </article>;
 }

@@ -21,6 +21,7 @@
 //!
 //! The two decisions are in `requests_decide`.
 
+use std::collections::BTreeSet;
 use std::ops::Bound;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -30,7 +31,7 @@ use axum::extract::rejection::JsonRejection;
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use lys_identity::grants::{GrantId, RecipientKind, Relation, Resource};
+use lys_identity::grants::{GrantError, GrantId, RecipientKind, Relation, Resource};
 use lys_identity::{IdentityId, OperationId, PersonId};
 use serde::Deserialize;
 
@@ -120,12 +121,60 @@ pub(crate) fn with_requests<T>(
     act(&mut store)
 }
 
+/// Whether the model as it stands now defines the relation a request asks
+/// for on its kind (ACCESS-011 R1). A request is asked against the model of
+/// its day; an app's schema replaced since, or Lys's own model raised, can
+/// leave the relation undefined, and the request is then shown as asked,
+/// not approved, and declinable, and never refuses the queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Standing {
+    /// The relation resolves to actions under the model as it stands.
+    Grantable,
+    /// The model (the kind's version named) defines no such relation.
+    RelationUnknown { model_version: u64 },
+}
+
+impl Standing {
+    /// The word on the wire.
+    pub(crate) fn word(self) -> &'static str {
+        match self {
+            Self::Grantable => "grantable",
+            Self::RelationUnknown { .. } => "relation_unknown",
+        }
+    }
+}
+
+/// The requests whose outlived relation has been named in the log since
+/// start, so each is named once, not on every read of the queue.
+static NAMED_OUTLIVED: std::sync::OnceLock<std::sync::Mutex<BTreeSet<String>>> =
+    std::sync::OnceLock::new();
+
+fn name_outlived_once(asked: &Asked, model_version: u64) {
+    let named = NAMED_OUTLIVED.get_or_init(|| std::sync::Mutex::new(BTreeSet::default()));
+    // A poisoned set names the request again rather than never.
+    let first = named
+        .lock()
+        .map_or(true, |mut held| held.insert(asked.id.clone()));
+    if first {
+        tracing::warn!(
+            request = %asked.id,
+            kind = %asked.resource_kind,
+            relation = %asked.relation,
+            model_version,
+            "an access request asks for a relation the model as it stands no longer defines on its kind; it is listed as not grantable and can be declined"
+        );
+    }
+}
+
 /// A request read against the directory and the grants as they stand.
 pub(crate) struct Weighed {
     pub(crate) seeker: IdentityId,
     pub(crate) responsible: PersonId,
     pub(crate) resource: Resource,
     pub(crate) relation: Relation,
+    /// The actions the relation resolves to now; none when it is unknown.
+    actions: BTreeSet<lys_identity::grants::Action>,
+    pub(crate) standing: Standing,
     approvers: Vec<PersonId>,
     /// The people who may issue the root asked for (ACCESS-009 R2).
     rooters: Vec<PersonId>,
@@ -137,10 +186,18 @@ impl Weighed {
         let seeker = identity_id(&asked.asked_by)?;
         let resource = Resource::new(&asked.resource_kind, &asked.resource_id)?;
         let relation = Relation::new(&asked.relation)?;
-        let needed = judged
-            .grants
-            .model()
-            .actions_on(resource.kind(), &relation)?;
+        let (actions, standing) = match judged.grants.model().actions_on(resource.kind(), &relation)
+        {
+            Ok(needed) => (needed.clone(), Standing::Grantable),
+            Err(GrantError::RelationUnknown { model_version, .. }) => {
+                name_outlived_once(asked, model_version);
+                (
+                    BTreeSet::default(),
+                    Standing::RelationUnknown { model_version },
+                )
+            }
+            Err(other) => return Err(other.into()),
+        };
         let kind = RecipientKind::of(seeker);
         let book = judged.grants.book();
         let mut approvers = Vec::new();
@@ -151,20 +208,24 @@ impl Weighed {
             rooters = judged.grants.rooters(organisation, &resource, at)?;
             approvers.extend(rooters.iter().copied());
         }
-        for record in book.on_resource(&resource) {
-            let grant = record.grant();
-            let lends = grant.pass_on().permits(kind)
-                && grant
-                    .pass_on()
-                    .actions()
-                    .is_some_and(|actions| needed.is_subset(actions));
-            if let IdentityId::Person(holder) = grant.holder()
-                && lends
-                && stands(book, record, at)
-            {
-                lenders.push((holder, grant.id()));
-                if !approvers.contains(&holder) {
-                    approvers.push(holder);
+        // Nothing lends a relation the model no longer defines: an empty set
+        // of needed actions would be within every pass-on.
+        if standing == Standing::Grantable {
+            for record in book.on_resource(&resource) {
+                let grant = record.grant();
+                let lends = grant.pass_on().permits(kind)
+                    && grant
+                        .pass_on()
+                        .actions()
+                        .is_some_and(|held| actions.is_subset(held));
+                if let IdentityId::Person(holder) = grant.holder()
+                    && lends
+                    && stands(book, record, at)
+                {
+                    lenders.push((holder, grant.id()));
+                    if !approvers.contains(&holder) {
+                        approvers.push(holder);
+                    }
                 }
             }
         }
@@ -173,10 +234,25 @@ impl Weighed {
             responsible: PersonId::from_str(&asked.responsible)?,
             resource,
             relation,
+            actions,
+            standing,
             approvers,
             rooters,
             lenders,
         })
+    }
+
+    /// The refusal of an approval of a request whose relation the model no
+    /// longer defines (ACCESS-011 R2), or nothing to refuse.
+    pub(crate) fn approvable(&self) -> Result<(), ServerError> {
+        match self.standing {
+            Standing::Grantable => Ok(()),
+            Standing::RelationUnknown { model_version } => Err(GrantError::RelationUnknown {
+                relation: format!("{} on {}", self.relation, self.resource.kind()),
+                model_version,
+            }
+            .into()),
+        }
     }
 
     fn decides(&self, caller: IdentityId) -> bool {
@@ -202,10 +278,6 @@ impl Weighed {
         let summary = |person: PersonId| {
             person_record(judged.directory, person).map(|record| person_summary(person, record))
         };
-        let actions = judged
-            .grants
-            .model()
-            .actions_on(self.resource.kind(), &self.relation)?;
         Ok(RequestView {
             id: asked.id.clone(),
             asked_by: asked.asked_by.clone(),
@@ -219,10 +291,12 @@ impl Weighed {
                 id: asked.resource_id.clone(),
             },
             relation: asked.relation.clone(),
-            actions: actions
+            actions: self
+                .actions
                 .iter()
                 .map(|action| action.as_str().to_owned())
                 .collect(),
+            standing: self.standing.word(),
             ends_at: asked.ends_at,
             why: asked.why.clone(),
             asked_at: asked.asked_at,
@@ -418,6 +492,10 @@ async fn ask(
             asked_at: at,
         };
         let weighed = Weighed::of(&judged, &asked, at)?;
+        // A relation the model does not define is refused when asked for;
+        // only a request the model later outlives is kept and listed as
+        // not grantable (ACCESS-011).
+        weighed.approvable()?;
         with_requests(&state, |store| {
             let fresh = store.request(&asked.id).is_none();
             if fresh && asked.ends_at.is_some_and(|ends_at| ends_at <= at) {

@@ -144,6 +144,9 @@ pub(crate) async fn approve(
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
             let by = decider(&judged, caller, &weighed)?;
+            // A relation the model no longer defines is refused by name
+            // before any intent is kept (ACCESS-011 R2).
+            weighed.approvable()?;
             let decided = reconcile(&judged, store, &asked, &weighed, at)?;
             if let Some(decided) = &decided {
                 settled(decided, by, true)?;
@@ -253,6 +256,7 @@ pub(crate) async fn settle(
         let at = state.sessions.now()?;
         with_requests(&state, |store| {
             let (asked, _, weighed) = seen(&judged, store, caller, &id, at)?;
+            weighed.approvable()?;
             let decided = reconcile(&judged, store, &asked, &weighed, at)?;
             Ok(Json(weighed.view(
                 &judged,

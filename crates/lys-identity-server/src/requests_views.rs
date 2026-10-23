@@ -45,8 +45,13 @@ pub struct RequestView {
     pub resource: ResourceView,
     /// The relation asked for.
     pub relation: String,
-    /// The actions the model resolves the relation to.
+    /// The actions the model resolves the relation to; none when the model
+    /// as it stands now no longer defines the relation on the kind.
     pub actions: Vec<String>,
+    /// `grantable`, or `relation_unknown` when the model as it stands now
+    /// does not define the relation on the kind (ACCESS-011 R1): the request
+    /// is shown as asked, cannot be approved, and can be declined.
+    pub standing: &'static str,
     /// When the access would end, in seconds since the Unix epoch, null for no end of its own.
     pub ends_at: Option<u64>,
     /// Why it is asked.

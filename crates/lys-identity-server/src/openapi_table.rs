@@ -320,9 +320,9 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/roles/{id}/holders/{holder}/end" "End a holding" G [ADMIN_BODY] scope("role", "role.holder.end", ["id"]);
     GET "/requests" "The access requests" G [SIGNED, &["NoPerson", "NotAdmitted", "RequestMalformed", "TeamUnknown", "TeamsUnavailable"]] scope("request", "read", []);
     POST "/requests" "Ask for access" G [SIGNED_BODY, &["RelationUnknown"], &["NoPerson", "NotAdmitted", "RequestReused"]] scope("request", "request.create", []);
-    POST "/requests/{id}/approve" "Approve an access request" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided"], &["SourceUnknown", "WithheldFromAgents"]] scope("request", "request.approve", ["id"]);
+    POST "/requests/{id}/approve" "Approve an access request; one whose relation the model no longer defines is refused by name" S [SIGNED_BODY, &["NotAdmitted", "RequestDecided", "RelationUnknown"], &["SourceUnknown", "WithheldFromAgents"]] scope("request", "request.approve", ["id"]);
     POST "/requests/{id}/decline" "Decline an access request" S [SIGNED_BODY, &["RequestDecided", "RequestUnknown"], &["NotAdmitted"]] scope("request", "request.decline", ["id"]);
-    POST "/requests/{id}/reconcile" "Settle an approval" G [SIGNED_BODY, &["NoPerson", "NotAdmitted"]] scope("request", "request.reconcile", ["id"]);
+    POST "/requests/{id}/reconcile" "Settle an approval" G [SIGNED_BODY, &["NoPerson", "NotAdmitted", "RelationUnknown"]] scope("request", "request.reconcile", ["id"]);
     GET "/connections" "What the service is connected to" G [ADMIN] scope("connection", "read", []);
     GET "/sign-in-providers" "The sign-in providers" S [ADMIN, &["SignInProvidersUnavailable"]];
     POST "/sign-in-providers" "Set a sign-in provider" S [ADMIN_BODY, &["ProviderRefused"]];

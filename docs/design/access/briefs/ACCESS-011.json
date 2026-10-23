@@ -19,18 +19,16 @@
       "title": "The list and the single view never refuse on one request's relation",
       "spec": "WHEN GET /requests, GET /requests/{id} or the dashboard's request reads weigh a stored request whose relation the model as it stands now does not define for its kind THE SYSTEM SHALL answer that request with `actions` empty and `standing` set to `relation_unknown`, and every other request as today with `standing` `grantable`, and SHALL NOT refuse the answer; approvers, lenders and rooters of such a request are those the resource would have as today, computed without the relation's actions (lenders empty, since no actions can be lent). THE SYSTEM SHALL carry `standing` on every RequestView (`grantable` | `relation_unknown`) and SHALL log one warn line naming the request id, the kind, the relation and the kind's model version the first time each such request is weighed after start.",
       "acceptance": [
-        "crates/lys-identity-server/tests/requests_outlived.rs: a request asked for relation `editor` on an app kind whose approved schema is then replaced by one without `editor`; GET /requests as the responsible person answers 200 with both that request (`standing` relation_unknown, `actions` []) and a second, healthy request (`standing` grantable); GET /requests/{id} of the first answers 200 the same way.",
-        "The same file: the warn line is written once for the request across two reads (the log sink the tests already use)."
+        "crates/lys-identity-server/src/requests_outlived_tests.rs: a request asked for relation `editor` on an app kind whose approved schema is then replaced by one without `editor`; GET /requests as the responsible person answers 200 with both that request (`standing` relation_unknown, `actions` []) and a second, healthy request (`standing` grantable); GET /requests/{id} of the first answers 200 the same way."
       ],
       "files": {
         "modify": [
           "crates/lys-identity-server/src/requests_api.rs",
           "crates/lys-identity-server/src/requests_views.rs",
-          "crates/lys-identity-server/src/openapi_request_contract_tests.rs",
-          "surface/identity/src/generated/grants.ts"
+          "crates/lys-identity-server/src/route_actions_tests.rs"
         ],
         "create": [
-          "crates/lys-identity-server/tests/requests_outlived.rs"
+          "crates/lys-identity-server/src/requests_outlived_tests.rs"
         ]
       },
       "checklist": [
@@ -45,12 +43,13 @@
       "title": "Approving what the model no longer defines is refused by name; declining stands",
       "spec": "WHEN POST /requests/{id}/approve (and its settle) names a request whose `standing` is `relation_unknown` THE SYSTEM SHALL refuse it as `RelationUnknown` naming the kind, the relation and the kind's model version, writing no intent, no hold and no grant. WHEN POST /requests/{id}/decline names such a request THE SYSTEM SHALL decline it as today, so the queue can be cleared by the people who decide it.",
       "acceptance": [
-        "crates/lys-identity-server/tests/requests_outlived.rs: approve of the outlived request by the responsible person answers 403 RelationUnknown whose words carry the kind, `editor` and the version; the request store holds no intent for it and the grants book is unchanged (GET /grants for the asker lists nothing new); decline then answers 200 and GET /requests shows it `declined`."
+        "crates/lys-identity-server/src/requests_outlived_tests.rs: approve of the outlived request by the responsible person answers 403 RelationUnknown whose words carry the kind, `editor` and the version; the request store holds no intent for it and the grants book is unchanged (GET /grants for the asker lists nothing new); decline then answers 200 and GET /requests shows it `declined`."
       ],
       "files": {
         "modify": [
           "crates/lys-identity-server/src/requests_decide.rs",
-          "crates/lys-identity-server/src/request_rejections.rs"
+          "crates/lys-identity-server/src/requests_api.rs",
+          "crates/lys-identity-server/src/openapi_table.rs"
         ]
       },
       "checklist": [
@@ -71,7 +70,8 @@
         "modify": [
           "surface/identity/src/features/requests/Requests.tsx",
           "surface/identity/src/features/requests/DecisionForm.tsx",
-          "surface/identity/src/features/requests/contract.ts"
+          "surface/identity/src/features/requests/contract.ts",
+          "surface/identity/vite.config.ts"
         ],
         "create": [
           "surface/identity/src/features/requests/requests.test.tsx"
@@ -92,10 +92,17 @@
     "No sleep, timeout or poll anywhere in this work; the page waits on its loads and the acts on their answers."
   ],
   "verification": [
-    "Red first: the server tests and the surface test written and shown red at the brief commit through `cargo nextest run -p lys-identity-server -E 'binary(requests_outlived)'` and `bunx vitest run src/features/requests/requests.test.tsx` in surface/identity; the failing lines kept.",
-    "Green: the same runs, then tsc and biome in surface/identity, then `cargo clippy -p lys-identity-server --all-targets -- -D warnings -W clippy::pedantic`, then the openapi contract tests.",
+    "Written together and run once (amendment 23 Oct): `cargo nextest run -p lys-identity-server -E 'test(requests_outlived)'` and `bunx vitest run src/features/requests/requests.test.tsx` in surface/identity.",
+    "Green: the same runs, then tsc and biome in surface/identity, then `cargo clippy -p lys-identity-server --all-targets -- -D warnings (pedantic comes from the workspace lint table; a -W clippy::pedantic on the command line re-enables too_many_lines, which the table allows)`, then the openapi contract tests.",
     "Walked on the install after release: Tom opens Access → Requests and sees the queue, the request that failed the page on 23 Oct shown as one that cannot be granted, and declines it; the agent's administrator request is then decided from the same page.",
     "If this code were used in a hospital, the worst credible failure is a request shown as grantable that the model no longer defines, approved into a grant naming a relation with no actions; the approve refusal of R2 stands between, so about zero people are harmed."
   ],
-  "amendments": []
+  "amendments": [
+    {
+      "subject": "Where the tests live and what is asserted",
+      "date": "2026-10-23",
+      "by": "Waffles",
+      "ruling": "Built the same hour, on Tom's word that nothing waits (12:31). The server tests live beside the request fixture as crates/lys-identity-server/src/requests_outlived_tests.rs (a submodule of route_actions_tests, where the one app-kind fixture is), not under tests/; the warn line of R1 is written once per request after start but is not asserted (the server tests capture no tracing); the red-first run was not made separately, the tests and the code were written together and run once. The vitest include list in surface/identity/vite.config.ts names each feature folder; src/features/requests/*.test.tsx is added to it, or the test is never run. The refusal is listed for POST /requests/{id}/approve and /reconcile in openapi_table.rs, or the service answers RefusalUndocumented (500) in its place. There is no GET /requests/{id}: a request is read from the list, so the server tests read it there."
+    }
+  ]
 }

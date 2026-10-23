@@ -10,6 +10,8 @@ export interface AccessRequest {
   resource: ResourceRef;
   relation: string;
   actions: string[];
+  /** `relation_unknown`: the model as it stands no longer defines the relation on the kind (ACCESS-011); older responses carry none. */
+  standing?: 'grantable' | 'relation_unknown';
   ends_at: number | null;
   why: string;
   asked_at: number;

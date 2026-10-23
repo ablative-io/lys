@@ -281,6 +281,36 @@
       "path": "surface/identity/src/generated/grants.ts",
       "note": "The generated request and grant view types the surface reads; RequestView carries standing (ACCESS-011).",
       "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity-server/src/requests_outlived_tests.rs",
+      "note": "A request whose relation the model no longer defines is listed, refused on approve by name and declinable (ACCESS-011).",
+      "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity-server/src/route_actions_tests.rs",
+      "note": "The route-action test fixture with one app kind; holds the request test modules (ACCESS-011).",
+      "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity-server/src/requests_api.rs",
+      "note": "The access request routes: ask and list; a request is weighed with its standing under the model as it stands (ACCESS-011).",
+      "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity-server/src/requests_views.rs",
+      "note": "The request view on the wire, with standing (ACCESS-011).",
+      "brief": "ACCESS-011"
+    },
+    {
+      "path": "crates/lys-identity-server/src/requests_decide.rs",
+      "note": "Approve and decline; approve refuses an outlived request by name (ACCESS-011).",
+      "brief": "ACCESS-011"
+    },
+    {
+      "path": "surface/identity/vite.config.ts",
+      "note": "The identity surface's build and test configuration; the vitest include list names each feature folder with tests.",
+      "brief": "ACCESS-011"
     }
   ],
   "inventory": [

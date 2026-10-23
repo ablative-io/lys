@@ -457,6 +457,8 @@ async fn an_unknown_kept_route_refuses_service_startup() -> TestResult {
 
 #[path = "requests_app_kind_tests.rs"]
 mod requests_app_kind_tests;
+#[path = "requests_outlived_tests.rs"]
+mod requests_outlived_tests;
 
 fn reported_runtime(
     runtime_dir: &std::path::Path,

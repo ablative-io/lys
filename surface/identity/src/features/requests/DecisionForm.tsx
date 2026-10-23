@@ -30,8 +30,10 @@ function load(key: string): Pending {
   return { kind: 'damaged' };
 }
 
-export function DecisionForm({ entry, person, canIssueRoot, changed, describe }: {
+export function DecisionForm({ entry, person, canIssueRoot, declineOnly = false, changed, describe }: {
   entry: AccessRequest; person: string; canIssueRoot: boolean; changed: (answer: AccessRequest) => void;
+  /** The model no longer defines what is asked (ACCESS-011 R3): only Decline is offered. */
+  declineOnly?: boolean;
   /** A source grant in words, by what it is on; never its identifier. */
   describe: (source: string, index: number) => string;
 }) {
@@ -98,9 +100,9 @@ export function DecisionForm({ entry, person, canIssueRoot, changed, describe }:
         <label className="field">Reason for your decision<textarea name="note" required /></label>
         <Act symbol="approve" name={'Confirm ' + (action === 'approve' ? 'approval' : 'decline')} word="Confirm" tone="primary" type="submit" disabled={busy} />{' '}
         <Act symbol="close" name="Cancel" word="Cancel" disabled={busy} onClick={() => setAction(null)} />
-      </form> : <><Act symbol="approve" name="Approve access" word={APPROVE} tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}
+      </form> : <>{declineOnly ? null : <><Act symbol="approve" name="Approve access" word={APPROVE} tone="primary" disabled={!canIssueRoot && !entry.sources.length} onClick={() => setAction('approve')} />{' '}</>}
         <Act symbol="decline" name="Decline request" word={DECLINE} onClick={() => setAction('decline')} />
-        {!canIssueRoot && !entry.sources.length ? <p className="why-not">You cannot approve this: you hold no access you may pass on that covers it. You can still decline it.</p> : null}</>}
+        {!declineOnly && !canIssueRoot && !entry.sources.length ? <p className="why-not">You cannot approve this: you hold no access you may pass on that covers it. You can still decline it.</p> : null}</>}
     {failure ? <p className="why-not" role="alert">{failure}</p> : null}
   </div>;
 }
