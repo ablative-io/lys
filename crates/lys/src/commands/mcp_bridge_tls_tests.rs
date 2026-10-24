@@ -1,8 +1,9 @@
 //! AGENTS-015 R3 over a real socket: Lys's MCP route served over TLS on loopback,
-//! reached through the bridge's own relay. The test's root is added to the same
-//! trust path the bridge builds from the system's roots, so the test certificate is
-//! trusted exactly the way a system root is; a certificate no root on that path
-//! issued is refused by name and answered as a JSON-RPC error.
+//! reached through the bridge's own relay. The test's root stands alone on the
+//! same verifying path the bridge builds from the system's roots, so what is
+//! proved about verification does not depend on the machine's own trust store;
+//! a certificate no root on that path issued is refused by name and answered as
+//! a JSON-RPC error.
 //!
 //! These live inside the crate because the one seam, a root added to the trust path,
 //! is crate-private and compiled only for tests: nothing outside the crate, and no
@@ -147,14 +148,14 @@ fn identity() -> Ed25519Identity {
 }
 
 /// A tools/list through the bridge is answered by Lys's MCP route over TLS, verified
-/// against the system's roots with the test's root added to the same path, whether
-/// the server ends with `close_notify` or closes once its answer is whole.
+/// against the test's root alone on the verifying path, whether the server ends
+/// with `close_notify` or closes once its answer is whole.
 #[test]
 fn a_tools_list_through_the_bridge_is_answered_over_verified_tls() -> TestResult {
     let issued = issue("AGENTS-015 test root")?;
     let (port, server) = serve(&issued, &[Close::Notify, Close::Drop])?;
     let endpoint = endpoint(&format!("https://localhost:{port}/api/mcp"))?;
-    let transport = Transport::Tls(TrustPath::system_and(&issued.root)?);
+    let transport = Transport::Tls(TrustPath::only(&issued.root)?);
     for id in [1, 2] {
         let answer = relay(&endpoint, &transport, AGENT, &identity(), &tools_list(id))
             .ok_or("the bridge wrote no answer")?;
@@ -183,7 +184,7 @@ fn a_certificate_the_trust_path_does_not_trust_is_refused_by_name() -> TestResul
     let stranger = issue("AGENTS-015 stranger root")?;
     let (port, server) = serve(&stranger, &[Close::Notify])?;
     let endpoint = endpoint(&format!("https://localhost:{port}/api/mcp"))?;
-    let transport = Transport::Tls(TrustPath::system_and(&trusted.root)?);
+    let transport = Transport::Tls(TrustPath::only(&trusted.root)?);
     let answer = relay(&endpoint, &transport, AGENT, &identity(), &tools_list(7))
         .ok_or("the refusal was dropped")?;
     let answer: serde_json::Value = serde_json::from_str(&answer)?;
@@ -213,7 +214,7 @@ fn an_address_where_nothing_listens_is_answered_mcp_unreachable() -> TestResult 
     for (url, transport) in [
         (
             format!("https://127.0.0.1:{port}/api/mcp"),
-            Transport::Tls(TrustPath::system_and(&issued.root)?),
+            Transport::Tls(TrustPath::only(&issued.root)?),
         ),
         (
             format!("http://127.0.0.1:{port}/api/mcp"),

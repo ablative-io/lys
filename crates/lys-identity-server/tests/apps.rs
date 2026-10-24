@@ -498,6 +498,26 @@ async fn a_workspace_member_may_read_a_channel_placed_in_it_and_no_more() -> Tes
     )
     .await?;
     refused(&refused_place, 400, "placement_invalid")?;
+    let (status, listed) = service
+        .get(&format!("/apps/{NOTES}/placements"), Some(&admin))
+        .await?;
+    assert_eq!(status, 200, "{listed}");
+    assert_eq!(listed["app"], NOTES, "{listed}");
+    let placements = listed["placements"].as_array().ok_or("no placements")?;
+    assert_eq!(
+        placements.len(),
+        1,
+        "the refused placement is not recorded: {listed}"
+    );
+    assert_eq!(placements[0]["child_kind"], channel, "{listed}");
+    assert_eq!(placements[0]["child_id"], "general", "{listed}");
+    assert_eq!(placements[0]["parent_kind"], workspace, "{listed}");
+    assert_eq!(placements[0]["parent_id"], "team", "{listed}");
+    let (status, unknown) = service
+        .get("/apps/nowhere/placements", Some(&admin))
+        .await?;
+    assert_eq!(status, 404, "{unknown}");
+    assert_eq!(unknown["refusal"], "app_unknown", "{unknown}");
     ok(root(&service, &admin, &bea, (&workspace, "team"), "member").await?)?;
 
     let bea_cookie = service.sign_in(login(BEA)).await?;

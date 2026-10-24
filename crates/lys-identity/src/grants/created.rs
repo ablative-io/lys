@@ -1,9 +1,10 @@
 //! The rights an agent holds on an agent it registers (AGENTS-015 R2,
 //! AGENTS-016 R3): when an agent registers an agent under its grant of
-//! `agent.create`, the person answering for both gives it exactly
+//! `agent.create`, or under the administrator standing that covers it
+//! (24 October 2026), the person answering for both gives it exactly
 //! [`CREATED_RIGHTS`] on the new agent, each one relation carrying one
-//! action, use-only, standing in the chain of that `agent.create` grant, so
-//! revoking it withdraws them.
+//! action, use-only, standing in the chain of the grant that admitted the
+//! registration, so revoking it withdraws them.
 //!
 //! The agent exists before its rights do: they are recorded only on an agent
 //! the directory already holds, answering to the same person, and refused by
@@ -18,7 +19,7 @@ use super::admission::Route;
 use super::authority::{Grants, Recorded};
 use super::error::GrantError;
 use super::events::{GrantChange, GrantEvent, SignedGrantEvent, sign_grant_event};
-use super::lineage::{CREATE, CREATED_RIGHTS, created_hop};
+use super::lineage::{CREATED_RIGHTS, admits_create, created_hop};
 use super::permission::RelationshipStore;
 use super::receipt::GrantReceipt;
 use super::shipped::ONE;
@@ -63,7 +64,8 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// # Errors
     /// - `GrantError::SourceUnknown` if the source grant is absent.
     /// - `GrantError::LineageMalformed` if it is not an agent's grant of
-    ///   `agent.create`, or the directory does not hold the agent yet.
+    ///   `agent.create` or of administrator standing, or the directory does
+    ///   not hold the agent yet.
     /// - `GrantError::Revoked` if it was revoked.
     /// - `GrantError::OperationReused` if the agent answers to another person, or the operations name other changes.
     /// - `GrantError::LogUnavailable` or `GrantError::AppendRefused` if the batch is not recorded.
@@ -147,8 +149,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         Ok(answered)
     }
 
-    /// The live `agent.create` grant `request` stands under, once the
-    /// directory holds its agent answering to that grant's person.
+    /// The live grant `request` stands under, of `agent.create` or of the
+    /// standing that covers it, once the directory holds its agent answering
+    /// to that grant's person.
     fn created_source(
         &self,
         directory: &Projection,
@@ -161,14 +164,9 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
                 .ok_or_else(|| GrantError::SourceUnknown {
                     grant: request.source.to_string(),
                 })?;
-        if !matches!(source.holder(), IdentityId::Agent(_))
-            || !source
-                .actions()
-                .iter()
-                .any(|action| action.as_str() == CREATE)
-        {
+        if !matches!(source.holder(), IdentityId::Agent(_)) || !admits_create(&source) {
             return Err(GrantError::LineageMalformed {
-                reason: "an agent's rights on an agent it registered stand under its grant of agent.create",
+                reason: "an agent's rights on an agent it registered stand under its grant of agent.create or its administrator standing",
             });
         }
         if self

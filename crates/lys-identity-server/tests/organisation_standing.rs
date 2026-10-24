@@ -5,8 +5,9 @@
 //! refused by the act's name; given the administrator relation on Ada's
 //! organisation, the same agent reads every person and its own record,
 //! issues another agent's certificate, reads its certificates, gives a
-//! grant from the standing and approves a draft of one, and discovery names
-//! the routes the standing opens; given reading alone, it reads and changes
+//! grant from the standing and approves a draft of one, registers an agent
+//! and holds its rights on it under the standing, and discovery names the
+//! routes the standing opens; given reading alone, it reads and changes
 //! nothing. Each admission records its use against the standing grant.
 
 #[path = "support/agent_starts_agent.rs"]
@@ -318,5 +319,44 @@ async fn administrator_standing_reads_another_agents_certificates() -> TestResul
             .is_empty(),
         "the creator was certified at the start: {certificates}"
     );
+    Ok(())
+}
+
+/// An agent with administrator standing registers an agent under the person it
+/// answers to, in one act: the agent is active and the registrant's five rights
+/// on it stand under the standing grant, so revoking the standing withdraws them.
+#[tokio::test]
+async fn administrator_standing_registers_an_agent_and_holds_its_rights() -> TestResult {
+    let world = World::new().await?;
+    let grant = standing(&world, &world.stranger, "administrator").await?;
+    let body = json!({"operation": operation()?, "display_name": "Registered by standing"});
+    let (status, registered) = change(&world, &world.stranger, "/agents", &body).await?;
+    assert_eq!(status, 200, "{registered}");
+    assert_eq!(registered["responsible"], world.bea_person, "{registered}");
+    let agent = registered["agent"]
+        .as_str()
+        .ok_or("an agent id")?
+        .to_owned();
+    let (status, record) = read(&world, &world.stranger, &format!("/agents/{agent}")).await?;
+    assert_eq!(status, 200, "{record}");
+    assert_eq!(record["state"], "active", "{record}");
+    let (status, grants) = world.service.get("/grants", Some(&world.ada)).await?;
+    assert_eq!(status, 200, "{grants}");
+    let rights: Vec<&Value> = grants["grants"]
+        .as_array()
+        .ok_or("no grants")?
+        .iter()
+        .filter(|each| {
+            each["holder"] == world.stranger.id
+                && each["resource"]["kind"] == "agent"
+                && each["resource"]["id"] == agent
+        })
+        .collect();
+    assert_eq!(rights.len(), 5, "{grants}");
+    for right in rights {
+        assert_eq!(right["source"], grant, "{right}");
+        assert_eq!(right["responsible"], world.bea_person, "{right}");
+        assert_eq!(right["pass_on"]["kind"], "use_only", "{right}");
+    }
     Ok(())
 }

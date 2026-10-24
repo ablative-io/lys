@@ -54,6 +54,23 @@ pub enum Outcome {
         /// The route's refusal words.
         reason: String,
     },
+    /// The admitted route recorded the act but could not yet answer it: a
+    /// refusal of the recorded class (`ProjectionPending`,
+    /// `OperationUnresolved`). Nothing is closed; the draft stays approved,
+    /// and the next approve replays the same operation, which the route
+    /// answers from its record (24 October 2026).
+    Pending {
+        /// The route's refusal name.
+        refusal: String,
+        /// The route's refusal words.
+        reason: String,
+    },
+}
+
+/// Whether a route's refusal says the act is recorded but not yet answered,
+/// so the draft is not closed on it.
+fn pending(refusal: &str) -> bool {
+    crate::openapi_refusals::RECORDED.contains(&refusal)
 }
 pub(crate) fn outcome(held: &DraftRecord) -> Option<Outcome> {
     held.executed
@@ -96,6 +113,9 @@ pub(crate) async fn apply(
     let bytes = prepared_body(held, approved.application)?;
     let response = dispatch(state, headers, held, &actor, &bytes).await?;
     let outcome = applied_outcome(state, held, &actor, &bytes, response).await?;
+    if matches!(outcome, Outcome::Pending { .. }) {
+        return Ok(outcome);
+    }
     close(state, held, actor, &outcome)?;
     Ok(outcome)
 }
@@ -203,6 +223,12 @@ async fn applied_outcome(
         let reason = answer["reason"]
             .as_str()
             .ok_or_else(|| fault("the applied route's refusal has no words"))?;
+        if pending(refusal) {
+            return Ok(Outcome::Pending {
+                refusal: refusal.to_owned(),
+                reason: reason.to_owned(),
+            });
+        }
         Ok(Outcome::RefusedOnExecution {
             refusal: refusal.to_owned(),
             reason: reason.to_owned(),
@@ -253,8 +279,24 @@ fn close(
                     reason: reason.clone(),
                 }))
             }
+            Outcome::Pending { .. } => return Err(fault("a pending act closes no draft")),
         };
         directory.record_draft(event)?;
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod pending_tests {
+    use super::pending;
+
+    /// A refusal of the recorded class leaves the draft open for a replay; a
+    /// route's own decision closes it.
+    #[test]
+    fn only_the_recorded_class_leaves_the_draft_open() {
+        assert!(pending("ProjectionPending"));
+        assert!(pending("OperationUnresolved"));
+        assert!(!pending("ProvisioningChanged"));
+        assert!(!pending("NotHeld"));
+    }
 }

@@ -495,6 +495,7 @@ pub(crate) const TABLE: &[E] = entries! {
     POST "/teams/{id}/nesting" "Replace a team parent and lead" G [SIGNED_BODY, &["NotAdmitted", "team_parent_cycle", "team_lead_not_member", "TeamsUnavailable"]] scope("team", "team.parent.set", ["id"]);
     POST "/teams/{id}/retire" "Retire a team" G [SIGNED_BODY] scope("team", "team.retire", ["id"]);
     GET "/resources" "The resources grants are on" G [SIGNED, &["NotAdmitted"]] scope("resource", "read", []);
+    GET "/apps/{app}/placements" "An app's recorded placements: each child resource under its parent, in the order they were placed" G [SIGNED, &["NotAdmitted", "app_unknown"]] scope("resource", "read", []);
     GET "/secrets" "The secrets" G [SIGNED, &["NoPerson", "SecretsUnavailable"]] scope("secret", "read", []);
     GET "/secrets/grants" "The secrets' grants" G [SIGNED] scope("secret", "read", []);
     GET "/secrets/audit" "The secrets' audit" G [SIGNED] scope("secret", "read", []);

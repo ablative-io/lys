@@ -20,6 +20,10 @@
 //! removes a role is refused `schema_change_strands_grants` while a standing
 //! grant names that role.
 //!
+//! `GET /apps/{app}/placements` answers an app's recorded placements to any
+//! admitted caller, so a product or an administrator's agent can read what a
+//! pass will reach without holding a grant on each child (24 October 2026).
+//!
 //! `POST /apps/{app}/placements` records that a resource of an app kind is
 //! in a parent its kind's schema lists, so the relations held on the parent
 //! flow to it; unless it is `restricted` (ACCESS-004 R2), when nothing held
@@ -38,7 +42,7 @@ use lys_identity::OperationId;
 use lys_identity::grants::{
     AppSchema, GrantBook, Resource, Standing as Held, diff, owner_of, stranded,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::apps_api::refresh;
@@ -110,7 +114,7 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route("/apps/{app}/schema/check", post(check))
         .route("/apps/{app}/schema/approve", post(approve))
         .route("/apps/{app}/schema/decline", post(decline))
-        .route("/apps/{app}/placements", post(place))
+        .route("/apps/{app}/placements", post(place).get(placements))
 }
 
 fn malformed(reason: impl Into<String>) -> ServerError {
@@ -402,6 +406,48 @@ async fn version(
         })
     })
     .map(Json)
+}
+
+/// The answer of `GET /apps/{app}/placements`.
+#[derive(Debug, Serialize)]
+pub(crate) struct PlacementsView {
+    /// The app whose placements these are.
+    pub app: String,
+    /// Each child resource under its parent, in the order they were placed.
+    pub placements: Vec<Placed>,
+    /// The grants' revision the answer was read at.
+    pub revision: u64,
+}
+
+/// `GET /apps/{app}/placements`: the app's placements, for an admitted caller.
+///
+/// # Errors
+/// `NotAdmitted` for a caller the directory does not admit; `app_unknown`
+/// for an app that is not registered; the grants' own refusals when they
+/// cannot be read.
+async fn placements(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<Json<PlacementsView>, ServerError> {
+    with_grants(&state, |judged| {
+        crate::service_account_grants::caller(&state, &headers, &judged)?;
+        let held = judged.apps.held();
+        if held.app(&id).is_none() {
+            return Err(AppError::AppUnknown { app: id.clone() }.into());
+        }
+        let placements = held
+            .placements
+            .iter()
+            .filter(|placed| placed.app == id)
+            .cloned()
+            .collect();
+        Ok(Json(PlacementsView {
+            app: id.clone(),
+            placements,
+            revision: judged.grants.revision(),
+        }))
+    })
 }
 
 async fn place(

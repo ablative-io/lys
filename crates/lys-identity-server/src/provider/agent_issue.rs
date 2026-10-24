@@ -48,8 +48,31 @@ pub(crate) struct AgentAppPass {
 }
 
 /// The pass of `agent` to the approved app `app`, at this request. The
-/// agent is the caller's to have proved.
+/// agent is the caller's to have proved. A pass refused is one line in the
+/// service's log naming the agent, the audience and the refusal, so a boot
+/// that was answered nothing can be read back (24 October 2026).
 pub(crate) fn agent_app_pass(
+    state: &AppState,
+    agent: AgentId,
+    app: &str,
+) -> Result<AgentAppPass, ServerError> {
+    let answer = issue_agent_app_pass(state, agent, app);
+    if let Err(refusal) = &answer {
+        eprintln!("{}", refused_line(agent, app, refusal));
+    }
+    answer
+}
+
+/// The service's log line for a pass refused to `agent` for `app`: the
+/// refusal's name and words, never a credential.
+fn refused_line(agent: AgentId, app: &str, refusal: &ServerError) -> String {
+    format!(
+        "lys-identity-server agent pass refused: agent {agent} audience {app} refusal {} {refusal}",
+        refusal.name()
+    )
+}
+
+fn issue_agent_app_pass(
     state: &AppState,
     agent: AgentId,
     app: &str,
@@ -127,4 +150,27 @@ pub(super) fn key_thumbprints(
     keys.sort_unstable();
     keys.dedup();
     Ok(keys)
+}
+
+#[cfg(test)]
+mod refused_line_tests {
+    use lys_identity::AgentId;
+
+    use super::refused_line;
+    use crate::error::ServerError;
+
+    /// A refused pass is logged by the agent, the audience and the refusal's name and words.
+    #[test]
+    fn a_refused_pass_is_logged_by_the_refusals_name() {
+        let agent = AgentId::from_bytes([7; 16]);
+        let refusal = ServerError::NotAdmitted {
+            reason: "held for the person",
+        };
+        let line = refused_line(agent, "liminal", &refusal);
+        let opening = format!(
+            "lys-identity-server agent pass refused: agent {agent} audience liminal refusal NotAdmitted "
+        );
+        assert!(line.starts_with(&opening), "{line}");
+        assert!(line.contains("held for the person"), "{line}");
+    }
 }

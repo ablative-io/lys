@@ -70,19 +70,31 @@ pub const CREATED_RIGHTS: [&str; 5] = [
 /// The act whose grant the rights in [`CREATED_RIGHTS`] stand under.
 pub const CREATE: &str = "agent.create";
 
+/// Whether `source` admits its holder to register an agent: it carries
+/// `agent.create` itself, or the organisation standing that covers it
+/// (`organisation.administer`, [`super::shipped::standing_for`]), under
+/// which an administrator's agent registers (24 October 2026). The rights
+/// the registration records stand under whichever admitted it.
+#[must_use]
+pub fn admits_create(source: &Grant) -> bool {
+    let standing = super::shipped::standing_for(CREATE);
+    source
+        .actions()
+        .iter()
+        .any(|action| action.as_str() == CREATE || action.as_str() == standing)
+}
+
 /// Whether `grant` is one of the rights `source`'s holder, an agent, holds
 /// on an agent it registered: issued by the person answering for it, held by
 /// the same agent, on an agent, use-only, and carrying nothing outside
 /// [`CREATED_RIGHTS`]. Such a grant stands in the chain of the `agent.create`
-/// grant it was recorded under, so revoking that grant withdraws it.
+/// grant, or the administrator standing, it was recorded under
+/// ([`admits_create`]), so revoking that grant withdraws it.
 #[must_use]
 pub fn created_hop(grant: &Grant, source: &Grant) -> bool {
     let parts = grant.parts();
     is_agent(source.holder())
-        && source
-            .actions()
-            .iter()
-            .any(|action| action.as_str() == CREATE)
+        && admits_create(source)
         && grant.holder() == source.holder()
         && parts.issuer == IdentityId::Person(source.responsible())
         && grant.responsible() == source.responsible()

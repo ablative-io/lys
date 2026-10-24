@@ -35,43 +35,45 @@ impl TrustPath {
     /// Refuses `mcp_trust_roots_unreadable` when no system root can be read, naming
     /// what the platform store said.
     pub(crate) fn system() -> CliResult<Self> {
-        Self::with_roots(&[])
+        Self::with_roots(true, &[])
     }
 
-    /// The system's trust roots with `root` added to the same store, for this crate's
-    /// tests alone: the test certificate is trusted the way a system root is.
+    /// The test's root alone on the same verifying path, for this crate's tests:
+    /// what the bridge proves about verification does not depend on the machine's
+    /// own trust store, which a detached gate cannot always read (24 October 2026).
     ///
     /// # Errors
-    /// As [`TrustPath::system`], and `mcp_trust_roots_unreadable` when `root` is not a
-    /// usable trust anchor.
+    /// `mcp_trust_roots_unreadable` when `root` is not a usable trust anchor.
     #[cfg(test)]
-    pub(crate) fn system_and(root: &CertificateDer<'static>) -> CliResult<Self> {
-        Self::with_roots(std::slice::from_ref(root))
+    pub(crate) fn only(root: &CertificateDer<'static>) -> CliResult<Self> {
+        Self::with_roots(false, std::slice::from_ref(root))
     }
 
-    fn with_roots(extra: &[CertificateDer<'static>]) -> CliResult<Self> {
-        let loaded = rustls_native_certs::load_native_certs();
+    fn with_roots(system: bool, extra: &[CertificateDer<'static>]) -> CliResult<Self> {
         let mut roots = RootCertStore::empty();
-        let (added, ignored) = roots.add_parsable_certificates(loaded.certs);
-        let problems: Vec<String> = loaded.errors.iter().map(ToString::to_string).collect();
-        if added == 0 {
-            return Err(refused(
-                "mcp_trust_roots_unreadable",
-                format!(
-                    "no trust root could be read from this system ({ignored} unusable): {}",
-                    if problems.is_empty() {
-                        "the store is empty".to_owned()
-                    } else {
-                        problems.join("; ")
-                    }
-                ),
-            ));
-        }
-        if !problems.is_empty() {
-            eprintln!(
-                "mcp_trust_roots_partial: {added} system roots read; not read: {}",
-                problems.join("; ")
-            );
+        if system {
+            let loaded = rustls_native_certs::load_native_certs();
+            let (added, ignored) = roots.add_parsable_certificates(loaded.certs);
+            let problems: Vec<String> = loaded.errors.iter().map(ToString::to_string).collect();
+            if added == 0 {
+                return Err(refused(
+                    "mcp_trust_roots_unreadable",
+                    format!(
+                        "no trust root could be read from this system ({ignored} unusable): {}",
+                        if problems.is_empty() {
+                            "the store is empty".to_owned()
+                        } else {
+                            problems.join("; ")
+                        }
+                    ),
+                ));
+            }
+            if !problems.is_empty() {
+                eprintln!(
+                    "mcp_trust_roots_partial: {added} system roots read; not read: {}",
+                    problems.join("; ")
+                );
+            }
         }
         for root in extra {
             roots.add(root.clone()).map_err(|error| {
