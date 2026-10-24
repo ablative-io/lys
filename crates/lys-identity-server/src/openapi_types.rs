@@ -103,6 +103,12 @@ pub(crate) fn types(api: &mut Api) -> BTreeMap<(Method, &'static str), (Schema, 
         Some(api.schema::<crate::product_agents::ProductAgentsQuery>()),
         Some(api.schema::<crate::product_agents::ProductAgents>()),
     ));
+    entries.push((
+        GET,
+        "/apps/{app}/placements",
+        None,
+        Some(api.schema::<crate::apps_schema_api::PlacementsView>()),
+    ));
     entries.extend(crate::cord_api::types(api));
     entries.extend(crate::canvas_api::types(api));
     entries.extend(crate::dashboard_api::types(api));

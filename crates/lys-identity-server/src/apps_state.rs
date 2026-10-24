@@ -57,7 +57,7 @@ pub const DOMAIN: &str = "lys/identity/apps-state/v1";
 const FORMAT: &str = "lys-apps-state/v1";
 
 /// Who made an act on the apps.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum By {
     /// A signed-in person, by their login.
@@ -226,7 +226,7 @@ pub struct Applied {
 }
 
 /// A resource of an app kind placed in its parent.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Placed {
     /// The operation id it was placed with.

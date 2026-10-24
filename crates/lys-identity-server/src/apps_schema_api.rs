@@ -409,7 +409,7 @@ async fn version(
 }
 
 /// The answer of `GET /apps/{app}/placements`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub(crate) struct PlacementsView {
     /// The app whose placements these are.
     pub app: String,
