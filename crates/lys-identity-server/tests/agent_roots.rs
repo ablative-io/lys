@@ -108,6 +108,7 @@ async fn setup_gives_the_administrator_roots_an_agent_can_be_given_access_throug
     assert_eq!(
         own["pass_on"]["actions"],
         json!([
+            "agent.certificate.issue",
             "agent.create",
             "agent.provisioning.review",
             "agent.provisioning.set"
@@ -290,9 +291,9 @@ fn the_withheld_list_keeps_exactly_a_persons_credentials() {
     }
 }
 
-/// The one standing choice's four grants, in its order, from the roots on
+/// The one standing choice's five grants, in its order, from the roots on
 /// the administrator's own person and on the computer, to `agent`; their ids.
-async fn give_four(
+async fn give_five(
     service: &Service,
     auth: Auth<'_>,
     (own, computer): (&Value, &Value),
@@ -304,6 +305,7 @@ async fn give_four(
         (computer, "machine.agent.set"),
         (own, "agent.provisioning.set"),
         (own, "agent.provisioning.review"),
+        (own, "agent.certificate.issue"),
     ] {
         let body = json!({"operation": op()?, "route": "api", "source": source["id"],
             "recipient": agent, "responsible": person, "resource": source["resource"],
@@ -332,7 +334,7 @@ async fn own_computers(service: &Service, cookie: &str) -> Result<Vec<Value>, Bo
 /// which names the computer Lys runs on once, then gives four grants, and the
 /// agent reads all four back as its own on `GET /agent/grants`.
 #[tokio::test]
-async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> TestResult {
+async fn a_standing_give_after_agent_roots_leaves_the_agent_five_grants() -> TestResult {
     let (service, seeded) = Service::start_asking(&shipped_model(), None, None, |config| {
         Ok(seed_configured(config, [ADMINISTRATOR, "bea-subject"])?)
     })
@@ -377,7 +379,7 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> Tes
     };
     let own = on(json!({"kind": "person", "id": person}))?;
     let computer = on(json!({"kind": "machine", "id": machine}))?;
-    let held = give_four(&service, auth, (&own, &computer), (&person, &agent)).await?;
+    let held = give_five(&service, auth, (&own, &computer), (&person, &agent)).await?;
 
     // The agent, certified, reads its own grants by its own signature.
     let key = Arc::new(Ed25519Identity::from_seed(&Zeroizing::new([4; 32])));
@@ -413,7 +415,7 @@ async fn a_standing_give_after_agent_roots_leaves_the_agent_four_grants() -> Tes
             "{grant} not held: {read}"
         );
     }
-    assert_eq!(held.len(), 4);
+    assert_eq!(held.len(), 5);
     Ok(())
 }
 

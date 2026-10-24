@@ -2,8 +2,8 @@
  * "They may", wherever a person chooses what someone may do: three levels read in a breath (view, edit, own), each
  * said from the actions the model gives it and never from its name, so a model that changes what a level carries
  * changes its words with it. Every other relation folds under "More", grouped by area, one sentence each. An app's
- * kind, whose few relations are its own, lists them by name. Agents keep the per-action picker: an agent is never
- * given a level.
+ * kind, whose few relations are its own, lists them by name, each said by the model's sentences when it has one for
+ * every action it carries. Agents keep the per-action picker: an agent is never given a level.
  */
 import { useId } from 'react';
 import type { ReactNode } from 'react';
@@ -55,7 +55,7 @@ export function LevelPicker({ model, relations, value, onChange, name, legend = 
   const app = !LEVELS.every(([relation]) => relation in relations);
   const levels = app ? [] : LEVELS;
   const shown: [string, string, string][] = app
-    ? Object.entries(relations).map(([relation, actions]) => [relation, relation, actions.join(', ')])
+    ? Object.entries(relations).map(([relation, actions]) => [relation, relation, actions.every((action) => action in model.action_sentences) ? oneWords(model, actions) : actions.join(', ')])
     : levels.map(([relation, label]) => [relation, label, levelWords(relations[relation])]);
   const others = app ? [] : Object.entries(relations).filter(([relation]) => !LEVEL_NAMES.includes(relation));
   const areas = [...new Set(others.map(([, actions]) => areaOf(actions)))].sort();

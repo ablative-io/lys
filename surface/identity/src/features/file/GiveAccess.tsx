@@ -13,6 +13,9 @@ import { readableMachine } from '../network/contract';
 import type { Machine, NetworkView } from '../network/contract';
 import { NetworkRead } from '../network/shared-read';
 import type { Entry } from '../people/directory';
+import { actionWords } from '../grants/action-words';
+import { ORGANISATION_KIND, relationsOf } from '../grants/IssueRoot';
+import { organisationActs } from '../grants/organisation-acts';
 import { giveLink } from './giveLink';
 
 /** An unavailable recipient still opens an empty drawer, never an unrelated form. */
@@ -40,12 +43,16 @@ type Outcome =
   | { at: 'given'; words: string }
   | { at: 'refused'; words: string };
 
-/** The four grants of the one standing choice, in the order they are given (AGENTS-017 R4). */
+/**
+ * The five grants of the one standing choice, in the order they are given (AGENTS-017 R4; the fifth, issuing the
+ * person's agents' certificates, since 24 October 2026).
+ */
 const ACTS: { action: string; on: 'person' | 'computer' }[] = [
   { action: 'agent.create', on: 'person' },
   { action: 'machine.agent.set', on: 'computer' },
   { action: 'agent.provisioning.set', on: 'person' },
   { action: 'agent.provisioning.review', on: 'person' },
+  { action: 'agent.certificate.issue', on: 'person' },
 ];
 
 /**
@@ -93,11 +100,12 @@ const plansFor = (w: GrantWorld, computer: Machine | undefined): { action: strin
 
 /**
  * The one standing choice a person gives an agent once (AGENTS-015 R4, AGENTS-017 R4): let it set up and run agents
- * on a computer of theirs. Its Give posts four grants in order, agent.create, machine.agent.set,
- * agent.provisioning.set and agent.provisioning.review, through POST /grants exactly as the pickers below post theirs:
+ * on a computer of theirs. Its Give posts five grants in order, agent.create, machine.agent.set,
+ * agent.provisioning.set, agent.provisioning.review and agent.certificate.issue, through POST /grants exactly as the
+ * pickers below post theirs:
  * same body, same kept request, same confirmation, use only. The administrator who holds nothing to give one of them
  * from has Lys record their roots first (POST /grants/agent-roots), which also names the computer Lys runs on; the
- * grants and computers are read again before the four are planned. One receipt names the four grants; a refusal names
+ * grants and computers are read again before the five are planned. One receipt names the five grants; a refusal names
  * the step that refused and leaves the earlier grants given, so pressing Give again finishes what is left.
  */
 function StandingGrants({ x, w, reload }: { x: Entry; w: GrantWorld; reload: () => void }) {
@@ -116,7 +124,8 @@ function StandingGrants({ x, w, reload }: { x: Entry; w: GrantWorld; reload: () 
   const title = `Let ${name} set up and run agents on ${chosen?.name ?? 'your computer'}`;
   const sentence = `Lets ${name} register agents that answer to you; it then may set up, start, stop and restart each agent it creates. `
     + `Lets ${name} allow your agents to run on ${where}. `
-    + `Lets ${name} set up and review your agents’ profiles; a version ${name} sets itself is reviewed by someone else.`;
+    + `Lets ${name} set up and review your agents’ profiles; a version ${name} sets itself is reviewed by someone else. `
+    + `Lets ${name} issue your agents’ certificates, the keys they act with, so a new or re-keyed agent needs no sign-in of yours.`;
 
   /** The roots first when the administrator lacks a source, then each step's grant in turn, kept before it is sent. */
   const give = async () => {
@@ -203,6 +212,70 @@ function StandingGrants({ x, w, reload }: { x: Entry; w: GrantWorld; reload: () 
   );
 }
 
+/**
+ * Standing in the organisation itself, given to an agent by whoever holds organisation.grant there (24 October 2026):
+ * the same POST /grants from administrator standing the Give access form posts, from the agent's own file, so the two
+ * places agree. The server judges it; this offers only the organisation's standing relations, administrator among them.
+ */
+function OrganisationStanding({ x, w, reload }: { x: Entry; w: GrantWorld; reload: () => void }) {
+  const acts = organisationActs(w.me, w.list.grants);
+  const [relation, setRelation] = useState('');
+  const [outcome, setOutcome] = useState<Outcome>({ at: 'idle' });
+  if (!acts.organisation || !acts.grant) return null;
+  const organisation = acts.organisation;
+  const relations = relationsOf(w.model, ORGANISATION_KIND);
+  const resource: ResourceRef = { kind: ORGANISATION_KIND, id: organisation.id };
+  const said = `${relation} of ${organisation.display_name} to ${x.display_name}`;
+  const give = async () => {
+    const actions = relations[relation];
+    if (!actions || outcome.at === 'sending') return;
+    setOutcome({ at: 'sending' });
+    const me = w.me.person.id;
+    const body: DelegateBody = {
+      operation: operationId(), route: 'browser', source: 'administrator', recipient: x.id, responsible: me, mode: 'outright',
+      resource, relation, pass_on: { kind: 'use_only' }, window: { starts_at: Math.floor(Date.now() / 1000), ends_at: null },
+    };
+    const kept = await keptSend<Recorded>(pendingGrantKey(me, 'administrator.' + organisation.id), body, async () => {
+      const answer = await api.delegate(body);
+      if (answer.operation !== body.operation || answer.receipt?.caller !== me || typeof answer.grant !== 'string' || !/^grant-[0-9a-f]{32}$/.test(answer.grant)) {
+        throw new Refused(200, { refusal: 'UnconfirmedAnswer', reason: 'Lys did not confirm this grant operation.' });
+      }
+      return answer;
+    }, true);
+    if (kept.at !== 'confirmed') {
+      const reason = kept.error instanceof Refused ? kept.error.refusal.reason : String(kept.error);
+      setOutcome({ at: 'refused', words: kept.at === 'refused' ? `Not given: Lys refused ${said}: ${reason}.`
+        : kept.at === 'unkept' ? `Nothing was sent: this browser could not keep the request for ${said} (${reason}).`
+          : `Lys has not confirmed ${said} (${reason}). The request is kept in this browser.` });
+      return;
+    }
+    setOutcome({ at: 'given', words: `Given: ${x.display_name} is now ${relation} of ${organisation.display_name} (${grantNo(kept.answer.grant)}). ${actionWords(w.model, resource, actions)}.` });
+    reload();
+  };
+  return (
+    <div className="field" data-organisation-standing>
+      <div className="eyebrow">In {organisation.display_name}</div>
+      <p className="note">
+        Standing in the organisation itself, given from your own standing there. An administrator adds people, gives access
+        directly and administers the organisation; every act under it is on the record as {x.display_name}’s.
+      </p>
+      <label className="field">
+        Standing to give
+        <select aria-label="Standing in the organisation" value={relation} onChange={(event) => setRelation(event.target.value)}>
+          <option value="">Choose standing</option>
+          {Object.entries(relations).map(([name, actions]) => (
+            <option key={name} value={name}>{name} · {actionWords(w.model, resource, actions)}</option>
+          ))}
+        </select>
+      </label>
+      <Act symbol="send" name={`Give ${x.display_name} standing in ${organisation.display_name}`} word="Give" data-act="organisation-standing"
+        disabled={!relation || outcome.at === 'sending'} onClick={() => { void give(); }} />
+      {outcome.at === 'given' ? <p role="status" data-organisation-receipt>{outcome.words}</p> : null}
+      {outcome.at === 'refused' ? <p role="alert" data-organisation-refused>{outcome.words}</p> : null}
+    </div>
+  );
+}
+
 /** The same Give form whether opened by a press or filled by a reviewed link. */
 export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; query: string; reload: () => void }) {
   const shell = useShell();
@@ -212,6 +285,8 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
   const [sourceId, setSourceId] = useState(linked.at === 'ready' ? linked.source.id : '');
   const [fromLink, setFromLink] = useState(linked.at !== 'absent');
   const passable = w.list.grants.filter((grant) => grant.holder === w.me.person.id && grant.standing.stands && givesTo(grant.pass_on).includes(x.kind === 'agent' ? 'agent' : 'person'));
+  // Whoever holds organisation.grant gives an agent standing in the organisation outright, holding nothing passable.
+  const standing = w.people.scope === 'directory' || organisationActs(w.me, w.list.grants).grant;
   const source = passable.find((grant) => grant.id === sourceId);
   const mineToGive = x.state !== 'retired' && (x.kind === 'person' ? x.id !== w.me.person.id : x.person?.id === w.me.person.id);
   const refused = fromLink && linked.at === 'refused';
@@ -226,7 +301,7 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
             word="Give"
             data-act="grant"
             onClick={(event) => {
-              if (mineToGive && (passable.length || (x.kind === 'agent' && w.people.scope === 'directory'))) {
+              if (mineToGive && (passable.length || (x.kind === 'agent' && standing))) {
                 setSourceId('');
                 setFromLink(false);
                 setOpener(event.currentTarget);
@@ -258,7 +333,7 @@ export function GiveAccess({ x, w, query, reload }: { x: Entry; w: GrantWorld; q
             </>
           ) : (
             <>
-              {x.kind === 'agent' && mineToGive ? <StandingGrants x={x} w={w} reload={reload} /> : null}
+              {x.kind === 'agent' && mineToGive ? <><StandingGrants x={x} w={w} reload={reload} /><OrganisationStanding x={x} w={w} reload={reload} /></> : null}
               <label className="field">
                 Access to give
                 <select

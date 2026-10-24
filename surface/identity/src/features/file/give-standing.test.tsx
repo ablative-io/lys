@@ -1,7 +1,8 @@
 /**
  * AGENTS-017 R4: the agent file's Give form offers one standing choice, above the pickers: let the agent set up and
- * run agents on a computer of the person's. Give posts four grants in order; an administrator who holds nothing to
- * give one from has Lys record their roots first. No clocks: every wait here is the page changing (a
+ * run agents on a computer of the person's. Give posts five grants in order (the fifth, issuing the person's agents'
+ * certificates, since 24 October 2026); an administrator who holds nothing to give one from has Lys record their roots
+ * first. Below it, whoever holds organisation.grant gives the agent standing in the organisation itself. No clocks: every wait here is the page changing (a
  * MutationObserver), never a set time.
  */
 import { createRoot } from 'react-dom/client';
@@ -12,7 +13,7 @@ import { grantNo, type GrantWorld } from '../grants/model';
 import type { Entry } from '../people/directory';
 import type { DelegateBody, Grant, GrantModel } from '../../generated/grants';
 import { ShellProvider } from '../../shell/ShellContext';
-import { ADA, BEA, DIRECTORY, GRANTS, ME, MODEL, OWN, SCRIBE, ok, refused } from '../../../tests/fixtures';
+import { ADA, BEA, DIRECTORY, FOUNDING_G, GRANTS, ME, MODEL, ORGANISATION, OWN, SCRIBE, ok, refused } from '../../../tests/fixtures';
 import type { Route } from '../../../tests/fixtures';
 import type { PeopleView } from '../../generated';
 import { serve } from '../../../tests/harness';
@@ -33,9 +34,16 @@ const model: GrantModel = {
     'only.machine.agent.set': ['machine.agent.set'],
     'only.agent.provisioning.set': ['agent.provisioning.set'],
     'only.agent.provisioning.review': ['agent.provisioning.review'],
+    'only.agent.certificate.issue': ['agent.certificate.issue'],
   },
   withheld_from_agents: ['grant'],
 };
+/** The same model as a founded organisation's service serves it: the administrator relation, with its sentences. */
+const WITH_ORGANISATION: GrantModel = { ...model,
+  relations: { ...model.relations, administrator: ['organisation.administer', 'organisation.admit', 'organisation.grant', 'organisation.read'] },
+  action_sentences: { ...model.action_sentences, 'organisation.administer': 'Administer this organisation', 'organisation.admit': 'Add people to this organisation',
+    'organisation.grant': 'Give access directly in this organisation', 'organisation.read': 'Read this organisation' } };
+const FOUNDING = GRANTS.find((grant) => grant.id === FOUNDING_G) as Grant;
 
 const held = (id: string, resource: Grant['resource'], actions: string[]): Grant => ({
   ...GRANTS[0], id, holder: ADA, resource, relation: 'owner', actions, source: null,
@@ -44,7 +52,7 @@ const held = (id: string, resource: Grant['resource'], actions: string[]): Grant
 const SOURCES: Grant[] = [
   held(PERSON_G, { kind: 'person', id: ADA }, ['agent.create']),
   held(MACHINE_G, { kind: 'machine', id: HOME }, ['machine.agent.set']),
-  held(AGENTS_G, { kind: 'person', id: ADA }, ['agent.provisioning.set', 'agent.provisioning.review']),
+  held(AGENTS_G, { kind: 'person', id: ADA }, ['agent.provisioning.set', 'agent.provisioning.review', 'agent.certificate.issue']),
 ];
 
 const machine = (id: string, name: string, owner: string, runtime = 'runner') => ({
@@ -61,8 +69,9 @@ const TITLE = 'Let Scribe set up and run agents on Workshop';
 const CREATE = 'Lets Scribe register agents that answer to you; it then may set up, start, stop and restart each agent it creates.';
 const RUN = 'Lets Scribe allow your agents to run on Workshop.';
 const PROFILES = 'Lets Scribe set up and review your agents’ profiles; a version Scribe sets itself is reviewed by someone else.';
+const CERTIFICATES = 'Lets Scribe issue your agents’ certificates, the keys they act with, so a new or re-keyed agent needs no sign-in of yours.';
 const WHY = 'Six approvals for every agent is security too awkward to use';
-const ORDER = ['agent.create', 'machine.agent.set', 'agent.provisioning.set', 'agent.provisioning.review'];
+const ORDER = ['agent.create', 'machine.agent.set', 'agent.provisioning.set', 'agent.provisioning.review', 'agent.certificate.issue'];
 const OLD_CHOICES = ['Create agents for me', 'Run my agents on this computer', 'Set up and review this kind of profile'];
 
 let root: Root | null = null;
@@ -96,6 +105,7 @@ interface Opening {
   /** The answer to the n-th POST /grants (1-based), when not the plain confirmation. */
   answer?: (made: number, body: DelegateBody) => ReturnType<typeof ok> | null;
   routes?: Record<string, Route>;
+  model?: GrantModel;
 }
 
 async function opened(x: Entry, given: Opening = {}) {
@@ -113,7 +123,7 @@ async function opened(x: Entry, given: Opening = {}) {
     },
     ...given.routes,
   }, posted);
-  const world: GrantWorld = { me: ME, people: given.people ?? DIRECTORY, list: { grants, revision: 7 }, model,
+  const world: GrantWorld = { me: ME, people: given.people ?? DIRECTORY, list: { grants, revision: 7 }, model: given.model ?? model,
     byId: new Map(grants.map((g) => [g.id, g])), who: new Map([
       [ADA, { name: 'Ada', state: 'active', kind: 'person', responsible: null }],
       [SCRIBE, { name: 'Scribe', state: 'active', kind: 'agent', responsible: ADA }],
@@ -144,12 +154,12 @@ const actionsOf = (body: unknown): string[] => model.relations[(body as Delegate
 const grantsPosted = (posted: { path: string; body: unknown }[]) => posted.filter((p) => p.path === '/grants');
 
 describe('The one standing choice on an agent’s Give form', () => {
-  it('offers one choice naming the computer, with the three sentences, once saying why it is one choice, above the pickers', async () => {
+  it('offers one choice naming the computer, with the four sentences, once saying why it is one choice, above the pickers', async () => {
     const { container } = await opened(scribe);
     const choices = container.querySelectorAll('[data-standing-choice]');
     expect(choices.length).toBe(1);
     const text = container.textContent ?? '';
-    for (const words of [TITLE, CREATE, RUN, PROFILES]) expect(text).toContain(words);
+    for (const words of [TITLE, CREATE, RUN, PROFILES, CERTIFICATES]) expect(text).toContain(words);
     for (const words of OLD_CHOICES) expect(text).not.toContain(words);
     expect(text.split(WHY).length - 1).toBe(1);
     expect(text).toContain('the standing grant is your consent, and every act under it is on the record as Scribe’s');
@@ -168,26 +178,26 @@ describe('The one standing choice on an agent’s Give form', () => {
     expect(container.textContent).toContain(TITLE);
   });
 
-  it('Give posts the four grants in order, each exactly one act, use only, and one receipt names all four', async () => {
+  it('Give posts the five grants in order, each exactly one act, use only, and one receipt names all five', async () => {
     const { container, posted } = await opened(scribe);
     await give(container);
-    expect(posted.map((p) => p.path)).toEqual(['/grants', '/grants', '/grants', '/grants']);
+    expect(posted.map((p) => p.path)).toEqual(['/grants', '/grants', '/grants', '/grants', '/grants']);
     expect(posted.map((p) => actionsOf(p.body))).toEqual(ORDER.map((action) => [action]));
-    expect(posted.map((p) => (p.body as DelegateBody).source)).toEqual([PERSON_G, MACHINE_G, AGENTS_G, AGENTS_G]);
+    expect(posted.map((p) => (p.body as DelegateBody).source)).toEqual([PERSON_G, MACHINE_G, AGENTS_G, AGENTS_G, AGENTS_G]);
     expect(posted.map((p) => (p.body as DelegateBody).resource)).toEqual([
-      { kind: 'person', id: ADA }, { kind: 'machine', id: HOME }, { kind: 'person', id: ADA }, { kind: 'person', id: ADA }]);
+      { kind: 'person', id: ADA }, { kind: 'machine', id: HOME }, { kind: 'person', id: ADA }, { kind: 'person', id: ADA }, { kind: 'person', id: ADA }]);
     for (const p of posted) {
       expect(p.body).toMatchObject({ recipient: SCRIBE, responsible: ADA, pass_on: { kind: 'use_only' }, route: 'browser' });
     }
     const receipt = container.querySelectorAll('[data-standing-receipt]');
     expect(receipt.length).toBe(1);
     const words = receipt[0].textContent ?? '';
-    for (const part of [TITLE, CREATE, RUN, PROFILES, ...ORDER]) expect(words).toContain(part);
-    for (const made of [1, 2, 3, 4]) expect(words).toContain(grantNo('grant-' + hex(100 + made)));
+    for (const part of [TITLE, CREATE, RUN, PROFILES, CERTIFICATES, ...ORDER]) expect(words).toContain(part);
+    for (const made of [1, 2, 3, 4, 5]) expect(words).toContain(grantNo('grant-' + hex(100 + made)));
     expect(container.querySelector('[data-standing-refused]')).toBeNull();
   });
 
-  it('an administrator holding nothing to give has Lys record their roots first, reads the grants again, then gives the four', async () => {
+  it('an administrator holding nothing to give has Lys record their roots first, reads the grants again, then gives the five', async () => {
     const { container, posted } = await opened(scribe, {
       grants: [],
       routes: {
@@ -198,7 +208,7 @@ describe('The one standing choice on an agent’s Give form', () => {
     // Nothing passable yet, so the pickers say so; the standing choice is still offered to the administrator.
     expect(container.querySelector('[data-act="standing-all"]')).not.toBeNull();
     await give(container);
-    expect(posted.map((p) => p.path)).toEqual(['/grants/agent-roots', '/grants', '/grants', '/grants', '/grants']);
+    expect(posted.map((p) => p.path)).toEqual(['/grants/agent-roots', '/grants', '/grants', '/grants', '/grants', '/grants']);
     expect(grantsPosted(posted).map((p) => actionsOf(p.body))).toEqual(ORDER.map((action) => [action]));
     expect(container.querySelector('[data-standing-receipt]')?.textContent).toContain(TITLE);
   });
@@ -228,5 +238,44 @@ describe('The one standing choice on an agent’s Give form', () => {
     expect(container.querySelector('[data-standing]')).toBeNull();
     for (const words of [TITLE, WHY]) expect(container.textContent).not.toContain(words);
     expect(posted).toEqual([]);
+  });
+});
+
+describe('Standing in the organisation on an agent’s Give form (24 October 2026)', () => {
+  const standing = (container: HTMLElement) => container.querySelector<HTMLSelectElement>('select[aria-label="Standing in the organisation"]');
+
+  it('offers the organisation’s standing relations by sentence to the holder of organisation.grant, and gives administrator as administrator standing', async () => {
+    const { container, posted } = await opened(scribe, { grants: [...SOURCES, FOUNDING], model: WITH_ORGANISATION });
+    const block = container.querySelector('[data-organisation-standing]');
+    expect(block?.textContent).toContain('In Example organisation');
+    expect([...(standing(container)?.options ?? [])].map((o) => o.value)).toEqual(['', 'administrator']);
+    expect(standing(container)?.textContent).toContain('Add people to this organisation');
+    expect(standing(container)?.textContent).not.toContain('Edit this resource');
+    const button = container.querySelector<HTMLButtonElement>('[data-act="organisation-standing"]');
+    expect(button?.disabled).toBe(true);
+    const select = standing(container);
+    if (!select) throw new Error('no standing select');
+    const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+    setter?.call(select, 'administrator');
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await until(container, () => container.querySelector<HTMLButtonElement>('[data-act="organisation-standing"]')?.disabled === false);
+    container.querySelector<HTMLButtonElement>('[data-act="organisation-standing"]')?.click();
+    await until(container, () => container.querySelector('[data-organisation-receipt], [data-organisation-refused]') !== null);
+    expect(grantsPosted(posted)).toHaveLength(1);
+    expect(grantsPosted(posted)[0].body).toMatchObject({
+      source: 'administrator', recipient: SCRIBE, responsible: ADA, relation: 'administrator', mode: 'outright', route: 'browser',
+      resource: { kind: 'organisation', id: ORGANISATION }, pass_on: { kind: 'use_only' }, window: { ends_at: null },
+    });
+    const words = container.querySelector('[data-organisation-receipt]')?.textContent ?? '';
+    expect(words).toContain('Scribe is now administrator of Example organisation (' + grantNo('grant-' + hex(101)) + ')');
+    expect(words).toContain('Add people to this organisation');
+  });
+
+  it('is not drawn for a person holding no organisation.grant, nor for an agent the person does not answer for', async () => {
+    const mine = await opened(scribe, { model: WITH_ORGANISATION });
+    expect(mine.container.querySelector('[data-organisation-standing]')).toBeNull();
+    root?.unmount();
+    const theirs = await opened(notMine, { grants: [...SOURCES, FOUNDING], model: WITH_ORGANISATION });
+    expect(theirs.container.querySelector('[data-organisation-standing]')).toBeNull();
   });
 });

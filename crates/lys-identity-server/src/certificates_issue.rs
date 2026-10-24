@@ -230,7 +230,7 @@ pub(crate) async fn issue(
     body: Result<Json<IssueBody>, JsonRejection>,
 ) -> Result<Json<CertificatesView>, ServerError> {
     if let Some(admitted) = crate::agent_acts::admitted() {
-        return first(&state, admitted.agent, &id, body);
+        return by_agent(&state, admitted.agent, &id, body);
     }
     let seen = if let Some(actor) = crate::provider::app_person_actor(&state, &headers)? {
         with_directory(&state, |directory| {
@@ -305,6 +305,63 @@ fn asked(
         serial,
         request,
         answered,
+    })
+}
+
+/// A certificate of agent `id` asked by `caller`, another agent. Through a
+/// live grant of `agent.certificate.issue` on the agent, or on the person
+/// it answers to, any certificate, the use recorded against that grant and
+/// the certificate naming `caller` as its issuer; holding none, only the
+/// first certificate of an agent `caller` itself registered ([`first`]).
+/// This is how an agent an administrator trusts with
+/// `agent.certificate.issue` re-keys the agents of its person without a
+/// person signing in for each (24 October 2026).
+fn by_agent(
+    state: &AppState,
+    caller: lys_identity::AgentId,
+    id: &str,
+    body: Result<Json<IssueBody>, JsonRejection>,
+) -> Result<Json<CertificatesView>, ServerError> {
+    let agent: lys_identity::AgentId = id.parse().map_err(|error| {
+        drop(error);
+        ServerError::AgentNotVisible
+    })?;
+    let resource = lys_identity::grants::Resource::new("agent", id)?;
+    let action = lys_identity::grants::Action::new("agent.certificate.issue")?;
+    match crate::agent_acts::admitting(state, caller, &resource, &action) {
+        Ok(_) => {}
+        Err(ServerError::NotPermitted { .. }) => return first(state, caller, id, body),
+        Err(error) => return Err(error),
+    }
+    let person = with_directory(state, |directory| {
+        directory
+            .projection()?
+            .record(IdentityId::Agent(agent))
+            .and_then(lys_identity::projection::Record::responsible)
+            .ok_or(ServerError::AgentNotVisible)
+    })?;
+    let seen = SeenAgent {
+        agent,
+        responsible: Some(person),
+    };
+    let asked = asked(state, &seen, body)?;
+    if let Some(answered) = asked.answered {
+        return Ok(answered);
+    }
+    let issued = issued_by(
+        state,
+        &seen,
+        &asked.request,
+        asked.serial.clone(),
+        (now(), Some(caller)),
+    )?;
+    // The use is recorded once the request is sound and before the
+    // certificate is entered, so a refused body records no exercise.
+    crate::agent_acts::require(state, caller, &resource, &action)?;
+    let named = agent.to_string();
+    with_store(state, |store| {
+        store.issue(issued)?;
+        answer(store, &named, Some(asked.serial))
     })
 }
 

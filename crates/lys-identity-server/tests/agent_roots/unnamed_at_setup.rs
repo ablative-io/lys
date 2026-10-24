@@ -17,7 +17,7 @@ use lys_identity::grants::shipped_model;
 use serde_json::{Value, json};
 
 use super::support::Table;
-use super::{agent_roots, give_four, ok, own_computers};
+use super::{agent_roots, give_five, ok, own_computers};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -114,8 +114,8 @@ async fn walk(table: &Table) -> TestResult {
     };
     let own = on(json!({"kind": "person", "id": person}))?;
     let computer = on(json!({"kind": "machine", "id": machine}))?;
-    let held = give_four(service, auth, (&own, &computer), (&person, &agent)).await?;
-    assert_eq!(held.len(), 4, "{held:?}");
+    let held = give_five(service, auth, (&own, &computer), (&person, &agent)).await?;
+    assert_eq!(held.len(), 5, "{held:?}");
 
     // A reviewed profile, the agent allowed on the computer, and a start on it.
     let path = format!("/agents/{agent}/provisioning");

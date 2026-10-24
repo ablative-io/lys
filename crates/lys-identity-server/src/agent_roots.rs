@@ -7,11 +7,15 @@
 //!
 //! Beside the directory roots are the two the one standing choice on an
 //! agent's Access tab gives from (AGENTS-017 R4): one on the administrator's
-//! own person passing `agent.create`, `agent.provisioning.set` and
-//! `agent.provisioning.review` to agents, and one on the computer Lys runs
+//! own person passing `agent.create`, `agent.provisioning.set`,
+//! `agent.provisioning.review` and, since 24 October 2026,
+//! `agent.certificate.issue` to agents, and one on the computer Lys runs
 //! on, which is named first (`own_computer`), passing `machine.agent.set`.
 //! A grant is given only on its source's resource, so a directory root alone
-//! could not give an agent any of those four.
+//! could not give an agent any of those five. The root on the person is
+//! labelled by the acts it passes, so an install whose root was recorded
+//! with fewer acts records the wider one on its administrator's next
+//! `POST /grants/agent-roots`, beside the old.
 
 use lys_identity::grants::{
     Action, GrantError, PassOn, RecipientKind, Relation, Resource, RootRequest, Route, Window,
@@ -51,7 +55,8 @@ pub(crate) fn issue(state: &AppState, owner: PersonId) -> Result<Vec<String>, Se
 }
 
 /// The acts the root on the administrator's own person passes to agents.
-const PERSON_ACTS: [&str; 3] = [
+const PERSON_ACTS: [&str; 4] = [
+    "agent.certificate.issue",
     "agent.create",
     "agent.provisioning.review",
     "agent.provisioning.set",
@@ -105,10 +110,15 @@ fn issue_with(
         };
         let person = own("person", &PERSON_ACTS);
         if !person.is_empty() {
+            let acts = person
+                .iter()
+                .map(Action::as_str)
+                .collect::<Vec<_>>()
+                .join(",");
             wanted.push((
                 Resource::new("person", &owner.to_string())?,
                 person,
-                format!("person/v{version}"),
+                format!("person/v{version}/{acts}"),
             ));
         }
         if let Some(machine) = computer {

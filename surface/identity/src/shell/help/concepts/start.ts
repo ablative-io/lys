@@ -123,7 +123,7 @@ export const START: Seed[] = [
     body: [
       'Once an app is connected, its channels are places in Lys you can give access to.',
       'On the agent’s page, open Access and press Give. You can pass on only access you hold yourself and are allowed to pass to agents.',
-      'Access to an app’s channel comes from a grant on that app’s resource that you hold and may pass to agents. The one standing choice, "set up and run agents", records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the four grants. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
+      'Access to an app’s channel comes from a grant on that app’s resource that you hold and may pass to agents. The one standing choice, "set up and run agents", records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the five grants, the fifth letting it issue your agents’ certificates. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
     ],
     steps: [
       { text: 'Connect the app first.', href: '#/apps', link: 'Open Apps' },

@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, Refused, request, useLoad } from '../../api';
 import type { GrantModel, ResourceRef } from '../../generated/grants';
-import type { PeopleView, MeView } from '../../generated';
+import type { PeopleView, MeView, OrganisationSummary } from '../../generated';
 import { Gate } from '../signin/Gate';
 import { field, RecordedForm } from '../people/RecordedForm';
 import type { Change } from '../people/RecordedForm';
 import { ErrorWords, STATUS } from '../people/Words';
 import { Picker } from '../../shell/Picker';
 import { MODE_HINTS, MODES, modeWords } from './mode-words';
-import { resourceNames, resourceWords } from '../people/agent-resource-names';
+import { key, resourceNames, resourceWords } from '../people/agent-resource-names';
 import { LEVEL_NAMES, LevelPicker } from './LevelPicker';
 import { actionWords } from './action-words';
 import { organisationActs, ORGANISATION_GRANT } from './organisation-acts';
@@ -18,6 +18,23 @@ import type { OrganisationActs } from './organisation-acts';
 
 /** The resource choice that opens a box for an id Lys holds no grant on yet. */
 const BY_ID = '\u0000by-id';
+
+/**
+ * Lys's own organisation kind (24 October 2026): offered by name to whoever may give access directly, so standing in
+ * the organisation, administrator among them, is given from this form like anything else, to a person or an agent.
+ */
+export const ORGANISATION_KIND = 'organisation';
+
+/**
+ * The relations the form offers on `kind`: for the organisation, its standing relations alone, those carrying only
+ * organisation acts (the levels say nothing about an organisation); for any other kind, the model's own.
+ */
+export function relationsOf(model: GrantModel, kind: string): Record<string, string[]> {
+  const all = model.kinds?.[kind]?.relations ?? model.relations;
+  if (kind !== ORGANISATION_KIND) return all;
+  const standing = Object.fromEntries(Object.entries(all).filter(([, actions]) => actions.length > 0 && actions.every((action) => action.startsWith('organisation.'))));
+  return Object.keys(standing).length ? standing : all;
+}
 
 /**
  * The kinds a resource may be: each approved app's schema kinds under its name, then Lys's own kinds already held.
@@ -67,15 +84,19 @@ const passTo = (data: FormData): ('person' | 'agent')[] => [
 /** Kinds whose every item the directory names: a person or agent is chosen by name, never typed as an id. */
 const DIRECTORY_KINDS = new Set(['person', 'agent', 'identity']);
 
-/** The items of `kind` Lys knows: those already granted, then, for a directory kind, everyone the directory lists. */
-export function knownOf(kind: string, resources: ResourceRef[], people: PeopleView): ResourceRef[] {
+/**
+ * The items of `kind` Lys knows: the person's own organisation first, then those already granted, then, for a directory
+ * kind, everyone the directory lists.
+ */
+export function knownOf(kind: string, resources: ResourceRef[], people: PeopleView, organisation: OrganisationSummary | null = null): ResourceRef[] {
+  const own = kind === ORGANISATION_KIND && organisation ? [{ kind, id: organisation.id }] : [];
   const held = resources.filter((resource) => resource.kind === kind);
   const listed = !DIRECTORY_KINDS.has(kind) ? [] : people.people.flatMap((person) => [
     ...(kind === 'agent' ? [] : [{ kind, id: person.id }]),
     ...(kind === 'person' ? [] : person.agents.map((agent) => ({ kind, id: agent.id }))),
   ]);
   const seen = new Set<string>();
-  return [...held, ...listed].filter((resource) => !seen.has(resource.id) && seen.add(resource.id));
+  return [...own, ...held, ...listed].filter((resource) => !seen.has(resource.id) && seen.add(resource.id));
 }
 
 /**
@@ -92,7 +113,7 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
   const [kind, setKind] = useState(() => (app ? kinds.flatMap((group) => group.kinds).find((each) => each.startsWith(app + '.')) : undefined) ?? '');
   const [toAgent, setToAgent] = useState(false);
   const agents = people.people.find((person) => person.id === me.person.id)?.agents.filter((agent) => agent.state === 'active') ?? [];
-  const relations = model.kinds?.[kind]?.relations ?? model.relations;
+  const relations = relationsOf(model, kind);
   const [mode, setMode] = useState<string>('outright');
   const [role, setRole] = useState('');
   const [level, setLevel] = useState('');
@@ -102,7 +123,9 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
   const [which, setWhich] = useState('');
   const roles = rolesOf(kinds, kind);
   const names = resourceNames(people, [], null);
-  const known = knownOf(kind, resources, people).map((resource) => ({ resource, words: resourceWords(resource, names).words }))
+  const organisation = me.organisation ?? null;
+  if (organisation) names.set(key(ORGANISATION_KIND, organisation.id), organisation.display_name);
+  const known = knownOf(kind, resources, people, organisation).map((resource) => ({ resource, words: resourceWords(resource, names).words }))
     .sort((a, b) => a.words.localeCompare(b.words));
   // Nothing is chosen before a kind is; with none of the kind known to Lys, the only way to name one is by its id in its app.
   const chosenWhich = !kind ? '' : known.length ? which : BY_ID;
@@ -113,9 +136,10 @@ function Form({ people, me, model, kinds, resources, done }: { people: PeopleVie
     const name = people.people.flatMap((person) => [person, ...person.agents]).find((each) => each.id === holder)?.display_name ?? 'They';
     const thing = resourceWords(body.resource, names).words;
     const app = rolesOf(kinds, body.resource.kind)[body.relation];
+    if (body.resource.kind === ORGANISATION_KIND) return `${name} is now ${body.relation} of ${thing}.`;
     if (LEVEL_NAMES.includes(body.relation)) return `${name} can now ${({ viewer: 'view', editor: 'edit', owner: 'own' } as Record<string, string>)[body.relation]} ${thing}.`;
     if (app) return `${name} now has the app's ${body.relation} role on ${thing}.`;
-    const words = actionWords(model, body.resource, (model.kinds?.[body.resource.kind]?.relations ?? model.relations)[body.relation] ?? [body.relation]);
+    const words = actionWords(model, body.resource, relationsOf(model, body.resource.kind)[body.relation] ?? [body.relation]);
     // The model's sentences say "this agent" or "this resource": the thing given takes that place, so it is never named twice.
     const sentence = words.charAt(0).toLowerCase() + words.slice(1);
     return `${name} can now ${/\bthis [a-z]+/.test(sentence) ? sentence.replace(/\bthis [a-z]+/, thing) : sentence + ', on ' + thing}.`;
@@ -180,11 +204,11 @@ type AppRow = { id: string; name: string; state: string };
 type SchemaAnswer = { app: string; version: number; schema: { kinds?: Record<string, { roles?: Record<string, string[]> }> } | null };
 
 /**
- * The kinds the form offers: each approved app's schema kinds (GET /apps/{id}/schema),
- * then the kinds of the resources Lys already holds grants on that no app's schema names.
- * Lys never reads an app's own records, so the ids offered are the ones Lys already holds.
+ * The kinds the form offers: each approved app's schema kinds (GET /apps/{id}/schema), then Lys's own organisation
+ * when the signed-in person belongs to one, then the kinds of the resources Lys already holds grants on that nothing
+ * above names. Lys never reads an app's own records, so the ids offered are the ones Lys already holds.
  */
-export async function readKinds(resources: ResourceRef[]): Promise<KindGroup[]> {
+export async function readKinds(resources: ResourceRef[], organisation: OrganisationSummary | null = null): Promise<KindGroup[]> {
   const { apps } = await request<{ apps: AppRow[] }>('/apps');
   const approved = apps.filter((app) => app.state === 'approved');
   const schemas = await Promise.all(approved.map((app) => request<SchemaAnswer>('/apps/' + encodeURIComponent(app.id) + '/schema')));
@@ -193,16 +217,17 @@ export async function readKinds(resources: ResourceRef[]): Promise<KindGroup[]> 
     const roles = Object.fromEntries(Object.entries(declared).filter(([, body]) => body?.roles).map(([each, body]) => [each, body.roles ?? {}]));
     return { label: app.name, kinds: Object.keys(declared).sort(), roles };
   }).filter((group) => group.kinds.length);
-  const named = new Set(groups.flatMap((group) => group.kinds));
+  const lys: KindGroup[] = organisation ? [{ label: 'Lys', kinds: [ORGANISATION_KIND] }] : [];
+  const named = new Set([...groups, ...lys].flatMap((group) => group.kinds));
   const held = [...new Set(resources.map((resource) => resource.kind))].filter((each) => !named.has(each)).sort();
-  return held.length ? [...groups, { label: 'Already granted in Lys', kinds: held }] : groups;
+  return [...groups, ...lys, ...(held.length ? [{ label: 'Already granted in Lys', kinds: held }] : [])];
 }
 
 async function read(resources: ResourceRef[]) {
   const [people, me, list] = await Promise.all([api.people(), api.me(), api.grants()]);
   const acts = organisationActs(me, list.grants);
   if (!mayGiveAccess(acts, people)) throw notRoot(acts);
-  const [model, kinds] = await Promise.all([api.model(), readKinds(resources)]);
+  const [model, kinds] = await Promise.all([api.model(), readKinds(resources, me.organisation ?? null)]);
   return { people, me, model, kinds };
 }
 

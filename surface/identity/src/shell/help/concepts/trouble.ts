@@ -79,7 +79,7 @@ export const TROUBLE: Seed[] = [
     title: '"You hold no access you can give an agent"',
     summary: 'You can pass on only access you hold and may pass to agents.',
     body: [
-      'The administrator can give their agent the one standing choice, "set up and run agents", on its Access tab: Give records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the four grants. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
+      'The administrator can give their agent the one standing choice, "set up and run agents", on its Access tab: Give records the administrator’s roots first (the agents and apps directories, their own person record and the computer Lys runs on), then gives the five grants, the fifth letting it issue your agents’ certificates. It gives no access to an app’s channels; those need a separate grant you hold and may pass to agents.',
       'Anyone else asks the administrator for a grant that may be passed to agents.',
     ],
     steps: [],

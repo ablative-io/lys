@@ -118,11 +118,12 @@ describe('The kind of thing is picked from the app schemas', () => {
     expect(requests).toContain('/apps/notes/schema');
     expect(requests).not.toContain('/apps/drafty/schema');
     expect($('input[name="kind"]')).toBeNull();
-    expect($$('select[name="kind"] optgroup').map((group) => group.getAttribute('label'))).toEqual(['Notes', 'Already granted in Lys']);
+    expect($$('select[name="kind"] optgroup').map((group) => group.getAttribute('label'))).toEqual(['Notes', 'Lys', 'Already granted in Lys']);
     // Each kind is named in words; its value is the kind the grant is sent with.
     expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.textContent)).toEqual(['Doc', 'Folder']);
     expect($$('select[name="kind"] optgroup[label="Notes"] option').map((option) => option.getAttribute('value'))).toEqual(['notes.doc', 'notes.folder']);
-    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['Organisation', 'Project']);
+    expect($$('select[name="kind"] optgroup[label="Lys"] option').map((option) => option.textContent)).toEqual(['Organisation']);
+    expect($$('select[name="kind"] optgroup[label="Already granted in Lys"] option').map((option) => option.textContent)).toEqual(['Project']);
   });
 
   it('offers the ids Lys already holds for the chosen kind', async () => {
