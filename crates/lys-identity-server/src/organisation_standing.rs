@@ -82,7 +82,7 @@ mod tests {
         for kind in ["person", "agent", "grant", "machine", "role", "request"] {
             assert!(covers(kind), "{kind}");
         }
-        for kind in ["notes.workspace", "cambium.place", "organisation"] {
+        for kind in ["notes.workspace", "docs.page", "organisation"] {
             assert!(!covers(kind), "{kind}");
         }
     }

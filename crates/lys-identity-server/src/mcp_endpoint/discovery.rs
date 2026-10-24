@@ -156,13 +156,13 @@ fn standing_rows(
     state: &AppState,
     resources: &BTreeMap<Resource, BTreeSet<Action>>,
     routes: &mut BTreeMap<(&'static str, &'static str, String, String), Value>,
-) -> Result<(), ServerError> {
+) {
     let held: Vec<_> = resources
         .iter()
         .filter(|(resource, _)| resource.kind() == "organisation")
         .collect();
     if held.is_empty() {
-        return Ok(());
+        return;
     }
     for row in crate::openapi_table::TABLE {
         if row.5.is_none()
@@ -194,7 +194,6 @@ fn standing_rows(
                 });
         }
     }
-    Ok(())
 }
 
 fn inventory(
@@ -273,7 +272,7 @@ fn inventory(
         }
     }
     if agent {
-        standing_rows(state, &resources, &mut routes)?;
+        standing_rows(state, &resources, &mut routes);
     }
     let message = if resources.is_empty() {
         "This connection has no resource grants. The listed routes apply their own authentication, role and input rules; listing them grants no authority."

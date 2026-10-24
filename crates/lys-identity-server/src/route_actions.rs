@@ -121,21 +121,19 @@ pub(crate) fn admit(
                     // No grant of the act itself: the agent's standing in
                     // its own organisation admits it, or the refusal names
                     // who can give the act (24 October 2026).
-                    match standing(&mut judged, agent, &resource, &action, at)? {
-                        Some(permit) => permit,
-                        None => {
-                            let holders = crate::who_can_grant::for_judged(
-                                &mut judged,
-                                agent,
-                                &request.resource,
-                                &request.action,
-                                at,
-                            )?;
-                            return Ok(Some(Box::new(crate::who_can_grant::refusal(
-                                error, &holders,
-                            ))));
-                        }
-                    }
+                    let Some(permit) = standing(&mut judged, agent, &resource, &action, at)? else {
+                        let holders = crate::who_can_grant::for_judged(
+                            &mut judged,
+                            agent,
+                            &request.resource,
+                            &request.action,
+                            at,
+                        )?;
+                        return Ok(Some(Box::new(crate::who_can_grant::refusal(
+                            error, &holders,
+                        ))));
+                    };
+                    permit
                 }
                 Err(error) => return Err(error.into()),
             };
