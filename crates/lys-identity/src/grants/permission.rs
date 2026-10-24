@@ -36,7 +36,7 @@ definition machine {}
 
 definition grant {
   relation holder: person | person with unexpired | agent | agent with unexpired | service_account | service_account with unexpired | machine | machine with unexpired | connector | connector with unexpired
-  relation source: grant | person
+  relation source: grant | person | agent
 }
 ";
 

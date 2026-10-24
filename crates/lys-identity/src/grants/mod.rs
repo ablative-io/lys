@@ -27,6 +27,8 @@ pub mod lineage;
 mod mode;
 pub mod model;
 pub mod permission;
+#[cfg(test)]
+mod permission_source_tests;
 pub mod projection;
 pub mod reading;
 pub mod receipt;
