@@ -89,6 +89,11 @@ pub(crate) fn admit(
                 resource: resource.clone(),
                 action: action.clone(),
             });
+            if let Some(standing) =
+                crate::organisation_standing::behind(judged.directory, agent, &resource, &action)?
+            {
+                asked.push(standing);
+            }
             Ok(asked)
         },
         |mut judged| {
@@ -113,16 +118,24 @@ pub(crate) fn admit(
             let (permit, _) = match decision {
                 Ok(permit) => permit,
                 Err(error) if names_grantors(&error) => {
-                    let holders = crate::who_can_grant::for_judged(
-                        &mut judged,
-                        agent,
-                        &request.resource,
-                        &request.action,
-                        at,
-                    )?;
-                    return Ok(Some(Box::new(crate::who_can_grant::refusal(
-                        error, &holders,
-                    ))));
+                    // No grant of the act itself: the agent's standing in
+                    // its own organisation admits it, or the refusal names
+                    // who can give the act (24 October 2026).
+                    match standing(&mut judged, agent, &resource, &action, at)? {
+                        Some(permit) => permit,
+                        None => {
+                            let holders = crate::who_can_grant::for_judged(
+                                &mut judged,
+                                agent,
+                                &request.resource,
+                                &request.action,
+                                at,
+                            )?;
+                            return Ok(Some(Box::new(crate::who_can_grant::refusal(
+                                error, &holders,
+                            ))));
+                        }
+                    }
                 }
                 Err(error) => return Err(error.into()),
             };
@@ -143,6 +156,43 @@ pub(crate) fn admit(
     match refusal {
         Some(refusal) => Err(refusal),
         None => Ok(()),
+    }
+}
+
+/// The standing permit behind `action` on `resource`, its use recorded:
+/// none when the agent holds no standing in its organisation that admits
+/// the act, or standing does not reach the resource.
+///
+/// # Errors
+/// Propagates a refusal that is not the standing's absence.
+fn standing(
+    judged: &mut crate::grants::Judged<'_>,
+    agent: lys_identity::AgentId,
+    resource: &lys_identity::grants::Resource,
+    action: &lys_identity::grants::Action,
+    at: u64,
+) -> Result<
+    Option<(lys_identity::grants::Permit, lys_identity::grants::Resource)>,
+    crate::error::ServerError,
+> {
+    let Some(request) =
+        crate::organisation_standing::behind(judged.directory, agent, resource, action)?
+    else {
+        return Ok(None);
+    };
+    judged
+        .apps
+        .admit_action(request.resource.kind(), request.action.as_str())?;
+    match crate::grants::decide(
+        judged,
+        &request,
+        at,
+        None,
+        crate::grants::Decision::Exercise,
+    ) {
+        Ok(permit) => Ok(Some(permit)),
+        Err(error) if names_grantors(&error) => Ok(None),
+        Err(error) => Err(error.into()),
     }
 }
 

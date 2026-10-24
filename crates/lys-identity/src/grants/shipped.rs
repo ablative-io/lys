@@ -20,14 +20,35 @@ pub const ORGANISATION_GRANT: &str = "organisation.grant";
 
 /// The acts on an organisation, in name order: reading it, admitting a
 /// person into it, issuing a root on a resource it owns, and administering
-/// it (its name, its retirement, passing its administration on). The last
-/// three are withheld from agents.
+/// it (its name, its retirement, passing its administration on). An agent
+/// may be given all four; a machine only reading it. Each stands behind the
+/// acts within the organisation that [`standing_for`] names.
 pub const ORGANISATION_ACTIONS: [&str; 4] = [
     "organisation.administer",
     "organisation.admit",
     "organisation.grant",
     "organisation.read",
 ];
+
+/// The organisation act that stands behind `action` on one of Lys's own
+/// kinds within the organisation (24 October 2026): reading anything is
+/// `organisation.read`; registering a person is `organisation.admit`;
+/// giving, checking, explaining and revoking grants is `organisation.grant`;
+/// every other act is `organisation.administer`. An agent holding the
+/// standing acts within its own organisation as its administrator does,
+/// each use recorded against the standing grant.
+#[must_use]
+pub fn standing_for(action: &str) -> &'static str {
+    if action == READ || action == "view" {
+        "organisation.read"
+    } else if action == "person.create" {
+        "organisation.admit"
+    } else if action == "grant" || action.starts_with("grant.") {
+        "organisation.grant"
+    } else {
+        "organisation.administer"
+    }
+}
 
 /// The acts the first model named, kept so every grant made under it
 /// still resolves.
@@ -499,7 +520,7 @@ mod tests {
     use super::{
         ACTIONS, ADMINISTRATOR_RELATION, AGENT_MAY_HOLD, FIRST_ACTIONS, ONE, ORGANISATION_ACTIONS,
         READ, SHIPPED_VERSION, WITHHELD_FROM_AGENTS, agent_may_hold, machine_may_hold,
-        shipped_model,
+        shipped_model, standing_for,
     };
     use crate::grants::{Action, Relation};
     use serde_json::Value;
@@ -620,5 +641,26 @@ mod tests {
             assert!(!machine_may_hold("organisation", given), "{given}");
         }
         Ok(())
+    }
+
+    /// Every shipped act has one organisation act standing behind it.
+    #[test]
+    fn standing_names_the_organisation_act_behind_each_act() {
+        assert_eq!(standing_for("read"), "organisation.read");
+        assert_eq!(standing_for("view"), "organisation.read");
+        assert_eq!(standing_for("person.create"), "organisation.admit");
+        assert_eq!(standing_for("grant"), "organisation.grant");
+        assert_eq!(standing_for("grant.why"), "organisation.grant");
+        assert_eq!(standing_for("agent.create"), "organisation.administer");
+        assert_eq!(
+            standing_for("organisation.admit"),
+            "organisation.administer"
+        );
+        for action in ACTIONS.iter().chain(FIRST_ACTIONS.iter()) {
+            assert!(
+                ORGANISATION_ACTIONS.contains(&standing_for(action)),
+                "{action}"
+            );
+        }
     }
 }

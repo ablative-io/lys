@@ -210,6 +210,8 @@ pub mod operations_api;
 #[cfg(test)]
 mod operations_api_tests;
 pub mod operator;
+/// Organisation standing behind an agent's act within its organisation (24 October 2026).
+pub(crate) mod organisation_standing;
 pub mod organisations_found;
 pub mod organisations_prove;
 /// The computer Lys runs on, named once by its administrator (AGENTS-017 R4).

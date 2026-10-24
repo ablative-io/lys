@@ -289,6 +289,14 @@ fn reach(
     {
         return Ok(found);
     }
+    // Last, the agent's standing in its own organisation (24 October 2026).
+    if let Some(standing) = with_directory(state, |directory| {
+        crate::organisation_standing::behind(directory.projection()?, agent, resource, action)
+    })? && let Some(found) =
+        exercised(state, agent, &standing.resource, &standing.action, decision)?
+    {
+        return Ok(found);
+    }
     Err(ServerError::NotPermitted {
         reason: format!("agent {agent} holds no live grant of {action} on {resource}"),
     })

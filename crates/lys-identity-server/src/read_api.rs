@@ -229,6 +229,15 @@ async fn own_people(
     query: crate::list_page::Input,
 ) -> Result<Json<PeopleView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
+    // An agent the door admitted to read every person, by its own grant of
+    // read on person:all or by its organisation standing, reads the
+    // directory within its organisation as the administrator does (24
+    // October 2026); a person reads their own.
+    if crate::routes::door_agent(&state, &actor)?.is_some() {
+        return with_directory(&state, |directory| {
+            people_within(&state, &actor, query, "/people", directory)
+        });
+    }
     with_directory(&state, |directory| {
         let projection = directory.projection()?;
         let person = own_person(projection, &actor)?;
@@ -255,14 +264,28 @@ async fn every_person(
     let actor = signed_in(&state, &headers)?;
     crate::routes::administrator(&state, &actor)?;
     with_directory(&state, |directory| {
+        people_within(&state, &actor, query, "/directory/people", directory)
+    })
+}
+
+/// Every person of the caller's organisation, paged as `route`, once the
+/// caller is admitted to the wider view.
+fn people_within(
+    state: &AppState,
+    actor: &Actor,
+    query: crate::list_page::Input,
+    route: &'static str,
+    directory: &mut lys_identity::Directory<lys_log_store::FileLeafStore>,
+) -> Result<Json<PeopleView>, ServerError> {
+    {
         let projection = directory.projection()?;
         // The wider view is the wider view within the administrator's
         // organisation (DIRECTORY-109 R4): a person of another is absent.
-        let scope = crate::caller_admission::administrators_organisation(projection, &actor);
+        let scope = crate::caller_admission::administrators_organisation(projection, actor);
         let within = |person: PersonId| {
             scope.is_some() && projection.organisation_of(IdentityId::Person(person)) == scope
         };
-        let page = crate::list_page::Page::read(query, "/directory/people")?;
+        let page = crate::list_page::Page::read(query, route)?;
         let Some(page) = page else {
             let mut grouped = agents_by_person(projection)?;
             let people = projection
@@ -288,7 +311,7 @@ async fn every_person(
                 agents_total: None,
             }));
         };
-        let members = page.members(&state)?;
+        let members = page.members(state)?;
         let filtered = page.filtered();
         let mut agents_total = 0;
         let after = if filtered {
@@ -356,7 +379,7 @@ async fn every_person(
             page: Some(totals),
             agents_total: Some(agents_total),
         }))
-    })
+    }
 }
 
 fn personal_people(
@@ -425,9 +448,21 @@ async fn own_agent(
 ) -> Result<Json<AgentView>, ServerError> {
     let actor = signed_in(&state, &headers)?;
     let agent = AgentId::from_str(&id)?;
+    // An agent the door admitted to read this agent, by its own grant or by
+    // its organisation standing, reads it as the directory does, within its
+    // own organisation (24 October 2026); another organisation's is absent.
+    let door = crate::routes::door_agent(&state, &actor)?;
     with_directory(&state, |directory| {
-        agent_json(directory, agent, |projection| {
-            Ok(Scope::Person(own_person(projection, &actor)?))
+        agent_json(directory, agent, |projection| match door {
+            Some(caller) => {
+                let own = projection.organisation_of(IdentityId::Agent(caller));
+                if own.is_some() && projection.organisation_of(IdentityId::Agent(agent)) == own {
+                    Ok(Scope::Directory)
+                } else {
+                    Err(ServerError::AgentNotVisible)
+                }
+            }
+            None => Ok(Scope::Person(own_person(projection, &actor)?)),
         })
     })
 }

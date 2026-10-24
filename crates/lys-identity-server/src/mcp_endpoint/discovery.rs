@@ -147,6 +147,56 @@ fn questions(
     Ok(requests)
 }
 
+/// The routes an agent's organisation standing opens (24 October 2026):
+/// every declared scope on one of Lys's own kinds whose standing act the
+/// agent holds on its organisation, listed once by its pattern and naming
+/// the standing that admits it. A route a person keeps from every agent,
+/// or keeps as a responsibility, is not listed.
+fn standing_rows(
+    state: &AppState,
+    resources: &BTreeMap<Resource, BTreeSet<Action>>,
+    routes: &mut BTreeMap<(&'static str, &'static str, String, String), Value>,
+) -> Result<(), ServerError> {
+    let held: Vec<_> = resources
+        .iter()
+        .filter(|(resource, _)| resource.kind() == "organisation")
+        .collect();
+    if held.is_empty() {
+        return Ok(());
+    }
+    for row in crate::openapi_table::TABLE {
+        if row.5.is_none()
+            || crate::openapi_table::listed_human_only(row)
+            || state.kept_responsibilities.keeps(row.0.word(), row.1)
+        {
+            continue;
+        }
+        let Some((kind, action, one)) = crate::openapi_table::declared_scope(row) else {
+            continue;
+        };
+        if !crate::organisation_standing::covers(kind) {
+            continue;
+        }
+        // A route on one resource is listed by its pattern: the id is the
+        // path's, whichever of the organisation's the agent names.
+        let id = if one { "{id}" } else { "all" };
+        let standing = lys_identity::grants::shipped::standing_for(action);
+        for (organisation, actions) in &held {
+            if !actions.iter().any(|held| held.as_str() == standing) {
+                continue;
+            }
+            routes
+                .entry((row.0.word(), row.1, kind.to_owned(), id.to_owned()))
+                .or_insert_with(|| {
+                    json!({"method": row.0.word().to_ascii_uppercase(), "path": row.1,
+                        "resource": {"kind": kind, "id": id}, "action": action,
+                        "standing": {"kind": "organisation", "id": organisation.id(), "action": standing}})
+                });
+        }
+    }
+    Ok(())
+}
+
 fn inventory(
     state: &AppState,
     judged: &mut Judged<'_>,
@@ -221,6 +271,9 @@ fn inventory(
                     json!({"method": row.0.word().to_ascii_uppercase(), "path": row.1, "resource": {"kind": resource.kind(), "id": resource.id()}, "action": action.as_str()}));
             }
         }
+    }
+    if agent {
+        standing_rows(state, &resources, &mut routes)?;
     }
     let message = if resources.is_empty() {
         "This connection has no resource grants. The listed routes apply their own authentication, role and input rules; listing them grants no authority."

@@ -185,6 +185,13 @@ pub(crate) fn human_only(method: &str, path: &str) -> Option<&'static str> {
         .map(|(_, _, reason)| *reason)
 }
 
+/// The scope `row` declares, as its kind, its action and whether the
+/// path names the one resource (`true`) or every resource of the kind.
+pub(crate) fn declared_scope(row: &E) -> Option<(&'static str, &'static str, bool)> {
+    row.5
+        .map(|scope| (scope.kind, scope.action, !scope.parameters.is_empty()))
+}
+
 /// Whether the table's `row` is on [`HUMAN_ONLY`].
 pub(crate) fn listed_human_only(row: &E) -> bool {
     HUMAN_ONLY

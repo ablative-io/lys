@@ -256,8 +256,9 @@ function OrganisationStanding({ x, w, reload }: { x: Entry; w: GrantWorld; reloa
     <div className="field" data-organisation-standing>
       <div className="eyebrow">In {organisation.display_name}</div>
       <p className="note">
-        Standing in the organisation itself, given from your own standing there. An administrator adds people, gives access
-        directly and administers the organisation; every act under it is on the record as {x.display_name}’s.
+        Standing in the organisation itself, given from your own standing there. Reading lets {x.display_name} read everything
+        in the organisation; an administrator adds people, gives access directly and acts within the organisation as you do,
+        through the same routes. Every act under it is on the record as {x.display_name}’s, against this grant.
       </p>
       <label className="field">
         Standing to give
