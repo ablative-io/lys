@@ -4,9 +4,10 @@
 //! administrator does there (24 October 2026). A stranger holding nothing is
 //! refused by the act's name; given the administrator relation on Ada's
 //! organisation, the same agent reads every person and its own record,
-//! issues another agent's certificate, and discovery names the routes the
-//! standing opens; given reading alone, it reads and changes nothing. Each
-//! admission records its use against the standing grant.
+//! issues another agent's certificate, reads its certificates, gives a
+//! grant from the standing and approves a draft of one, and discovery names
+//! the routes the standing opens; given reading alone, it reads and changes
+//! nothing. Each admission records its use against the standing grant.
 
 #[path = "support/agent_starts_agent.rs"]
 pub mod support;
@@ -207,6 +208,115 @@ async fn discovery_names_the_routes_the_standing_opens() -> TestResult {
             .iter()
             .any(|route| route["method"] == "POST" && route["path"] == "/agents"),
         "reading opens no act: {inventory}"
+    );
+    Ok(())
+}
+
+/// The body giving `recipient` reading standing on Ada's organisation from
+/// administrator standing, Bea responsible for it.
+async fn reading_for(
+    world: &World,
+    recipient: &Certified,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    let (status, me) = world.service.get("/me", Some(&world.ada)).await?;
+    assert_eq!(status, 200, "{me}");
+    Ok(json!({
+        "mode": "outright", "operation": operation()?, "route": "api",
+        "source": "administrator", "recipient": recipient.id, "responsible": world.bea_person,
+        "resource": {"kind": "organisation", "id": me["organisation"]["id"]},
+        "relation": "only.organisation.read", "pass_on": {"kind": "use_only"},
+        "window": {"starts_at": 0, "ends_at": null}
+    }))
+}
+
+#[tokio::test]
+async fn administrator_standing_gives_a_grant_from_the_standing() -> TestResult {
+    let world = World::new().await?;
+    standing(&world, &world.stranger, "administrator").await?;
+    let (status, refused) = read(&world, &world.reviewer, "/people").await?;
+    assert_eq!(status, 403, "{refused}");
+    let body = reading_for(&world, &world.reviewer).await?;
+    let (status, given) = change(&world, &world.stranger, "/grants", &body).await?;
+    assert_eq!(status, 200, "{given}");
+    assert_eq!(given["operation"], body["operation"], "{given}");
+    let grant = given["grant"].as_str().ok_or("no grant")?;
+    let held = listed(&world, grant).await?;
+    assert_eq!(held["issuer"], world.stranger.id, "{held}");
+    assert_eq!(held["holder"], world.reviewer.id, "{held}");
+    let (status, people) = read(&world, &world.reviewer, "/people").await?;
+    assert_eq!(status, 200, "{people}");
+    let (status, again) = change(&world, &world.stranger, "/grants", &body).await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(
+        again["grant"], given["grant"],
+        "a retried give answers the same grant"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn administrator_standing_approves_a_drafted_give_and_it_executes() -> TestResult {
+    let world = World::new().await?;
+    standing(&world, &world.stranger, "administrator").await?;
+    let give = reading_for(&world, &world.reviewer).await?;
+    let drafted = json!({
+        "operation": operation()?,
+        "target": {"kind": "grant", "id": "all", "action": "grant.delegate"},
+        "method": "POST", "path": "/grants",
+        "body": serde_json::to_string(&give)?, "note": "reading standing for the reviewer",
+    });
+    let (status, created) = world.signed(&world.creator, "/drafts", &drafted).await?;
+    assert_eq!(status, 200, "{created}");
+    let draft = created["draft"].as_str().ok_or("no draft")?.to_owned();
+    let hash = created["creation_hash"]
+        .as_str()
+        .ok_or("no creation hash")?;
+    let approval =
+        json!({"operation": operation()?, "creation_hash": hash, "application": operation()?});
+    let path = format!("/drafts/{draft}/approve");
+    let (status, approved) = change(&world, &world.stranger, &path, &approval).await?;
+    assert_eq!(status, 200, "{approved}");
+    assert_eq!(approved["draft"], draft.as_str(), "{approved}");
+    assert_eq!(approved["execution"]["state"], "executed", "{approved}");
+    let (status, people) = read(&world, &world.reviewer, "/people").await?;
+    assert_eq!(status, 200, "the drafted grant stands: {people}");
+    let (status, again) = change(&world, &world.stranger, &path, &approval).await?;
+    assert_eq!(status, 200, "{again}");
+    assert_eq!(
+        again["execution"], approved["execution"],
+        "a retried approval replays"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn reading_standing_gives_nothing_from_the_standing() -> TestResult {
+    let world = World::new().await?;
+    standing(&world, &world.stranger, "only.organisation.read").await?;
+    let body = reading_for(&world, &world.reviewer).await?;
+    let (status, refused) = change(&world, &world.stranger, "/grants", &body).await?;
+    assert_eq!(status, 403, "{refused}");
+    // The give is judged by its handler: the model names the missing standing.
+    assert_eq!(refused["refusal"], "RootAuthorityRefused", "{refused}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn administrator_standing_reads_another_agents_certificates() -> TestResult {
+    let world = World::new().await?;
+    let path = format!("/agents/{}/certificates", world.creator.id);
+    let (status, refused) = read(&world, &world.stranger, &path).await?;
+    assert_eq!(status, 403, "{refused}");
+    standing(&world, &world.stranger, "administrator").await?;
+    let (status, certificates) = read(&world, &world.stranger, &path).await?;
+    assert_eq!(status, 200, "{certificates}");
+    assert_eq!(certificates["agent"], world.creator.id, "{certificates}");
+    assert!(
+        !certificates["certificates"]
+            .as_array()
+            .ok_or("no certificates")?
+            .is_empty(),
+        "the creator was certified at the start: {certificates}"
     );
     Ok(())
 }

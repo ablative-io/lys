@@ -4,7 +4,8 @@ use crate::draft_event::{
 };
 use crate::projection::Projection;
 use crate::{
-    Actor, AuthMethod, IdentityError, IdentityId, LoginBinding, OperationId, PersonId, Provenance,
+    Actor, AgentId, AuthMethod, IdentityError, IdentityId, LoginBinding, OperationId, PersonId,
+    Provenance,
 };
 use std::error::Error;
 use std::sync::Arc;
@@ -16,6 +17,15 @@ fn actor() -> Result<Actor, IdentityError> {
     Ok(Actor::new(
         LoginBinding::new("https://issuer.test", "person")?,
         Provenance::new(AuthMethod::Oidc, 1),
+    ))
+}
+/// An agent admitted on its own draft.decide grant, as the server records
+/// the approver of a draft it decided.
+fn agent_actor() -> Result<Actor, IdentityError> {
+    let agent = AgentId::from_bytes([9; 16]);
+    Ok(Actor::new(
+        LoginBinding::new("https://issuer.test", &agent.to_string())?,
+        Provenance::new(AuthMethod::AgentSignature(agent), 1),
     ))
 }
 fn created() -> Result<DraftEvent, IdentityError> {
@@ -264,6 +274,51 @@ fn an_application_is_reserved_even_before_its_first_execution() -> Result<(), Bo
     assert!(matches!(
         projection.check_draft(&DraftEvent::Approved(approval)),
         Err(IdentityError::OperationReused { .. })
+    ));
+    Ok(())
+}
+
+/// An agent that decided a draft closes it (24 October 2026): the close
+/// needs only its three operations kept apart, never a person's authority.
+#[test]
+fn an_agent_approver_closes_the_draft_it_decided() -> Result<(), Box<dyn Error>> {
+    let hash = [4; 32];
+    let executed = DraftEvent::Executed(Arc::new(Executed {
+        operation: op(5),
+        actor: agent_actor()?,
+        recorded_at: 3,
+        draft: op(1),
+        draft_hash: hash,
+        application: op(4),
+        status: 200,
+        receipt_index: 7,
+    }));
+    executed.validate()?;
+    assert_eq!(encode(&decode(&encode(&executed))?), encode(&executed));
+    let refused = DraftEvent::RefusedOnExecution(Arc::new(RefusedOnExecution {
+        operation: op(5),
+        actor: agent_actor()?,
+        recorded_at: 3,
+        draft: op(1),
+        draft_hash: hash,
+        application: op(4),
+        refusal: "NotHeld".into(),
+        reason: "the agent does not hold this scope".into(),
+    }));
+    refused.validate()?;
+    let same = DraftEvent::Executed(Arc::new(Executed {
+        operation: op(4),
+        actor: agent_actor()?,
+        recorded_at: 3,
+        draft: op(1),
+        draft_hash: hash,
+        application: op(4),
+        status: 200,
+        receipt_index: 7,
+    }));
+    assert!(matches!(
+        same.validate(),
+        Err(IdentityError::DraftChangeInvalid { .. })
     ));
     Ok(())
 }

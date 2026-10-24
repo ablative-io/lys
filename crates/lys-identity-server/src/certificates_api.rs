@@ -1,9 +1,9 @@
 //! The certificate route: the capability certificates entered for an agent,
 //! each with what verifies its entry in the certificate log offline.
 //!
-//! The administrator, the person responsible for the agent and the agent
-//! itself read it; to anyone else the agent's certificates are not
-//! visible. A certificate's claims are what held when it was issued. They
+//! The administrator, the person responsible for the agent, the agent
+//! itself and an agent with standing in the agent's organisation read it;
+//! to anyone else the agent's certificates are not visible. A certificate's claims are what held when it was issued. They
 //! are never the grants as they stand now, and the answer says so in
 //! `claims_are_live`.
 //!

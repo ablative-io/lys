@@ -63,7 +63,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
 
     /// Show `caller` to hold a live grant carrying organisation.grant on
     /// `organisation`, by the same reading a check makes, recording no use.
-    fn holds_organisation_grant(
+    pub(super) fn holds_organisation_grant(
         &mut self,
         directory: &Projection,
         caller: IdentityId,

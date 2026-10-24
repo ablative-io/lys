@@ -1,4 +1,8 @@
-//! Only the signed-in administrator may give from standing.
+//! Who gives from standing: the signed-in administrator; or, since 24
+//! October 2026, an agent through its own signed MCP message (relayed to
+//! this route, or approving a draft of it) whose organisation standing the
+//! model judges. A pass holder never gives from standing: a pass
+//! authenticates its holder for its audience, and signs nothing.
 
 use super::Judged;
 use crate::error::ServerError;
@@ -23,9 +27,11 @@ pub(super) fn delegate(
     }
     let actor = signed_in(state, headers)?;
     let caller = super::caller(state, headers, judged.directory)?;
-    if !actor.provenance().method().is_person_signed_in()
-        || caller != IdentityId::Person(judged.root)
-    {
+    let administrator = actor.provenance().method().is_person_signed_in()
+        && caller == IdentityId::Person(judged.root);
+    let agent_by_signature = matches!(caller, IdentityId::Agent(_))
+        && crate::routes::admitted_agent(judged.directory, &actor)?;
+    if !administrator && !agent_by_signature {
         return Err(GrantError::RootAuthorityRefused {
             caller: caller.to_string(),
         }

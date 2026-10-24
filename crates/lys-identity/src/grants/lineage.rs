@@ -220,10 +220,22 @@ pub fn resolve<'a>(
                 });
             }
             Source::Administrator => {
-                let IdentityId::Person(person) = current.parts().issuer else {
-                    return Err(GrantError::LineageMalformed {
-                        reason: "administrator standing is passed on by a person",
-                    });
+                // A person gives from the install's standing and heads the
+                // chain. An agent gives from its organisation's standing (24
+                // October 2026); the organisation's record, not this book,
+                // names who answers for it, so the chain is answered for by
+                // the person responsible for the holder.
+                let person = match current.parts().issuer {
+                    IdentityId::Person(person) => person,
+                    IdentityId::Agent(_) => current.parts().responsible,
+                    IdentityId::ServiceAccount(_)
+                    | IdentityId::Connector(_)
+                    | IdentityId::Machine(_)
+                    | IdentityId::Organisation(_) => {
+                        return Err(GrantError::LineageMalformed {
+                            reason: "administrator standing is passed on by a person or an agent",
+                        });
+                    }
                 };
                 return Ok(Lineage {
                     path,

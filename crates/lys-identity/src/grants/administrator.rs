@@ -13,8 +13,15 @@ use lys_log_store::LeafStore;
 impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
     /// Pass on the administrator's standing through the ordinary recipient rules.
     ///
+    /// The install's root person gives from standing; so does an agent of an
+    /// organisation shown to hold a live grant carrying organisation.grant on
+    /// it (administrator standing, 24 October 2026). The standing itself is
+    /// an unlimited source: the holding is read, never spent, and only the
+    /// resulting grant is recorded.
+    ///
     /// # Errors
-    /// Refuses any caller other than the active root person, invalid terms,
+    /// Refuses any caller other than the active root person or an agent
+    /// holding organisation.grant on its own organisation, invalid terms,
     /// an inadmissible recipient, reused operations or an unavailable log or engine.
     pub fn delegate_administrator(
         &mut self,
@@ -23,11 +30,7 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
         mode: Mode,
         at: u64,
     ) -> Result<Recorded, GrantError> {
-        if request.caller != IdentityId::Person(self.root_authority) {
-            return Err(GrantError::RootAuthorityRefused {
-                caller: request.caller.to_string(),
-            });
-        }
+        self.standing_of(directory, request, at)?;
         active(directory, request.caller)?;
         // Standing is passed on within the administrator's organisation
         // (ACCESS-009 R3); an administrator of none passes it to anyone.
@@ -97,5 +100,47 @@ impl<S: LeafStore, R: RelationshipStore> Grants<S, R> {
             at,
             GrantChange::Issue(Box::new(grant)),
         )?)
+    }
+
+    /// Whose standing `request.caller` gives from: the install's, as its
+    /// root person; or its organisation's, as an agent holding a live grant
+    /// carrying organisation.grant on it. Anyone else is refused by name.
+    fn standing_of(
+        &mut self,
+        directory: &Projection,
+        request: &PassOnRequest,
+        at: u64,
+    ) -> Result<(), GrantError> {
+        let refused = || GrantError::RootAuthorityRefused {
+            caller: request.caller.to_string(),
+        };
+        match request.caller {
+            IdentityId::Person(person) if person == self.root_authority => Ok(()),
+            IdentityId::Agent(_) => {
+                let organisation = directory
+                    .organisation_of(request.caller)
+                    .ok_or_else(refused)?;
+                self.holds_organisation_grant(
+                    directory,
+                    request.caller,
+                    request.route,
+                    organisation,
+                    at,
+                )
+                .map_err(|error| match error {
+                    GrantError::NotHeld { .. }
+                    | GrantError::Revoked { .. }
+                    | GrantError::Expired { .. }
+                    | GrantError::NotStarted { .. }
+                    | GrantError::PermissionAbsent { .. } => refused(),
+                    other => other,
+                })
+            }
+            IdentityId::Person(_)
+            | IdentityId::ServiceAccount(_)
+            | IdentityId::Connector(_)
+            | IdentityId::Machine(_)
+            | IdentityId::Organisation(_) => Err(refused()),
+        }
     }
 }

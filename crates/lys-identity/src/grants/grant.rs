@@ -78,9 +78,11 @@ impl Grant {
             Source::Grant(source) if source == parts.id => Err(GrantError::LineageMalformed {
                 reason: "a grant does not derive from itself",
             }),
-            Source::Administrator if !matches!(parts.issuer, IdentityId::Person(_)) => {
+            Source::Administrator
+                if !matches!(parts.issuer, IdentityId::Person(_) | IdentityId::Agent(_)) =>
+            {
                 Err(GrantError::LineageMalformed {
-                    reason: "administrator standing is passed on by a person",
+                    reason: "administrator standing is passed on by a person or an agent",
                 })
             }
             Source::Root | Source::Grant(_) | Source::Administrator => Ok(Self {

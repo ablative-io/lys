@@ -270,23 +270,13 @@ impl DraftEvent {
                 if !(200..300).contains(&event.status) {
                     return Err(invalid("an execution needs a successful status"));
                 }
-                closing(
-                    event.operation,
-                    event.draft,
-                    event.application,
-                    &event.actor,
-                )
+                closing(event.operation, event.draft, event.application)
             }
             Self::RefusedOnExecution(event) => {
                 if event.refusal.trim().is_empty() || event.reason.trim().is_empty() {
                     return Err(invalid("an execution refusal needs its name and words"));
                 }
-                closing(
-                    event.operation,
-                    event.draft,
-                    event.application,
-                    &event.actor,
-                )
+                closing(event.operation, event.draft, event.application)
             }
             Self::Created(event) => {
                 if !token(&event.target.kind)
@@ -403,20 +393,17 @@ mod signature;
 #[path = "draft_event_close_tests.rs"]
 mod close_tests;
 
+/// The approver closes the draft: a person, or an agent admitted on its own
+/// draft.decide grant, whose signed decision the approval carries (24 October
+/// 2026). Who may approve is the server's judgement at the approval; the
+/// close only needs the three operations kept apart.
 fn closing(
     operation: OperationId,
     draft: OperationId,
     application: OperationId,
-    actor: &Actor,
 ) -> Result<(), IdentityError> {
-    if operation == draft
-        || operation == application
-        || draft == application
-        || actor.provenance().agent().is_some()
-    {
-        return Err(invalid(
-            "a close needs distinct operations and the approving person's authority",
-        ));
+    if operation == draft || operation == application || draft == application {
+        return Err(invalid("a close needs distinct operations"));
     }
     Ok(())
 }

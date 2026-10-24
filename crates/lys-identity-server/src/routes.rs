@@ -358,7 +358,8 @@ pub(crate) fn administrator(state: &AppState, actor: &Actor) -> Result<(), Serve
 }
 
 /// Admit a pass actor, or the agent a signed MCP message relayed this call for, whose
-/// route grant was exercised by the guarded router. A request merely signed, not relayed
+/// route grant was exercised by the guarded router, or the agent approver of a draft
+/// Lys is applying, admitted at the approval. A request merely signed, not relayed
 /// and judged, cannot borrow this exception to personal admission.
 pub(crate) fn admitted_agent(
     directory: &lys_identity::projection::Projection,
@@ -367,6 +368,11 @@ pub(crate) fn admitted_agent(
     let relayed = match actor.provenance().method() {
         lys_identity::AuthMethod::AgentSignature(agent) => {
             crate::agent_signature::relayed_agent() == Some(agent)
+                // The approver of a draft, carried by Lys's own application of
+                // it (24 October 2026): admitted at the approval on its signed
+                // decision, which the approval leaf keeps. Only drafts_apply
+                // attaches draft provenance.
+                || actor.draft().is_some()
         }
         _ => false,
     };

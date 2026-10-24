@@ -1,6 +1,9 @@
 //! Who sees what is kept about an agent: the administrator, the person
-//! responsible for the agent, and the agent itself. To anyone else the
-//! agent is not visible, in the same words as an agent that does not exist.
+//! responsible for the agent, the agent itself, and an agent admitted at the
+//! door of the route (its grant of the act judged there, organisation
+//! standing among them, 24 October 2026) for an agent of its own
+//! organisation. To anyone else the agent is not visible, in the same words
+//! as an agent that does not exist.
 
 use std::str::FromStr;
 
@@ -36,7 +39,13 @@ pub(crate) fn seen_agent(
         let responsible = record.responsible();
         let sees = state.admission.is_administrator(directory, &actor)?
             || match asker {
-                IdentityId::Agent(own) => own == agent,
+                IdentityId::Agent(own) => {
+                    own == agent
+                        || (crate::routes::admitted_agent(directory, &actor)?
+                            && directory.organisation_of(asker).is_some()
+                            && directory.organisation_of(asker)
+                                == directory.organisation_of(IdentityId::Agent(agent)))
+                }
                 IdentityId::ServiceAccount(_)
                 | IdentityId::Connector(_)
                 | IdentityId::Machine(_)
