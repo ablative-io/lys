@@ -726,3 +726,10 @@
 ## DIRECTORY-119: A runner's feed is begun again when that runner next answers, never on a backoff clock
 
 - [ ] **C842** — A feed that cannot be read ends its follow on that failure, once, link released, and is begun again only when its runner next answers a request through ensure; no backoff, wait or 'retry in' remains. DIRECTORY-119/R1.
+
+## A person added to an organisation gets its product's first access by default, an admit that gives no access says so, and a refused person asks to be let in with one click (DIRECTORY-120)
+
+- [ ] **C843** — Add a person preselects the organisation's one product's kind, resource and declared first access, changeable by the person adding; never "No access yet" when a first access could be. DIRECTORY-120/R1.
+- [ ] **C844** — An admission giving no access, whoever asked for it, says so in its receipt (no_access line), its letter and the People row; it is never refused for it. DIRECTORY-120/R2.
+- [ ] **C845** — An approved app on its agent pass records a draft of its declared first grant for a refused person; one open draft per person and resource; administrators approve or refuse it in Drafts; the door never issues a grant. DIRECTORY-120/R3.
+- [ ] **C846** — Standing bars hold for DIRECTORY-120; no fixed wait; no test proves less than before. DIRECTORY-120/R4.

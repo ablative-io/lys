@@ -140,6 +140,10 @@
 
 **S455.** As the founding administrator of my organisation, I hold its administrator grant from the moment it exists, I may pass admitting and granting to my own people, and nobody from the service provider holds anything inside it.
 
+**S478.** As an administrator adding a person to an organisation that has one product, I want their usual first access already chosen for me, so that adding a person is one act and nobody is made without access by my oversight.
+
+**S479.** As an administrator, I want every person who has no access to anything to be marked so where I read the people, and said so in the admission's receipt and letter, so that I give it before they meet a door and not after.
+
 ## Certificate verifier — Checks an agent's certificate and its record against the certificate log without the issuer's cooperation
 
 **S31.** As a certificate verifier, I want a revoked certificate to fail verification against the log with its revocation leaf named, so that revocation rests on the log and not on the issuer's word.
@@ -201,6 +205,8 @@
 **S476.** As a Directory administrator reading identity.log for why a person could not sign in, I want every line to say when it was said and whom it refused, so that I can find their attempt among everyone's and tell them what happened.
 
 **S477.** As a Directory administrator reading identity.log, I want a lost runner to be said once and its feed to come back when the runner does, so that the log is not hundreds of copies of the same line and the service never sits on a clock.
+
+**S481.** As a directory administrator, I want this change held to every standing bar with the screens' tests red first, so that the default and the ask are proven on the real routes and nothing is assumed.
 
 ## Release reviewer — Decides from the record whether the release proof is complete
 
@@ -433,3 +439,7 @@
 **S260.** As a person running Lys's tests on a shared machine, I want every process and folder a test makes to be gone when it ends, however it ends, so a killed or failing test never leaves work running for days.
 
 **S424.** As a person running Lys's tests on a Linux machine whose awk is mawk, I want the development start script to see a child's ready line the moment it is written, so that the development scripts test passes there as it does on a Mac instead of timing out with an empty log.
+
+## Person refused at a product's door — Was added to the organisation but holds no access to the product yet
+
+**S480.** As a person refused at a product's door, I want to ask to be let in with one click and have the right people see the ask where they already decide things, so that a refusal is a short wait and never a dead end.

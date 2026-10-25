@@ -2665,6 +2665,31 @@
           "done": false
         }
       ]
+    },
+    {
+      "name": "A person added to an organisation gets its product's first access by default, an admit that gives no access says so, and a refused person asks to be let in with one click (DIRECTORY-120)",
+      "items": [
+        {
+          "id": "C843",
+          "text": "Add a person preselects the organisation's one product's kind, resource and declared first access, changeable by the person adding; never \"No access yet\" when a first access could be. DIRECTORY-120/R1.",
+          "done": false
+        },
+        {
+          "id": "C844",
+          "text": "An admission giving no access, whoever asked for it, says so in its receipt (no_access line), its letter and the People row; it is never refused for it. DIRECTORY-120/R2.",
+          "done": false
+        },
+        {
+          "id": "C845",
+          "text": "An approved app on its agent pass records a draft of its declared first grant for a refused person; one open draft per person and resource; administrators approve or refuse it in Drafts; the door never issues a grant. DIRECTORY-120/R3.",
+          "done": false
+        },
+        {
+          "id": "C846",
+          "text": "Standing bars hold for DIRECTORY-120; no fixed wait; no test proves less than before. DIRECTORY-120/R4.",
+          "done": false
+        }
+      ]
     }
   ]
 }

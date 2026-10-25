@@ -290,6 +290,14 @@
         {
           "id": "S455",
           "text": "As the founding administrator of my organisation, I hold its administrator grant from the moment it exists, I may pass admitting and granting to my own people, and nobody from the service provider holds anything inside it."
+        },
+        {
+          "id": "S478",
+          "text": "As an administrator adding a person to an organisation that has one product, I want their usual first access already chosen for me, so that adding a person is one act and nobody is made without access by my oversight."
+        },
+        {
+          "id": "S479",
+          "text": "As an administrator, I want every person who has no access to anything to be marked so where I read the people, and said so in the admission's receipt and letter, so that I give it before they meet a door and not after."
         }
       ]
     },
@@ -420,6 +428,10 @@
         {
           "id": "S477",
           "text": "As a Directory administrator reading identity.log, I want a lost runner to be said once and its feed to come back when the runner does, so that the log is not hundreds of copies of the same line and the service never sits on a clock."
+        },
+        {
+          "id": "S481",
+          "text": "As a directory administrator, I want this change held to every standing bar with the screens' tests red first, so that the default and the ask are proven on the real routes and nothing is assumed."
         }
       ]
     },
@@ -946,6 +958,16 @@
         {
           "id": "S424",
           "text": "As a person running Lys's tests on a Linux machine whose awk is mawk, I want the development start script to see a child's ready line the moment it is written, so that the development scripts test passes there as it does on a Mac instead of timing out with an empty log."
+        }
+      ]
+    },
+    {
+      "name": "Person refused at a product's door",
+      "role": "Was added to the organisation but holds no access to the product yet",
+      "stories": [
+        {
+          "id": "S480",
+          "text": "As a person refused at a product's door, I want to ask to be let in with one click and have the right people see the ask where they already decide things, so that a refusal is a short wait and never a dead end."
         }
       ]
     }
