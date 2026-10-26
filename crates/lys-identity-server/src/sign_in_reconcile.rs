@@ -180,6 +180,11 @@ pub(crate) fn judge(
         if !enabled {
             return SignInHealth::Disabled;
         }
+        // Their own address is theirs whoever else holds it: a mix-up on
+        // another record is shown on that record.
+        if seen.held.as_deref().is_some_and(|held| same(held, email)) {
+            return SignInHealth::Ready;
+        }
         let others: Vec<&Seen> = everyone
             .iter()
             .filter(|other| other.person != seen.person)

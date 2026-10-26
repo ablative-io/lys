@@ -51,6 +51,28 @@ fn an_account_under_the_held_address_is_ready_whatever_its_case() {
 }
 
 #[test]
+fn an_account_under_their_own_address_is_ready_though_another_record_holds_it_too() {
+    // After the 26 October move: Annabel's account is hers, while Dean's
+    // record still holds her address beside his own.
+    let annabel = seen(2, Some("annabel@example.test"), &["d"]);
+    let mut dean = seen(1, None, &[]);
+    dean.several = vec![
+        "annabel@example.test".to_owned(),
+        "dean@example.test".to_owned(),
+    ];
+    let everyone = [dean, seen(2, Some("annabel@example.test"), &["d"])];
+    assert_eq!(
+        judge(
+            &annabel,
+            &live("d", "annabel@example.test", true),
+            &everyone,
+            &name
+        ),
+        SignInHealth::Ready
+    );
+}
+
+#[test]
 fn a_turned_off_account_is_disabled() {
     let ada = seen(1, Some("ada@example.test"), &["a"]);
     assert_eq!(

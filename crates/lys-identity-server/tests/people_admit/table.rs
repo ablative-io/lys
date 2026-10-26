@@ -21,8 +21,8 @@ use sha2::{Digest, Sha256};
 pub(super) type TestResult = Result<(), Box<dyn Error>>;
 
 const CODE: &str = "people-admit-first-run-code";
-const ADMIN_EMAIL: &str = "ada@example.test";
-const PASSWORD: &str = "Analytical-Engine-1843";
+pub(super) const ADMIN_EMAIL: &str = "ada@example.test";
+pub(super) const PASSWORD: &str = "Analytical-Engine-1843";
 pub(super) const BEA: &str = "bea@example.test";
 
 pub(super) async fn table_with_mail(

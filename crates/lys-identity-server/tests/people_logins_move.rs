@@ -8,7 +8,7 @@ use identity_contract::fake_rauthy::{API_KEY, FakeRauthy};
 use identity_contract::harness::Service;
 use lys_identity::OperationId;
 use serde_json::{Value, json};
-use table::{BEA, TestResult, admit, signed_in_as, table_with_mail};
+use table::{ADMIN_EMAIL, BEA, PASSWORD, TestResult, admit, signed_in_as, table_with_mail};
 
 async fn add(
     service: &Service,

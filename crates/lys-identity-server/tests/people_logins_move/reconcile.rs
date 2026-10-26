@@ -210,13 +210,6 @@ async fn the_administrator_with_two_addresses_held_still_signs_in() -> TestResul
         .as_str()
         .ok_or("the administrator")?
         .to_owned();
-    let (_, record) = service
-        .get(&format!("/identities/{administrator}"), Some(&ada))
-        .await?;
-    let subject = record["logins"][0]["subject"]
-        .as_str()
-        .ok_or("their login")?
-        .to_owned();
     // An admission writes the foundings file whose row the two addresses copy.
     add(&service, &ada, "Bea", "bea@example.test").await?;
     let foundings = service.dir.path().join("foundings.json");
@@ -247,12 +240,12 @@ async fn the_administrator_with_two_addresses_held_still_signs_in() -> TestResul
         "several_addresses",
         "the administrator's record holds two addresses"
     );
-    let session = service
-        .sign_in(Login {
-            subject,
-            email: "ada@example.test".to_owned(),
-        })
+    let signed_in = reqwest::Client::new()
+        .post(format!("{}/sign-in", service.base))
+        .json(&json!({"email": ADMIN_EMAIL, "password": PASSWORD}))
+        .send()
         .await?;
+    let session = identity_contract::harness::session_cookie(signed_in).await?;
     assert_eq!(
         service.get("/me", Some(&session)).await?.1["person"]["id"],
         json!(administrator)
