@@ -125,7 +125,7 @@ async fn restart(
     )
     .await?;
     // perform refuses an end answered without the session's exit.
-    perform(
+    let Json(_ended) = perform(
         &state,
         (&driven, caller, "end"),
         Carried::default(),
